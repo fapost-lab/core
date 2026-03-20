@@ -70,6 +70,7 @@ Domains/{Domain}/
 ## Соглашения по коду
 
 **Общие:**
+
 - Подход близкий к DDD, без фанатизма
 - Интерфейсы — везде где это целесообразно, не ради галочки
 - Финальные классы (`final class`) по умолчанию, снимать явно если нужно наследование
@@ -77,18 +78,21 @@ Domains/{Domain}/
 - Enums вместо констант для фиксированных наборов значений
 
 **Именование:**
+
 - Интерфейсы: `{Name}Interface` (не `I{Name}`, не `{Name}Contract`)
 - Services: `{Name}Service` — содержат бизнес-логику
 - Jobs: `{Verb}{Entity}Job` — `ProcessIncomingMessageJob`, `ExecuteFlowNodeJob`
 - Exceptions: `{Name}Exception` — доменные, не используем базовые Laravel exceptions в доменном коде
 
 **Запрещено:**
+
 - Бизнес-логика в Controllers и Jobs — только оркестрация
 - Eloquent в доменных сервисах напрямую — только через Repository
 - `app()` и `resolve()` внутри доменного кода — всё через DI
 - Хелперы Laravel (`config()`, `cache()`) внутри доменных сервисов — инжектить зависимости явно
 
 **Можно и нужно:**
+
 - Eloquent Models в `Domains/{Domain}/Models/` — это нормально
 - Laravel Jobs, Events, Listeners — в соответствующих папках домена
 - Facades — только в infrastructure слое (Jobs, Controllers, Providers)
@@ -97,14 +101,17 @@ Domains/{Domain}/
 
 ## Tenant-aware execution model
 
-**Принципиальная позиция:** Core всегда работает внутри tenant-контекста. Tenant — базовая координата runtime, не опциональная абстракция.
+**Принципиальная позиция:** Core всегда работает внутри tenant-контекста. Tenant — базовая координата runtime, не
+опциональная абстракция.
 
 **Core не знает:**
+
 - Сколько tenant существует
 - Есть ли landlord DB
 - Используется ли SaaS wrapper
 
 **Запрещено в core:**
+
 - SaaS-логика, landlord DB lookups
 - `if (isSaas())` / `if (isSingleTenant())`
 - Опциональные tenant проверки — только hard fail если контекст не установлен
@@ -117,13 +124,16 @@ $tenant = $this->tenantContext->get();
 $tenant = $this->tenantContext->get() ?? $this->getDefaultTenant();
 ```
 
-**Self-hosted = один tenant**, создаётся при `platform:install`. Не отдельная архитектурная ветка — частный случай общей модели.
+**Self-hosted = один tenant**, создаётся при `platform:install`. Не отдельная архитектурная ветка — частный случай общей
+модели.
 
-**SaaS = внешний control plane** поверх core. Добавляет: tenant lifecycle, billing, provisioning, feature flags, onboarding. Core об этом не знает.
+**SaaS = внешний control plane** поверх core. Добавляет: tenant lifecycle, billing, provisioning, feature flags,
+onboarding. Core об этом не знает.
 
 **Users — всегда в tenant schema**, без исключений. Одинаково для self-hosted и SaaS.
 
 **TenantProvisioningService** — единый сервис для обоих сценариев:
+
 ```
 platform:install   → TenantProvisioningService::provision()
 SaaS onboarding    → TenantProvisioningService::provision() + billing, flags
@@ -132,10 +142,12 @@ SaaS onboarding    → TenantProvisioningService::provision() + billing, flags
 ## Multi-tenancy
 
 **Две базы данных:**
+
 - `landlord` — одна на всю платформу. Содержит: tenants, plans, subscriptions.
 - `tenant_{slug}` — отдельная PostgreSQL schema per tenant. Содержит всё остальное.
 
 **Как работает переключение:**
+
 - `TenantContextInterface` — синглтон в контейнере
 - Перед обработкой любого запроса/job — вызвать `TenantContext::set()`
 - Octane: использовать `runForTenant(callable)` для изоляции между запросами
@@ -147,12 +159,14 @@ SaaS onboarding    → TenantProvisioningService::provision() + billing, flags
 ## Flow Engine
 
 **Ключевые принципы:**
+
 - Flow = граф нод хранящийся как JSON в `flow_definitions.nodes`
 - Engine детерминирован — никакого недетерминированного кода внутри execution loop
 - Node handler резолвится по паре `(type, version)` из in-memory `NodeHandlerRegistry`
 - Registry собирается при boot из ServiceProviders — никаких запросов в БД при резолвинге
 
 **Структура ноды в JSON:**
+
 ```json
 {
   "id": "uuid",
@@ -164,11 +178,13 @@ SaaS onboarding    → TenantProvisioningService::provision() + billing, flags
 ```
 
 **Версионирование:**
+
 - Backward-compatible изменение → version не меняется
 - Breaking change → version++ в новых flow, старый handler остаётся зарегистрированным
 - `FlowSession` фиксирует `flow_definition_id` на старте и выполняется по нему до конца
 
 **State namespace-ы** (строго, нарушение = ошибка валидации):
+
 - `system.*` — только engine
 - `flow.*` — input/set_attribute ноды
 - `rag.*` — rag_query нода, умирает с сессией
@@ -230,11 +246,10 @@ RAG нода никогда не кладёт raw LLM output в state.
 
 ---
 
-
-
 ## Boot Lifecycle
 
 **Порядок boot pipeline — строгий:**
+
 ```
 1. Core boot     → AppServiceProvider, DomainServiceProvider
                    contracts, bindings, registries, infrastructure
@@ -252,6 +267,7 @@ RAG нода никогда не кладёт raw LLM output в state.
 ```
 
 **register() — только декларативно. Запрещено:**
+
 - side effects
 - обращения к БД
 - tenant-specific логика
@@ -265,16 +281,18 @@ RAG нода никогда не кладёт raw LLM output в state.
 
 **Никто кроме Core не имеет права напрямую мутировать global runtime.**
 
-| Запрещено | Правильно |
-|-----------|-----------|
-| `Route::get(...)` напрямую | `$registrar->routes(fn(Router $r) => ...)` |
-| `Schedule::call(...)` напрямую | `$registrar->schedule(...)` |
+| Запрещено                           | Правильно                                                  |
+|-------------------------------------|------------------------------------------------------------|
+| `Route::get(...)` напрямую          | `$registrar->routes(fn(Router $r) => ...)`                 |
+| `Schedule::call(...)` напрямую      | `$registrar->schedule(...)`                                |
 | `Artisan::call('migrate')` напрямую | `$registrar->migrations(__DIR__ . '/Database/Migrations')` |
-| `app()->bind(...)` глобально | Только через DomainServiceProvider |
+| `app()->bind(...)` глобально        | Только через DomainServiceProvider                         |
 
-**CoreRegistrar** — единственный контракт через который Feature/Solution/Plugin взаимодействуют с runtime. Core автоматически оборачивает routes в tenant + auth + activation middleware.
+**CoreRegistrar** — единственный контракт через который Feature/Solution/Plugin взаимодействуют с runtime. Core
+автоматически оборачивает routes в tenant + auth + activation middleware.
 
 **Migration phase order (platform:install / platform:update):**
+
 ```
 Phase 1: tenant platform migrations   (database/migrations/tenant/)
 Phase 2: feature migrations           (database/migrations/features/{name}/)
@@ -284,6 +302,7 @@ Phase 5: activation
 ```
 
 **Governance модель:**
+
 ```
 Domain    → владеет infrastructure surface
 Feature   → декларирует capability surface
@@ -297,12 +316,14 @@ Core      → собирает final runtime из всех деклараций
 Четыре понятия с разной ответственностью. Смешивать — архитектурная ошибка.
 
 **Domain** — технический bounded context, всегда активен:
+
 ```
 app/Domains/
   Tenancy/, Flow/, Messaging/, Contact/, Bot/, Broadcasting/
 ```
 
 **Feature** — built-in capability Core, активируется per tenant:
+
 ```
 app/Features/
   Rag/, AccessControl/, Analytics/
@@ -316,13 +337,16 @@ database/migrations/features/
 ```
 
 **Solution** — готовое нишевое решение, ВСЕГДА внешний composer package:
+
 ```
 fapost/solution-hr          → implements SolutionInterface
 fapost/solution-education   → implements SolutionInterface
 ```
+
 `app/Solutions/` — НЕ СУЩЕСТВУЕТ в Core.
 
 **Plugin** — ecosystem extension от сторонних разработчиков:
+
 ```
 fapost/plugin-{name}   → реализует публичные extension points Core
 ```
@@ -348,21 +372,24 @@ TenantActivationRuntime  — per request/job, что активно для tenan
 ```
 
 Активация:
+
 - Self-hosted: `config/features.php`, `config/solutions.php`
 - SaaS: billing plan → `tenant_activations`
 
-
 **Ownership boundary: Feature vs Solution:**
+
 - Feature owns contract (напр. `KnowledgeQueryInterface`)
 - Solution может предоставить свою реализацию через тот же contract
 - Если capability нужна только внутри одного Solution → internal solution service, НЕ global Feature
 
 **Solution versioning — identity сильнее version:**
+
 - Backward compatible change → обычный semver, тот же solution ID
 - Breaking change → новый solution identity (`hr` vs `hr_v2`), не upgrade
 - Tenant явно мигрирует на новый identity
 
 **Schema lifecycle независим от activation:**
+
 - `tenant_activations.is_active = false` → capability скрыта из runtime
 - Таблицы Feature/Solution в tenant schema НЕ удаляются
 - Удаление schema — только явная administrative операция, никогда автоматически
@@ -417,9 +444,308 @@ database/migrations/
 Этап 1 — Платформа.
 
 Порядок реализации:
+
 1. Структура проекта, базовые providers
 2. Multi-tenancy (TenantContext, переключение схем, миграции)
 3. Flow engine (registry, execution loop, session)
 4. Messaging pipeline (webhook → queue → worker → response)
 5. Filament admin (tenants, bots, базовое управление)
 6. Перенос текущего клиента как первый tenant
+
+===
+
+<laravel-boost-guidelines>
+=== foundation rules ===
+
+# Laravel Boost Guidelines
+
+The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines
+should be followed closely to ensure the best experience when building Laravel applications.
+
+## Foundational Context
+
+This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an
+expert with them all. Ensure you abide by these specific packages & versions.
+
+- php - 8.4
+- filament/filament (FILAMENT) - v5
+- laravel/framework (LARAVEL) - v12
+- laravel/horizon (HORIZON) - v5
+- laravel/octane (OCTANE) - v2
+- laravel/prompts (PROMPTS) - v0
+- laravel/pulse (PULSE) - v1
+- livewire/livewire (LIVEWIRE) - v4
+- laravel/boost (BOOST) - v2
+- laravel/mcp (MCP) - v0
+- laravel/pail (PAIL) - v1
+- laravel/pint (PINT) - v1
+- laravel/telescope (TELESCOPE) - v5
+- phpunit/phpunit (PHPUNIT) - v12
+- tailwindcss (TAILWINDCSS) - v4
+
+## Conventions
+
+- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling
+  files for the correct structure, approach, and naming.
+- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
+- Check for existing components to reuse before writing a new one.
+
+## Verification Scripts
+
+- Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature
+  tests are more important.
+
+## Application Structure & Architecture
+
+- Stick to existing directory structure; don't create new base folders without approval.
+- Do not change the application's dependencies without approval.
+
+## Frontend Bundling
+
+- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`,
+  `npm run dev`, or `composer run dev`. Ask them.
+
+## Documentation Files
+
+- You must only create documentation files if explicitly requested by the user.
+
+## Replies
+
+- Be concise in your explanations - focus on what's important rather than explaining obvious details.
+
+=== boost rules ===
+
+# Laravel Boost
+
+- Laravel Boost is an MCP server that comes with powerful tools designed specifically for this application. Use them.
+
+## Artisan Commands
+
+- Run Artisan commands directly via the command line (e.g., `php artisan route:list`,
+  `php artisan tinker --execute "..."`).
+- Use `php artisan list` to discover available commands and `php artisan [command] --help` to check parameters.
+
+## URLs
+
+- Whenever you share a project URL with the user, you should use the `get-absolute-url` tool to ensure you're using the
+  correct scheme, domain/IP, and port.
+
+## Debugging
+
+- Use the `database-query` tool when you only need to read from the database.
+- Use the `database-schema` tool to inspect table structure before writing migrations or models.
+- To execute PHP code for debugging, run `php artisan tinker --execute "your code here"` directly.
+- To read configuration values, read the config files directly or run `php artisan config:show [key]`.
+- To inspect routes, run `php artisan route:list` directly.
+- To check environment variables, read the `.env` file directly.
+
+## Reading Browser Logs With the `browser-logs` Tool
+
+- You can read browser logs, errors, and exceptions using the `browser-logs` tool from Boost.
+- Only recent browser logs will be useful - ignore old logs.
+
+## Searching Documentation (Critically Important)
+
+- Boost comes with a powerful `search-docs` tool you should use before trying other approaches when working with Laravel
+  or Laravel ecosystem packages. This tool automatically passes a list of installed packages and their versions to the
+  remote Boost API, so it returns only version-specific documentation for the user's circumstance. You should pass an
+  array of packages to filter on if you know you need docs for particular packages.
+- Search the documentation before making code changes to ensure we are taking the correct approach.
+- Use multiple, broad, simple, topic-based queries at once. For example:
+  `['rate limiting', 'routing rate limiting', 'routing']`. The most relevant results will be returned first.
+- Do not add package names to queries; package information is already shared. For example, use `test resource table`,
+  not `filament 4 test resource table`.
+
+### Available Search Syntax
+
+1. Simple Word Searches with auto-stemming - query=authentication - finds 'authenticate' and 'auth'.
+2. Multiple Words (AND Logic) - query=rate limit - finds knowledge containing both "rate" AND "limit".
+3. Quoted Phrases (Exact Position) - query="infinite scroll" - words must be adjacent and in that order.
+4. Mixed Queries - query=middleware "rate limit" - "middleware" AND exact phrase "rate limit".
+5. Multiple Queries - queries=["authentication", "middleware"] - ANY of these terms.
+
+=== php rules ===
+
+# PHP
+
+- Always use curly braces for control structures, even for single-line bodies.
+
+## Constructors
+
+- Use PHP 8 constructor property promotion in `__construct()`.
+    - `public function __construct(public GitHub $github) { }`
+- Do not allow empty `__construct()` methods with zero parameters unless the constructor is private.
+
+## Type Declarations
+
+- Always use explicit return type declarations for methods and functions.
+- Use appropriate PHP type hints for method parameters.
+
+<!-- Explicit Return Types and Method Params -->
+
+```php
+protected function isAccessible(User $user, ?string $path = null): bool
+{
+    ...
+}
+```
+
+## Enums
+
+- Typically, keys in an Enum should be TitleCase. For example: `FavoritePerson`, `BestLake`, `Monthly`.
+
+## Comments
+
+- Prefer PHPDoc blocks over inline comments. Never use comments within the code itself unless the logic is exceptionally
+  complex.
+
+## PHPDoc Blocks
+
+- Add useful array shape type definitions when appropriate.
+
+=== laravel/core rules ===
+
+# Do Things the Laravel Way
+
+- Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list
+  available Artisan commands using `php artisan list` and check their parameters with `php artisan [command] --help`.
+- If you're creating a generic PHP class, use `php artisan make:class`.
+- Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the
+  correct `--options` to ensure correct behavior.
+
+## Database
+
+- Always use proper Eloquent relationship methods with return type hints. Prefer relationship methods over raw queries
+  or manual joins.
+- Use Eloquent models and relationships before suggesting raw database queries.
+- Avoid `DB::`; prefer `Model::query()`. Generate code that leverages Laravel's ORM capabilities rather than bypassing
+  them.
+- Generate code that prevents N+1 query problems by using eager loading.
+- Use Laravel's query builder for very complex database operations.
+
+### Model Creation
+
+- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other
+  things, using `php artisan make:model --help` to check the available options.
+
+### APIs & Eloquent Resources
+
+- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you
+  should follow existing application convention.
+
+## Controllers & Validation
+
+- Always create Form Request classes for validation rather than inline validation in controllers. Include both
+  validation rules and custom error messages.
+- Check sibling Form Requests to see if the application uses array or string based validation rules.
+
+## Authentication & Authorization
+
+- Use Laravel's built-in authentication and authorization features (gates, policies, Sanctum, etc.).
+
+## URL Generation
+
+- When generating links to other pages, prefer named routes and the `route()` function.
+
+## Queues
+
+- Use queued jobs for time-consuming operations with the `ShouldQueue` interface.
+
+## Configuration
+
+- Use environment variables only in configuration files - never use the `env()` function directly outside of config
+  files. Always use `config('app.name')`, not `env('APP_NAME')`.
+
+## Testing
+
+- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be
+  used before manually setting up the model.
+- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to
+  use `$this->faker` or `fake()`.
+- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit`
+  to create a unit test. Most tests should be feature tests.
+
+## Vite Error
+
+- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run
+  `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
+
+=== laravel/v12 rules ===
+
+# Laravel 12
+
+- CRITICAL: ALWAYS use `search-docs` tool for version-specific Laravel documentation and updated code examples.
+- Since Laravel 11, Laravel has a new streamlined file structure which this project uses.
+
+## Laravel 12 Structure
+
+- In Laravel 12, middleware are no longer registered in `app/Http/Kernel.php`.
+- Middleware are configured declaratively in `bootstrap/app.php` using `Application::configure()->withMiddleware()`.
+- `bootstrap/app.php` is the file to register middleware, exceptions, and routing files.
+- `bootstrap/providers.php` contains application specific service providers.
+- The `app/Console/Kernel.php` file no longer exists; use `bootstrap/app.php` or `routes/console.php` for console
+  configuration.
+- Console commands in `app/Console/Commands/` are automatically available and do not require manual registration.
+
+## Database
+
+- When modifying a column, the migration must include all of the attributes that were previously defined on the column.
+  Otherwise, they will be dropped and lost.
+- Laravel 12 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
+
+### Models
+
+- Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing
+  conventions from other models.
+
+=== octane/core rules ===
+
+# Octane
+
+- Octane boots the application once and reuses it across requests, so singletons persist between requests.
+- The Laravel container's `scoped` method may be used as a safe alternative to `singleton`.
+- Never inject the container, request, or config repository into a singleton's constructor; use a resolver closure or
+  `bind()` instead:
+
+```php
+// Bad
+$this->app->singleton(Service::class, fn (Application $app) => new Service($app['request']));
+
+// Good
+$this->app->singleton(Service::class, fn () => new Service(fn () => request()));
+```
+
+- Never append to static properties, as they accumulate in memory across requests.
+
+=== pint/core rules ===
+
+# Laravel Pint Code Formatter
+
+- If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to
+  ensure your code matches the project's expected style.
+- Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting
+  issues.
+
+=== phpunit/core rules ===
+
+# PHPUnit
+
+- This application uses PHPUnit for testing. All tests must be written as PHPUnit classes. Use
+  `php artisan make:test --phpunit {name}` to create a new test.
+- If you see a test using "Pest", convert it to PHPUnit.
+- Every time a test has been updated, run that singular test.
+- When the tests relating to your feature are passing, ask the user if they would like to also run the entire test suite
+  to make sure everything is still passing.
+- Tests should cover all happy paths, failure paths, and edge cases.
+- You must not remove any tests or test files from the tests directory without approval. These are not temporary or
+  helper files; these are core to the application.
+
+## Running Tests
+
+- Run the minimal number of tests, using an appropriate filter, before finalizing.
+- To run all tests: `php artisan test --compact`.
+- To run all tests in a file: `php artisan test --compact tests/Feature/ExampleTest.php`.
+- To filter on a particular test name: `php artisan test --compact --filter=testName` (recommended after making a change
+  to a related file).
+
+</laravel-boost-guidelines>
