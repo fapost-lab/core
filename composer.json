@@ -32,7 +32,6 @@
     "spatie/laravel-settings": "^3.7",
     "spiral/roadrunner-cli": "^2.6.0",
     "spiral/roadrunner-http": "^3.3.0",
-    "stancl/tenancy": "^3.9",
     "tpetry/laravel-postgresql-enhanced": "^3.6"
   },
   "require-dev": {
