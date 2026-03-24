@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Tenancy\Exceptions;
 
-final class TenantNotFoundException extends \RuntimeException
+use RuntimeException;
+
+final class TenantNotFoundException extends RuntimeException
 {
     public static function forId(string $id): self
     {

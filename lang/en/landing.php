@@ -151,9 +151,9 @@ return [
     ],
 
     'deployment' => [
-        'title'      => 'Your Infrastructure, Your Rules',
-        'subtitle'   => 'Choose the deployment model that fits your business requirements.',
-        'saas'       => [
+        'title'    => 'Your Infrastructure, Your Rules',
+        'subtitle' => 'Choose the deployment model that fits your business requirements.',
+        'saas'     => [
             'title'       => 'Cloud',
             'badge'       => 'Quick Start',
             'description' => 'Get started in minutes. We handle the infrastructure so you can focus on building.',
@@ -178,13 +178,13 @@ return [
     ],
 
     'form' => [
-        'title'               => 'Get Early Access',
-        'subtitle'            => 'Join the waitlist. We\'ll reach out to discuss your use case and set you up.',
-        'name'                => 'Full Name',
-        'company'             => 'Company',
-        'email'               => 'Work Email',
-        'messenger'           => 'How should we contact you?',
-        'messenger_options'   => [
+        'title'             => 'Get Early Access',
+        'subtitle'          => 'Join the waitlist. We\'ll reach out to discuss your use case and set you up.',
+        'name'              => 'Full Name',
+        'company'           => 'Company',
+        'email'             => 'Work Email',
+        'messenger'         => 'How should we contact you?',
+        'messenger_options' => [
             'telegram' => 'Messenger',
             'whatsapp' => 'Phone / Video Call',
             'both'     => 'Email',

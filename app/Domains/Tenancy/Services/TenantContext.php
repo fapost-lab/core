@@ -21,13 +21,13 @@ final class TenantContext implements TenantContextInterface
     {
         return $this->tenant
                ?? throw new TenantNotResolvedException(
-                'Tenant context has not been resolved. Ensure tenant is set before accessing tenant context.'
-            );
+                   'Tenant context has not been resolved. Ensure tenant is set before accessing tenant context.'
+               );
     }
 
     public function isResolved(): bool
     {
-        return $this->tenant !== null;
+        return null !== $this->tenant;
     }
 
     public function runForTenant(TenantInterface $tenant, callable $callback): mixed

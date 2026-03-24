@@ -13,7 +13,7 @@ final class TenantContextTest extends TestCase
 {
     public function test_throws_when_not_resolved(): void
     {
-        $context = new TenantContext;
+        $context = new TenantContext();
 
         $this->expectException(TenantNotResolvedException::class);
 
@@ -22,7 +22,7 @@ final class TenantContextTest extends TestCase
 
     public function test_returns_tenant_after_set(): void
     {
-        $context = new TenantContext;
+        $context = new TenantContext();
         $tenant  = $this->createMock(TenantInterface::class);
 
         $context->set($tenant);
@@ -33,7 +33,7 @@ final class TenantContextTest extends TestCase
 
     public function test_run_for_tenant_restores_previous_context(): void
     {
-        $context = new TenantContext;
+        $context = new TenantContext();
         $tenant1 = $this->createMock(TenantInterface::class);
         $tenant2 = $this->createMock(TenantInterface::class);
 
@@ -48,7 +48,7 @@ final class TenantContextTest extends TestCase
 
     public function test_is_not_resolved_initially(): void
     {
-        $context = new TenantContext;
+        $context = new TenantContext();
 
         $this->assertFalse($context->isResolved());
     }

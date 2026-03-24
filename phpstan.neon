@@ -1,0 +1,10 @@
+includes:
+	- vendor/phpat/phpat/extension.neon
+
+parameters:
+	level: 0
+	paths:
+		- app
+		- database
+		- tests/Architecture
+

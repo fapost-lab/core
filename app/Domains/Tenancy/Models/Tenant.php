@@ -50,7 +50,7 @@ final class Tenant extends Model implements TenantInterface
 
     public function isActive(): bool
     {
-        return $this->status === TenantStatus::Active;
+        return TenantStatus::Active === $this->status;
     }
 
     public function getConfig(string $key, mixed $default = null): mixed

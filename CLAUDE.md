@@ -70,6 +70,7 @@ Domains/{Domain}/
 ## Соглашения по коду
 
 **Общие:**
+
 - Подход близкий к DDD, без фанатизма
 - Интерфейсы — везде где это целесообразно, не ради галочки
 - Финальные классы (`final class`) по умолчанию, снимать явно если нужно наследование
@@ -77,18 +78,21 @@ Domains/{Domain}/
 - Enums вместо констант для фиксированных наборов значений
 
 **Именование:**
+
 - Интерфейсы: `{Name}Interface` (не `I{Name}`, не `{Name}Contract`)
 - Services: `{Name}Service` — содержат бизнес-логику
 - Jobs: `{Verb}{Entity}Job` — `ProcessIncomingMessageJob`, `ExecuteFlowNodeJob`
 - Exceptions: `{Name}Exception` — доменные, не используем базовые Laravel exceptions в доменном коде
 
 **Запрещено:**
+
 - Бизнес-логика в Controllers и Jobs — только оркестрация
 - Eloquent в доменных сервисах напрямую — только через Repository
 - `app()` и `resolve()` внутри доменного кода — всё через DI
 - Хелперы Laravel (`config()`, `cache()`) внутри доменных сервисов — инжектить зависимости явно
 
 **Можно и нужно:**
+
 - Eloquent Models в `Domains/{Domain}/Models/` — это нормально
 - Laravel Jobs, Events, Listeners — в соответствующих папках домена
 - Facades — только в infrastructure слое (Jobs, Controllers, Providers)
@@ -97,14 +101,17 @@ Domains/{Domain}/
 
 ## Tenant-aware execution model
 
-**Принципиальная позиция:** Core всегда работает внутри tenant-контекста. Tenant — базовая координата runtime, не опциональная абстракция.
+**Принципиальная позиция:** Core всегда работает внутри tenant-контекста. Tenant — базовая координата runtime, не
+опциональная абстракция.
 
 **Core не знает:**
+
 - Сколько tenant существует
 - Есть ли landlord DB
 - Используется ли SaaS wrapper
 
 **Запрещено в core:**
+
 - SaaS-логика, landlord DB lookups
 - `if (isSaas())` / `if (isSingleTenant())`
 - Опциональные tenant проверки — только hard fail если контекст не установлен
@@ -117,13 +124,16 @@ $tenant = $this->tenantContext->get();
 $tenant = $this->tenantContext->get() ?? $this->getDefaultTenant();
 ```
 
-**Self-hosted = один tenant**, создаётся при `platform:install`. Не отдельная архитектурная ветка — частный случай общей модели.
+**Self-hosted = один tenant**, создаётся при `platform:install`. Не отдельная архитектурная ветка — частный случай общей
+модели.
 
-**SaaS = внешний control plane** поверх core. Добавляет: tenant lifecycle, billing, provisioning, feature flags, onboarding. Core об этом не знает.
+**SaaS = внешний control plane** поверх core. Добавляет: tenant lifecycle, billing, provisioning, feature flags,
+onboarding. Core об этом не знает.
 
 **Users — всегда в tenant schema**, без исключений. Одинаково для self-hosted и SaaS.
 
 **TenantProvisioningService** — единый сервис для обоих сценариев:
+
 ```
 platform:install   → TenantProvisioningService::provision()
 SaaS onboarding    → TenantProvisioningService::provision() + billing, flags
@@ -132,10 +142,12 @@ SaaS onboarding    → TenantProvisioningService::provision() + billing, flags
 ## Multi-tenancy
 
 **Две базы данных:**
+
 - `landlord` — одна на всю платформу. Содержит: tenants, plans, subscriptions.
 - `tenant_{slug}` — отдельная PostgreSQL schema per tenant. Содержит всё остальное.
 
 **Как работает переключение:**
+
 - `TenantContextInterface` — синглтон в контейнере
 - Перед обработкой любого запроса/job — вызвать `TenantContext::set()`
 - Octane: использовать `runForTenant(callable)` для изоляции между запросами
@@ -147,12 +159,14 @@ SaaS onboarding    → TenantProvisioningService::provision() + billing, flags
 ## Flow Engine
 
 **Ключевые принципы:**
+
 - Flow = граф нод хранящийся как JSON в `flow_definitions.nodes`
 - Engine детерминирован — никакого недетерминированного кода внутри execution loop
 - Node handler резолвится по паре `(type, version)` из in-memory `NodeHandlerRegistry`
 - Registry собирается при boot из ServiceProviders — никаких запросов в БД при резолвинге
 
 **Структура ноды в JSON:**
+
 ```json
 {
   "id": "uuid",
@@ -164,11 +178,13 @@ SaaS onboarding    → TenantProvisioningService::provision() + billing, flags
 ```
 
 **Версионирование:**
+
 - Backward-compatible изменение → version не меняется
 - Breaking change → version++ в новых flow, старый handler остаётся зарегистрированным
 - `FlowSession` фиксирует `flow_definition_id` на старте и выполняется по нему до конца
 
 **State namespace-ы** (строго, нарушение = ошибка валидации):
+
 - `system.*` — только engine
 - `flow.*` — input/set_attribute ноды
 - `rag.*` — rag_query нода, умирает с сессией
@@ -230,9 +246,88 @@ RAG нода никогда не кладёт raw LLM output в state.
 
 ---
 
+## Bot Domain
+
+**Bot — полноценный агент/ассистент внутри тенанта:**
+
+- Один тенант может иметь несколько ботов в разных каналах
+- Каждый бот: name, channel, token (encrypted), webhook_public_hash, secret_token
+- `default_flow_id` — flow при /start или первом сообщении
+- `fallback_message` — ответ если нет активного flow и триггера
+- `status`: active | inactive | maintenance
+
+**BotContext — по аналогии с TenantContext:**
+
+```php
+interface BotContextInterface
+{
+    public function set(BotInterface $bot): void;
+    public function get(): BotInterface; // throws BotNotResolvedException
+    public function isResolved(): bool;
+}
+```
+
+Порядок установки: Webhook → resolve tenant → switch schema → resolve bot → set BotContext → dispatch job.
+
+`flow_sessions` хранит `tenant_id + bot_id + contact_id` — полный контекст.
+
+---
+
+## Flow Triggers
+
+Триггер — условие старта flow. Не нода, а внешнее событие.
+
+| Тип | Когда срабатывает |
+|-----|-----------------|
+| `keyword` | Контакт написал ключевое слово или /start |
+| `webhook` | Внешний HTTP запрос от CRM/HR системы |
+| `schedule` | Cron-выражение |
+| `event` | Внутреннее событие (flow.completed + optional delay) |
+| `api` | Программный вызов из Solution/Plugin |
+
+`emit_event` нода (P2) публикует событие из flow → `event` триггер подписывается → chains между flow с опциональной
+задержкой.
+
+---
+
+## Broadcasting (Feature)
+
+Управляемая отправка flow/сообщения группе контактов.
+
+**broadcasts:** tenant_id, bot_id, name, type (flow|message), flow_id, target_type (group|segment|tag|all),
+scheduled_at, cron, status (draft→scheduled→running→completed), stats JSON.
+
+**broadcast_recipients:** contact_id, status (pending|sent|failed|skipped), sent_at, error.
+
+**Отличие от schedule триггера:** Broadcast — управляемая операция через UI со статусами и аналитикой. Schedule
+триггер — автоматический старт без UI.
+
+---
+
+## Contact Domain — сегментация
+
+Три концепта:
+
+| Концепт | Тип | Управление |
+|---------|-----|-----------|
+| Groups | Статические списки | Ручное |
+| Tags | Динамические метки | Нода set_tag в flow |
+| Segments | Правила выборки | Вычисляется при запросе |
+
+**set_tag нода (Core, P1):** action (add|remove|toggle), tags (массив).
+
+**contact_tags:** contact_id, tag, tagged_by (flow_session_id | staff_user_id), tagged_at.
+
+**contact_segments:** rules (JSON с условиями), cached_count.
+
+**ContactSegmentResolver** вычисляет выборку по rules. Используется Broadcasting при создании списка получателей.
+
+**Broadcast target_type:** group | segment | tag | all.
+
 ## Boot Lifecycle
 
 **Порядок boot pipeline — строгий:**
+
 ```
 1. Core boot     → AppServiceProvider, DomainServiceProvider
                    contracts, bindings, registries, infrastructure
@@ -250,6 +345,7 @@ RAG нода никогда не кладёт raw LLM output в state.
 ```
 
 **register() — только декларативно. Запрещено:**
+
 - side effects
 - обращения к БД
 - tenant-specific логика
@@ -270,9 +366,11 @@ RAG нода никогда не кладёт raw LLM output в state.
 | `Artisan::call('migrate')` напрямую | `$registrar->migrations(__DIR__ . '/Database/Migrations')` |
 | `app()->bind(...)` глобально | Только через DomainServiceProvider |
 
-**CoreRegistrar** — единственный контракт через который Feature/Solution/Plugin взаимодействуют с runtime. Core автоматически оборачивает routes в tenant + auth + activation middleware.
+**CoreRegistrar** — единственный контракт через который Feature/Solution/Plugin взаимодействуют с runtime. Core
+автоматически оборачивает routes в tenant + auth + activation middleware.
 
 **Migration phase order (platform:install / platform:update):**
+
 ```
 Phase 1: tenant platform migrations   (database/migrations/tenant/)
 Phase 2: feature migrations           (database/migrations/features/{name}/)
@@ -282,6 +380,7 @@ Phase 5: activation
 ```
 
 **Governance модель:**
+
 ```
 Domain    → владеет infrastructure surface
 Feature   → декларирует capability surface
@@ -295,12 +394,14 @@ Core      → собирает final runtime из всех деклараций
 Четыре понятия с разной ответственностью. Смешивать — архитектурная ошибка.
 
 **Domain** — технический bounded context, всегда активен:
+
 ```
 app/Domains/
   Tenancy/, Flow/, Messaging/, Contact/, Bot/, Broadcasting/
 ```
 
 **Feature** — built-in capability Core, активируется per tenant:
+
 ```
 app/Features/
   Rag/, AccessControl/, Analytics/
@@ -314,13 +415,16 @@ database/migrations/features/
 ```
 
 **Solution** — готовое нишевое решение, ВСЕГДА внешний composer package:
+
 ```
 fapost/solution-hr          → implements SolutionInterface
 fapost/solution-education   → implements SolutionInterface
 ```
+
 `app/Solutions/` — НЕ СУЩЕСТВУЕТ в Core.
 
 **Plugin** — ecosystem extension от сторонних разработчиков:
+
 ```
 fapost/plugin-{name}   → реализует публичные extension points Core
 ```
@@ -346,20 +450,24 @@ TenantActivationRuntime  — per request/job, что активно для tenan
 ```
 
 Активация:
+
 - Self-hosted: `config/features.php`, `config/solutions.php`
 - SaaS: billing plan → `tenant_activations`
 
 **Ownership boundary: Feature vs Solution:**
+
 - Feature owns contract (напр. `KnowledgeQueryInterface`)
 - Solution может предоставить свою реализацию через тот же contract
 - Если capability нужна только внутри одного Solution → internal solution service, НЕ global Feature
 
 **Solution versioning — identity сильнее version:**
+
 - Backward compatible change → обычный semver, тот же solution ID
 - Breaking change → новый solution identity (`hr` vs `hr_v2`), не upgrade
 - Tenant явно мигрирует на новый identity
 
 **Schema lifecycle независим от activation:**
+
 - `tenant_activations.is_active = false` → capability скрыта из runtime
 - Таблицы Feature/Solution в tenant schema НЕ удаляются
 - Удаление schema — только явная administrative операция, никогда автоматически
@@ -406,11 +514,14 @@ database/migrations/
 | `{solution}.*` | Solution | Любой будущий Solution |
 | `{plugin}.*` | Plugin | Внешний Plugin |
 
-**HandlerRegistration содержит:** `handler_id`, `namespace`, `owner_level` (core/feature/solution/plugin), `owner_id`, `handler` instance.
+**HandlerRegistration содержит:** `handler_id`, `namespace`, `owner_level` (core/feature/solution/plugin), `owner_id`,
+`handler` instance.
 
-**TenantActivationRuntime фильтрует** доступные handlers по owner_level и owner_id против активированных Feature/Solution/Plugin тенанта.
+**TenantActivationRuntime фильтрует** доступные handlers по owner_level и owner_id против активированных
+Feature/Solution/Plugin тенанта.
 
 **Input нода — типизация:**
+
 - `expected_type`: text, number, phone, email, callback, reply, contact, location, document, image, any
 - `validation`: required, pattern, min_length, max_length, custom_handler
 - `on_invalid`: message, retry_limit, on_exceed (node_id)
@@ -421,6 +532,7 @@ database/migrations/
 ## Node Schema
 
 **Базовая структура:**
+
 ```json
 {
   "id": "uuid",
@@ -433,6 +545,7 @@ database/migrations/
 ```
 
 **flow_definitions хранит два поля:**
+
 - `nodes` — execution data, читает engine
 - `nodes_ui` — `{ node_id: {x, y} }`, читает конструктор, engine игнорирует
 
@@ -462,12 +575,14 @@ database/migrations/
 **send_message content_type:** `text`, `text_with_keyboard`, `image`, `document`, `video`, `voice`
 
 **Кнопки:**
+
 - `id` — UUID, хранится в `callback_data`. Стабилен навсегда.
 - `type` — `callback` (InlineKeyboard) или `reply` (ReplyKeyboard)
 - `value` — бизнес-значение, сохраняется в state при нажатии
 - `order` + `row` — раскладка по рядам, поддержка сортировки
 
 **Outputs (именованные порты):**
+
 - `default` — стандартный выход
 - `true` / `false` — condition
 - `no_response` — input timeout
@@ -477,6 +592,7 @@ database/migrations/
 - `[значение]` + `default` — switch
 
 **handler нода:**
+
 - Тип ноды живёт в Core
 - Реализации регистрируют Solution/Plugin при boot через `CoreRegistrar`
 - `handler_id` определяет реализацию: `hr.sync_employee`, `crm.create_deal`
@@ -500,6 +616,19 @@ database/migrations/
 - Изменение namespace-ов в `flow_sessions.state`
 
 ---
+
+## Текущий этап
+
+Этап 1 — Платформа.
+
+Порядок реализации:
+
+1. Структура проекта, базовые providers
+2. Multi-tenancy (TenantContext, переключение схем, миграции)
+3. Flow engine (registry, execution loop, session)
+4. Messaging pipeline (webhook → queue → worker → response)
+5. Filament admin (tenants, bots, базовое управление)
+6. Перенос текущего клиента как первый tenant
 
 # Implementation Plan
 
@@ -560,9 +689,9 @@ database/migrations/
 
 | # | Название | Статус |
 |---|----------|--------|
-| 01 | Project scaffolding (Laravel 12 без Octane, Horizon, Filament, Inertia+Vue, phpat, migration path structure) | ⬜ |
+| 01 | Project scaffolding (Laravel 12 без Octane, Horizon, Filament, Inertia+Vue, phpat, migration path structure) | ✅ |
 | 02 | Tenancy Domain (контракты, Tenant модель, TenantSettings, миграция landlord.tenants) | ✅ |
-| 03 | Tenant infrastructure (TenantRepository, TenantDatabaseManager, Redis webhook registry write, **Migration Isolation Contract как phpat-правило**) | ⬜ |
+| 03 | Tenant infrastructure (TenantRepository, TenantDatabaseManager, Redis webhook registry write, **Migration Isolation Contract как phpat-правило**) | ✅ |
 
 **Спринт 2 — boot lifecycle**
 

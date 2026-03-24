@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
-class LandingPageTest extends TestCase
+final class LandingPageTest extends TestCase
 {
     use RefreshDatabase;
 

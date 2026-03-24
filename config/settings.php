@@ -36,7 +36,7 @@ return [
             'table'      => null,
             'connection' => null,
         ],
-        'redis'    => [
+        'redis' => [
             'type'       => RedisSettingsRepository::class,
             'connection' => null,
             'prefix'     => null,

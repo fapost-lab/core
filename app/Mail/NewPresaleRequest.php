@@ -19,8 +19,7 @@ final class NewPresaleRequest extends Mailable implements ShouldQueue
 
     public function __construct(
         public readonly PreSaleRequest $presaleRequest,
-    )
-    {
+    ) {
     }
 
     public function envelope(): Envelope

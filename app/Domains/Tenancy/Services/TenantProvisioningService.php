@@ -10,15 +10,16 @@ use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Exceptions\TenantProvisioningException;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Models\TenantStatus;
+use App\Domains\Tenancy\ValueObjects\MigrationScope;
 use Illuminate\Support\Str;
+use Throwable;
 
-final class TenantProvisioningService
+final readonly class TenantProvisioningService
 {
     public function __construct(
-        private readonly TenantRepositoryInterface $tenantRepository,
-        private readonly TenantDatabaseManagerInterface $databaseManager,
-    )
-    {
+        private TenantRepositoryInterface $tenantRepository,
+        private TenantDatabaseManagerInterface $databaseManager,
+    ) {
     }
 
     /**
@@ -46,8 +47,10 @@ final class TenantProvisioningService
 
         try {
             $this->databaseManager->createSchema($tenant);
-            $this->databaseManager->runMigrations($tenant);
-        } catch (\Throwable $throwable) {
+            $this->databaseManager->runForTenant($tenant, function (): void {
+                $this->databaseManager->runMigrations(MigrationScope::tenant());
+            });
+        } catch (Throwable $throwable) {
             $tenant->fill(['status' => TenantStatus::Inactive->value]);
             $this->tenantRepository->save($tenant);
 
@@ -62,12 +65,11 @@ final class TenantProvisioningService
 
     private function makeTemporaryTenant(string $slug, string $schemaName): TenantInterface
     {
-        return new readonly class($slug, $schemaName) implements TenantInterface {
+        return new readonly class ($slug, $schemaName) implements TenantInterface {
             public function __construct(
                 private string $slug,
                 private string $schemaName,
-            )
-            {
+            ) {
             }
 
             public function getId(): string

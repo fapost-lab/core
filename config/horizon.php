@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 return [
 
     /*
@@ -208,7 +210,7 @@ return [
             'timeout'             => 30,
             'nice'                => 0,
         ],
-        'messaging-broadcast'     => [
+        'messaging-broadcast' => [
             'connection'          => 'redis',
             'queue'               => ['messaging.broadcast'],
             'balance'             => 'auto',
@@ -221,7 +223,7 @@ return [
             'timeout'             => 60,
             'nice'                => 5,
         ],
-        'flow-execution'          => [
+        'flow-execution' => [
             'connection'          => 'redis',
             'queue'               => ['flow.execution'],
             'balance'             => 'auto',
@@ -234,7 +236,7 @@ return [
             'timeout'             => 60,
             'nice'                => 0,
         ],
-        'sync-external'           => [
+        'sync-external' => [
             'connection'          => 'redis',
             'queue'               => ['sync.external'],
             'balance'             => 'auto',
@@ -247,7 +249,7 @@ return [
             'timeout'             => 120,
             'nice'                => 0,
         ],
-        'scheduled-triggers'      => [
+        'scheduled-triggers' => [
             'connection'          => 'redis',
             'queue'               => ['scheduled.triggers'],
             'balance'             => 'auto',
@@ -260,7 +262,7 @@ return [
             'timeout'             => 60,
             'nice'                => 0,
         ],
-        'default'                 => [
+        'default' => [
             'connection'          => 'redis',
             'queue'               => ['default'],
             'balance'             => 'auto',
@@ -282,27 +284,27 @@ return [
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
-            'messaging-broadcast'     => [
+            'messaging-broadcast' => [
                 'maxProcesses'    => 5,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
-            'flow-execution'          => [
+            'flow-execution' => [
                 'maxProcesses'    => 8,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
-            'sync-external'           => [
+            'sync-external' => [
                 'maxProcesses'    => 3,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
-            'scheduled-triggers'      => [
+            'scheduled-triggers' => [
                 'maxProcesses'    => 3,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
-            'default'                 => [
+            'default' => [
                 'maxProcesses'    => 3,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
@@ -313,19 +315,19 @@ return [
             'messaging-transactional' => [
                 'maxProcesses' => 2,
             ],
-            'messaging-broadcast'     => [
+            'messaging-broadcast' => [
                 'maxProcesses' => 1,
             ],
-            'flow-execution'          => [
+            'flow-execution' => [
                 'maxProcesses' => 2,
             ],
-            'sync-external'           => [
+            'sync-external' => [
                 'maxProcesses' => 1,
             ],
-            'scheduled-triggers'      => [
+            'scheduled-triggers' => [
                 'maxProcesses' => 1,
             ],
-            'default'                 => [
+            'default' => [
                 'maxProcesses' => 1,
             ],
         ],

@@ -35,7 +35,7 @@ final class SetLocale
         }
 
         $preferred = $request->getPreferredLanguage(self::SUPPORTED_LOCALES);
-        if ($preferred !== null) {
+        if (null !== $preferred) {
             return $preferred;
         }
 
