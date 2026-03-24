@@ -501,17 +501,183 @@ database/migrations/
 
 ---
 
-## Текущий этап
+# Implementation Plan
 
-Этап 1 — Платформа.
+**Документ:** `fapost-plan.docx` — полное описание фаз, спринтов, задач и архитектурных контрактов.
+**Версия плана:** 2.0 · Март 2026 (пересмотрен после архитектурного ревью).
+**MVP:** достигается после Фазы 2 (задача 16).
 
-Порядок реализации:
-1. Структура проекта, базовые providers
-2. Multi-tenancy (TenantContext, переключение схем, миграции)
-3. Flow engine (registry, execution loop, session)
-4. Messaging pipeline (webhook → queue → worker → response)
-5. Filament admin (tenants, bots, базовое управление)
-6. Перенос текущего клиента как первый tenant
+---
+
+## Архитектурные контракты (жёсткие, без исключений)
+
+### Migration Isolation Contract
+
+Миграция — это чистая DDL-операция. Она не знает о тенантах, конфигах, модулях и состоянии системы.
+
+**Запрещено внутри `up()`/`down()`:**
+
+- `app()`, `config()`, `env()` — кроме connection name как константы
+- `TenantContext::get()` или любой tenant-aware сервис
+- Условные ветки на основе module activation или feature flags
+- Seed-данные зависящие от runtime состояния
+- `DB::table()` поверх таблиц платформы или другого модуля (из миграции модуля)
+
+**Enforcement:** phpat-правило в CI, начиная с задачи 03.
+
+### Handler Version Contract
+
+- Каждый `NodeHandler` реализует `NodeHandlerInterface`: `type()`, `version()`, `supportedVersions()`
+- Engine резолвит handler по `(type, version)` из in-memory registry — без запросов в БД
+- Backward-compatible изменение → version не меняется
+- Breaking change → version++ в новых flow, старый handler остаётся зарегистрированным
+- **Безопасное удаление handler** = `flow_active_node_stats` показывает 0 И нет `flow_sessions` со статусом `waiting`/
+  `paused` с этим `type@version`
+- **Enforcement:** phpat-правило
+
+### Module Registration Contract
+
+- `ModuleRegistrarInterface` — заглушка с задачи 04. Полная реализация только в Фазе 4.
+- Модуль декларирует intent через `CoreRegistrar` — никогда не вызывает `Route`, `Schedule`, `Migrations` напрямую
+- `DataAccessorInterface`, `RagAdapterInterface` — module-grade extension points, контракты фиксируются в Фазах 0–2
+- Solutions живут только как внешние composer-пакеты, никогда в `app/Solutions/`
+
+### UI Non-interference Contract
+
+- Filament UI читает только из `analytics_events` и существующих query scopes
+- Новые методы на доменных объектах ради UI — запрещены до стабилизации runtime model
+- Задача 20 — строго read-only surface
+
+---
+
+## Фазы и спринты
+
+### Фаза 0 — Фундамент *(Спринты 1–2)*
+
+Разбита на два спринта. `platform:install` появляется только в спринте 2 — когда provisioning контракт стабилен.
+
+**Спринт 1 — контракты и инфраструктура**
+
+| # | Название | Статус |
+|---|----------|--------|
+| 01 | Project scaffolding (Laravel 12 без Octane, Horizon, Filament, Inertia+Vue, phpat, migration path structure) | ⬜ |
+| 02 | Tenancy Domain (контракты, Tenant модель, TenantSettings, миграция landlord.tenants) | ✅ |
+| 03 | Tenant infrastructure (TenantRepository, TenantDatabaseManager, Redis webhook registry write, **Migration Isolation Contract как phpat-правило**) | ⬜ |
+
+**Спринт 2 — boot lifecycle**
+
+| # | Название | Статус |
+|---|----------|--------|
+| 04 | Tenancy middleware & boot (TenancyMiddleware, CoreBootstrap, DomainServiceProvider chain, platform:install, **ModuleRegistrarInterface заглушка**) | ⬜ |
+
+---
+
+### Фаза 1 — Core Platform *(Спринт 3)*
+
+Octane вводится последним в фазе — когда все lifecycle boundaries известны.
+
+| # | Название |
+|---|----------|
+| 05 | Staff Domain (users, roles, Filament Shield, Filament panel) |
+| 06 | Bot Domain (модель, token encryption, webhook_public_hash, Redis registry write) |
+| 07 | Contact Domain (модель, channel identity, contact_groups, findOrCreate) |
+| 08 | Webhook routing (ChannelAdapter Telegram+WA, signature verify, idempotency Redis SET NX, tenant resolve, IncomingMessageJob) |
+| 08a | Octane integration (поверх стабильного TenantContext+middleware, singleton/scoped bindings, runForTenant как изолятор) |
+
+---
+
+### Фаза 2 — Flow Engine *(Спринты 4–6)* — MVP
+
+**Спринт 4 — ядро движка**
+
+| # | Название |
+|---|----------|
+| 09 | Flow definition & registry (flow_definitions, **NodeHandlerInterface**, NodeHandlerRegistry in-memory, **HandlerVersionContract phpat**, flow_active_node_stats, правило безопасного удаления) |
+| 10 | Flow session & state (flow_sessions, namespaced state system/flow/rag/module, optimistic lock, FlowState VO, namespace violation = validation error) |
+
+**Спринт 5 — execution & concurrency**
+
+| # | Название |
+|---|----------|
+| 11 | Flow execution engine (FlowEngine::start/resume, execute loop, dispatch по (type,version), session persist) |
+| 12 | Concurrency protection (distributed lock Redis TTL=30s, optimistic lock retry, backoff при lock miss — не дроп) |
+| 13 | Built-in node handlers (send_message, input, condition, delay, set_attribute, webhook — все idempotent) |
+| 14 | Flow triggers (flow_triggers, TriggerResolver, IncomingMessageJob → FlowEngine) |
+
+**Спринт 6 — data access & logging**
+
+| # | Название |
+|---|----------|
+| 15 | DataAccessor layer (DataAccessorInterface, DataAccessorRegistry, condition нода только через accessor, flow_logs snapshot) |
+| 16 | Logging & retention (flow_logs monthly partition, analytics_events forever, retention 30d) |
+
+---
+
+### Фаза 3 — Messaging Pipeline *(Спринт 7)*
+
+| # | Название |
+|---|----------|
+| 17 | Message queues & sender (transactional HIGH / broadcast LOW / system, worker pools Horizon) |
+| 18 | Broadcast engine (BroadcastSendJob 1:1, rate limiter Redis, backpressure check) |
+| 19 | RAG adapter (RagAdapterInterface, StructuredRagResult, knowledge_bases, rag_query нода) |
+| 20 | Filament admin UI (Bots, Contacts, Flow list, analytics dashboard — **только read-only**) |
+
+---
+
+### Фаза 4 — Module System & HR *(Спринты 8–9)*
+
+Контракты `ModuleRegistrarInterface`, `DataAccessorInterface`, `RagAdapterInterface` уже существуют с Фаз 0–2. Здесь —
+полная реализация.
+
+**Спринт 8 — module framework**
+
+| # | Название |
+|---|----------|
+| 21 | Module framework (ModuleManifest, ActivatableInterface, CoreRegistrar полная реализация, capabilities validation, hard fail) |
+| 22 | Module isolation (degraded state, session failed + fallback, активные сессии доживают по snapshot) |
+
+**Спринт 9 — HR-модуль (fapost/solution-hr)**
+
+| # | Название |
+|---|----------|
+| 23 | HR Domain (employees canonical, employee_sync_logs, HrDataAccessor, sync_employee нода, scheduled sync) |
+| 24 | HR assessments (assessments 360°, assessment_results, access_control_rules, flow templates, Filament HR) |
+
+---
+
+### Фаза 5 — Self-hosted ops & SaaS shell *(Спринт 10)*
+
+| # | Название |
+|---|----------|
+| 25 | platform:update (5 фаз: VALIDATE→MIGRATE platform→MIGRATE modules→BOOT VALIDATION→ACTIVATE, rollback per phase) |
+| 26 | SaaS shell (plans, subscriptions внутренний учёт, feature_flags, tenant onboarding, landlord panel) |
+| 27 | Flow constructor UI (Vue Flow граф-редактор, Inertia, drag-and-drop, flow_definition snapshot, activate) |
+
+---
+
+## Решённые вопросы
+
+| Вопрос | Решение |
+|--------|---------|
+| Flow constructor | Vue Flow |
+| Billing / Stripe | Недоступен юридически — внутренний учёт |
+| Octane в scaffolding | Отложен до конца Фазы 1 (задача 08a) |
+| Фаза 0 перегружена | Разбита на два спринта: контракты отдельно от boot lifecycle |
+| Migration discipline | Migration Isolation Contract + phpat с задачи 03 |
+| Module contracts слишком поздно | ModuleRegistrarInterface заглушка с задачи 04 |
+| UI диктует backend | UI Non-interference Contract, задача 20 строго read-only |
+
+## Открытые вопросы
+
+| Вопрос | Когда |
+|--------|-------|
+| RAG провайдер: OpenAI Assistants vs pgvector | До Фазы 3, задача 19 |
+| Enterprise-клиент: legacy или новый тенант? | До Фазы 1 |
+| Backpressure threshold: per tenant или глобальный? | Задача 18 |
+| Cross-module migration enforcement: только phpat или + runtime check? | Задача 25 |
+| Миграции при отключении модуля: остаются или soft-delete? | Задача 22 |
+| Единый manifest contract: адаптация SaaS vs self-hosted | Задача 25 |
+| Второй Solution после HR | После Фазы 4, по обратной связи рынка |
 
 ===
 
