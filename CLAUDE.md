@@ -697,7 +697,7 @@ Feature/Solution/Plugin тенанта.
 
 | # | Название | Статус |
 |---|----------|--------|
-| 04 | Tenancy middleware & boot (TenancyMiddleware, CoreBootstrap, DomainServiceProvider chain, platform:install, **ModuleRegistrarInterface заглушка**) | ⬜ |
+| 04 | Tenancy middleware & boot (TenancyMiddleware, CoreBootstrap, DomainServiceProvider chain, platform:install, **ModuleRegistrarInterface заглушка**) | ✅ |
 
 ---
 

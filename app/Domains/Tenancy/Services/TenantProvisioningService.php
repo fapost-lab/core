@@ -14,18 +14,31 @@ use App\Domains\Tenancy\ValueObjects\MigrationScope;
 use Illuminate\Support\Str;
 use Throwable;
 
+/**
+ * Creates the landlord tenant record, PostgreSQL schema, and applies platform tenant migrations.
+ */
 final readonly class TenantProvisioningService
 {
     public function __construct(
         private TenantRepositoryInterface $tenantRepository,
         private TenantDatabaseManagerInterface $databaseManager,
+        private TenantSwitcher $tenantSwitcher,
     ) {
     }
 
     /**
+     * Provisions a tenant for the given slug: persist, create schema, migrate tenant platform DDL.
+     *
+     * Guarantees:
+     * - Status is active only after tenant migrations succeed; until then the row stays inactive.
+     * - If an error occurs after the tenant row exists, status is set inactive before surfacing
+     *   {@see TenantProvisioningException}.
+     *
+     * Migrations run inside {@see TenantSwitcher::runForTenant()} so the tenant connection and context match.
+     *
      * @param  array<string, mixed>  $config
      *
-     * @throws TenantProvisioningException
+     * @throws TenantProvisioningException on schema conflict or any failure during provisioning.
      */
     public function provision(string $slug, array $config = []): TenantInterface
     {
@@ -39,7 +52,7 @@ final readonly class TenantProvisioningService
         $tenant = new Tenant([
             'slug'        => $slug,
             'schema_name' => $schemaName,
-            'status'      => TenantStatus::Active,
+            'status'      => TenantStatus::Inactive,
             'config'      => $config,
         ]);
 
@@ -47,7 +60,7 @@ final readonly class TenantProvisioningService
 
         try {
             $this->databaseManager->createSchema($tenant);
-            $this->databaseManager->runForTenant($tenant, function (): void {
+            $this->tenantSwitcher->runForTenant($tenant, function (): void {
                 $this->databaseManager->runMigrations(MigrationScope::tenant());
             });
         } catch (Throwable $throwable) {
@@ -59,6 +72,9 @@ final readonly class TenantProvisioningService
                 previous: $throwable,
             );
         }
+
+        $tenant->fill(['status' => TenantStatus::Active->value]);
+        $this->tenantRepository->save($tenant);
 
         return $tenant;
     }

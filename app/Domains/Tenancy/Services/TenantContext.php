@@ -8,6 +8,9 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Exceptions\TenantNotResolvedException;
 
+/**
+ * @see TenantContextInterface
+ */
 final class TenantContext implements TenantContextInterface
 {
     private ?TenantInterface $tenant = null;
@@ -30,16 +33,8 @@ final class TenantContext implements TenantContextInterface
         return null !== $this->tenant;
     }
 
-    public function runForTenant(TenantInterface $tenant, callable $callback): mixed
+    public function reset(): void
     {
-        $previousTenant = $this->tenant;
-
-        try {
-            $this->tenant = $tenant;
-
-            return $callback();
-        } finally {
-            $this->tenant = $previousTenant;
-        }
+        $this->tenant = null;
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 return [
     'landlord_connection' => env('LANDLORD_DB_CONNECTION', 'pgsql'),
     'tenant_connection'   => env('TENANT_DB_CONNECTION', 'pgsql'),
+    'default_tenant_slug' => env('TENANT_SLUG', null),
     'schema_prefix'       => env('TENANT_SCHEMA_PREFIX', 'tenant_'),
     'redis_prefix'        => env('TENANT_REDIS_PREFIX', 'fapost'),
     'migration_paths'     => [

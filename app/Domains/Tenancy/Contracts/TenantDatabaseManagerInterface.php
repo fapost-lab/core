@@ -6,8 +6,12 @@ namespace App\Domains\Tenancy\Contracts;
 
 use App\Domains\Tenancy\Exceptions\ConnectionStackEmptyException;
 use App\Domains\Tenancy\ValueObjects\MigrationScope;
-use Closure;
 
+/**
+ * Landlord DDL for tenant schemas and stack-based switching of the default DB connection to a tenant.
+ *
+ * Application flows should use {@see \App\Domains\Tenancy\Services\TenantSwitcher::runForTenant()} instead of managing {@see switchTo()}/{@see restore()} manually.
+ */
 interface TenantDatabaseManagerInterface
 {
     public function createSchema(TenantInterface $tenant): void;
@@ -17,23 +21,23 @@ interface TenantDatabaseManagerInterface
     public function schemaExists(TenantInterface $tenant): bool;
 
     /**
-     * Low-level primitive. Prefer runForTenant().
-     * Pushes current connection onto stack before switching.
+     * Pushes current default connection/search_path state, then points the tenant connection at this tenant’s schema.
+     *
+     * Must be paired with {@see restore()} on the same manager instance (singleton stack).
      */
     public function switchTo(TenantInterface $tenant): void;
 
     /**
-     * Pop previous connection from stack and restore it.
+     * Pops the stack entry from the last {@see switchTo()} and restores the previous default connection.
      *
-     * @throws ConnectionStackEmptyException if stack is empty
+     * @throws ConnectionStackEmptyException if no matching {@see switchTo()} was called.
      */
     public function restore(): void;
 
     /**
-     * Execute callback in tenant context.
-     * Guarantees restore() via finally — safe for exceptions and early returns.
+     * Runs Laravel migrate against the then-current default connection.
+     *
+     * Constraint: invoke while tenant DB is active when migrating tenant paths (e.g. inside {@see \App\Domains\Tenancy\Services\TenantSwitcher::runForTenant()}).
      */
-    public function runForTenant(TenantInterface $tenant, Closure $callback): mixed;
-
     public function runMigrations(MigrationScope $scope): void;
 }

@@ -31,19 +31,30 @@ final class TenantContextTest extends TestCase
         $this->assertTrue($context->isResolved());
     }
 
-    public function test_run_for_tenant_restores_previous_context(): void
+    public function test_reset_clears_context(): void
     {
         $context = new TenantContext();
-        $tenant1 = $this->createMock(TenantInterface::class);
-        $tenant2 = $this->createMock(TenantInterface::class);
+        $tenant  = $this->createMock(TenantInterface::class);
 
-        $context->set($tenant1);
+        $context->set($tenant);
+        $this->assertTrue($context->isResolved());
 
-        $context->runForTenant($tenant2, function () use ($context, $tenant2): void {
-            $this->assertSame($tenant2, $context->get());
-        });
+        $context->reset();
 
-        $this->assertSame($tenant1, $context->get());
+        $this->assertFalse($context->isResolved());
+    }
+
+    public function test_get_throws_after_reset(): void
+    {
+        $context = new TenantContext();
+        $tenant  = $this->createMock(TenantInterface::class);
+
+        $context->set($tenant);
+        $context->reset();
+
+        $this->expectException(TenantNotResolvedException::class);
+
+        $context->get();
     }
 
     public function test_is_not_resolved_initially(): void

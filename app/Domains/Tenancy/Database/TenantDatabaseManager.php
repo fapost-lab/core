@@ -2,17 +2,19 @@
 
 declare(strict_types=1);
 
-namespace App\Domains\Tenancy\Services;
+namespace App\Domains\Tenancy\Database;
 
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Exceptions\ConnectionStackEmptyException;
 use App\Domains\Tenancy\ValueObjects\MigrationScope;
-use Closure;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
+/**
+ * @see TenantDatabaseManagerInterface
+ */
 final class TenantDatabaseManager implements TenantDatabaseManagerInterface
 {
     /**
@@ -46,12 +48,13 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
 
     public function switchTo(TenantInterface $tenant): void
     {
+        $tenantConnection   = (string) config('tenancy.tenant_connection', 'tenant');
         $previousConnection = DB::getDefaultConnection();
         $previousSearchPath = null;
 
-        if ('tenant' === $previousConnection) {
+        if ($previousConnection === $tenantConnection) {
             /** @var string|null $configured */
-            $configured         = config('database.connections.tenant.search_path');
+            $configured         = config("database.connections.{$tenantConnection}.search_path");
             $previousSearchPath = $configured;
         }
 
@@ -60,9 +63,9 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
             'search_path' => $previousSearchPath,
         ];
 
-        config(['database.connections.tenant.search_path' => $tenant->getSchemaName()]);
-        DB::purge('tenant');
-        DB::setDefaultConnection('tenant');
+        config(["database.connections.{$tenantConnection}.search_path" => $tenant->getSchemaName()]);
+        DB::purge($tenantConnection);
+        DB::setDefaultConnection($tenantConnection);
     }
 
     public function restore(): void
@@ -71,25 +74,15 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
             throw ConnectionStackEmptyException::make();
         }
 
-        $previous = array_pop($this->stack);
+        $tenantConnection = (string) config('tenancy.tenant_connection', 'tenant');
+        $previous         = array_pop($this->stack);
 
-        if ('tenant' === $previous['connection']) {
-            config(['database.connections.tenant.search_path' => $previous['search_path'] ?? 'public']);
-            DB::purge('tenant');
+        if ($previous['connection'] === $tenantConnection) {
+            config(["database.connections.{$tenantConnection}.search_path" => $previous['search_path'] ?? 'public']);
+            DB::purge($tenantConnection);
         }
 
         DB::setDefaultConnection($previous['connection']);
-    }
-
-    public function runForTenant(TenantInterface $tenant, Closure $callback): mixed
-    {
-        $this->switchTo($tenant);
-
-        try {
-            return $callback();
-        } finally {
-            $this->restore();
-        }
     }
 
     public function runMigrations(MigrationScope $scope): void

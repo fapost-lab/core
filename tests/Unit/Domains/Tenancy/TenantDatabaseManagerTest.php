@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Tenancy;
 
 use App\Domains\Tenancy\Contracts\TenantInterface;
+use App\Domains\Tenancy\Database\TenantDatabaseManager;
 use App\Domains\Tenancy\Exceptions\ConnectionStackEmptyException;
-use App\Domains\Tenancy\Services\TenantDatabaseManager;
+use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\MigrationScope;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -37,12 +38,12 @@ final class TenantDatabaseManagerTest extends TestCase
 
     public function test_run_for_tenant_restores_on_exception(): void
     {
-        $manager = $this->app->make(TenantDatabaseManager::class);
-        $tenant  = $this->makeTenant('acme');
-        $before  = DB::getDefaultConnection();
+        $switcher = $this->app->make(TenantSwitcher::class);
+        $tenant   = $this->makeTenant('acme');
+        $before   = DB::getDefaultConnection();
 
         try {
-            $manager->runForTenant($tenant, function (): void {
+            $switcher->runForTenant($tenant, function (): void {
                 throw new RuntimeException('boom');
             });
         } catch (RuntimeException) {
@@ -53,22 +54,24 @@ final class TenantDatabaseManagerTest extends TestCase
 
     public function test_nested_run_for_tenant_restores_correctly(): void
     {
-        $manager = $this->app->make(TenantDatabaseManager::class);
-        $tenantA = $this->makeTenant('alpha');
-        $tenantB = $this->makeTenant('beta');
-        $before  = DB::getDefaultConnection();
+        $switcher = $this->app->make(TenantSwitcher::class);
+        $tenantA  = $this->makeTenant('alpha');
+        $tenantB  = $this->makeTenant('beta');
+        $before   = DB::getDefaultConnection();
 
-        $manager->runForTenant($tenantA, function () use ($manager, $tenantB): void {
+        $tenantConn = (string) config('tenancy.tenant_connection');
+
+        $switcher->runForTenant($tenantA, function () use ($switcher, $tenantB, $tenantConn): void {
             $afterA      = DB::getDefaultConnection();
-            $searchPathA = (string) config('database.connections.tenant.search_path');
+            $searchPathA = (string) config("database.connections.{$tenantConn}.search_path");
 
-            $manager->runForTenant($tenantB, function () use ($afterA, $searchPathA): void {
+            $switcher->runForTenant($tenantB, function () use ($afterA, $searchPathA, $tenantConn): void {
                 $this->assertEquals($afterA, DB::getDefaultConnection());
-                $this->assertNotEquals($searchPathA, (string) config('database.connections.tenant.search_path'));
+                $this->assertNotEquals($searchPathA, (string) config("database.connections.{$tenantConn}.search_path"));
             });
 
             $this->assertEquals($afterA, DB::getDefaultConnection());
-            $this->assertEquals($searchPathA, (string) config('database.connections.tenant.search_path'));
+            $this->assertEquals($searchPathA, (string) config("database.connections.{$tenantConn}.search_path"));
         });
 
         $this->assertEquals($before, DB::getDefaultConnection());
