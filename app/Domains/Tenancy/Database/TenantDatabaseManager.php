@@ -64,7 +64,12 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         ];
 
         config(["database.connections.{$tenantConnection}.search_path" => $tenant->getSchemaName()]);
-        DB::purge($tenantConnection);
+
+        // SQLite has no schema concept — purging an :memory: connection destroys it.
+        if ('sqlite' !== $this->connectionDriver($tenantConnection)) {
+            DB::purge($tenantConnection);
+        }
+
         DB::setDefaultConnection($tenantConnection);
     }
 
@@ -78,8 +83,11 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         $previous         = array_pop($this->stack);
 
         if ($previous['connection'] === $tenantConnection) {
-            config(["database.connections.{$tenantConnection}.search_path" => $previous['search_path'] ?? 'public']);
-            DB::purge($tenantConnection);
+            config(["database.connections.{$tenantConnection}.search_path" => $previous['search_path']]);
+
+            if ('sqlite' !== $this->connectionDriver($tenantConnection)) {
+                DB::purge($tenantConnection);
+            }
         }
 
         DB::setDefaultConnection($previous['connection']);
@@ -92,6 +100,11 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
             '--force'    => true,
             '--realpath' => true,
         ]);
+    }
+
+    private function connectionDriver(string $connection): string
+    {
+        return (string) config("database.connections.{$connection}.driver", '');
     }
 
     private function quoteIdentifier(string $name): string

@@ -8,6 +8,8 @@ use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
 
 interface TenantRepositoryInterface
 {
+    public function existsAny(): bool;
+
     public function findById(string $id): ?TenantInterface;
 
     public function findBySlug(string $slug): ?TenantInterface;

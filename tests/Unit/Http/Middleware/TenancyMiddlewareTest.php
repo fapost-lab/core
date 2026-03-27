@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Mockery;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpFoundation\Response;
 
 final class TenancyMiddlewareTest extends TestCase
@@ -27,18 +28,20 @@ final class TenancyMiddlewareTest extends TestCase
 
     public function test_sets_tenant_context_and_switches_db(): void
     {
-        $tenant    = Mockery::mock(TenantInterface::class);
-        $resolver  = Mockery::mock(TenantResolverInterface::class);
-        $dbManager = Mockery::mock(TenantDatabaseManagerInterface::class);
-        $bootstrap = Mockery::mock(CoreBootstrapInterface::class);
-        $context   = new TenantContext();
-        $switcher  = new TenantSwitcher($context, $dbManager);
+        $tenant              = Mockery::mock(TenantInterface::class);
+        $resolver            = Mockery::mock(TenantResolverInterface::class);
+        $dbManager           = Mockery::mock(TenantDatabaseManagerInterface::class);
+        $bootstrap           = Mockery::mock(CoreBootstrapInterface::class);
+        $permissionRegistrar = Mockery::mock(PermissionRegistrar::class);
+        $context             = new TenantContext();
+        $switcher            = new TenantSwitcher($context, $dbManager, $permissionRegistrar);
 
         $request = Request::create('/test');
 
         $resolver->shouldReceive('resolve')->once()->with($request)->andReturn($tenant);
         $dbManager->shouldReceive('switchTo')->once()->with($tenant);
         $dbManager->shouldReceive('restore')->once();
+        $permissionRegistrar->shouldReceive('forgetCachedPermissions')->twice();
         $bootstrap->shouldReceive('boot')->once();
         $bootstrap->shouldReceive('reset')->once();
 
@@ -51,18 +54,20 @@ final class TenancyMiddlewareTest extends TestCase
 
     public function test_resets_bootstrap_even_on_exception(): void
     {
-        $tenant    = Mockery::mock(TenantInterface::class);
-        $resolver  = Mockery::mock(TenantResolverInterface::class);
-        $dbManager = Mockery::mock(TenantDatabaseManagerInterface::class);
-        $bootstrap = Mockery::mock(CoreBootstrapInterface::class);
-        $context   = new TenantContext();
-        $switcher  = new TenantSwitcher($context, $dbManager);
+        $tenant              = Mockery::mock(TenantInterface::class);
+        $resolver            = Mockery::mock(TenantResolverInterface::class);
+        $dbManager           = Mockery::mock(TenantDatabaseManagerInterface::class);
+        $bootstrap           = Mockery::mock(CoreBootstrapInterface::class);
+        $permissionRegistrar = Mockery::mock(PermissionRegistrar::class);
+        $context             = new TenantContext();
+        $switcher            = new TenantSwitcher($context, $dbManager, $permissionRegistrar);
 
         $request = Request::create('/test');
 
         $resolver->shouldReceive('resolve')->twice()->with($request)->andReturn($tenant);
         $dbManager->shouldReceive('switchTo')->twice()->with($tenant);
         $dbManager->shouldReceive('restore')->twice();
+        $permissionRegistrar->shouldReceive('forgetCachedPermissions');
         $bootstrap->shouldReceive('boot')->twice();
         $bootstrap->shouldReceive('reset')->twice();
 

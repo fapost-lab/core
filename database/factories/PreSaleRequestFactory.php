@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
-use App\Enums\MessengerPreference;
-use App\Models\PreSaleRequest;
+use App\Domains\Presale\Enums\MessengerPreference;
+use App\Domains\Presale\Models\PreSaleRequest;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /** @extends Factory<PreSaleRequest> */

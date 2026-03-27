@@ -15,17 +15,33 @@ use Tests\TestCase;
 
 final class TenantDatabaseManagerTest extends TestCase
 {
-    public function test_switch_and_restore_changes_default_connection(): void
+    public function test_switch_and_restore_changes_tenant_schema(): void
     {
-        $manager = $this->app->make(TenantDatabaseManager::class);
-        $tenant  = $this->makeTenant('acme');
+        $manager    = $this->app->make(TenantDatabaseManager::class);
+        $tenant     = $this->makeTenant('acme');
+        $tenantConn = (string) config('tenancy.tenant_connection');
 
-        $before = DB::getDefaultConnection();
+        $beforeSearchPath = (string) config("database.connections.{$tenantConn}.search_path");
+        $beforeDefault    = DB::getDefaultConnection();
+
         $manager->switchTo($tenant);
-        $this->assertNotEquals($before, DB::getDefaultConnection());
+
+        // After switchTo: search_path must point to tenant schema
+        $this->assertEquals(
+            $tenant->getSchemaName(),
+            (string) config("database.connections.{$tenantConn}.search_path"),
+        );
+        // Default connection must be the tenant connection
+        $this->assertEquals($tenantConn, DB::getDefaultConnection());
 
         $manager->restore();
-        $this->assertEquals($before, DB::getDefaultConnection());
+
+        // After restore: default connection and search_path are back
+        $this->assertEquals($beforeDefault, DB::getDefaultConnection());
+        $this->assertEquals(
+            $beforeSearchPath,
+            (string) config("database.connections.{$tenantConn}.search_path"),
+        );
     }
 
     public function test_restore_throws_on_empty_stack(): void

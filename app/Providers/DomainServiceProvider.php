@@ -23,9 +23,9 @@ final class DomainServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(TenantContextInterface::class, TenantContext::class);
+        $this->app->scoped(TenantContextInterface::class, TenantContext::class);
 
-        $this->app->singleton(
+        $this->app->scoped(
             TenantDatabaseManagerInterface::class,
             TenantDatabaseManager::class,
         );
@@ -37,10 +37,10 @@ final class DomainServiceProvider extends ServiceProvider
 
         $this->app->bind(TenantResolverInterface::class, ConfigTenantResolver::class);
 
-        $this->app->singleton(CoreBootstrap::class);
-        $this->app->singleton(CoreBootstrapInterface::class, fn ($app): CoreBootstrap => $app->make(CoreBootstrap::class));
-        $this->app->singleton(DomainBootstrapper::class);
-        $this->app->singleton(TenantSwitcher::class);
+        $this->app->scoped(CoreBootstrap::class);
+        $this->app->scoped(CoreBootstrapInterface::class, fn ($app): CoreBootstrap => $app->make(CoreBootstrap::class));
+        $this->app->scoped(DomainBootstrapper::class);
+        $this->app->scoped(TenantSwitcher::class);
         $this->app->singleton(WebhookRegistryWriter::class);
     }
 }

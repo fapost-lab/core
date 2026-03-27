@@ -28,5 +28,7 @@ final class AppServiceProvider extends ServiceProvider
         DB::prohibitDestructiveCommands(
             $this->app->environment('production')
         );
+
+        $this->loadMigrationsFrom(database_path('migrations/landlord'));
     }
 }

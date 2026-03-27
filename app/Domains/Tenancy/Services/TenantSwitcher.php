@@ -8,6 +8,7 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use Closure;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Orchestrates tenant identity ({@see TenantContextInterface}) and tenant DB switching for a bounded scope.
@@ -17,6 +18,7 @@ final readonly class TenantSwitcher
     public function __construct(
         private TenantContextInterface $tenantContext,
         private TenantDatabaseManagerInterface $databaseManager,
+        private PermissionRegistrar $permissionRegistrar,
     ) {
     }
 
@@ -39,11 +41,13 @@ final readonly class TenantSwitcher
 
         $this->tenantContext->set($tenant);
         $this->databaseManager->switchTo($tenant);
+        $this->permissionRegistrar->forgetCachedPermissions();
 
         try {
             return $callback();
         } finally {
             $this->databaseManager->restore();
+            $this->permissionRegistrar->forgetCachedPermissions();
 
             if (null !== $previousTenant) {
                 $this->tenantContext->set($previousTenant);

@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "bb989dce8cb18ab9d347e32b82c04ec8",
+  "content-hash": "f454ba893643290c1df8b306d4b39fe5",
   "packages": [
     {
       "name": "blade-ui-kit/blade-heroicons",
@@ -523,6 +523,71 @@
         }
       ],
       "time": "2025-08-20T19:15:30+00:00"
+    },
+    {
+      "name": "craft-forge/filament-language-switcher",
+      "version": "v1.2.1",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/craft-forge/filament-language-switcher.git",
+        "reference": "235421f4b8ce7cd89b3c16af3c9f54e464c3ca53"
+      },
+      "dist": {
+        "type": "zip",
+        "url": "https://api.github.com/repos/craft-forge/filament-language-switcher/zipball/235421f4b8ce7cd89b3c16af3c9f54e464c3ca53",
+        "reference": "235421f4b8ce7cd89b3c16af3c9f54e464c3ca53",
+        "shasum": ""
+      },
+      "require": {
+        "filament/filament": "^3.0|^4.0|^5.0",
+        "php": "^8.1",
+        "spatie/laravel-package-tools": "^1.16",
+        "stijnvanouplines/blade-country-flags": "^1.0.6"
+      },
+      "require-dev": {
+        "orchestra/testbench": "^9.0",
+        "phpunit/phpunit": "^11.5.3"
+      },
+      "type": "library",
+      "extra": {
+        "laravel": {
+          "providers": [
+            "CraftForge\\FilamentLanguageSwitcher\\FilamentLanguageSwitcherServiceProvider"
+          ]
+        }
+      },
+      "autoload": {
+        "psr-4": {
+          "CraftForge\\FilamentLanguageSwitcher\\": "src/"
+        }
+      },
+      "notification-url": "https://packagist.org/downloads/",
+      "license": [
+        "MIT"
+      ],
+      "authors": [
+        {
+          "name": "Taras Koval",
+          "email": "taraskovaldev@gmail.com",
+          "homepage": "https://github.com/taras-koval"
+        }
+      ],
+      "description": "Zero-config language switcher for Filament admin panels. Automatically scans available translations, renders dropdown with country flags, persists selection via sessions.",
+      "homepage": "https://github.com/craft-forge/filament-language-switcher",
+      "keywords": [
+        "admin",
+        "filament",
+        "i18n",
+        "language",
+        "laravel",
+        "localization",
+        "switcher"
+      ],
+      "support": {
+        "issues": "https://github.com/craft-forge/filament-language-switcher/issues",
+        "source": "https://github.com/craft-forge/filament-language-switcher"
+      },
+      "time": "2026-03-04T15:40:02+00:00"
     },
     {
       "name": "danharrin/date-format-converter",
@@ -6588,6 +6653,90 @@
       "time": "2026-02-21T12:49:54+00:00"
     },
     {
+      "name": "spatie/laravel-permission",
+      "version": "6.25.0",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/spatie/laravel-permission.git",
+        "reference": "d7d4cb0d58616722f1afc90e0484e4825155b9b3"
+      },
+      "dist": {
+        "type": "zip",
+        "url": "https://api.github.com/repos/spatie/laravel-permission/zipball/d7d4cb0d58616722f1afc90e0484e4825155b9b3",
+        "reference": "d7d4cb0d58616722f1afc90e0484e4825155b9b3",
+        "shasum": ""
+      },
+      "require": {
+        "illuminate/auth": "^8.12|^9.0|^10.0|^11.0|^12.0|^13.0",
+        "illuminate/container": "^8.12|^9.0|^10.0|^11.0|^12.0|^13.0",
+        "illuminate/contracts": "^8.12|^9.0|^10.0|^11.0|^12.0|^13.0",
+        "illuminate/database": "^8.12|^9.0|^10.0|^11.0|^12.0|^13.0",
+        "php": "^8.0"
+      },
+      "require-dev": {
+        "laravel/passport": "^11.0|^12.0|^13.0",
+        "laravel/pint": "^1.0",
+        "orchestra/testbench": "^6.23|^7.0|^8.0|^9.0|^10.0|^11.0",
+        "pestphp/pest": "^2.0|^3.0|^4.0",
+        "pestphp/pest-plugin-laravel": "^2.0|^3.0|^4.0"
+      },
+      "type": "library",
+      "extra": {
+        "laravel": {
+          "providers": [
+            "Spatie\\Permission\\PermissionServiceProvider"
+          ]
+        },
+        "branch-alias": {
+          "dev-main": "6.x-dev",
+          "dev-master": "6.x-dev"
+        }
+      },
+      "autoload": {
+        "files": [
+          "src/helpers.php"
+        ],
+        "psr-4": {
+          "Spatie\\Permission\\": "src"
+        }
+      },
+      "notification-url": "https://packagist.org/downloads/",
+      "license": [
+        "MIT"
+      ],
+      "authors": [
+        {
+          "name": "Freek Van der Herten",
+          "email": "freek@spatie.be",
+          "homepage": "https://spatie.be",
+          "role": "Developer"
+        }
+      ],
+      "description": "Permission handling for Laravel 8.0 and up",
+      "homepage": "https://github.com/spatie/laravel-permission",
+      "keywords": [
+        "acl",
+        "laravel",
+        "permission",
+        "permissions",
+        "rbac",
+        "roles",
+        "security",
+        "spatie"
+      ],
+      "support": {
+        "issues": "https://github.com/spatie/laravel-permission/issues",
+        "source": "https://github.com/spatie/laravel-permission/tree/6.25.0"
+      },
+      "funding": [
+        {
+          "url": "https://github.com/spatie",
+          "type": "github"
+        }
+      ],
+      "time": "2026-03-17T22:46:46+00:00"
+    },
+    {
       "name": "spatie/laravel-query-builder",
       "version": "7.0.1",
       "source": {
@@ -7896,6 +8045,60 @@
         }
       ],
       "time": "2026-02-23T11:45:59+00:00"
+    },
+    {
+      "name": "stijnvanouplines/blade-country-flags",
+      "version": "1.0.9",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/stijnvanouplines/blade-country-flags.git",
+        "reference": "06b53f8ae58238c30a5eaa35fd199ffd772a83f8"
+      },
+      "dist": {
+        "type": "zip",
+        "url": "https://api.github.com/repos/stijnvanouplines/blade-country-flags/zipball/06b53f8ae58238c30a5eaa35fd199ffd772a83f8",
+        "reference": "06b53f8ae58238c30a5eaa35fd199ffd772a83f8",
+        "shasum": ""
+      },
+      "require": {
+        "blade-ui-kit/blade-icons": "^1.0",
+        "illuminate/support": "^8.0|^9.0|^10.0|^11.0|^12.0|^13.0",
+        "php": "^7.4|^8.0"
+      },
+      "require-dev": {
+        "orchestra/testbench": "^6.18|^8.0|^9.0|^10.0|^11.0",
+        "pestphp/pest": "^1.4|^2.34|^3.0|^4.4",
+        "spatie/pest-plugin-snapshots": "^1.0|^2.1"
+      },
+      "type": "library",
+      "extra": {
+        "laravel": {
+          "providers": [
+            "StijnVanouplines\\BladeCountryFlags\\BladeCountryFlagsServiceProvider"
+          ]
+        }
+      },
+      "autoload": {
+        "psr-4": {
+          "StijnVanouplines\\BladeCountryFlags\\": "src/"
+        }
+      },
+      "notification-url": "https://packagist.org/downloads/",
+      "license": [
+        "MIT"
+      ],
+      "description": "A package to easily make use of country flags in your Laravel Blade views.",
+      "homepage": "https://github.com/stijnvanouplines/blade-country-flags",
+      "keywords": [
+        "blade",
+        "country flags",
+        "laravel"
+      ],
+      "support": {
+        "issues": "https://github.com/stijnvanouplines/blade-country-flags/issues",
+        "source": "https://github.com/stijnvanouplines/blade-country-flags/tree/1.0.9"
+      },
+      "time": "2026-03-03T13:15:47+00:00"
     },
     {
       "name": "symfony/clock",

@@ -17,7 +17,10 @@ final class SetLocale
         $locale = $this->resolveLocale($request);
 
         app()->setLocale($locale);
-        $request->session()->put('locale', $locale);
+
+        if ($request->hasSession()) {
+            $request->session()->put('locale', $locale);
+        }
 
         return $next($request);
     }
@@ -29,16 +32,15 @@ final class SetLocale
             return $lang;
         }
 
-        $sessionLocale = $request->session()->get('locale');
-        if (is_string($sessionLocale) && in_array($sessionLocale, self::SUPPORTED_LOCALES, true)) {
-            return $sessionLocale;
+        if ($request->hasSession()) {
+            $sessionLocale = $request->session()->get('locale');
+            if (filled($sessionLocale) && is_string($sessionLocale) && in_array($sessionLocale, self::SUPPORTED_LOCALES, true)) {
+                return $sessionLocale;
+            }
         }
 
         $preferred = $request->getPreferredLanguage(self::SUPPORTED_LOCALES);
-        if (null !== $preferred) {
-            return $preferred;
-        }
 
-        return config('app.locale', 'en');
+        return $preferred ?? config('app.locale', 'en');
     }
 }

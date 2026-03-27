@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Providers\Filament;
 
+use App\Domains\Staff\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\SetLocale;
+use App\Http\Middleware\TenancyMiddleware;
+use CraftForge\FilamentLanguageSwitcher\FilamentLanguageSwitcherPlugin;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -12,6 +16,7 @@ use Filament\Pages\Dashboard;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
+use Filament\View\PanelsRenderHook;
 use Filament\Widgets\AccountWidget;
 use Filament\Widgets\FilamentInfoWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
@@ -30,6 +35,14 @@ final class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
+            ->spa()
+            ->plugins([
+                FilamentLanguageSwitcherPlugin::make()
+                    ->locales(['en', 'ru', 'uk'])
+                    // Default USER_MENU_BEFORE is easy to miss in the topbar; this hook is inside the topbar actions area.
+                    ->renderHook(PanelsRenderHook::GLOBAL_SEARCH_AFTER),
+            ])
+            ->font('Poppins')
             ->colors([
                 'primary' => Color::Amber,
             ])
@@ -44,6 +57,7 @@ final class AdminPanelProvider extends PanelProvider
                 FilamentInfoWidget::class,
             ])
             ->middleware([
+                TenancyMiddleware::class,
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
@@ -54,8 +68,14 @@ final class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+            // Must run after StartSession (see first middleware() block above). A separate append keeps order correct.
+            ->middleware([
+                SetLocale::class,
+            ], isPersistent: true)
             ->authMiddleware([
+                TenancyMiddleware::class,
                 Authenticate::class,
+                EnsureUserIsActive::class,
             ]);
     }
 }

@@ -115,7 +115,7 @@ return [
         ],
 
         'landlord' => [
-            'driver'   => 'pgsql',
+            'driver'   => env('LANDLORD_DB_DRIVER', 'pgsql'),
             'host'     => env('LANDLORD_DB_HOST', env('DB_HOST', '127.0.0.1')),
             'port'     => env('LANDLORD_DB_PORT', env('DB_PORT', '5432')),
             'database' => env('LANDLORD_DB_DATABASE', env('DB_DATABASE', 'fapost')),

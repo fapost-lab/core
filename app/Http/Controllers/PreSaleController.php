@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Domains\Presale\Models\PreSaleRequest;
 use App\Http\Requests\StorePreSaleRequest;
 use App\Mail\NewPresaleRequest;
-use App\Models\PreSaleRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Mail;
 

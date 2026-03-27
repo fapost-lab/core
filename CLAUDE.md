@@ -148,9 +148,10 @@ SaaS onboarding    → TenantProvisioningService::provision() + billing, flags
 
 **Как работает переключение:**
 
-- `TenantContextInterface` — синглтон в контейнере
+- `TenantContextInterface` — `scoped` в контейнере (новый экземпляр per-request, изолирован от соседних запросов)
 - Перед обработкой любого запроса/job — вызвать `TenantContext::set()`
 - Octane: использовать `runForTenant(callable)` для изоляции между запросами
+- Все сервисы с per-request состоянием или инжектирующие `TenantContextInterface` — `scoped` (`TenantDatabaseManager`, `CoreBootstrap`, `DomainBootstrapper`, `TenantSwitcher`)
 
 **Правило:** никакой код платформы не обращается к landlord напрямую кроме `Tenancy` домена.
 
@@ -705,13 +706,13 @@ Feature/Solution/Plugin тенанта.
 
 Octane вводится последним в фазе — когда все lifecycle boundaries известны.
 
-| # | Название |
-|---|----------|
-| 05 | Staff Domain (users, roles, Filament Shield, Filament panel) |
-| 06 | Bot Domain (модель, token encryption, webhook_public_hash, Redis registry write) |
-| 07 | Contact Domain (модель, channel identity, contact_groups, findOrCreate) |
-| 08 | Webhook routing (ChannelAdapter Telegram+WA, signature verify, idempotency Redis SET NX, tenant resolve, IncomingMessageJob) |
-| 08a | Octane integration (поверх стабильного TenantContext+middleware, singleton/scoped bindings, runForTenant как изолятор) |
+| # | Название | Статус |
+|---|----------|--------|
+| 05 | Staff Domain (users, roles, Filament Shield, Filament panel) | ✅ |
+| 06 | Bot Domain (модель, token encryption, webhook_public_hash, Redis registry write) | |
+| 07 | Contact Domain (модель, channel identity, contact_groups, findOrCreate) | |
+| 08 | Webhook routing (ChannelAdapter Telegram+WA, signature verify, idempotency Redis SET NX, tenant resolve, IncomingMessageJob) | |
+| 08a | Octane integration (поверх стабильного TenantContext+middleware, ~~singleton/scoped bindings~~, runForTenant как изолятор) | 🔶 scoped bindings ✅ |
 
 ---
 

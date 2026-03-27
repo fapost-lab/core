@@ -6,7 +6,6 @@ namespace App\Console\Commands;
 
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantProvisioningService;
-use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -14,62 +13,62 @@ use Illuminate\Support\Facades\DB;
 final class InstallPlatformCommand extends Command
 {
     protected $signature = 'platform:install
-        {--tenant-slug=main : Slug для первого тенанта}
-        {--admin-email= : Email первого администратора}
-        {--admin-password= : Пароль первого администратора}
-        {--force : Пропустить подтверждения}';
+        {--tenant-slug=app : Slug for the first tenant}
+        {--admin-email= : Email for the first admin}
+        {--admin-password= : Password for the first admin}';
 
-    protected $description = 'Install FAPost Core platform';
+    protected $description = 'Install FAPOST Core platform';
 
     public function __construct(
-        private readonly TenantProvisioningService $provisioningService,
         private readonly TenantRepositoryInterface $tenantRepository,
-        private readonly TenantSwitcher $tenantSwitcher,
+        private readonly TenantProvisioningService $provisioningService,
     ) {
         parent::__construct();
     }
 
     public function handle(): int
     {
-        $this->info('FAPost Core - Platform Installation');
+        $this->info('FAPOST Core - Platform Installation');
         $this->newLine();
 
         $this->components->task('Checking database connection', function (): void {
             DB::connection('landlord')->getPdo();
         });
 
-        $this->components->task('Running landlord migrations', function (): void {
-            Artisan::call('migrate', [
+        if ($this->tenantRepository->existsAny()) {
+            $this->components->error('Platform is already installed. Only one tenant is allowed in self-hosted mode.');
+
+            return self::FAILURE;
+        }
+
+        $migrateExitCode = 0;
+        $this->components->task('Running landlord migrations', function () use (&$migrateExitCode): void {
+            $migrateExitCode = Artisan::call('migrate', [
                 '--path'     => 'database/migrations/landlord',
                 '--database' => 'landlord',
                 '--force'    => true,
             ]);
         });
 
-        $slug = (string) $this->option('tenant-slug');
+        if (self::SUCCESS !== $migrateExitCode) {
+            $this->components->error('Landlord migrations failed. Installation aborted.');
 
-        $this->components->task("Provisioning tenant [{$slug}]", function () use ($slug): void {
-            $tenant = $this->provisioningService->provision($slug);
-            $this->line("  Schema: {$tenant->getSchemaName()}");
-        });
+            return self::FAILURE;
+        }
 
+        $slug     = (string) $this->option('tenant-slug');
         $email    = $this->option('admin-email') ?: $this->ask('Admin email');
         $password = $this->option('admin-password') ?: $this->secret('Admin password');
 
-        $this->components->task('Preparing admin user setup', function () use ($slug, $email): void {
-            $tenant = $this->tenantRepository->findBySlug($slug);
-
-            if (null === $tenant) {
-                return;
-            }
-
-            $this->tenantSwitcher->runForTenant($tenant, function () use ($email): void {
-                $this->line("  Admin: {$email} - will be created when Staff Domain is ready");
-            });
-        });
-
-        $this->components->task('Warming up cache', function (): void {
-            Artisan::call('route:cache');
+        $this->components->task("Provisioning tenant [{$slug}] and first admin", function () use ($slug, $email, $password): void {
+            $tenant = $this->provisioningService->provision(
+                slug: $slug,
+                firstAdminEmail: $email,
+                firstAdminPassword: $password,
+            );
+            $this->line("  Schema: {$tenant->getSchemaName()}");
+            $this->line("  Admin: {$email}");
+            $this->line('  Role: admin (ACL bootstrap) assigned to the first admin.');
         });
 
         $this->newLine();

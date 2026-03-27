@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Tenancy\Services;
 
+use App\Domains\Staff\Enums\UserStatus;
+use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
@@ -15,7 +18,7 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Creates the landlord tenant record, PostgreSQL schema, and applies platform tenant migrations.
+ * Creates the landlord tenant record, PostgreSQL schema, tenant migrations, and first staff admin.
  */
 final readonly class TenantProvisioningService
 {
@@ -23,25 +26,34 @@ final readonly class TenantProvisioningService
         private TenantRepositoryInterface $tenantRepository,
         private TenantDatabaseManagerInterface $databaseManager,
         private TenantSwitcher $tenantSwitcher,
+        private AclBootstrapService $aclBootstrapService,
     ) {
     }
 
     /**
-     * Provisions a tenant for the given slug: persist, create schema, migrate tenant platform DDL.
+     * Provisions a tenant: persist (inactive), schema, migrations, first admin user, then activate.
      *
      * Guarantees:
-     * - Status is active only after tenant migrations succeed; until then the row stays inactive.
-     * - If an error occurs after the tenant row exists, status is set inactive before surfacing
+     * - Status becomes active only after the first admin user exists in the tenant schema with the admin role.
+     * - Migration and user creation run inside {@see TenantSwitcher::runForTenant()} (tenant DB + context).
+     * - On failure after the tenant row exists, status is set inactive before
      *   {@see TenantProvisioningException}.
-     *
-     * Migrations run inside {@see TenantSwitcher::runForTenant()} so the tenant connection and context match.
      *
      * @param  array<string, mixed>  $config
      *
-     * @throws TenantProvisioningException on schema conflict or any failure during provisioning.
+     * @throws TenantProvisioningException on schema conflict, missing admin credentials, or any step failure.
      */
-    public function provision(string $slug, array $config = []): TenantInterface
-    {
+    public function provision(
+        string $slug,
+        string $firstAdminEmail,
+        string $firstAdminPassword,
+        string $firstAdminName = 'Administrator',
+        array $config = [],
+    ): TenantInterface {
+        if ('' === mb_trim($firstAdminEmail) || '' === $firstAdminPassword) {
+            throw new TenantProvisioningException('First admin email and password are required.');
+        }
+
         $schemaName      = 'tenant_' . Str::slug($slug, '_');
         $temporaryTenant = $this->makeTemporaryTenant($slug, $schemaName);
 
@@ -60,8 +72,14 @@ final readonly class TenantProvisioningService
 
         try {
             $this->databaseManager->createSchema($tenant);
-            $this->tenantSwitcher->runForTenant($tenant, function (): void {
+            $this->tenantSwitcher->runForTenant($tenant, function () use (
+                $firstAdminEmail,
+                $firstAdminPassword,
+                $firstAdminName,
+            ): void {
                 $this->databaseManager->runMigrations(MigrationScope::tenant());
+                $this->aclBootstrapService->bootstrap();
+                $this->createFirstTenantAdminUser($firstAdminEmail, $firstAdminPassword, $firstAdminName);
             });
         } catch (Throwable $throwable) {
             $tenant->fill(['status' => TenantStatus::Inactive->value]);
@@ -77,6 +95,22 @@ final readonly class TenantProvisioningService
         $this->tenantRepository->save($tenant);
 
         return $tenant;
+    }
+
+    /**
+     * @internal Invoked only inside {@see TenantSwitcher::runForTenant()} after tenant migrations.
+     */
+    private function createFirstTenantAdminUser(string $email, string $password, string $name): void
+    {
+        $user = User::query()->create([
+            'name'              => $name,
+            'email'             => $email,
+            'password'          => $password,
+            'email_verified_at' => now(),
+            'status'            => UserStatus::Active,
+        ]);
+
+        $user->assignRole('admin');
     }
 
     private function makeTemporaryTenant(string $slug, string $schemaName): TenantInterface

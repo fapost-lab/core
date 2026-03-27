@@ -5,15 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Mail\NewPresaleRequest;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
-use Tests\TestCase;
 
-final class LandingPageTest extends TestCase
+final class LandingPageTest extends FeatureTestCase
 {
-    use RefreshDatabase;
-
     public function test_landing_page_returns_200(): void
     {
         $response = $this->get('/');
@@ -182,5 +178,16 @@ final class LandingPageTest extends TestCase
             'email'   => 'jane@example.com',
             'message' => null,
         ]);
+    }
+
+    /**
+     * Run root-level migrations only (presale_requests, cache, jobs).
+     * Landlord setup is handled by {@see FeatureTestCase::setUpLandlord()}.
+     *
+     * @return array<string, mixed>
+     */
+    protected function migrateFreshUsing(): array
+    {
+        return ['--path' => 'database/migrations', '--force' => true];
     }
 }

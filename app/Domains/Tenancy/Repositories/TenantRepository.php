@@ -13,6 +13,11 @@ use InvalidArgumentException;
 
 final class TenantRepository implements TenantRepositoryInterface
 {
+    public function existsAny(): bool
+    {
+        return Tenant::on('landlord')->exists();
+    }
+
     public function findById(string $id): ?TenantInterface
     {
         return Tenant::on('landlord')->find($id);
