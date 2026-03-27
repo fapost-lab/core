@@ -71,7 +71,7 @@ final class TenantsSeedAclCommand extends Command
 
             try {
                 $this->tenantSwitcher->runForTenant($tenant, function (): void {
-                    (new RoleSeeder())->run();
+                    new RoleSeeder()->run();
                 });
                 $this->line("[{$slug}] → <info>OK</info>");
                 $success++;

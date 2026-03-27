@@ -6,7 +6,7 @@
 
 ## Что это за проект
 
-FAPost Core (Flow Automation Post) — платформа для построения диалоговых ботов в Telegram и WhatsApp.
+FAPost Core (Flow Automation Post) — платформа для построения диалоговых ассистентов в Telegram и WhatsApp.
 Архитектура: FAPost Core (этот репо) + FAPost HR / FAPost {Niche} (отдельные репо) + FAPost SaaS (отдельный репо).
 
 Сейчас разрабатывается только FAPost Core. Без FAPost SaaS, без модулей.
@@ -35,7 +35,7 @@ app/
     Flow/             — flow engine, node registry, session management
     Messaging/        — channel adapters, incoming/outgoing pipeline
     Contact/          — участники диалогов
-    Bot/              — боты, webhook management
+    Assistant/        — ассистенты и каналы (transport endpoints)
   Jobs/               — оркестрационные jobs (пересекают домены)
   Http/
     Middleware/       — глобальные middleware (tenant resolve, auth)
@@ -151,9 +151,66 @@ SaaS onboarding    → TenantProvisioningService::provision() + billing, flags
 - `TenantContextInterface` — `scoped` в контейнере (новый экземпляр per-request, изолирован от соседних запросов)
 - Перед обработкой любого запроса/job — вызвать `TenantContext::set()`
 - Octane: использовать `runForTenant(callable)` для изоляции между запросами
-- Все сервисы с per-request состоянием или инжектирующие `TenantContextInterface` — `scoped` (`TenantDatabaseManager`, `CoreBootstrap`, `DomainBootstrapper`, `TenantSwitcher`)
+- Все сервисы с per-request состоянием или инжектирующие `TenantContextInterface` — `scoped` (`TenantDatabaseManager`,
+  `CoreBootstrap`, `DomainBootstrapper`, `TenantSwitcher`)
 
 **Правило:** никакой код платформы не обращается к landlord напрямую кроме `Tenancy` домена.
+
+---
+
+## Assistant Domain
+
+**Доменная модель:**
+
+- `Assistant` — верхний бизнес-агрегат. Самостоятельная управляемая единица внутри tenant.
+- `Channel` — подчинённая сущность `Assistant`. Transport endpoint — отвечает только за подключение канала.
+
+**Один tenant может иметь несколько `Assistant`. Примеры:** Sales Assistant, Support Assistant, Warehouse Assistant.
+
+**`Assistant` содержит:**
+
+- `name`, `is_active`, `default_flow_id`, `fallback_message`, `settings` (JSONB: AI/runtime настройки)
+
+**`Channel` содержит:**
+
+- `assistant_id` (FK → assistants), `type` (telegram|whatsapp), `token` (encrypted),
+  `secret_token` (encrypted), `webhook_public_hash` (UNIQUE), `config` (JSONB), `is_active`
+
+**Инварианты `Channel`:**
+
+- `webhook_public_hash` генерируется один раз при создании
+- Ротация — только через `ChannelService::rotateWebhookHash()`
+- `webhook_public_hash` не меняется при update токена
+
+**AssistantContext — по аналогии с TenantContext:**
+
+```php
+interface AssistantContextInterface
+{
+    public function set(AssistantInterface $assistant): void;
+    public function get(): AssistantInterface; // throws AssistantNotResolvedException
+    public function isResolved(): bool;
+}
+```
+
+**Порядок установки:** Webhook → resolve tenant → switch schema → resolve channel → resolve assistant → set
+AssistantContext → dispatch job.
+
+**Runtime rule:**
+
+```
+Incoming webhook
+  → resolve channel (by public_hash из Redis)
+  → resolve assistant (assistant_id из channel payload)
+  → run assistant flow
+```
+
+Flow запускается **ассистентом**, не каналом.
+
+**`flow_sessions` хранит `tenant_id + assistant_id + contact_id`** — полный контекст.
+
+**Access control:** User ↔ Assistants many-to-many (`user_assistants` pivot). Пользователь видит только назначенные ему
+ассистенты — влияет на список, assistant panel, выбор в триггерах и рассылках.
 
 ---
 
@@ -198,7 +255,7 @@ SaaS onboarding    → TenantProvisioningService::provision() + billing, flags
 Три обязательных уровня защиты в `ProcessIncomingMessageJob`:
 
 1. **Idempotency key:** `Redis SET NX "processed:{update_id}" EX 86400`
-2. **Distributed lock:** `Redis lock "session_lock:{tenant_id}:{contact_id}:{bot_id}" TTL=30`
+2. **Distributed lock:** `Redis lock "session_lock:{tenant_id}:{contact_id}:{assistant_id}" TTL=30`
 3. **Optimistic locking:** `flow_sessions.version` — UPDATE WHERE version = N
 
 Если lock не получен — job уходит в backoff очередь, не дропается.
@@ -225,9 +282,15 @@ scheduled.triggers        — крон-запуски flow
 
 URL: `/webhook/{channel}/{public_hash}`
 
-`public_hash` → Redis → `{ tenant_id, bot_id, schema_name, secret_token }`
+`public_hash` → Redis → `{ tenant_id, assistant_id, channel_id, channel, secret_token }`
 
 Landlord не участвует в hot path. Redis — единственный источник для webhook routing.
+
+**Write-through contract:**
+
+- БД — источник истины
+- Redis — hot cache, TTL не ставим
+- `platform:install` прогревает registry: `Channel::active()->with('assistant')->each(fn($c) => $registry->set($c))`
 
 ---
 
@@ -244,33 +307,6 @@ RAG нода никогда не кладёт raw LLM output в state.
 - `flow_logs` — raw, партиционирование по `created_at` (monthly), retention 30 дней
 - `analytics_events` — агрегированные бизнес-события, хранятся постоянно
 - Delay nodes, idempotency hits — не логировать в raw
-
----
-
-## Bot Domain
-
-**Bot — полноценный агент/ассистент внутри тенанта:**
-
-- Один тенант может иметь несколько ботов в разных каналах
-- Каждый бот: name, channel, token (encrypted), webhook_public_hash, secret_token
-- `default_flow_id` — flow при /start или первом сообщении
-- `fallback_message` — ответ если нет активного flow и триггера
-- `status`: active | inactive | maintenance
-
-**BotContext — по аналогии с TenantContext:**
-
-```php
-interface BotContextInterface
-{
-    public function set(BotInterface $bot): void;
-    public function get(): BotInterface; // throws BotNotResolvedException
-    public function isResolved(): bool;
-}
-```
-
-Порядок установки: Webhook → resolve tenant → switch schema → resolve bot → set BotContext → dispatch job.
-
-`flow_sessions` хранит `tenant_id + bot_id + contact_id` — полный контекст.
 
 ---
 
@@ -295,7 +331,7 @@ interface BotContextInterface
 
 Управляемая отправка flow/сообщения группе контактов.
 
-**broadcasts:** tenant_id, bot_id, name, type (flow|message), flow_id, target_type (group|segment|tag|all),
+**broadcasts:** tenant_id, assistant_id, name, type (flow|message), flow_id, target_type (group|segment|tag|all),
 scheduled_at, cron, status (draft→scheduled→running→completed), stats JSON.
 
 **broadcast_recipients:** contact_id, status (pending|sent|failed|skipped), sent_at, error.
@@ -398,7 +434,7 @@ Core      → собирает final runtime из всех деклараций
 
 ```
 app/Domains/
-  Tenancy/, Flow/, Messaging/, Contact/, Bot/, Broadcasting/
+  Tenancy/, Flow/, Messaging/, Contact/, Assistant/, Broadcasting/
 ```
 
 **Feature** — built-in capability Core, активируется per tenant:
@@ -618,6 +654,37 @@ Feature/Solution/Plugin тенанта.
 
 ---
 
+## Octane — ADR-01: ingress-only
+
+**Решение принято: март 2026.**
+
+Octane используется **только для webhook ingress** (`/webhooks/*`). Основное приложение работает на PHP-FPM.
+
+**Причина:** система содержит mutable scoped context (`TenantContext`, `CurrentAssistant`). Полный Octane runtime
+создаёт риск state leakage при нарушении scoped lifecycle.
+
+**Модель деплоя:**
+
+| Компонент | Runtime | Обслуживает |
+|---|---|---|
+| Main app | PHP-FPM | `/admin`, `/assistant`, API |
+| Webhook ingress | Octane (RoadRunner) | `/webhooks/*` |
+
+Routing split на уровне Traefik / Nginx: `/webhooks/*` → octane, всё остальное → php-fpm.
+
+**Обязательные ограничения для Octane ingress:**
+
+- Весь webhook path stateless — нет накопленного состояния между запросами
+- Любой tenant switch — только через `TenantSwitcher::runForTenant()` с `finally restore()`
+- Нет mutable singleton state — только scoped bindings
+- Нет session, нет Filament, нет navigation state в webhook path
+
+**Намеренно исключено из Octane:** Filament panels, assistant panel, admin panel, обычные tenant routes.
+
+**Расширение Octane scope** допустимо только после полного lifecycle audit всех scoped bindings.
+
+---
+
 ## Текущий этап
 
 Этап 1 — Платформа.
@@ -628,7 +695,7 @@ Feature/Solution/Plugin тенанта.
 2. Multi-tenancy (TenantContext, переключение схем, миграции)
 3. Flow engine (registry, execution loop, session)
 4. Messaging pipeline (webhook → queue → worker → response)
-5. Filament admin (tenants, bots, базовое управление)
+5. Filament admin (tenants, assistants, базовое управление)
 6. Перенос текущего клиента как первый tenant
 
 # Implementation Plan
@@ -709,10 +776,11 @@ Octane вводится последним в фазе — когда все lif
 | # | Название | Статус |
 |---|----------|--------|
 | 05 | Staff Domain (users, roles, Filament Shield, Filament panel) | ✅ |
-| 06 | Bot Domain (модель, token encryption, webhook_public_hash, Redis registry write) | |
+| 06 | ~~Bot Domain~~ → **superseded by 06b** | — |
+| 06b | Assistant & Channel Domain (модели `Assistant`+`Channel`, миграции `assistants`+`channels`, `AssistantService`+`ChannelService`, Redis registry write с `assistant_id`+`channel_id`, `ChannelWebhookRegistry`) | |
 | 07 | Contact Domain (модель, channel identity, contact_groups, findOrCreate) | |
-| 08 | Webhook routing (ChannelAdapter Telegram+WA, signature verify, idempotency Redis SET NX, tenant resolve, IncomingMessageJob) | |
-| 08a | Octane integration (поверх стабильного TenantContext+middleware, ~~singleton/scoped bindings~~, runForTenant как изолятор) | 🔶 scoped bindings ✅ |
+| 08 | Webhook routing (ChannelAdapter Telegram+WA, signature verify, idempotency Redis SET NX, tenant resolve, resolve assistant через channel, IncomingMessageJob) | |
+| 08a | Octane integration — **ingress-only scope** (RoadRunner config для `/webhooks/*`, routing split Traefik/Nginx, stateless webhook path validation) — ADR-01 | 🔶 scoped bindings ✅ |
 
 ---
 
@@ -723,14 +791,14 @@ Octane вводится последним в фазе — когда все lif
 | # | Название |
 |---|----------|
 | 09 | Flow definition & registry (flow_definitions, **NodeHandlerInterface**, NodeHandlerRegistry in-memory, **HandlerVersionContract phpat**, flow_active_node_stats, правило безопасного удаления) |
-| 10 | Flow session & state (flow_sessions, namespaced state system/flow/rag/module, optimistic lock, FlowState VO, namespace violation = validation error) |
+| 10 | Flow session & state (flow_sessions с `assistant_id`, namespaced state system/flow/rag/module, optimistic lock, FlowState VO, namespace violation = validation error) |
 
 **Спринт 5 — execution & concurrency**
 
 | # | Название |
 |---|----------|
 | 11 | Flow execution engine (FlowEngine::start/resume, execute loop, dispatch по (type,version), session persist) |
-| 12 | Concurrency protection (distributed lock Redis TTL=30s, optimistic lock retry, backoff при lock miss — не дроп) |
+| 12 | Concurrency protection (distributed lock `session_lock:{tenant_id}:{contact_id}:{assistant_id}` Redis TTL=30s, optimistic lock retry, backoff при lock miss — не дроп) |
 | 13 | Built-in node handlers (send_message, input, condition, delay, set_attribute, webhook — все idempotent) |
 | 14 | Flow triggers (flow_triggers, TriggerResolver, IncomingMessageJob → FlowEngine) |
 
@@ -750,7 +818,7 @@ Octane вводится последним в фазе — когда все lif
 | 17 | Message queues & sender (transactional HIGH / broadcast LOW / system, worker pools Horizon) |
 | 18 | Broadcast engine (BroadcastSendJob 1:1, rate limiter Redis, backpressure check) |
 | 19 | RAG adapter (RagAdapterInterface, StructuredRagResult, knowledge_bases, rag_query нода) |
-| 20 | Filament admin UI (Bots, Contacts, Flow list, analytics dashboard — **только read-only**) |
+| 20 | Filament admin UI (Assistants, Contacts, Flow list, analytics dashboard — **только read-only**) |
 
 ---
 
@@ -796,6 +864,9 @@ Octane вводится последним в фазе — когда все lif
 | Migration discipline | Migration Isolation Contract + phpat с задачи 03 |
 | Module contracts слишком поздно | ModuleRegistrarInterface заглушка с задачи 04 |
 | UI диктует backend | UI Non-interference Contract, задача 20 строго read-only |
+| Bot как верхний домен | **Упразднён.** `Assistant` — верхний бизнес-агрегат, `Channel` — transport. Задача 06 superseded by 06b. |
+| Octane scope | **ADR-01: ingress-only.** Octane только для `/webhooks/*`. Main app (`/admin`, `/assistant`, API) — PHP-FPM. Причина: mutable scoped context (`TenantContext`, `CurrentAssistant`). |
+| Assistant panel архитектура | **ADR-02: separate operational console.** Отдельный Filament panel provider `/assistant`. Статичный prefix, identity через `?assistant={uuid}` (query param — приоритет, сессия — fallback). `CurrentAssistant` scoped. Нет дублирования бизнес-логики — только через `AssistantService`/`ChannelService`. |
 
 ## Открытые вопросы
 
@@ -816,11 +887,13 @@ Octane вводится последним в фазе — когда все lif
 
 # Laravel Boost Guidelines
 
-The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines should be followed closely to ensure the best experience when building Laravel applications.
+The Laravel Boost guidelines are specifically curated by Laravel maintainers for this application. These guidelines
+should be followed closely to ensure the best experience when building Laravel applications.
 
 ## Foundational Context
 
-This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an expert with them all. Ensure you abide by these specific packages & versions.
+This application is a Laravel application and its main Laravel ecosystems package & versions are below. You are an
+expert with them all. Ensure you abide by these specific packages & versions.
 
 - php - 8.4
 - filament/filament (FILAMENT) - v5
@@ -839,13 +912,15 @@ This application is a Laravel application and its main Laravel ecosystems packag
 
 ## Conventions
 
-- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, and naming.
+- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling
+  files for the correct structure, approach, and naming.
 - Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
 - Check for existing components to reuse before writing a new one.
 
 ## Verification Scripts
 
-- Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
+- Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature
+  tests are more important.
 
 ## Application Structure & Architecture
 
@@ -854,7 +929,8 @@ This application is a Laravel application and its main Laravel ecosystems packag
 
 ## Frontend Bundling
 
-- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`, `npm run dev`, or `composer run dev`. Ask them.
+- If the user doesn't see a frontend change reflected in the UI, it could mean they need to run `npm run build`,
+  `npm run dev`, or `composer run dev`. Ask them.
 
 ## Documentation Files
 
@@ -872,12 +948,14 @@ This application is a Laravel application and its main Laravel ecosystems packag
 
 ## Artisan Commands
 
-- Run Artisan commands directly via the command line (e.g., `php artisan route:list`, `php artisan tinker --execute "..."`).
+- Run Artisan commands directly via the command line (e.g., `php artisan route:list`,
+  `php artisan tinker --execute "..."`).
 - Use `php artisan list` to discover available commands and `php artisan [command] --help` to check parameters.
 
 ## URLs
 
-- Whenever you share a project URL with the user, you should use the `get-absolute-url` tool to ensure you're using the correct scheme, domain/IP, and port.
+- Whenever you share a project URL with the user, you should use the `get-absolute-url` tool to ensure you're using the
+  correct scheme, domain/IP, and port.
 
 ## Debugging
 
@@ -895,10 +973,15 @@ This application is a Laravel application and its main Laravel ecosystems packag
 
 ## Searching Documentation (Critically Important)
 
-- Boost comes with a powerful `search-docs` tool you should use before trying other approaches when working with Laravel or Laravel ecosystem packages. This tool automatically passes a list of installed packages and their versions to the remote Boost API, so it returns only version-specific documentation for the user's circumstance. You should pass an array of packages to filter on if you know you need docs for particular packages.
+- Boost comes with a powerful `search-docs` tool you should use before trying other approaches when working with Laravel
+  or Laravel ecosystem packages. This tool automatically passes a list of installed packages and their versions to the
+  remote Boost API, so it returns only version-specific documentation for the user's circumstance. You should pass an
+  array of packages to filter on if you know you need docs for particular packages.
 - Search the documentation before making code changes to ensure we are taking the correct approach.
-- Use multiple, broad, simple, topic-based queries at once. For example: `['rate limiting', 'routing rate limiting', 'routing']`. The most relevant results will be returned first.
-- Do not add package names to queries; package information is already shared. For example, use `test resource table`, not `filament 4 test resource table`.
+- Use multiple, broad, simple, topic-based queries at once. For example:
+  `['rate limiting', 'routing rate limiting', 'routing']`. The most relevant results will be returned first.
+- Do not add package names to queries; package information is already shared. For example, use `test resource table`,
+  not `filament 4 test resource table`.
 
 ### Available Search Syntax
 
@@ -926,6 +1009,7 @@ This application is a Laravel application and its main Laravel ecosystems packag
 - Use appropriate PHP type hints for method parameters.
 
 <!-- Explicit Return Types and Method Params -->
+
 ```php
 protected function isAccessible(User $user, ?string $path = null): bool
 {
@@ -939,7 +1023,8 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 ## Comments
 
-- Prefer PHPDoc blocks over inline comments. Never use comments within the code itself unless the logic is exceptionally complex.
+- Prefer PHPDoc blocks over inline comments. Never use comments within the code itself unless the logic is exceptionally
+  complex.
 
 ## PHPDoc Blocks
 
@@ -949,36 +1034,45 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 # Test Enforcement
 
-- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests to make sure they pass.
-- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a specific filename or filter.
+- Every change must be programmatically tested. Write a new test or update an existing test, then run the affected tests
+  to make sure they pass.
+- Run the minimum number of tests needed to ensure code quality and speed. Use `php artisan test --compact` with a
+  specific filename or filter.
 
 === laravel/core rules ===
 
 # Do Things the Laravel Way
 
-- Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using `php artisan list` and check their parameters with `php artisan [command] --help`.
+- Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list
+  available Artisan commands using `php artisan list` and check their parameters with `php artisan [command] --help`.
 - If you're creating a generic PHP class, use `php artisan make:class`.
-- Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
+- Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the
+  correct `--options` to ensure correct behavior.
 
 ## Database
 
-- Always use proper Eloquent relationship methods with return type hints. Prefer relationship methods over raw queries or manual joins.
+- Always use proper Eloquent relationship methods with return type hints. Prefer relationship methods over raw queries
+  or manual joins.
 - Use Eloquent models and relationships before suggesting raw database queries.
-- Avoid `DB::`; prefer `Model::query()`. Generate code that leverages Laravel's ORM capabilities rather than bypassing them.
+- Avoid `DB::`; prefer `Model::query()`. Generate code that leverages Laravel's ORM capabilities rather than bypassing
+  them.
 - Generate code that prevents N+1 query problems by using eager loading.
 - Use Laravel's query builder for very complex database operations.
 
 ### Model Creation
 
-- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
+- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other
+  things, using `php artisan make:model --help` to check the available options.
 
 ### APIs & Eloquent Resources
 
-- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
+- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you
+  should follow existing application convention.
 
 ## Controllers & Validation
 
-- Always create Form Request classes for validation rather than inline validation in controllers. Include both validation rules and custom error messages.
+- Always create Form Request classes for validation rather than inline validation in controllers. Include both
+  validation rules and custom error messages.
 - Check sibling Form Requests to see if the application uses array or string based validation rules.
 
 ## Authentication & Authorization
@@ -995,17 +1089,22 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 ## Configuration
 
-- Use environment variables only in configuration files - never use the `env()` function directly outside of config files. Always use `config('app.name')`, not `env('APP_NAME')`.
+- Use environment variables only in configuration files - never use the `env()` function directly outside of config
+  files. Always use `config('app.name')`, not `env('APP_NAME')`.
 
 ## Testing
 
-- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
-- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
-- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
+- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be
+  used before manually setting up the model.
+- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to
+  use `$this->faker` or `fake()`.
+- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit`
+  to create a unit test. Most tests should be feature tests.
 
 ## Vite Error
 
-- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
+- If you receive an "Illuminate\Foundation\ViteException: Unable to locate file in Vite manifest" error, you can run
+  `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
 
 === laravel/v12 rules ===
 
@@ -1020,17 +1119,20 @@ protected function isAccessible(User $user, ?string $path = null): bool
 - Middleware are configured declaratively in `bootstrap/app.php` using `Application::configure()->withMiddleware()`.
 - `bootstrap/app.php` is the file to register middleware, exceptions, and routing files.
 - `bootstrap/providers.php` contains application specific service providers.
-- The `app/Console/Kernel.php` file no longer exists; use `bootstrap/app.php` or `routes/console.php` for console configuration.
+- The `app/Console/Kernel.php` file no longer exists; use `bootstrap/app.php` or `routes/console.php` for console
+  configuration.
 - Console commands in `app/Console/Commands/` are automatically available and do not require manual registration.
 
 ## Database
 
-- When modifying a column, the migration must include all of the attributes that were previously defined on the column. Otherwise, they will be dropped and lost.
+- When modifying a column, the migration must include all of the attributes that were previously defined on the column.
+  Otherwise, they will be dropped and lost.
 - Laravel 12 allows limiting eagerly loaded records natively, without external packages: `$query->latest()->limit(10);`.
 
 ### Models
 
-- Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing conventions from other models.
+- Casts can and likely should be set in a `casts()` method on a model rather than the `$casts` property. Follow existing
+  conventions from other models.
 
 === octane/core rules ===
 
@@ -1038,7 +1140,8 @@ protected function isAccessible(User $user, ?string $path = null): bool
 
 - Octane boots the application once and reuses it across requests, so singletons persist between requests.
 - The Laravel container's `scoped` method may be used as a safe alternative to `singleton`.
-- Never inject the container, request, or config repository into a singleton's constructor; use a resolver closure or `bind()` instead:
+- Never inject the container, request, or config repository into a singleton's constructor; use a resolver closure or
+  `bind()` instead:
 
 ```php
 // Bad
@@ -1054,25 +1157,31 @@ $this->app->singleton(Service::class, fn () => new Service(fn () => request()));
 
 # Laravel Pint Code Formatter
 
-- If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
-- Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
+- If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to
+  ensure your code matches the project's expected style.
+- Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting
+  issues.
 
 === phpunit/core rules ===
 
 # PHPUnit
 
-- This application uses PHPUnit for testing. All tests must be written as PHPUnit classes. Use `php artisan make:test --phpunit {name}` to create a new test.
+- This application uses PHPUnit for testing. All tests must be written as PHPUnit classes. Use
+  `php artisan make:test --phpunit {name}` to create a new test.
 - If you see a test using "Pest", convert it to PHPUnit.
 - Every time a test has been updated, run that singular test.
-- When the tests relating to your feature are passing, ask the user if they would like to also run the entire test suite to make sure everything is still passing.
+- When the tests relating to your feature are passing, ask the user if they would like to also run the entire test suite
+  to make sure everything is still passing.
 - Tests should cover all happy paths, failure paths, and edge cases.
-- You must not remove any tests or test files from the tests directory without approval. These are not temporary or helper files; these are core to the application.
+- You must not remove any tests or test files from the tests directory without approval. These are not temporary or
+  helper files; these are core to the application.
 
 ## Running Tests
 
 - Run the minimal number of tests, using an appropriate filter, before finalizing.
 - To run all tests: `php artisan test --compact`.
 - To run all tests in a file: `php artisan test --compact tests/Feature/ExampleTest.php`.
-- To filter on a particular test name: `php artisan test --compact --filter=testName` (recommended after making a change to a related file).
+- To filter on a particular test name: `php artisan test --compact --filter=testName` (recommended after making a change
+  to a related file).
 
 </laravel-boost-guidelines>

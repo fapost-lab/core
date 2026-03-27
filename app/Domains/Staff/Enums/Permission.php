@@ -10,16 +10,16 @@ namespace App\Domains\Staff\Enums;
  */
 enum Permission: string
 {
-    case ManageBots      = 'manage_bots';
-    case ManageUsers     = 'manage_users';
-    case ManageFlow      = 'manage_flow';
-    case ManageBroadcast = 'manage_broadcast';
-    case ManageRag       = 'manage_rag';
-    case ViewContacts    = 'view_contacts';
-    case ManageContacts  = 'manage_contacts';
-    case ViewAnalytics   = 'view_analytics';
-    case ViewSystem      = 'view_system';
-    case ManageSettings  = 'manage_settings';
+    case ManageAssistants = 'manage_assistants';
+    case ManageUsers      = 'manage_users';
+    case ManageFlow       = 'manage_flow';
+    case ManageBroadcast  = 'manage_broadcast';
+    case ManageRag        = 'manage_rag';
+    case ViewContacts     = 'view_contacts';
+    case ManageContacts   = 'manage_contacts';
+    case ViewAnalytics    = 'view_analytics';
+    case ViewSystem       = 'view_system';
+    case ManageSettings   = 'manage_settings';
 
     /**
      * Enum cases grouped by their logical UI group.
@@ -65,8 +65,8 @@ enum Permission: string
     public function group(): string
     {
         return match ($this) {
-            self::ManageBots  => 'bots',
-            self::ManageUsers => 'users',
+            self::ManageAssistants => 'assistants',
+            self::ManageUsers      => 'users',
             self::ManageFlow, self::ManageBroadcast,
             self::ManageRag => 'content',
             self::ViewContacts, self::ManageContacts => 'contacts',

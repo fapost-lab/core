@@ -37,6 +37,7 @@ final class UserFactory extends Factory
             'remember_token'    => Str::random(10),
             'phone'             => null,
             'status'            => UserStatus::Active,
+            'is_active'         => true,
         ];
     }
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Console\Commands\InstallPlatformCommand;
+use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
@@ -51,6 +52,7 @@ final class InstallPlatformCommandTest extends TestCase
                 $databaseManager,
                 $tenantSwitcher,
                 new AclBootstrapService(),
+                Mockery::mock(ChannelWebhookRegistryInterface::class),
             ),
         );
 
@@ -105,6 +107,7 @@ final class InstallPlatformCommandTest extends TestCase
                 $databaseManager,
                 $tenantSwitcher,
                 new AclBootstrapService(),
+                Mockery::mock(ChannelWebhookRegistryInterface::class),
             ),
         );
 

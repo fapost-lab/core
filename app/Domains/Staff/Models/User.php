@@ -4,14 +4,21 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Models;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\UserStatus;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
+use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
@@ -36,7 +43,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|User withoutRole($roles, $guard = null)
  * @mixin \Eloquent
  */
-final class User extends Authenticatable implements FilamentUser
+final class User extends Authenticatable implements FilamentUser, HasTenants
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory;
@@ -74,6 +81,40 @@ final class User extends Authenticatable implements FilamentUser
     public function isAdmin(): bool
     {
         return $this->hasRole(RoleEnum::Admin->value);
+    }
+
+    /**
+     * Task 06.2: assignment to assistants; pivot DDL is owned by task 06b ({@code database/migrations/tenant/2026_03_27_210002_create_user_assistants_table.php}).
+     *
+     * @return BelongsToMany<Assistant, $this>
+     */
+    public function assistants(): BelongsToMany
+    {
+        return $this->belongsToMany(Assistant::class, 'user_assistants');
+    }
+
+    public function canAccessTenant(Model $tenant): bool
+    {
+        return $tenant instanceof Assistant && Gate::forUser($this)->allows('view', $tenant);
+    }
+
+    /**
+     * @return Collection<int, Assistant>
+     */
+    public function getTenants(Panel $panel): Collection
+    {
+        if ('assistant' !== $panel->getId()) {
+            return collect();
+        }
+
+        $platformTenant = app(TenantContextInterface::class)->get();
+
+        return Assistant::query()
+            ->where('tenant_id', $platformTenant->getId())
+            ->orderBy('name')
+            ->get()
+            ->filter(fn (Assistant $assistant): bool => Gate::forUser($this)->allows('view', $assistant))
+            ->values();
     }
 
     protected static function newFactory(): UserFactory

@@ -9,6 +9,7 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Contracts\TenantResolverInterface;
+use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Database\TenantDatabaseManager;
 use App\Domains\Tenancy\Repositories\TenantRepository;
 use App\Domains\Tenancy\Services\ConfigTenantResolver;
@@ -42,5 +43,6 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->scoped(DomainBootstrapper::class);
         $this->app->scoped(TenantSwitcher::class);
         $this->app->singleton(WebhookRegistryWriter::class);
+        $this->app->bind(WebhookRegistryWriterInterface::class, WebhookRegistryWriter::class);
     }
 }

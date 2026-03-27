@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Tenancy\Services;
 
+use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\AclBootstrapService;
@@ -27,6 +28,7 @@ final readonly class TenantProvisioningService
         private TenantDatabaseManagerInterface $databaseManager,
         private TenantSwitcher $tenantSwitcher,
         private AclBootstrapService $aclBootstrapService,
+        private ChannelWebhookRegistryInterface $channelWebhookRegistry,
     ) {
     }
 
@@ -76,10 +78,12 @@ final readonly class TenantProvisioningService
                 $firstAdminEmail,
                 $firstAdminPassword,
                 $firstAdminName,
+                $tenant,
             ): void {
                 $this->databaseManager->runMigrations(MigrationScope::tenant());
                 $this->aclBootstrapService->bootstrap();
                 $this->createFirstTenantAdminUser($firstAdminEmail, $firstAdminPassword, $firstAdminName);
+                $this->channelWebhookRegistry->warmup($tenant);
             });
         } catch (Throwable $throwable) {
             $tenant->fill(['status' => TenantStatus::Inactive->value]);

@@ -12,7 +12,8 @@ use Illuminate\Console\Command;
 use Throwable;
 
 /**
- * Runs {@see MigrationScope::tenant()} for every active tenant, using {@see TenantSwitcher} only for switching.
+ * Runs {@see MigrationScope::tenant()} for every active tenant. Keeps tenant schema current;
+ * later operational commands (e.g. seed ACL, sync webhooks) can be run separately after migrate.
  */
 final class TenantsMigrateCommand extends Command
 {
@@ -32,50 +33,26 @@ final class TenantsMigrateCommand extends Command
     {
         $tenants = $this->tenantRepository->findAllActive();
 
-        if ([] === $tenants) {
-            $this->components->info('No active tenants found.');
-
-            return self::SUCCESS;
-        }
-
-        $count = count($tenants);
-        $this->components->info("Running tenant migrations for {$count} active tenant(s).");
-        $this->newLine();
-
-        $success     = 0;
-        $fail        = 0;
-        $failedSlugs = [];
+        $success = 0;
+        $fail    = 0;
 
         foreach ($tenants as $tenant) {
             $slug = $tenant->getSlug();
-            $this->line("[{$slug}] → migrating …");
 
             try {
                 $this->tenantSwitcher->runForTenant($tenant, function (): void {
                     $this->databaseManager->runMigrations(MigrationScope::tenant());
                 });
-                $this->line("[{$slug}] → <info>OK</info>");
+                $this->line("✔ {$slug}");
                 $success++;
             } catch (Throwable $throwable) {
+                $this->line("✘ {$slug}: {$throwable->getMessage()}");
                 $fail++;
-                $failedSlugs[] = $slug;
-                $this->line("[{$slug}] → <error>FAILED</error> " . $throwable->getMessage());
-
-                if ($this->output->isVerbose()) {
-                    $this->line($throwable->getTraceAsString());
-                }
             }
-
-            $this->newLine();
         }
 
-        $this->components->twoColumnDetail('Success', (string) $success);
-        $this->components->twoColumnDetail('Failed', (string) $fail);
-
-        if ([] !== $failedSlugs) {
-            $this->newLine();
-            $this->components->error('Failed tenant slugs: ' . implode(', ', $failedSlugs));
-        }
+        $this->newLine();
+        $this->line("Migrated: {$success} successful, {$fail} failed");
 
         return $fail > 0 ? self::FAILURE : self::SUCCESS;
     }
