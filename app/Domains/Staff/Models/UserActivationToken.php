@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Models;
 
+use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * Single active activation token per user (enforced by unique user_id).
  *
+ * @property string $id
  * @property-read User|null $user
  * @method static \Illuminate\Database\Eloquent\Builder<static>|UserActivationToken newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|UserActivationToken newQuery()
@@ -18,6 +20,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 final class UserActivationToken extends Model
 {
+    use HasUlidPrimaryKey;
+
     public $timestamps = false;
 
     /**

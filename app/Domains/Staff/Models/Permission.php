@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Models;
 
+use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
 use Spatie\Permission\Models\Permission as SpatiePermission;
 
 /**
  * Tenant-scoped permission; table lives in the active tenant schema.
  *
+ * @property string $id
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Permission> $permissions
  * @property-read int|null $permissions_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Role> $roles
@@ -26,4 +28,5 @@ use Spatie\Permission\Models\Permission as SpatiePermission;
  */
 final class Permission extends SpatiePermission
 {
+    use HasUlidPrimaryKey;
 }

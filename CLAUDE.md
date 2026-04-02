@@ -99,6 +99,17 @@ Domains/{Domain}/
 
 ---
 
+## ID Strategy (ADR-03)
+
+- Все PK в tenant-схеме: ULID, хранится в postgresql `uuid` типе
+- Трейт: `App\Domains\Shared\Concerns\HasUlidPrimaryKey` (использует HasUlids + переопределяет newUniqueId через Str::
+  ulid()->toRfc4122())
+- Миграции: $table->uuid('id')->primary() — без default, Laravel генерирует сам
+- FK: foreignUuid('..._id')->constrained()->cascadeOnDelete()
+- external_id: uuid NULL — отдельная колонка, только где нужна внешняя интеграция, не автоматически
+- НЕ трогать: webhook_public_hash (random string), tenant_id в landlord-схеме
+
+
 ## Tenant-aware execution model
 
 **Принципиальная позиция:** Core всегда работает внутри tenant-контекста. Tenant — базовая координата runtime, не

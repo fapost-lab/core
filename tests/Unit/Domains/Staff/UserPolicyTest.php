@@ -6,6 +6,7 @@ namespace Tests\Unit\Domains\Staff;
 
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\UserStatus;
+use App\Domains\Staff\Models\Permission as PermissionModel;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Policies\UserPolicy;
@@ -156,12 +157,12 @@ final class UserPolicyTest extends TestCase
 
         $seeder->run();
         $rolesAfterFirst       = Role::count();
-        $permissionsAfterFirst = \Spatie\Permission\Models\Permission::count();
+        $permissionsAfterFirst = PermissionModel::count();
 
         $seeder->run();
 
         $this->assertSame($rolesAfterFirst, Role::count());
-        $this->assertSame($permissionsAfterFirst, \Spatie\Permission\Models\Permission::count());
+        $this->assertSame($permissionsAfterFirst, PermissionModel::count());
     }
 
     /**

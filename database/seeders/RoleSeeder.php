@@ -6,9 +6,9 @@ namespace Database\Seeders;
 
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
+use App\Domains\Staff\Models\Permission as PermissionModel;
 use App\Domains\Staff\Models\Role;
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Permission as SpatiePermission;
 
 /**
  * Idempotent seed of all platform permissions and system roles.
@@ -24,7 +24,7 @@ final class RoleSeeder extends Seeder
 
         // 1. Ensure all platform permissions exist.
         foreach (Permission::cases() as $permission) {
-            SpatiePermission::findOrCreate($permission->value, $guard);
+            PermissionModel::findOrCreate($permission->value, $guard);
         }
 
         // 2. Create / sync system roles from RoleEnum.

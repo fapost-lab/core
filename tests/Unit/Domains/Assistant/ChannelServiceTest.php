@@ -13,6 +13,7 @@ use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use Illuminate\Support\Str;
 use Mockery;
 use Tests\Feature\FeatureTestCase;
 
@@ -54,6 +55,27 @@ final class ChannelServiceTest extends FeatureTestCase
         });
 
         $this->assertSame(48, mb_strlen($channel->webhook_public_hash));
+    }
+
+    public function test_create_channel_has_ulid_format_id(): void
+    {
+        $tenant = $this->tenant();
+
+        $channel = $this->runInTenant($tenant, function () use ($tenant) {
+            $assistant = app(AssistantServiceInterface::class)->create($tenant, [
+                'name' => 'A1',
+            ]);
+
+            return app(ChannelServiceInterface::class)->create($assistant, [
+                'type'         => ChannelTypeEnum::Telegram->value,
+                'token'        => 'token-a',
+                'secret_token' => 'secret-a',
+                'config'       => [],
+                'is_active'    => true,
+            ]);
+        });
+
+        $this->assertTrue(Str::isUuid($channel->id));
     }
 
     public function test_create_writes_to_redis_registry(): void

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Tenancy\Models;
 
+use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
 use App\Domains\Tenancy\Contracts\TenantInterface;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -30,7 +30,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 final class Tenant extends Model implements TenantInterface
 {
-    use HasUuids;
+    use HasUlidPrimaryKey;
 
     protected $connection = 'landlord';
 

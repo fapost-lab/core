@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Models;
 
+use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
 use App\Domains\Staff\Enums\RoleEnum;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
@@ -12,6 +13,7 @@ use Spatie\Permission\Models\Role as SpatieRole;
 /**
  * Tenant-scoped role; table lives in the active tenant schema.
  *
+ * @property string $id
  * @property int $priority
  * @property bool $is_system
  * @property-read Collection<int, Permission> $permissions
@@ -27,6 +29,8 @@ use Spatie\Permission\Models\Role as SpatieRole;
  */
 final class Role extends SpatieRole
 {
+    use HasUlidPrimaryKey;
+
     private const STAFF_GUARD = 'web';
 
     /**

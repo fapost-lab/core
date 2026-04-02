@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Domains\Assistant\Models;
 
 use App\Domains\Assistant\Enums\ChannelTypeEnum;
+use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
 use Database\Factories\ChannelFactory;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,7 +33,7 @@ final class Channel extends Model
 {
     /** @use HasFactory<ChannelFactory> */
     use HasFactory;
-    use HasUuids;
+    use HasUlidPrimaryKey;
 
     /**
      * @var list<string>

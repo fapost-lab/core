@@ -12,6 +12,7 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Models\Channel;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use Illuminate\Support\Str;
 use Mockery;
 use Tests\Feature\FeatureTestCase;
 
@@ -39,6 +40,17 @@ final class AssistantServiceTest extends FeatureTestCase
         $this->assertTrue($assistant->is_active);
         $this->assertSame('Hi', $assistant->fallback_message);
         $this->assertSame(['k' => 'v'], $assistant->settings);
+    }
+
+    public function test_create_assistant_has_ulid_format_id(): void
+    {
+        $tenant = $this->tenant();
+
+        $assistant = $this->runInTenant($tenant, fn (): Assistant => app(AssistantServiceInterface::class)->create($tenant, [
+            'name' => 'ULID Check',
+        ]));
+
+        $this->assertTrue(Str::isUuid($assistant->id));
     }
 
     public function test_deactivate_assistant_deactivates_channels(): void

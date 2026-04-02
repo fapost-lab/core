@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domains\Assistant\Models;
 
+use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
 use App\Domains\Staff\Models\User;
 use Database\Factories\AssistantFactory;
 use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -32,7 +32,7 @@ final class Assistant extends Model implements HasName
 {
     /** @use HasFactory<AssistantFactory> */
     use HasFactory;
-    use HasUuids;
+    use HasUlidPrimaryKey;
 
     /**
      * @var list<string>

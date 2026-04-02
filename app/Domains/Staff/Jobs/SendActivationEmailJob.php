@@ -21,7 +21,7 @@ final class SendActivationEmailJob implements ShouldQueue
 
     public function __construct(
         public string $tenantId,
-        public int|string $userId,
+        public string $userId,
         public string $plainToken,
     ) {
     }

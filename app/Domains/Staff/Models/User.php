@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Staff\Models;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -24,7 +25,7 @@ use Spatie\Permission\Traits\HasRoles;
 /**
  * Tenant-scoped staff user; table lives in the active tenant schema (not landlord/public).
  *
- * @property int|string $id
+ * @property string $id
  * @property bool $is_active
  * @property UserStatus $status
  * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
@@ -48,6 +49,7 @@ final class User extends Authenticatable implements FilamentUser, HasTenants
     /** @use HasFactory<UserFactory> */
     use HasFactory;
     use HasRoles;
+    use HasUlidPrimaryKey;
     use Notifiable;
 
     /**
