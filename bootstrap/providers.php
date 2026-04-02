@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domains\Contact\Providers\ContactServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\AssistantServiceProvider;
 use App\Providers\DomainServiceProvider;
@@ -14,6 +15,7 @@ return [
     AppServiceProvider::class,
     DomainServiceProvider::class,
     AssistantServiceProvider::class,
+    ContactServiceProvider::class,
     StaffServiceProvider::class,
     AdminPanelProvider::class,
     AssistantPanelProvider::class,
