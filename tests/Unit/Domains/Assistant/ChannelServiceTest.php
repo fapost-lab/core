@@ -172,6 +172,7 @@ final class ChannelServiceTest extends FeatureTestCase
             ChannelTypeEnum::Telegram->value,
             'secret-b',
         )->once();
+        $this->addToAssertionCount(2);
     }
 
     public function test_rotate_hash_generates_new_hash(): void
@@ -223,6 +224,7 @@ final class ChannelServiceTest extends FeatureTestCase
 
         $this->registrySpy->shouldHaveReceived('delete')->with($oldHash)->once();
         $this->registrySpy->shouldHaveReceived('write')->twice();
+        $this->addToAssertionCount(2);
     }
 
     public function test_deactivate_removes_from_redis(): void
@@ -248,6 +250,7 @@ final class ChannelServiceTest extends FeatureTestCase
         });
 
         $this->registrySpy->shouldHaveReceived('delete')->with($hash)->once();
+        $this->addToAssertionCount(1);
     }
 
     public function test_reactivate_channel_writes_back_to_redis(): void
@@ -280,6 +283,7 @@ final class ChannelServiceTest extends FeatureTestCase
             ChannelTypeEnum::Telegram->value,
             'secret-a',
         )->twice();
+        $this->addToAssertionCount(1);
     }
 
     public function test_deleting_assistant_removes_channel_webhook_keys_from_redis(): void
@@ -304,6 +308,7 @@ final class ChannelServiceTest extends FeatureTestCase
         });
 
         $this->registrySpy->shouldHaveReceived('delete')->with($hash)->once();
+        $this->addToAssertionCount(1);
     }
 
     public function test_warmup_rewrites_registry_for_active_channels(): void
@@ -329,6 +334,7 @@ final class ChannelServiceTest extends FeatureTestCase
             app(ChannelWebhookRegistryInterface::class)->warmup($tenant);
 
             $warmupSpy->shouldHaveReceived('write')->once();
+            $this->addToAssertionCount(1);
         });
     }
 

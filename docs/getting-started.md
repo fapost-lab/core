@@ -19,14 +19,20 @@ changes, this file should reflect the actual working setup path, not the desired
 composer install
 ```
 
-2. Prepare `.env`:
+2. Install repository git hooks:
+
+```bash
+composer run hooks:install
+```
+
+3. Prepare `.env`:
 
 ```bash
 cp .env.example .env
 php artisan key:generate
 ```
 
-3. Verify database settings in `.env`:
+4. Verify database settings in `.env`:
 
 ```dotenv
 DB_CONNECTION=pgsql
@@ -37,13 +43,13 @@ DB_USERNAME=root
 DB_PASSWORD=
 ```
 
-4. Run migrations:
+5. Run migrations:
 
 ```bash
 php artisan migrate
 ```
 
-5. Install frontend dependencies:
+6. Install frontend dependencies:
 
 ```bash
 npm install

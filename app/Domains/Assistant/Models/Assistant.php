@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domains\Assistant\Models;
 
+use App\Domains\Assistant\Models\Builders\AssistantBuilder;
 use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
 use App\Domains\Shared\Models\BaseModel;
 use App\Domains\Staff\Models\User;
 use Database\Factories\AssistantFactory;
 use Filament\Models\Contracts\HasName;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -24,11 +24,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property-read int|null $channels_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, User> $users
  * @property-read int|null $users_count
- * @method static Builder<static>|Assistant active()
+ * @method static AssistantBuilder<static>|Assistant active()
  * @method static \Database\Factories\AssistantFactory factory($count = null, $state = [])
- * @method static Builder<static>|Assistant newModelQuery()
- * @method static Builder<static>|Assistant newQuery()
- * @method static Builder<static>|Assistant query()
+ * @method static AssistantBuilder<static>|Assistant newModelQuery()
+ * @method static AssistantBuilder<static>|Assistant newQuery()
+ * @method static AssistantBuilder<static>|Assistant query()
  * @mixin \Eloquent
  */
 final class Assistant extends BaseModel implements HasName
@@ -36,6 +36,9 @@ final class Assistant extends BaseModel implements HasName
     /** @use HasFactory<AssistantFactory> */
     use HasFactory;
     use HasUlidPrimaryKey;
+
+    /** @var class-string<AssistantBuilder> */
+    protected string $customBuilder = AssistantBuilder::class;
 
     /**
      * @var list<string>
@@ -71,16 +74,6 @@ final class Assistant extends BaseModel implements HasName
     public function getFilamentName(): string
     {
         return $this->name;
-    }
-
-    /**
-     * @param  Builder<static>  $query
-     *
-     * @return Builder<static>
-     */
-    public function scopeActive(Builder $query): Builder
-    {
-        return $query->where('is_active', true);
     }
 
     protected static function newFactory(): AssistantFactory

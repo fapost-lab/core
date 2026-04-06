@@ -117,6 +117,7 @@ final class AssistantServiceTest extends FeatureTestCase
         });
 
         $spy->shouldHaveReceived('remove')->with($hash)->twice();
+        $this->addToAssertionCount(1);
     }
 
     private function tenant(): Tenant

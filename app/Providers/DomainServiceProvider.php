@@ -9,8 +9,10 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Contracts\TenantResolverInterface;
+use App\Domains\Tenancy\Contracts\WebhookRegistryReaderInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Database\TenantDatabaseManager;
+use App\Domains\Tenancy\Infrastructure\EloquentWebhookRegistryReader;
 use App\Domains\Tenancy\Repositories\TenantRepository;
 use App\Domains\Tenancy\Services\ConfigTenantResolver;
 use App\Domains\Tenancy\Services\CoreBootstrap;
@@ -51,5 +53,6 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->scoped(DomainBootstrapper::class);
         $this->app->scoped(TenantSwitcher::class);
         $this->app->singleton(WebhookRegistryWriterInterface::class, WebhookRegistryWriter::class);
+        $this->app->singleton(WebhookRegistryReaderInterface::class, EloquentWebhookRegistryReader::class);
     }
 }

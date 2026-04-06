@@ -1,0 +1,41 @@
+#!/usr/bin/env sh
+
+set -eu
+
+repository_root="$(git rev-parse --show-toplevel)"
+
+cd "$repository_root"
+
+checksum_command="cksum"
+
+if command -v shasum >/dev/null 2>&1; then
+    checksum_command="shasum"
+fi
+
+calculate_php_diff_checksum() {
+    git diff --no-ext-diff --binary -- '*.php' | $checksum_command | awk '{print $1}'
+}
+
+run_step() {
+    printf '%s\n' ""
+    printf '%s\n' "Running: $1"
+    shift
+    "$@"
+}
+
+before_pint_checksum="$(calculate_php_diff_checksum)"
+
+run_step "Pint" vendor/bin/pint --dirty --format agent
+
+after_pint_checksum="$(calculate_php_diff_checksum)"
+
+if [ "$before_pint_checksum" != "$after_pint_checksum" ]; then
+    printf '%s\n' ""
+    printf '%s\n' "Pint reformatted PHP files. Review and stage the changes, then run commit again."
+
+    exit 1
+fi
+
+run_step "Unit tests" php artisan test --compact --testsuite=Unit
+run_step "Feature tests" php artisan test --compact --testsuite=Feature
+run_step "Architecture tests" vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=512M --no-interaction

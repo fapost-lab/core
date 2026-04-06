@@ -303,6 +303,12 @@ Landlord не участвует в hot path. Redis — единственный
 - Redis — hot cache, TTL не ставим
 - `platform:install` прогревает registry: `Channel::active()->with('assistant')->each(fn($c) => $registry->set($c))`
 
+**Landlord DB access pattern (domain boundary rule):**
+
+Любой домен, которому нужно читать из landlord DB, обязан делать это через контракт в `Tenancy/Contracts/`, а не через прямой `DB::connection('landlord')`.
+Прецедент: `WebhookRegistryReaderInterface` → `Tenancy/Infrastructure/EloquentWebhookRegistryReader`.
+Прямой вызов `DB::connection('landlord')` разрешён только внутри `Tenancy` домена.
+
 ---
 
 ## RAG
@@ -646,6 +652,26 @@ Feature/Solution/Plugin тенанта.
 - `handler_id` определяет реализацию: `hr.sync_employee`, `crm.create_deal`
 - TenantActivationRuntime фильтрует доступные handler_id по активированным Solution/Plugin
 
+## Shared Domain — BaseModel Extension Points
+
+`BaseModel` предоставляет три opt-in точки расширения через трейты (все три включены по умолчанию, инертны без объявления свойства):
+
+| Трейт | Свойство модели | Что делает |
+|-------|----------------|------------|
+| `HasComputedAttributes` | — | `__get` + `attributesToArray` через `ModelAttributeRegistry` |
+| `InteractWithUtilities` | `$utilitiesClass` | `__call` → utility class (implements `ModelUtilityInterface`) |
+| `InteractWithBuilder` | `$customBuilder` | `newEloquentBuilder` → кастомный `Builder` |
+
+**Все модели могут наследовать `BaseModel`** — трейты не влияют на стандартное Eloquent поведение без объявления свойств.
+
+**Solutions расширяют Core модели через `ModelAttributeRegistry::register()`**, а не через наследование или добавление своих колонок в Core-таблицы.
+
+**Relations остаются в моделях** — `with()` / `whereHas()` / `withCount()` требуют метод прямо на классе. Registry для relations невозможен без потери Eloquent machinery. Для кросс-доменных relations из Solution — `Model::resolveRelationUsing()` (встроенный Laravel механизм).
+
+`app()` в трейтах — допустимое исключение: Eloquent создаёт модели напрямую, обходя constructor DI. Изолировано в трейтах с явным комментарием.
+
+---
+
 ## Что делать автономно
 
 - Создавать модели, миграции, factories, seeders по готовой схеме
@@ -801,7 +827,7 @@ Octane вводится последним в фазе — когда все lif
 
 | # | Название |
 |---|----------|
-| 09 | Flow definition & registry (flow_definitions, **NodeHandlerInterface**, NodeHandlerRegistry in-memory, **HandlerVersionContract phpat**, flow_active_node_stats, правило безопасного удаления) |
+| 09 | Flow definition & registry (flow_definitions, **NodeHandlerInterface**, NodeHandlerRegistry in-memory, **HandlerVersionContract phpat**, flow_active_node_stats, правило безопасного удаления) | ✅ |
 | 10 | Flow session & state (flow_sessions с `assistant_id`, namespaced state system/flow/rag/module, optimistic lock, FlowState VO, namespace violation = validation error) |
 
 **Спринт 5 — execution & concurrency**
