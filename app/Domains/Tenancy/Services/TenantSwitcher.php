@@ -12,14 +12,26 @@ use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Orchestrates tenant identity ({@see TenantContextInterface}) and tenant DB switching for a bounded scope.
+ *
+ * Consumers may register restore hooks via {@see registerRestoreHook()} to reset per-request context
+ * that is not owned by this class (e.g. CurrentAssistant). Hooks are invoked in the finally block
+ * before tenant context is restored.
  */
-final readonly class TenantSwitcher
+final class TenantSwitcher
 {
+    /** @var array<int, Closure> */
+    private array $restoreHooks = [];
+
     public function __construct(
-        private TenantContextInterface $tenantContext,
-        private TenantDatabaseManagerInterface $databaseManager,
-        private PermissionRegistrar $permissionRegistrar,
+        private readonly TenantContextInterface $tenantContext,
+        private readonly TenantDatabaseManagerInterface $databaseManager,
+        private readonly PermissionRegistrar $permissionRegistrar,
     ) {
+    }
+
+    public function registerRestoreHook(Closure $hook): void
+    {
+        $this->restoreHooks[] = $hook;
     }
 
     /**
@@ -48,6 +60,10 @@ final readonly class TenantSwitcher
         } finally {
             $this->databaseManager->restore();
             $this->permissionRegistrar->forgetCachedPermissions();
+
+            foreach ($this->restoreHooks as $hook) {
+                $hook();
+            }
 
             if (null !== $previousTenant) {
                 $this->tenantContext->set($previousTenant);

@@ -13,6 +13,9 @@ use App\Domains\Assistant\Models\Assistant;
  */
 interface CurrentAssistantInterface
 {
+    /**
+     * Provide an explicit assistant override for this request/UI session.
+     */
     public function set(Assistant $assistant): void;
 
     /**
@@ -22,5 +25,8 @@ interface CurrentAssistantInterface
 
     public function isResolved(): bool;
 
+    /**
+     * Clear the explicit override.
+     */
     public function reset(): void;
 }

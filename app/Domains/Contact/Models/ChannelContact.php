@@ -11,14 +11,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * @property string                          $id
- * @property string                          $contact_id
- * @property string                          $channel_id
- * @property \Illuminate\Support\Carbon|null $last_interaction_at
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * Contact's per-channel linkage.
  *
+ * Represents a unique (contact_id, channel_id) pairing and stores last interaction timestamp.
+ *
+ * @property-read Channel|null $channel
+ * @property-read Contact|null $contact
+ * @method static Builder<static>|ChannelContact newModelQuery()
+ * @method static Builder<static>|ChannelContact newQuery()
  * @method static Builder<static>|ChannelContact query()
+ * @mixin \Eloquent
  */
 final class ChannelContact extends Model
 {
@@ -34,6 +36,7 @@ final class ChannelContact extends Model
     ];
 
     /**
+     * Relationship: contact owning this linkage.
      * @return BelongsTo<Contact, $this>
      */
     public function contact(): BelongsTo
@@ -42,6 +45,7 @@ final class ChannelContact extends Model
     }
 
     /**
+     * Relationship: assistant channel associated with this linkage.
      * @return BelongsTo<Channel, $this>
      */
     public function channel(): BelongsTo

@@ -6,26 +6,29 @@ namespace App\Domains\Contact\Models;
 
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
+use App\Domains\Shared\Models\BaseModel;
 use Database\Factories\ContactFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * @property string                          $id
- * @property string                          $tenant_id
- * @property PlatformEnum                    $platform
- * @property string                          $external_id
- * @property array<string, mixed>            $meta
- * @property array<string, mixed>            $attributes
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * Contact entity per tenant/platform identity.
  *
+ * Stores platform-specific identity and arbitrary metadata. Computed attributes can be extended via
+ * {@see BaseModel} (e.g. via HR solution).
+ *
+ * @property PlatformEnum $platform
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, ChannelContact> $channelContacts
+ * @property-read int|null $channel_contacts_count
+ * @property-read bool|null $channel_contacts_exists
+ * @method static \Database\Factories\ContactFactory factory($count = null, $state = [])
+ * @method static Builder<static>|Contact newModelQuery()
+ * @method static Builder<static>|Contact newQuery()
  * @method static Builder<static>|Contact query()
- * @method static ContactFactory factory($count = null, $state = [])
+ * @mixin \Eloquent
  */
-final class Contact extends Model
+final class Contact extends BaseModel
 {
     /** @use HasFactory<ContactFactory> */
     use HasFactory;
@@ -43,6 +46,7 @@ final class Contact extends Model
     ];
 
     /**
+     * Channel linkages for this contact.
      * @return HasMany<ChannelContact, $this>
      */
     public function channelContacts(): HasMany

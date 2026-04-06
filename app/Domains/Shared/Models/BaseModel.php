@@ -1,0 +1,56 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domains\Shared\Models;
+
+use App\Domains\Shared\Infrastructure\ModelAttributeRegistry;
+use Illuminate\Database\Eloquent\Model;
+
+/**
+ * Base Eloquent model that supports computed attribute extension.
+ *
+ * Computed attributes are resolved through {@see ModelAttributeRegistry}
+ * using the model's FQCN as a lookup key.
+ */
+abstract class BaseModel extends Model
+{
+    /**
+     * Resolve computed attributes registered in {@see ModelAttributeRegistry}.
+     *
+     * Fallbacks to Eloquent's default attribute resolution when the attribute is not registered.
+     *
+     * @throws \Illuminate\Contracts\Container\CircularDependencyException
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function __get($key): mixed
+    {
+        $registry = app(ModelAttributeRegistry::class);
+
+        if ($registry->has(static::class, (string) $key)) {
+            return $registry->resolve(static::class, (string) $key, $this);
+        }
+
+        return parent::__get($key);
+    }
+
+    /**
+     * Convert model to an attribute array and append registry attributes marked with {@code append=true}.
+     *
+     * Note: resolver closures may access relations; callers should eager-load to avoid N+1 queries.
+     *
+     * @return array<string, mixed>
+     */
+    public function attributesToArray(): array
+    {
+        $attributes = parent::attributesToArray();
+        $registry   = app(ModelAttributeRegistry::class);
+        $extra      = $registry->serializable(static::class);
+
+        foreach ($extra as $name => $resolver) {
+            $attributes[$name] = $resolver($this);
+        }
+
+        return $attributes;
+    }
+}

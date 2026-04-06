@@ -20,6 +20,9 @@ use Illuminate\Support\ServiceProvider;
  */
 final class StaffServiceProvider extends ServiceProvider
 {
+    /**
+     * Register staff bounded-context services.
+     */
     public function register(): void
     {
         $this->app->singleton(AclBootstrapService::class);
@@ -28,6 +31,9 @@ final class StaffServiceProvider extends ServiceProvider
         $this->app->singleton(UserService::class);
     }
 
+    /**
+     * Register staff authorization policies.
+     */
     public function boot(): void
     {
         Gate::policy(User::class, UserPolicy::class);

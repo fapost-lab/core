@@ -10,10 +10,17 @@ use Laravel\Telescope\IncomingEntry;
 use Laravel\Telescope\Telescope;
 use Laravel\Telescope\TelescopeApplicationServiceProvider;
 
+/**
+ * Laravel Telescope configuration provider.
+ *
+ * Applies request/job filtering and hides sensitive headers/parameters in non-local environments.
+ */
 final class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 {
     /**
-     * Register any application services.
+     * Register Telescope configuration.
+     *
+     * Enables filtering for non-local environments and calls internal safeguards for sensitive data.
      */
     public function register(): void
     {

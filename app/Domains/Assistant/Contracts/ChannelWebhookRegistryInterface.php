@@ -12,9 +12,18 @@ use App\Domains\Tenancy\Contracts\TenantInterface;
  */
 interface ChannelWebhookRegistryInterface
 {
+    /**
+     * Write a webhook routing entry into Redis (through DB write-through).
+     */
     public function set(Channel $channel, TenantInterface $tenant): void;
 
+    /**
+     * Remove a webhook routing entry by its public hash.
+     */
     public function remove(string $webhookPublicHash): void;
 
+    /**
+     * Repopulate Redis routing cache for all active channels in the tenant.
+     */
     public function warmup(TenantInterface $tenant): void;
 }

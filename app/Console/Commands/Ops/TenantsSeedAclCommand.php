@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Ops;
 
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
@@ -20,7 +20,7 @@ use Throwable;
  */
 final class TenantsSeedAclCommand extends Command
 {
-    protected $signature = 'tenants:seed-acl
+    protected $signature = 'ops:tenants-seed-acl
         {--tenant=* : Tenant slug(s); ignored when --all is used}
         {--all : Run for all active tenants (skips interactive selection)}';
 

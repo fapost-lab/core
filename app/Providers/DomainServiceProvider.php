@@ -20,8 +20,16 @@ use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Services\WebhookRegistryWriter;
 use Illuminate\Support\ServiceProvider;
 
+/**
+ * Tenancy domain provider.
+ *
+ * Registers tenant-context, tenant database management, runtime bootstrapping, and webhook registry writing.
+ */
 final class DomainServiceProvider extends ServiceProvider
 {
+    /**
+     * Register tenancy bindings (scoped/singleton) for per-request tenant isolation.
+     */
     public function register(): void
     {
         $this->app->scoped(TenantContextInterface::class, TenantContext::class);
@@ -42,7 +50,6 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->scoped(CoreBootstrapInterface::class, fn ($app): CoreBootstrap => $app->make(CoreBootstrap::class));
         $this->app->scoped(DomainBootstrapper::class);
         $this->app->scoped(TenantSwitcher::class);
-        $this->app->singleton(WebhookRegistryWriter::class);
-        $this->app->bind(WebhookRegistryWriterInterface::class, WebhookRegistryWriter::class);
+        $this->app->singleton(WebhookRegistryWriterInterface::class, WebhookRegistryWriter::class);
     }
 }

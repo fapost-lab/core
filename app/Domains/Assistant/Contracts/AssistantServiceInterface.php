@@ -15,12 +15,13 @@ interface AssistantServiceInterface
     public function create(TenantInterface $tenant, array $data): Assistant;
 
     /**
-     * @param  array<string, mixed>  $data
      *
      * Changing {@see Assistant::$is_active} here updates the assistant row only. It does not cascade to channels or
      * Redis webhook routing; use {@see deactivate}/{@see activate} for assistant lifecycle, and per-channel
      * {@see ChannelServiceInterface::reactivate} (or {@see ChannelServiceInterface::update} with {@code is_active => true})
      * when channels should register in {@see ChannelWebhookRegistryInterface} again.
+     *
+     * @param  array<string, mixed>  $data
      */
     public function update(Assistant $assistant, array $data): Assistant;
 
@@ -30,5 +31,10 @@ interface AssistantServiceInterface
      */
     public function activate(Assistant $assistant): void;
 
+    /**
+     * Deactivate the assistant and cascade to channels.
+     *
+     * Ensures each channel becomes inactive and its Redis webhook routing entry is removed.
+     */
     public function deactivate(Assistant $assistant): void;
 }

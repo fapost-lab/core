@@ -26,6 +26,9 @@ final class SendActivationEmailJob implements ShouldQueue
     ) {
     }
 
+    /**
+     * Resolve tenant and user, then send activation email within tenant DB context.
+     */
     public function handle(TenantRepositoryInterface $tenantRepository, TenantSwitcher $tenantSwitcher): void
     {
         $tenant = $tenantRepository->getById($this->tenantId);

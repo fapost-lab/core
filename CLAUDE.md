@@ -790,8 +790,8 @@ Octane вводится последним в фазе — когда все lif
 | 06 | ~~Bot Domain~~ → **superseded by 06b** | — |
 | 06b | Assistant & Channel Domain (модели `Assistant`+`Channel`, миграции `assistants`+`channels`, `AssistantService`+`ChannelService`, Redis registry write с `assistant_id`+`channel_id`, `ChannelWebhookRegistry`) | ✅ |
 | 07 | Contact Domain (модель, channel identity, contact_groups, findOrCreate) | ✅ |
-| 08 | Webhook routing (ChannelAdapter Telegram+WA, signature verify, idempotency Redis SET NX, tenant resolve, resolve assistant через channel, IncomingMessageJob) | |
-| 08a | Octane integration — **ingress-only scope** (RoadRunner config для `/webhooks/*`, routing split Traefik/Nginx, stateless webhook path validation) — ADR-01 | 🔶 scoped bindings ✅ |
+| 08 | Webhook routing (ChannelAdapter Telegram+WA, signature verify, idempotency Redis SET NX, tenant resolve, resolve assistant через channel, IncomingMessageJob) | ✅ |
+| 08a | Octane integration — **ingress-only scope** (RoadRunner config для `/webhooks/*`, routing split Traefik/Nginx, stateless webhook path validation) — ADR-01 | ✅ |
 
 ---
 

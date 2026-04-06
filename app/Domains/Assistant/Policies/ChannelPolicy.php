@@ -11,15 +11,26 @@ use App\Domains\Staff\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 use Illuminate\Foundation\Auth\User as AuthUser;
 
+/**
+ * Authorization policy for {@see Channel}.
+ *
+ * Users can manage channels only when they manage assistants or are assigned to the channel's assistant.
+ */
 final class ChannelPolicy
 {
     use HandlesAuthorization;
 
+    /**
+     * Whether the user can list channels.
+     */
     public function viewAny(AuthUser $authUser): bool
     {
         return $this->canManageAssistants($authUser);
     }
 
+    /**
+     * Whether the user can view a specific channel.
+     */
     public function view(AuthUser $authUser, Channel $channel): bool
     {
         return $this->canManageAssistants($authUser) && $this->canAccessAssistant($authUser, $channel->assistant);
@@ -43,16 +54,25 @@ final class ChannelPolicy
         return $this->canAccessAssistant($authUser, $assistant);
     }
 
+    /**
+     * Whether the user can update a specific channel.
+     */
     public function update(AuthUser $authUser, Channel $channel): bool
     {
         return $this->canManageAssistants($authUser) && $this->canAccessAssistant($authUser, $channel->assistant);
     }
 
+    /**
+     * Whether the user can delete a specific channel.
+     */
     public function delete(AuthUser $authUser, Channel $channel): bool
     {
         return $this->canManageAssistants($authUser) && $this->canAccessAssistant($authUser, $channel->assistant);
     }
 
+    /**
+     * Whether the user can rotate webhook settings for a specific channel.
+     */
     public function rotateWebhook(AuthUser $authUser, Channel $channel): bool
     {
         return $this->canManageAssistants($authUser) && $this->canAccessAssistant($authUser, $channel->assistant);

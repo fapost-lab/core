@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Ops;
 
 use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
@@ -16,7 +16,7 @@ use Throwable;
  */
 final class TenantsWebhookWarmupCommand extends Command
 {
-    protected $signature = 'tenants:webhook-warmup
+    protected $signature = 'ops:webhook-warmup
         {--tenant=* : Tenant slug(s); ignored when --all is used}
         {--all : Run for all active tenants}';
 

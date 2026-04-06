@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Console\Commands;
+namespace App\Console\Commands\Ops;
 
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
@@ -17,7 +17,7 @@ use Throwable;
  */
 final class TenantsMigrateCommand extends Command
 {
-    protected $signature = 'tenants:migrate';
+    protected $signature = 'ops:tenants-migrate';
 
     protected $description = 'Run database/migrations/tenant for all active tenants';
 

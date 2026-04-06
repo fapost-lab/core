@@ -26,8 +26,16 @@ use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
 
+/**
+ * Platform “admin” Filament panel surface.
+ *
+ * Configured for the platform tenant using {@see TenancyMiddleware}.
+ */
 final class AdminPanelProvider extends PanelProvider
 {
+    /**
+     * Build and configure the admin panel (id/path/resources/pages/widgets/middleware).
+     */
     public function panel(Panel $panel): Panel
     {
         return $panel

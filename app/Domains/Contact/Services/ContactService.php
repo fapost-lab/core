@@ -10,9 +10,17 @@ use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use Illuminate\Database\UniqueConstraintViolationException;
 
+/**
+ * Contact service.
+ *
+ * Provides idempotent creation of contacts and (contact, channel) link records, handling concurrent writes
+ * via unique constraint violation fallback.
+ */
 final readonly class ContactService implements ContactServiceInterface
 {
     /**
+     * Find an existing contact by (tenant, platform, external id) or create it.
+     *
      * @param  array<string, mixed>  $meta
      */
     public function findOrCreate(
@@ -42,6 +50,9 @@ final readonly class ContactService implements ContactServiceInterface
         }
     }
 
+    /**
+     * Find or create the (contact_id, channel_id) linkage record and update last interaction time.
+     */
     public function findOrCreateChannelContact(Contact $contact, string $channelId): ChannelContact
     {
         try {

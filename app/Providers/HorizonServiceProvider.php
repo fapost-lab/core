@@ -7,10 +7,15 @@ namespace App\Providers;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Horizon\HorizonApplicationServiceProvider;
 
+/**
+ * Laravel Horizon configuration provider.
+ *
+ * Allows customizing Horizon boot behavior and applies a gate for non-local access.
+ */
 final class HorizonServiceProvider extends HorizonApplicationServiceProvider
 {
     /**
-     * Bootstrap any application services.
+     * Boot Horizon and apply optional runtime configuration.
      */
     public function boot(): void
     {

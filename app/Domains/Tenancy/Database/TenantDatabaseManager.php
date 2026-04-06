@@ -13,6 +13,11 @@ use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
+ * Tenant database manager implementation.
+ *
+ * Responsible for creating/dropping tenant schemas, switching default DB connection to a tenant schema,
+ * and running tenant-scoped migrations.
+ *
  * @see TenantDatabaseManagerInterface
  */
 final class TenantDatabaseManager implements TenantDatabaseManagerInterface
@@ -22,6 +27,9 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
      */
     private array $stack = [];
 
+    /**
+     * Create schema for the given tenant in the landlord database.
+     */
     public function createSchema(TenantInterface $tenant): void
     {
         DB::connection('landlord')->statement(
@@ -29,6 +37,9 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         );
     }
 
+    /**
+     * Drop schema for the given tenant (with CASCADE).
+     */
     public function dropSchema(TenantInterface $tenant): void
     {
         DB::connection('landlord')->statement(
@@ -36,6 +47,9 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         );
     }
 
+    /**
+     * Check if tenant schema already exists.
+     */
     public function schemaExists(TenantInterface $tenant): bool
     {
         $result = DB::connection('landlord')->selectOne(
@@ -46,6 +60,9 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         return null !== $result;
     }
 
+    /**
+     * Switch default DB connection to the tenant schema, pushing previous connection onto a stack.
+     */
     public function switchTo(TenantInterface $tenant): void
     {
         $tenantConnection   = (string) config('tenancy.tenant_connection', 'tenant');
@@ -73,6 +90,11 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         DB::setDefaultConnection($tenantConnection);
     }
 
+    /**
+     * Restore previous DB connection/search_path from the stack.
+     *
+     * @throws ConnectionStackEmptyException when called without a previous switch.
+     */
     public function restore(): void
     {
         if (empty($this->stack)) {
@@ -93,6 +115,9 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         DB::setDefaultConnection($previous['connection']);
     }
 
+    /**
+     * Run migrations for the given migration scope (tenant/platform/etc.).
+     */
     public function runMigrations(MigrationScope $scope): void
     {
         Artisan::call('migrate', [

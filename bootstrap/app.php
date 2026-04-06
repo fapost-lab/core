@@ -16,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__ . '/../routes/console.php',
         health: '/up',
         then: function (): void {
+            Route::group([], base_path('app/Domains/Webhook/routes/webhook.php'));
+
             Route::middleware(['tenant', 'tenant.root.redirect'])
                 ->group(base_path('routes/tenant.php'));
         }

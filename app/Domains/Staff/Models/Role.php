@@ -13,9 +13,6 @@ use Spatie\Permission\Models\Role as SpatieRole;
 /**
  * Tenant-scoped role; table lives in the active tenant schema.
  *
- * @property string $id
- * @property int $priority
- * @property bool $is_system
  * @property-read Collection<int, Permission> $permissions
  * @property-read int|null $permissions_count
  * @property-read Collection<int, User> $users

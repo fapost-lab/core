@@ -11,10 +11,16 @@ use Illuminate\Support\ServiceProvider;
  */
 final class StaffDomainServiceProvider extends ServiceProvider
 {
+    /**
+     * Register additional staff domain bindings (currently empty stub).
+     */
     public function register(): void
     {
     }
 
+    /**
+     * Bootstrap staff domain services (currently empty stub).
+     */
     public function boot(): void
     {
     }

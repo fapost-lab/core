@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
-use App\Console\Commands\InstallPlatformCommand;
+use App\Console\Commands\Platform\InstallPlatformCommand;
 use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;

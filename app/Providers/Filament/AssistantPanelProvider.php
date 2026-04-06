@@ -39,6 +39,9 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
  */
 final class AssistantPanelProvider extends PanelProvider
 {
+    /**
+     * Build and configure the assistant operational panel (id/path/tenant/middleware).
+     */
     public function panel(Panel $panel): Panel
     {
         return $panel

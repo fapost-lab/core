@@ -17,11 +17,17 @@ use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
  */
 final readonly class ChannelWebhookRegistry implements ChannelWebhookRegistryInterface
 {
+    /**
+     * @param  WebhookRegistryWriterInterface  $writer  DB-backed writer (used for Redis write-through).
+     */
     public function __construct(
         private WebhookRegistryWriterInterface $writer,
     ) {
     }
 
+    /**
+     * Persist a channel routing entry into Redis via write-through.
+     */
     public function set(Channel $channel, TenantInterface $tenant): void
     {
         if ( ! $channel->is_active) {
@@ -38,11 +44,17 @@ final readonly class ChannelWebhookRegistry implements ChannelWebhookRegistryInt
         );
     }
 
+    /**
+     * Remove an entry from Redis routing cache by webhook public hash.
+     */
     public function remove(string $webhookPublicHash): void
     {
         $this->writer->delete($webhookPublicHash);
     }
 
+    /**
+     * Repopulate Redis routing cache for all active channels in the given tenant.
+     */
     public function warmup(TenantInterface $tenant): void
     {
         Channel::query()

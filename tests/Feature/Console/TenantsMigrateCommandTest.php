@@ -27,7 +27,7 @@ final class TenantsMigrateCommandTest extends TestCase
             $mock->shouldReceive('findAllActive')->once()->andReturn([]);
         });
 
-        $exitCode = Artisan::call('tenants:migrate');
+        $exitCode = Artisan::call('ops:tenants-migrate');
 
         $this->assertSame(0, $exitCode);
         $this->assertStringContainsString('Migrated: 0 successful, 0 failed', Artisan::output());
@@ -51,7 +51,7 @@ final class TenantsMigrateCommandTest extends TestCase
         $this->app->instance(TenantDatabaseManagerInterface::class, $db);
         $this->app->forgetInstance(TenantSwitcher::class);
 
-        $exitCode = Artisan::call('tenants:migrate');
+        $exitCode = Artisan::call('ops:tenants-migrate');
 
         $this->assertSame(0, $exitCode);
         $output = Artisan::output();
@@ -86,7 +86,7 @@ final class TenantsMigrateCommandTest extends TestCase
         $this->app->instance(TenantDatabaseManagerInterface::class, $db);
         $this->app->forgetInstance(TenantSwitcher::class);
 
-        $exitCode = Artisan::call('tenants:migrate');
+        $exitCode = Artisan::call('ops:tenants-migrate');
 
         $this->assertSame(1, $exitCode);
         $output = Artisan::output();

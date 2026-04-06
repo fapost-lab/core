@@ -17,11 +17,20 @@ use App\Domains\Assistant\Services\AssistantService;
 use App\Domains\Assistant\Services\ChannelService;
 use App\Domains\Assistant\Services\ChannelWebhookRegistry;
 use App\Domains\Assistant\Services\CurrentAssistant;
+use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
+/**
+ * Assistant bounded context provider.
+ *
+ * Registers assistant/channel services and policies, plus model observers.
+ */
 final class AssistantServiceProvider extends ServiceProvider
 {
+    /**
+     * Register assistant domain service bindings.
+     */
     public function register(): void
     {
         $this->app->singleton(ChannelWebhookRegistryInterface::class, ChannelWebhookRegistry::class);
@@ -29,8 +38,17 @@ final class AssistantServiceProvider extends ServiceProvider
         $this->app->bind(ChannelServiceInterface::class, ChannelService::class);
         $this->app->scoped(CurrentAssistant::class, CurrentAssistant::class);
         $this->app->scoped(CurrentAssistantInterface::class, fn ($app): CurrentAssistant => $app->make(CurrentAssistant::class));
+
+        $this->app->afterResolving(TenantSwitcher::class, function (TenantSwitcher $switcher, $app): void {
+            $switcher->registerRestoreHook(function () use ($app): void {
+                $app->make(CurrentAssistantInterface::class)->reset();
+            });
+        });
     }
 
+    /**
+     * Register assistant authorization policies and observers.
+     */
     public function boot(): void
     {
         Gate::policy(Assistant::class, AssistantPolicy::class);

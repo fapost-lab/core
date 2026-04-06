@@ -100,7 +100,8 @@
     ],
     "pre-package-uninstall": [
       "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
-    ]
+    ],
+    "docs:build": "php tools/doctum/doctum.phar update tools/doctum/config.php --ignore-parse-errors"
   },
   "extra": {
     "laravel": {

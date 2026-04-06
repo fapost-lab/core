@@ -17,12 +17,19 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
  */
 final readonly class ChannelObserver
 {
+    /**
+     * @param  ChannelWebhookRegistryInterface  $registry  Redis write-through routing registry.
+     * @param  TenantContextInterface  $tenantContext      Current platform tenant context.
+     */
     public function __construct(
         private ChannelWebhookRegistryInterface $registry,
         private TenantContextInterface $tenantContext,
     ) {
     }
 
+    /**
+     * Observer hook: after channel creation, write Redis routing if the channel is active.
+     */
     public function created(Channel $channel): void
     {
         if ( ! $channel->is_active) {
@@ -32,6 +39,9 @@ final readonly class ChannelObserver
         $this->registry->set($channel, $this->tenantContext->get());
     }
 
+    /**
+     * Observer hook: after channel update, sync Redis routing on relevant hash/active-state changes.
+     */
     public function updated(Channel $channel): void
     {
         if ($channel->wasChanged('webhook_public_hash')) {
@@ -47,6 +57,9 @@ final readonly class ChannelObserver
         $this->registry->set($channel, $this->tenantContext->get());
     }
 
+    /**
+     * Observer hook: after deletion, remove the Redis routing entry.
+     */
     public function deleted(Channel $channel): void
     {
         $this->registry->remove($channel->webhook_public_hash);

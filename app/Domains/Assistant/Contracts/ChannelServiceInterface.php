@@ -22,8 +22,14 @@ interface ChannelServiceInterface
      */
     public function update(Channel $channel, array $data): Channel;
 
+    /**
+     * Rotate the public webhook hash and update the Redis routing cache.
+     */
     public function rotateWebhookHash(Channel $channel): Channel;
 
+    /**
+     * Deactivate a channel (sets {@see Channel::$is_active} to false).
+     */
     public function deactivate(Channel $channel): void;
 
     /**

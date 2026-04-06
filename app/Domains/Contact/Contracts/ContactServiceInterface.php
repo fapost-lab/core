@@ -20,5 +20,8 @@ interface ContactServiceInterface
         array $meta = [],
     ): Contact;
 
+    /**
+     * Find or create a (contact, channel) link record and update last interaction timestamp.
+     */
     public function findOrCreateChannelContact(Contact $contact, string $channelId): ChannelContact;
 }

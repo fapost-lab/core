@@ -15,6 +15,6 @@ final class TenantsSeedAclCommandTest extends TestCase
             $mock->shouldReceive('findAllActive')->once()->andReturn([]);
         });
 
-        $this->artisan('tenants:seed-acl', ['--no-interaction' => true])->assertSuccessful();
+        $this->artisan('ops:tenants-seed-acl', ['--no-interaction' => true])->assertSuccessful();
     }
 }

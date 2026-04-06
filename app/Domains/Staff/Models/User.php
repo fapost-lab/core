@@ -25,9 +25,9 @@ use Spatie\Permission\Traits\HasRoles;
 /**
  * Tenant-scoped staff user; table lives in the active tenant schema (not landlord/public).
  *
- * @property string $id
- * @property bool $is_active
  * @property UserStatus $status
+ * @property-read \Illuminate\Database\Eloquent\Collection<int, Assistant> $assistants
+ * @property-read int|null $assistants_count
  * @property-read \Illuminate\Notifications\DatabaseNotificationCollection<int, \Illuminate\Notifications\DatabaseNotification> $notifications
  * @property-read int|null $notifications_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Permission> $permissions

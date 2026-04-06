@@ -11,7 +11,14 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
+/**
+ * Assistant lifecycle service.
+ *
+ * Creates and updates assistant settings and coordinates assistant deactivation/activation cascade to channels
+ * and Redis webhook routing.
+ */
 final readonly class AssistantService implements AssistantServiceInterface
 {
     public function __construct(
@@ -21,6 +28,8 @@ final readonly class AssistantService implements AssistantServiceInterface
     }
 
     /**
+     * Create an assistant within a tenant.
+     *
      * @param  array<string, mixed>  $data
      */
     public function create(TenantInterface $tenant, array $data): Assistant
@@ -41,6 +50,8 @@ final readonly class AssistantService implements AssistantServiceInterface
     }
 
     /**
+     * Update assistant fields using a whitelist of allowed values.
+     *
      * @param  array<string, mixed>  $data
      */
     public function update(Assistant $assistant, array $data): Assistant
@@ -80,6 +91,8 @@ final readonly class AssistantService implements AssistantServiceInterface
      * Deactivation contract (service-level invariant, not only observer side effects):
      * every channel is deactivated via {@see ChannelServiceInterface::deactivate} and removed from
      * {@see ChannelWebhookRegistryInterface} so Redis cannot route webhooks to a deactivated assistant tree.
+     *
+     * @throws Throwable
      */
     public function deactivate(Assistant $assistant): void
     {

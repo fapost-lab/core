@@ -10,7 +10,6 @@ use Spatie\Permission\Models\Permission as SpatiePermission;
 /**
  * Tenant-scoped permission; table lives in the active tenant schema.
  *
- * @property string $id
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Permission> $permissions
  * @property-read int|null $permissions_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Role> $roles

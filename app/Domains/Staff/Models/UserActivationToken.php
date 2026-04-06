@@ -11,7 +11,6 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 /**
  * Single active activation token per user (enforced by unique user_id).
  *
- * @property string $id
  * @property-read User|null $user
  * @method static \Illuminate\Database\Eloquent\Builder<static>|UserActivationToken newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|UserActivationToken newQuery()

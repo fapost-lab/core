@@ -14,20 +14,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
 /**
- * @property string                          $id
- * @property string                          $assistant_id
- * @property string                          $tenant_id
- * @property ChannelTypeEnum                 $type
- * @property string                          $token
- * @property string                          $secret_token
- * @property string                          $webhook_public_hash
- * @property array<string, mixed>            $config
- * @property bool                            $is_active
- * @property \Illuminate\Support\Carbon|null $created_at
- * @property \Illuminate\Support\Carbon|null $updated_at
+ * Assistant transport endpoint.
  *
+ * Stores channel identity (webhook hash) and connection data for a specific assistant.
+ * Mutations of `webhook_public_hash` must go through {@see \App\Domains\Assistant\Services\ChannelService::rotateWebhookHash()}.
+ *
+ * @property ChannelTypeEnum $type
+ * @property-read Assistant|null $assistant
  * @method static Builder<static>|Channel active()
- * @method static ChannelFactory factory($count = null, $state = [])
+ * @method static \Database\Factories\ChannelFactory factory($count = null, $state = [])
+ * @method static Builder<static>|Channel newModelQuery()
+ * @method static Builder<static>|Channel newQuery()
+ * @method static Builder<static>|Channel query()
+ * @mixin \Eloquent
  */
 final class Channel extends Model
 {

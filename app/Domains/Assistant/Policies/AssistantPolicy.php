@@ -10,30 +10,50 @@ use App\Domains\Staff\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 use Illuminate\Foundation\Auth\User as AuthUser;
 
+/**
+ * Authorization policy for {@see Assistant}.
+ *
+ * Admin can manage assistants; non-admins can access only assigned assistants.
+ */
 final class AssistantPolicy
 {
     use HandlesAuthorization;
 
+    /**
+     * Whether the user can list assistants.
+     */
     public function viewAny(AuthUser $authUser): bool
     {
         return $this->canManageAssistants($authUser);
     }
 
+    /**
+     * Whether the user can view a specific assistant.
+     */
     public function view(AuthUser $authUser, Assistant $assistant): bool
     {
         return $this->canManageAssistants($authUser) && $this->isAssignedOrAdmin($authUser, $assistant);
     }
 
+    /**
+     * Whether the user can create assistants.
+     */
     public function create(AuthUser $authUser): bool
     {
         return $this->canManageAssistants($authUser);
     }
 
+    /**
+     * Whether the user can update a specific assistant.
+     */
     public function update(AuthUser $authUser, Assistant $assistant): bool
     {
         return $this->canManageAssistants($authUser) && $this->isAssignedOrAdmin($authUser, $assistant);
     }
 
+    /**
+     * Whether the user can delete a specific assistant.
+     */
     public function delete(AuthUser $authUser, Assistant $assistant): bool
     {
         return $this->canManageAssistants($authUser) && $this->isAssignedOrAdmin($authUser, $assistant);
