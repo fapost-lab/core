@@ -4,19 +4,31 @@ declare(strict_types=1);
 
 namespace App\Domains\Webhook\Adapters;
 
+use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
-use App\Domains\Webhook\DTOs\IncomingMessage;
-use Illuminate\Http\Request;
+use FAPost\Foundation\DTO\IncomingMessage;
+use FAPost\Foundation\DTO\OutgoingMessage;
+use FAPost\Foundation\DTO\SendResult;
 use LogicException;
 
 final class WhatsAppChannelAdapter implements ChannelAdapterInterface
 {
-    public function verifySignature(Request $request, string $secretToken): void
+    public function platform(): PlatformEnum
+    {
+        return PlatformEnum::WhatsApp;
+    }
+
+    public function verifySignature(array $headers, string $body, string $secret): bool
     {
         throw new LogicException('WhatsApp adapter is not implemented yet.');
     }
 
-    public function parse(Request $request): IncomingMessage
+    public function parseIncoming(string $body): IncomingMessage
+    {
+        throw new LogicException('WhatsApp adapter is not implemented yet.');
+    }
+
+    public function send(OutgoingMessage $message, string $token): SendResult
     {
         throw new LogicException('WhatsApp adapter is not implemented yet.');
     }

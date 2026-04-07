@@ -45,7 +45,10 @@ final class WebhookController extends Controller
         $entry = $this->registryResolver->resolve($hash);
 
         $adapter = $this->adapterResolver->resolve($entry->platform);
-        $adapter->verifySignature($request, $entry->secretToken);
+
+        if ( ! $adapter->verifySignature($request->headers->all(), $request->getContent(), $entry->secretToken)) {
+            throw new InvalidSignatureException('Invalid channel signature.');
+        }
 
         $updateId = (string) $request->json('update_id', '');
 
@@ -53,7 +56,7 @@ final class WebhookController extends Controller
             return response()->json(['ok' => true]);
         }
 
-        $message = $adapter->parse($request);
+        $message = $adapter->parseIncoming($request->getContent());
 
         IncomingMessageJob::dispatch(
             message: $message,

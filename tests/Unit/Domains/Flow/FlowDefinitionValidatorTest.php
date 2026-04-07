@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Flow;
 
-use App\Domains\Flow\Contracts\NodeHandlerInterface;
-use App\Domains\Flow\DTO\NodeExecutionContext;
-use App\Domains\Flow\DTO\NodeExecutionResult;
-use App\Domains\Flow\Enums\NodeExecutionStatus;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
+use FAPost\Foundation\Contracts\NodeExecutionContext;
+use FAPost\Foundation\Contracts\NodeHandlerInterface;
+use FAPost\Foundation\DTO\NodeExecutionResult;
 use Tests\TestCase;
 
 final class FlowDefinitionValidatorTest extends TestCase
@@ -153,9 +152,9 @@ final class TestConditionHandlerV2 implements NodeHandlerInterface
         return [2];
     }
 
-    public function handle(NodeExecutionContext $context): NodeExecutionResult
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
-        return new NodeExecutionResult(NodeExecutionStatus::Completed, 'default');
+        return NodeExecutionResult::completed();
     }
 }
 
@@ -176,8 +175,8 @@ final class TestInputHandlerV1 implements NodeHandlerInterface
         return [1];
     }
 
-    public function handle(NodeExecutionContext $context): NodeExecutionResult
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
-        return new NodeExecutionResult(NodeExecutionStatus::WaitingForInput, 'timeout');
+        return NodeExecutionResult::waiting();
     }
 }

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Webhook;
 
-use App\Domains\Contact\Enums\PlatformEnum;
-use App\Domains\Webhook\DTOs\IncomingMessage;
 use App\Domains\Webhook\Jobs\IncomingMessageJob;
+use FAPost\Foundation\DTO\IncomingMessage;
+use FAPost\Foundation\DTO\IncomingMessageType;
 use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
@@ -18,13 +18,12 @@ final class IncomingMessageJobTest extends TestCase
 
         $message = new IncomingMessage(
             updateId: 'up-1',
-            externalChatId: 'chat-1',
             externalUserId: 'user-1',
+            externalChatId: 'chat-1',
             text: 'hello',
-            platform: PlatformEnum::Telegram,
-            messageType: 'text',
-            timestamp: 1_717_171_717,
-            meta: ['username' => 'u1'],
+            type: IncomingMessageType::Text,
+            platform: 'telegram',
+            payload: ['username' => 'u1'],
         );
 
         IncomingMessageJob::dispatch(

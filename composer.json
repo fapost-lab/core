@@ -40,6 +40,7 @@
   "require-dev": {
     "barryvdh/laravel-ide-helper": "^3.7",
     "fakerphp/faker": "^1.23",
+    "fapost/foundation": "*",
     "laravel/boost": "^2.0",
     "laravel/pail": "^1.2.5",
     "laravel/pint": "^1.27",
@@ -62,6 +63,12 @@
       "Tests\\": "tests/"
     }
   },
+  "repositories": [
+    {
+      "type": "path",
+      "url": "packages/fapost-foundation"
+    }
+  ],
   "scripts": {
     "hooks:install": "@php tools/git-hooks/install.php",
     "setup": [

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Registry;
 
-use App\Domains\Flow\Contracts\NodeHandlerInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use FAPost\Foundation\Contracts\NodeHandlerInterface;
 use LogicException;
 
 final class NodeHandlerRegistry implements NodeHandlerRegistryInterface

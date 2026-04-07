@@ -6,27 +6,36 @@ namespace App\Domains\Webhook\Adapters;
 
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
-use App\Domains\Webhook\DTOs\IncomingMessage;
-use App\Domains\Webhook\Exceptions\InvalidSignatureException;
-use Illuminate\Http\Request;
+use FAPost\Foundation\DTO\IncomingMessage;
+use FAPost\Foundation\DTO\IncomingMessageType;
+use FAPost\Foundation\DTO\OutgoingMessage;
+use FAPost\Foundation\DTO\SendResult;
+use LogicException;
 
 final class TelegramChannelAdapter implements ChannelAdapterInterface
 {
     private const string HEADER = 'x-telegram-bot-api-secret-token';
 
-    public function verifySignature(Request $request, string $secretToken): void
+    public function platform(): PlatformEnum
     {
-        $provided = $request->header(self::HEADER, '');
-
-        if ( ! hash_equals($secretToken, $provided)) {
-            throw new InvalidSignatureException('Invalid Telegram secret token.');
-        }
+        return PlatformEnum::Telegram;
     }
 
-    public function parse(Request $request): IncomingMessage
+    public function verifySignature(array $headers, string $body, string $secret): bool
+    {
+        $provided = $headers[self::HEADER] ?? '';
+
+        if (is_array($provided)) {
+            $provided = $provided[0] ?? '';
+        }
+
+        return hash_equals($secret, (string) $provided);
+    }
+
+    public function parseIncoming(string $body): IncomingMessage
     {
         /** @var array<string, mixed> $payload */
-        $payload = $request->json()->all();
+        $payload = json_decode($body, true, flags: JSON_THROW_ON_ERROR);
 
         /** @var array<string, mixed> $from */
         $from = $payload['callback_query']['from']
@@ -42,18 +51,23 @@ final class TelegramChannelAdapter implements ChannelAdapterInterface
 
         return new IncomingMessage(
             updateId: (string) ($payload['update_id'] ?? ''),
-            externalChatId: (string) ($message['chat']['id'] ?? ''),
             externalUserId: (string) ($from['id'] ?? ''),
+            externalChatId: (string) ($message['chat']['id'] ?? ''),
             text: is_string($callbackData) ? $callbackData : ($message['text'] ?? null),
-            platform: PlatformEnum::Telegram,
-            messageType: $this->resolveMessageType($payload),
-            timestamp: (int) ($message['date'] ?? time()),
-            meta: array_filter([
+            type: IncomingMessageType::from($this->resolveMessageType($payload)),
+            platform: $this->platform()->value,
+            payload: array_filter([
                 'username'   => $from['username'] ?? null,
                 'first_name' => $from['first_name'] ?? null,
                 'last_name'  => $from['last_name'] ?? null,
+                'timestamp'  => (int) ($message['date'] ?? 0) ?: null,
             ], static fn (mixed $value): bool => null !== $value),
         );
+    }
+
+    public function send(OutgoingMessage $message, string $token): SendResult
+    {
+        throw new LogicException('TelegramChannelAdapter::send() is not implemented yet.');
     }
 
     /**
@@ -66,7 +80,6 @@ final class TelegramChannelAdapter implements ChannelAdapterInterface
             isset($payload['message']['photo'])    => 'photo',
             isset($payload['message']['document']) => 'document',
             isset($payload['message']['voice'])    => 'voice',
-            isset($payload['message']['sticker'])  => 'sticker',
             isset($payload['message']['text'])     => 'text',
             default                                => 'unknown',
         };

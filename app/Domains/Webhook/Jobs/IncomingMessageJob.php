@@ -7,9 +7,10 @@ namespace App\Domains\Webhook\Jobs;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
+use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
-use App\Domains\Webhook\DTOs\IncomingMessage;
+use FAPost\Foundation\DTO\IncomingMessage;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -45,9 +46,9 @@ final class IncomingMessageJob implements ShouldQueue
 
             $contact = $contactService->findOrCreate(
                 tenantId: $this->tenantId,
-                platform: $this->message->platform,
+                platform: PlatformEnum::from($this->message->platform),
                 externalId: $this->message->externalUserId,
-                meta: $this->message->meta,
+                meta: $this->message->payload,
             );
 
             $contactService->findOrCreateChannelContact(

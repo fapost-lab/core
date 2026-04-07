@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers\Abstract;
 
-use App\Domains\Flow\Contracts\NodeHandlerInterface;
+use FAPost\Foundation\Contracts\NodeHandlerInterface;
 
 abstract class AbstractVersionedHandler implements NodeHandlerInterface
 {
