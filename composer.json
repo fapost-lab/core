@@ -20,6 +20,8 @@
     "ext-pdo": "*",
     "ext-pdo_pgsql": "*",
     "craft-forge/filament-language-switcher": "^1.2",
+    "fapost/foundation": "*",
+    "fapost/support": "*",
     "filament/filament": "^5.0",
     "irazasyed/telegram-bot-sdk": "^3.15",
     "laravel/framework": "^12.0",
@@ -40,8 +42,6 @@
   "require-dev": {
     "barryvdh/laravel-ide-helper": "^3.7",
     "fakerphp/faker": "^1.23",
-    "fapost/foundation": "*",
-    "fapost/support": "*",
     "laravel/boost": "^2.0",
     "laravel/pail": "^1.2.5",
     "laravel/pint": "^1.27",
