@@ -7,8 +7,8 @@ namespace Tests\Unit\Domains\Flow;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
-use FAPost\Foundation\Contracts\NodeExecutionContext;
 use FAPost\Foundation\Contracts\NodeHandlerInterface;
+use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use Tests\TestCase;
 

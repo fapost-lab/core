@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Shared\Registries;
 
-use App\Domains\Shared\Contracts\DataAccessorInterface;
+use FAPost\Foundation\Contracts\DataAccessorInterface;
 use LogicException;
 
 final class ModuleNamespaceRegistry

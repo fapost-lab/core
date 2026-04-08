@@ -20,6 +20,10 @@ final class SessionStateResolver implements NamespaceResolverInterface
         if (StateNamespace::Module === $namespace) {
             throw new InvalidArgumentException('Use ModuleStateResolver for module namespace.');
         }
+
+        if (StateNamespace::Rag === $namespace) {
+            throw new InvalidArgumentException('Use RagStateResolver for rag namespace.');
+        }
     }
 
     public function get(StatePath $path, FlowState $state): mixed

@@ -10,6 +10,12 @@ use Tests\TestCase;
 
 final class BaseModelExtensionTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        app()->forgetInstance(ModelAttributeRegistry::class);
+    }
+
     protected function tearDown(): void
     {
         app()->forgetInstance(ModelAttributeRegistry::class);

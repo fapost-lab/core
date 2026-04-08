@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Flow;
 
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
-use FAPost\Foundation\Contracts\NodeExecutionContext;
 use FAPost\Foundation\Contracts\NodeHandlerInterface;
+use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use LogicException;
 use Tests\TestCase;

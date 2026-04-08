@@ -33,6 +33,12 @@ final class NamespaceResolverRegistry
 
     public function freeze(): void
     {
+        foreach (StateNamespace::cases() as $namespace) {
+            if ( ! isset($this->resolvers[$namespace->value])) {
+                throw new LogicException("No resolver registered for namespace '{$namespace->value}'");
+            }
+        }
+
         $this->frozen = true;
     }
 }

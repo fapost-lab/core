@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class () extends Migration {
@@ -30,8 +29,8 @@ return new class () extends Migration {
             $table->index('flow_definition_id');
         });
 
-        if ('sqlite' !== DB::getDriverName()) {
-            DB::statement(
+        if ('sqlite' !== Schema::getConnection()->getDriverName()) {
+            Schema::getConnection()->statement(
                 "ALTER TABLE flow_sessions ADD CONSTRAINT flow_sessions_status_check
                 CHECK (status IN ('pending', 'active', 'waiting_input', 'paused', 'completed', 'failed'))"
             );
@@ -40,8 +39,8 @@ return new class () extends Migration {
 
     public function down(): void
     {
-        if ('sqlite' !== DB::getDriverName()) {
-            DB::statement('ALTER TABLE flow_sessions DROP CONSTRAINT IF EXISTS flow_sessions_status_check');
+        if ('sqlite' !== Schema::getConnection()->getDriverName()) {
+            Schema::getConnection()->statement('ALTER TABLE flow_sessions DROP CONSTRAINT IF EXISTS flow_sessions_status_check');
         }
 
         Schema::dropIfExists('flow_sessions');

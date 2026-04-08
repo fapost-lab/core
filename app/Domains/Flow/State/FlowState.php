@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\State;
 
+use App\Domains\Flow\State\Exceptions\InvalidStatePathException;
+
 /**
  * Mutable typed container for session-backed runtime state.
  *
@@ -58,8 +60,14 @@ final class FlowState
         $ref  = &$this->data;
 
         foreach (array_slice($keys, 0, -1) as $key) {
-            if ( ! isset($ref[$key]) || ! is_array($ref[$key])) {
+            if ( ! array_key_exists($key, $ref)) {
                 $ref[$key] = [];
+            }
+
+            if ( ! is_array($ref[$key])) {
+                throw new InvalidStatePathException(
+                    "Cannot write path '{$path->toString()}': segment '{$key}' points to scalar value."
+                );
             }
 
             $ref = &$ref[$key];

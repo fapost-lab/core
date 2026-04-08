@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Providers;
 
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\State\Resolvers\ModuleResolutionContext;
 use App\Domains\Flow\State\Resolvers\ModuleStateResolver;
 use App\Domains\Flow\State\Resolvers\NamespaceResolverRegistry;
 use App\Domains\Flow\State\Resolvers\RagStateResolver;
@@ -20,13 +21,23 @@ final class FlowServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ModuleNamespaceRegistry::class);
+        // NOTE: ModuleResolutionContext is scoped (per-request), but NamespaceResolverRegistry
+        // is a singleton. This is safe because flow execution runs in queue workers (FPM),
+        // never in Octane ingress. If that changes — audit this binding.
+        $this->app->scoped(ModuleResolutionContext::class);
         $this->app->singleton(NamespaceResolverRegistry::class, function ($app): NamespaceResolverRegistry {
             $registry = new NamespaceResolverRegistry();
 
             $registry->register(StateNamespace::System, new SessionStateResolver(StateNamespace::System));
             $registry->register(StateNamespace::Flow, new SessionStateResolver(StateNamespace::Flow));
             $registry->register(StateNamespace::Rag, new RagStateResolver());
-            $registry->register(StateNamespace::Module, new ModuleStateResolver($app->make(ModuleNamespaceRegistry::class)));
+            $registry->register(
+                StateNamespace::Module,
+                new ModuleStateResolver(
+                    $app->make(ModuleNamespaceRegistry::class),
+                    $app->make(ModuleResolutionContext::class),
+                )
+            );
 
             return $registry;
         });

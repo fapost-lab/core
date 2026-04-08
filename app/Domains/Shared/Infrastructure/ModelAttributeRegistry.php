@@ -23,6 +23,7 @@ final class ModelAttributeRegistry
      * @var array<string, array<string, RegisteredEntry>>
      */
     private array $entries = [];
+    private bool $frozen   = false;
 
     /**
      * Register resolver for a computed attribute on a given model class.
@@ -33,6 +34,10 @@ final class ModelAttributeRegistry
      */
     public function register(string $modelClass, string $name, Closure $resolver, bool $append = false): void
     {
+        if ($this->frozen) {
+            throw new LogicException('ModelAttributeRegistry is frozen and cannot be modified.');
+        }
+
         if (isset($this->entries[$modelClass][$name])) {
             throw new LogicException(sprintf(
                 'Model attribute [%s] is already registered on [%s].',
@@ -92,5 +97,10 @@ final class ModelAttributeRegistry
         }
 
         return $out;
+    }
+
+    public function freeze(): void
+    {
+        $this->frozen = true;
     }
 }

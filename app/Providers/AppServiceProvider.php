@@ -40,5 +40,9 @@ final class AppServiceProvider extends ServiceProvider
         );
 
         $this->loadMigrationsFrom(database_path('migrations/landlord'));
+
+        $this->app->booted(function (): void {
+            $this->app->make(ModelAttributeRegistry::class)->freeze();
+        });
     }
 }

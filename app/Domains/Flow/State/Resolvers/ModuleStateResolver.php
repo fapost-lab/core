@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\State\Resolvers;
 
+use App\Domains\Flow\State\Exceptions\InvalidStatePathException;
 use App\Domains\Flow\State\Exceptions\ReadonlyNamespaceException;
 use App\Domains\Flow\State\FlowState;
 use App\Domains\Flow\State\StatePath;
@@ -14,6 +15,7 @@ final class ModuleStateResolver implements NamespaceResolverInterface
 {
     public function __construct(
         private readonly ModuleNamespaceRegistry $registry,
+        private readonly ModuleResolutionContext $context,
     ) {
     }
 
@@ -22,10 +24,14 @@ final class ModuleStateResolver implements NamespaceResolverInterface
         $owner = $path->owner;
 
         if (null === $owner) {
-            throw new ReadonlyNamespaceException("Namespace 'module' requires owner segment.");
+            throw new InvalidStatePathException("Namespace 'module' requires owner segment.");
         }
 
-        return $this->registry->for($owner)->get($path->leaf);
+        return $this->registry->for($owner)->get(
+            $path->leaf,
+            $this->context->contactId(),
+            $this->context->tenantId(),
+        );
     }
 
     public function set(StatePath $path, mixed $value, FlowState $state, WriteContext $context): void
@@ -33,16 +39,11 @@ final class ModuleStateResolver implements NamespaceResolverInterface
         $owner = $path->owner;
 
         if (null === $owner) {
-            throw new ReadonlyNamespaceException("Namespace 'module' requires owner segment.");
+            throw new InvalidStatePathException("Namespace 'module' requires owner segment.");
         }
 
-        if ( ! $context->isAccessor($owner)) {
-            throw new ReadonlyNamespaceException(
-                "Namespace 'module' is accessor-only. Direct write is forbidden. "
-                . "Got context type '{$context->type}' with name '{$context->name}'."
-            );
-        }
-
-        $this->registry->for($owner)->set($path->leaf, $value);
+        throw new ReadonlyNamespaceException(
+            "Namespace 'module' is read-only. Writes are not supported by DataAccessor contract."
+        );
     }
 }

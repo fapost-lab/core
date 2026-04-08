@@ -669,6 +669,39 @@ Feature/Solution/Plugin тенанта.
 
 `app()` в трейтах — допустимое исключение: Eloquent создаёт модели напрямую, обходя constructor DI. Изолировано в трейтах с явным комментарием.
 
+**`ModelAttributeRegistry` замораживается** в `AppServiceProvider::booted()`. Регистрация после freeze — `LogicException`. Тесты сбрасывают экземпляр через `app()->forgetInstance()` в `setUp()`.
+
+---
+
+## fapost/foundation — Extension Boundary Contract
+
+Пакет `packages/fapost-foundation` (composer: `fapost/foundation`) — единственный публичный контрактный слой для всех внешних расширений. Подключается через path repository.
+
+**Правило:** новые публичные контракты для расширений создаются только в SDK. Запрещено появление extension-контрактов в `app/Domains/*`.
+
+**Что живёт в SDK:**
+
+| Файл | Назначение |
+|------|-----------|
+| `Contracts/CoreRegistrarInterface` | registerNodeHandler, registerDataAccessor, registerRagAdapter, registerManifest, **registerRoutes, registerSchedule, registerMigrations** |
+| `Contracts/DataAccessorInterface` | `namespace()`, `get(key, contactId, tenantId)`, `supportedKeys()` — **read-only**, без `set()` |
+| `Contracts/NodeHandlerInterface` | type, version, supportedVersions, execute |
+| `Contracts/RagAdapterInterface` | provider, query |
+| `Contracts/ActivatableInterface` | getId, getVersion, getManifest, onActivate, onDeactivate |
+| `DTO/NodeExecutionContext` | tenantId, contactId, sessionId, nodeId, idempotencyKey, platform |
+| `Lifecycle/AbstractSolutionServiceProvider` | base provider для Solution-пакетов |
+| `Manifest/SolutionManifest` | id, version, requiresPlatform, requiresCapabilities |
+
+**`DataAccessorInterface` — единственный контракт.** Дубликат `App\Domains\Shared\Contracts\DataAccessorInterface` удалён. `ModuleNamespaceRegistry` использует Foundation-версию.
+
+**`module.*` namespace — read-only.** `DataAccessorInterface` не имеет `set()`. Запись в module-namespace всегда бросает `ReadonlyNamespaceException`. Модули управляют своими данными через собственные сервисы, не через state writer.
+
+**`ModuleResolutionContext`** (`app/Domains/Flow/State/Resolvers/ModuleResolutionContext.php`) — scoped-зависимость, несёт `contactId` + `tenantId` для DataAccessor-вызовов. Устанавливается engine'ом перед выполнением ноды. Инжектируется в `ModuleStateResolver` через конструктор.
+
+**Octane note:** `NamespaceResolverRegistry` — singleton, `ModuleResolutionContext` — scoped. Безопасно пока flow execution идёт через queue workers (FPM). Если scope расширится на Octane — нужен lifecycle audit.
+
+**`loadSolutionMigrations()` deprecated.** Использовать `CoreRegistrar::registerMigrations()` когда будет реализован в задаче 21. До тех пор метод бросает `E_USER_DEPRECATED`.
+
 ---
 
 ## Что делать автономно
@@ -796,6 +829,8 @@ Routing split на уровне Traefik / Nginx: `/webhooks/*` → octane, вс�
 | 01 | Project scaffolding (Laravel 12 без Octane, Horizon, Filament, Inertia+Vue, phpat, migration path structure) | ✅ |
 | 02 | Tenancy Domain (контракты, Tenant модель, TenantSettings, миграция landlord.tenants) | ✅ |
 | 03 | Tenant infrastructure (TenantRepository, TenantDatabaseManager, Redis webhook registry write, **Migration Isolation Contract как phpat-правило**) | ✅ |
+| 4.1 | Model Extension Infrastructure (`BaseModel` + `ModelAttributeRegistry`) | ✅ |
+| 4.2 | Introduce `fapost/foundation` — публичный контрактный пакет для extension boundary | ✅ |
 
 **Спринт 2 — boot lifecycle**
 
@@ -827,7 +862,7 @@ Octane вводится последним в фазе — когда все lif
 | # | Название |
 |---|----------|
 | 09 | Flow definition & registry (flow_definitions, **NodeHandlerInterface**, NodeHandlerRegistry in-memory, **HandlerVersionContract phpat**, flow_active_node_stats, правило безопасного удаления) | ✅ |
-| 10 | Flow session & state (flow_sessions с `assistant_id`, namespaced state system/flow/rag/module, optimistic lock, FlowState VO, namespace violation = validation error) |
+| 10 | Flow session & state (flow_sessions с `assistant_id`, namespaced state system/flow/rag/module, optimistic lock, FlowState VO, namespace violation = validation error) | ✅ |
 
 **Спринт 5 — execution & concurrency**
 

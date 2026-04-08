@@ -11,6 +11,12 @@ use Tests\TestCase;
 
 final class ModelAttributeRegistryTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        app()->forgetInstance(ModelAttributeRegistry::class);
+    }
+
     protected function tearDown(): void
     {
         app()->forgetInstance(ModelAttributeRegistry::class);
@@ -97,6 +103,21 @@ final class ModelAttributeRegistryTest extends TestCase
         $registry = app(ModelAttributeRegistry::class);
 
         $this->assertFalse($registry->has(ModelAttributeRegistryDummyModel::class, 'nope'));
+    }
+
+    public function test_register_throws_after_freeze(): void
+    {
+        $registry = app(ModelAttributeRegistry::class);
+        $registry->freeze();
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('ModelAttributeRegistry is frozen');
+
+        $registry->register(
+            ModelAttributeRegistryDummyModel::class,
+            'late',
+            fn (): string => 'value',
+        );
     }
 }
 
