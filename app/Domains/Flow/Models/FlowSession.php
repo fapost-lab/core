@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $tenant_id
  * @property string $assistant_id
  * @property string $contact_id
- * @property string $flow_definition_id
+ * @property string $flow_definition_id  FK to {@see FlowDefinition::$id} — immutable definition snapshot for this session (specific version row), not only logical {@see FlowDefinition::$flow_id}
  * @property int $flow_version
  * @property string|null $current_node_id
  * @property array<string, mixed> $state
