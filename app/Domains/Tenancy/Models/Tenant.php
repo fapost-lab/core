@@ -6,6 +6,7 @@ namespace App\Domains\Tenancy\Models;
 
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use FAPost\Support\Concerns\HasUlidPrimaryKey;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -16,16 +17,16 @@ use Illuminate\Database\Eloquent\Model;
  * @property array<array-key, mixed> $config
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Tenant newModelQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Tenant newQuery()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Tenant query()
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Tenant whereConfig($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Tenant whereCreatedAt($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Tenant whereId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Tenant whereSchemaName($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Tenant whereSlug($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Tenant whereStatus($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|Tenant whereUpdatedAt($value)
+ * @method static Builder<static>|Tenant newModelQuery()
+ * @method static Builder<static>|Tenant newQuery()
+ * @method static Builder<static>|Tenant query()
+ * @method static Builder<static>|Tenant whereConfig($value)
+ * @method static Builder<static>|Tenant whereCreatedAt($value)
+ * @method static Builder<static>|Tenant whereId($value)
+ * @method static Builder<static>|Tenant whereSchemaName($value)
+ * @method static Builder<static>|Tenant whereSlug($value)
+ * @method static Builder<static>|Tenant whereStatus($value)
+ * @method static Builder<static>|Tenant whereUpdatedAt($value)
  * @mixin \Eloquent
  */
 final class Tenant extends Model implements TenantInterface
