@@ -41,6 +41,7 @@
     "barryvdh/laravel-ide-helper": "^3.7",
     "fakerphp/faker": "^1.23",
     "fapost/foundation": "*",
+    "fapost/support": "*",
     "laravel/boost": "^2.0",
     "laravel/pail": "^1.2.5",
     "laravel/pint": "^1.27",
@@ -67,6 +68,10 @@
     {
       "type": "path",
       "url": "packages/fapost-foundation"
+    },
+    {
+      "type": "path",
+      "url": "packages/fapost-support"
     }
   ],
   "scripts": {

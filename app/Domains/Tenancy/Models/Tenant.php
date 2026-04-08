@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Tenancy\Models;
 
-use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
 use App\Domains\Tenancy\Contracts\TenantInterface;
+use FAPost\Support\Concerns\HasUlidPrimaryKey;
 use Illuminate\Database\Eloquent\Model;
 
 /**

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Models;
 
-use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
+use FAPost\Support\Concerns\HasUlidPrimaryKey;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 

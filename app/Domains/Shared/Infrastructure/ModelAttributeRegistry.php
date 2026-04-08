@@ -5,19 +5,22 @@ declare(strict_types=1);
 namespace App\Domains\Shared\Infrastructure;
 
 use Closure;
+use FAPost\Foundation\Contracts\ModelAttributeResolverInterface;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 
 /**
  * Container-backed registry for computed model attributes registered by Features/Solutions/Plugins.
  *
- * Used by {@see \App\Domains\Shared\Models\BaseModel} to resolve computed attributes via {@see __get()}
- * and to include only {@code append=true} attributes into {@see Model::toArray()}
- * / {@see Model::toJson()}.
+ * Implements {@see ModelAttributeResolverInterface} so the fapost/support traits can depend
+ * on the contract without coupling to this Core implementation.
+ *
+ * Used by {@see \FAPost\Support\Concerns\HasComputedAttributes} to resolve computed attributes
+ * and to include only {@code append=true} attributes into {@see Model::toArray()} / toJson().
  *
  * @phpstan-type RegisteredEntry array{0: Closure(Model): mixed, 1: bool} // [resolver, append]
  */
-final class ModelAttributeRegistry
+final class ModelAttributeRegistry implements ModelAttributeResolverInterface
 {
     /**
      * @var array<string, array<string, RegisteredEntry>>

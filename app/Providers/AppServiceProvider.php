@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Domains\Shared\Infrastructure\ModelAttributeRegistry;
+use FAPost\Foundation\Contracts\ModelAttributeResolverInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 
@@ -23,6 +24,7 @@ final class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ModelAttributeRegistry::class);
+        $this->app->singleton(ModelAttributeResolverInterface::class, ModelAttributeRegistry::class);
 
         if ($this->app->environment('local')) {
             $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);

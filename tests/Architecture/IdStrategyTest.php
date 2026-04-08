@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Architecture;
 
 use App\Domains\Presale\Models\PreSaleRequest;
-use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
+use FAPost\Support\Concerns\HasUlidPrimaryKey;
 use PHPat\Selector\Selector;
 use PHPat\Test\Builder\Rule;
 use PHPat\Test\PHPat;

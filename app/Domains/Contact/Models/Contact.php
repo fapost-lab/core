@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Domains\Contact\Models;
 
 use App\Domains\Contact\Enums\PlatformEnum;
-use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
-use App\Domains\Shared\Models\BaseModel;
 use Database\Factories\ContactFactory;
+use FAPost\Support\Concerns\HasUlidPrimaryKey;
+use FAPost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;

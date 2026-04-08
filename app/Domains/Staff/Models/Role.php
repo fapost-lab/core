@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Models;
 
-use App\Domains\Shared\Concerns\HasUlidPrimaryKey;
 use App\Domains\Staff\Enums\RoleEnum;
+use FAPost\Support\Concerns\HasUlidPrimaryKey;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Spatie\Permission\Models\Role as SpatieRole;

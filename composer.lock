@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "35ac5d35e530f629b043d86fc8e64300",
+  "content-hash": "01e83087f7b041342e86c21afe0cd729",
   "packages": [
     {
       "name": "blade-ui-kit/blade-heroicons",
@@ -11853,9 +11853,10 @@
       "dist": {
         "type": "path",
         "url": "packages/fapost-foundation",
-        "reference": "1d74bc763e1c763cffd6f8c511e620982dbc13f2"
+        "reference": "425455be10947bd644258d3bc43d646d482c1e3c"
       },
       "require": {
+        "illuminate/support": "^11.0 || ^12.0",
         "php": "^8.4",
         "spatie/laravel-data": "^4.0"
       },
@@ -11882,6 +11883,47 @@
         "proprietary"
       ],
       "description": "FAPost public contract layer for Solutions, Plugins and external integrations",
+      "transport-options": {
+        "relative": true
+      }
+    },
+    {
+      "name": "fapost/support",
+      "version": "dev-dev",
+      "dist": {
+        "type": "path",
+        "url": "packages/fapost-support",
+        "reference": "f7d47fa65357cb09b5694ad49cac2066f32fe5b6"
+      },
+      "require": {
+        "fapost/foundation": "*",
+        "illuminate/database": "^11.0 || ^12.0",
+        "illuminate/support": "^11.0 || ^12.0",
+        "php": "^8.4"
+      },
+      "require-dev": {
+        "phpunit/phpunit": "^11.0"
+      },
+      "type": "library",
+      "extra": {
+        "laravel": {
+          "providers": []
+        }
+      },
+      "autoload": {
+        "psr-4": {
+          "FAPost\\Support\\": "src/"
+        }
+      },
+      "autoload-dev": {
+        "psr-4": {
+          "FAPost\\Support\\Tests\\": "tests/"
+        }
+      },
+      "license": [
+        "proprietary"
+      ],
+      "description": "FAPost reusable Eloquent primitives — traits, base model, and model concerns",
       "transport-options": {
         "relative": true
       }
