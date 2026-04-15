@@ -197,7 +197,7 @@ final class SequentialFlowTestHandler implements NodeHandlerInterface
         $id = $nodeConfig['id'] ?? '';
 
         return match ($id) {
-            'n1'    => NodeExecutionResult::completed(),
+            'n1'    => NodeExecutionResult::executed(),
             'n2'    => NodeExecutionResult::finished(),
             default => NodeExecutionResult::failed('unexpected node'),
         };
@@ -230,7 +230,7 @@ final class WaitingFlowTestHandler implements NodeHandlerInterface
             return NodeExecutionResult::waiting();
         }
 
-        return NodeExecutionResult::completed();
+        return NodeExecutionResult::executed();
     }
 }
 
@@ -257,8 +257,8 @@ final class InfiniteLoopFlowTestHandler implements NodeHandlerInterface
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         return match ($nodeConfig['id'] ?? '') {
-            'n0'    => NodeExecutionResult::completed('next'),
-            default => NodeExecutionResult::completed(),
+            'n0'    => NodeExecutionResult::executed('next'),
+            default => NodeExecutionResult::executed(),
         };
     }
 }

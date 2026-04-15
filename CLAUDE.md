@@ -258,6 +258,52 @@ Flow запускается **ассистентом**, не каналом.
 - `rag.*` — rag_query нода, умирает с сессией
 - `module.*` — модули через DataAccessorInterface
 
+**State Key Constants — соглашение по именованию:**
+
+Все ключи в `flow_sessions.state` объявляются как константы в классах-реестрах.
+Не строки inline, не магические значения в handlers.
+
+Структура:
+
+- `FlowStateNamespace` — префиксы namespace-ов, архитектурный контракт
+- `SystemStateKeys`, `RagStateKeys` и т.д. — конкретные ключи, сгруппированные по владельцу
+
+```php
+// app/Domains/Flow/State/FlowStateNamespace.php
+final class FlowStateNamespace
+{
+    public const SYSTEM = 'system';
+    public const FLOW   = 'flow';
+    public const RAG    = 'rag';
+    public const MODULE = 'module';
+}
+
+// app/Domains/Flow/State/SystemStateKeys.php
+final class SystemStateKeys
+{
+    public const SENT_MESSAGES = FlowStateNamespace::SYSTEM . '.sent_messages';
+    public const STARTED_AT    = FlowStateNamespace::SYSTEM . '.started_at';
+    public const RETRY_COUNT   = FlowStateNamespace::SYSTEM . '.retry_count';
+    public const DELAY_PREFIX  = FlowStateNamespace::SYSTEM . '.delay'; // + ".{nodeId}.scheduled_at"
+}
+
+// app/Domains/Flow/State/RagStateKeys.php
+final class RagStateKeys
+{
+    public const FOUND      = FlowStateNamespace::RAG . '.found';
+    public const CONFIDENCE = FlowStateNamespace::RAG . '.confidence';
+    public const ANSWER     = FlowStateNamespace::RAG . '.answer';
+    public const INTENT     = FlowStateNamespace::RAG . '.intent';
+}
+```
+
+**Правила:**
+
+- Константы с конкатенацией через `FlowStateNamespace::*` — PHP 8.3+ поддерживает выражения в константах класса
+- `SystemStateKeys`, `RagStateKeys` — рядом с engine (`app/Domains/Flow/State/`)
+- `module.*` ключи — в пакете Solution, не в Core
+- Inline строки типа `'system.sent_messages'` в handler-ах — запрещены
+
 ---
 
 ## Concurrency
@@ -278,6 +324,35 @@ Flow запускается **ассистентом**, не каналом.
 - `FlowOrchestrator` содержит optimistic retry loop (до 3 попыток, `usleep` 50–150ms) **внутри** distributed lock. Сессия перечитывается из БД на каждой попытке.
 - `IncomingMessageJob` при `SessionLockTimeoutException`: `release($delay)` + `return`, без `backoff()` метода. Задержки: 1/2/5/10s по номеру попытки. `$tries = 5`.
 - `AssistantFlowConfigRepositoryInterface` — `App\Domains\Assistant\Contracts\`. Реализация в `App\Domains\Assistant\Repositories\`. Биндинг в `AssistantServiceProvider`.
+
+---
+
+## Built-in Node Handlers (задача 13)
+
+**Файловая структура:** `app/Domains/Flow/Handlers/{Handler}.php`, support-классы в `Handlers/Support/`.
+
+**Инварианты handlers (жёсткие):**
+
+- Handler только возвращает `NodeExecutionResult` — никогда не вызывает `save()`, не открывает `DB::transaction()`, не диспатчит jobs
+- Effects — декларативные намерения: `[['type' => 'set_contact_attribute', 'key' => ..., 'value' => ...]]`
+- Engine интерпретирует effects через `ContactServiceInterface::updateAttributes()` внутри своей транзакции
+
+**Идемпотентность:**
+
+- `send_message` — через `system.sent_messages.{nodeId}` в state
+- `delay` — через `system.delay.{nodeId}.scheduled_at` в state
+- `input`, `condition`, `set_attribute`, `webhook` — детерминированы по входным данным
+
+**`ConditionNodeHandler`** — единственный handler с `DataAccessorRegistryInterface`. Пути `module.*` → registry, остальные → `data_get($state, $path)`.
+
+**`WebhookNodeHandler`** — Transport error (`ConnectionException`) → `Failed`; HTTP response получен (любой код) → `Executed`. Retry-безопасность на стороне получателя через `X-Idempotency-Key: {sessionId}:{nodeId}`.
+
+**`TemplateResolver`** (`Handlers/Support/`) — резолвит `{{flow.*}}` и `{{system.*}}` из state. `module.*` — расширение в задаче 15.
+
+**`FlowEngine` после задачи 13:**
+
+- Все зависимости через интерфейсы: `FlowSessionRepositoryInterface::create()`, `FlowDefinitionRepositoryInterface::findById()`, `ContactServiceInterface::findById()`
+- Нет прямых `Model::query()` и `->save()` внутри сервиса
 
 ---
 
@@ -879,7 +954,7 @@ Octane вводится последним в фазе — когда все lif
 |---|----------|
 | 11 | Flow execution engine (FlowEngine::start/resume, execute loop, dispatch по (type,version), session persist) |
 | 12 | Concurrency protection (distributed lock `session_lock:{tenant_id}:{contact_id}:{assistant_id}` Redis TTL=30s, optimistic lock retry, backoff при lock miss — не дроп) | ✅ |
-| 13 | Built-in node handlers (send_message, input, condition, delay, set_attribute, webhook — все idempotent) |
+| 13 | Built-in node handlers (send_message, input, condition, delay, set_attribute, webhook — все idempotent) | ✅ |
 | 14 | Flow triggers (flow_triggers, TriggerResolver, IncomingMessageJob → FlowEngine) |
 
 **Спринт 6 — data access & logging**

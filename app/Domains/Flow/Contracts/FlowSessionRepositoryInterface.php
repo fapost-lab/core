@@ -10,4 +10,9 @@ use App\Domains\Flow\Models\FlowSession;
 interface FlowSessionRepositoryInterface
 {
     public function findActiveForContact(Contact $contact, string $assistantId): ?FlowSession;
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public function create(array $attributes): FlowSession;
 }

@@ -87,7 +87,7 @@ final class TestConditionNodeHandlerV2 implements NodeHandlerInterface
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
-        return NodeExecutionResult::completed();
+        return NodeExecutionResult::executed();
     }
 }
 
@@ -110,6 +110,6 @@ final class InvalidSupportedVersionsHandler implements NodeHandlerInterface
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
-        return NodeExecutionResult::completed();
+        return NodeExecutionResult::executed();
     }
 }

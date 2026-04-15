@@ -79,4 +79,25 @@ final readonly class ContactService implements ContactServiceInterface
 
         return $channelContact;
     }
+
+    public function updateAttributes(string $contactId, array $attributes): Contact
+    {
+        $contact = $this->findById($contactId);
+        $current = $contact->attributes ?? [];
+
+        if ( ! is_array($current)) {
+            $current = [];
+        }
+
+        $contact->forceFill([
+            'attributes' => array_replace($current, $attributes),
+        ])->save();
+
+        return $contact;
+    }
+
+    public function findById(string $contactId): Contact
+    {
+        return Contact::query()->findOrFail($contactId);
+    }
 }

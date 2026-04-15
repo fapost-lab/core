@@ -24,4 +24,11 @@ interface ContactServiceInterface
      * Find or create a (contact, channel) link record and update last interaction timestamp.
      */
     public function findOrCreateChannelContact(Contact $contact, string $channelId): ChannelContact;
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    public function updateAttributes(string $contactId, array $attributes): Contact;
+
+    public function findById(string $contactId): Contact;
 }

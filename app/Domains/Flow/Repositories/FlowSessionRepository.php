@@ -24,4 +24,9 @@ final class FlowSessionRepository implements FlowSessionRepositoryInterface
             ->latest('updated_at')
             ->first();
     }
+
+    public function create(array $attributes): FlowSession
+    {
+        return FlowSession::query()->create($attributes);
+    }
 }

@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Services;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowConcurrencyException;
@@ -16,6 +19,8 @@ use App\Domains\Flow\Exceptions\InvalidFlowGraphException;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\State\FlowStateNamespace;
+use App\Domains\Flow\State\SystemStateKeys;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\NodeExecutionContext as FoundationNodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
@@ -30,9 +35,12 @@ final readonly class FlowEngine implements FlowEngineInterface
     public function __construct(
         private FlowGraphResolver $graphResolver,
         private NodeHandlerRegistryInterface $registry,
+        private FlowSessionRepositoryInterface $sessions,
+        private FlowDefinitionRepositoryInterface $definitions,
         private FlowSessionPersister $persister,
         private FlowLogWriter $logWriter,
         private CurrentAssistantInterface $currentAssistant,
+        private ContactServiceInterface $contactService,
         private ConnectionInterface $connection,
         private Repository $config,
     ) {
@@ -49,18 +57,18 @@ final readonly class FlowEngine implements FlowEngineInterface
         $entry = $this->graphResolver->resolveEntryNode($definition);
 
         $baseState = array_replace_recursive([
-            'system' => [
-                'started_at'         => now()->toIso8601String(),
-                'flow_definition_id' => (string) $definition->getKey(),
-                'contact_id'         => (string) $contact->getKey(),
-                'retry_count'        => 0,
+            FlowStateNamespace::SYSTEM => [
+                SystemStateKeys::STARTED_AT_LEAF  => now()->toIso8601String(),
+                'flow_definition_id'              => (string) $definition->getKey(),
+                'contact_id'                      => (string) $contact->getKey(),
+                SystemStateKeys::RETRY_COUNT_LEAF => 0,
             ],
         ], $initialState);
 
         $assistant = $this->currentAssistant->get();
 
         $session = $this->connection->transaction(function () use ($assistant, $baseState, $contact, $definition, $entry): FlowSession {
-            $created = FlowSession::query()->create([
+            $created = $this->sessions->create([
                 'tenant_id'          => $contact->tenant_id,
                 'assistant_id'       => $assistant->getKey(),
                 'contact_id'         => $contact->getKey(),
@@ -90,10 +98,8 @@ final readonly class FlowEngine implements FlowEngineInterface
     {
         $session->refresh();
 
-        /** @var FlowDefinition $definition Immutable snapshot row: {@see FlowSession::$flow_definition_id} → flow_definitions.id */
-        $definition = FlowDefinition::query()->findOrFail($session->flow_definition_id);
-
-        $contact = Contact::query()->findOrFail($session->contact_id);
+        $definition = $this->definitions->findById($session->flow_definition_id);
+        $contact    = $this->contactService->findById($session->contact_id);
 
         $this->executeLoop($definition, $session, $message, $contact);
         $session->refresh();
@@ -110,7 +116,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         ?IncomingMessage $incoming,
         Contact $contact,
     ): void {
-        $maxIterations = (int) $this->config->get('flow.execution.max_iterations', 100);
+        $maxIterations = (int) $this->config->get("flow.execution.max_iterations", 100);
         $iterations    = 0;
         $incomingStep  = $incoming;
 
@@ -179,11 +185,12 @@ final readonly class FlowEngine implements FlowEngineInterface
 
             $nextNodeId = null;
 
-            if (NodeExecutionStatus::Completed === $result->status && null !== $result->sourceHandle) {
+            if (NodeExecutionStatus::Executed === $result->status && null !== $result->sourceHandle) {
                 $nextNodeId = $this->graphResolver->resolveNextNode($definition, $nodeId, $result->sourceHandle);
             }
 
-            $this->connection->transaction(function () use ($session, $node, $result, $nextNodeId): void {
+            $this->connection->transaction(function () use ($session, $contact, $node, $result, $nextNodeId): void {
+                $this->applyEffects($contact, $result);
                 $this->persister->persist($session, $result, $nextNodeId);
                 $this->logWriter->write($session, $node, $result, $nextNodeId);
 
@@ -216,7 +223,7 @@ final readonly class FlowEngine implements FlowEngineInterface
      */
     private function resolveTerminalReason(NodeExecutionResult $result, ?string $nextNodeId): ?string
     {
-        if (NodeExecutionStatus::Completed === $result->status && null === $nextNodeId) {
+        if (NodeExecutionStatus::Executed === $result->status && null === $nextNodeId) {
             return 'no_next_node';
         }
 
@@ -229,6 +236,25 @@ final readonly class FlowEngine implements FlowEngineInterface
         }
 
         return null;
+    }
+
+    private function applyEffects(Contact $contact, NodeExecutionResult $result): void
+    {
+        foreach ($result->effects as $effect) {
+            if ( ! is_array($effect) || 'set_contact_attribute' !== ($effect['type'] ?? null)) {
+                continue;
+            }
+
+            $key = $effect['key'] ?? null;
+            if ( ! is_string($key) || '' === $key) {
+                continue;
+            }
+
+            $this->contactService->updateAttributes(
+                $contact->getKey(),
+                [$key => $effect['value'] ?? null],
+            );
+        }
     }
 
     /**

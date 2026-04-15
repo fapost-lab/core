@@ -49,8 +49,8 @@ final class FlowSessionPersister
     private function resolveColumnPatch(NodeExecutionResult $result, ?string $nextNodeId): array
     {
         return match ($result->status) {
-            NodeExecutionStatus::Completed => $this->patchForCompleted($nextNodeId),
-            NodeExecutionStatus::Waiting   => [
+            NodeExecutionStatus::Executed => $this->patchForCompleted($nextNodeId),
+            NodeExecutionStatus::Waiting  => [
                 'status' => FlowSessionStatus::WaitingInput,
             ],
             NodeExecutionStatus::Delayed => [

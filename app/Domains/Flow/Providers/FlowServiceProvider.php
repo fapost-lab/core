@@ -4,12 +4,22 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Providers;
 
+use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
+use App\Domains\Flow\Contracts\HttpClientInterface;
+use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Handlers\ConditionNodeHandler;
+use App\Domains\Flow\Handlers\DelayNodeHandler;
+use App\Domains\Flow\Handlers\InputNodeHandler;
+use App\Domains\Flow\Handlers\SendMessageNodeHandler;
+use App\Domains\Flow\Handlers\SetAttributeNodeHandler;
+use App\Domains\Flow\Handlers\Support\TemplateResolver;
+use App\Domains\Flow\Handlers\WebhookNodeHandler;
 use App\Domains\Flow\Orchestration\FlowOrchestrator;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Repositories\FlowDefinitionRepository;
@@ -24,6 +34,9 @@ use App\Domains\Flow\State\Resolvers\NamespaceResolverRegistry;
 use App\Domains\Flow\State\Resolvers\RagStateResolver;
 use App\Domains\Flow\State\Resolvers\SessionStateResolver;
 use App\Domains\Flow\State\StateNamespace;
+use App\Domains\Flow\Support\LaravelHttpClient;
+use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
+use App\Domains\Flow\Support\NullMessageSender;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
 use App\Domains\Shared\Registries\ModuleNamespaceRegistry;
 use App\Infrastructure\Flow\FlowExecutionGuard;
@@ -61,6 +74,10 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->singleton(NodeHandlerRegistry::class);
         $this->app->singleton(NodeHandlerRegistryInterface::class, fn ($app): NodeHandlerRegistry => $app->make(NodeHandlerRegistry::class));
         $this->app->singleton(FlowDefinitionValidator::class);
+        $this->app->singleton(DataAccessorRegistryInterface::class, ModuleDataAccessorRegistry::class);
+        $this->app->singleton(HttpClientInterface::class, LaravelHttpClient::class);
+        $this->app->singleton(MessageSenderInterface::class, NullMessageSender::class);
+        $this->app->singleton(TemplateResolver::class);
 
         $this->app->scoped(FlowEngineInterface::class, FlowEngine::class);
         $this->app->scoped(FlowGraphResolver::class);
@@ -85,6 +102,22 @@ final class FlowServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        $registry  = $this->app->make(NodeHandlerRegistryInterface::class);
+        $templates = $this->app->make(TemplateResolver::class);
+
+        $registry->register(new SendMessageNodeHandler(
+            $this->app->make(MessageSenderInterface::class),
+        ));
+        $registry->register(new InputNodeHandler());
+        $registry->register(new ConditionNodeHandler(
+            $this->app->make(DataAccessorRegistryInterface::class),
+        ));
+        $registry->register(new DelayNodeHandler());
+        $registry->register(new SetAttributeNodeHandler($templates));
+        $registry->register(new WebhookNodeHandler(
+            $this->app->make(HttpClientInterface::class),
+        ));
+
         $this->app->booted(function (): void {
             if ( ! $this->app->environment('testing')) {
                 $this->app->make(NodeHandlerRegistryInterface::class)->freeze();

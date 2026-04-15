@@ -17,4 +17,9 @@ final class FlowDefinitionRepository implements FlowDefinitionRepositoryInterfac
             ->orderByDesc('version')
             ->first();
     }
+
+    public function findById(string $id): FlowDefinition
+    {
+        return FlowDefinition::query()->findOrFail($id);
+    }
 }

@@ -154,7 +154,7 @@ final class TestConditionHandlerV2 implements NodeHandlerInterface
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
-        return NodeExecutionResult::completed();
+        return NodeExecutionResult::executed();
     }
 }
 
