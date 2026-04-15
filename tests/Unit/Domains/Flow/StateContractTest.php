@@ -17,7 +17,7 @@ use App\Domains\Flow\State\StatePath;
 use App\Domains\Flow\State\StateReader;
 use App\Domains\Flow\State\StateWriter;
 use App\Domains\Flow\State\WriteContext;
-use App\Domains\Shared\Registries\ModuleNamespaceRegistry;
+use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
 use FAPost\Foundation\Contracts\DataAccessorInterface;
 use InvalidArgumentException;
 use LogicException;
@@ -117,8 +117,8 @@ final class StateContractTest extends TestCase
 
     public function test_namespace_resolver_registry_cannot_register_after_freeze(): void
     {
-        $moduleRegistry = new ModuleNamespaceRegistry();
-        $moduleRegistry->register('hr', new TestModuleAccessor());
+        $moduleRegistry = new ModuleDataAccessorRegistry();
+        $moduleRegistry->register('module.hr', new TestModuleAccessor());
         $moduleContext = new ModuleResolutionContext();
         $moduleContext->set('contact-1', 'tenant-1');
 
@@ -147,7 +147,7 @@ final class StateContractTest extends TestCase
     public function test_module_state_resolver_throws_invalid_state_path_for_missing_owner(): void
     {
         $state          = new FlowState();
-        $moduleRegistry = new ModuleNamespaceRegistry();
+        $moduleRegistry = new ModuleDataAccessorRegistry();
         $moduleContext  = new ModuleResolutionContext();
         $moduleContext->set('contact-1', 'tenant-1');
         $resolver = new ModuleStateResolver($moduleRegistry, $moduleContext);
@@ -157,10 +157,23 @@ final class StateContractTest extends TestCase
         $resolver->get($path, $state);
     }
 
-    public function test_module_namespace_registry_cannot_register_after_freeze(): void
+    public function test_module_state_resolver_wraps_unknown_prefix_as_invalid_state_path(): void
     {
-        $moduleRegistry = new ModuleNamespaceRegistry();
-        $moduleRegistry->register('hr', new TestModuleAccessor());
+        $state          = new FlowState();
+        $moduleRegistry = new ModuleDataAccessorRegistry();
+        $moduleContext  = new ModuleResolutionContext();
+        $moduleContext->set('contact-1', 'tenant-1');
+        $resolver = new ModuleStateResolver($moduleRegistry, $moduleContext);
+        $path     = StatePath::from('module.hr.department');
+
+        $this->expectException(InvalidStatePathException::class);
+        $resolver->get($path, $state);
+    }
+
+    public function test_module_data_accessor_registry_cannot_register_after_freeze(): void
+    {
+        $moduleRegistry = new ModuleDataAccessorRegistry();
+        $moduleRegistry->register('module.hr', new TestModuleAccessor());
         $moduleRegistry->freeze();
 
         $this->expectException(LogicException::class);
@@ -169,8 +182,8 @@ final class StateContractTest extends TestCase
 
     private function resolverRegistryWith(TestModuleAccessor $accessor): NamespaceResolverRegistry
     {
-        $moduleRegistry = new ModuleNamespaceRegistry();
-        $moduleRegistry->register('hr', $accessor);
+        $moduleRegistry = new ModuleDataAccessorRegistry();
+        $moduleRegistry->register('module.hr', $accessor);
         $moduleContext = new ModuleResolutionContext();
         $moduleContext->set('contact-1', 'tenant-1');
 

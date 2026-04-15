@@ -18,6 +18,7 @@ use App\Domains\Flow\Handlers\Support\TemplateResolver;
 use App\Domains\Flow\Handlers\WebhookNodeHandler;
 use App\Domains\Flow\State\FlowStateNamespace;
 use App\Domains\Flow\State\SystemStateKeys;
+use FAPost\Foundation\Contracts\DataAccessorInterface;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\IncomingMessageType;
 use FAPost\Foundation\DTO\NodeExecutionContext;
@@ -68,7 +69,9 @@ final class BuiltInNodeHandlersTest extends TestCase
     public function test_condition_uses_state_for_flow_path_and_accessor_for_module_path(): void
     {
         $registry = Mockery::mock(DataAccessorRegistryInterface::class);
-        $registry->shouldReceive('resolve')->once()->with('module.hr.department', 'contact-1', 'tenant-1')->andReturn('sales');
+        $accessor = Mockery::mock(DataAccessorInterface::class);
+        $accessor->shouldReceive('get')->once()->with('department', 'contact-1', 'tenant-1')->andReturn('sales');
+        $registry->shouldReceive('resolve')->once()->with('module.hr')->andReturn($accessor);
 
         $handler  = new ConditionNodeHandler($registry);
         $flowNode = [
@@ -100,6 +103,8 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('yes', $flow->sourceHandle);
         $this->assertSame('route', $module->sourceHandle);
         $this->assertSame('empty', $empty->sourceHandle);
+        $this->assertSame('module.hr.department', $module->metadata['expression']['operand'] ?? null);
+        $this->assertSame('in', $module->metadata['expression']['operator'] ?? null);
     }
 
     public function test_delay_is_idempotent_when_already_scheduled(): void

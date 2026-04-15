@@ -29,4 +29,21 @@ final class HandlerVersionContractTest
                 'HandlerVersionContract: every core flow handler must implement NodeHandlerInterface.',
             );
     }
+
+    public function test_condition_handler_does_not_depend_on_database_layers(): Rule
+    {
+        return PHPat::rule()
+            ->classes(
+                Selector::classname('App\\Domains\\Flow\\Handlers\\ConditionNodeHandler'),
+            )
+            ->shouldNotDependOn()
+            ->classes(
+                Selector::inNamespace('Illuminate\\Database', true),
+                Selector::classname('Illuminate\\Support\\Facades\\DB'),
+                Selector::classname('Illuminate\\Support\\Facades\\Schema'),
+            )
+            ->because(
+                'Condition node must resolve module.* via DataAccessor and must not read database directly.'
+            );
+    }
 }

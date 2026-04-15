@@ -9,11 +9,11 @@ use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use Closure;
 use Illuminate\Contracts\Cache\LockProvider;
 
-final class FlowExecutionGuard implements FlowExecutionGuardInterface
+final readonly class FlowExecutionGuard implements FlowExecutionGuardInterface
 {
     public function __construct(
-        private readonly LockProvider $store,
-        private readonly int $ttl = 30,
+        private LockProvider $store,
+        private int $ttl = 30,
     ) {
     }
 

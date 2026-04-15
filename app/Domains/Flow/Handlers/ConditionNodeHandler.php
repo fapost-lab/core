@@ -6,7 +6,9 @@ namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
+use App\Domains\Flow\Exceptions\UnknownDataAccessorNamespacePrefixException;
 use App\Domains\Flow\Handlers\Abstract\AbstractVersionedHandler;
+use App\Domains\Flow\State\FlowStateNamespace;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
@@ -15,9 +17,7 @@ final class ConditionNodeHandler extends AbstractVersionedHandler
 {
     final public const string TYPE = "condition";
 
-    private const string RESOLVED_PATH_META  = "resolved_path";
-    private const string RESOLVED_VALUE_META = "resolved_value";
-    private const string HANDLE_META         = "handle";
+    private const string EXPRESSION_META = "expression";
 
     public function __construct(
         private readonly DataAccessorRegistryInterface $accessors,
@@ -38,36 +38,42 @@ final class ConditionNodeHandler extends AbstractVersionedHandler
             throw new InvalidNodeConfigException('condition: missing check');
         }
 
-        $value = str_starts_with($path, 'module.')
-            ? $this->accessors->resolve($path, $context->contactId, $context->tenantId)
-            : data_get($state, $path);
+        $value = $this->resolveOperandValue($path, $state, $context);
 
-        $rules  = is_array($config['rules'] ?? null) ? $config['rules'] : [];
-        $handle = $this->evaluateRules($value, $rules);
+        $rules                  = is_array($config['rules'] ?? null) ? $config['rules'] : [];
+        [$handle, $matchedRule] = $this->evaluateRules($value, $rules);
 
         return new NodeExecutionResult(
             status: NodeExecutionStatus::Executed,
             sourceHandle: $handle,
+            logResolved: [
+                $path => $value,
+            ],
             metadata: [
-                self::RESOLVED_PATH_META  => $path,
-                self::RESOLVED_VALUE_META => $value,
-                self::HANDLE_META         => $handle,
+                self::EXPRESSION_META => [
+                    'operand'  => $path,
+                    'operator' => is_array($matchedRule) ? ($matchedRule['operator'] ?? null) : null,
+                    'expected' => is_array($matchedRule) ? ($matchedRule['value'] ?? null) : null,
+                ],
             ],
         );
     }
 
     /**
      * @param  array<int, array<string, mixed>>  $rules
+     * @return array{0: string, 1: array<string, mixed>|null}
      */
-    private function evaluateRules(mixed $value, array $rules): string
+    private function evaluateRules(mixed $value, array $rules): array
     {
         foreach ($rules as $rule) {
             if (is_array($rule) && $this->matchesRule($value, $rule)) {
-                return is_string($rule['handle'] ?? null) ? $rule['handle'] : 'default';
+                $handle = is_string($rule['handle'] ?? null) ? $rule['handle'] : 'default';
+
+                return [$handle, $rule];
             }
         }
 
-        return 'default';
+        return ['default', null];
     }
 
     /**
@@ -88,5 +94,53 @@ final class ConditionNodeHandler extends AbstractVersionedHandler
             'not_empty' => ! empty($value),
             default     => false,
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $state
+     */
+    private function resolveOperandValue(string $path, array $state, NodeExecutionContext $context): mixed
+    {
+        if (str_starts_with($path, 'module.')) {
+            [$prefix, $key] = $this->splitModulePath($path);
+            try {
+                $accessor = $this->accessors->resolve($prefix);
+            } catch (UnknownDataAccessorNamespacePrefixException $exception) {
+                throw new InvalidNodeConfigException($exception->getMessage(), previous: $exception);
+            }
+
+            return $accessor->get($key, $context->contactId, $context->tenantId);
+        }
+
+        if (
+            str_starts_with($path, FlowStateNamespace::FLOW . '.')
+            || str_starts_with($path, FlowStateNamespace::SYSTEM . '.')
+            || str_starts_with($path, FlowStateNamespace::RAG . '.')
+        ) {
+            return data_get($state, $path);
+        }
+
+        throw new InvalidNodeConfigException("condition: unsupported namespace in check '{$path}'");
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function splitModulePath(string $path): array
+    {
+        $segments = explode('.', $path, 4);
+
+        if (count($segments) < 3 || 'module' !== $segments[0] || '' === $segments[1]) {
+            throw new InvalidNodeConfigException("condition: invalid module path '{$path}'");
+        }
+
+        $prefix = "{$segments[0]}.{$segments[1]}";
+        $key    = implode('.', array_slice($segments, 2));
+
+        if ('' === $key) {
+            throw new InvalidNodeConfigException("condition: invalid module path '{$path}'");
+        }
+
+        return [$prefix, $key];
     }
 }

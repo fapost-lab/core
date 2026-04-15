@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Contracts;
 
+use FAPost\Foundation\Contracts\DataAccessorInterface;
+
 interface DataAccessorRegistryInterface
 {
-    public function resolve(string $path, string $contactId, string $tenantId): mixed;
+    public function has(string $namespacePrefix): bool;
+
+    public function resolve(string $namespacePrefix): DataAccessorInterface;
 }

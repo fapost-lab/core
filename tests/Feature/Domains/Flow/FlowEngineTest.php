@@ -7,12 +7,15 @@ namespace Tests\Feature\Domains\Flow;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowExecutionLimitExceededException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use FAPost\Foundation\Contracts\DataAccessorInterface;
 use FAPost\Foundation\Contracts\NodeHandlerInterface;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\IncomingMessageType;
@@ -170,6 +173,73 @@ final class FlowEngineTest extends FeatureTestCase
 
         $this->assertSame('max_iterations_exceeded', json_decode((string) $endLog->metadata, true)['reason'] ?? null);
     }
+
+    public function test_condition_logs_resolved_runtime_value_expression_and_transition(): void
+    {
+        $tenantId = (string) Str::uuid();
+
+        $assistant = Assistant::factory()->create([
+            'tenant_id' => $tenantId,
+        ]);
+
+        $contact = Contact::factory()->forTenant($tenantId)->create();
+
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+        $this->registerModuleAccessorOnce('module.hr', new StaticHrDataAccessor());
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Condition Audit',
+            'nodes'     => [
+                [
+                    'id'      => 'c1',
+                    'type'    => 'condition',
+                    'version' => 1,
+                    'config'  => [
+                        'check' => 'module.hr.department',
+                        'rules' => [
+                            ['operator' => 'eq', 'value' => 'logistics', 'handle' => 'match'],
+                        ],
+                    ],
+                ],
+                ['id' => 'n2', 'type' => 'sequential_test', 'version' => 1, 'config' => []],
+            ],
+            'edges' => [
+                ['id' => 'e1', 'source_node_id' => 'c1', 'target_node_id' => 'n2', 'transition' => 'match'],
+            ],
+            'is_active' => true,
+        ]);
+
+        $engine = $this->app->make(FlowEngineInterface::class);
+        $engine->start($definition, $contact);
+
+        $conditionLog = DB::table('flow_logs')
+            ->where('node_id', 'c1')
+            ->where('node_type', 'condition')
+            ->first();
+
+        $this->assertNotNull($conditionLog);
+
+        $resolved = json_decode((string) $conditionLog->resolved, true);
+        $metadata = json_decode((string) $conditionLog->metadata, true);
+
+        $this->assertSame('logistics', $resolved['module.hr.department'] ?? null);
+        $this->assertSame('module.hr.department', $metadata['expression']['operand'] ?? null);
+        $this->assertSame('eq', $metadata['expression']['operator'] ?? null);
+        $this->assertSame('logistics', $metadata['expression']['expected'] ?? null);
+        $this->assertSame('n2', $metadata['transition'] ?? null);
+    }
+
+    private function registerModuleAccessorOnce(string $prefix, DataAccessorInterface $accessor): void
+    {
+        $readRegistry = $this->app->make(DataAccessorRegistryInterface::class);
+
+        if ( ! $readRegistry->has($prefix)) {
+            $this->app->make(MutableDataAccessorRegistryInterface::class)->register($prefix, $accessor);
+        }
+    }
 }
 
 final class SequentialFlowTestHandler implements NodeHandlerInterface
@@ -260,5 +330,29 @@ final class InfiniteLoopFlowTestHandler implements NodeHandlerInterface
             'n0'    => NodeExecutionResult::executed('next'),
             default => NodeExecutionResult::executed(),
         };
+    }
+}
+
+final class StaticHrDataAccessor implements DataAccessorInterface
+{
+    public function namespace(): string
+    {
+        return 'hr';
+    }
+
+    public function get(string $key, string $contactId, string $tenantId): mixed
+    {
+        return match ($key) {
+            'department' => 'logistics',
+            default      => null,
+        };
+    }
+
+    /**
+     * @return string[]
+     */
+    public function supportedKeys(): array
+    {
+        return ['department'];
     }
 }

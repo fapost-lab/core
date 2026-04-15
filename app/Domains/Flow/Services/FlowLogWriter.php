@@ -37,20 +37,24 @@ final class FlowLogWriter
         NodeExecutionResult $result,
         ?string $nextNodeId,
     ): void {
-        $now = now();
+        $now                    = now();
+        $nodeType               = isset($node['type']) && is_string($node['type']) ? $node['type'] : null;
+        $resolved               = [] !== $result->logResolved ? $result->logResolved : $result->stateChanges;
+        $metadata               = $result->metadata;
+        $metadata['transition'] = $nextNodeId;
 
         $this->connection->table('flow_logs')->insert([
             'id'            => Str::ulid()->toRfc4122(),
             'session_id'    => $session->getKey(),
             'node_id'       => $node['id'] ?? null,
-            'node_type'     => isset($node['type']) && is_string($node['type']) ? $node['type'] : null,
+            'node_type'     => $nodeType,
             'node_version'  => isset($node['version']) && is_int($node['version']) ? $node['version'] : 1,
             'status'        => $result->status->value,
             'source_handle' => $result->sourceHandle,
             'next_node_id'  => $nextNodeId,
-            'resolved'      => $this->encodeJson($result->stateChanges),
+            'resolved'      => $this->encodeJson($resolved),
             'error'         => $result->errorMessage,
-            'metadata'      => $this->encodeJson($result->metadata),
+            'metadata'      => $this->encodeJson($metadata),
             'created_at'    => $now,
         ]);
     }
