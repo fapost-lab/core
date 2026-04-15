@@ -12,10 +12,10 @@ use App\Domains\Flow\State\StatePath;
 use App\Domains\Flow\State\WriteContext;
 use InvalidArgumentException;
 
-final class SessionStateResolver implements NamespaceResolverInterface
+final readonly class SessionStateResolver implements NamespaceResolverInterface
 {
     public function __construct(
-        private readonly StateNamespace $namespace,
+        private StateNamespace $namespace,
     ) {
         if (StateNamespace::Module === $namespace) {
             throw new InvalidArgumentException('Use ModuleStateResolver for module namespace.');
