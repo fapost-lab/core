@@ -4,9 +4,16 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Providers;
 
+use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
+use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
+use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Orchestration\FlowOrchestrator;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\Repositories\FlowDefinitionRepository;
+use App\Domains\Flow\Repositories\FlowSessionRepository;
 use App\Domains\Flow\Services\FlowEngine;
 use App\Domains\Flow\Services\FlowGraphResolver;
 use App\Domains\Flow\Services\FlowLogWriter;
@@ -19,7 +26,11 @@ use App\Domains\Flow\State\Resolvers\SessionStateResolver;
 use App\Domains\Flow\State\StateNamespace;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
 use App\Domains\Shared\Registries\ModuleNamespaceRegistry;
+use App\Infrastructure\Flow\FlowExecutionGuard;
+use Illuminate\Contracts\Cache\LockProvider;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\ServiceProvider;
+use LogicException;
 
 final class FlowServiceProvider extends ServiceProvider
 {
@@ -55,6 +66,21 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(FlowGraphResolver::class);
         $this->app->scoped(FlowSessionPersister::class);
         $this->app->scoped(FlowLogWriter::class);
+        $this->app->scoped(FlowSessionRepository::class);
+        $this->app->scoped(FlowSessionRepositoryInterface::class, FlowSessionRepository::class);
+        $this->app->scoped(FlowDefinitionRepository::class);
+        $this->app->scoped(FlowDefinitionRepositoryInterface::class, FlowDefinitionRepository::class);
+        $this->app->scoped(FlowOrchestrator::class);
+        $this->app->scoped(FlowOrchestratorInterface::class, FlowOrchestrator::class);
+        $this->app->singleton(FlowExecutionGuardInterface::class, function (): FlowExecutionGuard {
+            $store = Cache::store('redis')->getStore();
+
+            if ( ! $store instanceof LockProvider) {
+                throw new LogicException('Configured redis cache store does not support distributed locks.');
+            }
+
+            return new FlowExecutionGuard(store: $store, ttl: 30);
+        });
     }
 
     public function boot(): void

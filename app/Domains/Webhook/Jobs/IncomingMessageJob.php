@@ -8,6 +8,8 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Enums\PlatformEnum;
+use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
+use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use FAPost\Foundation\DTO\IncomingMessage;
@@ -18,8 +20,7 @@ final class IncomingMessageJob implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries   = 3;
-    public int $backoff = 5;
+    public int $tries = 5;
 
     public function __construct(
         public readonly IncomingMessage $message,
@@ -34,14 +35,16 @@ final class IncomingMessageJob implements ShouldQueue
         TenantSwitcher $switcher,
         CurrentAssistantInterface $currentAssistant,
         ContactServiceInterface $contactService,
+        FlowOrchestratorInterface $orchestrator,
     ): void {
         $tenant = new RuntimeTenant(
             id: $this->tenantId,
             schemaName: $this->schema,
         );
 
-        $switcher->runForTenant($tenant, function () use ($contactService, $currentAssistant): void {
-            $assistant = Assistant::query()->findOrFail($this->assistantId);
+        $switcher->runForTenant($tenant, function () use ($contactService, $currentAssistant, $orchestrator): void {
+            $assistant = new Assistant();
+            $assistant->forceFill(['id' => $this->assistantId]);
             $currentAssistant->set($assistant);
 
             $contact = $contactService->findOrCreate(
@@ -55,6 +58,24 @@ final class IncomingMessageJob implements ShouldQueue
                 contact: $contact,
                 channelId: $this->channelId,
             );
+
+            try {
+                $orchestrator->handle($contact, $this->message, $this->assistantId);
+            } catch (SessionLockTimeoutException) {
+                $this->release($this->lockMissDelay($this->attempts()));
+
+                return;
+            }
         });
+    }
+
+    private function lockMissDelay(int $attempt): int
+    {
+        return match ($attempt) {
+            1       => 1,
+            2       => 2,
+            3       => 5,
+            default => 10,
+        };
     }
 }

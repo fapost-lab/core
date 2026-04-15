@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domains\Assistant\Contracts\AssistantFlowConfigRepositoryInterface;
 use App\Domains\Assistant\Contracts\AssistantServiceInterface;
 use App\Domains\Assistant\Contracts\ChannelServiceInterface;
 use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
@@ -13,6 +14,7 @@ use App\Domains\Assistant\Models\Channel;
 use App\Domains\Assistant\Observers\ChannelObserver;
 use App\Domains\Assistant\Policies\AssistantPolicy;
 use App\Domains\Assistant\Policies\ChannelPolicy;
+use App\Domains\Assistant\Repositories\AssistantFlowConfigRepository;
 use App\Domains\Assistant\Services\AssistantService;
 use App\Domains\Assistant\Services\ChannelService;
 use App\Domains\Assistant\Services\ChannelWebhookRegistry;
@@ -34,6 +36,7 @@ final class AssistantServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ChannelWebhookRegistryInterface::class, ChannelWebhookRegistry::class);
+        $this->app->bind(AssistantFlowConfigRepositoryInterface::class, AssistantFlowConfigRepository::class);
         $this->app->bind(AssistantServiceInterface::class, AssistantService::class);
         $this->app->bind(ChannelServiceInterface::class, ChannelService::class);
         $this->app->scoped(CurrentAssistant::class, CurrentAssistant::class);

@@ -270,6 +270,15 @@ Flow запускается **ассистентом**, не каналом.
 
 Если lock не получен — job уходит в backoff очередь, не дропается.
 
+**Реализация (задача 12):**
+
+- `FlowExecutionGuard` (`Infrastructure\Flow\`) — единственная реализация distributed lock. Зависит от `LockProvider`, не от `Cache\Repository`. Lock снимается в `finally` без исключений.
+- `FlowExecutionGuardInterface` — `App\Domains\Flow\Contracts\`. **Не в Foundation SDK** — это внутренний контракт платформы, не extension point.
+- `SessionLockTimeoutException` — `App\Domains\Flow\Exceptions\`. Доменное исключение, не инфраструктурное.
+- `FlowOrchestrator` содержит optimistic retry loop (до 3 попыток, `usleep` 50–150ms) **внутри** distributed lock. Сессия перечитывается из БД на каждой попытке.
+- `IncomingMessageJob` при `SessionLockTimeoutException`: `release($delay)` + `return`, без `backoff()` метода. Задержки: 1/2/5/10s по номеру попытки. `$tries = 5`.
+- `AssistantFlowConfigRepositoryInterface` — `App\Domains\Assistant\Contracts\`. Реализация в `App\Domains\Assistant\Repositories\`. Биндинг в `AssistantServiceProvider`.
+
 ---
 
 ## Очереди (Horizon)
@@ -869,7 +878,7 @@ Octane вводится последним в фазе — когда все lif
 | # | Название |
 |---|----------|
 | 11 | Flow execution engine (FlowEngine::start/resume, execute loop, dispatch по (type,version), session persist) |
-| 12 | Concurrency protection (distributed lock `session_lock:{tenant_id}:{contact_id}:{assistant_id}` Redis TTL=30s, optimistic lock retry, backoff при lock miss — не дроп) |
+| 12 | Concurrency protection (distributed lock `session_lock:{tenant_id}:{contact_id}:{assistant_id}` Redis TTL=30s, optimistic lock retry, backoff при lock miss — не дроп) | ✅ |
 | 13 | Built-in node handlers (send_message, input, condition, delay, set_attribute, webhook — все idempotent) |
 | 14 | Flow triggers (flow_triggers, TriggerResolver, IncomingMessageJob → FlowEngine) |
 
