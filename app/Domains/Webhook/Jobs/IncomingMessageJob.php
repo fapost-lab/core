@@ -9,10 +9,14 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
+use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
+use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use FAPost\Foundation\DTO\IncomingMessage;
+use FAPost\Foundation\Flow\Contracts\TriggerResolverInterface;
+use FAPost\Foundation\Flow\DTO\TriggerContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 
@@ -35,6 +39,8 @@ final class IncomingMessageJob implements ShouldQueue
         TenantSwitcher $switcher,
         CurrentAssistantInterface $currentAssistant,
         ContactServiceInterface $contactService,
+        FlowSessionRepositoryInterface $sessions,
+        TriggerResolverInterface $triggerResolver,
         FlowOrchestratorInterface $orchestrator,
     ): void {
         $tenant = new RuntimeTenant(
@@ -42,31 +48,52 @@ final class IncomingMessageJob implements ShouldQueue
             schemaName: $this->schema,
         );
 
-        $switcher->runForTenant($tenant, function () use ($contactService, $currentAssistant, $orchestrator): void {
-            $assistant = new Assistant();
-            $assistant->forceFill(['id' => $this->assistantId]);
-            $currentAssistant->set($assistant);
+        $switcher->runForTenant(
+            $tenant,
+            function () use ($contactService, $currentAssistant, $sessions, $triggerResolver, $orchestrator): void {
+                $assistant = new Assistant();
+                $assistant->forceFill(['id' => $this->assistantId]);
+                $currentAssistant->set($assistant);
 
-            $contact = $contactService->findOrCreate(
-                tenantId: $this->tenantId,
-                platform: PlatformEnum::from($this->message->platform),
-                externalId: $this->message->externalUserId,
-                meta: $this->message->payload,
-            );
+                $contact = $contactService->findOrCreate(
+                    tenantId: $this->tenantId,
+                    platform: PlatformEnum::from($this->message->platform),
+                    externalId: $this->message->externalUserId,
+                    meta: $this->message->payload,
+                );
 
-            $contactService->findOrCreateChannelContact(
-                contact: $contact,
-                channelId: $this->channelId,
-            );
+                $contactService->findOrCreateChannelContact(
+                    contact: $contact,
+                    channelId: $this->channelId,
+                );
 
-            try {
-                $orchestrator->handle($contact, $this->message, $this->assistantId);
-            } catch (SessionLockTimeoutException) {
-                $this->release($this->lockMissDelay($this->attempts()));
+                $activeSession = $sessions->findActiveForContact($contact, $this->assistantId);
 
-                return;
+                $trigger = null;
+
+                if (null === $activeSession) {
+                    $trigger = $triggerResolver->resolve(
+                        new TriggerContext(
+                            type: FlowTriggerType::Message->value,
+                            tenantId: $this->tenantId,
+                            assistantId: $this->assistantId,
+                            payload: [
+                                'text'             => $this->message->text,
+                                'incoming_payload' => $this->message->payload,
+                            ],
+                        )
+                    );
+                }
+
+                try {
+                    $orchestrator->handle($contact, $this->message, $this->assistantId, $trigger);
+                } catch (SessionLockTimeoutException) {
+                    $this->release($this->lockMissDelay($this->attempts()));
+
+                    return;
+                }
             }
-        });
+        );
     }
 
     private function lockMissDelay(int $attempt): int

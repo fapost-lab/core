@@ -10,6 +10,8 @@ use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
+use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
+use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Contracts\HttpClientInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
@@ -25,10 +27,16 @@ use App\Domains\Flow\Orchestration\FlowOrchestrator;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Repositories\FlowDefinitionRepository;
 use App\Domains\Flow\Repositories\FlowSessionRepository;
+use App\Domains\Flow\Repositories\FlowTriggerRepository;
 use App\Domains\Flow\Services\FlowEngine;
 use App\Domains\Flow\Services\FlowGraphResolver;
 use App\Domains\Flow\Services\FlowLogWriter;
 use App\Domains\Flow\Services\FlowSessionPersister;
+use App\Domains\Flow\Services\Resolvers\ApiTriggerResolver;
+use App\Domains\Flow\Services\Resolvers\MessageTriggerResolver;
+use App\Domains\Flow\Services\Resolvers\ScheduleTriggerResolver;
+use App\Domains\Flow\Services\Resolvers\TriggerResolver;
+use App\Domains\Flow\Services\Resolvers\WebhookTriggerResolver;
 use App\Domains\Flow\State\Resolvers\ModuleResolutionContext;
 use App\Domains\Flow\State\Resolvers\ModuleStateResolver;
 use App\Domains\Flow\State\Resolvers\NamespaceResolverRegistry;
@@ -39,7 +47,9 @@ use App\Domains\Flow\Support\LaravelHttpClient;
 use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
 use App\Domains\Flow\Support\NullMessageSender;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
+use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
 use App\Infrastructure\Flow\FlowExecutionGuard;
+use FAPost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\ServiceProvider;
@@ -47,6 +57,30 @@ use LogicException;
 
 final class FlowServiceProvider extends ServiceProvider
 {
+    /**
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function boot(): void
+    {
+        $registry  = $this->app->make(NodeHandlerRegistryInterface::class);
+        $templates = $this->app->make(TemplateResolver::class);
+
+        $registry->register(new SendMessageNodeHandler($this->app->make(MessageSenderInterface::class)));
+        $registry->register(new InputNodeHandler());
+        $registry->register(new ConditionNodeHandler($this->app->make(DataAccessorRegistryInterface::class)));
+        $registry->register(new DelayNodeHandler());
+        $registry->register(new SetAttributeNodeHandler($templates));
+        $registry->register(new WebhookNodeHandler($this->app->make(HttpClientInterface::class)));
+
+        $this->app->booted(function (): void {
+            if ( ! $this->app->environment('testing')) {
+                $this->app->make(NodeHandlerRegistryInterface::class)->freeze();
+            }
+
+            $this->app->make(NamespaceResolverRegistry::class)->freeze();
+        });
+    }
+
     public function register(): void
     {
         // NOTE: ModuleResolutionContext is scoped (per-request), but NamespaceResolverRegistry
@@ -71,7 +105,10 @@ final class FlowServiceProvider extends ServiceProvider
         });
 
         $this->app->singleton(NodeHandlerRegistry::class);
-        $this->app->singleton(NodeHandlerRegistryInterface::class, fn ($app): NodeHandlerRegistry => $app->make(NodeHandlerRegistry::class));
+        $this->app->singleton(
+            NodeHandlerRegistryInterface::class,
+            fn ($app): NodeHandlerRegistry => $app->make(NodeHandlerRegistry::class)
+        );
         $this->app->singleton(FlowDefinitionValidator::class);
         $this->app->singleton(ModuleDataAccessorRegistry::class);
         $this->app->singleton(
@@ -94,6 +131,20 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(FlowSessionRepositoryInterface::class, FlowSessionRepository::class);
         $this->app->scoped(FlowDefinitionRepository::class);
         $this->app->scoped(FlowDefinitionRepositoryInterface::class, FlowDefinitionRepository::class);
+        $this->app->scoped(FlowTriggerRepository::class);
+        $this->app->scoped(FlowTriggerRepositoryInterface::class, FlowTriggerRepository::class);
+        $this->app->scoped(FlowTriggerConfigValidatorInterface::class, FlowTriggerConfigValidator::class);
+        $this->app->scoped(MessageTriggerResolver::class);
+        $this->app->scoped(ScheduleTriggerResolver::class);
+        $this->app->scoped(WebhookTriggerResolver::class);
+        $this->app->scoped(ApiTriggerResolver::class);
+        $this->app->scoped(TriggerResolver::class, fn ($app): TriggerResolver => new TriggerResolver(
+            messageResolver: $app->make(MessageTriggerResolver::class),
+            scheduleResolver: $app->make(ScheduleTriggerResolver::class),
+            webhookResolver: $app->make(WebhookTriggerResolver::class),
+            apiResolver: $app->make(ApiTriggerResolver::class),
+        ));
+        $this->app->scoped(TriggerResolverInterface::class, TriggerResolver::class);
         $this->app->scoped(FlowOrchestrator::class);
         $this->app->scoped(FlowOrchestratorInterface::class, FlowOrchestrator::class);
         $this->app->singleton(FlowExecutionGuardInterface::class, function (): FlowExecutionGuard {
@@ -104,30 +155,6 @@ final class FlowServiceProvider extends ServiceProvider
             }
 
             return new FlowExecutionGuard(store: $store, ttl: 30);
-        });
-    }
-
-    /**
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
-     */
-    public function boot(): void
-    {
-        $registry  = $this->app->make(NodeHandlerRegistryInterface::class);
-        $templates = $this->app->make(TemplateResolver::class);
-
-        $registry->register(new SendMessageNodeHandler($this->app->make(MessageSenderInterface::class)));
-        $registry->register(new InputNodeHandler());
-        $registry->register(new ConditionNodeHandler($this->app->make(DataAccessorRegistryInterface::class)));
-        $registry->register(new DelayNodeHandler());
-        $registry->register(new SetAttributeNodeHandler($templates));
-        $registry->register(new WebhookNodeHandler($this->app->make(HttpClientInterface::class)));
-
-        $this->app->booted(function (): void {
-            if ( ! $this->app->environment('testing')) {
-                $this->app->make(NodeHandlerRegistryInterface::class)->freeze();
-            }
-
-            $this->app->make(NamespaceResolverRegistry::class)->freeze();
         });
     }
 }

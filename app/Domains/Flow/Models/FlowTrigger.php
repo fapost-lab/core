@@ -1,0 +1,71 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domains\Flow\Models;
+
+use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
+use App\Domains\Flow\Enums\FlowTriggerType;
+use FAPost\Support\Concerns\HasUlidPrimaryKey;
+use FAPost\Support\Models\BaseModel;
+
+/**
+ * @property string                          $id
+ * @property string                          $tenant_id
+ * @property string|null                     $assistant_id
+ * @property string                          $flow_id
+ * @property FlowTriggerType                 $type
+ * @property bool                            $is_active
+ * @property int                             $priority
+ * @property array<string, mixed>            $config
+ * @property \Illuminate\Support\Carbon|null $last_run_at
+ * @property \Illuminate\Support\Carbon|null $next_run_at
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger newModelQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger newQuery()
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger query()
+ * @mixin \Eloquent
+ */
+final class FlowTrigger extends BaseModel
+{
+    use HasUlidPrimaryKey;
+
+    /**
+     * @var list<string>
+     */
+    protected $fillable = [
+        'tenant_id',
+        'assistant_id',
+        'flow_id',
+        'type',
+        'is_active',
+        'priority',
+        'config',
+        'last_run_at',
+        'next_run_at',
+    ];
+
+    protected static function booted(): void
+    {
+        static::saving(static function (FlowTrigger $trigger): void {
+            // Eloquent models are instantiated by ORM directly, so validator is resolved lazily here.
+            app(FlowTriggerConfigValidatorInterface::class)
+                ->validate($trigger->type->value, $trigger->config);
+        });
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'type'        => FlowTriggerType::class,
+            'is_active'   => 'boolean',
+            'priority'    => 'integer',
+            'config'      => 'array',
+            'last_run_at' => 'datetime',
+            'next_run_at' => 'datetime',
+        ];
+    }
+
+}
