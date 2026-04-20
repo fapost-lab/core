@@ -10,6 +10,7 @@ use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
+use App\Domains\Flow\Contracts\LanguageResolverInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowConcurrencyException;
@@ -41,6 +42,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         private FlowLogWriter $logWriter,
         private CurrentAssistantInterface $currentAssistant,
         private ContactServiceInterface $contactService,
+        private LanguageResolverInterface $languageResolver,
         private ConnectionInterface $connection,
         private Repository $config,
     ) {
@@ -165,7 +167,8 @@ final readonly class FlowEngine implements FlowEngineInterface
                 throw HandlerNotFoundException::forTypeAndVersion($type, $version, $exception);
             }
 
-            $platform = $incomingStep?->platform ?? $contact->platform->value;
+            $platform         = $incomingStep?->platform ?? $contact->platform->value;
+            $resolvedLanguage = $this->languageResolver->resolve($contact, $session);
 
             $idempotencyKey = null !== $incomingStep
                 ? $incomingStep->updateId . '|' . $session->getKey()
@@ -178,10 +181,12 @@ final readonly class FlowEngine implements FlowEngineInterface
                 nodeId: $nodeId,
                 idempotencyKey: $idempotencyKey,
                 platform: $platform,
+                resolvedLanguage: $resolvedLanguage,
                 incoming: $incomingStep,
             );
 
             $result = $handler->execute($node, $session->state ?? [], $handlerContext);
+            $result = $this->applySystemStateEffects($result);
 
             $nextNodeId = null;
 
@@ -241,20 +246,65 @@ final readonly class FlowEngine implements FlowEngineInterface
     private function applyEffects(Contact $contact, NodeExecutionResult $result): void
     {
         foreach ($result->effects as $effect) {
-            if ( ! is_array($effect) || 'set_contact_attribute' !== ($effect['type'] ?? null)) {
+            if ( ! is_array($effect)) {
                 continue;
             }
 
-            $key = $effect['key'] ?? null;
-            if ( ! is_string($key) || '' === $key) {
+            if ('set_contact_attribute' === ($effect['type'] ?? null)) {
+                $key = $effect['key'] ?? null;
+                if ( ! is_string($key) || '' === $key) {
+                    continue;
+                }
+
+                $this->contactService->updateAttributes(
+                    $contact->getKey(),
+                    [$key => $effect['value'] ?? null],
+                );
+
                 continue;
             }
 
-            $this->contactService->updateAttributes(
-                $contact->getKey(),
-                [$key => $effect['value'] ?? null],
-            );
+            if ('set_contact_language' === ($effect['type'] ?? null)) {
+                $value = $effect['value'] ?? null;
+
+                if ( ! is_string($value) || '' === $value) {
+                    continue;
+                }
+
+                $this->contactService->updateLanguage($contact->getKey(), $value);
+            }
         }
+    }
+
+    private function applySystemStateEffects(NodeExecutionResult $result): NodeExecutionResult
+    {
+        $stateChanges = $result->stateChanges;
+
+        foreach ($result->effects as $effect) {
+            if ( ! is_array($effect) || 'set_contact_language' !== ($effect['type'] ?? null)) {
+                continue;
+            }
+
+            $value = $effect['value'] ?? null;
+
+            if (is_string($value) && '' !== $value) {
+                $stateChanges[SystemStateKeys::LANGUAGE] = $value;
+            }
+        }
+
+        if ($stateChanges === $result->stateChanges) {
+            return $result;
+        }
+
+        return new NodeExecutionResult(
+            status: $result->status,
+            sourceHandle: $result->sourceHandle,
+            stateChanges: $stateChanges,
+            logResolved: $result->logResolved,
+            effects: $result->effects,
+            metadata: $result->metadata,
+            errorMessage: $result->errorMessage,
+        );
     }
 
     /**

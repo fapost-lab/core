@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Webhook;
 
+use App\Domains\Assistant\Contracts\AssistantRepositoryInterface;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
@@ -104,6 +106,7 @@ final class IncomingMessageJobTest extends TestCase
         $job->setJob($queueJob);
 
         $switcher         = $this->tenantSwitcher();
+        $assistants       = $this->assistantRepository();
         $currentAssistant = $this->mock(CurrentAssistantInterface::class, function (MockInterface $mock): void {
             $mock->shouldReceive('set')->once();
         });
@@ -139,7 +142,7 @@ final class IncomingMessageJobTest extends TestCase
                 ->andThrow(new SessionLockTimeoutException('session_lock:tenant-1:contact-1:assistant-1'));
         });
 
-        $job->handle($switcher, $currentAssistant, $contactService, $sessions, $triggerResolver, $orchestrator);
+        $job->handle($switcher, $currentAssistant, $assistants, $contactService, $sessions, $triggerResolver, $orchestrator);
 
         $this->assertSame(5, $releaseDelay);
     }
@@ -161,6 +164,7 @@ final class IncomingMessageJobTest extends TestCase
         $job->setJob($queueJob);
 
         $switcher         = $this->tenantSwitcher();
+        $assistants       = $this->assistantRepository();
         $currentAssistant = $this->mock(CurrentAssistantInterface::class, function (MockInterface $mock): void {
             $mock->shouldReceive('set')->once();
         });
@@ -187,7 +191,7 @@ final class IncomingMessageJobTest extends TestCase
             $mock->shouldReceive('handle')->once();
         });
 
-        $job->handle($switcher, $currentAssistant, $contactService, $sessions, $triggerResolver, $orchestrator);
+        $job->handle($switcher, $currentAssistant, $assistants, $contactService, $sessions, $triggerResolver, $orchestrator);
     }
 
     #[DataProvider('lockMissDelayProvider')]
@@ -217,6 +221,7 @@ final class IncomingMessageJobTest extends TestCase
         $job->setJob($queueJob);
 
         $switcher         = $this->tenantSwitcher();
+        $assistants       = $this->assistantRepository();
         $currentAssistant = $this->mock(CurrentAssistantInterface::class, function (MockInterface $mock): void {
             $mock->shouldReceive('set')->once();
         });
@@ -245,7 +250,7 @@ final class IncomingMessageJobTest extends TestCase
                 ->andThrow(new SessionLockTimeoutException('session_lock:tenant-1:contact-1:assistant-1'));
         });
 
-        $job->handle($switcher, $currentAssistant, $contactService, $sessions, $triggerResolver, $orchestrator);
+        $job->handle($switcher, $currentAssistant, $assistants, $contactService, $sessions, $triggerResolver, $orchestrator);
 
         $this->assertSame($expectedDelay, $releaseDelay);
     }
@@ -261,6 +266,7 @@ final class IncomingMessageJobTest extends TestCase
         );
 
         $switcher         = $this->tenantSwitcher();
+        $assistants       = $this->assistantRepository();
         $currentAssistant = $this->mock(CurrentAssistantInterface::class, function (MockInterface $mock): void {
             $mock->shouldReceive('set')->once();
         });
@@ -288,7 +294,7 @@ final class IncomingMessageJobTest extends TestCase
             );
         });
 
-        $job->handle($switcher, $currentAssistant, $contactService, $sessions, $triggerResolver, $orchestrator);
+        $job->handle($switcher, $currentAssistant, $assistants, $contactService, $sessions, $triggerResolver, $orchestrator);
     }
 
     private function message(): IncomingMessage
@@ -322,6 +328,19 @@ final class IncomingMessageJobTest extends TestCase
         });
 
         return new TenantSwitcher($tenantContext, $databaseManager, $permissionRegistrar);
+    }
+
+    private function assistantRepository(): AssistantRepositoryInterface
+    {
+        return $this->mock(AssistantRepositoryInterface::class, function (MockInterface $mock): void {
+            $assistant = new Assistant();
+            $assistant->forceFill([
+                'id'               => 'assistant-1',
+                'default_language' => 'en',
+            ]);
+
+            $mock->shouldReceive('findById')->andReturn($assistant);
+        });
     }
 
     private function expectedDelayForAttempt(int $attempt): int

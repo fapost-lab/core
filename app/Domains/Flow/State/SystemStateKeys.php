@@ -12,4 +12,5 @@ final class SystemStateKeys
     public const string STARTED_AT        = FlowStateNamespace::SYSTEM . '.started_at';
     public const string RETRY_COUNT       = FlowStateNamespace::SYSTEM . '.retry_count';
     public const string DELAY_NODE_PREFIX = FlowStateNamespace::SYSTEM . '.delay';
+    public const string LANGUAGE          = FlowStateNamespace::SYSTEM . '.language';
 }

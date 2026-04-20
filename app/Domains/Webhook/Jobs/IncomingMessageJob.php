@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Webhook\Jobs;
 
+use App\Domains\Assistant\Contracts\AssistantRepositoryInterface;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
-use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
@@ -38,6 +38,7 @@ final class IncomingMessageJob implements ShouldQueue
     public function handle(
         TenantSwitcher $switcher,
         CurrentAssistantInterface $currentAssistant,
+        AssistantRepositoryInterface $assistants,
         ContactServiceInterface $contactService,
         FlowSessionRepositoryInterface $sessions,
         TriggerResolverInterface $triggerResolver,
@@ -50,9 +51,8 @@ final class IncomingMessageJob implements ShouldQueue
 
         $switcher->runForTenant(
             $tenant,
-            function () use ($contactService, $currentAssistant, $sessions, $triggerResolver, $orchestrator): void {
-                $assistant = new Assistant();
-                $assistant->forceFill(['id' => $this->assistantId]);
+            function () use ($contactService, $currentAssistant, $sessions, $triggerResolver, $orchestrator, $assistants): void {
+                $assistant = $assistants->findById($this->assistantId);
                 $currentAssistant->set($assistant);
 
                 $contact = $contactService->findOrCreate(
@@ -60,6 +60,7 @@ final class IncomingMessageJob implements ShouldQueue
                     platform: PlatformEnum::from($this->message->platform),
                     externalId: $this->message->externalUserId,
                     meta: $this->message->payload,
+                    defaultLanguage: $assistant->default_language,
                 );
 
                 $contactService->findOrCreateChannelContact(

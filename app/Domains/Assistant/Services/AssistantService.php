@@ -38,6 +38,7 @@ final readonly class AssistantService implements AssistantServiceInterface
             'tenant_id'        => $tenant->getId(),
             'name'             => (string) $data['name'],
             'is_active'        => (bool) ($data['is_active'] ?? true),
+            'default_language' => isset($data['default_language']) ? (string) $data['default_language'] : 'en',
             'fallback_message' => isset($data['fallback_message']) ? (string) $data['fallback_message'] : null,
             'default_flow_id'  => isset($data['default_flow_id']) && '' !== (string) $data['default_flow_id']
                 ? (string) $data['default_flow_id']
@@ -59,6 +60,7 @@ final readonly class AssistantService implements AssistantServiceInterface
         $allowed = Arr::only($data, [
             'name',
             'is_active',
+            'default_language',
             'fallback_message',
             'default_flow_id',
             'settings',

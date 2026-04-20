@@ -47,6 +47,7 @@ final class Assistant extends BaseModel implements HasName
         'tenant_id',
         'name',
         'is_active',
+        'default_language',
         'default_flow_id',
         'fallback_message',
         'settings',
@@ -96,8 +97,9 @@ final class Assistant extends BaseModel implements HasName
     protected function casts(): array
     {
         return [
-            'settings'  => 'array',
-            'is_active' => 'boolean',
+            'settings'         => 'array',
+            'is_active'        => 'boolean',
+            'default_language' => 'string',
         ];
     }
 }

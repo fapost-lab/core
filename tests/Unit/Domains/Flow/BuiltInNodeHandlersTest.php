@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Flow;
 
+use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\HttpClientInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
@@ -38,11 +39,26 @@ final class BuiltInNodeHandlersTest extends TestCase
     public function test_send_message_is_idempotent_per_node_id(): void
     {
         $sender = Mockery::mock(MessageSenderInterface::class);
-        $sender->shouldReceive('send')->once()->andReturn('ext-1');
+        $sender->shouldReceive('send')->once()->withArgs(
+            static fn (string $tenantId, string $contactId, string $sessionId, array $payload): bool => 'tenant-1'
+                === $tenantId
+                && 'contact-1' === $contactId
+                && 'session-1' === $sessionId
+                && 'hello' === ($payload['text'] ?? null)
+                && 'Click' === ($payload['buttons'][0]['label'] ?? null)
+        )->andReturn('ext-1');
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $translator->shouldReceive('resolveField')->twice()->andReturn('hello', 'Click');
 
-        $handler = new SendMessageNodeHandler($sender);
+        $handler = new SendMessageNodeHandler($sender, $translator);
         $context = $this->context();
-        $node    = ['id' => 'node-1', 'config' => ['text' => 'hello']];
+        $node    = [
+            'id'     => 'node-1',
+            'config' => [
+                'text'    => ['en' => 'hello', 'es' => 'hola'],
+                'buttons' => [['label' => ['en' => 'Click', 'es' => 'Pulsa']]],
+            ],
+        ];
 
         $first  = $handler->execute($node, [], $context);
         $second = $handler->execute($node, ['system' => ['sent_messages' => ['node-1' => 'ext-1']]], $context);
@@ -141,6 +157,28 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('set_contact_attribute', $contact->effects[0]['type']);
         $this->assertSame('Jane', $contact->effects[0]['value']);
         $this->assertSame('Jane', $flow->stateChanges[FlowStateNamespace::FLOW . '.nickname']);
+    }
+
+    public function test_set_attribute_contact_language_returns_language_effect(): void
+    {
+        $handler = new SetAttributeNodeHandler(new TemplateResolver());
+        $context = $this->context();
+
+        $result = $handler->execute([
+            'id'     => 'set-contact-language',
+            'config' => ['target' => 'contact', 'key' => 'contact.language', 'value' => 'es'],
+        ], [], $context);
+
+        $this->assertSame('set_contact_language', $result->effects[0]['type']);
+        $this->assertSame('es', $result->effects[0]['value']);
+
+        $canonical = $handler->execute([
+            'id'     => 'set-contact-language-canonical',
+            'config' => ['target' => 'contact', 'key' => 'language', 'value' => 'de'],
+        ], [], $context);
+
+        $this->assertSame('set_contact_language', $canonical->effects[0]['type']);
+        $this->assertSame('de', $canonical->effects[0]['value']);
     }
 
     public function test_webhook_returns_failed_on_transport_error_and_success_on_http_2xx(): void

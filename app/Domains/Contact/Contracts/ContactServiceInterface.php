@@ -18,6 +18,7 @@ interface ContactServiceInterface
         PlatformEnum $platform,
         string $externalId,
         array $meta = [],
+        ?string $defaultLanguage = null,
     ): Contact;
 
     /**
@@ -29,6 +30,8 @@ interface ContactServiceInterface
      * @param  array<string, mixed>  $attributes
      */
     public function updateAttributes(string $contactId, array $attributes): Contact;
+
+    public function updateLanguage(string $contactId, string $language): Contact;
 
     public function findById(string $contactId): Contact;
 }

@@ -41,6 +41,7 @@ final class Contact extends BaseModel
         'tenant_id',
         'platform',
         'external_id',
+        'language',
         'meta',
         'attributes',
     ];
@@ -66,6 +67,7 @@ final class Contact extends BaseModel
     {
         return [
             'platform'   => PlatformEnum::class,
+            'language'   => 'string',
             'meta'       => 'array',
             'attributes' => 'array',
         ];

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Providers;
 
+use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
@@ -13,9 +14,12 @@ use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Contracts\HttpClientInterface;
+use App\Domains\Flow\Contracts\LanguageResolverInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Contracts\TenantTranslationRepositoryInterface;
+use App\Domains\Flow\Contracts\TenantTranslationServiceInterface;
 use App\Domains\Flow\Handlers\ConditionNodeHandler;
 use App\Domains\Flow\Handlers\DelayNodeHandler;
 use App\Domains\Flow\Handlers\InputNodeHandler;
@@ -28,15 +32,18 @@ use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Repositories\FlowDefinitionRepository;
 use App\Domains\Flow\Repositories\FlowSessionRepository;
 use App\Domains\Flow\Repositories\FlowTriggerRepository;
+use App\Domains\Flow\Repositories\TenantTranslationRepository;
 use App\Domains\Flow\Services\FlowEngine;
 use App\Domains\Flow\Services\FlowGraphResolver;
 use App\Domains\Flow\Services\FlowLogWriter;
 use App\Domains\Flow\Services\FlowSessionPersister;
+use App\Domains\Flow\Services\LanguageResolver;
 use App\Domains\Flow\Services\Resolvers\ApiTriggerResolver;
 use App\Domains\Flow\Services\Resolvers\MessageTriggerResolver;
 use App\Domains\Flow\Services\Resolvers\ScheduleTriggerResolver;
 use App\Domains\Flow\Services\Resolvers\TriggerResolver;
 use App\Domains\Flow\Services\Resolvers\WebhookTriggerResolver;
+use App\Domains\Flow\Services\TenantTranslationService;
 use App\Domains\Flow\State\Resolvers\ModuleResolutionContext;
 use App\Domains\Flow\State\Resolvers\ModuleStateResolver;
 use App\Domains\Flow\State\Resolvers\NamespaceResolverRegistry;
@@ -48,6 +55,7 @@ use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
 use App\Domains\Flow\Support\NullMessageSender;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
 use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
+use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\FlowExecutionGuard;
 use FAPost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use Illuminate\Contracts\Cache\LockProvider;
@@ -65,7 +73,10 @@ final class FlowServiceProvider extends ServiceProvider
         $registry  = $this->app->make(NodeHandlerRegistryInterface::class);
         $templates = $this->app->make(TemplateResolver::class);
 
-        $registry->register(new SendMessageNodeHandler($this->app->make(MessageSenderInterface::class)));
+        $registry->register(new SendMessageNodeHandler(
+            $this->app->make(MessageSenderInterface::class),
+            $this->app->make(ContentTranslatorInterface::class),
+        ));
         $registry->register(new InputNodeHandler());
         $registry->register(new ConditionNodeHandler($this->app->make(DataAccessorRegistryInterface::class)));
         $registry->register(new DelayNodeHandler());
@@ -121,6 +132,10 @@ final class FlowServiceProvider extends ServiceProvider
         );
         $this->app->singleton(HttpClientInterface::class, LaravelHttpClient::class);
         $this->app->singleton(MessageSenderInterface::class, NullMessageSender::class);
+        $this->app->bind(LanguageResolverInterface::class, LanguageResolver::class);
+        $this->app->bind(ContentTranslatorInterface::class, CachedContentTranslator::class);
+        $this->app->bind(TenantTranslationRepositoryInterface::class, TenantTranslationRepository::class);
+        $this->app->bind(TenantTranslationServiceInterface::class, TenantTranslationService::class);
         $this->app->singleton(TemplateResolver::class);
 
         $this->app->scoped(FlowEngineInterface::class, FlowEngine::class);

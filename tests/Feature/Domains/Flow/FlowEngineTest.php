@@ -36,6 +36,7 @@ final class FlowEngineTest extends FeatureTestCase
         $registry->register(new SequentialFlowTestHandler());
         $registry->register(new WaitingFlowTestHandler());
         $registry->register(new InfiniteLoopFlowTestHandler());
+        $registry->register(new SetLanguageEffectTestHandler());
     }
 
     public function test_start_executes_linear_flow_until_finished(): void
@@ -232,6 +233,38 @@ final class FlowEngineTest extends FeatureTestCase
         $this->assertSame('n2', $metadata['transition'] ?? null);
     }
 
+    public function test_set_contact_language_effect_updates_contact_language(): void
+    {
+        $tenantId = (string) Str::uuid();
+
+        $assistant = Assistant::factory()->create([
+            'tenant_id' => $tenantId,
+        ]);
+
+        $contact = Contact::factory()->forTenant($tenantId)->create([
+            'language' => 'en',
+        ]);
+
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Set language',
+            'nodes'     => [
+                ['id' => 'lang-1', 'type' => 'set_language_effect_test', 'version' => 1, 'config' => []],
+            ],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        $engine = $this->app->make(FlowEngineInterface::class);
+        $engine->start($definition, $contact);
+
+        $this->assertSame('es', $contact->fresh()->language);
+    }
+
     private function registerModuleAccessorOnce(string $prefix, DataAccessorInterface $accessor): void
     {
         $readRegistry = $this->app->make(DataAccessorRegistryInterface::class);
@@ -354,5 +387,36 @@ final class StaticHrDataAccessor implements DataAccessorInterface
     public function supportedKeys(): array
     {
         return ['department'];
+    }
+}
+
+final class SetLanguageEffectTestHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'set_language_effect_test';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return NodeExecutionResult::executed(
+            effects: [[
+                'type'  => 'set_contact_language',
+                'value' => 'es',
+            ]],
+        );
     }
 }

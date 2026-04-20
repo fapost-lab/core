@@ -24,6 +24,7 @@ final class ContactFactory extends Factory
             'tenant_id'   => fake()->uuid(),
             'platform'    => PlatformEnum::Telegram,
             'external_id' => (string) fake()->unique()->numerify('##########'),
+            'language'    => 'en',
             'meta'        => [],
             'attributes'  => [],
         ];

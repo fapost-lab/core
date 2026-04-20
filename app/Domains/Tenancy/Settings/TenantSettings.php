@@ -26,6 +26,15 @@ final class TenantSettings extends Settings
 
     public int $max_contacts;
 
+    public string $content_base_language = 'en';
+
+    /**
+     * @var list<string>
+     */
+    public array $available_languages = ['en'];
+
+    public string $fallback_language = 'en';
+
     public static function group(): string
     {
         return 'tenant';

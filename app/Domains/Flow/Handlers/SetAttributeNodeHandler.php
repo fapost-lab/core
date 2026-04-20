@@ -50,6 +50,18 @@ final class SetAttributeNodeHandler extends AbstractVersionedHandler
             );
         }
 
+        if ('contact' === $target && ('language' === $key || 'contact.language' === $key)) {
+            return new NodeExecutionResult(
+                status: NodeExecutionStatus::Executed,
+                sourceHandle: 'default',
+                effects: [[
+                    'type'  => 'set_contact_language',
+                    'value' => (string) $value,
+                ]],
+                metadata: [self::TARGET_META => 'contact', self::KEY_META => $key],
+            );
+        }
+
         return new NodeExecutionResult(
             status: NodeExecutionStatus::Executed,
             sourceHandle: 'default',

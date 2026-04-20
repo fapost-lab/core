@@ -28,6 +28,7 @@ final readonly class ContactService implements ContactServiceInterface
         PlatformEnum $platform,
         string $externalId,
         array $meta = [],
+        ?string $defaultLanguage = null,
     ): Contact {
         try {
             return Contact::query()->firstOrCreate(
@@ -39,6 +40,7 @@ final readonly class ContactService implements ContactServiceInterface
                 [
                     'meta'       => $meta,
                     'attributes' => [],
+                    'language'   => $defaultLanguage ?: 'en',
                 ],
             );
         } catch (UniqueConstraintViolationException) {
@@ -94,6 +96,15 @@ final readonly class ContactService implements ContactServiceInterface
         ])->save();
 
         return $contact;
+    }
+
+    public function updateLanguage(string $contactId, string $language): Contact
+    {
+        Contact::query()->whereKey($contactId)->update([
+            'language' => $language,
+        ]);
+
+        return $this->findById($contactId);
     }
 
     public function findById(string $contactId): Contact

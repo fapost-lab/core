@@ -148,6 +148,21 @@ final class ContactServiceTest extends FeatureTestCase
         });
     }
 
+    public function test_update_language_updates_contact_language(): void
+    {
+        $tenant = $this->tenant();
+
+        $this->runInTenant($tenant, function () use ($tenant): void {
+            $service = app(ContactServiceInterface::class);
+            $contact = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram, 'lang-user', []);
+
+            $updated = $service->updateLanguage($contact->id, 'es');
+
+            $this->assertSame('es', $updated->language);
+            $this->assertSame('es', $contact->fresh()->language);
+        });
+    }
+
     private function tenant(): Tenant
     {
         return Tenant::query()->firstOrFail();

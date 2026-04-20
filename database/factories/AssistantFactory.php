@@ -23,6 +23,7 @@ final class AssistantFactory extends Factory
             'tenant_id'        => '00000000-0000-0000-0000-000000000001',
             'name'             => 'Assistant',
             'is_active'        => true,
+            'default_language' => 'en',
             'default_flow_id'  => null,
             'fallback_message' => null,
             'settings'         => [],
