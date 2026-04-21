@@ -7,12 +7,14 @@ namespace Tests\Unit\Domains\Assistant;
 use App\Domains\Assistant\Contracts\AssistantServiceInterface;
 use App\Domains\Assistant\Contracts\ChannelServiceInterface;
 use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
-use App\Domains\Assistant\Enums\ChannelTypeEnum;
 use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use App\Jobs\Messaging\SyncChannelWebhookJob;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Mockery;
 use Tests\Feature\FeatureTestCase;
@@ -25,6 +27,7 @@ final class ChannelServiceTest extends FeatureTestCase
     {
         parent::setUp();
 
+        Queue::fake([SyncChannelWebhookJob::class]);
         $this->registrySpy = Mockery::spy(WebhookRegistryWriterInterface::class);
         $this->app->instance(WebhookRegistryWriterInterface::class, $this->registrySpy);
         $this->app->forgetInstance(ChannelWebhookRegistryInterface::class);
@@ -55,6 +58,7 @@ final class ChannelServiceTest extends FeatureTestCase
         });
 
         $this->assertSame(48, mb_strlen($channel->webhook_public_hash));
+        Queue::assertPushed(SyncChannelWebhookJob::class);
     }
 
     public function test_create_channel_has_ulid_format_id(): void

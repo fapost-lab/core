@@ -6,18 +6,44 @@ namespace Tests\Unit\Domains\Contact;
 
 use App\Domains\Assistant\Contracts\AssistantServiceInterface;
 use App\Domains\Assistant\Contracts\ChannelServiceInterface;
-use App\Domains\Assistant\Enums\ChannelTypeEnum;
+use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use App\Jobs\Messaging\SyncChannelWebhookJob;
 use Closure;
+use Illuminate\Support\Facades\Queue;
+use Mockery;
+use Mockery\MockInterface;
 use Tests\Feature\FeatureTestCase;
 
 final class ContactServiceTest extends FeatureTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Queue::fake([SyncChannelWebhookJob::class]);
+        $registry = Mockery::mock(ChannelWebhookRegistryInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('set')->andReturnNull();
+            $mock->shouldReceive('remove')->andReturnNull();
+        });
+
+        $this->app->instance(ChannelWebhookRegistryInterface::class, $registry);
+    }
+
+    protected function tearDown(): void
+    {
+        Mockery::close();
+        $this->app->forgetInstance(ChannelWebhookRegistryInterface::class);
+
+        parent::tearDown();
+    }
+
     public function test_find_or_create_persists_single_contact_per_tenant_platform_external_id(): void
     {
         $tenant = $this->tenant();

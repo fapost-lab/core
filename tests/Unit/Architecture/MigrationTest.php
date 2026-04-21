@@ -17,6 +17,7 @@ final class MigrationTest extends TestCase
             'analyse',
             '--configuration',
             base_path('phpstan.neon'),
+            '--debug',
             '--memory-limit=512M',
             '--no-interaction',
         ]);

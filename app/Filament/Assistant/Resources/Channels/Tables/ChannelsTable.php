@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\Assistant\Resources\Channels\Tables;
 
 use App\Domains\Assistant\Contracts\ChannelServiceInterface;
-use App\Domains\Assistant\Enums\ChannelTypeEnum;
 use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -28,10 +28,7 @@ final class ChannelsTable
                     ->formatStateUsing(function (mixed $state): string {
                         $enum = $state instanceof ChannelTypeEnum ? $state : ChannelTypeEnum::from((string) $state);
 
-                        return match ($enum) {
-                            ChannelTypeEnum::Telegram => __('staff.channels.types.telegram'),
-                            ChannelTypeEnum::WhatsApp => __('staff.channels.types.whatsapp'),
-                        };
+                        return __($enum->labelKey());
                     }),
                 TextColumn::make('webhook_public_hash')
                     ->label(__('staff.channels.fields.webhook_hash'))

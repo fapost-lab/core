@@ -6,9 +6,9 @@ namespace App\Domains\Assistant\Services;
 
 use App\Domains\Assistant\Contracts\ChannelServiceInterface;
 use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
-use App\Domains\Assistant\Enums\ChannelTypeEnum;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;

@@ -6,4 +6,4 @@ use App\Domains\Webhook\Http\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::post('/webhook/{channel}/{hash}', WebhookController::class)
-    ->name('webhook.incoming');
+    ->name('webhook.handle');

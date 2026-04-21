@@ -197,38 +197,13 @@ return [
     */
 
     'defaults' => [
-        'messaging-transactional' => [
+        'high' => [
             'connection'          => 'redis',
-            'queue'               => ['messaging.transactional'],
+            'queue'               => ['flow.execution', 'messaging.transactional'],
             'balance'             => 'auto',
             'autoScalingStrategy' => 'time',
-            'maxProcesses'        => 1,
-            'maxTime'             => 0,
-            'maxJobs'             => 0,
-            'memory'              => 128,
-            'tries'               => 3,
-            'timeout'             => 30,
-            'nice'                => 0,
-        ],
-        'messaging-broadcast' => [
-            'connection'          => 'redis',
-            'queue'               => ['messaging.broadcast'],
-            'balance'             => 'auto',
-            'autoScalingStrategy' => 'time',
-            'maxProcesses'        => 1,
-            'maxTime'             => 0,
-            'maxJobs'             => 0,
-            'memory'              => 128,
-            'tries'               => 3,
-            'timeout'             => 60,
-            'nice'                => 5,
-        ],
-        'flow-execution' => [
-            'connection'          => 'redis',
-            'queue'               => ['flow.execution'],
-            'balance'             => 'auto',
-            'autoScalingStrategy' => 'time',
-            'maxProcesses'        => 1,
+            'minProcesses'        => 1,
+            'maxProcesses'        => 2,
             'maxTime'             => 0,
             'maxJobs'             => 0,
             'memory'              => 128,
@@ -236,12 +211,13 @@ return [
             'timeout'             => 60,
             'nice'                => 0,
         ],
-        'sync-external' => [
+        'medium' => [
             'connection'          => 'redis',
-            'queue'               => ['sync.external'],
+            'queue'               => ['sync.external', 'scheduled.triggers'],
             'balance'             => 'auto',
             'autoScalingStrategy' => 'time',
-            'maxProcesses'        => 1,
+            'minProcesses'        => 1,
+            'maxProcesses'        => 2,
             'maxTime'             => 0,
             'maxJobs'             => 0,
             'memory'              => 128,
@@ -249,18 +225,19 @@ return [
             'timeout'             => 120,
             'nice'                => 0,
         ],
-        'scheduled-triggers' => [
+        'low' => [
             'connection'          => 'redis',
-            'queue'               => ['scheduled.triggers'],
+            'queue'               => ['messaging.broadcast', 'messaging.system'],
             'balance'             => 'auto',
             'autoScalingStrategy' => 'time',
-            'maxProcesses'        => 1,
+            'minProcesses'        => 1,
+            'maxProcesses'        => 2,
             'maxTime'             => 0,
             'maxJobs'             => 0,
             'memory'              => 128,
             'tries'               => 3,
             'timeout'             => 60,
-            'nice'                => 0,
+            'nice'                => 5,
         ],
         'default' => [
             'connection'          => 'redis',
@@ -279,27 +256,20 @@ return [
 
     'environments' => [
         'production' => [
-            'messaging-transactional' => [
+            'high' => [
+                'minProcesses'    => 3,
                 'maxProcesses'    => 10,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
-            'messaging-broadcast' => [
+            'medium' => [
+                'minProcesses'    => 2,
                 'maxProcesses'    => 5,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
-            'flow-execution' => [
-                'maxProcesses'    => 8,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
-            ],
-            'sync-external' => [
-                'maxProcesses'    => 3,
-                'balanceMaxShift' => 1,
-                'balanceCooldown' => 3,
-            ],
-            'scheduled-triggers' => [
+            'low' => [
+                'minProcesses'    => 1,
                 'maxProcesses'    => 3,
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
@@ -312,19 +282,16 @@ return [
         ],
 
         'local' => [
-            'messaging-transactional' => [
+            'high' => [
+                'minProcesses' => 1,
                 'maxProcesses' => 2,
             ],
-            'messaging-broadcast' => [
+            'medium' => [
+                'minProcesses' => 1,
                 'maxProcesses' => 1,
             ],
-            'flow-execution' => [
-                'maxProcesses' => 2,
-            ],
-            'sync-external' => [
-                'maxProcesses' => 1,
-            ],
-            'scheduled-triggers' => [
+            'low' => [
+                'minProcesses' => 1,
                 'maxProcesses' => 1,
             ],
             'default' => [

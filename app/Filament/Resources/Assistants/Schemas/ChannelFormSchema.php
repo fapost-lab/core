@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Assistants\Schemas;
 
-use App\Domains\Assistant\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -19,10 +19,7 @@ final class ChannelFormSchema
             ->components([
                 Select::make('type')
                     ->label(__('staff.channels.fields.type'))
-                    ->options([
-                        ChannelTypeEnum::Telegram->value => __('staff.channels.types.telegram'),
-                        ChannelTypeEnum::WhatsApp->value => __('staff.channels.types.whatsapp'),
-                    ])
+                    ->options(ChannelTypeEnum::options())
                     ->required()
                     ->native(false),
                 TextInput::make('token')

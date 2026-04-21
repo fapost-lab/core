@@ -7,17 +7,34 @@ namespace Tests\Unit\Domains\Assistant;
 use App\Domains\Assistant\Contracts\AssistantServiceInterface;
 use App\Domains\Assistant\Contracts\ChannelServiceInterface;
 use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
-use App\Domains\Assistant\Enums\ChannelTypeEnum;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use App\Jobs\Messaging\SyncChannelWebhookJob;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Mockery;
+use Mockery\MockInterface;
 use Tests\Feature\FeatureTestCase;
 
 final class AssistantServiceTest extends FeatureTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Queue::fake([SyncChannelWebhookJob::class]);
+        $registry = Mockery::mock(ChannelWebhookRegistryInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('set')->andReturnNull();
+            $mock->shouldReceive('remove')->andReturnNull();
+        });
+
+        $this->app->instance(ChannelWebhookRegistryInterface::class, $registry);
+        $this->app->forgetInstance(AssistantServiceInterface::class);
+    }
+
     protected function tearDown(): void
     {
         Mockery::close();

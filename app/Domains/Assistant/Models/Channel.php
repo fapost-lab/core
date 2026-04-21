@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Assistant\Models;
 
-use App\Domains\Assistant\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
 use Database\Factories\ChannelFactory;
 use FAPost\Support\Concerns\HasUlidPrimaryKey;
 use Illuminate\Database\Eloquent\Builder;

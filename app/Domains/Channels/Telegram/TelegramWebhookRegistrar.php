@@ -1,0 +1,47 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domains\Channels\Telegram;
+
+use App\Domains\Channels\Telegram\Dto\SetWebhookDto;
+use FAPost\Foundation\Channel\WebhookRegistrarInterface;
+use FAPost\Foundation\Channel\WebhookRegistrationPayload;
+
+/**
+ * Registers Telegram provider-side webhooks for configured assistant channels.
+ */
+final readonly class TelegramWebhookRegistrar implements WebhookRegistrarInterface
+{
+    public function __construct(
+        private TelegramBotApiClientFactory $clientFactory,
+    ) {
+    }
+
+    /**
+     * Create or refresh the Telegram webhook for the given channel.
+     */
+    public function register(WebhookRegistrationPayload $payload): void
+    {
+        $client         = $this->clientFactory->make($payload->token);
+        $allowedUpdates = is_array($payload->config['allowed_updates'] ?? null)
+            ? $payload->config['allowed_updates']
+            : null;
+
+        $client->setWebhook(new SetWebhookDto(
+            url: route('webhook.handle', ['channel' => 'telegram', 'hash' => $payload->webhookPublicHash]),
+            secretToken: $payload->secretToken,
+            allowedUpdates: $allowedUpdates,
+        ));
+    }
+
+    /**
+     * Remove the Telegram webhook for the given channel.
+     */
+    public function deregister(WebhookRegistrationPayload $payload): void
+    {
+        $this->clientFactory
+            ->make($payload->token)
+            ->deleteWebhook();
+    }
+}

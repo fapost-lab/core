@@ -368,8 +368,6 @@ sync.external             — синхронизации из внешних с�
 scheduled.triggers        — крон-запуски flow
 ```
 
-`messaging.broadcast` workers проверяют насыщение `messaging.transactional` перед отправкой.
-
 ---
 
 ## Webhook routing
@@ -952,17 +950,17 @@ Octane вводится последним в фазе — когда все lif
 
 | # | Название |
 |---|----------|
-| 11 | Flow execution engine (FlowEngine::start/resume, execute loop, dispatch по (type,version), session persist) |
+| 11 | Flow execution engine (FlowEngine::start/resume, execute loop, dispatch по (type,version), session persist) ✅|
 | 12 | Concurrency protection (distributed lock `session_lock:{tenant_id}:{contact_id}:{assistant_id}` Redis TTL=30s, optimistic lock retry, backoff при lock miss — не дроп) | ✅ |
 | 13 | Built-in node handlers (send_message, input, condition, delay, set_attribute, webhook — все idempotent) | ✅ |
-| 14 | Flow triggers (flow_triggers, TriggerResolver, IncomingMessageJob → FlowEngine) |
+| 14 | Flow triggers (flow_triggers, TriggerResolver, IncomingMessageJob → FlowEngine) ✅|
 
 **Спринт 6 — data access & logging**
 
 | # | Название |
 |---|----------|
-| 15 | DataAccessor layer (DataAccessorInterface, DataAccessorRegistry, condition нода только через accessor, flow_logs snapshot) |
-| 16 | Logging & retention (flow_logs monthly partition, analytics_events forever, retention 30d) |
+| 15 | DataAccessor layer (DataAccessorInterface, DataAccessorRegistry, condition нода только через accessor, flow_logs snapshot) ✅|
+| 16 | Logging & retention (flow_logs monthly partition, analytics_events forever, retention 30d) ✅|
 
 ---
 
@@ -970,7 +968,7 @@ Octane вводится последним в фазе — когда все lif
 
 | # | Название |
 |---|----------|
-| 17 | Message queues & sender (transactional HIGH / broadcast LOW / system, worker pools Horizon) |
+| 17 | Message queues & sender (transactional HIGH / broadcast LOW / system, worker pools Horizon) ✅|
 | 18 | Broadcast engine (BroadcastSendJob 1:1, rate limiter Redis, backpressure check) |
 | 19 | RAG adapter (RagAdapterInterface, StructuredRagResult, knowledge_bases, rag_query нода) |
 | 20 | Filament admin UI (Assistants, Contacts, Flow list, analytics dashboard — **только read-only**) |

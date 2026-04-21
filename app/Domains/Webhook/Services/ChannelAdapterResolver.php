@@ -4,33 +4,32 @@ declare(strict_types=1);
 
 namespace App\Domains\Webhook\Services;
 
+use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
 use App\Domains\Webhook\Exceptions\AdapterNotFoundException;
-use Illuminate\Contracts\Container\Container;
 
+/**
+ * Resolves inbound webhook adapters through the shared channel registry.
+ */
 final readonly class ChannelAdapterResolver
 {
-    /**
-     * @param  array<string, class-string<ChannelAdapterInterface>>  $adapterMap
-     */
     public function __construct(
-        private Container $container,
-        private array $adapterMap,
+        private ChannelRegistryInterface $channelRegistry,
     ) {
     }
 
     /**
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * Resolve the adapter for the given external platform or fail explicitly.
      */
     public function resolve(PlatformEnum $platform): ChannelAdapterInterface
     {
-        $class = $this->adapterMap[$platform->value] ?? null;
+        $adapter = $this->channelRegistry->adapter($platform->value);
 
-        if (null === $class) {
+        if (null === $adapter) {
             throw new AdapterNotFoundException("No adapter registered for platform: {$platform->value}");
         }
 
-        return $this->container->make($class);
+        return $adapter;
     }
 }

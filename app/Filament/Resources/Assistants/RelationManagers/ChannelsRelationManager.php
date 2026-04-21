@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Filament\Resources\Assistants\RelationManagers;
 
 use App\Domains\Assistant\Contracts\ChannelServiceInterface;
-use App\Domains\Assistant\Enums\ChannelTypeEnum;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Filament\Resources\Assistants\Schemas\ChannelFormSchema;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -65,10 +65,7 @@ final class ChannelsRelationManager extends RelationManager
                     ->formatStateUsing(function (mixed $state): string {
                         $enum = $state instanceof ChannelTypeEnum ? $state : ChannelTypeEnum::from((string) $state);
 
-                        return match ($enum) {
-                            ChannelTypeEnum::Telegram => __('staff.channels.types.telegram'),
-                            ChannelTypeEnum::WhatsApp => __('staff.channels.types.whatsapp'),
-                        };
+                        return __($enum->labelKey());
                     }),
                 TextColumn::make('webhook_public_hash')
                     ->label(__('staff.channels.fields.webhook_hash'))
