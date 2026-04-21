@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domains\Flow\Logging\DatabaseAnalyticsWriter;
 use App\Domains\Shared\Infrastructure\ModelAttributeRegistry;
+use FAPost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
 use FAPost\Foundation\Contracts\ModelAttributeResolverInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
@@ -25,6 +27,8 @@ final class AppServiceProvider extends ServiceProvider
     {
         $this->app->singleton(ModelAttributeRegistry::class);
         $this->app->singleton(ModelAttributeResolverInterface::class, ModelAttributeRegistry::class);
+        $this->app->scoped(DatabaseAnalyticsWriter::class);
+        $this->app->scoped(AnalyticsWriterInterface::class, DatabaseAnalyticsWriter::class);
 
         if ($this->app->environment('local')) {
             $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);

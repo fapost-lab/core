@@ -18,16 +18,24 @@ use App\Domains\Flow\Exceptions\FlowExecutionLimitExceededException;
 use App\Domains\Flow\Exceptions\HandlerNotFoundException;
 use App\Domains\Flow\Exceptions\InvalidFlowGraphException;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
+use App\Domains\Flow\Logging\FlowLogEntry;
+use App\Domains\Flow\Logging\FlowLogStatus;
+use App\Domains\Flow\Logging\FlowLogWriter;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\State\FlowStateNamespace;
 use App\Domains\Flow\State\SystemStateKeys;
+use DateTimeImmutable;
+use FAPost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
+use FAPost\Foundation\Analytics\DTO\AnalyticsEvent;
+use FAPost\Foundation\Analytics\Enums\AnalyticsEventType;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\NodeExecutionContext as FoundationNodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\ConnectionInterface;
+use Illuminate\Support\Facades\DB;
 use LogicException;
 use Throwable;
 
@@ -40,6 +48,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowSessionPersister $persister,
         private FlowLogWriter $logWriter,
+        private AnalyticsWriterInterface $analyticsWriter,
         private CurrentAssistantInterface $currentAssistant,
         private ContactServiceInterface $contactService,
         private LanguageResolverInterface $languageResolver,
@@ -82,9 +91,16 @@ final readonly class FlowEngine implements FlowEngineInterface
                 'version'            => 1,
             ]);
 
-            $this->logWriter->writeFlowStart($created);
-
             return $created;
+        });
+
+        $this->afterCommit(function () use ($session): void {
+            $this->analyticsWriter->record(new AnalyticsEvent(
+                tenantId: (string) $session->tenant_id,
+                eventType: AnalyticsEventType::FlowStarted,
+                payload: ['session_id' => (string) $session->getKey()],
+                occurredAt: new DateTimeImmutable(),
+            ));
         });
 
         $this->executeLoop($definition, $session, null, $contact);
@@ -133,7 +149,14 @@ final readonly class FlowEngine implements FlowEngineInterface
                         throw FlowConcurrencyException::forSession((string) $session->getKey(), $exception);
                     }
 
-                    $this->logWriter->writeFlowEnd($session, 'max_iterations_exceeded');
+                    $this->afterCommit(function () use ($session): void {
+                        $this->analyticsWriter->record(new AnalyticsEvent(
+                            tenantId: (string) $session->tenant_id,
+                            eventType: AnalyticsEventType::FlowFailed,
+                            payload: ['session_id' => (string) $session->getKey()],
+                            occurredAt: new DateTimeImmutable(),
+                        ));
+                    });
                 });
 
                 throw new FlowExecutionLimitExceededException();
@@ -197,12 +220,18 @@ final readonly class FlowEngine implements FlowEngineInterface
             $this->connection->transaction(function () use ($session, $contact, $node, $result, $nextNodeId): void {
                 $this->applyEffects($contact, $result);
                 $this->persister->persist($session, $result, $nextNodeId);
-                $this->logWriter->write($session, $node, $result, $nextNodeId);
+                $this->logWriter->write($this->buildLogEntry($session, $node, $result, $nextNodeId));
 
-                $reason = $this->resolveTerminalReason($result, $nextNodeId);
-
-                if (null !== $reason) {
-                    $this->logWriter->writeFlowEnd($session, $reason);
+                $analyticsEventType = $this->resolveAnalyticsEventType($result, $nextNodeId);
+                if (null !== $analyticsEventType) {
+                    $this->afterCommit(function () use ($analyticsEventType, $session): void {
+                        $this->analyticsWriter->record(new AnalyticsEvent(
+                            tenantId: (string) $session->tenant_id,
+                            eventType: $analyticsEventType,
+                            payload: ['session_id' => (string) $session->getKey()],
+                            occurredAt: new DateTimeImmutable(),
+                        ));
+                    });
                 }
             });
 
@@ -223,24 +252,48 @@ final readonly class FlowEngine implements FlowEngineInterface
         }
     }
 
-    /**
-     * Lifecycle {@code flow_end} reason for this step, or {@code null} when no terminal lifecycle row is written.
-     */
-    private function resolveTerminalReason(NodeExecutionResult $result, ?string $nextNodeId): ?string
+    private function resolveAnalyticsEventType(NodeExecutionResult $result, ?string $nextNodeId): ?AnalyticsEventType
     {
         if (NodeExecutionStatus::Executed === $result->status && null === $nextNodeId) {
-            return 'no_next_node';
+            return AnalyticsEventType::FlowCompleted;
         }
 
         if (NodeExecutionStatus::Finished === $result->status) {
-            return 'finished';
+            return AnalyticsEventType::FlowCompleted;
         }
 
         if (NodeExecutionStatus::Failed === $result->status) {
-            return 'failed';
+            return AnalyticsEventType::FlowFailed;
         }
 
         return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $node
+     */
+    private function buildLogEntry(
+        FlowSession $session,
+        array $node,
+        NodeExecutionResult $result,
+        ?string $nextNodeId,
+    ): FlowLogEntry {
+        return new FlowLogEntry(
+            sessionId: (string) $session->getKey(),
+            nodeId: (string) ($node['id'] ?? ''),
+            nodeType: (string) ($node['type'] ?? ''),
+            nodeVersion: $this->resolveNodeVersion($node),
+            status: match (true) {
+                NodeExecutionStatus::Failed === $result->status                           => FlowLogStatus::Failed,
+                NodeExecutionStatus::Finished === $result->status                         => FlowLogStatus::Terminal,
+                NodeExecutionStatus::Executed === $result->status && null === $nextNodeId => FlowLogStatus::Terminal,
+                default                                                                   => FlowLogStatus::Executed,
+            },
+            sourceHandle: $result->sourceHandle,
+            stateChanges: [] !== $result->stateChanges ? $result->stateChanges : null,
+            resolved: [] !== $result->logResolved ? $result->logResolved : null,
+            error: null !== $result->errorMessage ? ['message' => $result->errorMessage] : null,
+        );
     }
 
     private function applyEffects(Contact $contact, NodeExecutionResult $result): void
@@ -323,5 +376,12 @@ final readonly class FlowEngine implements FlowEngineInterface
         }
 
         return 1;
+    }
+
+    private function afterCommit(callable $callback): void
+    {
+        // Flow engine transactions run on the default tenant connection in current runtime,
+        // so facade-level afterCommit is coupled to the same transaction lifecycle.
+        DB::afterCommit($callback);
     }
 }

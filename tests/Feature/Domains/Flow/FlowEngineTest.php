@@ -75,13 +75,11 @@ final class FlowEngineTest extends FeatureTestCase
 
         $logs = DB::table('flow_logs')->where('session_id', $session->getKey())->orderBy('created_at')->get();
 
-        $this->assertCount(4, $logs);
-        $this->assertSame('flow_start', $logs[0]->status);
-        $this->assertSame('n1', $logs[1]->node_id);
-        $this->assertSame('n2', $logs[2]->node_id);
-        $this->assertSame('finished', $logs[2]->status);
-        $this->assertSame('flow_end', $logs[3]->status);
-        $this->assertSame('finished', json_decode((string) $logs[3]->metadata, true)['reason'] ?? null);
+        $this->assertCount(2, $logs);
+        $this->assertSame('n1', $logs[0]->node_id);
+        $this->assertSame('executed', $logs[0]->status);
+        $this->assertSame('n2', $logs[1]->node_id);
+        $this->assertSame('terminal', $logs[1]->status);
     }
 
     public function test_resume_passes_incoming_message_only_for_first_node_in_run(): void
@@ -170,9 +168,7 @@ final class FlowEngineTest extends FeatureTestCase
 
         $this->assertSame(FlowSessionStatus::Failed, $session->status);
 
-        $endLog = DB::table('flow_logs')->where('session_id', $session->getKey())->where('status', 'flow_end')->latest('created_at')->first();
-
-        $this->assertSame('max_iterations_exceeded', json_decode((string) $endLog->metadata, true)['reason'] ?? null);
+        $this->assertDatabaseCount('flow_logs', 4);
     }
 
     public function test_condition_logs_resolved_runtime_value_expression_and_transition(): void
@@ -224,13 +220,7 @@ final class FlowEngineTest extends FeatureTestCase
         $this->assertNotNull($conditionLog);
 
         $resolved = json_decode((string) $conditionLog->resolved, true);
-        $metadata = json_decode((string) $conditionLog->metadata, true);
-
         $this->assertSame('logistics', $resolved['module.hr.department'] ?? null);
-        $this->assertSame('module.hr.department', $metadata['expression']['operand'] ?? null);
-        $this->assertSame('eq', $metadata['expression']['operator'] ?? null);
-        $this->assertSame('logistics', $metadata['expression']['expected'] ?? null);
-        $this->assertSame('n2', $metadata['transition'] ?? null);
     }
 
     public function test_set_contact_language_effect_updates_contact_language(): void
