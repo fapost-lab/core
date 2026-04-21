@@ -28,4 +28,22 @@ abstract class AbstractVersionedHandler implements NodeHandlerInterface
     {
         return [$this->version()];
     }
+
+    public function label(): string
+    {
+        return ucfirst(str_replace('_', ' ', $this->type()));
+    }
+
+    public function category(): string
+    {
+        return 'Core';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function configSchema(): array
+    {
+        return [];
+    }
 }

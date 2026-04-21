@@ -49,6 +49,21 @@ final class NodeHandlerRegistry implements NodeHandlerRegistryInterface
         return $this->handlers[$key];
     }
 
+    public function all(): array
+    {
+        $latestByType = [];
+
+        foreach ($this->handlers as $handler) {
+            $type = $handler->type();
+
+            if ( ! isset($latestByType[$type]) || $handler->version() > $latestByType[$type]->version()) {
+                $latestByType[$type] = $handler;
+            }
+        }
+
+        return array_values($latestByType);
+    }
+
     public function freeze(): void
     {
         $this->frozen = true;

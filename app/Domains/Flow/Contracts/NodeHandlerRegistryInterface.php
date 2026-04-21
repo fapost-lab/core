@@ -12,5 +12,10 @@ interface NodeHandlerRegistryInterface
 
     public function resolve(string $type, int $version): NodeHandlerInterface;
 
+    /**
+     * @return list<NodeHandlerInterface>
+     */
+    public function all(): array;
+
     public function freeze(): void;
 }

@@ -66,6 +66,57 @@ final class NodeHandlerRegistryTest extends TestCase
 
         $registry->register(new TestConditionNodeHandlerV2());
     }
+
+    public function test_all_returns_latest_handler_version_per_type(): void
+    {
+        $registry = new NodeHandlerRegistry();
+        $registry->register(new TestConditionNodeHandlerV1());
+        $registry->register(new TestConditionNodeHandlerV2());
+
+        $all = $registry->all();
+
+        $this->assertCount(1, $all);
+        $this->assertSame('condition', $all[0]->type());
+        $this->assertSame(2, $all[0]->version());
+    }
+}
+
+final class TestConditionNodeHandlerV1 implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'condition';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Condition';
+    }
+
+    public function category(): string
+    {
+        return 'Core';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return NodeExecutionResult::executed();
+    }
 }
 
 final class TestConditionNodeHandlerV2 implements NodeHandlerInterface
@@ -83,6 +134,21 @@ final class TestConditionNodeHandlerV2 implements NodeHandlerInterface
     public function supportedVersions(): array
     {
         return [1, 2];
+    }
+
+    public function label(): string
+    {
+        return 'Condition';
+    }
+
+    public function category(): string
+    {
+        return 'Core';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
@@ -106,6 +172,21 @@ final class InvalidSupportedVersionsHandler implements NodeHandlerInterface
     public function supportedVersions(): array
     {
         return [1, 2];
+    }
+
+    public function label(): string
+    {
+        return 'Condition';
+    }
+
+    public function category(): string
+    {
+        return 'Core';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult

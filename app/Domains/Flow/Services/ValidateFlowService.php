@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Services;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
-use App\Domains\Flow\Contracts\HasConfigSchemaInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\DTOs\FlowValidationResultDto;
@@ -162,20 +161,15 @@ final readonly class ValidateFlowService
             return;
         }
 
-        // NOTE: Required-field validation works only for handlers that implement HasConfigSchemaInterface.
-        // Existing handlers that do not implement this contract are intentionally skipped for now.
         $requiredFields = [];
-        if ($handler instanceof HasConfigSchemaInterface) {
-            /** @var mixed $schema */
-            $schema = $handler->getConfigSchema();
-            if (is_array($schema)) {
-                /** @var mixed $required */
-                $required = $schema['required'] ?? [];
-                if (is_array($required)) {
-                    foreach ($required as $field) {
-                        if (is_string($field) && '' !== $field) {
-                            $requiredFields[] = $field;
-                        }
+        $schema         = $handler->configSchema();
+        if (is_array($schema)) {
+            /** @var mixed $required */
+            $required = $schema['required'] ?? [];
+            if (is_array($required)) {
+                foreach ($required as $field) {
+                    if (is_string($field) && '' !== $field) {
+                        $requiredFields[] = $field;
                     }
                 }
             }

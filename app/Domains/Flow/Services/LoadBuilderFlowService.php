@@ -4,20 +4,22 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
+use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\DTOs\BuilderFlowDto;
-use App\Domains\Flow\Models\FlowDefinition;
-use App\Domains\Flow\Models\FlowDraft;
 
-final class LoadBuilderFlowService
+final readonly class LoadBuilderFlowService
 {
+    public function __construct(
+        private FlowDraftRepositoryInterface $drafts,
+        private FlowDefinitionRepositoryInterface $definitions,
+    ) {
+    }
+
     public function execute(string $flowId): BuilderFlowDto
     {
-        $draft = FlowDraft::query()->where('flow_id', $flowId)->firstOrFail();
-
-        $published = FlowDefinition::query()
-            ->where('flow_id', $flowId)
-            ->where('is_active', true)
-            ->first();
+        $draft     = $this->drafts->findByFlowId($flowId);
+        $published = $this->definitions->findLatestActiveByFlowId($flowId);
 
         return BuilderFlowDto::fromDraftAndDefinition($draft, $published);
     }

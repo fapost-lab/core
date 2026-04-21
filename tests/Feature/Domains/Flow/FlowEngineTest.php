@@ -285,6 +285,21 @@ final class SequentialFlowTestHandler implements NodeHandlerInterface
         return [1];
     }
 
+    public function label(): string
+    {
+        return 'Sequential Test';
+    }
+
+    public function category(): string
+    {
+        return 'Test';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         $id = $nodeConfig['id'] ?? '';
@@ -317,6 +332,21 @@ final class WaitingFlowTestHandler implements NodeHandlerInterface
         return [1];
     }
 
+    public function label(): string
+    {
+        return 'Waiting Test';
+    }
+
+    public function category(): string
+    {
+        return 'Test';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         if (null === $context->incoming) {
@@ -345,6 +375,21 @@ final class InfiniteLoopFlowTestHandler implements NodeHandlerInterface
     public function supportedVersions(): array
     {
         return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Infinite Loop Test';
+    }
+
+    public function category(): string
+    {
+        return 'Test';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
@@ -398,6 +443,21 @@ final class SetLanguageEffectTestHandler implements NodeHandlerInterface
     public function supportedVersions(): array
     {
         return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Set Language Effect Test';
+    }
+
+    public function category(): string
+    {
+        return 'Test';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult

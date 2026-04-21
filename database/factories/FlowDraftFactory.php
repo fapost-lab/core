@@ -28,4 +28,26 @@ final class FlowDraftFactory extends Factory
             'nodes'         => [],
         ];
     }
+
+    public function withUnconnectedOutput(): self
+    {
+        return $this->state(fn (): array => [
+            'nodes' => [
+                [
+                    'id'      => 'condition_1',
+                    'type'    => 'condition',
+                    'version' => 1,
+                    'config'  => [
+                        'check' => 'flow.answer',
+                        'rules' => [
+                            ['operator' => 'eq', 'value' => 'yes', 'handle' => 'yes'],
+                        ],
+                    ],
+                    'outputs' => [
+                        'yes' => ['next' => 'missing-node'],
+                    ],
+                ],
+            ],
+        ]);
+    }
 }

@@ -157,6 +157,21 @@ final class TestConditionHandlerV2 implements NodeHandlerInterface
         return [2];
     }
 
+    public function label(): string
+    {
+        return 'Condition';
+    }
+
+    public function category(): string
+    {
+        return 'Core';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         return NodeExecutionResult::executed();
@@ -178,6 +193,21 @@ final class TestInputHandlerV1 implements NodeHandlerInterface
     public function supportedVersions(): array
     {
         return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Input';
+    }
+
+    public function category(): string
+    {
+        return 'Core';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
