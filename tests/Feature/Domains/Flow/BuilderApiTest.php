@@ -20,14 +20,13 @@ final class BuilderApiTest extends FeatureTestCase
         $this->actingAs($user)
             ->get("/builder/flows/{$draft->flow_id}")
             ->assertOk()
-            ->assertInertia(function (AssertableInertia $page): void {
-                $page->component('Builder/Flow')
-                    ->has('flow_id')
-                    ->has('name')
-                    ->has('draft_version')
-                    ->has('published_version')
-                    ->has('definition')
-                    ->has('published_at');
+            ->assertInertia(function (AssertableInertia $page) use ($draft): void {
+                $page->component('FlowBuilder/FlowEditor')
+                    ->has('flow', fn (AssertableInertia $flow): AssertableInertia => $flow
+                        ->where('flowId', $draft->flow_id)
+                        ->where('name', $draft->name)
+                        ->where('draftVersion', $draft->draft_version)
+                        ->etc());
             });
     }
 

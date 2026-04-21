@@ -111,6 +111,89 @@ Domains/{Domain}/
 - external_id: uuid NULL — отдельная колонка, только где нужна внешняя интеграция, не автоматически
 - НЕ трогать: webhook_public_hash (random string), tenant_id в landlord-схеме
 
+
+## Frontend Extension Boundary: Plugin vs Solution (ADR-06)
+
+### Таблица возможностей
+
+| Capability                     | Core     | Plugin   | Solution  | SaaS-only |
+|--------------------------------|----------|----------|-----------|-----------|
+| NodeHandler                    | ✓        | ✓        | ✓         | ✗         |
+| DataAccessor                   | ✓        | ✓        | ✓         | ✗         |
+| Flow template                  | ✓        | ✓        | ✓         | ✗         |
+| Tenant migrations              | ✓        | ✗        | ✓         | ✗         |
+| Landlord access                | ✗        | ✗        | ✗         | ✓         |
+| Queue jobs                     | ✓        | limited  | ✓         | ✗         |
+| Scheduled jobs                 | ✓        | limited  | ✓         | ✗         |
+| Custom Vue config component    | ✓        | ✗        | ✓         | ✗         |
+| Custom preview renderer        | ✓        | ✗        | ✓         | ✗         |
+| Custom field renderer          | ✓        | ✗        | ✓         | ✗         |
+| Filament resources             | ✓        | ✗        | ✓         | ✗         |
+| Runtime install without deploy | ✗        | ✓        | ✗         | ✗         |
+| Composer package               | internal | optional | mandatory | internal  |
+
+### Пояснения
+
+**Plugin limited для Queue/Scheduled jobs** — Plugin может диспатчить jobs в
+существующие очереди платформы, но не может регистрировать новые worker pools
+в Horizon и не может добавлять scheduled entries в kernel.
+
+**Flow template у Plugin** — template это JSON файл, не привязан к build
+pipeline. Plugin поставляет через `vendor:publish` без перебилда.
+
+**Config component vs Preview renderer** — разные точки расширения builder:
+
+- Config component — правая панель при выборе ноды
+- Preview renderer — карточка ноды в sequence editor (центральная колонка)
+
+### Plugin — только логика, без Vue компонентов
+
+Plugin устанавливается без перебилда frontend — Vue компоненты невозможны.
+Ноды от Plugin рендерятся через `SchemaConfigRenderer` (schema-driven) и
+дефолтный `FlowNodeCard`. Если стандартных field types недостаточно —
+расширять `SchemaConfigRenderer` в Core, не делать Plugin Solution-ом.
+
+### Solution — Vue компоненты через vendor:publish (с перебилдом)
+
+Solution публикует компоненты в предсказуемую структуру:
+
+```
+vendor/fapost/solution-{name}/
+  resources/js/builder/
+    SyncEmployeeConfig.vue     ← config panel override
+    SyncEmployeePreview.vue    ← node card preview override (опционально)
+```
+
+Builder подхватывает через Vite glob:
+
+```js
+const vendorConfigs = import.meta.glob(
+  '../../vendor/fapost/*/resources/js/builder/*Config.vue',
+  { eager: true }
+)
+const vendorPreviews = import.meta.glob(
+  '../../vendor/fapost/*/resources/js/builder/*Preview.vue',
+  { eager: true }
+)
+```
+
+**Соглашение по именованию — обязательно:**
+`{PascalCaseType}Config.vue` → тип ноды `snake_case`
+`SyncEmployeeConfig.vue` → `sync_employee`
+
+### Что НЕ делать
+
+- Не давать Plugin возможность поставлять Vue компоненты
+- Не использовать dynamic runtime import для vendor компонентов (CSP, изоляция)
+- Не хардкодить vendor overrides в ConfigPanel — только через glob
+- Не давать Plugin/Solution доступ к landlord БД — только SaaS-оболочка
+- Plugin не регистрирует worker pools в Horizon и scheduled jobs в kernel
+
+### Перебилд при установке Solution
+
+`npm run build` обязателен после установки каждого Solution.
+Зафиксировать как шаг в `platform:update` (Task 25).
+
 ## Tenant-aware execution model
 
 **Принципиальная позиция:** Core всегда работает внутри tenant-контекста. Tenant — базовая координата runtime, не

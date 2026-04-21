@@ -23,13 +23,15 @@ final class BuilderFlowController extends Controller
     ): Response {
         $dto = $service->execute(flowId: $flow);
 
-        return Inertia::render('Builder/Flow', [
-            'flow_id'           => $dto->flowId,
-            'name'              => $dto->name,
-            'draft_version'     => $dto->draftVersion,
-            'published_version' => $dto->publishedVersion,
-            'definition'        => $dto->definition,
-            'published_at'      => $dto->publishedAt,
+        return Inertia::render('FlowBuilder/FlowEditor', [
+            'flow' => [
+                'flowId'           => $dto->flowId,
+                'name'             => $dto->name,
+                'draftVersion'     => $dto->draftVersion,
+                'publishedVersion' => $dto->publishedVersion,
+                'definition'       => $dto->definition,
+                'publishedAt'      => $dto->publishedAt?->toIso8601String(),
+            ],
         ]);
     }
 
