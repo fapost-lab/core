@@ -17,6 +17,7 @@ use FAPost\Support\Models\BaseModel;
  * @property array<int, array<string, mixed>> $nodes
  * @property array<int, array<string, mixed>> $edges
  * @property bool $is_active
+ * @property \Illuminate\Support\Carbon|null $published_at
  * @method static FlowDefinitionBuilder<static>|FlowDefinition active()
  * @method static FlowDefinitionBuilder<static>|FlowDefinition newModelQuery()
  * @method static FlowDefinitionBuilder<static>|FlowDefinition newQuery()
@@ -53,6 +54,7 @@ final class FlowDefinition extends BaseModel
         'nodes',
         'edges',
         'is_active',
+        'published_at',
     ];
 
     /**
@@ -61,9 +63,10 @@ final class FlowDefinition extends BaseModel
     protected function casts(): array
     {
         return [
-            'nodes'     => 'array',
-            'edges'     => 'array',
-            'is_active' => 'boolean',
+            'nodes'        => 'array',
+            'edges'        => 'array',
+            'is_active'    => 'boolean',
+            'published_at' => 'datetime',
         ];
     }
 }

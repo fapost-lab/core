@@ -35,93 +35,98 @@ final class FlowDefinitionValidatorTest extends TestCase
     public function test_validate_fails_when_node_version_is_missing(): void
     {
         $validator = $this->validator();
-
-        $this->expectException(FlowValidationException::class);
-        $this->expectExceptionMessage('must contain integer version');
-
-        $validator->validate(
-            nodes: [['id' => 'n1', 'type' => 'condition', 'config' => []]],
-            edges: [],
-        );
+        try {
+            $validator->validate(
+                nodes: [['id' => 'n1', 'type' => 'condition', 'config' => []]],
+                edges: [],
+            );
+            $this->fail('Expected FlowValidationException was not thrown.');
+        } catch (FlowValidationException $exception) {
+            $this->assertStringContainsString('must contain integer version', $exception->errors[0]->message);
+        }
     }
 
     public function test_validate_fails_for_duplicate_transition_from_same_source(): void
     {
         $validator = $this->validator();
-
-        $this->expectException(FlowValidationException::class);
-        $this->expectExceptionMessage('Duplicate edge transition mapping');
-
-        $validator->validate(
-            nodes: [
-                ['id' => 'n1', 'type' => 'condition', 'version' => 2, 'config' => []],
-                ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
-                ['id' => 'n3', 'type' => 'input', 'version' => 1, 'config' => []],
-            ],
-            edges: [
-                ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
-                ['id' => 'e2', 'source_node_id' => 'n1', 'target_node_id' => 'n3', 'transition' => 'default'],
-            ],
-        );
+        try {
+            $validator->validate(
+                nodes: [
+                    ['id' => 'n1', 'type' => 'condition', 'version' => 2, 'config' => []],
+                    ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
+                    ['id' => 'n3', 'type' => 'input', 'version' => 1, 'config' => []],
+                ],
+                edges: [
+                    ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
+                    ['id' => 'e2', 'source_node_id' => 'n1', 'target_node_id' => 'n3', 'transition' => 'default'],
+                ],
+            );
+            $this->fail('Expected FlowValidationException was not thrown.');
+        } catch (FlowValidationException $exception) {
+            $this->assertStringContainsString('Duplicate edge transition mapping', $exception->errors[0]->message);
+        }
     }
 
     public function test_validate_fails_when_graph_has_orphan_node(): void
     {
         $validator = $this->validator();
-
-        $this->expectException(FlowValidationException::class);
-        $this->expectExceptionMessage('orphan nodes');
-
-        $validator->validate(
-            nodes: [
-                ['id' => 'n1', 'type' => 'condition', 'version' => 2, 'config' => []],
-                ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
-                ['id' => 'n3', 'type' => 'input', 'version' => 1, 'config' => []],
-            ],
-            edges: [
-                ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
-                ['id' => 'e2', 'source_node_id' => 'n3', 'target_node_id' => 'n3', 'transition' => 'default'],
-            ],
-        );
+        try {
+            $validator->validate(
+                nodes: [
+                    ['id' => 'n1', 'type' => 'condition', 'version' => 2, 'config' => []],
+                    ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
+                    ['id' => 'n3', 'type' => 'input', 'version' => 1, 'config' => []],
+                ],
+                edges: [
+                    ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
+                    ['id' => 'e2', 'source_node_id' => 'n3', 'target_node_id' => 'n3', 'transition' => 'default'],
+                ],
+            );
+            $this->fail('Expected FlowValidationException was not thrown.');
+        } catch (FlowValidationException $exception) {
+            $this->assertStringContainsString('orphan nodes', $exception->errors[0]->message);
+        }
     }
 
     public function test_validate_fails_when_required_transition_missing(): void
     {
         $validator = $this->validator();
-
-        $this->expectException(FlowValidationException::class);
-        $this->expectExceptionMessage('requires transition timeout');
-
-        $validator->validate(
-            nodes: [
-                [
-                    'id'                   => 'n1',
-                    'type'                 => 'condition',
-                    'version'              => 2,
-                    'config'               => [],
-                    'required_transitions' => ['timeout'],
+        try {
+            $validator->validate(
+                nodes: [
+                    [
+                        'id'                   => 'n1',
+                        'type'                 => 'condition',
+                        'version'              => 2,
+                        'config'               => [],
+                        'required_transitions' => ['timeout'],
+                    ],
+                    ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
                 ],
-                ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
-            ],
-            edges: [
-                ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
-            ],
-        );
+                edges: [
+                    ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
+                ],
+            );
+            $this->fail('Expected FlowValidationException was not thrown.');
+        } catch (FlowValidationException $exception) {
+            $this->assertStringContainsString('requires transition timeout', $exception->errors[0]->message);
+        }
     }
 
     public function test_validate_wraps_registry_resolution_error_as_flow_validation_exception(): void
     {
         $validator = $this->validator();
-
-        $this->expectException(FlowValidationException::class);
-        $this->expectExceptionMessage('references unknown handler version: condition@99');
-
-        $validator->validate(
-            nodes: [
-                ['id' => 'n1', 'type' => 'condition', 'version' => 99, 'config' => []],
-            ],
-            edges: [],
-        );
+        try {
+            $validator->validate(
+                nodes: [
+                    ['id' => 'n1', 'type' => 'condition', 'version' => 99, 'config' => []],
+                ],
+                edges: [],
+            );
+            $this->fail('Expected FlowValidationException was not thrown.');
+        } catch (FlowValidationException $exception) {
+            $this->assertStringContainsString('references unknown handler version: condition@99', $exception->errors[0]->message);
+        }
     }
 
     private function validator(): FlowDefinitionValidator

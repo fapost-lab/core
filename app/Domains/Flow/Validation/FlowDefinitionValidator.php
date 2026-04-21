@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Validation;
 
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use LogicException;
+use Throwable;
 
 final readonly class FlowDefinitionValidator
 {
@@ -23,7 +25,7 @@ final readonly class FlowDefinitionValidator
     public function validate(array $nodes, array $edges): array
     {
         if ([] === $nodes) {
-            throw new FlowValidationException('Flow definition must contain at least one node.');
+            throw $this->validationException('Flow definition must contain at least one node.');
         }
 
         $nodeMap = [];
@@ -36,14 +38,14 @@ final readonly class FlowDefinitionValidator
             try {
                 $this->registry->resolve($type, $version);
             } catch (LogicException $exception) {
-                throw new FlowValidationException(
+                throw $this->validationException(
                     "Node {$nodeId} references unknown handler version: {$type}@{$version}",
-                    previous: $exception,
+                    $exception,
                 );
             }
 
             if (isset($nodeMap[$nodeId])) {
-                throw new FlowValidationException("Duplicate node id: {$nodeId}");
+                throw $this->validationException("Duplicate node id: {$nodeId}");
             }
 
             $nodeMap[$nodeId] = $node;
@@ -58,15 +60,15 @@ final readonly class FlowDefinitionValidator
             $transition   = $this->stringField($edge, 'transition', 'Edge must contain transition.');
 
             if ( ! isset($nodeMap[$sourceNodeId])) {
-                throw new FlowValidationException("Edge references unknown source node: {$sourceNodeId}");
+                throw $this->validationException("Edge references unknown source node: {$sourceNodeId}");
             }
 
             if ( ! isset($nodeMap[$targetNodeId])) {
-                throw new FlowValidationException("Edge references unknown target node: {$targetNodeId}");
+                throw $this->validationException("Edge references unknown target node: {$targetNodeId}");
             }
 
             if (isset($adjacency[$sourceNodeId][$transition])) {
-                throw new FlowValidationException(
+                throw $this->validationException(
                     "Duplicate edge transition mapping for source {$sourceNodeId} and transition {$transition}"
                 );
             }
@@ -85,7 +87,7 @@ final readonly class FlowDefinitionValidator
         }
 
         if (1 !== count($entryCandidates)) {
-            throw new FlowValidationException(
+            throw $this->validationException(
                 'Flow definition must contain exactly one entry point node (node without incoming edges).'
             );
         }
@@ -110,7 +112,7 @@ final readonly class FlowDefinitionValidator
 
         if (count($visited) !== count($nodeMap)) {
             $orphanNodes = array_diff(array_keys($nodeMap), array_keys($visited));
-            throw new FlowValidationException(
+            throw $this->validationException(
                 'Flow definition contains orphan nodes: ' . implode(', ', $orphanNodes)
             );
         }
@@ -122,11 +124,11 @@ final readonly class FlowDefinitionValidator
 
             foreach ($node['required_transitions'] as $transition) {
                 if ( ! is_string($transition) || '' === $transition) {
-                    throw new FlowValidationException("Node {$nodeId} has invalid required transition value.");
+                    throw $this->validationException("Node {$nodeId} has invalid required transition value.");
                 }
 
                 if ( ! isset($adjacency[$nodeId][$transition])) {
-                    throw new FlowValidationException(
+                    throw $this->validationException(
                         "Node {$nodeId} requires transition {$transition}, but edge is missing."
                     );
                 }
@@ -148,7 +150,7 @@ final readonly class FlowDefinitionValidator
         $value = $payload[$field] ?? null;
 
         if ( ! is_string($value) || '' === $value) {
-            throw new FlowValidationException($message);
+            throw $this->validationException($message);
         }
 
         return $value;
@@ -162,9 +164,20 @@ final readonly class FlowDefinitionValidator
         $value = $payload[$field] ?? null;
 
         if ( ! is_int($value)) {
-            throw new FlowValidationException($message);
+            throw $this->validationException($message);
         }
 
         return $value;
+    }
+
+    private function validationException(string $message, ?Throwable $previous = null): FlowValidationException
+    {
+        return new FlowValidationException([
+            new FlowValidationErrorDto(
+                path: 'flow_definition',
+                code: 'invalid_definition',
+                message: $message,
+            ),
+        ], $previous);
     }
 }
