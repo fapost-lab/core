@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Domains\Assistant\Services;
 
 use App\Domains\Assistant\Contracts\AssistantServiceInterface;
-use App\Domains\Assistant\Contracts\ChannelServiceInterface;
-use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\Contracts\ChannelServiceInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;

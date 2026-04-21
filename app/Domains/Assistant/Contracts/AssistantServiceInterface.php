@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Domains\Assistant\Contracts;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\Contracts\ChannelServiceInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 
 interface AssistantServiceInterface

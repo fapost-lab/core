@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Domains\Assistant\Services;
+namespace App\Domains\Channels\Services;
 
-use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
-use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 

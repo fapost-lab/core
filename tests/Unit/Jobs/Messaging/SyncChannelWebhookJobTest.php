@@ -22,6 +22,7 @@ final class SyncChannelWebhookJobTest extends TestCase
         $registrar = $this->mock(WebhookRegistrarInterface::class, function (MockInterface $mock): void {
             $mock->shouldReceive('register')->once()->withArgs(
                 fn (WebhookRegistrationPayload $payload): bool => 'token-1' === $payload->token
+                    && 'channel-1' === $payload->channelId
                     && 'secret-1' === $payload->secretToken
                     && 'hash-1' === $payload->webhookPublicHash
                     && ['message'] === ($payload->config['allowed_updates'] ?? null)
@@ -35,6 +36,7 @@ final class SyncChannelWebhookJobTest extends TestCase
         $job = new SyncChannelWebhookJob(
             tenantId: 'tenant-1',
             schema: 'tenant_test',
+            channelId: 'channel-1',
             channelType: 'telegram',
             webhookPublicHash: 'hash-1',
             token: 'token-1',
@@ -51,6 +53,7 @@ final class SyncChannelWebhookJobTest extends TestCase
         $registrar = $this->mock(WebhookRegistrarInterface::class, function (MockInterface $mock): void {
             $mock->shouldReceive('deregister')->once()->withArgs(
                 fn (WebhookRegistrationPayload $payload): bool => 'token-1' === $payload->token
+                    && 'channel-1' === $payload->channelId
                     && 'hash-1' === $payload->webhookPublicHash
             );
         });
@@ -62,6 +65,7 @@ final class SyncChannelWebhookJobTest extends TestCase
         $job = new SyncChannelWebhookJob(
             tenantId: 'tenant-1',
             schema: 'tenant_test',
+            channelId: 'channel-1',
             channelType: 'telegram',
             webhookPublicHash: 'hash-1',
             token: 'token-1',
@@ -82,6 +86,7 @@ final class SyncChannelWebhookJobTest extends TestCase
         $job = new SyncChannelWebhookJob(
             tenantId: 'tenant-1',
             schema: 'tenant_test',
+            channelId: 'channel-1',
             channelType: 'telegram',
             webhookPublicHash: 'hash-1',
             token: 'token-1',

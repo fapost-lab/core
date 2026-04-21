@@ -21,6 +21,18 @@ use FAPost\Support\Models\BaseModel;
  * @method static FlowDefinitionBuilder<static>|FlowDefinition newModelQuery()
  * @method static FlowDefinitionBuilder<static>|FlowDefinition newQuery()
  * @method static FlowDefinitionBuilder<static>|FlowDefinition query()
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @method static FlowDefinitionBuilder<static>|FlowDefinition whereCreatedAt($value)
+ * @method static FlowDefinitionBuilder<static>|FlowDefinition whereEdges($value)
+ * @method static FlowDefinitionBuilder<static>|FlowDefinition whereFlowId($value)
+ * @method static FlowDefinitionBuilder<static>|FlowDefinition whereId($value)
+ * @method static FlowDefinitionBuilder<static>|FlowDefinition whereIsActive($value)
+ * @method static FlowDefinitionBuilder<static>|FlowDefinition whereName($value)
+ * @method static FlowDefinitionBuilder<static>|FlowDefinition whereNodes($value)
+ * @method static FlowDefinitionBuilder<static>|FlowDefinition whereTenantId($value)
+ * @method static FlowDefinitionBuilder<static>|FlowDefinition whereUpdatedAt($value)
+ * @method static FlowDefinitionBuilder<static>|FlowDefinition whereVersion($value)
  * @mixin \Eloquent
  */
 final class FlowDefinition extends BaseModel

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers\Filament;
 
 use App\Domains\Staff\Http\Middleware\EnsureUserIsActive;
+use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TenancyMiddleware;
 use CraftForge\FilamentLanguageSwitcher\FilamentLanguageSwitcherPlugin;
@@ -69,6 +70,7 @@ final class AdminPanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
+                ForgetInvalidAuthenticatedSession::class,
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 VerifyCsrfToken::class,

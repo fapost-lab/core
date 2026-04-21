@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Messaging\Providers;
 
-use App\Domains\Assistant\Models\Channel;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Messaging\MessageSender;
-use App\Domains\Messaging\Observers\ChannelObserver;
 use FAPost\Foundation\Messaging\MessageSenderInterface;
 use Illuminate\Support\ServiceProvider;
 
@@ -21,8 +19,6 @@ final class MessageSenderServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(ChannelObserver::class);
-
         $this->app->singleton(
             MessageSenderInterface::class,
             fn ($app): MessageSender => new MessageSender(
@@ -33,11 +29,4 @@ final class MessageSenderServiceProvider extends ServiceProvider
         );
     }
 
-    /**
-     * Attach the messaging observer to assistant channels.
-     */
-    public function boot(): void
-    {
-        Channel::observe($this->app->make(ChannelObserver::class));
-    }
 }

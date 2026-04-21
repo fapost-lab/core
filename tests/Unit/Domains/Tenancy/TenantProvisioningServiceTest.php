@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Tenancy;
 
-use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;

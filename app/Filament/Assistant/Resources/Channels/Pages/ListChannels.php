@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Assistant\Resources\Channels\Pages;
 
-use App\Domains\Assistant\Contracts\ChannelServiceInterface;
+use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Filament\Assistant\Resources\Channels\ChannelResource;
 use App\Filament\Assistant\Resources\Channels\Tables\ChannelsTable;
 use Filament\Actions\CreateAction;

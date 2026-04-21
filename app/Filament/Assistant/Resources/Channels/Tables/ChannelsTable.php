@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace App\Filament\Assistant\Resources\Channels\Tables;
 
-use App\Domains\Assistant\Contracts\ChannelServiceInterface;
-use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Models\Channel;
 use Filament\Actions\Action;
+use Filament\Actions\Contracts\HasActions;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Contracts\HasSchemas;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 
 final class ChannelsTable
@@ -47,7 +50,19 @@ final class ChannelsTable
     {
         return $table
             ->recordActions([
-                EditAction::make(),
+                EditAction::make()
+                    ->using(function (array $data, HasActions&HasSchemas $livewire, Model $record, ?Table $table) use ($channelService): void {
+                        if ('' === ($data['token'] ?? '')) {
+                            unset($data['token']);
+                        }
+
+                        if ('' === ($data['secret_token'] ?? '')) {
+                            unset($data['secret_token']);
+                        }
+
+                        /** @var Channel $record */
+                        $channelService->update($record, $data);
+                    }),
                 Action::make('rotateWebhookHash')
                     ->label(__('staff.channels.actions.rotate_webhook_hash'))
                     ->icon(Heroicon::OutlinedArrowPath)

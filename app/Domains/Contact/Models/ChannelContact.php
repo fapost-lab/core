@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Contact\Models;
 
-use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Models\Channel;
 use FAPost\Support\Concerns\HasUlidPrimaryKey;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -20,6 +20,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @method static Builder<static>|ChannelContact newModelQuery()
  * @method static Builder<static>|ChannelContact newQuery()
  * @method static Builder<static>|ChannelContact query()
+ * @property string $id
+ * @property string $contact_id
+ * @property string $channel_id
+ * @property \Illuminate\Support\Carbon|null $last_interaction_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @method static Builder<static>|ChannelContact whereChannelId($value)
+ * @method static Builder<static>|ChannelContact whereContactId($value)
+ * @method static Builder<static>|ChannelContact whereCreatedAt($value)
+ * @method static Builder<static>|ChannelContact whereId($value)
+ * @method static Builder<static>|ChannelContact whereLastInteractionAt($value)
+ * @method static Builder<static>|ChannelContact whereUpdatedAt($value)
  * @mixin \Eloquent
  */
 final class ChannelContact extends Model

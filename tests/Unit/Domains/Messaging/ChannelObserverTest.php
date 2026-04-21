@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Messaging;
 
-use App\Domains\Assistant\Models\Channel;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Messaging\Observers\ChannelObserver;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
 use FAPost\Foundation\Channel\WebhookRegistrarInterface;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Bus;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -22,15 +22,17 @@ final class ChannelObserverTest extends TestCase
     {
         parent::setUp();
 
-        Queue::fake();
+        Bus::fake();
     }
 
-    public function test_created_dispatches_register_job_for_active_supported_channel(): void
+    public function test_saved_dispatches_register_job_sync_for_new_active_supported_channel(): void
     {
-        $observer = $this->observer(hasRegistrar: true);
-        $observer->created($this->channel(isActive: true));
+        $observer                    = $this->observer(hasRegistrar: true);
+        $channel                     = $this->channel(isActive: true);
+        $channel->wasRecentlyCreated = true;
+        $observer->saved($channel);
 
-        Queue::assertPushed(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => 'telegram' === $job->channelType
+        Bus::assertDispatchedSync(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => 'telegram' === $job->channelType
                 && 'hash-1' === $job->webhookPublicHash
                 && 'token-1' === $job->token
                 && 'secret-1' === $job->secretToken
@@ -38,65 +40,89 @@ final class ChannelObserverTest extends TestCase
                 && true === $job->register);
     }
 
-    public function test_created_does_not_dispatch_for_inactive_channel(): void
+    public function test_saved_does_not_dispatch_for_new_inactive_channel(): void
     {
-        $observer = $this->observer(hasRegistrar: true);
-        $observer->created($this->channel(isActive: false));
+        $observer                    = $this->observer(hasRegistrar: true);
+        $channel                     = $this->channel(isActive: false);
+        $channel->wasRecentlyCreated = true;
+        $observer->saved($channel);
 
-        Queue::assertNothingPushed();
+        Bus::assertNothingDispatched();
     }
 
-    public function test_deleted_dispatches_deregister_job_for_supported_channel(): void
+    public function test_deleted_dispatches_deregister_job_sync_for_supported_channel(): void
     {
         $observer = $this->observer(hasRegistrar: true);
         $observer->deleted($this->channel(isActive: true));
 
-        Queue::assertPushed(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => false === $job->register);
+        Bus::assertDispatchedSync(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => false === $job->register);
     }
 
-    public function test_updated_dispatches_register_when_token_changes(): void
+    public function test_saved_dispatches_register_job_sync_when_token_changes(): void
     {
         $channel  = $this->channelWithChanges(changed: ['token'], isActive: true);
         $observer = $this->observer(hasRegistrar: true);
-        $observer->updated($channel);
+        $observer->saved($channel);
 
-        Queue::assertPushed(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => true === $job->register);
+        Bus::assertDispatchedSync(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => true === $job->register);
     }
 
-    public function test_updated_dispatches_deregister_when_channel_is_deactivated(): void
+    public function test_saved_dispatches_register_job_sync_when_config_changes(): void
+    {
+        $channel  = $this->channelWithChanges(changed: ['config'], isActive: true);
+        $observer = $this->observer(hasRegistrar: true);
+        $observer->saved($channel);
+
+        Bus::assertDispatchedSync(
+            SyncChannelWebhookJob::class,
+            fn (SyncChannelWebhookJob $job): bool => true === $job->register
+                && ['allowed_updates' => ['message']] === $job->config,
+        );
+    }
+
+    public function test_saved_dispatches_deregister_job_sync_when_channel_is_deactivated(): void
     {
         $channel  = $this->channelWithChanges(changed: ['is_active'], isActive: false);
         $observer = $this->observer(hasRegistrar: true);
-        $observer->updated($channel);
+        $observer->saved($channel);
 
-        Queue::assertPushed(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => false === $job->register);
+        Bus::assertDispatchedSync(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => false === $job->register);
     }
 
-    public function test_updated_does_not_dispatch_when_no_transport_fields_changed(): void
+    public function test_saved_dispatches_register_job_sync_when_channel_is_reactivated(): void
+    {
+        $channel  = $this->channelWithChanges(changed: ['is_active'], isActive: true);
+        $observer = $this->observer(hasRegistrar: true);
+        $observer->saved($channel);
+
+        Bus::assertDispatchedSync(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => true === $job->register);
+    }
+
+    public function test_saved_does_not_dispatch_when_no_transport_fields_changed(): void
     {
         $channel  = $this->channelWithChanges(changed: ['name'], isActive: true);
         $observer = $this->observer(hasRegistrar: false);
-        $observer->updated($channel);
+        $observer->saved($channel);
 
-        Queue::assertNothingPushed();
+        Bus::assertNothingDispatched();
     }
 
-    public function test_updated_does_not_dispatch_for_inactive_channel_with_transport_changes(): void
+    public function test_saved_does_not_dispatch_for_inactive_channel_with_transport_changes(): void
     {
         $channel  = $this->channelWithChanges(changed: ['token'], isActive: false);
         $observer = $this->observer(hasRegistrar: false);
-        $observer->updated($channel);
+        $observer->saved($channel);
 
-        Queue::assertNothingPushed();
+        Bus::assertNothingDispatched();
     }
 
     public function test_unsupported_channel_does_not_dispatch_job(): void
     {
         $channel  = $this->channelWithChanges(changed: ['token'], isActive: true);
         $observer = $this->observer(hasRegistrar: false);
-        $observer->updated($channel);
+        $observer->saved($channel);
 
-        Queue::assertNothingPushed();
+        Bus::assertNothingDispatched();
     }
 
     private function observer(bool $hasRegistrar): ChannelObserver

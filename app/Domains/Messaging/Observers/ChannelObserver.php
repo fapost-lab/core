@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace App\Domains\Messaging\Observers;
 
-use App\Domains\Assistant\Models\Channel;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
+use Illuminate\Support\Facades\DB;
 
 /**
- * Schedules provider-side webhook synchronization after channel lifecycle events.
+ * Executes provider-side webhook synchronization after channel lifecycle events.
  *
- * Network calls are intentionally deferred to {@see SyncChannelWebhookJob} so that channel
- * persistence does not depend on external provider availability inside model observers.
+ * Network calls are deferred until after commit via {@see DB::afterCommit()} so that provider
+ * registration sees committed channel state, but still runs within the current request.
  */
 final readonly class ChannelObserver
 {
@@ -24,31 +25,33 @@ final readonly class ChannelObserver
     }
 
     /**
-     * Queue provider webhook registration for newly created active channels when supported.
-     */
-    public function created(Channel $channel): void
-    {
-        if ( ! $channel->is_active) {
-            return;
-        }
-
-        $this->dispatch($channel, register: true);
-    }
-
-    /**
-     * Queue provider webhook refresh only when transport-relevant fields change.
+     * Run provider webhook synchronization after channel persistence.
      *
-     * Fires a deregister when the channel is deactivated, a register when relevant credentials
-     * or config change. Skips unrelated updates (e.g. name changes) to avoid redundant
-     * provider-side calls.
+     * Registers newly created active channels, deregisters on deactivation, registers on
+     * reactivation, and refreshes provider state when transport-relevant fields change.
+     * Ignores no-op saves and unrelated updates.
      */
-    public function updated(Channel $channel): void
+    public function saved(Channel $channel): void
     {
         $transportFields = ['token', 'secret_token', 'config', 'webhook_public_hash'];
 
-        if ($channel->wasChanged('is_active') && ! $channel->is_active) {
-            $this->dispatch($channel, register: false);
+        if ($channel->wasRecentlyCreated) {
+            if ( ! $channel->is_active) {
+                return;
+            }
 
+            $this->dispatch($channel, register: true);
+
+            return;
+        }
+
+        if ($channel->wasChanged('is_active')) {
+            $this->dispatch($channel, register: $channel->is_active);
+
+            return;
+        }
+
+        if ( ! $channel->is_active) {
             return;
         }
 
@@ -56,15 +59,11 @@ final readonly class ChannelObserver
             return;
         }
 
-        if ( ! $channel->is_active) {
-            return;
-        }
-
         $this->dispatch($channel, register: true);
     }
 
     /**
-     * Queue provider webhook removal when a channel is deleted.
+     * Run provider webhook removal when a channel is deleted.
      */
     public function deleted(Channel $channel): void
     {
@@ -72,7 +71,7 @@ final readonly class ChannelObserver
     }
 
     /**
-     * Dispatch an async webhook sync job when the channel integration exposes a registrar.
+     * Dispatch a sync webhook job after commit when the channel integration exposes a registrar.
      */
     private function dispatch(Channel $channel, bool $register): void
     {
@@ -82,15 +81,18 @@ final readonly class ChannelObserver
 
         $tenant = $this->tenantContext->get();
 
-        SyncChannelWebhookJob::dispatch(
-            tenantId: $tenant->getId(),
-            schema: $tenant->getSchemaName(),
-            channelType: $channel->type->value,
-            webhookPublicHash: $channel->webhook_public_hash,
-            token: (string) $channel->token,
-            secretToken: (string) $channel->secret_token,
-            config: is_array($channel->config) ? $channel->config : [],
-            register: $register,
-        );
+        DB::afterCommit(static function () use ($channel, $register, $tenant): void {
+            SyncChannelWebhookJob::dispatchSync(
+                tenantId: $tenant->getId(),
+                schema: $tenant->getSchemaName(),
+                channelId: (string) $channel->getKey(),
+                channelType: $channel->type->value,
+                webhookPublicHash: $channel->webhook_public_hash,
+                token: $channel->token,
+                secretToken: $channel->secret_token,
+                config: is_array($channel->config) ? $channel->config : [],
+                register: $register,
+            );
+        });
     }
 }

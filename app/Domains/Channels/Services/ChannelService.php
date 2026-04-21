@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace App\Domains\Assistant\Services;
+namespace App\Domains\Channels\Services;
 
-use App\Domains\Assistant\Contracts\ChannelServiceInterface;
-use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Assistant\Models\Assistant;
-use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Contracts\ChannelServiceInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
@@ -34,14 +34,16 @@ final readonly class ChannelService implements ChannelServiceInterface
      */
     public function create(Assistant $assistant, array $data): Channel
     {
+        $normalized = $this->normalizeInput($data);
+
         $channel = new Channel([
             'assistant_id' => $assistant->getKey(),
             'tenant_id'    => $assistant->tenant_id,
-            'type'         => ChannelTypeEnum::from((string) $data['type']),
-            'token'        => (string) $data['token'],
-            'secret_token' => (string) $data['secret_token'],
-            'config'       => is_array($data['config'] ?? null) ? $data['config'] : [],
-            'is_active'    => (bool) ($data['is_active'] ?? true),
+            'type'         => ChannelTypeEnum::from((string) $normalized['type']),
+            'token'        => (string) $normalized['token'],
+            'secret_token' => (string) $normalized['secret_token'],
+            'config'       => is_array($normalized['config'] ?? null) ? $normalized['config'] : [],
+            'is_active'    => (bool) ($normalized['is_active'] ?? true),
         ]);
         $channel->save();
 
@@ -55,7 +57,7 @@ final readonly class ChannelService implements ChannelServiceInterface
      */
     public function update(Channel $channel, array $data): Channel
     {
-        $allowed = Arr::only($data, [
+        $allowed = Arr::only($this->normalizeInput($data), [
             'type',
             'token',
             'secret_token',
@@ -118,6 +120,34 @@ final readonly class ChannelService implements ChannelServiceInterface
     {
         $channel->is_active = true;
         $channel->save();
+    }
+
+    /**
+     * Normalize channel form payload so service accepts both nested `config` arrays and dotted `config.*` UI keys.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function normalizeInput(array $data): array
+    {
+        $normalized = $data;
+        $config     = is_array($data['config'] ?? null) ? $data['config'] : [];
+        $hasConfig  = array_key_exists('config', $data);
+
+        foreach ($data as $key => $value) {
+            if ( ! is_string($key) || ! str_starts_with($key, 'config.')) {
+                continue;
+            }
+
+            Arr::set($config, Str::after($key, 'config.'), $value);
+            $hasConfig = true;
+        }
+
+        if ($hasConfig) {
+            $normalized['config'] = $config;
+        }
+
+        return $normalized;
     }
 
     private function generateWebhookPublicHash(): string

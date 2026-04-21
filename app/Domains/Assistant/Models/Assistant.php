@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Assistant\Models;
 
 use App\Domains\Assistant\Models\Builders\AssistantBuilder;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Staff\Models\User;
 use Database\Factories\AssistantFactory;
 use FAPost\Support\Concerns\HasUlidPrimaryKey;
@@ -29,6 +30,28 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @method static AssistantBuilder<static>|Assistant newModelQuery()
  * @method static AssistantBuilder<static>|Assistant newQuery()
  * @method static AssistantBuilder<static>|Assistant query()
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $name
+ * @property bool $is_active
+ * @property string|null $default_flow_id
+ * @property string|null $fallback_message
+ * @property array<array-key, mixed> $settings
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property string $default_language
+ * @property-read bool|null $channels_exists
+ * @property-read bool|null $users_exists
+ * @method static AssistantBuilder<static>|Assistant whereCreatedAt($value)
+ * @method static AssistantBuilder<static>|Assistant whereDefaultFlowId($value)
+ * @method static AssistantBuilder<static>|Assistant whereDefaultLanguage($value)
+ * @method static AssistantBuilder<static>|Assistant whereFallbackMessage($value)
+ * @method static AssistantBuilder<static>|Assistant whereId($value)
+ * @method static AssistantBuilder<static>|Assistant whereIsActive($value)
+ * @method static AssistantBuilder<static>|Assistant whereName($value)
+ * @method static AssistantBuilder<static>|Assistant whereSettings($value)
+ * @method static AssistantBuilder<static>|Assistant whereTenantId($value)
+ * @method static AssistantBuilder<static>|Assistant whereUpdatedAt($value)
  * @mixin \Eloquent
  */
 final class Assistant extends BaseModel implements HasName
@@ -84,7 +107,7 @@ final class Assistant extends BaseModel implements HasName
 
     protected static function booted(): void
     {
-        static::deleting(function (Assistant $assistant): void {
+        self::deleting(static function (Assistant $assistant): void {
             $assistant->channels()->each(function (Channel $channel): void {
                 $channel->delete();
             });

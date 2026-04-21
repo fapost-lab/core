@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Channels\Telegram;
 
 use App\Domains\Channels\ChannelIntegrationDefinition;
+use App\Domains\Channels\Telegram\Contracts\TelegramBotIdentityStoreInterface;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -18,6 +19,7 @@ final class TelegramChannelServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(TelegramBotApiClientFactory::class);
+        $this->app->bind(TelegramBotIdentityStoreInterface::class, TelegramBotIdentityStore::class);
         $this->app->bind(TelegramDeliveryResolver::class, fn ($app): TelegramDeliveryResolver => new TelegramDeliveryResolver(
             $app->tagged('channels.telegram_delivery')
         ));

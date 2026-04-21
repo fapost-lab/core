@@ -8,6 +8,7 @@ use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
+use JsonException;
 
 /**
  * Единственное место записи в Redis webhook registry и landlord.webhook_registry.
@@ -18,6 +19,9 @@ use Illuminate\Support\Facades\Redis;
  */
 final class WebhookRegistryWriter implements WebhookRegistryWriterInterface
 {
+    /**
+     * @throws JsonException
+     */
     public function write(
         string $publicHash,
         TenantInterface $tenant,

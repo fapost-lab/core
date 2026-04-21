@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Contact;
 
 use App\Domains\Assistant\Contracts\AssistantServiceInterface;
-use App\Domains\Assistant\Contracts\ChannelServiceInterface;
-use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
+use App\Domains\Channels\Contracts\ChannelServiceInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Enums\PlatformEnum;
@@ -16,7 +16,7 @@ use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
 use Closure;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Bus;
 use Mockery;
 use Mockery\MockInterface;
 use Tests\Feature\FeatureTestCase;
@@ -27,7 +27,7 @@ final class ContactServiceTest extends FeatureTestCase
     {
         parent::setUp();
 
-        Queue::fake([SyncChannelWebhookJob::class]);
+        Bus::fake([SyncChannelWebhookJob::class]);
         $registry = Mockery::mock(ChannelWebhookRegistryInterface::class, function (MockInterface $mock): void {
             $mock->shouldReceive('set')->andReturnNull();
             $mock->shouldReceive('remove')->andReturnNull();

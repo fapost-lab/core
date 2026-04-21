@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Assistant;
 
 use App\Domains\Assistant\Contracts\AssistantServiceInterface;
-use App\Domains\Assistant\Contracts\ChannelServiceInterface;
-use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
-use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Contracts\ChannelServiceInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
-use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
 use Mockery;
 use Tests\Feature\FeatureTestCase;
@@ -27,7 +27,7 @@ final class ChannelServiceTest extends FeatureTestCase
     {
         parent::setUp();
 
-        Queue::fake([SyncChannelWebhookJob::class]);
+        Bus::fake([SyncChannelWebhookJob::class]);
         $this->registrySpy = Mockery::spy(WebhookRegistryWriterInterface::class);
         $this->app->instance(WebhookRegistryWriterInterface::class, $this->registrySpy);
         $this->app->forgetInstance(ChannelWebhookRegistryInterface::class);
@@ -58,7 +58,7 @@ final class ChannelServiceTest extends FeatureTestCase
         });
 
         $this->assertSame(48, mb_strlen($channel->webhook_public_hash));
-        Queue::assertPushed(SyncChannelWebhookJob::class);
+        Bus::assertDispatchedSync(SyncChannelWebhookJob::class);
     }
 
     public function test_create_channel_has_ulid_format_id(): void
@@ -80,6 +80,29 @@ final class ChannelServiceTest extends FeatureTestCase
         });
 
         $this->assertTrue(Str::isUuid($channel->id));
+    }
+
+    public function test_create_accepts_dotted_config_fields_from_filament_form(): void
+    {
+        $tenant = $this->tenant();
+
+        $channel = $this->runInTenant($tenant, function () use ($tenant): Channel {
+            $assistant = app(AssistantServiceInterface::class)->create($tenant, ['name' => 'A1']);
+
+            return app(ChannelServiceInterface::class)->create($assistant, [
+                'type'                   => ChannelTypeEnum::Telegram->value,
+                'token'                  => 'token-a',
+                'secret_token'           => 'secret-a',
+                'config.allowed_updates' => ['message', 'callback_query'],
+                'config.max_connections' => 50,
+                'config.parse_mode'      => 'HTML',
+                'is_active'              => true,
+            ]);
+        });
+
+        $this->assertSame(['message', 'callback_query'], $channel->config['allowed_updates'] ?? null);
+        $this->assertSame(50, $channel->config['max_connections'] ?? null);
+        $this->assertSame('HTML', $channel->config['parse_mode'] ?? null);
     }
 
     public function test_create_writes_to_redis_registry(): void
@@ -177,6 +200,34 @@ final class ChannelServiceTest extends FeatureTestCase
             'secret-b',
         )->once();
         $this->addToAssertionCount(2);
+    }
+
+    public function test_update_accepts_dotted_config_fields_from_filament_form(): void
+    {
+        $tenant = $this->tenant();
+
+        $channel = $this->runInTenant($tenant, function () use ($tenant): Channel {
+            $assistant = app(AssistantServiceInterface::class)->create($tenant, ['name' => 'A1']);
+
+            $channel = app(ChannelServiceInterface::class)->create($assistant, [
+                'type'         => ChannelTypeEnum::Telegram->value,
+                'token'        => 'token-a',
+                'secret_token' => 'secret-a',
+                'config'       => [],
+                'is_active'    => true,
+            ]);
+
+            return app(ChannelServiceInterface::class)->update($channel, [
+                'secret_token'           => 'secret-b',
+                'config.allowed_updates' => ['message', 'callback_query'],
+                'config.max_connections' => 80,
+                'is_active'              => true,
+            ]);
+        });
+
+        $this->assertSame(['message', 'callback_query'], $channel->config['allowed_updates'] ?? null);
+        $this->assertSame(80, $channel->config['max_connections'] ?? null);
+        $this->assertSame('secret-b', $channel->secret_token);
     }
 
     public function test_rotate_hash_generates_new_hash(): void

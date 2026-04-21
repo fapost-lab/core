@@ -15,6 +15,7 @@ final class SetWebhookDto extends Data
         public readonly string $url,
         public readonly string $secretToken,
         public readonly ?array $allowedUpdates = null,
+        public readonly int $maxConnections = 40,
     ) {
     }
 }

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Tenancy\Services;
 
-use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\AclBootstrapService;

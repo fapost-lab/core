@@ -24,7 +24,11 @@ final class WebhookController extends Controller
     }
 
     /**
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @param  Request  $request
+     * @param  string                    $channel
+     * @param  string                    $hash
+     *
+     * @return JsonResponse
      */
     public function __invoke(Request $request, string $channel, string $hash): JsonResponse
     {
@@ -38,7 +42,10 @@ final class WebhookController extends Controller
     }
 
     /**
-     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     * @param  Request  $request
+     * @param  string                    $hash
+     *
+     * @return JsonResponse
      */
     private function handle(Request $request, string $hash): JsonResponse
     {

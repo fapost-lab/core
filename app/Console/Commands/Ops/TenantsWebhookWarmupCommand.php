@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Ops;
 
-use App\Domains\Assistant\Contracts\ChannelWebhookRegistryInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;

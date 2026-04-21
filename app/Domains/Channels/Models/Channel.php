@@ -2,11 +2,15 @@
 
 declare(strict_types=1);
 
-namespace App\Domains\Assistant\Models;
+namespace App\Domains\Channels\Models;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Observers\ChannelObserver as RegistryChannelObserver;
+use App\Domains\Messaging\Observers\ChannelObserver as MessagingChannelObserver;
 use Database\Factories\ChannelFactory;
 use FAPost\Support\Concerns\HasUlidPrimaryKey;
+use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,7 +21,7 @@ use Illuminate\Support\Str;
  * Assistant transport endpoint.
  *
  * Stores channel identity (webhook hash) and connection data for a specific assistant.
- * Mutations of `webhook_public_hash` must go through {@see \App\Domains\Assistant\Services\ChannelService::rotateWebhookHash()}.
+ * Mutations of `webhook_public_hash` must go through {@see \App\Domains\Channels\Services\ChannelService::rotateWebhookHash()}.
  *
  * @property ChannelTypeEnum $type
  * @property-read Assistant|null $assistant
@@ -26,8 +30,32 @@ use Illuminate\Support\Str;
  * @method static Builder<static>|Channel newModelQuery()
  * @method static Builder<static>|Channel newQuery()
  * @method static Builder<static>|Channel query()
+ * @property string $id
+ * @property string $assistant_id
+ * @property string $tenant_id
+ * @property string $token
+ * @property string $secret_token
+ * @property string|null $telegram_bot_username
+ * @property string $webhook_public_hash
+ * @property array<array-key, mixed> $config
+ * @property bool $is_active
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @method static Builder<static>|Channel whereAssistantId($value)
+ * @method static Builder<static>|Channel whereConfig($value)
+ * @method static Builder<static>|Channel whereCreatedAt($value)
+ * @method static Builder<static>|Channel whereId($value)
+ * @method static Builder<static>|Channel whereIsActive($value)
+ * @method static Builder<static>|Channel whereSecretToken($value)
+ * @method static Builder<static>|Channel whereTelegramBotUsername($value)
+ * @method static Builder<static>|Channel whereTenantId($value)
+ * @method static Builder<static>|Channel whereToken($value)
+ * @method static Builder<static>|Channel whereType($value)
+ * @method static Builder<static>|Channel whereUpdatedAt($value)
+ * @method static Builder<static>|Channel whereWebhookPublicHash($value)
  * @mixin \Eloquent
  */
+#[ObservedBy([RegistryChannelObserver::class, MessagingChannelObserver::class])]
 final class Channel extends Model
 {
     /** @use HasFactory<ChannelFactory> */

@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace App\Domains\Assistant\Policies;
+namespace App\Domains\Channels\Policies;
 
 use App\Domains\Assistant\Models\Assistant;
-use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;

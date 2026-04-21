@@ -8,6 +8,7 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Staff\Http\Middleware\EnsureUserIsActive;
 use App\Filament\Assistant\Pages\AssistantDashboard;
 use App\Http\Controllers\Filament\AssistantPanelHomeController;
+use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TenancyMiddleware;
 use CraftForge\FilamentLanguageSwitcher\FilamentLanguageSwitcherPlugin;
@@ -82,6 +83,7 @@ final class AssistantPanelProvider extends PanelProvider
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
+                ForgetInvalidAuthenticatedSession::class,
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 VerifyCsrfToken::class,

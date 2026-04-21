@@ -34,6 +34,7 @@ final class SyncChannelWebhookJob implements ShouldQueue
     public function __construct(
         public readonly string $tenantId,
         public readonly string $schema,
+        public readonly string $channelId,
         public readonly string $channelType,
         public readonly string $webhookPublicHash,
         public readonly string $token,
@@ -60,6 +61,7 @@ final class SyncChannelWebhookJob implements ShouldQueue
             }
 
             $payload = new WebhookRegistrationPayload(
+                channelId: $this->channelId,
                 token: $this->token,
                 secretToken: $this->secretToken,
                 webhookPublicHash: $this->webhookPublicHash,

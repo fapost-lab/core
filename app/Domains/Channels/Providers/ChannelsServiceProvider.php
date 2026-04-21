@@ -6,8 +6,11 @@ namespace App\Domains\Channels\Providers;
 
 use App\Domains\Channels\ChannelRegistry;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Channels\Models\Channel;
+use App\Domains\Channels\Policies\ChannelPolicy;
 use App\Domains\Channels\Telegram\TelegramChannelServiceProvider;
 use App\Domains\Channels\WhatsApp\WhatsAppChannelServiceProvider;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -30,5 +33,10 @@ final class ChannelsServiceProvider extends ServiceProvider
                 container: $app,
             )
         );
+    }
+
+    public function boot(): void
+    {
+        Gate::policy(Channel::class, ChannelPolicy::class);
     }
 }

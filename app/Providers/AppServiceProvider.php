@@ -8,6 +8,7 @@ use App\Domains\Flow\Logging\DatabaseAnalyticsWriter;
 use App\Domains\Shared\Infrastructure\ModelAttributeRegistry;
 use FAPost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
 use FAPost\Foundation\Contracts\ModelAttributeResolverInterface;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 
@@ -25,6 +26,13 @@ final class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        Auth::provider('legacy-uuid-eloquent', function ($app, array $config): LegacyUuidUserProvider {
+            /** @var class-string<\Illuminate\Contracts\Auth\Authenticatable&\Illuminate\Database\Eloquent\Model> $model */
+            $model = $config['model'];
+
+            return new LegacyUuidUserProvider($app['hash'], $model);
+        });
+
         $this->app->singleton(ModelAttributeRegistry::class);
         $this->app->singleton(ModelAttributeResolverInterface::class, ModelAttributeRegistry::class);
         $this->app->scoped(DatabaseAnalyticsWriter::class);

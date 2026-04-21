@@ -27,6 +27,24 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession query()
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read Assistant $assistant
+ * @property-read Contact $contact
+ * @property-read FlowDefinition $flowDefinition
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereAssistantId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereContactId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereCurrentNodeId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereExpiresAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereFlowDefinitionId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereFlowVersion($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereState($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereStatus($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereTenantId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereUpdatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereVersion($value)
  * @mixin \Eloquent
  */
 final class FlowSession extends BaseModel

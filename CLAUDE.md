@@ -96,6 +96,8 @@ Domains/{Domain}/
 - Eloquent Models в `Domains/{Domain}/Models/` — это нормально
 - Laravel Jobs, Events, Listeners — в соответствующих папках домена
 - Facades — только в infrastructure слое (Jobs, Controllers, Providers)
+- Если Laravel поддерживает атрибуты для регистрации/конфигурации (`#[ObservedBy]`, `#[ScopedBy]`, route/model metadata и т. п.), использовать атрибуты как приоритетный способ
+- Не смешивать стили регистрации без причины: если сущность можно оформить через атрибут, не дублировать это в ServiceProvider
 
 ---
 

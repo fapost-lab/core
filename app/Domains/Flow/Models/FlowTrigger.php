@@ -23,6 +23,20 @@ use FAPost\Support\Models\BaseModel;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger query()
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger whereAssistantId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger whereConfig($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger whereFlowId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger whereIsActive($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger whereLastRunAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger whereNextRunAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger wherePriority($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger whereTenantId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger whereType($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowTrigger whereUpdatedAt($value)
  * @mixin \Eloquent
  */
 final class FlowTrigger extends BaseModel

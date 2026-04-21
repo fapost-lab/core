@@ -17,13 +17,13 @@ use Throwable;
 /**
  * Minimal Telegram Bot API client used by the Telegram channel integration.
  */
-final class TelegramBotApiClient
+final readonly class TelegramBotApiClient
 {
     /**
      * @param  string  $token  Bot token used to build authenticated Telegram API URLs.
      */
     public function __construct(
-        private readonly string $token,
+        private string $token,
     ) {
     }
 
@@ -56,7 +56,20 @@ final class TelegramBotApiClient
      */
     public function setWebhook(SetWebhookDto $dto): array
     {
-        return $this->request('setWebhook', $dto->toArray());
+        return $this->request('setWebhook', array_filter([
+            'url'             => $dto->url,
+            'secret_token'    => $dto->secretToken,
+            'allowed_updates' => $dto->allowedUpdates,
+            'max_connections' => $dto->maxConnections,
+        ], static fn (mixed $value): bool => null !== $value));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getMe(): array
+    {
+        return $this->request('getMe', []);
     }
 
     /**
@@ -71,6 +84,7 @@ final class TelegramBotApiClient
      * Execute one Telegram API request with retry semantics and response validation.
      *
      * @param  array<string, mixed>  $payload
+     *
      * @return array<string, mixed>
      */
     private function request(string $method, array $payload): array
@@ -90,12 +104,15 @@ final class TelegramBotApiClient
 
                     return false;
                 }
-            )->asJson()->post(
-                "https://api.telegram.org/bot{$this->token}/{$method}",
-                $payload,
-            )->throw();
+            )
+                ->asJson()
+                ->post(
+                    "https://api.telegram.org/bot{$this->token}/{$method}",
+                    $payload,
+                )
+                ->throw();
         } catch (Throwable $exception) {
-            throw new TelegramApiException($exception->getMessage(), (int) $exception->getCode(), $exception);
+            throw new TelegramApiException($exception->getMessage(), (int)$exception->getCode(), $exception);
         }
 
         /** @var array<string, mixed> $data */

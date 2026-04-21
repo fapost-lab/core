@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Assistants\RelationManagers;
 
-use App\Domains\Assistant\Contracts\ChannelServiceInterface;
 use App\Domains\Assistant\Models\Assistant;
-use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Models\Channel;
 use App\Filament\Resources\Assistants\Schemas\ChannelFormSchema;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\Contracts\HasActions;
-use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Notifications\Notification;
@@ -25,7 +24,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
-use InvalidArgumentException;
 
 final class ChannelsRelationManager extends RelationManager
 {
@@ -77,19 +75,6 @@ final class ChannelsRelationManager extends RelationManager
                 TextColumn::make('updated_at')
                     ->label(__('staff.channels.fields.updated_at'))
                     ->dateTime(),
-            ])
-            ->headerActions([
-                CreateAction::make()
-                    ->authorize(fn (): bool => Gate::check('create', [Channel::class, $this->getOwnerRecord()]))
-                    ->using(function (array $data, HasActions&HasSchemas $livewire): Model {
-                        $owner = $livewire->getOwnerRecord();
-
-                        if ( ! $owner instanceof Assistant) {
-                            throw new InvalidArgumentException('Channels relation owner must be an Assistant.');
-                        }
-
-                        return app(ChannelServiceInterface::class)->create($owner, $data);
-                    }),
             ])
             ->recordActions([
                 EditAction::make()

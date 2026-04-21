@@ -26,6 +26,23 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @method static Builder<static>|Contact newModelQuery()
  * @method static Builder<static>|Contact newQuery()
  * @method static Builder<static>|Contact query()
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $external_id
+ * @property array<array-key, mixed> $meta
+ * @property array<array-key, mixed> $attributes
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property string $language
+ * @method static Builder<static>|Contact whereAttributes($value)
+ * @method static Builder<static>|Contact whereCreatedAt($value)
+ * @method static Builder<static>|Contact whereExternalId($value)
+ * @method static Builder<static>|Contact whereId($value)
+ * @method static Builder<static>|Contact whereLanguage($value)
+ * @method static Builder<static>|Contact whereMeta($value)
+ * @method static Builder<static>|Contact wherePlatform($value)
+ * @method static Builder<static>|Contact whereTenantId($value)
+ * @method static Builder<static>|Contact whereUpdatedAt($value)
  * @mixin \Eloquent
  */
 final class Contact extends BaseModel

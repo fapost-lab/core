@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Assistant\Resources\Channels;
 
 use App\Domains\Assistant\Models\Assistant;
-use App\Domains\Assistant\Models\Channel;
+use App\Domains\Channels\Models\Channel;
 use App\Filament\Assistant\Resources\Channels\Pages\CreateChannel;
 use App\Filament\Assistant\Resources\Channels\Pages\EditChannel;
 use App\Filament\Assistant\Resources\Channels\Pages\ListChannels;

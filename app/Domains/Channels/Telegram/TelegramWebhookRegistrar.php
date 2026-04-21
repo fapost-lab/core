@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Channels\Telegram;
 
+use App\Domains\Channels\Telegram\Contracts\TelegramBotIdentityStoreInterface;
 use App\Domains\Channels\Telegram\Dto\SetWebhookDto;
+use App\Domains\Webhook\Services\WebhookUrlGenerator;
 use FAPost\Foundation\Channel\WebhookRegistrarInterface;
 use FAPost\Foundation\Channel\WebhookRegistrationPayload;
 
@@ -15,6 +17,8 @@ final readonly class TelegramWebhookRegistrar implements WebhookRegistrarInterfa
 {
     public function __construct(
         private TelegramBotApiClientFactory $clientFactory,
+        private WebhookUrlGenerator $webhookUrlGenerator,
+        private TelegramBotIdentityStoreInterface $identityStore,
     ) {
     }
 
@@ -27,12 +31,21 @@ final readonly class TelegramWebhookRegistrar implements WebhookRegistrarInterfa
         $allowedUpdates = is_array($payload->config['allowed_updates'] ?? null)
             ? $payload->config['allowed_updates']
             : null;
+        $maxConnections = max(1, min(100, (int) ($payload->config['max_connections'] ?? 40)));
 
         $client->setWebhook(new SetWebhookDto(
-            url: route('webhook.handle', ['channel' => 'telegram', 'hash' => $payload->webhookPublicHash]),
+            url: $this->webhookUrlGenerator->forChannel('telegram', $payload->webhookPublicHash),
             secretToken: $payload->secretToken,
             allowedUpdates: $allowedUpdates,
+            maxConnections: $maxConnections,
         ));
+
+        $bot = $client->getMe();
+
+        $this->identityStore->saveUsername(
+            $payload->channelId,
+            is_string($bot['result']['username'] ?? null) ? $bot['result']['username'] : null,
+        );
     }
 
     /**
