@@ -8,6 +8,7 @@ use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RedirectTenantRootToAdmin;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TenancyMiddleware;
+use App\Http\Middleware\TmaAuthMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -26,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->group(base_path('routes/tenant.php'));
 
             Route::middleware('web')->group(base_path('routes/builder.php'));
+            Route::middleware('web')->group(base_path('routes/tma.php'));
         }
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -34,6 +36,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'tenant'               => TenancyMiddleware::class,
             'tenant.root.redirect' => RedirectTenantRootToAdmin::class,
+            'tma.auth'             => TmaAuthMiddleware::class,
         ]);
 
         $middleware->web(

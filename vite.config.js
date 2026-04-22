@@ -25,6 +25,7 @@ export default defineConfig({
         alias: {
             '@builder': path.resolve(__dirname, 'resources/js/builder'),
             '@shared': path.resolve(__dirname, 'resources/js/shared'),
+            '@tma': path.resolve(__dirname, 'resources/js/tma'),
         },
     },
     server: {
