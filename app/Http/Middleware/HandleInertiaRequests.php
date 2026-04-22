@@ -39,7 +39,11 @@ final class HandleInertiaRequests extends Middleware
     {
         return [
             ...parent::share($request),
-            'csrf_token' => csrf_token(),
+            'csrf_token'   => csrf_token(),
+            'locale'       => app()->getLocale(),
+            'translations' => [
+                'builder' => trans('builder'),
+            ],
         ];
     }
 }

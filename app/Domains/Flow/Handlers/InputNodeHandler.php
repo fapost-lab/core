@@ -20,6 +20,21 @@ final class InputNodeHandler extends AbstractVersionedHandler
         return 1;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function configSchema(): array
+    {
+        return [
+            'save_to' => [
+                'type'        => 'state-picker',
+                'label'       => 'Save to',
+                'required'    => false,
+                'placeholder' => 'flow.user_input',
+            ],
+        ];
+    }
+
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         $incomingText = $context->incoming?->text;

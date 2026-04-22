@@ -32,6 +32,7 @@ export const useBuilderStore = defineStore('builder', () => {
     const draftVersion = ref(null);
     const definition = ref({ nodes: [], edges: [] });
     const saveStatus = ref('idle');
+    const activeTab = ref('builder');
 
     /**
      * @param {{
@@ -62,14 +63,35 @@ export const useBuilderStore = defineStore('builder', () => {
         saveStatus.value = status;
     }
 
+    /**
+     * @param {'builder'|'content'} tab
+     */
+    function setActiveTab(tab) {
+        activeTab.value = tab;
+    }
+
+    /**
+     * @param {string} nodeId
+     * @param {Record<string, unknown>} config
+     */
+    function updateNodeConfig(nodeId, config) {
+        const node = definition.value.nodes.find((n) => n.id === nodeId);
+        if (node) {
+            node.config = config;
+        }
+    }
+
     return {
         flowId,
         flowName,
         draftVersion,
         definition,
         saveStatus,
+        activeTab,
         init,
         setDraftVersion,
         setSaveStatus,
+        setActiveTab,
+        updateNodeConfig,
     };
 });

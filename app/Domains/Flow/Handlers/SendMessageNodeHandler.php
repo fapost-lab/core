@@ -29,6 +29,26 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
         return 1;
     }
 
+    /**
+     * @return array<string, mixed>
+     */
+    public function configSchema(): array
+    {
+        return [
+            'text' => [
+                'type'        => 'text',
+                'label'       => 'Message text',
+                'required'    => true,
+                'placeholder' => 'Welcome, {{flow.name}}',
+            ],
+            'buttons' => [
+                'type'     => 'array',
+                'label'    => 'Buttons',
+                'required' => false,
+            ],
+        ];
+    }
+
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         $sentIds = data_get($state, SystemStateKeys::SENT_MESSAGES, []);

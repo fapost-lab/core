@@ -29,6 +29,38 @@ final class SetAttributeNodeHandler extends AbstractVersionedHandler
         return 1;
     }
 
+    public function category(): string
+    {
+        return 'Data';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function configSchema(): array
+    {
+        return [
+            'target' => [
+                'type'     => 'enum',
+                'label'    => 'Target',
+                'required' => true,
+                'options'  => ['flow', 'contact'],
+            ],
+            'key' => [
+                'type'        => 'string',
+                'label'       => 'Key',
+                'required'    => true,
+                'placeholder' => 'language',
+            ],
+            'value' => [
+                'type'        => 'text',
+                'label'       => 'Value',
+                'required'    => true,
+                'placeholder' => '{{flow.input}}',
+            ],
+        ];
+    }
+
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         $config = is_array($nodeConfig['config'] ?? null) ? $nodeConfig['config'] : [];

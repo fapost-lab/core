@@ -29,6 +29,31 @@ final class ConditionNodeHandler extends AbstractVersionedHandler
         return 1;
     }
 
+    public function category(): string
+    {
+        return 'Logic';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function configSchema(): array
+    {
+        return [
+            'check' => [
+                'type'        => 'state-picker',
+                'label'       => 'Check',
+                'required'    => true,
+                'placeholder' => 'flow.status',
+            ],
+            'rules' => [
+                'type'     => 'repeater',
+                'label'    => 'Rules',
+                'required' => true,
+            ],
+        ];
+    }
+
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         $config = is_array($nodeConfig['config'] ?? null) ? $nodeConfig['config'] : [];

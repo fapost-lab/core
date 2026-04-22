@@ -32,6 +32,7 @@ final class BuilderFlowController extends Controller
                 'definition'       => $dto->definition,
                 'publishedAt'      => $dto->publishedAt?->toIso8601String(),
             ],
+            'backUrl' => route('filament.assistant.resources.flows.index', ['tenant' => $dto->assistantId]),
         ]);
     }
 

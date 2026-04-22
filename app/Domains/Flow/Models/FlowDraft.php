@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Models;
 
+use App\Domains\Assistant\Models\Assistant;
 use Database\Factories\FlowDraftFactory;
 use FAPost\Support\Concerns\HasUlidPrimaryKey;
 use FAPost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @method static FlowDraftFactory factory($count = null, $state = [])
@@ -28,10 +30,25 @@ final class FlowDraft extends BaseModel
     protected $fillable = [
         'tenant_id',
         'flow_id',
+        'assistant_id',
+        'flow_group_id',
         'draft_version',
         'name',
+        'description',
+        'is_public',
+        'is_active',
         'nodes',
     ];
+
+    public function assistant(): BelongsTo
+    {
+        return $this->belongsTo(Assistant::class);
+    }
+
+    public function group(): BelongsTo
+    {
+        return $this->belongsTo(FlowGroup::class, 'flow_group_id');
+    }
 
     protected static function newFactory(): FlowDraftFactory
     {
@@ -46,6 +63,8 @@ final class FlowDraft extends BaseModel
         return [
             'nodes'         => 'array',
             'draft_version' => 'integer',
+            'is_public'     => 'boolean',
+            'is_active'     => 'boolean',
         ];
     }
 }

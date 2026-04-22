@@ -32,6 +32,43 @@ final class WebhookNodeHandler extends AbstractVersionedHandler
         return 1;
     }
 
+    public function category(): string
+    {
+        return 'Integration';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function configSchema(): array
+    {
+        return [
+            'url' => [
+                'type'        => 'string',
+                'label'       => 'URL',
+                'required'    => true,
+                'placeholder' => 'https://example.com/webhook',
+            ],
+            'timeout' => [
+                'type'     => 'number',
+                'label'    => 'Timeout (seconds)',
+                'required' => false,
+                'default'  => 10,
+            ],
+            'save_response_to' => [
+                'type'        => 'state-picker',
+                'label'       => 'Save response to',
+                'required'    => false,
+                'placeholder' => 'flow.webhook_response',
+            ],
+            'include_state' => [
+                'type'     => 'array',
+                'label'    => 'Include state',
+                'required' => false,
+            ],
+        ];
+    }
+
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         $config = is_array($nodeConfig['config'] ?? null) ? $nodeConfig['config'] : [];

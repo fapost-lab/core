@@ -13,6 +13,7 @@ final class BuilderFlowDto extends Data
 {
     public function __construct(
         public readonly string $flowId,
+        public readonly string $assistantId,
         public readonly string $name,
         public readonly int $draftVersion,
         public readonly ?int $publishedVersion,
@@ -26,6 +27,7 @@ final class BuilderFlowDto extends Data
     {
         return new self(
             flowId: $draft->flow_id,
+            assistantId: $draft->assistant_id,
             name: $draft->name,
             draftVersion: $draft->draft_version,
             publishedVersion: $published?->version,

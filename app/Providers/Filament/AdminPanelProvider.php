@@ -44,7 +44,6 @@ final class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login()
-            ->spa()
             ->plugins([
                 FilamentLanguageSwitcherPlugin::make()
                     ->locales(['en', 'ru', 'uk'])

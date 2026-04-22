@@ -70,6 +70,7 @@ return [
 
         'fields' => [
             'name'              => 'Назва',
+            'default_language'  => 'Мова за замовчуванням',
             'is_active'         => 'Активний',
             'fallback_message'  => 'Повідомлення за замовчуванням',
             'default_flow'      => 'Сценарій за замовчуванням',

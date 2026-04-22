@@ -14,6 +14,49 @@ return [
             'settings' => 'Settings',
         ],
     ],
+    'flows' => [
+        'label'        => 'Flow',
+        'plural_label' => 'Flows',
+        'fields'       => [
+            'name'           => 'Name',
+            'description'    => 'Description',
+            'group'          => 'Group',
+            'group_name'     => 'Group name',
+            'is_public'      => 'Public',
+            'is_public_hint' => 'If disabled, contact must have auth = true to start this flow',
+            'is_active'      => 'Active',
+            'updated_at'     => 'Updated',
+        ],
+        'actions' => [
+            'open_builder' => 'Open builder',
+            'activate'     => 'Activate',
+            'deactivate'   => 'Deactivate',
+        ],
+        'filters' => [
+            'group'     => 'Group',
+            'is_active' => 'Active',
+        ],
+        'groups' => [
+            'ungrouped'            => 'No group',
+            'create_modal_heading' => 'Create group',
+        ],
+        'delete_guard' => [
+            'title' => 'Cannot delete',
+            'body'  => 'This flow has active sessions. Deactivate it first.',
+        ],
+    ],
+    'flow_groups' => [
+        'label'        => 'Group',
+        'plural_label' => 'Groups',
+        'fields'       => [
+            'name'        => 'Name',
+            'flows_count' => 'Flows',
+        ],
+        'delete_guard' => [
+            'title' => 'Cannot delete',
+            'body'  => 'This group has flows. Move or delete them first.',
+        ],
+    ],
     'pages' => [
         'overview' => [
             'title'    => 'Assistant overview',
@@ -32,13 +75,23 @@ return [
                 'settings' => 'Assistant-specific settings will appear here.',
             ],
         ],
-        'flow' => [
-            'title'       => 'Flow',
-            'placeholder' => 'Flow tools will be available in a future release.',
-        ],
         'settings' => [
-            'title'       => 'Settings',
-            'placeholder' => 'Assistant settings will be available in a future release.',
+            'title'   => 'Settings',
+            'saved'   => 'Settings saved',
+            'actions' => [
+                'save' => 'Save',
+            ],
+            'sections' => [
+                'general'  => 'General',
+                'advanced' => 'Advanced',
+            ],
+            'fields' => [
+                'default_language'        => 'Default language',
+                'default_language_locked' => 'Cannot be changed once flows exist',
+                'default_flow_id'         => 'Default flow',
+                'fallback_message'        => 'Fallback message',
+                'settings'                => 'Settings',
+            ],
         ],
     ],
 ];

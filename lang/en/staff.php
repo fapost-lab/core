@@ -70,6 +70,7 @@ return [
 
         'fields' => [
             'name'              => 'Name',
+            'default_language'  => 'Default language',
             'is_active'         => 'Active',
             'fallback_message'  => 'Fallback message',
             'default_flow'      => 'Default flow',

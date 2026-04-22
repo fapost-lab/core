@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Flow;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Models\User;
 use Inertia\Testing\AssertableInertia;
@@ -13,7 +14,7 @@ final class BuilderApiTest extends FeatureTestCase
 {
     public function test_show_returns_builder_flow_dto(): void
     {
-        $draft = FlowDraft::factory()->create();
+        $draft = $this->draft();
         $user  = $this->staffUser();
         /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
 
@@ -32,7 +33,7 @@ final class BuilderApiTest extends FeatureTestCase
 
     public function test_save_draft_returns_409_on_version_conflict(): void
     {
-        $draft = FlowDraft::factory()->create(['draft_version' => 5]);
+        $draft = $this->draft(['draft_version' => 5]);
         $user  = $this->staffUser();
         /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
 
@@ -47,7 +48,7 @@ final class BuilderApiTest extends FeatureTestCase
 
     public function test_save_draft_increments_draft_version(): void
     {
-        $draft = FlowDraft::factory()->create(['draft_version' => 5]);
+        $draft = $this->draft(['draft_version' => 5]);
         $user  = $this->staffUser();
         /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
 
@@ -62,7 +63,7 @@ final class BuilderApiTest extends FeatureTestCase
 
     public function test_publish_returns_422_on_invalid_draft(): void
     {
-        $draft = FlowDraft::factory()->withUnconnectedOutput()->create();
+        $draft = $this->draftWithUnconnectedOutput();
         $user  = $this->staffUser();
         /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
 
@@ -90,5 +91,29 @@ final class BuilderApiTest extends FeatureTestCase
     private function staffUser(): User
     {
         return User::factory()->createOne();
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function draft(array $attributes = []): FlowDraft
+    {
+        $assistant = Assistant::factory()->create();
+
+        return FlowDraft::factory()->create([
+            'tenant_id'    => $assistant->tenant_id,
+            'assistant_id' => $assistant->getKey(),
+            ...$attributes,
+        ]);
+    }
+
+    private function draftWithUnconnectedOutput(): FlowDraft
+    {
+        $assistant = Assistant::factory()->create();
+
+        return FlowDraft::factory()->withUnconnectedOutput()->create([
+            'tenant_id'    => $assistant->tenant_id,
+            'assistant_id' => $assistant->getKey(),
+        ]);
     }
 }

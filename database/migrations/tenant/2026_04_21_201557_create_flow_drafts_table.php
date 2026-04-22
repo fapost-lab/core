@@ -12,14 +12,19 @@ return new class () extends Migration {
         Schema::create('flow_drafts', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->uuid('tenant_id');
-            $table->uuid('flow_id');
+            $table->uuid('flow_id')->unique();
+            $table->uuid('assistant_id');
             $table->integer('draft_version')->default(1);
             $table->string('name');
+            $table->text('description')->nullable();
+            $table->string('folder')->nullable();
+            $table->boolean('is_public')->default(true);
+            $table->boolean('is_active')->default(true);
             $table->jsonb('nodes')->default('{}');
             $table->timestamps();
 
-            $table->unique(['flow_id']);
-            $table->index(['tenant_id', 'flow_id']);
+            $table->index(['tenant_id', 'assistant_id']);
+            $table->index(['tenant_id', 'folder']);
         });
     }
 

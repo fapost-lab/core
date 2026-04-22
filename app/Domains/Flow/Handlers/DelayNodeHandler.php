@@ -22,6 +22,26 @@ final class DelayNodeHandler extends AbstractVersionedHandler
         return 1;
     }
 
+    public function category(): string
+    {
+        return 'Logic';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function configSchema(): array
+    {
+        return [
+            'seconds' => [
+                'type'     => 'number',
+                'label'    => 'Delay (seconds)',
+                'required' => false,
+                'default'  => 60,
+            ],
+        ];
+    }
+
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         $alreadyScheduled = data_get($state, SystemStateKeys::DELAY_NODE_PREFIX . ".{$context->nodeId}.scheduled_at");
