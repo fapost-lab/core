@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
+import { buildTree } from '@builder/utils/buildTree';
 
 /**
  * @param {unknown} raw
@@ -31,6 +32,10 @@ export const useBuilderStore = defineStore('builder', () => {
     const flowName = ref('');
     const draftVersion = ref(null);
     const definition = ref({ nodes: [], edges: [] });
+    const tree = computed(() => buildTree(
+        definition.value.nodes ?? [],
+        definition.value.edges ?? [],
+    ));
     const saveStatus = ref('idle');
     const activeTab = ref('builder');
 
@@ -86,6 +91,7 @@ export const useBuilderStore = defineStore('builder', () => {
         flowName,
         draftVersion,
         definition,
+        tree,
         saveStatus,
         activeTab,
         init,

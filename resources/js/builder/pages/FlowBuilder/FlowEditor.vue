@@ -4,9 +4,9 @@ import { useBuilderStore }  from '@builder/store/builderStore'
 import { useRegistryStore } from '@builder/store/registryStore'
 import { useAutoSave }      from '@builder/composables/useAutoSave'
 import AppTopBar            from '@builder/components/AppTopBar.vue'
-import StructurePanel       from '@builder/components/builder/StructurePanel.vue'
-import SequencePanel        from '@builder/components/builder/SequencePanel.vue'
-import ConfigPanel          from '@builder/components/config/ConfigPanel.vue'
+import FlowStructure        from '@builder/components/editor/FlowStructure.vue'
+import FlowSequence         from '@builder/components/editor/FlowSequence.vue'
+import ConfigPanel          from '@builder/components/editor/ConfigPanel.vue'
 import ContentTab           from '@builder/components/content/ContentTab.vue'
 
 const props = defineProps({
@@ -26,7 +26,7 @@ onMounted(async () => {
 </script>
 
 <template>
-    <div style="display:flex; flex-direction:column; height:100vh; overflow:hidden;">
+    <div class="h-screen flex flex-col">
         <AppTopBar
             :flow-name="builderStore.flowName"
             :draft-version="builderStore.draftVersion"
@@ -44,11 +44,11 @@ onMounted(async () => {
 
         <div
             v-if="builderStore.activeTab === 'builder'"
-            style="display:flex; flex:1; overflow:hidden;"
+            class="flex-1 flex overflow-hidden"
         >
-            <StructurePanel />
-            <SequencePanel />
-            <ConfigPanel />
+            <FlowStructure class="w-56 border-r shrink-0 overflow-y-auto" />
+            <FlowSequence class="flex-1 overflow-y-auto px-8 py-6" />
+            <ConfigPanel class="w-72 border-l shrink-0 overflow-y-auto" />
         </div>
 
         <ContentTab v-else />

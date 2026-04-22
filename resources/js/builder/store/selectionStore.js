@@ -3,6 +3,7 @@ import { ref } from 'vue';
 
 export const useSelectionStore = defineStore('selection', () => {
     const selectedNodeId = ref(null);
+    const activeBranch = ref([]);
 
     /**
      * @param {string|null} nodeId
@@ -15,5 +16,23 @@ export const useSelectionStore = defineStore('selection', () => {
         selectedNodeId.value = null;
     }
 
-    return { selectedNodeId, select, clear };
+    /**
+     * @param {string[]} path
+     */
+    function setActiveBranch(path) {
+        activeBranch.value = path;
+    }
+
+    function clearBranch() {
+        activeBranch.value = [];
+    }
+
+    return {
+        selectedNodeId,
+        activeBranch,
+        select,
+        clear,
+        setActiveBranch,
+        clearBranch,
+    };
 });
