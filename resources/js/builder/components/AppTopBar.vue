@@ -12,6 +12,9 @@ defineProps({
     backUrl:          { type: String,  default: null },
     canUndo:          { type: Boolean, default: false },
     canRedo:          { type: Boolean, default: false },
+    validating:       { type: Boolean, default: false },
+    publishing:       { type: Boolean, default: false },
+    publishedMsg:     { type: String, default: null },
 })
 
 const emit = defineEmits([
@@ -38,6 +41,7 @@ const SAVE_COLORS = {
             <div class="version-badge">
                 <span v-if="draftVersion != null" class="badge badge-draft">Draft v{{ draftVersion }}</span>
                 <span v-if="publishedVersion != null" class="badge badge-pub">Published v{{ publishedVersion }}</span>
+                <span v-else class="badge badge-muted">Not published</span>
             </div>
             <span
                 v-if="saveStatus !== 'idle'"
@@ -76,9 +80,16 @@ const SAVE_COLORS = {
             <button class="btn btn-ghost" @click="emit('rollback')">↩ {{ t('topbar.rollback') }}</button>
             <div class="sep"></div>
             <button class="btn btn-ghost" @click="emit('preview')">▷ {{ t('topbar.preview') }}</button>
-            <button class="btn btn-outline" @click="emit('validate')">✓ {{ t('topbar.validate') }}</button>
+            <button class="btn btn-outline" :disabled="validating" @click="emit('validate')">
+                {{ validating ? 'Validating…' : `✓ ${t('topbar.validate')}` }}
+            </button>
             <button class="btn btn-ghost" @click="emit('saveDraft')">{{ t('topbar.save_draft') }}</button>
-            <button class="btn btn-primary" @click="emit('publish')">↑ {{ t('topbar.publish') }}</button>
+            <button class="btn btn-primary" :disabled="publishing" @click="emit('publish')">
+                {{ publishing ? 'Publishing…' : `↑ ${t('topbar.publish')}` }}
+            </button>
+            <Transition name="fade">
+                <span v-if="publishedMsg" class="published-msg">{{ publishedMsg }}</span>
+            </Transition>
         </div>
     </div>
 </template>
@@ -134,6 +145,7 @@ const SAVE_COLORS = {
 }
 .badge-draft { background: var(--amber-bg); color: var(--amber); border: 1px solid #e8d8b8; }
 .badge-pub   { background: var(--sage-bg);  color: var(--sage);  border: 1px solid #cdddd4; }
+.badge-muted { background: var(--surface-2); color: var(--text-3); border: 1px solid var(--border); }
 .save-status { font-size: 12px; }
 
 .sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
@@ -185,4 +197,20 @@ const SAVE_COLORS = {
 .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
 .btn-primary:hover { background: #4a5c48; }
 .btn:disabled { opacity: .3; cursor: not-allowed; }
+
+.published-msg {
+    color: var(--sage);
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+    transition: opacity .3s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+    opacity: 0;
+}
 </style>

@@ -16,6 +16,10 @@ const isSelected = computed(() =>
     selectionStore.selectedNodeId === props.treeNode.node.id
 )
 
+const hasError = computed(() =>
+    builderStore.nodesWithErrors.has(props.treeNode.node.id)
+)
+
 const handlerMeta = computed(() =>
     registryStore.getByType(props.treeNode.node.type, props.treeNode.node.version)
 )
@@ -33,8 +37,13 @@ function confirmDelete() {
 
 <template>
     <div
+        :id="`node-card-${treeNode.node.id}`"
         class="relative group w-96 rounded-lg border bg-white shadow-sm cursor-pointer transition-all"
-        :class="isSelected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200 hover:border-gray-300'"
+        :class="[
+            isSelected ? 'border-blue-500 ring-2 ring-blue-100' : '',
+            hasError ? 'border-red-300 ring-2 ring-red-100' : '',
+            !isSelected && !hasError ? 'border-gray-200 hover:border-gray-300' : '',
+        ]"
         @click="select"
     >
         <div class="absolute right-2 top-2 hidden group-hover:flex gap-1">

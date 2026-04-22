@@ -33,6 +33,7 @@ export const useBuilderStore = defineStore('builder', () => {
     const flowId = ref(null);
     const flowName = ref('');
     const draftVersion = ref(null);
+    const publishedVersion = ref(null);
     const definition = ref({ nodes: [], edges: [] });
     const tree = computed(() => buildTree(
         definition.value.nodes ?? [],
@@ -40,15 +41,28 @@ export const useBuilderStore = defineStore('builder', () => {
     ));
     const saveStatus = ref('idle');
     const activeTab = ref('builder');
+    const validationResult = ref(null);
+    const validationOpen = ref(false);
     const undoStack = ref([]);
     const redoStack = ref([]);
     const MAX_UNDO = 50;
+    const nodesWithErrors = computed(() => {
+        const errors = validationResult.value?.errors;
+        if (!Array.isArray(errors) || errors.length === 0) {
+            return new Set();
+        }
+
+        return new Set(errors
+            .map((error) => error?.path?.split('.')?.[1])
+            .filter(Boolean));
+    });
 
     /**
      * @param {{
      *   flowId: string,
      *   name: string,
      *   draftVersion: number,
+     *   publishedVersion?: number|null,
      *   definition?: unknown,
      * }} flow
      */
@@ -56,6 +70,7 @@ export const useBuilderStore = defineStore('builder', () => {
         flowId.value = flow.flowId;
         flowName.value = flow.name;
         draftVersion.value = flow.draftVersion;
+        publishedVersion.value = flow.publishedVersion ?? null;
         definition.value = normalizeDefinition(flow.definition);
     }
 
@@ -64,6 +79,13 @@ export const useBuilderStore = defineStore('builder', () => {
      */
     function setDraftVersion(v) {
         draftVersion.value = v;
+    }
+
+    /**
+     * @param {number|null} version
+     */
+    function setPublishedVersion(version) {
+        publishedVersion.value = version;
     }
 
     /**
@@ -78,6 +100,21 @@ export const useBuilderStore = defineStore('builder', () => {
      */
     function setActiveTab(tab) {
         activeTab.value = tab;
+    }
+
+    /**
+     * @param {{ valid: boolean, errors?: Array<{ path: string, message: string }> }|null} result
+     * @param {boolean} [open=true]
+     */
+    function setValidationResult(result, open = true) {
+        validationResult.value = result;
+        if (open) {
+            validationOpen.value = true;
+        }
+    }
+
+    function closeValidation() {
+        validationOpen.value = false;
     }
 
     function snapshot() {
@@ -303,16 +340,23 @@ export const useBuilderStore = defineStore('builder', () => {
         flowId,
         flowName,
         draftVersion,
+        publishedVersion,
         definition,
         tree,
         saveStatus,
         activeTab,
+        validationResult,
+        validationOpen,
+        nodesWithErrors,
         undoStack,
         redoStack,
         init,
         setDraftVersion,
+        setPublishedVersion,
         setSaveStatus,
         setActiveTab,
+        setValidationResult,
+        closeValidation,
         undo,
         redo,
         updateNodeConfig,

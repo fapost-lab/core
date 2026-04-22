@@ -25,16 +25,21 @@ return [
             'is_public'      => 'Публичный',
             'is_public_hint' => 'Если выключено, контакт должен иметь auth = true для запуска сценария',
             'is_active'      => 'Активный',
+            'versions'       => 'Версии',
             'updated_at'     => 'Обновлено',
         ],
         'actions' => [
-            'open_builder' => 'Открыть конструктор',
+            'open_builder' => 'Конструктор',
             'activate'     => 'Активировать',
-            'deactivate'   => 'Деактивировать',
+            'deactivate'   => 'Отключить',
         ],
         'filters' => [
             'group'     => 'Группа',
             'is_active' => 'Активный',
+        ],
+        'visibility' => [
+            'public'  => 'Публичный',
+            'private' => 'Приватный',
         ],
         'groups' => [
             'ungrouped'            => 'Без группы',

@@ -78,6 +78,10 @@ final class AssistantPanelProvider extends PanelProvider
                     ->icon(Heroicon::OutlinedArrowLeftOnRectangle)
                     ->sort(100),
             ])
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): string => (string) view('filament.assistant.partials.flow-row-colors')
+            )
             ->middleware([
                 TenancyMiddleware::class,
                 EncryptCookies::class,

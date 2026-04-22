@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Assistant\Resources\Flows;
 
+use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Filament\Assistant\Resources\Flows\Pages\CreateFlow;
 use App\Filament\Assistant\Resources\Flows\Pages\EditFlow;
@@ -15,6 +16,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use UnitEnum;
 
 final class FlowResource extends Resource
@@ -50,6 +52,17 @@ final class FlowResource extends Resource
     public static function table(Table $table): Table
     {
         return FlowsTable::configure($table);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->addSelect([
+                'published_version' => FlowDefinition::query()
+                    ->selectRaw('MAX(version)')
+                    ->whereColumn('flow_id', 'flow_drafts.flow_id')
+                    ->where('is_active', true),
+            ]);
     }
 
     public static function getPages(): array

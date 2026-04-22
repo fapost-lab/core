@@ -25,6 +25,7 @@ return [
             'is_public'      => 'Public',
             'is_public_hint' => 'If disabled, contact must have auth = true to start this flow',
             'is_active'      => 'Active',
+            'versions'       => 'Versions',
             'updated_at'     => 'Updated',
         ],
         'actions' => [
@@ -35,6 +36,10 @@ return [
         'filters' => [
             'group'     => 'Group',
             'is_active' => 'Active',
+        ],
+        'visibility' => [
+            'public'  => 'Public',
+            'private' => 'Private',
         ],
         'groups' => [
             'ungrouped'            => 'No group',

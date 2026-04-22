@@ -25,16 +25,21 @@ return [
             'is_public'      => 'Публічний',
             'is_public_hint' => 'Якщо вимкнено, контакт повинен мати auth = true для запуску сценарію',
             'is_active'      => 'Активний',
+            'versions'       => 'Версії',
             'updated_at'     => 'Оновлено',
         ],
         'actions' => [
-            'open_builder' => 'Відкрити конструктор',
+            'open_builder' => 'Конструктор',
             'activate'     => 'Активувати',
-            'deactivate'   => 'Деактивувати',
+            'deactivate'   => 'Вимкнути',
         ],
         'filters' => [
             'group'     => 'Група',
             'is_active' => 'Активний',
+        ],
+        'visibility' => [
+            'public'  => 'Публічний',
+            'private' => 'Приватний',
         ],
         'groups' => [
             'ungrouped'            => 'Без групи',
