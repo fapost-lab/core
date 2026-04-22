@@ -77,12 +77,13 @@ export const useBuilderStore = defineStore('builder', () => {
 
     /**
      * @param {string} nodeId
-     * @param {Record<string, unknown>} config
+     * @param {Record<string, unknown>} patch
+     * Merges a partial config patch into existing node config.
      */
-    function updateNodeConfig(nodeId, config) {
+    function updateNodeConfig(nodeId, patch) {
         const node = definition.value.nodes.find((n) => n.id === nodeId);
         if (node) {
-            node.config = config;
+            node.config = { ...(node.config ?? {}), ...patch };
         }
     }
 
