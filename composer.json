@@ -76,6 +76,7 @@
   ],
   "scripts": {
     "hooks:install": "@php tools/git-hooks/install.php",
+    "ngrok": "tools/ngrok-http",
     "setup": [
       "composer install",
       "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",

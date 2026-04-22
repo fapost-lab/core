@@ -1,22 +1,27 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useSelectionStore } from '@builder/store/selectionStore'
-import FlowNodeCard from './FlowNodeCard.vue'
-import FlowSwitchCard from './FlowSwitchCard.vue'
+import { useBuilderStore } from '@builder/store/builderStore'
+import { nodeColors } from '@builder/utils/nodeColors'
+
 
 const props = defineProps({
-    treeNode: { type: Object, required: true },
-    parentBranch: { type: Array, default: () => [] },
+    treeNode:     { type: Object, required: true },
+    parentBranch: { type: Array,  default: () => [] },
+    index:        { type: Number, default: null },
 })
 
 const selectionStore = useSelectionStore()
-const handles = computed(() => Object.keys(props.treeNode.childrenByHandle ?? {}))
-const activeHandle = ref(handles.value[0] ?? 'yes')
+const builderStore   = useBuilderStore()
 
-watch(handles, (nextHandles) => {
-    if (!nextHandles.includes(activeHandle.value)) {
-        activeHandle.value = nextHandles[0] ?? 'yes'
-    }
+const handles      = computed(() => Object.keys(props.treeNode.childrenByHandle ?? {}))
+const activeHandle = ref(handles.value[0] ?? 'yes')
+const colors       = computed(() => nodeColors('condition'))
+const isSelected   = computed(() => selectionStore.selectedNodeId === props.treeNode.node.id)
+const hasError     = computed(() => builderStore.nodesWithErrors.has(props.treeNode.node.id))
+
+watch(handles, (next) => {
+    if (!next.includes(activeHandle.value)) activeHandle.value = next[0] ?? 'yes'
 }, { immediate: true })
 
 function selectCard() {
@@ -27,46 +32,66 @@ function selectBranch(handle) {
     activeHandle.value = handle
     selectionStore.setActiveBranch([...props.parentBranch, props.treeNode.node.id, handle])
 }
+
+function branchClass(handle) {
+    if (handle === 'yes') return 'branch-btn branch-yes'
+    if (handle === 'no')  return 'branch-btn branch-no'
+    return 'branch-btn branch-default'
+}
+
+function childCount(handle) {
+    return props.treeNode.childrenByHandle?.[handle]?.length ?? 0
+}
 </script>
 
 <template>
-    <div class="w-96">
-        <div
-            class="rounded-lg border bg-white shadow-sm transition-all cursor-pointer"
-            :class="selectionStore.selectedNodeId === treeNode.node.id ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200'"
-            @click="selectCard"
-        >
-            <div class="px-4 py-3 border-b border-gray-100 text-xs font-medium text-gray-400 uppercase tracking-wide">
-                Condition
+    <div
+        :id="`node-card-${treeNode.node.id}`"
+        class="node-card"
+        :class="{
+            selected: isSelected,
+            'has-error': hasError && !isSelected,
+        }"
+        @click="selectCard"
+    >
+        <div class="node-card-head">
+            <div
+                class="node-type-icon"
+                :style="{ background: colors.bg, color: colors.color }"
+            >{{ colors.icon }}</div>
+            <span class="node-type-label">Condition</span>
+            <div v-if="hasError" class="node-warn" title="Validation error">!</div>
+            <span v-if="index != null" class="node-num">#{{ index }}</span>
+            <button class="node-delete-btn" title="Delete node" @click.stop="builderStore.deleteNode(treeNode.node.id)">×</button>
+        </div>
+
+        <div class="node-card-body">
+            <div v-if="treeNode.node.config?.expression" class="node-summary-row">
+                <span class="node-summary-key">Expr</span>
+                <span
+                    class="node-summary-val"
+                    style="font-family:'DM Mono',monospace;font-size:12px"
+                >{{ treeNode.node.config.expression }}</span>
             </div>
-            <div class="px-4 py-3 text-sm text-gray-600">
-                {{ treeNode.node.config?.expression ?? '—' }}
+            <div
+                v-for="handle in handles"
+                :key="handle"
+                class="node-summary-row"
+            >
+                <span class="node-summary-key" style="text-transform:uppercase">{{ handle }}</span>
+                <span class="node-summary-val muted">{{ childCount(handle) }} nodes</span>
             </div>
-            <div class="px-4 pb-3 flex gap-2">
+
+            <div class="condition-branches">
                 <button
                     v-for="handle in handles"
                     :key="handle"
-                    class="px-3 py-1 rounded text-xs font-medium transition-colors"
-                    :class="activeHandle === handle
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'"
+                    :class="[branchClass(handle), { 'active-branch': activeHandle === handle }]"
                     @click.stop="selectBranch(handle)"
                 >
-                    {{ handle }} ({{ treeNode.childrenByHandle[handle]?.length ?? 0 }})
+                    ▶ {{ handle }}
                 </button>
             </div>
-        </div>
-
-        <div class="ml-6 border-l-2 border-blue-100 pl-4 mt-2 space-y-2">
-            <template v-for="child in treeNode.childrenByHandle[activeHandle] ?? []" :key="child.node.id">
-                <FlowConditionCard
-                    v-if="child.node.type === 'condition'"
-                    :tree-node="child"
-                    :parent-branch="[...parentBranch, treeNode.node.id, activeHandle]"
-                />
-                <FlowSwitchCard v-else-if="child.node.type === 'switch'" :tree-node="child" />
-                <FlowNodeCard v-else :tree-node="child" />
-            </template>
         </div>
     </div>
 </template>

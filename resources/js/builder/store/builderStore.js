@@ -157,7 +157,8 @@ export const useBuilderStore = defineStore('builder', () => {
             const incomingNodeIds = new Set(definition.value.edges.map((edge) => edge.to));
             const roots = definition.value.nodes.filter((node) => !incomingNodeIds.has(node.id));
 
-            if (roots.length !== 1) {
+            // Allow inserting into an empty flow (0 roots) or before the single root (1 root).
+            if (roots.length > 1) {
                 return null;
             }
         }

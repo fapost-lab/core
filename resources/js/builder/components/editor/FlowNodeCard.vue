@@ -3,92 +3,114 @@ import { computed } from 'vue'
 import { useSelectionStore } from '@builder/store/selectionStore'
 import { useRegistryStore } from '@builder/store/registryStore'
 import { useBuilderStore } from '@builder/store/builderStore'
+import { nodeColors } from '@builder/utils/nodeColors'
 
 const props = defineProps({
     treeNode: { type: Object, required: true },
+    index:    { type: Number, default: null },
 })
 
 const selectionStore = useSelectionStore()
-const registryStore = useRegistryStore()
-const builderStore = useBuilderStore()
+const registryStore  = useRegistryStore()
+const builderStore   = useBuilderStore()
 
-const isSelected = computed(() =>
-    selectionStore.selectedNodeId === props.treeNode.node.id
-)
+const isSelected = computed(() => selectionStore.selectedNodeId === props.treeNode.node.id)
+const hasError   = computed(() => builderStore.nodesWithErrors.has(props.treeNode.node.id))
+const colors     = computed(() => nodeColors(props.treeNode.node.type))
+const handlerMeta = computed(() => registryStore.getByType(props.treeNode.node.type, props.treeNode.node.version))
 
-const hasError = computed(() =>
-    builderStore.nodesWithErrors.has(props.treeNode.node.id)
-)
+const typeLabel = computed(() => {
+    if (handlerMeta.value?.label) return handlerMeta.value.label
+    return props.treeNode.node.type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+})
 
-const handlerMeta = computed(() =>
-    registryStore.getByType(props.treeNode.node.type, props.treeNode.node.version)
-)
+/** Compact summary rows for the card body */
+const summaryRows = computed(() => {
+    const node   = props.treeNode.node
+    const config = node.config ?? {}
+    const type   = node.type
+
+    if (type === 'send_message') {
+        const rows = []
+        const text = config.body ?? config.text ?? config.content_key ?? null
+        if (text) rows.push({ key: 'Text', val: typeof text === 'object' ? Object.values(text)[0] : text, mono: false })
+        const btns = config.buttons?.length ?? 0
+        if (btns > 0) rows.push({ key: 'Buttons', val: `${btns} button${btns > 1 ? 's' : ''}`, muted: true })
+        return rows
+    }
+
+    if (type === 'input') {
+        const rows = []
+        if (config.save_to) rows.push({ key: 'Var', val: config.save_to, mono: true })
+        if (config.expected_type) rows.push({ key: 'Type', val: config.expected_type, muted: true })
+        return rows
+    }
+
+    if (type === 'condition') {
+        return config.expression ? [{ key: 'Expr', val: config.expression, mono: true }] : []
+    }
+
+    if (type === 'delay') {
+        const val = config.seconds != null
+            ? `${config.seconds}s`
+            : config.duration ?? '—'
+        return [{ key: 'Wait', val, muted: false }]
+    }
+
+    if (type === 'set_attribute') {
+        return config.key ? [{ key: 'Key', val: config.key, mono: true }] : []
+    }
+
+    if (type === 'webhook') {
+        return config.url ? [{ key: 'URL', val: config.url, muted: true }] : []
+    }
+
+    return []
+})
 
 function select() {
     selectionStore.select(props.treeNode.node.id)
 }
 
-function confirmDelete() {
-    if (window.confirm('Delete this node?')) {
-        builderStore.deleteNode(props.treeNode.node.id)
-    }
+function deleteNode() {
+    builderStore.deleteNode(props.treeNode.node.id)
 }
 </script>
 
 <template>
     <div
         :id="`node-card-${treeNode.node.id}`"
-        class="relative group w-96 rounded-lg border bg-white shadow-sm cursor-pointer transition-all"
-        :class="[
-            isSelected ? 'border-blue-500 ring-2 ring-blue-100' : '',
-            hasError ? 'border-red-300 ring-2 ring-red-100' : '',
-            !isSelected && !hasError ? 'border-gray-200 hover:border-gray-300' : '',
-        ]"
+        class="node-card"
+        :class="{
+            selected: isSelected,
+            'has-error': hasError && !isSelected,
+        }"
         @click="select"
     >
-        <div class="absolute right-2 top-2 hidden group-hover:flex gap-1">
-            <button
-                class="p-1 text-gray-300 hover:text-gray-500 text-xs"
-                title="Move up"
-                @click.stop="builderStore.moveNodeUp(treeNode.node.id)"
-            >
-                ↑
-            </button>
-            <button
-                class="p-1 text-gray-300 hover:text-gray-500 text-xs"
-                title="Move down"
-                @click.stop="builderStore.moveNodeDown(treeNode.node.id)"
-            >
-                ↓
-            </button>
-            <button
-                class="p-1 text-gray-300 hover:text-red-400 text-xs"
-                title="Delete"
-                @click.stop="confirmDelete"
-            >
-                ✕
-            </button>
+        <div class="node-card-head">
+            <div
+                class="node-type-icon"
+                :style="{ background: colors.bg, color: colors.color }"
+            >{{ colors.icon }}</div>
+            <span class="node-type-label">{{ typeLabel }}</span>
+            <div v-if="hasError" class="node-warn" title="Validation error">!</div>
+            <span v-if="index != null" class="node-num">#{{ index }}</span>
+            <button class="node-delete-btn" title="Delete node" @click.stop="deleteNode">×</button>
         </div>
 
-        <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
-            <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">
-                {{ handlerMeta?.label ?? treeNode.node.type }}
-            </span>
-            <span class="text-xs text-gray-300 ml-auto">
-                v{{ treeNode.node.version }}
-            </span>
-        </div>
-        <div class="px-4 py-3 text-sm text-gray-600">
-            <span v-if="treeNode.node.type === 'send_message'">
-                {{ treeNode.node.config?.body?.slice(0, 60) ?? '—' }}
-            </span>
-            <span v-else-if="treeNode.node.type === 'input'">
-                Save to: <code class="text-xs bg-gray-50 px-1 rounded">{{ treeNode.node.config?.save_to ?? '—' }}</code>
-            </span>
-            <span v-else-if="treeNode.node.type === 'condition'">
-                {{ treeNode.node.config?.expression ?? '—' }}
-            </span>
-            <span v-else class="text-gray-400 italic">{{ treeNode.node.type }}</span>
+        <div v-if="summaryRows.length > 0" class="node-card-body">
+            <div
+                v-for="row in summaryRows"
+                :key="row.key"
+                class="node-summary-row"
+            >
+                <span class="node-summary-key">{{ row.key }}</span>
+                <span
+                    class="node-summary-val"
+                    :class="{ muted: row.muted }"
+                    :style="row.mono ? { fontFamily: 'DM Mono, monospace', fontSize: '12px' } : {}"
+                >{{ typeof row.val === 'string' ? row.val.slice(0, 60) : row.val }}</span>
+            </div>
         </div>
     </div>
 </template>

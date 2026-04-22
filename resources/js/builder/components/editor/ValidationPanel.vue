@@ -9,90 +9,106 @@ const { validate } = useValidation();
 
 function jumpToNode(error) {
     const nodeId = error?.path?.split('.')?.[1];
-    if (!nodeId) {
-        return;
-    }
-
+    if (!nodeId) return;
     selectionStore.select(nodeId);
-
     const target = document.getElementById(`node-card-${nodeId}`);
-    if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 </script>
 
 <template>
     <Transition name="slide-up">
-        <div
-            v-if="store.validationOpen"
-            class="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white shadow-lg"
-        >
-            <div class="flex items-center justify-between border-b border-gray-100 px-6 py-3">
-                <div class="flex items-center gap-3">
-                    <span class="text-sm font-medium text-gray-700">Validation</span>
+        <div v-if="store.validationOpen" class="val-panel">
+            <div class="val-header">
+                <div class="val-header-left">
+                    <span class="val-title">Validation</span>
                     <span
                         v-if="store.validationResult"
-                        class="rounded-full px-2 py-0.5 text-xs"
-                        :class="store.validationResult.valid
-                            ? 'bg-green-100 text-green-600'
-                            : 'bg-red-100 text-red-600'"
+                        class="val-badge"
+                        :class="store.validationResult.valid ? 'val-badge--ok' : 'val-badge--err'"
                     >
                         {{ store.validationResult.valid ? 'Valid' : `${store.validationResult.errors.length} errors` }}
                     </span>
                 </div>
-                <div class="flex items-center gap-2">
-                    <button
-                        class="rounded border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:bg-gray-50"
-                        @click="validate"
-                    >
-                        Revalidate
-                    </button>
-                    <button
-                        class="text-sm text-gray-400 hover:text-gray-600"
-                        @click="store.closeValidation()"
-                    >
-                        ✕
-                    </button>
+                <div class="val-header-right">
+                    <button class="btn btn-ghost" style="font-size:11.5px;padding:3px 8px" @click="validate">Revalidate</button>
+                    <button class="val-close" @click="store.closeValidation()">✕</button>
                 </div>
             </div>
 
-            <div class="max-h-48 overflow-y-auto px-6 py-3">
-                <div v-if="store.validationResult?.valid" class="text-sm text-green-600">
-                    No errors found. Ready to publish.
-                </div>
+            <div class="val-body">
+                <div v-if="store.validationResult?.valid" class="val-ok">No errors found. Ready to publish.</div>
 
-                <div v-else-if="store.validationResult?.errors?.length" class="flex flex-col gap-2">
+                <template v-else-if="store.validationResult?.errors?.length">
                     <button
                         v-for="error in store.validationResult.errors"
                         :key="`${error.path}:${error.message}`"
-                        class="flex w-full items-start gap-3 rounded px-2 py-1.5 text-left text-sm transition-colors hover:bg-gray-50"
+                        class="val-error-row"
                         @click="jumpToNode(error)"
                     >
-                        <span class="mt-0.5 shrink-0 text-red-400">●</span>
+                        <span class="val-dot">●</span>
                         <div>
-                            <code class="font-mono text-xs text-gray-400">{{ error.path }}</code>
-                            <div class="text-gray-600">{{ error.message }}</div>
+                            <code class="val-path">{{ error.path }}</code>
+                            <div class="val-msg">{{ error.message }}</div>
                         </div>
                     </button>
-                </div>
+                </template>
 
-                <div v-else class="text-sm text-gray-400">
-                    Run validation to check your flow.
-                </div>
+                <div v-else class="val-empty">Run validation to check your flow.</div>
             </div>
         </div>
     </Transition>
 </template>
 
 <style scoped>
-.slide-up-enter-active,
-.slide-up-leave-active {
-    transition: transform 0.2s ease;
+.val-panel {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 40;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
 }
+.val-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+}
+.val-header-left { display: flex; align-items: center; gap: 8px; }
+.val-header-right { display: flex; align-items: center; gap: 6px; }
+.val-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.val-badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500;
+}
+.val-badge--ok  { background: var(--sage-bg);  color: var(--sage); }
+.val-badge--err { background: var(--rose-bg);  color: var(--rose); }
+.val-close {
+    background: none; border: none; cursor: pointer;
+    font-size: 13px; color: var(--text-3); padding: 2px 6px;
+    transition: color .12s;
+}
+.val-close:hover { color: var(--text); }
+.val-body { max-height: 192px; overflow-y: auto; padding: 10px 20px; }
+.val-ok   { font-size: 13px; color: var(--sage); }
+.val-empty { font-size: 13px; color: var(--text-3); }
+.val-error-row {
+    display: flex; align-items: flex-start; gap: 10px;
+    width: 100%; text-align: left;
+    padding: 6px 8px; border-radius: 6px;
+    background: none; border: none; cursor: pointer;
+    transition: background .1s;
+    margin-bottom: 2px;
+}
+.val-error-row:hover { background: var(--rose-bg); }
+.val-dot { color: var(--rose); font-size: 10px; margin-top: 3px; flex-shrink: 0; }
+.val-path { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-3); }
+.val-msg  { font-size: 12.5px; color: var(--text-2); margin-top: 1px; }
 
-.slide-up-enter-from,
-.slide-up-leave-to {
-    transform: translateY(100%);
-}
+.btn { padding: 6px 12px; border-radius: var(--radius); font-family: 'DM Sans', sans-serif;
+  font-size: 12.5px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
+.btn-ghost { background: transparent; color: var(--text-2); border-color: var(--border); }
+.btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+
+.slide-up-enter-active, .slide-up-leave-active { transition: transform .2s ease; }
+.slide-up-enter-from, .slide-up-leave-to { transform: translateY(100%); }
 </style>

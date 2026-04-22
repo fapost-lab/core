@@ -1,6 +1,6 @@
 <script setup>
 const props = defineProps({
-    node: { type: Object, required: true },
+    node:   { type: Object, required: true },
     schema: { type: Object, required: true },
 })
 
@@ -12,16 +12,32 @@ function update(key, value) {
 </script>
 
 <template>
-    <div class="flex flex-col gap-4">
-        <div class="flex flex-col gap-1">
-            <label class="text-xs font-medium text-gray-500">Expression <span class="text-red-400">*</span></label>
-            <input
-                class="field font-mono text-xs"
-                :value="props.node.config?.expression ?? ''"
-                placeholder="flow.department == 'hr'"
-                @input="update('expression', $event.target.value)"
-            >
-            <span class="text-xs text-gray-300">Supports flow.*, rag.*, module.* namespaces</span>
+    <div>
+        <div class="config-section">
+            <div class="config-label">Expression</div>
+            <div class="config-field">
+                <div class="field-label">Condition <small>boolean expression</small></div>
+                <input
+                    class="field-input"
+                    style="font-family:'DM Mono',monospace"
+                    :value="props.node.config?.expression ?? ''"
+                    placeholder="flow.department == 'hr'"
+                    @input="update('expression', $event.target.value)"
+                >
+            </div>
+        </div>
+
+        <div class="config-section">
+            <div class="config-label">Meta</div>
+            <div class="config-field">
+                <div class="field-label">Node ID</div>
+                <input
+                    class="field-input"
+                    style="font-family:'DM Mono',monospace;font-size:11.5px"
+                    :value="props.node.id"
+                    readonly
+                >
+            </div>
         </div>
     </div>
 </template>

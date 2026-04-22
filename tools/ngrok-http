@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+local_domain="${1:-}"
+
+if [[ -z "${local_domain}" ]]; then
+    echo "Usage: $(basename "$0") <local-domain>" >&2
+    exit 1
+fi
+
+if [[ "${local_domain}" == *.* ]]; then
+    local_host="${local_domain}"
+else
+    local_host="${local_domain}.test"
+fi
+
+ngrok_bin="${NGROK_BIN:-ngrok}"
+ngrok_region="${NGROK_REGION:-eu}"
+ngrok_public_domain="${NGROK_PUBLIC_DOMAIN:-mobiman.eu.ngrok.io}"
+ngrok_port="${NGROK_PORT:-80}"
+
+exec "${ngrok_bin}" http \
+    --region="${ngrok_region}" \
+    --domain="${ngrok_public_domain}" \
+    --host-header="${local_host}" \
+    "${local_host}:${ngrok_port}"

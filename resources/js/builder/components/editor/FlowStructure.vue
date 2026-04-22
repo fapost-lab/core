@@ -6,16 +6,16 @@ const builderStore = useBuilderStore()
 </script>
 
 <template>
-    <nav class="p-3">
-        <div class="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2 px-2">
-            Structure
+    <div class="panel panel-structure">
+        <div class="panel-header">Structure</div>
+        <div class="panel-body">
+            <FlowStructureNode
+                v-for="treeNode in builderStore.tree"
+                :key="treeNode.node.id"
+                :tree-node="treeNode"
+                :depth="0"
+                :parent-branch="[]"
+            />
         </div>
-        <FlowStructureNode
-            v-for="treeNode in builderStore.tree"
-            :key="treeNode.node.id"
-            :tree-node="treeNode"
-            :depth="0"
-            :parent-branch="[]"
-        />
-    </nav>
+    </div>
 </template>

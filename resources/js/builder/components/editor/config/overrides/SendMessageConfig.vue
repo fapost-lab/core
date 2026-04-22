@@ -1,6 +1,6 @@
 <script setup>
 const props = defineProps({
-    node: { type: Object, required: true },
+    node:   { type: Object, required: true },
     schema: { type: Object, required: true },
 })
 
@@ -30,52 +30,46 @@ function removeButton(index) {
 </script>
 
 <template>
-    <div class="flex flex-col gap-4">
-        <div class="flex flex-col gap-1">
-            <label class="text-xs font-medium text-gray-500">Message text <span class="text-red-400">*</span></label>
-            <textarea
-                class="w-full rounded border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400 resize-none"
-                rows="4"
-                :value="props.node.config?.body ?? ''"
-                placeholder="Use {{flow.variable}} for dynamic values"
-                @input="update('body', $event.target.value)"
-            />
-            <span
-                v-pre
-                class="text-xs text-gray-300"
-            >Supports {{flow.*}}, {{system.*}} variables</span>
+    <div>
+        <div class="config-section">
+            <div class="config-label">Body</div>
+            <div class="config-field">
+                <div class="field-label">Message text</div>
+                <textarea
+                    class="field-input"
+                    rows="4"
+                    :value="props.node.config?.body ?? ''"
+                    placeholder="Use {{flow.variable}} for dynamic values"
+                    @input="update('body', $event.target.value)"
+                />
+            </div>
         </div>
 
-        <div class="flex flex-col gap-2">
-            <label class="text-xs font-medium text-gray-500">Buttons</label>
+        <div class="config-section">
+            <div class="config-label">Buttons</div>
             <div
                 v-for="(btn, index) in (props.node.config?.buttons ?? [])"
                 :key="index"
-                class="flex gap-2 items-center"
+                class="repeater-item"
             >
+                <span class="drag-handle">⠿</span>
                 <input
-                    class="flex-1 rounded border border-gray-200 px-2 py-1 text-sm"
+                    class="rep-text field-input"
+                    style="margin:0;padding:2px 6px"
                     :value="btn.label"
                     placeholder="Label"
                     @input="updateButton(index, 'label', $event.target.value)"
                 >
                 <input
-                    class="flex-1 rounded border border-gray-200 px-2 py-1 text-sm"
+                    class="rep-text field-input"
+                    style="margin:0;padding:2px 6px"
                     :value="btn.value"
                     placeholder="Value"
                     @input="updateButton(index, 'value', $event.target.value)"
                 >
-                <button
-                    class="text-gray-300 hover:text-red-400 text-xs"
-                    type="button"
-                    @click="removeButton(index)"
-                >x</button>
+                <span class="rep-del" @click="removeButton(index)">×</span>
             </div>
-            <button
-                class="text-xs text-blue-400 hover:text-blue-500 text-left"
-                type="button"
-                @click="addButton"
-            >
+            <button class="add-item-btn" style="margin-top:4px" type="button" @click="addButton">
                 + Add button
             </button>
         </div>

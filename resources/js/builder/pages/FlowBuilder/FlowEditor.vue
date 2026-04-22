@@ -75,7 +75,7 @@ useEventListener(document, 'keydown', (event) => {
 </script>
 
 <template>
-    <div class="h-screen flex flex-col">
+    <div class="editor-root">
         <AppTopBar
             :flow-name="builderStore.flowName"
             :draft-version="builderStore.draftVersion"
@@ -98,16 +98,28 @@ useEventListener(document, 'keydown', (event) => {
             @preview="() => {}"
         />
 
-        <div
-            v-if="builderStore.activeTab === 'builder'"
-            class="flex-1 flex overflow-hidden"
-        >
-            <FlowStructure class="w-56 border-r shrink-0 overflow-y-auto" />
-            <FlowSequence class="flex-1 overflow-y-auto px-8 py-6" />
-            <ConfigPanel class="w-72 border-l shrink-0 overflow-y-auto" />
+        <div v-if="builderStore.activeTab === 'builder'" class="editor-main">
+            <FlowStructure />
+            <FlowSequence />
+            <ConfigPanel />
         </div>
 
-        <ContentTab v-else />
+        <ContentTab v-else class="editor-main" />
         <ValidationPanel />
     </div>
 </template>
+
+<style scoped>
+.editor-root {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+.editor-main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+}
+</style>
