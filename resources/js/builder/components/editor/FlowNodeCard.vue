@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useSelectionStore } from '@builder/store/selectionStore'
 import { useRegistryStore } from '@builder/store/registryStore'
+import { useBuilderStore } from '@builder/store/builderStore'
 
 const props = defineProps({
     treeNode: { type: Object, required: true },
@@ -9,6 +10,7 @@ const props = defineProps({
 
 const selectionStore = useSelectionStore()
 const registryStore = useRegistryStore()
+const builderStore = useBuilderStore()
 
 const isSelected = computed(() =>
     selectionStore.selectedNodeId === props.treeNode.node.id
@@ -21,14 +23,44 @@ const handlerMeta = computed(() =>
 function select() {
     selectionStore.select(props.treeNode.node.id)
 }
+
+function confirmDelete() {
+    if (window.confirm('Delete this node?')) {
+        builderStore.deleteNode(props.treeNode.node.id)
+    }
+}
 </script>
 
 <template>
     <div
-        class="w-96 rounded-lg border bg-white shadow-sm cursor-pointer transition-all"
+        class="relative group w-96 rounded-lg border bg-white shadow-sm cursor-pointer transition-all"
         :class="isSelected ? 'border-blue-500 ring-2 ring-blue-100' : 'border-gray-200 hover:border-gray-300'"
         @click="select"
     >
+        <div class="absolute right-2 top-2 hidden group-hover:flex gap-1">
+            <button
+                class="p-1 text-gray-300 hover:text-gray-500 text-xs"
+                title="Move up"
+                @click.stop="builderStore.moveNodeUp(treeNode.node.id)"
+            >
+                ↑
+            </button>
+            <button
+                class="p-1 text-gray-300 hover:text-gray-500 text-xs"
+                title="Move down"
+                @click.stop="builderStore.moveNodeDown(treeNode.node.id)"
+            >
+                ↓
+            </button>
+            <button
+                class="p-1 text-gray-300 hover:text-red-400 text-xs"
+                title="Delete"
+                @click.stop="confirmDelete"
+            >
+                ✕
+            </button>
+        </div>
+
         <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
             <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">
                 {{ handlerMeta?.label ?? treeNode.node.type }}

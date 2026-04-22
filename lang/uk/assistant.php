@@ -88,6 +88,7 @@ return [
             'fields' => [
                 'default_language'        => 'Мова за замовчуванням',
                 'default_language_locked' => "Неможливо змінити, якщо є сценарії",
+                'available_languages'     => 'Доступні мови',
                 'default_flow_id'         => 'Сценарій за замовчуванням',
                 'fallback_message'        => 'Резервне повідомлення',
                 'settings'                => 'Налаштування',

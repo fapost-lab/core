@@ -10,10 +10,12 @@ defineProps({
     saveStatus:       { type: String,  default: 'idle' },
     activeTab:        { type: String,  default: 'builder' },
     backUrl:          { type: String,  default: null },
+    canUndo:          { type: Boolean, default: false },
+    canRedo:          { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
-    'tabChange', 'rollback', 'preview', 'validate', 'saveDraft', 'publish',
+    'tabChange', 'rollback', 'preview', 'validate', 'saveDraft', 'publish', 'undo', 'redo',
 ])
 
 const SAVE_COLORS = {
@@ -69,6 +71,8 @@ const SAVE_COLORS = {
 
         <!-- Right -->
         <div class="topbar-right">
+            <button class="btn btn-ghost" :disabled="!canUndo" @click="emit('undo')">↩ Undo</button>
+            <button class="btn btn-ghost" :disabled="!canRedo" @click="emit('redo')">↪ Redo</button>
             <button class="btn btn-ghost" @click="emit('rollback')">↩ {{ t('topbar.rollback') }}</button>
             <div class="sep"></div>
             <button class="btn btn-ghost" @click="emit('preview')">▷ {{ t('topbar.preview') }}</button>
@@ -180,4 +184,5 @@ const SAVE_COLORS = {
 .btn-outline:hover { background: var(--surface-2); }
 .btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
 .btn-primary:hover { background: #4a5c48; }
+.btn:disabled { opacity: .3; cursor: not-allowed; }
 </style>

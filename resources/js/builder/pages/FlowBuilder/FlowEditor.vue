@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted } from 'vue'
+import { useEventListener } from '@vueuse/core'
 import { useBuilderStore }  from '@builder/store/builderStore'
 import { useRegistryStore } from '@builder/store/registryStore'
 import { useAutoSave }      from '@builder/composables/useAutoSave'
@@ -23,6 +24,19 @@ builderStore.init(props.flow)
 onMounted(async () => {
     await registryStore.load()
 })
+
+useEventListener(document, 'keydown', (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'z' && !event.shiftKey) {
+        event.preventDefault()
+        builderStore.undo()
+        return
+    }
+
+    if ((event.metaKey || event.ctrlKey) && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
+        event.preventDefault()
+        builderStore.redo()
+    }
+})
 </script>
 
 <template>
@@ -34,8 +48,12 @@ onMounted(async () => {
             :save-status="builderStore.saveStatus"
             :active-tab="builderStore.activeTab"
             :back-url="backUrl"
+            :can-undo="builderStore.undoStack.length > 0"
+            :can-redo="builderStore.redoStack.length > 0"
             @tab-change="builderStore.setActiveTab"
             @save-draft="save"
+            @undo="builderStore.undo"
+            @redo="builderStore.redo"
             @publish="() => {}"
             @validate="() => {}"
             @rollback="() => {}"

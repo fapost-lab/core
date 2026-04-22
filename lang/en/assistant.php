@@ -88,6 +88,7 @@ return [
             'fields' => [
                 'default_language'        => 'Default language',
                 'default_language_locked' => 'Cannot be changed once flows exist',
+                'available_languages'     => 'Available languages',
                 'default_flow_id'         => 'Default flow',
                 'fallback_message'        => 'Fallback message',
                 'settings'                => 'Settings',

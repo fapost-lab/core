@@ -6,6 +6,7 @@ namespace App\Filament\Assistant\Pages;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Tenancy\Settings\TenantSettings;
 use App\Filament\Support\ContentLanguages;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -35,6 +36,7 @@ final class AssistantSettings extends Page
     protected string $view = 'filament.assistant.pages.assistant-settings';
 
     protected CurrentAssistantInterface $currentAssistant;
+    protected TenantSettings $tenantSettings;
 
     public static function getNavigationGroup(): string|UnitEnum|null
     {
@@ -46,28 +48,40 @@ final class AssistantSettings extends Page
         return __('assistant.pages.settings.title');
     }
 
-    public function boot(CurrentAssistantInterface $currentAssistant): void
+    public function boot(CurrentAssistantInterface $currentAssistant, TenantSettings $tenantSettings): void
     {
         $this->currentAssistant = $currentAssistant;
+        $this->tenantSettings   = $tenantSettings;
     }
 
     public function mount(): void
     {
-        $this->form->fill(
-            $this->currentAssistant->get()->only([
-                'default_language',
-                'default_flow_id',
-                'fallback_message',
-                'settings',
-            ])
-        );
+        $assistantData = $this->currentAssistant->get()->only([
+            'default_language',
+            'default_flow_id',
+            'fallback_message',
+            'settings',
+        ]);
+
+        $assistantData['available_languages'] = $this->tenantSettings->available_languages;
+
+        $this->form->fill($assistantData);
     }
 
     public function save(): void
     {
-        $data = $this->form->getState();
+        /** @var array<string, mixed> $data */
+        $data               = $this->form->getState();
+        $availableLanguages = $data['available_languages'] ?? [];
+        unset($data['available_languages']);
 
         $this->currentAssistant->get()->update($data);
+
+        $this->tenantSettings->available_languages = array_values(array_unique(array_filter(
+            is_array($availableLanguages) ? $availableLanguages : [],
+            static fn (mixed $language): bool => is_string($language) && '' !== $language,
+        )));
+        $this->tenantSettings->save();
 
         Notification::make()
             ->success()
@@ -99,6 +113,12 @@ final class AssistantSettings extends Page
                             ->disabled($hasFlows)
                             ->hintIcon($hasFlows ? Heroicon::OutlinedLockClosed : null)
                             ->hintIconTooltip($hasFlows ? __('assistant.pages.settings.fields.default_language_locked') : null),
+                        Select::make('available_languages')
+                            ->label(__('assistant.pages.settings.fields.available_languages'))
+                            ->options(ContentLanguages::options())
+                            ->multiple()
+                            ->searchable()
+                            ->nullable(),
                         Select::make('default_flow_id')
                             ->label(__('assistant.pages.settings.fields.default_flow_id'))
                             ->options($flowOptions)

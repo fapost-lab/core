@@ -88,6 +88,7 @@ return [
             'fields' => [
                 'default_language'        => 'Язык по умолчанию',
                 'default_language_locked' => 'Нельзя изменить, если есть сценарии',
+                'available_languages'     => 'Доступные языки',
                 'default_flow_id'         => 'Сценарий по умолчанию',
                 'fallback_message'        => 'Сообщение-заглушка',
                 'settings'                => 'Настройки',

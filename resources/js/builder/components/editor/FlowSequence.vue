@@ -85,7 +85,7 @@ const activeNodes = computed(() => resolveBranchNodes(
 <template>
     <div class="flex flex-col items-center gap-0">
         <template v-for="(item, index) in activeNodes" :key="item.node.id">
-            <FlowInsertPoint :before-node-id="item.node.id" :index="index" />
+            <FlowInsertPoint :after-node-id="activeNodes[index - 1]?.node.id ?? null" :index="index" />
             <FlowConditionCard
                 v-if="item.node.type === 'condition'"
                 :tree-node="item"
@@ -94,6 +94,6 @@ const activeNodes = computed(() => resolveBranchNodes(
             <FlowSwitchCard v-else-if="item.node.type === 'switch'" :tree-node="item" />
             <FlowNodeCard v-else :tree-node="item" />
         </template>
-        <FlowInsertPoint :index="activeNodes.length" />
+        <FlowInsertPoint :after-node-id="activeNodes[activeNodes.length - 1]?.node.id ?? null" :index="activeNodes.length" />
     </div>
 </template>
