@@ -10,11 +10,22 @@ use App\Domains\Webhook\Exceptions\InvalidSignatureException;
 use App\Domains\Webhook\Exceptions\WebhookRegistryException;
 use App\Domains\Webhook\Jobs\IncomingMessageJob;
 use App\Domains\Webhook\Services\ChannelAdapterResolver;
+use FAPost\Foundation\DTO\InboundWebhookPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Redis;
 
+/**
+ * Stateless webhook ingress endpoint. Responsible ONLY for:
+ *   1. Signature verification (secret from Redis registry, no DB).
+ *   2. Idempotency deduplication (Redis SET NX).
+ *   3. Routing envelope lookup (Redis registry, no DB).
+ *   4. Dispatching IncomingMessageJob with raw payload.
+ *
+ * No Eloquent, no TenantContext, no payload normalization here.
+ * All domain work (normalize, contact resolve, flow execution) happens in the worker.
+ */
 final class WebhookController extends Controller
 {
     public function __construct(
@@ -23,13 +34,6 @@ final class WebhookController extends Controller
     ) {
     }
 
-    /**
-     * @param  Request  $request
-     * @param  string                    $channel
-     * @param  string                    $hash
-     *
-     * @return JsonResponse
-     */
     public function __invoke(Request $request, string $channel, string $hash): JsonResponse
     {
         try {
@@ -41,45 +45,44 @@ final class WebhookController extends Controller
         }
     }
 
-    /**
-     * @param  Request  $request
-     * @param  string                    $hash
-     *
-     * @return JsonResponse
-     */
     private function handle(Request $request, string $hash): JsonResponse
     {
-        $entry = $this->registryResolver->resolve($hash);
-
+        $entry   = $this->registryResolver->resolve($hash);
         $adapter = $this->adapterResolver->resolve($entry->platform);
 
-        if ( ! $adapter->verifySignature($request->headers->all(), $request->getContent(), $entry->secretToken)) {
+        if ( ! $adapter->verifySignature($request, $entry->secretToken)) {
             throw new InvalidSignatureException('Invalid channel signature.');
         }
 
-        $updateId = (string) $request->json('update_id', '');
+        $idempotencyKey = $adapter->extractIdempotencyKey($request, $entry->channelId);
 
-        if ('' !== $updateId && ! $this->markProcessed($entry->channelId, $updateId)) {
+        if ( ! $this->markProcessed($idempotencyKey)) {
             return response()->json(['ok' => true]);
         }
 
-        $message = $adapter->parseIncoming($request->getContent());
-
-        IncomingMessageJob::dispatch(
-            message: $message,
-            tenantId: $entry->tenantId,
-            assistantId: $entry->assistantId,
-            channelId: $entry->channelId,
-            schema: $entry->schema,
-        )->onQueue('flow.execution');
+        dispatch(
+            new IncomingMessageJob(
+                new InboundWebhookPayload(
+                    tenantId: $entry->tenantId,
+                    schema: $entry->schema,
+                    assistantId: $entry->assistantId,
+                    channelId: $entry->channelId,
+                    platform: $entry->platform->value,
+                    rawPayload: $request->json()->all(),
+                    idempotencyKey: $idempotencyKey,
+                    receivedAt: time(),
+                )
+            )
+        )
+            ->onQueue('flow.execution');
 
         return response()->json(['ok' => true]);
     }
 
-    private function markProcessed(string $channelId, string $updateId): bool
+    private function markProcessed(string $idempotencyKey): bool
     {
-        return (bool) Redis::set(
-            "processed:{$channelId}:{$updateId}",
+        return (bool)Redis::set(
+            "processed:{$idempotencyKey}",
             '1',
             'EX',
             86400,

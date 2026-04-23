@@ -8,24 +8,40 @@ use App\Domains\Contact\Enums\PlatformEnum;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\OutgoingMessage;
 use FAPost\Foundation\DTO\SendResult;
+use Illuminate\Http\Request;
 
 interface ChannelAdapterInterface
 {
     public function platform(): PlatformEnum;
 
     /**
-     * Verify incoming webhook request signature.
-     * Called before any database access, using only headers and request body.
+     * Verify the incoming webhook request signature using the pre-resolved secret.
      *
-     * @param  array<string, string|string[]>  $headers
+     * Called in ingress before any database access.
+     * The secret comes from the Redis webhook registry (write-through cache) — no DB involved.
      */
-    public function verifySignature(array $headers, string $body, string $secret): bool;
+    public function verifySignature(Request $request, string $secret): bool;
 
     /**
-     * Parse webhook body into normalized IncomingMessage.
-     * Called only after successful signature verification.
+     * Extract a platform-specific idempotency key from the request body.
+     *
+     * Called in ingress immediately after signature verification.
+     * Must perform minimal parsing — only the fields needed to build the key.
+     *
+     * @TODO ADR-XX: per-platform format vs hash(raw_body) vs hybrid.
+     *               Decided per-adapter until cross-platform strategy is fixed.
      */
-    public function parseIncoming(string $body): IncomingMessage;
+    public function extractIdempotencyKey(Request $request, string $channelId): string;
+
+    /**
+     * Normalize the raw webhook payload into a platform-agnostic IncomingMessage.
+     *
+     * Called exclusively in the worker (IncomingMessageJob), never in ingress.
+     * Receives the already-decoded payload array that was stored in InboundWebhookPayload.
+     *
+     * @param  array<string, mixed>  $rawPayload
+     */
+    public function normalize(array $rawPayload): IncomingMessage;
 
     public function send(OutgoingMessage $message, string $token): SendResult;
 }

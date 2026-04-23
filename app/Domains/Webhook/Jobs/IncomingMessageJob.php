@@ -14,12 +14,25 @@ use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
-use FAPost\Foundation\DTO\IncomingMessage;
+use App\Domains\Webhook\Services\ChannelAdapterResolver;
+use FAPost\Foundation\DTO\InboundWebhookPayload;
 use FAPost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use FAPost\Foundation\Flow\DTO\TriggerContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Cache;
 
+/**
+ * Processes an inbound webhook event inside the tenant context.
+ *
+ * Execution order (must be strictly preserved):
+ *   1. Switch to tenant schema.
+ *   2. Normalize raw payload → IncomingMessage.
+ *   3. Acquire distributed lock (platform_user_id based, before any DB write).
+ *   4. findOrCreate contact.
+ *   5. Resume / start flow session.
+ *   6. Release lock.
+ */
 final class IncomingMessageJob implements ShouldQueue
 {
     use Queueable;
@@ -27,16 +40,13 @@ final class IncomingMessageJob implements ShouldQueue
     public int $tries = 5;
 
     public function __construct(
-        public readonly IncomingMessage $message,
-        public readonly string $tenantId,
-        public readonly string $assistantId,
-        public readonly string $channelId,
-        public readonly string $schema,
+        public readonly InboundWebhookPayload $payload,
     ) {
     }
 
     public function handle(
         TenantSwitcher $switcher,
+        ChannelAdapterResolver $adapterResolver,
         CurrentAssistantInterface $currentAssistant,
         AssistantRepositoryInterface $assistants,
         ContactServiceInterface $contactService,
@@ -45,53 +55,84 @@ final class IncomingMessageJob implements ShouldQueue
         FlowOrchestratorInterface $orchestrator,
     ): void {
         $tenant = new RuntimeTenant(
-            id: $this->tenantId,
-            schemaName: $this->schema,
+            id: $this->payload->tenantId,
+            schemaName: $this->payload->schema,
         );
 
         $switcher->runForTenant(
             $tenant,
-            function () use ($contactService, $currentAssistant, $sessions, $triggerResolver, $orchestrator, $assistants): void {
-                $assistant = $assistants->findById($this->assistantId);
-                $currentAssistant->set($assistant);
+            function () use (
+                $adapterResolver,
+                $currentAssistant,
+                $assistants,
+                $contactService,
+                $sessions,
+                $triggerResolver,
+                $orchestrator,
+            ): void {
+                $adapter        = $adapterResolver->resolve(PlatformEnum::from($this->payload->platform));
+                $inboundMessage = $adapter->normalize($this->payload->rawPayload);
 
-                $contact = $contactService->findOrCreate(
-                    tenantId: $this->tenantId,
-                    platform: PlatformEnum::from($this->message->platform),
-                    externalId: $this->message->externalUserId,
-                    meta: $this->message->payload,
-                    defaultLanguage: $assistant->default_language,
+                $lockKey = sprintf(
+                    'session_lock:%s:%s:%s:%s',
+                    $this->payload->tenantId,
+                    $this->payload->platform,
+                    $inboundMessage->externalUserId,
+                    $this->payload->assistantId,
                 );
 
-                $contactService->findOrCreateChannelContact(
-                    contact: $contact,
-                    channelId: $this->channelId,
-                );
+                $lock = Cache::lock($lockKey, 30);
 
-                $activeSession = $sessions->findActiveForContact($contact, $this->assistantId);
-
-                $trigger = null;
-
-                if (null === $activeSession) {
-                    $trigger = $triggerResolver->resolve(
-                        new TriggerContext(
-                            type: FlowTriggerType::Message->value,
-                            tenantId: $this->tenantId,
-                            assistantId: $this->assistantId,
-                            payload: [
-                                'text'             => $this->message->text,
-                                'incoming_payload' => $this->message->payload,
-                            ],
-                        )
-                    );
-                }
-
-                try {
-                    $orchestrator->handle($contact, $this->message, $this->assistantId, $trigger);
-                } catch (SessionLockTimeoutException) {
+                if ( ! $lock->get()) {
                     $this->release($this->lockMissDelay($this->attempts()));
 
                     return;
+                }
+
+                try {
+                    $assistant = $assistants->findById($this->payload->assistantId);
+                    $currentAssistant->set($assistant);
+
+                    $contact = $contactService->findOrCreate(
+                        tenantId: $this->payload->tenantId,
+                        platform: PlatformEnum::from($this->payload->platform),
+                        externalId: $inboundMessage->externalUserId,
+                        meta: $inboundMessage->payload,
+                        defaultLanguage: $assistant->default_language,
+                    );
+
+                    $contactService->findOrCreateChannelContact(
+                        contact: $contact,
+                        channelId: $this->payload->channelId,
+                    );
+
+                    $activeSession = $sessions->findActiveForContact($contact, $this->payload->assistantId);
+
+                    $trigger = null;
+
+                    if (null === $activeSession) {
+                        $trigger = $triggerResolver->resolve(
+                            new TriggerContext(
+                                type: FlowTriggerType::Message->value,
+                                tenantId: $this->payload->tenantId,
+                                assistantId: $this->payload->assistantId,
+                                payload: [
+                                    'text'             => $inboundMessage->text,
+                                    'incoming_payload' => $inboundMessage->payload,
+                                ],
+                            )
+                        );
+                    }
+
+                    try {
+                        $orchestrator->handle($contact, $inboundMessage, $this->payload->assistantId, $trigger);
+                    } catch (SessionLockTimeoutException) {
+                        $this->release($this->lockMissDelay($this->attempts()));
+
+                        return;
+                    }
+                } finally {
+                    $lock->release();
                 }
             }
         );

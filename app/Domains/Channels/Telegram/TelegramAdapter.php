@@ -6,18 +6,22 @@ namespace App\Domains\Channels\Telegram;
 
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
-use App\Domains\Webhook\Exceptions\InvalidSignatureException;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\OutgoingMessage;
 use FAPost\Foundation\DTO\SendResult;
 use Illuminate\Http\Request;
-use JsonException;
 
 /**
  * Telegram implementation of the inbound webhook adapter contract.
+ *
+ * Implements two distinct responsibilities:
+ *   - Ingress methods (verifySignature, extractIdempotencyKey): minimal, stateless, no DB.
+ *   - Worker method (normalize): full payload parsing via TelegramInboundNormalizer.
  */
 final readonly class TelegramAdapter implements ChannelAdapterInterface
 {
+    private const string SECRET_HEADER = 'x-telegram-bot-api-secret-token';
+
     public function __construct(
         private TelegramSignatureVerifier $signatureVerifier,
         private TelegramInboundNormalizer $normalizer,
@@ -33,30 +37,43 @@ final readonly class TelegramAdapter implements ChannelAdapterInterface
     }
 
     /**
-     * Validate the Telegram webhook secret header.
+     * Verify the Telegram secret token header against the pre-resolved secret from Redis registry.
      */
-    public function verifySignature(array $headers, string $body, string $secret): bool
+    public function verifySignature(Request $request, string $secret): bool
     {
-        $headerToken = $headers['x-telegram-bot-api-secret-token'] ?? '';
+        $headerToken = (string) $request->header(self::SECRET_HEADER, '');
 
-        if (is_array($headerToken)) {
-            $headerToken = $headerToken[0] ?? '';
-        }
-
-        return $this->signatureVerifier->verify((string) $headerToken, $secret);
+        return $this->signatureVerifier->verify($headerToken, $secret);
     }
 
     /**
-     * Parse and normalize the raw Telegram webhook body.
+     * Build the Telegram idempotency key from channel ID and update_id.
      *
-     * @throws JsonException
+     * Parses only update_id — the minimum needed for deduplication.
+     * Full normalization happens in the worker.
+     *
+     * Format: tg:{channelId}:{update_id}
+     *
+     * @TODO ADR-XX: per-platform format vs hash(raw_body) vs hybrid.
+     *               Decided per-adapter until cross-platform strategy is fixed.
      */
-    public function parseIncoming(string $body): IncomingMessage
+    public function extractIdempotencyKey(Request $request, string $channelId): string
     {
-        /** @var array<string, mixed> $payload */
-        $payload = json_decode($body, true, flags: JSON_THROW_ON_ERROR);
+        $updateId = (string) ($request->json('update_id') ?? '');
 
-        return $this->normalizer->normalize($payload);
+        return "tg:{$channelId}:{$updateId}";
+    }
+
+    /**
+     * Normalize the decoded Telegram webhook payload into a platform-agnostic IncomingMessage.
+     *
+     * Called only from IncomingMessageJob (worker), never from ingress.
+     *
+     * @param  array<string, mixed>  $rawPayload
+     */
+    public function normalize(array $rawPayload): IncomingMessage
+    {
+        return $this->normalizer->normalize($rawPayload);
     }
 
     /**
@@ -65,26 +82,5 @@ final readonly class TelegramAdapter implements ChannelAdapterInterface
     public function send(OutgoingMessage $message, string $token): SendResult
     {
         return SendResult::fail('TelegramAdapter::send is not used in messaging pipeline.');
-    }
-
-    /**
-     * @param  Request     $request
-     * @param  array{secret_token: string}  $registryPayload
-     *
-     * @return IncomingMessage
-     */
-    public function handle(Request $request, array $registryPayload): IncomingMessage
-    {
-        $secretToken = (string) ($registryPayload['secret_token'] ?? '');
-        $headerToken = (string) $request->header('x-telegram-bot-api-secret-token', '');
-
-        if ( ! $this->signatureVerifier->verify($headerToken, $secretToken)) {
-            throw new InvalidSignatureException('Invalid Telegram webhook signature.');
-        }
-
-        /** @var array<string, mixed> $payload */
-        $payload = $request->json()->all();
-
-        return $this->normalizer->normalize($payload);
     }
 }

@@ -15,12 +15,14 @@ final class TelegramInboundNormalizer
      */
     public function normalize(array $update): IncomingMessage
     {
-        if (isset($update['message']) && is_array($update['message'])) {
-            return $this->normalizeMessage($update);
-        }
-
+        // callback_query must take precedence: when a user presses an inline button,
+        // Telegram sends both the original message and the callback_query in the same update.
         if (isset($update['callback_query']) && is_array($update['callback_query'])) {
             return $this->normalizeCallbackQuery($update);
+        }
+
+        if (isset($update['message']) && is_array($update['message'])) {
+            return $this->normalizeMessage($update);
         }
 
         throw new UnsupportedUpdateTypeException('Unsupported Telegram update type.');
