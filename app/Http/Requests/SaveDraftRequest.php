@@ -19,6 +19,7 @@ final class SaveDraftRequest extends FormRequest
         return [
             'draft_version' => ['required', 'integer', 'min:1'],
             'definition'    => ['required', 'array'],
+            'trigger'       => ['nullable', 'array'],
         ];
     }
 }

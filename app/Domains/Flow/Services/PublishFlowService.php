@@ -32,7 +32,6 @@ final readonly class PublishFlowService
 
             $lastVersion = FlowDefinition::query()
                 ->where('flow_id', $draft->flow_id)
-                ->lockForUpdate()
                 ->max('version');
 
             $newVersion = ($lastVersion ?? 0) + 1;

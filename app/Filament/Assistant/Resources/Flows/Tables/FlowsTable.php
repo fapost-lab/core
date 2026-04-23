@@ -7,6 +7,7 @@ namespace App\Filament\Assistant\Resources\Flows\Tables;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Models\FlowTrigger;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
@@ -19,6 +20,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
+use Illuminate\Support\Str;
 
 final class FlowsTable
 {
@@ -27,6 +29,7 @@ final class FlowsTable
         return $table
             ->columns([
                 TextColumn::make('name')
+                    ->description(fn (FlowDraft $record): ?string => self::summarizeTrigger($record->trigger))
                     ->searchable()
                     ->sortable(),
 
@@ -60,8 +63,6 @@ final class FlowsTable
                     )
                     ->collapsible(),
             ])
-            ->defaultGroup('flow_group_id')
-            ->collapsedGroupsByDefault(false)
             ->filters([
                 SelectFilter::make('flow_group_id')
                     ->relationship('group', 'name')
@@ -113,5 +114,74 @@ final class FlowsTable
             ->bulkActions([
                 DeleteBulkAction::make(),
             ]);
+    }
+
+    public static function summarizeTrigger(?FlowTrigger $trigger): ?string
+    {
+        if (null === $trigger) {
+            return null;
+        }
+
+        /** @var array<string, mixed> $config */
+        $config = is_array($trigger->config) ? $trigger->config : [];
+
+        return match ($trigger->type->value) {
+            'message' => __('assistant.flows.trigger_summary.message', [
+                'keywords' => self::summarizeList($config['keywords'] ?? []),
+                'phrases'  => self::summarizeList($config['phrases'] ?? []),
+            ]),
+            'event' => __('assistant.flows.trigger_summary.event', [
+                'event' => self::stringOrDash($config['event_name'] ?? null),
+            ]),
+            'schedule' => __('assistant.flows.trigger_summary.schedule', [
+                'cron'     => self::stringOrDash($config['cron'] ?? null),
+                'timezone' => self::stringOrDash($config['timezone'] ?? null),
+            ]),
+            'webhook' => __('assistant.flows.trigger_summary.webhook', [
+                'method' => self::stringOrDash($config['method'] ?? null),
+                'path'   => self::stringOrDash($config['path'] ?? null),
+            ]),
+            'api' => __('assistant.flows.trigger_summary.api', [
+                'route_key'       => self::stringOrDash($config['route_key'] ?? null),
+                'allowed_sources' => self::summarizeList($config['allowed_sources'] ?? []),
+            ]),
+            default => __('assistant.flows.trigger_summary.unknown'),
+        };
+    }
+
+    /**
+     * @param  mixed  $value
+     */
+    private static function stringOrDash(mixed $value): string
+    {
+        return is_string($value) && '' !== mb_trim($value) ? mb_trim($value) : '—';
+    }
+
+    /**
+     * @param  mixed  $values
+     */
+    private static function summarizeList(mixed $values): string
+    {
+        if ( ! is_array($values)) {
+            return '—';
+        }
+
+        $items = array_values(array_filter(array_map(
+            static fn (mixed $value): ?string => is_string($value) && '' !== mb_trim($value) ? mb_trim($value) : null,
+            $values,
+        )));
+
+        if ([] === $items) {
+            return '—';
+        }
+
+        $visible = array_slice($items, 0, 3);
+        $summary = implode(', ', $visible);
+
+        if (count($items) > 3) {
+            $summary .= ' +' . (count($items) - 3);
+        }
+
+        return Str::limit($summary, 80);
     }
 }

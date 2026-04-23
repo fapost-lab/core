@@ -49,6 +49,14 @@ return [
             'title' => 'Невозможно удалить',
             'body'  => 'У этого сценария есть активные сессии. Сначала деактивируйте его.',
         ],
+        'trigger_summary' => [
+            'message'  => 'Сообщение: ключевые слова :keywords; фразы :phrases',
+            'event'    => 'Событие: :event',
+            'schedule' => 'Расписание: :cron (:timezone)',
+            'webhook'  => 'Вебхук: :method :path',
+            'api'      => 'API: :route_key; источники :allowed_sources',
+            'unknown'  => 'Триггер настроен',
+        ],
     ],
     'flow_groups' => [
         'label'        => 'Группа',

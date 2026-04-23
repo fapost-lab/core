@@ -19,6 +19,7 @@ use App\Domains\Flow\Contracts\LanguageResolverInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationServiceInterface;
 use App\Domains\Flow\Handlers\ConditionNodeHandler;
@@ -37,9 +38,11 @@ use App\Domains\Flow\Repositories\FlowDefinitionRepository;
 use App\Domains\Flow\Repositories\FlowDraftRepository;
 use App\Domains\Flow\Repositories\FlowSessionRepository;
 use App\Domains\Flow\Repositories\FlowTriggerRepository;
+use App\Domains\Flow\Repositories\TenantEventRepository;
 use App\Domains\Flow\Repositories\TenantTranslationRepository;
 use App\Domains\Flow\Services\FlowEngine;
 use App\Domains\Flow\Services\FlowGraphResolver;
+use App\Domains\Flow\Services\FlowMessageSender;
 use App\Domains\Flow\Services\FlowSessionPersister;
 use App\Domains\Flow\Services\LanguageResolver;
 use App\Domains\Flow\Services\Resolvers\ApiTriggerResolver;
@@ -56,12 +59,12 @@ use App\Domains\Flow\State\Resolvers\SessionStateResolver;
 use App\Domains\Flow\State\StateNamespace;
 use App\Domains\Flow\Support\LaravelHttpClient;
 use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
-use App\Domains\Flow\Support\NullMessageSender;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
 use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
 use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\FlowExecutionGuard;
 use FAPost\Foundation\Flow\Contracts\TriggerResolverInterface;
+use FAPost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\ServiceProvider;
@@ -135,10 +138,16 @@ final class FlowServiceProvider extends ServiceProvider
             fn ($app): ModuleDataAccessorRegistry => $app->make(ModuleDataAccessorRegistry::class)
         );
         $this->app->singleton(HttpClientInterface::class, LaravelHttpClient::class);
-        $this->app->singleton(MessageSenderInterface::class, NullMessageSender::class);
+        $this->app->singleton(
+            MessageSenderInterface::class,
+            fn ($app): FlowMessageSender => new FlowMessageSender(
+                $app->make(OutboundMessageSenderInterface::class),
+            )
+        );
         $this->app->bind(LanguageResolverInterface::class, LanguageResolver::class);
         $this->app->bind(ContentTranslatorInterface::class, CachedContentTranslator::class);
         $this->app->bind(TenantTranslationRepositoryInterface::class, TenantTranslationRepository::class);
+        $this->app->bind(TenantEventRepositoryInterface::class, TenantEventRepository::class);
         $this->app->bind(TenantTranslationServiceInterface::class, TenantTranslationService::class);
         $this->app->singleton(TemplateResolver::class);
 

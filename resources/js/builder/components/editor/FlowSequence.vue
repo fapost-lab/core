@@ -74,8 +74,40 @@ const breadcrumbs = computed(() => {
 
 const isAtRoot = computed(() => selectionStore.activeBranch.length === 0)
 
-/** Generic trigger placeholder — real trigger config shown in a future trigger node */
-const triggerLabel = computed(() => ({ label: 'Trigger', sub: 'Configured separately' }))
+const triggerLabel = computed(() => {
+    if (!builderStore.trigger || builderStore.trigger._delete === true) {
+        return {
+            label: 'No trigger configured',
+            sub: 'Click to add a trigger',
+        }
+    }
+
+    const type = builderStore.trigger.type.replace(/_/g, ' ')
+    const label = `${type.charAt(0).toUpperCase()}${type.slice(1)} trigger`
+
+    if (builderStore.trigger.type === 'message') {
+        const keywords = builderStore.trigger.config?.keywords ?? []
+        const phrases = builderStore.trigger.config?.phrases ?? []
+        const total = keywords.length + phrases.length
+
+        return {
+            label,
+            sub: total > 0 ? `${total} message matcher${total > 1 ? 's' : ''}` : 'No phrases or keywords yet',
+        }
+    }
+
+    if (builderStore.trigger.type === 'event') {
+        return {
+            label,
+            sub: builderStore.trigger.config?.event_name ?? 'No event selected',
+        }
+    }
+
+    return {
+        label,
+        sub: builderStore.trigger.is_active ? 'Active' : 'Inactive',
+    }
+})
 
 const hoveredSlot = ref(null)
 
@@ -101,7 +133,7 @@ function goToRoot() {
 
             <!-- Trigger card (only at root) -->
             <template v-if="isAtRoot">
-                <div class="trigger-card">
+                <div class="trigger-card" @click="selectionStore.selectTrigger()">
                     <div class="trigger-icon">⚡</div>
                     <div>
                         <div class="trigger-label">{{ triggerLabel.label }}</div>

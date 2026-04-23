@@ -17,6 +17,7 @@ export function useAutoSave() {
             const { draft_version: draftVersion } = await saveDraft(
                 store.flowId,
                 store.definition,
+                store.trigger,
                 store.draftVersion,
             );
 
@@ -31,7 +32,7 @@ export function useAutoSave() {
         }
     }, 1500);
 
-    watch(() => store.definition, save, { deep: true });
+    watch(() => [store.definition, store.trigger], save, { deep: true });
 
     return { save };
 }

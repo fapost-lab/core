@@ -7,6 +7,8 @@ namespace App\Domains\Channels\Telegram;
 use App\Domains\Channels\Telegram\Dto\SendDocumentDto;
 use App\Domains\Channels\Telegram\Dto\SendMessageDto;
 use App\Domains\Channels\Telegram\Dto\SendPhotoDto;
+use App\Domains\Channels\Telegram\Dto\SendVideoDto;
+use App\Domains\Channels\Telegram\Dto\SendVoiceDto;
 use App\Domains\Channels\Telegram\Dto\SetWebhookDto;
 use App\Domains\Channels\Telegram\Exceptions\TelegramApiException;
 use Illuminate\Http\Client\ConnectionException;
@@ -32,7 +34,7 @@ final readonly class TelegramBotApiClient
      */
     public function sendMessage(SendMessageDto $dto): array
     {
-        return $this->request('sendMessage', $dto->toArray());
+        return $this->request('sendMessage', array_filter($dto->toArray(), static fn (mixed $value): bool => null !== $value));
     }
 
     /**
@@ -40,7 +42,7 @@ final readonly class TelegramBotApiClient
      */
     public function sendPhoto(SendPhotoDto $dto): array
     {
-        return $this->request('sendPhoto', $dto->toArray());
+        return $this->request('sendPhoto', array_filter($dto->toArray(), static fn (mixed $value): bool => null !== $value));
     }
 
     /**
@@ -48,7 +50,23 @@ final readonly class TelegramBotApiClient
      */
     public function sendDocument(SendDocumentDto $dto): array
     {
-        return $this->request('sendDocument', $dto->toArray());
+        return $this->request('sendDocument', array_filter($dto->toArray(), static fn (mixed $value): bool => null !== $value));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function sendVideo(SendVideoDto $dto): array
+    {
+        return $this->request('sendVideo', array_filter($dto->toArray(), static fn (mixed $value): bool => null !== $value));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function sendVoice(SendVoiceDto $dto): array
+    {
+        return $this->request('sendVoice', array_filter($dto->toArray(), static fn (mixed $value): bool => null !== $value));
     }
 
     /**

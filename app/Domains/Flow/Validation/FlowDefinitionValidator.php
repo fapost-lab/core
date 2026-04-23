@@ -135,6 +135,24 @@ final readonly class FlowDefinitionValidator
             }
         }
 
+        foreach ($nodeMap as $nodeId => $node) {
+            if (($node['type'] ?? null) !== 'send_message') {
+                continue;
+            }
+
+            $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+
+            if (($config['keyboard_mode'] ?? null) !== 'reply') {
+                continue;
+            }
+
+            if (isset($adjacency[$nodeId]['default'])) {
+                throw $this->validationException(
+                    "send_message node with keyboard_mode=reply must be terminal — 'default' output cannot be connected"
+                );
+            }
+        }
+
         return [
             'entry_node_id'     => $entryNodeId,
             'adjacency'         => $adjacency,

@@ -14,7 +14,7 @@ use Tests\Feature\FeatureTestCase;
 
 final class MessageTriggerResolverTest extends FeatureTestCase
 {
-    public function test_it_resolves_first_match_by_priority(): void
+    public function test_it_prefers_exact_match_over_higher_priority_contains_match(): void
     {
         $this->createAssistant('assistant-1');
 
@@ -24,10 +24,10 @@ final class MessageTriggerResolverTest extends FeatureTestCase
             'flow_id'      => 'flow-contains',
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
-            'priority'     => 200,
+            'priority'     => 100,
             'config'       => [
-                'keywords' => ['help'],
-                'match'    => 'contains',
+                'keywords' => ['vacation'],
+                'phrases'  => [],
             ],
         ]);
 
@@ -37,10 +37,10 @@ final class MessageTriggerResolverTest extends FeatureTestCase
             'flow_id'      => 'flow-exact',
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
-            'priority'     => 100,
+            'priority'     => 200,
             'config'       => [
-                'keywords' => ['help'],
-                'match'    => 'exact',
+                'keywords' => ['vacation leave'],
+                'phrases'  => [],
             ],
         ]);
 
@@ -51,7 +51,7 @@ final class MessageTriggerResolverTest extends FeatureTestCase
                 type: FlowTriggerType::Message->value,
                 tenantId: 'tenant-1',
                 assistantId: 'assistant-1',
-                payload: ['text' => 'help'],
+                payload: ['text' => 'vacation leave'],
             )
         );
 
@@ -59,20 +59,20 @@ final class MessageTriggerResolverTest extends FeatureTestCase
         $this->assertSame('flow-exact', $trigger->flowId);
     }
 
-    public function test_it_supports_regex_match_mode(): void
+    public function test_it_matches_normalized_text_before_contains_fallback(): void
     {
         $this->createAssistant('assistant-1');
 
         FlowTrigger::query()->create([
             'tenant_id'    => 'tenant-1',
             'assistant_id' => 'assistant-1',
-            'flow_id'      => 'flow-regex',
+            'flow_id'      => 'flow-normalized',
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
             'priority'     => 100,
             'config'       => [
-                'keywords' => ['/^\d{4}$/'],
-                'match'    => 'regex',
+                'keywords' => ['otp'],
+                'phrases'  => [],
             ],
         ]);
 
@@ -83,28 +83,28 @@ final class MessageTriggerResolverTest extends FeatureTestCase
                 type: FlowTriggerType::Message->value,
                 tenantId: 'tenant-1',
                 assistantId: 'assistant-1',
-                payload: ['text' => '1234'],
+                payload: ['text' => ' OTP!!! '],
             )
         );
 
         $this->assertNotNull($trigger);
-        $this->assertSame('flow-regex', $trigger->flowId);
+        $this->assertSame('flow-normalized', $trigger->flowId);
     }
 
-    public function test_it_does_not_mutate_regex_case_sensitivity(): void
+    public function test_it_uses_contains_fallback_after_exact_lookup(): void
     {
         $this->createAssistant('assistant-1');
 
         FlowTrigger::query()->create([
             'tenant_id'    => 'tenant-1',
             'assistant_id' => 'assistant-1',
-            'flow_id'      => 'flow-case-sensitive-regex',
+            'flow_id'      => 'flow-contains',
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
             'priority'     => 100,
             'config'       => [
-                'keywords' => ['/[A-Z]{4}/'],
-                'match'    => 'regex',
+                'keywords' => ['vacation'],
+                'phrases'  => [],
             ],
         ]);
 
@@ -115,11 +115,12 @@ final class MessageTriggerResolverTest extends FeatureTestCase
                 type: FlowTriggerType::Message->value,
                 tenantId: 'tenant-1',
                 assistantId: 'assistant-1',
-                payload: ['text' => 'abcd'],
+                payload: ['text' => 'I want vacation tomorrow'],
             )
         );
 
-        $this->assertNull($trigger);
+        $this->assertNotNull($trigger);
+        $this->assertSame('flow-contains', $trigger->flowId);
     }
 
     public function test_it_uses_global_trigger_when_assistant_specific_does_not_match(): void
@@ -133,7 +134,7 @@ final class MessageTriggerResolverTest extends FeatureTestCase
             'priority'     => 100,
             'config'       => [
                 'keywords' => ['/start'],
-                'match'    => 'exact',
+                'phrases'  => [],
             ],
         ]);
 
@@ -165,7 +166,7 @@ final class MessageTriggerResolverTest extends FeatureTestCase
             'priority'     => 100,
             'config'       => [
                 'keywords' => ['/start'],
-                'match'    => 'exact',
+                'phrases'  => [],
             ],
         ]);
 
@@ -178,7 +179,7 @@ final class MessageTriggerResolverTest extends FeatureTestCase
             'priority'     => 100,
             'config'       => [
                 'keywords' => ['/start'],
-                'match'    => 'exact',
+                'phrases'  => [],
             ],
         ]);
 
@@ -197,7 +198,7 @@ final class MessageTriggerResolverTest extends FeatureTestCase
         $this->assertSame('flow-assistant', $trigger->flowId);
     }
 
-    public function test_it_rejects_invalid_regex_in_message_trigger_config(): void
+    public function test_it_rejects_empty_message_trigger_config(): void
     {
         $this->createAssistant('assistant-1');
 
@@ -206,13 +207,13 @@ final class MessageTriggerResolverTest extends FeatureTestCase
         FlowTrigger::query()->create([
             'tenant_id'    => 'tenant-1',
             'assistant_id' => 'assistant-1',
-            'flow_id'      => 'flow-invalid-regex',
+            'flow_id'      => 'flow-invalid-message',
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
             'priority'     => 100,
             'config'       => [
-                'keywords' => ['/[a-z+/'],
-                'match'    => 'regex',
+                'keywords' => [],
+                'phrases'  => [],
             ],
         ]);
     }

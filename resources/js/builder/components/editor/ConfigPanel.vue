@@ -9,6 +9,7 @@ import SchemaConfigRenderer from './config/SchemaConfigRenderer.vue'
 import SendMessageConfig from './config/overrides/SendMessageConfig.vue'
 import InputConfig from './config/overrides/InputConfig.vue'
 import ConditionConfig from './config/overrides/ConditionConfig.vue'
+import TriggerConfig from './config/overrides/TriggerConfig.vue'
 
 const OVERRIDES = {
     send_message: SendMessageConfig,
@@ -24,6 +25,8 @@ const { width, isCollapsed, handleRef, toggle } = useConfigResize()
 const selectedNode = computed(() =>
     builderStore.definition.nodes.find((n) => n.id === selectionStore.selectedNodeId) ?? null
 )
+
+const isTriggerSelected = computed(() => selectionStore.selectedNodeId === '__trigger__')
 
 const handlerMeta = computed(() =>
     selectedNode.value
@@ -49,6 +52,14 @@ function updateConfig(patch) {
     if (!selectionStore.selectedNodeId) return
     builderStore.updateNodeConfig(selectionStore.selectedNodeId, patch)
 }
+
+function updateTrigger(trigger) {
+    builderStore.setTrigger(trigger)
+}
+
+function deleteTrigger() {
+    builderStore.deleteTrigger()
+}
 </script>
 
 <template>
@@ -66,13 +77,35 @@ function updateConfig(patch) {
 
         <template v-if="!isCollapsed">
             <!-- empty state -->
-            <div v-if="!selectedNode" class="config-empty">
+            <div v-if="!selectedNode && !isTriggerSelected" class="config-empty">
                 <div class="config-empty-icon">☰</div>
                 <div class="config-empty-text">Select a node to<br>configure it</div>
             </div>
 
+            <template v-else-if="isTriggerSelected">
+                <div class="config-node-header">
+                    <div
+                        class="node-type-icon"
+                        style="width:28px;height:28px;font-size:13px;background:var(--sky-bg);color:var(--sky)"
+                    >⚡</div>
+                    <div style="flex:1;min-width:0">
+                        <div class="config-node-title">Trigger</div>
+                        <span class="config-node-type">Flow entry configuration</span>
+                    </div>
+                </div>
+
+                <div class="config-scrollable">
+                    <TriggerConfig
+                        :trigger="builderStore.trigger"
+                        :available-events="builderStore.availableEvents"
+                        @update:trigger="updateTrigger"
+                        @delete:trigger="deleteTrigger"
+                    />
+                </div>
+            </template>
+
             <!-- node config -->
-            <template v-else>
+            <template v-else-if="selectedNode">
                 <div class="config-node-header">
                     <div
                         v-if="colors"

@@ -35,6 +35,8 @@ export const useBuilderStore = defineStore('builder', () => {
     const draftVersion = ref(null);
     const publishedVersion = ref(null);
     const definition = ref({ nodes: [], edges: [] });
+    const trigger = ref(null);
+    const availableEvents = ref([]);
     const tree = computed(() => buildTree(
         definition.value.nodes ?? [],
         definition.value.edges ?? [],
@@ -72,6 +74,8 @@ export const useBuilderStore = defineStore('builder', () => {
         draftVersion.value = flow.draftVersion;
         publishedVersion.value = flow.publishedVersion ?? null;
         definition.value = normalizeDefinition(flow.definition);
+        trigger.value = normalizeTrigger(flow.trigger);
+        availableEvents.value = Array.isArray(flow.availableEvents) ? flow.availableEvents : [];
     }
 
     /**
@@ -86,6 +90,31 @@ export const useBuilderStore = defineStore('builder', () => {
      */
     function setPublishedVersion(version) {
         publishedVersion.value = version;
+    }
+
+    /**
+     * @param {import('@builder/dto/types').BuilderTriggerPayload|null} nextTrigger
+     */
+    function setTrigger(nextTrigger) {
+        trigger.value = normalizeTrigger(nextTrigger);
+    }
+
+    /**
+     * @param {Record<string, unknown>} patch
+     */
+    function updateTrigger(patch) {
+        trigger.value = {
+            ...(trigger.value ?? defaultTrigger()),
+            ...patch,
+            config: {
+                ...(trigger.value?.config ?? defaultTrigger().config),
+                ...(patch.config ?? {}),
+            },
+        };
+    }
+
+    function deleteTrigger() {
+        trigger.value = { _delete: true };
     }
 
     /**
@@ -343,6 +372,8 @@ export const useBuilderStore = defineStore('builder', () => {
         draftVersion,
         publishedVersion,
         definition,
+        trigger,
+        availableEvents,
         tree,
         saveStatus,
         activeTab,
@@ -354,6 +385,9 @@ export const useBuilderStore = defineStore('builder', () => {
         init,
         setDraftVersion,
         setPublishedVersion,
+        setTrigger,
+        updateTrigger,
+        deleteTrigger,
         setSaveStatus,
         setActiveTab,
         setValidationResult,
@@ -367,3 +401,44 @@ export const useBuilderStore = defineStore('builder', () => {
         moveNodeDown,
     };
 });
+
+/**
+ * @param {unknown} raw
+ * @returns {import('@builder/dto/types').BuilderTriggerPayload|null}
+ */
+function normalizeTrigger(raw) {
+    if (!raw || typeof raw !== 'object') {
+        return null;
+    }
+
+    const trigger = /** @type {{ _delete?: unknown, type?: unknown, is_active?: unknown, priority?: unknown, config?: unknown }} */ (raw);
+    if (trigger._delete === true) {
+        return { _delete: true };
+    }
+
+    if (typeof trigger.type !== 'string') {
+        return null;
+    }
+
+    return {
+        type: trigger.type,
+        is_active: typeof trigger.is_active === 'boolean' ? trigger.is_active : true,
+        priority: Number.isInteger(trigger.priority) ? trigger.priority : 100,
+        config: typeof trigger.config === 'object' && trigger.config !== null ? trigger.config : {},
+    };
+}
+
+/**
+ * @returns {import('@builder/dto/types').BuilderTriggerPayload}
+ */
+function defaultTrigger() {
+    return {
+        type: 'message',
+        is_active: true,
+        priority: 100,
+        config: {
+            keywords: [],
+            phrases: [],
+        },
+    };
+}

@@ -32,8 +32,13 @@ final readonly class MessageTriggerResolver implements TriggerTypeResolverInterf
             type: FlowTriggerType::Message->value,
         );
 
+        $normalizedText  = $this->normalizeText(mb_trim($messageText));
+        $containsTrigger = null;
+
         foreach ($triggers as $trigger) {
-            if ($this->matchesTextTrigger($trigger, $messageText)) {
+            $matchType = $this->matchType($trigger, $normalizedText);
+
+            if ('exact' === $matchType) {
                 return new ResolvedTrigger(
                     triggerId: (string)$trigger->getKey(),
                     flowId: $trigger->flow_id,
@@ -45,43 +50,79 @@ final readonly class MessageTriggerResolver implements TriggerTypeResolverInterf
                     ],
                 );
             }
+
+            if ('contains' === $matchType && null === $containsTrigger) {
+                $containsTrigger = $trigger;
+            }
+        }
+
+        if ($containsTrigger instanceof FlowTrigger) {
+            return new ResolvedTrigger(
+                triggerId: (string)$containsTrigger->getKey(),
+                flowId: $containsTrigger->flow_id,
+                type: $containsTrigger->type->value,
+                config: $containsTrigger->config,
+                metadata: [
+                    'tenant_id'    => $context->tenantId,
+                    'assistant_id' => $context->assistantId,
+                ],
+            );
         }
 
         return null;
     }
 
-    private function matchesTextTrigger(FlowTrigger $trigger, string $messageText): bool
+    private function matchType(FlowTrigger $trigger, string $normalizedText): ?string
     {
         $keywords = $trigger->config['keywords'] ?? null;
-        $match    = $trigger->config['match'] ?? null;
+        $phrases  = $trigger->config['phrases'] ?? null;
 
-        if ( ! is_array($keywords) || ! is_string($match)) {
-            return false;
+        if ( ! is_array($keywords) || (null !== $phrases && ! is_array($phrases))) {
+            return null;
         }
 
-        $normalizedText = mb_strtolower(mb_trim($messageText));
-        $rawText        = mb_trim($messageText);
+        $needles = $this->normalizedNeedles($keywords, is_array($phrases) ? $phrases : []);
 
-        foreach ($keywords as $keyword) {
-            if ( ! is_string($keyword) || '' === mb_trim($keyword)) {
+        foreach ($needles as $needle) {
+            if ($normalizedText === $needle) {
+                return 'exact';
+            }
+        }
+
+        foreach ($needles as $needle) {
+            if (str_contains($normalizedText, $needle)) {
+                return 'contains';
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<int, mixed>  $keywords
+     * @param  array<int, mixed>  $phrases
+     * @return list<string>
+     */
+    private function normalizedNeedles(array $keywords, array $phrases): array
+    {
+        $needles = [];
+
+        foreach ([...$phrases, ...$keywords] as $value) {
+            if ( ! is_string($value) || '' === mb_trim($value)) {
                 continue;
             }
 
-            if ($this->matchesByMode($match, $normalizedText, $rawText, mb_trim($keyword))) {
-                return true;
-            }
+            $needles[] = $this->normalizeText($value);
         }
 
-        return false;
+        return array_values(array_unique($needles));
     }
 
-    private function matchesByMode(string $match, string $normalizedText, string $rawText, string $keyword): bool
+    private function normalizeText(string $value): string
     {
-        return match ($match) {
-            'exact'    => $normalizedText === mb_strtolower($keyword),
-            'contains' => str_contains($normalizedText, mb_strtolower($keyword)),
-            'regex'    => 1 === preg_match($keyword, $rawText),
-            default    => false,
-        };
+        $normalized = mb_strtolower(mb_trim($value));
+        $normalized = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $normalized) ?? $normalized;
+
+        return preg_replace('/\s+/u', ' ', mb_trim($normalized)) ?? mb_trim($normalized);
     }
 }

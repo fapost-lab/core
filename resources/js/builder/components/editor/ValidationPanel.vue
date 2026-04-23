@@ -8,6 +8,11 @@ const selectionStore = useSelectionStore();
 const { validate } = useValidation();
 
 function jumpToNode(error) {
+    if (error?.path?.startsWith('trigger.')) {
+        selectionStore.selectTrigger()
+        return
+    }
+
     const nodeId = error?.path?.split('.')?.[1];
     if (!nodeId) return;
     selectionStore.select(nodeId);

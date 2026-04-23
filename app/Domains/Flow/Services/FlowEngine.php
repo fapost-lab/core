@@ -78,21 +78,17 @@ final readonly class FlowEngine implements FlowEngineInterface
 
         $assistant = $this->currentAssistant->get();
 
-        $session = $this->connection->transaction(function () use ($assistant, $baseState, $contact, $definition, $entry): FlowSession {
-            $created = $this->sessions->create([
-                'tenant_id'          => $contact->tenant_id,
-                'assistant_id'       => $assistant->getKey(),
-                'contact_id'         => $contact->getKey(),
-                'flow_definition_id' => $definition->getKey(),
-                'flow_version'       => $definition->version,
-                'current_node_id'    => $entry,
-                'state'              => $baseState,
-                'status'             => FlowSessionStatus::Active,
-                'version'            => 1,
-            ]);
-
-            return $created;
-        });
+        $session = $this->connection->transaction(fn (): FlowSession => $this->sessions->create([
+            'tenant_id'          => $contact->tenant_id,
+            'assistant_id'       => $assistant->getKey(),
+            'contact_id'         => $contact->getKey(),
+            'flow_definition_id' => $definition->getKey(),
+            'flow_version'       => $definition->version,
+            'current_node_id'    => $entry,
+            'state'              => $baseState,
+            'status'             => FlowSessionStatus::Active,
+            'version'            => 1,
+        ]));
 
         $this->afterCommit(function () use ($session): void {
             $this->analyticsWriter->record(new AnalyticsEvent(

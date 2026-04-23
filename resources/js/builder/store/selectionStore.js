@@ -16,6 +16,10 @@ export const useSelectionStore = defineStore('selection', () => {
         selectedNodeId.value = null;
     }
 
+    function selectTrigger() {
+        selectedNodeId.value = '__trigger__';
+    }
+
     /**
      * @param {string[]} path
      */
@@ -31,6 +35,7 @@ export const useSelectionStore = defineStore('selection', () => {
         selectedNodeId,
         activeBranch,
         select,
+        selectTrigger,
         clear,
         setActiveBranch,
         clearBranch,

@@ -9,7 +9,7 @@ export function useValidation() {
      */
     async function validate(options = {}) {
         const { open = true } = options;
-        const result = await validateFlow(store.flowId, store.definition);
+        const result = await validateFlow(store.flowId, store.definition, store.trigger);
         store.setValidationResult(result, open);
 
         return result;

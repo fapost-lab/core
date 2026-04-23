@@ -49,6 +49,14 @@ return [
             'title' => 'Неможливо видалити',
             'body'  => 'У цього сценарію є активні сесії. Спочатку деактивуйте його.',
         ],
+        'trigger_summary' => [
+            'message'  => 'Повідомлення: ключові слова :keywords; фрази :phrases',
+            'event'    => 'Подія: :event',
+            'schedule' => 'Розклад: :cron (:timezone)',
+            'webhook'  => 'Вебхук: :method :path',
+            'api'      => 'API: :route_key; джерела :allowed_sources',
+            'unknown'  => 'Тригер налаштовано',
+        ],
     ],
     'flow_groups' => [
         'label'        => 'Група',

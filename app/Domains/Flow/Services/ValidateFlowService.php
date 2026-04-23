@@ -5,9 +5,15 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Services;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\DTOs\FlowValidationResultDto;
+use App\Domains\Flow\Enums\FlowTriggerType;
+use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Flow\Models\FlowTrigger;
+use InvalidArgumentException;
 use LogicException;
 
 final readonly class ValidateFlowService
@@ -15,13 +21,16 @@ final readonly class ValidateFlowService
     public function __construct(
         private NodeHandlerRegistryInterface $registry,
         private DataAccessorRegistryInterface $dataAccessors,
+        private FlowTriggerConfigValidatorInterface $triggerValidator,
+        private TenantEventRepositoryInterface $tenantEvents,
     ) {
     }
 
     /**
      * @param  array<string, mixed>  $nodes
+     * @param  array<string, mixed>|null  $trigger
      */
-    public function execute(array $nodes): FlowValidationResultDto
+    public function execute(array $nodes, ?array $trigger = null, ?string $flowId = null): FlowValidationResultDto
     {
         $errors  = [];
         $nodeMap = $this->normalizeNodeMap($nodes, $errors);
@@ -34,6 +43,8 @@ final readonly class ValidateFlowService
             $this->validateConditionNodeConnections($node, $path, $errors);
             $this->validateUnknownModuleReferences($node, $path, $errors);
         }
+
+        $this->validateTrigger($trigger, $errors, $flowId);
 
         return new FlowValidationResultDto(
             valid: [] === $errors,
@@ -242,5 +253,219 @@ final readonly class ValidateFlowService
                 );
             }
         });
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $trigger
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateTrigger(?array $trigger, array &$errors, ?string $flowId): void
+    {
+        if (null === $trigger) {
+            return;
+        }
+
+        if (true === ($trigger['_delete'] ?? false)) {
+            return;
+        }
+
+        $type = $trigger['type'] ?? null;
+        if ( ! is_string($type) || '' === $type) {
+            $errors[] = new FlowValidationErrorDto(
+                path: 'trigger.type',
+                code: 'invalid_trigger_type',
+                message: 'Trigger type is required.',
+            );
+
+            return;
+        }
+
+        if ( ! is_bool($trigger['is_active'] ?? null)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: 'trigger.is_active',
+                code: 'invalid_trigger_active_flag',
+                message: 'Trigger active flag must be boolean.',
+            );
+        }
+
+        $priority = $trigger['priority'] ?? null;
+        if ( ! is_int($priority) || $priority < 0) {
+            $errors[] = new FlowValidationErrorDto(
+                path: 'trigger.priority',
+                code: 'invalid_trigger_priority',
+                message: 'Trigger priority must be a non-negative integer.',
+            );
+        }
+
+        $config = $trigger['config'] ?? null;
+        if ( ! is_array($config)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: 'trigger.config',
+                code: 'invalid_trigger_config',
+                message: 'Trigger config must be an object.',
+            );
+
+            return;
+        }
+
+        try {
+            $this->triggerValidator->validate($type, $config);
+        } catch (InvalidArgumentException $exception) {
+            $errors[] = new FlowValidationErrorDto(
+                path: 'trigger.config',
+                code: 'invalid_trigger_config',
+                message: $exception->getMessage(),
+            );
+
+            return;
+        }
+
+        $this->validateUniqueMessageTriggerNeedles($type, $config, $flowId, $errors);
+        $this->validateExistingEventTriggerSelection($type, $config, $flowId, $errors);
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateUniqueMessageTriggerNeedles(
+        string $type,
+        array $config,
+        ?string $flowId,
+        array &$errors,
+    ): void {
+        if (FlowTriggerType::Message->value !== $type || null === $flowId) {
+            return;
+        }
+
+        $draft = FlowDraft::query()
+            ->where('flow_id', $flowId)
+            ->first();
+
+        if (null === $draft) {
+            return;
+        }
+
+        $currentNeedles = $this->normalizedTriggerNeedles($config);
+
+        if ([] === $currentNeedles) {
+            return;
+        }
+
+        $query = FlowTrigger::query()
+            ->where('tenant_id', $draft->tenant_id)
+            ->where('type', FlowTriggerType::Message->value)
+            ->where('flow_id', '!=', $flowId);
+
+        if (null === $draft->assistant_id) {
+            $query->whereNull('assistant_id');
+        } else {
+            $query->where('assistant_id', $draft->assistant_id);
+        }
+
+        $conflicts = [];
+
+        /** @var FlowTrigger $existingTrigger */
+        foreach ($query->get() as $existingTrigger) {
+            $duplicates = array_intersect(
+                $currentNeedles,
+                $this->normalizedTriggerNeedles($existingTrigger->config),
+            );
+
+            foreach ($duplicates as $duplicate) {
+                $conflicts[] = $duplicate;
+            }
+        }
+
+        $conflicts = array_values(array_unique($conflicts));
+
+        if ([] === $conflicts) {
+            return;
+        }
+
+        $errors[] = new FlowValidationErrorDto(
+            path: 'trigger.config.keywords',
+            code: 'duplicate_exact_trigger_keyword',
+            message: 'Exact message trigger keywords must be unique within the same scope: ' . implode(', ', $conflicts) . '.',
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @return list<string>
+     */
+    private function normalizedTriggerNeedles(array $config): array
+    {
+        $keywords = $config['keywords'] ?? null;
+        $phrases  = $config['phrases'] ?? null;
+
+        if ( ! is_array($keywords) || (null !== $phrases && ! is_array($phrases))) {
+            return [];
+        }
+
+        $needles = [];
+
+        foreach ([...$keywords, ...(is_array($phrases) ? $phrases : [])] as $value) {
+            if ( ! is_string($value) || '' === mb_trim($value)) {
+                continue;
+            }
+
+            $needles[] = $this->normalizeTriggerText($value);
+        }
+
+        return array_values(array_unique($needles));
+    }
+
+    private function normalizeTriggerText(string $value): string
+    {
+        $normalized = mb_strtolower(mb_trim($value));
+        $normalized = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $normalized) ?? $normalized;
+
+        return preg_replace('/\s+/u', ' ', mb_trim($normalized)) ?? mb_trim($normalized);
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateExistingEventTriggerSelection(
+        string $type,
+        array $config,
+        ?string $flowId,
+        array &$errors,
+    ): void {
+        if (FlowTriggerType::Event->value !== $type || null === $flowId) {
+            return;
+        }
+
+        $draft = FlowDraft::query()
+            ->where('flow_id', $flowId)
+            ->first();
+
+        if (null === $draft) {
+            return;
+        }
+
+        $eventName = $config['event_name'] ?? null;
+
+        if ( ! is_string($eventName) || '' === mb_trim($eventName)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: 'trigger.config.event_name',
+                code: 'missing_event_trigger_selection',
+                message: 'Event trigger requires selecting an existing event.',
+            );
+
+            return;
+        }
+
+        $availableEvents = $this->tenantEvents->getEventNamesByTenant($draft->tenant_id);
+
+        if ( ! in_array($eventName, $availableEvents, true)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: 'trigger.config.event_name',
+                code: 'unknown_event_trigger_selection',
+                message: 'Selected event must already exist in the tenant event registry.',
+            );
+        }
     }
 }

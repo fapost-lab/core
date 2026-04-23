@@ -8,10 +8,10 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Illuminate\Support\Str;
 
-final class CreateFlowAction
+final readonly class CreateFlowAction
 {
     public function __construct(
-        private readonly TenantContextInterface $tenantContext,
+        private TenantContextInterface $tenantContext,
     ) {
     }
 

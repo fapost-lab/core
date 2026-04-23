@@ -57,6 +57,7 @@ final class FlowResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
+            ->with('trigger')
             ->addSelect([
                 'published_version' => FlowDefinition::query()
                     ->selectRaw('MAX(version)')

@@ -10,12 +10,42 @@ use FAPost\Support\Concerns\HasUlidPrimaryKey;
 use FAPost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @method static FlowDraftFactory factory($count = null, $state = [])
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft query()
+ * @property string $id
+ * @property string $tenant_id
+ * @property string $flow_id
+ * @property string $assistant_id
+ * @property int $draft_version
+ * @property string $name
+ * @property string|null $description
+ * @property string|null $folder
+ * @property bool $is_public
+ * @property bool $is_active
+ * @property array<array-key, mixed> $nodes
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read Assistant|null $assistant
+ * @property-read FlowGroup|null $group
+ * @property-read FlowTrigger|null $trigger
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereAssistantId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereCreatedAt($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereDescription($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereDraftVersion($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereFlowId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereFolder($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereIsActive($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereIsPublic($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereName($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereNodes($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereTenantId($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereUpdatedAt($value)
  * @mixin \Eloquent
  */
 final class FlowDraft extends BaseModel
@@ -34,6 +64,7 @@ final class FlowDraft extends BaseModel
         'flow_group_id',
         'draft_version',
         'name',
+        'folder',
         'description',
         'is_public',
         'is_active',
@@ -48,6 +79,11 @@ final class FlowDraft extends BaseModel
     public function group(): BelongsTo
     {
         return $this->belongsTo(FlowGroup::class, 'flow_group_id');
+    }
+
+    public function trigger(): HasOne
+    {
+        return $this->hasOne(FlowTrigger::class, 'flow_id', 'flow_id');
     }
 
     protected static function newFactory(): FlowDraftFactory

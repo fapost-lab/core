@@ -10,24 +10,36 @@ use Illuminate\Support\Facades\DB;
 
 final class SaveDraftService
 {
+    public function __construct(
+        private readonly SyncFlowTriggerService $syncTrigger,
+    ) {
+    }
+
     /**
      * @param  array<string, mixed>  $nodes
+     * @param  array<string, mixed>|null  $trigger
      */
-    public function execute(string $flowId, array $nodes, int $expectedDraftVersion): int
+    public function execute(string $flowId, array $nodes, ?array $trigger, int $expectedDraftVersion): int
     {
-        $affected = FlowDraft::query()
-            ->where('flow_id', $flowId)
-            ->where('draft_version', $expectedDraftVersion)
-            ->update([
-                'nodes'         => json_encode($nodes, JSON_THROW_ON_ERROR),
-                'draft_version' => DB::raw('draft_version + 1'),
-                'updated_at'    => now(),
-            ]);
+        return DB::transaction(function () use ($flowId, $nodes, $trigger, $expectedDraftVersion): int {
+            $draft = FlowDraft::query()
+                ->where('flow_id', $flowId)
+                ->where('draft_version', $expectedDraftVersion)
+                ->lockForUpdate()
+                ->first();
 
-        if (0 === $affected) {
-            throw new DraftVersionConflictException($flowId);
-        }
+            if (null === $draft) {
+                throw new DraftVersionConflictException($flowId);
+            }
 
-        return $expectedDraftVersion + 1;
+            $draft->forceFill([
+                'nodes'         => $nodes,
+                'draft_version' => $draft->draft_version + 1,
+            ])->save();
+
+            $this->syncTrigger->execute($draft, $trigger);
+
+            return $draft->draft_version;
+        });
     }
 }

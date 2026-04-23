@@ -10,4 +10,5 @@ enum FlowTriggerType: string
     case Schedule = 'schedule';
     case Webhook  = 'webhook';
     case Api      = 'api';
+    case Event    = 'event';
 }

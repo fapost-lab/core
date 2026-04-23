@@ -32,10 +32,13 @@ const summaryRows = computed(() => {
 
     if (type === 'send_message') {
         const rows = []
-        const text = config.body ?? config.text ?? config.content_key ?? null
+        const text = config.text ?? config.caption ?? config.media_url ?? config.body ?? config.content_key ?? null
+        const contentType = config.content_type ?? 'text'
         if (text) rows.push({ key: 'Text', val: typeof text === 'object' ? Object.values(text)[0] : text, mono: false })
+        rows.push({ key: 'Type', val: contentType, muted: true })
         const btns = config.buttons?.length ?? 0
         if (btns > 0) rows.push({ key: 'Buttons', val: `${btns} button${btns > 1 ? 's' : ''}`, muted: true })
+        if (config.keyboard_mode === 'reply') rows.push({ key: 'Mode', val: 'reply keyboard', muted: true })
         return rows
     }
 

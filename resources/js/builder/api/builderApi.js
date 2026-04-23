@@ -65,20 +65,23 @@ export const fetchNodeTypes = () =>
 /**
  * @param {string} flowId
  * @param {{ nodes: unknown[], edges: unknown[] }} definition
+ * @param {import('@builder/dto/types').BuilderTriggerPayload|null} trigger
  * @param {number|null} draftVersion
  */
-export const saveDraft = (flowId, definition, draftVersion) =>
+export const saveDraft = (flowId, definition, trigger, draftVersion) =>
     request('PUT', `/flows/${flowId}/draft`, {
         definition,
+        trigger,
         draft_version: draftVersion,
     });
 
 /**
  * @param {string} flowId
  * @param {{ nodes: unknown[], edges: unknown[] }} definition
+ * @param {import('@builder/dto/types').BuilderTriggerPayload|null} trigger
  */
-export const validateFlow = (flowId, definition) =>
-    request('POST', `/flows/${flowId}/validate`, { definition });
+export const validateFlow = (flowId, definition, trigger) =>
+    request('POST', `/flows/${flowId}/validate`, { definition, trigger });
 
 /**
  * @param {string} flowId

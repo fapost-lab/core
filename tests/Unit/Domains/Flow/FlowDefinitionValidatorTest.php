@@ -32,6 +32,33 @@ final class FlowDefinitionValidatorTest extends TestCase
         $this->assertSame('n2', $result['adjacency']['n1']['default']);
     }
 
+    public function test_validate_fails_when_reply_keyboard_send_message_has_default_edge(): void
+    {
+        $validator = $this->validator();
+        try {
+            $validator->validate(
+                nodes: [
+                    [
+                        'id'      => 'send-1',
+                        'type'    => 'send_message',
+                        'version' => 1,
+                        'config'  => [
+                            'content_type'  => 'text_with_keyboard',
+                            'keyboard_mode' => 'reply',
+                        ],
+                    ],
+                    ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
+                ],
+                edges: [
+                    ['id' => 'e1', 'source_node_id' => 'send-1', 'target_node_id' => 'n2', 'transition' => 'default'],
+                ],
+            );
+            $this->fail('Expected FlowValidationException was not thrown.');
+        } catch (FlowValidationException $exception) {
+            $this->assertStringContainsString('keyboard_mode=reply', $exception->errors[0]->message);
+        }
+    }
+
     public function test_validate_fails_when_node_version_is_missing(): void
     {
         $validator = $this->validator();
@@ -134,9 +161,50 @@ final class FlowDefinitionValidatorTest extends TestCase
         $registry = new NodeHandlerRegistry();
         $registry->register(new TestConditionHandlerV2());
         $registry->register(new TestInputHandlerV1());
+        $registry->register(new TestSendMessageHandlerV1());
         $registry->freeze();
 
         return new FlowDefinitionValidator($registry);
+    }
+}
+
+final class TestSendMessageHandlerV1 implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'send_message';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Send Message';
+    }
+
+    public function category(): string
+    {
+        return 'Core';
+    }
+
+    public function configSchema(): array
+    {
+        return [
+            'required' => ['content_type'],
+        ];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return NodeExecutionResult::executed();
     }
 }
 

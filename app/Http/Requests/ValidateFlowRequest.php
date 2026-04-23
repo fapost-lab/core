@@ -18,6 +18,7 @@ final class ValidateFlowRequest extends FormRequest
     {
         return [
             'definition' => ['required', 'array'],
+            'trigger'    => ['nullable', 'array'],
         ];
     }
 }

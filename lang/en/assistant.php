@@ -49,6 +49,14 @@ return [
             'title' => 'Cannot delete',
             'body'  => 'This flow has active sessions. Deactivate it first.',
         ],
+        'trigger_summary' => [
+            'message'  => 'Message: keywords :keywords; phrases :phrases',
+            'event'    => 'Event: :event',
+            'schedule' => 'Schedule: :cron (:timezone)',
+            'webhook'  => 'Webhook: :method :path',
+            'api'      => 'API: :route_key; sources :allowed_sources',
+            'unknown'  => 'Trigger configured',
+        ],
     ],
     'flow_groups' => [
         'label'        => 'Group',

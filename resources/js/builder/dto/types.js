@@ -5,7 +5,18 @@
  * @property {number} draftVersion
  * @property {number|null} publishedVersion
  * @property {unknown} [definition] Draft definition from API (array of nodes or { nodes, edges }).
+ * @property {BuilderTriggerPayload|null} [trigger]
+ * @property {string[]} [availableEvents]
  * @property {string|null} [publishedAt]
+ */
+
+/**
+ * @typedef {object} BuilderTriggerPayload
+ * @property {boolean} [_delete]
+ * @property {'message'|'schedule'|'webhook'|'api'|'event'} type
+ * @property {boolean} is_active
+ * @property {number} priority
+ * @property {Record<string, unknown>} config
  */
 
 /**

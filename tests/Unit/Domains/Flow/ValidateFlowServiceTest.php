@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Flow;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
+use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Services\ValidateFlowService;
 use FAPost\Foundation\Contracts\DataAccessorInterface;
@@ -24,6 +26,8 @@ final class ValidateFlowServiceTest extends TestCase
         $service = new ValidateFlowService(
             registry: $registry,
             dataAccessors: new NullDataAccessorRegistry(),
+            triggerValidator: new NullTriggerConfigValidator(),
+            tenantEvents: new NullTenantEventRepository(),
         );
 
         $result = $service->execute([
@@ -91,5 +95,20 @@ final class NullDataAccessorRegistry implements DataAccessorRegistryInterface
     public function resolve(string $namespacePrefix): DataAccessorInterface
     {
         throw new LogicException('Not used in this test.');
+    }
+}
+
+final class NullTriggerConfigValidator implements FlowTriggerConfigValidatorInterface
+{
+    public function validate(string $type, array $config): void
+    {
+    }
+}
+
+final class NullTenantEventRepository implements TenantEventRepositoryInterface
+{
+    public function getEventNamesByTenant(string $tenantId): array
+    {
+        return [];
     }
 }

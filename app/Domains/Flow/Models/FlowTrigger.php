@@ -60,7 +60,7 @@ final class FlowTrigger extends BaseModel
 
     protected static function booted(): void
     {
-        static::saving(static function (FlowTrigger $trigger): void {
+        self::saving(static function (FlowTrigger $trigger): void {
             // Eloquent models are instantiated by ORM directly, so validator is resolved lazily here.
             app(FlowTriggerConfigValidatorInterface::class)
                 ->validate($trigger->type->value, $trigger->config);
@@ -81,5 +81,4 @@ final class FlowTrigger extends BaseModel
             'next_run_at' => 'datetime',
         ];
     }
-
 }

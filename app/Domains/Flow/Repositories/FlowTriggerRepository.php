@@ -34,4 +34,42 @@ final class FlowTriggerRepository implements FlowTriggerRepositoryInterface
             ->orderBy('id')
             ->get();
     }
+
+    public function findByFlowId(string $flowId): ?FlowTrigger
+    {
+        return FlowTrigger::query()
+            ->where('flow_id', $flowId)
+            ->first();
+    }
+
+    public function upsertForFlow(string $flowId, array $attributes): FlowTrigger
+    {
+        $trigger = FlowTrigger::query()->firstOrNew([
+            'flow_id' => $flowId,
+        ]);
+
+        $trigger->fill($attributes);
+        $trigger->save();
+
+        return $trigger;
+    }
+
+    public function deleteByFlowId(string $flowId): void
+    {
+        FlowTrigger::query()
+            ->where('flow_id', $flowId)
+            ->delete();
+    }
+
+    public function getActiveEventTriggers(string $tenantId, string $eventName): iterable
+    {
+        return FlowTrigger::query()
+            ->where('tenant_id', $tenantId)
+            ->where('type', 'event')
+            ->where('is_active', true)
+            ->where('config->event_name', $eventName)
+            ->orderBy('priority')
+            ->orderBy('id')
+            ->get();
+    }
 }

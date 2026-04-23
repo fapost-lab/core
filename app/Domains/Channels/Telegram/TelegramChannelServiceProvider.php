@@ -26,6 +26,8 @@ final class TelegramChannelServiceProvider extends ServiceProvider
         $this->app->bind(TelegramTextDeliveryAction::class);
         $this->app->bind(TelegramPhotoDeliveryAction::class);
         $this->app->bind(TelegramDocumentDeliveryAction::class);
+        $this->app->bind(TelegramVideoDeliveryAction::class);
+        $this->app->bind(TelegramVoiceDeliveryAction::class);
         $this->app->bind(TelegramSignatureVerifier::class);
         $this->app->bind(TelegramInboundNormalizer::class);
         $this->app->bind(TelegramSender::class);
@@ -49,6 +51,8 @@ final class TelegramChannelServiceProvider extends ServiceProvider
             TelegramTextDeliveryAction::class,
             TelegramPhotoDeliveryAction::class,
             TelegramDocumentDeliveryAction::class,
+            TelegramVideoDeliveryAction::class,
+            TelegramVoiceDeliveryAction::class,
         ], 'channels.telegram_delivery');
         $this->app->tag(['channels.integration.telegram'], 'channels.integration');
     }

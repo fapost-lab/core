@@ -1,6 +1,6 @@
 import { useBuilderStore } from '@builder/store/builderStore';
 import { useValidation } from '@builder/composables/useValidation';
-import { publishFlow } from '@builder/api/builderApi';
+import { publishFlow, saveDraft } from '@builder/api/builderApi';
 
 export function usePublish() {
     const store = useBuilderStore();
@@ -16,6 +16,15 @@ export function usePublish() {
         store.setSaveStatus('saving');
 
         try {
+            const { draft_version: draftVersion } = await saveDraft(
+                store.flowId,
+                store.definition,
+                store.trigger,
+                store.draftVersion,
+            );
+
+            store.setDraftVersion(draftVersion);
+
             const data = await publishFlow(store.flowId);
             store.setPublishedVersion(data.version);
             store.setSaveStatus('saved');
