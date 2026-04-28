@@ -40,7 +40,7 @@ final class WebhookRegistryResolver implements WebhookRegistryResolverInterface
         //    Both leader and non-leader do their own DB lookup immediately — no sleep in the Octane hot path.
         //    Only the leader deletes the lock; non-leaders leave it for the leader to clean up.
         $lockKey  = "warming:{$hash}";
-        $isLeader = (bool) Redis::set($lockKey, '1', 'EX', self::LOCK_TTL_SECONDS, 'NX');
+        $isLeader = (bool)Redis::set($lockKey, '1', 'EX', self::LOCK_TTL_SECONDS, 'NX');
 
         try {
             return $this->resolveFromLandlord($hash);

@@ -1,70 +1,234 @@
 <script setup>
-import { ref } from 'vue'
-import ContentKeysPanel    from './ContentKeysPanel.vue'
-import ContentEditorPanel  from './ContentEditorPanel.vue'
-import ContentLanguagePanel from './ContentLanguagePanel.vue'
+import { computed, ref } from 'vue'
+import { useBuilderStore } from '@builder/store/builderStore'
+import ContentEditorPanel from './ContentEditorPanel.vue'
 
-// Stub state — будет заменено contentStore в будущей задаче
-const selectedKey  = ref(null)
-const translations = ref({})
+const builderStore = useBuilderStore()
 
-const keys = ref([])
+const LANGUAGE_NAMES = {
+    uk: 'Ukrainian', en: 'English', ru: 'Russian', pl: 'Polish',
+    de: 'German', fr: 'French', es: 'Spanish', it: 'Italian',
+}
 
-const languages = ref([
-    { code: 'uk', name: 'Ukrainian' },
-    { code: 'en', name: 'English' },
-])
+const languages = computed(() =>
+    builderStore.availableLanguages.map((code) => ({
+        code,
+        name: LANGUAGE_NAMES[code] ?? code.toUpperCase(),
+    })),
+)
 
-function onSelectKey(key) {
+/**
+ * Extract all translatable content entries from flow nodes.
+ * Returns flat list of { key, nodeId, nodeType, nodeLabel, fieldLabel, values }.
+ */
+const contentEntries = computed(() => {
+    const entries = []
+    const nodes = builderStore.definition?.nodes ?? []
+
+    for (const node of nodes) {
+        const config = node.config ?? {}
+        const type   = node.type
+        const label  = node.label ?? type
+
+        if (type === 'send_message') {
+            const ct = config.content_type ?? 'text'
+
+            if (ct === 'text' || ct === 'text_with_keyboard') {
+                entries.push({
+                    key:        `${node.id}.text`,
+                    nodeId:     node.id,
+                    nodeType:   type,
+                    nodeLabel:  label,
+                    fieldLabel: 'Message text',
+                    values:     resolveValues(config.text ?? ''),
+                })
+            }
+
+            if (['image', 'document', 'video'].includes(ct)) {
+                entries.push({
+                    key:        `${node.id}.caption`,
+                    nodeId:     node.id,
+                    nodeType:   type,
+                    nodeLabel:  label,
+                    fieldLabel: 'Caption',
+                    values:     resolveValues(config.caption ?? ''),
+                })
+            }
+
+            const buttons = Array.isArray(config.buttons) ? config.buttons : []
+            buttons.forEach((btn, idx) => {
+                const raw = btn.label ?? ''
+                const baseText = typeof raw === 'object'
+                    ? (raw[builderStore.contentBaseLanguage] ?? Object.values(raw)[0] ?? '')
+                    : String(raw)
+                entries.push({
+                    key:        `${node.id}.buttons.${idx}.label`,
+                    nodeId:     node.id,
+                    nodeType:   type,
+                    nodeLabel:  label,
+                    fieldLabel: baseText.trim() !== '' ? baseText : `Button ${idx + 1}`,
+                    values:     resolveValues(raw),
+                })
+            })
+        }
+    }
+
+    return entries
+})
+
+/**
+ * Group entries by nodeId for display in the left panel.
+ */
+const groupedEntries = computed(() => {
+    const groups = new Map()
+    for (const entry of contentEntries.value) {
+        if (!groups.has(entry.nodeId)) {
+            groups.set(entry.nodeId, { nodeId: entry.nodeId, nodeLabel: entry.nodeLabel, nodeType: entry.nodeType, fields: [] })
+        }
+        groups.get(entry.nodeId).fields.push(entry)
+    }
+    return [...groups.values()]
+})
+
+function resolveValues(raw) {
+    if (raw === null || raw === undefined) return {}
+    if (typeof raw === 'object') return { ...raw }
+    // plain string — treat as base language value
+    return { [builderStore.contentBaseLanguage]: String(raw) }
+}
+
+const selectedKey = ref(null)
+const selectedEntry = computed(() => contentEntries.value.find((e) => e.key === selectedKey.value) ?? null)
+
+const localTranslations = ref({})
+
+function selectEntry(key) {
+    if (selectedKey.value === key) return
     selectedKey.value = key
-    // В реальной реализации загружаем переводы из API
+    const entry = contentEntries.value.find((e) => e.key === key)
+    localTranslations.value = entry ? { ...entry.values } : {}
 }
 
 function onUpdate(key, langCode, value) {
-    if (!translations.value[key]) translations.value[key] = {}
-    translations.value[key][langCode] = value
+    localTranslations.value[langCode] = value
 }
 
 function onSave() {
-    // PUT /builder/flows/{id}/content/{key}
-}
+    if (!selectedKey.value) return
+    const entry = contentEntries.value.find((e) => e.key === selectedKey.value)
+    if (!entry) return
 
-function onDelete(key) {
-    keys.value = keys.value.filter((k) => k.key !== key)
-    if (selectedKey.value === key) selectedKey.value = null
+    const nodes = builderStore.definition.nodes
+    const nodeIdx = nodes.findIndex((n) => n.id === entry.nodeId)
+    if (nodeIdx === -1) return
+
+    const node   = nodes[nodeIdx]
+    const config = { ...node.config }
+    const parts  = entry.key.slice(entry.nodeId.length + 1).split('.')
+
+    if (parts[0] === 'text') {
+        config.text = { ...localTranslations.value }
+    } else if (parts[0] === 'caption') {
+        config.caption = { ...localTranslations.value }
+    } else if (parts[0] === 'buttons' && parts[2] === 'label') {
+        const idx = Number(parts[1])
+        const buttons = [...(config.buttons ?? [])]
+        buttons[idx] = { ...buttons[idx], label: { ...localTranslations.value } }
+        config.buttons = buttons
+    }
+
+    builderStore.definition.nodes[nodeIdx] = { ...node, config }
 }
 </script>
 
 <template>
     <div class="content-tab">
-        <ContentKeysPanel
-            :keys="keys"
-            :selected-key="selectedKey"
-            :languages="languages"
-            @select="onSelectKey"
-            @add-key="() => {}"
-        />
+        <!-- Left: content keys grouped by node -->
+        <div class="keys-panel">
+            <div class="panel-header">Content</div>
+            <div class="panel-body">
+                <div v-if="groupedEntries.length === 0" class="empty">
+                    No translatable fields in this flow
+                </div>
+                <template v-for="group in groupedEntries" :key="group.nodeId">
+                    <div class="group-label">{{ group.nodeLabel }}</div>
+                    <button
+                        v-for="field in group.fields"
+                        :key="field.key"
+                        class="field-item"
+                        :class="{ 'is-selected': selectedKey === field.key }"
+                        type="button"
+                        @click="selectEntry(field.key)"
+                    >
+                        <span class="field-name">{{ field.fieldLabel }}</span>
+                        <span class="lang-count">{{ Object.keys(field.values).length }}/{{ languages.length }}</span>
+                    </button>
+                </template>
+            </div>
+        </div>
 
+        <!-- Right: translation editor -->
         <ContentEditorPanel
-            :content-key="selectedKey"
-            :translations="selectedKey ? (translations[selectedKey] ?? {}) : {}"
+            :content-key="selectedEntry?.fieldLabel ?? null"
+            :translations="localTranslations"
             :languages="languages"
             @update="onUpdate"
             @save="onSave"
-            @delete="onDelete"
-        />
-
-        <ContentLanguagePanel
-            :languages="languages"
-            @add-language="() => {}"
+            @delete="() => {}"
         />
     </div>
 </template>
 
 <style scoped>
-.content-tab {
+.content-tab { display: flex; flex: 1; overflow: hidden; }
+
+.keys-panel {
+    width: 220px;
+    border-right: 1px solid var(--border);
+    background: var(--surface);
     display: flex;
-    flex: 1;
+    flex-direction: column;
     overflow: hidden;
+    flex-shrink: 0;
 }
+.panel-header {
+    padding: 10px 14px 9px;
+    border-bottom: 1px solid var(--border);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    flex-shrink: 0;
+}
+.panel-body { flex: 1; overflow-y: auto; padding: 6px 0; }
+.empty { font-size: 12px; color: var(--text-3); text-align: center; padding: 24px 0; }
+
+.group-label {
+    padding: 8px 14px 4px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--text-3);
+}
+.field-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 5px 14px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12.5px;
+    color: var(--text-2);
+    transition: background .1s, color .1s;
+}
+.field-item:hover { background: var(--surface-2); color: var(--text); }
+.field-item.is-selected { background: var(--primary-bg, #eef2ee); color: var(--primary); }
+.field-name { flex: 1; }
+.lang-count { font-size: 10px; color: var(--text-3); }
 </style>

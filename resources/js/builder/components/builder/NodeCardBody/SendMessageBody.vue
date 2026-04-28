@@ -16,7 +16,19 @@ const buttonCount = computed(() => {
     return Array.isArray(props.config.buttons) ? props.config.buttons.length : 0
 })
 
-const contentType = computed(() => props.config.content_type ?? 'text')
+const CONTENT_TYPE_LABELS = {
+    text:               'Text',
+    text_with_keyboard: 'Text with keyboard',
+    image:              'Image',
+    document:           'Document',
+    video:              'Video',
+    voice:              'Voice',
+}
+
+const contentType = computed(() => {
+    const raw = props.config.content_type ?? 'text'
+    return CONTENT_TYPE_LABELS[raw] ?? raw
+})
 </script>
 
 <template>

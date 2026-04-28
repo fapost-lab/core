@@ -61,7 +61,7 @@ final class FlowEngineTest extends FeatureTestCase
                 ['id' => 'n2', 'type' => 'sequential_test', 'version' => 1, 'config' => []],
             ],
             'edges' => [
-                ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
+                ['id' => 'e1', 'from' => 'n1', 'to' => 'n2', 'handle' => 'default'],
             ],
             'is_active' => true,
         ]);
@@ -150,8 +150,8 @@ final class FlowEngineTest extends FeatureTestCase
                 ['id' => 'n1', 'type' => 'infinite_loop_test', 'version' => 1, 'config' => []],
             ],
             'edges' => [
-                ['id' => 'e0', 'source_node_id' => 'n0', 'target_node_id' => 'n1', 'transition' => 'next'],
-                ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n1', 'transition' => 'default'],
+                ['id' => 'e0', 'from' => 'n0', 'to' => 'n1', 'handle' => 'next'],
+                ['id' => 'e1', 'from' => 'n1', 'to' => 'n1', 'handle' => 'default'],
             ],
             'is_active' => true,
         ]);
@@ -204,7 +204,7 @@ final class FlowEngineTest extends FeatureTestCase
                 ['id' => 'n2', 'type' => 'sequential_test', 'version' => 1, 'config' => []],
             ],
             'edges' => [
-                ['id' => 'e1', 'source_node_id' => 'c1', 'target_node_id' => 'n2', 'transition' => 'match'],
+                ['id' => 'e1', 'from' => 'c1', 'to' => 'n2', 'handle' => 'match'],
             ],
             'is_active' => true,
         ]);

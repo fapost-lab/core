@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domains\Channels\Providers\ChannelsServiceProvider;
 use App\Domains\Contact\Providers\ContactServiceProvider;
 use App\Domains\Flow\Providers\FlowServiceProvider;
+use App\Domains\Media\Providers\MediaServiceProvider;
 use App\Domains\Messaging\Providers\MessageSenderServiceProvider;
 use App\Domains\Webhook\Providers\WebhookServiceProvider;
 use App\Providers\AppServiceProvider;
@@ -23,6 +24,7 @@ return [
     ChannelsServiceProvider::class,
     ContactServiceProvider::class,
     FlowServiceProvider::class,
+    MediaServiceProvider::class,
     MessageSenderServiceProvider::class,
     WebhookServiceProvider::class,
     StaffServiceProvider::class,

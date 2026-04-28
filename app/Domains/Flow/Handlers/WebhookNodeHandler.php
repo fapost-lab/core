@@ -7,10 +7,10 @@ namespace App\Domains\Flow\Handlers;
 use App\Domains\Flow\Contracts\HttpClientInterface;
 use App\Domains\Flow\Exceptions\HttpTransportException;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
-use App\Domains\Flow\Handlers\Abstract\AbstractVersionedHandler;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
+use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 
 final class WebhookNodeHandler extends AbstractVersionedHandler
 {
@@ -89,7 +89,7 @@ final class WebhookNodeHandler extends AbstractVersionedHandler
                     'X-Idempotency-Key' => $idempotencyKey,
                     'X-FAPost-Session'  => $context->sessionId,
                 ],
-                timeout: (int) ($config['timeout'] ?? 10),
+                timeout: (int)($config['timeout'] ?? 10),
             );
         } catch (HttpTransportException $exception) {
             return new NodeExecutionResult(
@@ -122,6 +122,7 @@ final class WebhookNodeHandler extends AbstractVersionedHandler
     /**
      * @param  array<string, mixed>  $config
      * @param  array<string, mixed>  $state
+     *
      * @return array<string, mixed>
      */
     private function buildPayload(array $config, array $state, NodeExecutionContext $context): array

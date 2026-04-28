@@ -49,6 +49,7 @@ final class ChannelContact extends Model
 
     /**
      * Relationship: contact owning this linkage.
+     *
      * @return BelongsTo<Contact, $this>
      */
     public function contact(): BelongsTo
@@ -58,6 +59,7 @@ final class ChannelContact extends Model
 
     /**
      * Relationship: assistant channel associated with this linkage.
+     *
      * @return BelongsTo<Channel, $this>
      */
     public function channel(): BelongsTo

@@ -16,10 +16,10 @@ final class TemplateResolver
         }
 
         return preg_replace_callback('/{{(.+?)}}/', static function (array $matches) use ($state): string {
-            $path     = mb_trim((string) ($matches[1] ?? ''));
+            $path     = mb_trim((string)($matches[1] ?? ''));
             $resolved = data_get($state, $path);
 
-            return null === $resolved ? '' : (string) $resolved;
+            return null === $resolved ? '' : (string)$resolved;
         }, $value);
     }
 }

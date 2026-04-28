@@ -16,7 +16,6 @@ use App\Domains\Assistant\Services\AssistantService;
 use App\Domains\Assistant\Services\CurrentAssistant;
 use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
-use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Services\ChannelService;
 use App\Domains\Channels\Services\ChannelWebhookRegistry;
 use App\Domains\Tenancy\Services\TenantSwitcher;
@@ -41,7 +40,10 @@ final class AssistantServiceProvider extends ServiceProvider
         $this->app->bind(AssistantServiceInterface::class, AssistantService::class);
         $this->app->bind(ChannelServiceInterface::class, ChannelService::class);
         $this->app->scoped(CurrentAssistant::class, CurrentAssistant::class);
-        $this->app->scoped(CurrentAssistantInterface::class, fn ($app): CurrentAssistant => $app->make(CurrentAssistant::class));
+        $this->app->scoped(
+            CurrentAssistantInterface::class,
+            fn ($app): CurrentAssistant => $app->make(CurrentAssistant::class)
+        );
 
         $this->app->afterResolving(TenantSwitcher::class, function (TenantSwitcher $switcher, $app): void {
             $switcher->registerRestoreHook(function () use ($app): void {

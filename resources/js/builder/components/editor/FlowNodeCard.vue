@@ -31,11 +31,15 @@ const summaryRows = computed(() => {
     const type   = node.type
 
     if (type === 'send_message') {
+        const CONTENT_TYPE_LABELS = {
+            text: 'Text', text_with_keyboard: 'Text with keyboard',
+            image: 'Image', document: 'Document', video: 'Video', voice: 'Voice',
+        }
         const rows = []
         const text = config.text ?? config.caption ?? config.media_url ?? config.body ?? config.content_key ?? null
-        const contentType = config.content_type ?? 'text'
+        const rawType = config.content_type ?? 'text'
         if (text) rows.push({ key: 'Text', val: typeof text === 'object' ? Object.values(text)[0] : text, mono: false })
-        rows.push({ key: 'Type', val: contentType, muted: true })
+        rows.push({ key: 'Type', val: CONTENT_TYPE_LABELS[rawType] ?? rawType, muted: true })
         const btns = config.buttons?.length ?? 0
         if (btns > 0) rows.push({ key: 'Buttons', val: `${btns} button${btns > 1 ? 's' : ''}`, muted: true })
         if (config.keyboard_mode === 'reply') rows.push({ key: 'Mode', val: 'reply keyboard', muted: true })

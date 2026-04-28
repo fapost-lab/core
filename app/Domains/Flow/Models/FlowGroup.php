@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * @property-read Assistant|null $assistant
  * @property-read \Illuminate\Database\Eloquent\Collection<int, FlowDraft> $drafts
- * @property-read int|null $drafts_count
+ * @property-read int|null  $drafts_count
  * @property-read bool|null $drafts_exists
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowGroup newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowGroup newQuery()

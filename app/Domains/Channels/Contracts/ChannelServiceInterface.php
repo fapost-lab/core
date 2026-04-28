@@ -17,8 +17,8 @@ interface ChannelServiceInterface
     /**
      * @param  array<string, mixed>  $data
      *
-     * When the persisted channel ends with {@see Channel::$is_active} {@code true}, webhook routing is refreshed for that
-     * channel via the persistence observer (same outcome as {@see reactivate} for an inactive channel).
+     * When the persisted channel ends with {@see Channel::$is_active} {@code true}, webhook routing is refreshed for
+     * that channel via the persistence observer (same outcome as {@see reactivate} for an inactive channel).
      */
     public function update(Channel $channel, array $data): Channel;
 
@@ -33,7 +33,8 @@ interface ChannelServiceInterface
     public function deactivate(Channel $channel): void;
 
     /**
-     * Sets {@see Channel::$is_active} to {@code true} and saves; Redis is repopulated for active channels by the channel observer.
+     * Sets {@see Channel::$is_active} to {@code true} and saves; Redis is repopulated for active channels by the
+     * channel observer.
      */
     public function reactivate(Channel $channel): void;
 }

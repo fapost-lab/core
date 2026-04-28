@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Providers;
 
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
@@ -15,10 +16,12 @@ use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Contracts\HttpClientInterface;
+use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\LanguageResolverInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationServiceInterface;
@@ -40,11 +43,14 @@ use App\Domains\Flow\Repositories\FlowSessionRepository;
 use App\Domains\Flow\Repositories\FlowTriggerRepository;
 use App\Domains\Flow\Repositories\TenantEventRepository;
 use App\Domains\Flow\Repositories\TenantTranslationRepository;
+use App\Domains\Flow\Services\FallbackMessageService;
 use App\Domains\Flow\Services\FlowEngine;
 use App\Domains\Flow\Services\FlowGraphResolver;
+use App\Domains\Flow\Services\FlowInlineKeyboardEditor;
 use App\Domains\Flow\Services\FlowMessageSender;
 use App\Domains\Flow\Services\FlowSessionPersister;
 use App\Domains\Flow\Services\LanguageResolver;
+use App\Domains\Flow\Services\PersistentButtonRegistry;
 use App\Domains\Flow\Services\Resolvers\ApiTriggerResolver;
 use App\Domains\Flow\Services\Resolvers\MessageTriggerResolver;
 use App\Domains\Flow\Services\Resolvers\ScheduleTriggerResolver;
@@ -61,6 +67,8 @@ use App\Domains\Flow\Support\LaravelHttpClient;
 use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
 use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
+use App\Domains\Media\Contracts\MediaIngestorInterface;
+use App\Domains\Media\Contracts\MediaServiceInterface;
 use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\FlowExecutionGuard;
 use FAPost\Foundation\Flow\Contracts\TriggerResolverInterface;
@@ -80,11 +88,21 @@ final class FlowServiceProvider extends ServiceProvider
         $registry  = $this->app->make(NodeHandlerRegistryInterface::class);
         $templates = $this->app->make(TemplateResolver::class);
 
-        $registry->register(new SendMessageNodeHandler(
-            $this->app->make(MessageSenderInterface::class),
-            $this->app->make(ContentTranslatorInterface::class),
-        ));
-        $registry->register(new InputNodeHandler());
+        $registry->register(
+            new SendMessageNodeHandler(
+                $this->app->make(MessageSenderInterface::class),
+                $this->app->make(ContentTranslatorInterface::class),
+                $templates,
+                $this->app->make(InlineKeyboardEditorInterface::class),
+                $this->app->make(PersistentButtonRegistryInterface::class),
+            )
+        );
+        $registry->register(
+            new InputNodeHandler(
+                $this->app->make(MediaIngestorInterface::class),
+                $this->app->make(MediaServiceInterface::class),
+            )
+        );
         $registry->register(new ConditionNodeHandler($this->app->make(DataAccessorRegistryInterface::class)));
         $registry->register(new DelayNodeHandler());
         $registry->register(new SetAttributeNodeHandler($templates));
@@ -142,6 +160,8 @@ final class FlowServiceProvider extends ServiceProvider
             MessageSenderInterface::class,
             fn ($app): FlowMessageSender => new FlowMessageSender(
                 $app->make(OutboundMessageSenderInterface::class),
+                $app->make(MediaServiceInterface::class),
+                $app->make(\App\Domains\Media\Contracts\MediaDispatcherInterface::class),
             )
         );
         $this->app->bind(LanguageResolverInterface::class, LanguageResolver::class);
@@ -177,6 +197,19 @@ final class FlowServiceProvider extends ServiceProvider
             apiResolver: $app->make(ApiTriggerResolver::class),
         ));
         $this->app->scoped(TriggerResolverInterface::class, TriggerResolver::class);
+        $this->app->bind(
+            FallbackMessageServiceInterface::class,
+            fn ($app): FallbackMessageService => new FallbackMessageService(
+                $app->make(OutboundMessageSenderInterface::class),
+            ),
+        );
+        $this->app->bind(
+            InlineKeyboardEditorInterface::class,
+            fn ($app): FlowInlineKeyboardEditor => new FlowInlineKeyboardEditor(
+                $app->make(OutboundMessageSenderInterface::class),
+            ),
+        );
+        $this->app->bind(PersistentButtonRegistryInterface::class, PersistentButtonRegistry::class);
         $this->app->scoped(FlowOrchestrator::class);
         $this->app->scoped(FlowOrchestratorInterface::class, FlowOrchestrator::class);
         $this->app->singleton(FlowExecutionGuardInterface::class, function (): FlowExecutionGuard {

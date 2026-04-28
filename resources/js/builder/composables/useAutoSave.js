@@ -26,6 +26,9 @@ export function useAutoSave() {
         } catch (err) {
             if (err.status === 409) {
                 store.setSaveStatus('conflict');
+            } else if (err?.status === 422 && typeof err?.body?.valid === 'boolean') {
+                store.setValidationResult(err.body, true);
+                store.setSaveStatus('error');
             } else {
                 store.setSaveStatus('error');
             }

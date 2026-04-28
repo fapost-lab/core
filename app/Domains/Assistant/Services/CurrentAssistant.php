@@ -12,7 +12,8 @@ use Filament\Facades\Filament;
 /**
  * Resolves the assistant from Filament panel tenancy when present; supports an explicit override for tests.
  *
- * Contract: {@see CurrentAssistantInterface} lives under {@code Domains/Assistant/Contracts/}; this class is the scoped implementation in {@code Services/}.
+ * Contract: {@see CurrentAssistantInterface} lives under {@code Domains/Assistant/Contracts/}; this class is the
+ * scoped implementation in {@code Services/}.
  */
 final class CurrentAssistant implements CurrentAssistantInterface
 {

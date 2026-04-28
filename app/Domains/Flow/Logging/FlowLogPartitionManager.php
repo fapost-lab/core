@@ -23,12 +23,19 @@ final readonly class FlowLogPartitionManager implements FlowLogPartitionManagerI
         $end   = $start->addMonth();
         $name  = $this->partitionName($start);
 
-        $this->connection->statement(sprintf(
-            "CREATE TABLE IF NOT EXISTS %s PARTITION OF flow_logs FOR VALUES FROM ('%s') TO ('%s')",
-            $name,
-            $start->format('Y-m-d H:i:sP'),
-            $end->format('Y-m-d H:i:sP'),
-        ));
+        $this->connection->statement(
+            sprintf(
+                "CREATE TABLE IF NOT EXISTS %s PARTITION OF flow_logs FOR VALUES FROM ('%s') TO ('%s')",
+                $name,
+                $start->format('Y-m-d H:i:sP'),
+                $end->format('Y-m-d H:i:sP'),
+            )
+        );
+    }
+
+    public function partitionName(CarbonImmutable $month): string
+    {
+        return 'flow_logs_' . $month->format('Y_m');
     }
 
     /**
@@ -36,7 +43,8 @@ final readonly class FlowLogPartitionManager implements FlowLogPartitionManagerI
      */
     public function listMonthlyPartitions(): Collection
     {
-        $rows = $this->connection->select(<<<'SQL'
+        $rows = $this->connection->select(
+            <<<'SQL'
 SELECT child.relname AS partition_name
 FROM pg_inherits
 INNER JOIN pg_class parent ON pg_inherits.inhparent = parent.oid
@@ -44,10 +52,11 @@ INNER JOIN pg_class child ON pg_inherits.inhrelid = child.oid
 WHERE parent.relname = 'flow_logs'
   AND child.relname ~ '^flow_logs_[0-9]{4}_[0-9]{2}$'
 ORDER BY child.relname
-SQL);
+SQL
+        );
 
         return collect($rows)
-            ->map(static fn (object $row): string => (string) $row->partition_name)
+            ->map(static fn (object $row): string => (string)$row->partition_name)
             ->values();
     }
 
@@ -58,10 +67,5 @@ SQL);
         }
 
         $this->connection->statement("DROP TABLE IF EXISTS {$partitionName}");
-    }
-
-    public function partitionName(CarbonImmutable $month): string
-    {
-        return 'flow_logs_' . $month->format('Y_m');
     }
 }

@@ -12,14 +12,15 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
  * Syncs Redis after channel persistence.
  *
  * When {@see Channel::$webhook_public_hash} changes, {@see updated()} skips registry writes so that
- * {@see \App\Domains\Channels\Services\ChannelService::rotateWebhookHash()} remains the only path that removes the old hash and writes the new one.
- * Any other code path that mutates {@see Channel::$webhook_public_hash} without going through rotate will leak the old Redis key.
+ * {@see \App\Domains\Channels\Services\ChannelService::rotateWebhookHash()} remains the only path that removes the old
+ * hash and writes the new one. Any other code path that mutates {@see Channel::$webhook_public_hash} without going
+ * through rotate will leak the old Redis key.
  */
 final readonly class ChannelObserver
 {
     /**
-     * @param  ChannelWebhookRegistryInterface  $registry  Redis write-through routing registry.
-     * @param  TenantContextInterface  $tenantContext      Current platform tenant context.
+     * @param  ChannelWebhookRegistryInterface  $registry       Redis write-through routing registry.
+     * @param  TenantContextInterface           $tenantContext  Current platform tenant context.
      */
     public function __construct(
         private ChannelWebhookRegistryInterface $registry,

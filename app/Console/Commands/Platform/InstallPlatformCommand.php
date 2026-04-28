@@ -56,20 +56,23 @@ final class InstallPlatformCommand extends Command
             return self::FAILURE;
         }
 
-        $slug     = (string) $this->option('tenant-slug');
+        $slug     = (string)$this->option('tenant-slug');
         $email    = $this->option('admin-email') ?: $this->ask('Admin email');
         $password = $this->option('admin-password') ?: $this->secret('Admin password');
 
-        $this->components->task("Provisioning tenant [{$slug}] and first admin", function () use ($slug, $email, $password): void {
-            $tenant = $this->provisioningService->provision(
-                slug: $slug,
-                firstAdminEmail: $email,
-                firstAdminPassword: $password,
-            );
-            $this->line("  Schema: {$tenant->getSchemaName()}");
-            $this->line("  Admin: {$email}");
-            $this->line('  Role: admin (ACL bootstrap) assigned to the first admin.');
-        });
+        $this->components->task(
+            "Provisioning tenant [{$slug}] and first admin",
+            function () use ($slug, $email, $password): void {
+                $tenant = $this->provisioningService->provision(
+                    slug: $slug,
+                    firstAdminEmail: $email,
+                    firstAdminPassword: $password,
+                );
+                $this->line("  Schema: {$tenant->getSchemaName()}");
+                $this->line("  Admin: {$email}");
+                $this->line('  Role: admin (ACL bootstrap) assigned to the first admin.');
+            }
+        );
 
         $this->newLine();
         $this->info('Installation complete!');

@@ -25,6 +25,11 @@ final class AssistantFormSchema
                     ->options(ContentLanguages::options())
                     ->searchable()
                     ->required(),
+                Select::make('available_languages')
+                    ->label(__('staff.assistants.fields.available_languages'))
+                    ->options(ContentLanguages::options())
+                    ->multiple()
+                    ->searchable(),
                 Toggle::make('is_active')
                     ->label(__('staff.assistants.fields.is_active'))
                     ->default(true),

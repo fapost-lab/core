@@ -31,14 +31,16 @@ final readonly class TelegramWebhookRegistrar implements WebhookRegistrarInterfa
         $allowedUpdates = is_array($payload->config['allowed_updates'] ?? null)
             ? $payload->config['allowed_updates']
             : null;
-        $maxConnections = max(1, min(100, (int) ($payload->config['max_connections'] ?? 40)));
+        $maxConnections = max(1, min(100, (int)($payload->config['max_connections'] ?? 40)));
 
-        $client->setWebhook(new SetWebhookDto(
-            url: $this->webhookUrlGenerator->forChannel('telegram', $payload->webhookPublicHash),
-            secretToken: $payload->secretToken,
-            allowedUpdates: $allowedUpdates,
-            maxConnections: $maxConnections,
-        ));
+        $client->setWebhook(
+            new SetWebhookDto(
+                url: $this->webhookUrlGenerator->forChannel('telegram', $payload->webhookPublicHash),
+                secretToken: $payload->secretToken,
+                allowedUpdates: $allowedUpdates,
+                maxConnections: $maxConnections,
+            )
+        );
 
         $bot = $client->getMe();
 

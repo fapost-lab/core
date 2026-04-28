@@ -52,6 +52,22 @@ function focusBranch(handle) {
     selectionStore.select(props.treeNode.node.id)
     selectionStore.setActiveBranch([...props.parentBranch, props.treeNode.node.id, handle])
 }
+
+function resolveHandleLabel(handle) {
+    if (props.treeNode.node.type === 'send_message') {
+        const buttons = props.treeNode.node.config?.buttons ?? []
+        const idx = buttons.findIndex((b) => b.id === handle)
+        if (idx !== -1) {
+            const lbl = buttons[idx].label
+            const text = typeof lbl === 'object'
+                ? (Object.values(lbl)[0] ?? '')
+                : String(lbl ?? '')
+            return text.trim() !== '' ? text.trim() : `Button ${idx + 1}`
+        }
+        return `Button`
+    }
+    return handle
+}
 </script>
 
 <template>
@@ -88,7 +104,7 @@ function focusBranch(handle) {
                         class="branch-dot"
                         :class="handle === 'yes' ? 'yes' : handle === 'no' ? 'no' : ''"
                     />
-                    {{ handle }}
+                    {{ resolveHandleLabel(handle) }}
                 </div>
                 <div class="tree-children">
                     <FlowStructureNode

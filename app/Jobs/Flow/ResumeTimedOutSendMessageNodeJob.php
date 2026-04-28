@@ -32,17 +32,20 @@ final class ResumeTimedOutSendMessageNodeJob implements ShouldQueue
             return;
         }
 
-        $engine->resume($session, new IncomingMessage(
-            updateId: "timeout:{$this->sessionId}:{$this->nodeId}",
-            externalUserId: '',
-            externalChatId: '',
-            text: null,
-            type: IncomingMessageType::Unknown,
-            platform: $this->platform,
-            payload: [
-                'send_message_timeout' => true,
-                'node_id'              => $this->nodeId,
-            ],
-        ));
+        $engine->resume(
+            $session,
+            new IncomingMessage(
+                updateId: "timeout:{$this->sessionId}:{$this->nodeId}",
+                externalUserId: '',
+                externalChatId: '',
+                text: null,
+                type: IncomingMessageType::Unknown,
+                platform: $this->platform,
+                payload: [
+                    'send_message_timeout' => true,
+                    'node_id'              => $this->nodeId,
+                ],
+            )
+        );
     }
 }

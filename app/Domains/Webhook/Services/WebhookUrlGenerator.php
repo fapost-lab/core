@@ -10,7 +10,7 @@ final class WebhookUrlGenerator
 {
     public function forChannel(string $channel, string $hash): string
     {
-        $baseUrl = (string) config('webhook.base_url');
+        $baseUrl = (string)config('webhook.base_url');
 
         if ('' === $baseUrl) {
             throw new InvalidArgumentException('Webhook base URL is not configured.');

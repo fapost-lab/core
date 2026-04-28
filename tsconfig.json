@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "jsx": "preserve",
+    "lib": ["ESNext", "DOM"],
+    "types": ["vite/client"],
+    "skipLibCheck": true,
+    "noEmit": true,
+    "paths": {
+      "@builder/*": ["./resources/js/builder/*"],
+      "@shared/*": ["./resources/js/shared/*"],
+      "@tma/*": ["./resources/js/tma/*"]
+    }
+  },
+  "include": ["resources/js/**/*"],
+  "exclude": ["node_modules", "public"]
+}

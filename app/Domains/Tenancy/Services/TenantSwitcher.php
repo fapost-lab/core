@@ -42,8 +42,9 @@ final class TenantSwitcher
      * - Default connection targets that tenant’s schema (via {@see TenantDatabaseManagerInterface::switchTo()} stack).
      * - Context and DB stack are restored when the callback returns or throws.
      *
-     * Nested calls restore the outer tenant context in order; do not call {@see TenantDatabaseManagerInterface::switchTo()}
-     * without a matching {@see TenantDatabaseManagerInterface::restore()}.
+     * Nested calls restore the outer tenant context in order; do not call
+     * {@see TenantDatabaseManagerInterface::switchTo()} without a matching
+     * {@see TenantDatabaseManagerInterface::restore()}.
      */
     public function runForTenant(TenantInterface $tenant, Closure $callback): mixed
     {

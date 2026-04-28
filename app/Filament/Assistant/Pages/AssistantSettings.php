@@ -26,14 +26,11 @@ use UnitEnum;
 final class AssistantSettings extends Page
 {
     /** @var array<string, mixed>|null */
-    public ?array $data            = [];
-    protected static ?string $slug = 'settings';
-
-    protected static ?int $navigationSort = 50;
-
+    public ?array            $data                          = [];
+    protected static ?string $slug                          = 'settings';
+    protected static ?int    $navigationSort                = 50;
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedCog6Tooth;
-
-    protected string $view = 'filament.assistant.pages.assistant-settings';
+    protected string         $view                          = 'filament.assistant.pages.assistant-settings';
 
     protected CurrentAssistantInterface $currentAssistant;
     protected TenantSettings $tenantSettings;
@@ -77,10 +74,14 @@ final class AssistantSettings extends Page
 
         $this->currentAssistant->get()->update($data);
 
-        $this->tenantSettings->available_languages = array_values(array_unique(array_filter(
-            is_array($availableLanguages) ? $availableLanguages : [],
-            static fn (mixed $language): bool => is_string($language) && '' !== $language,
-        )));
+        $this->tenantSettings->available_languages = array_values(
+            array_unique(
+                array_filter(
+                    is_array($availableLanguages) ? $availableLanguages : [],
+                    static fn (mixed $language): bool => is_string($language) && '' !== $language,
+                )
+            )
+        );
         $this->tenantSettings->save();
 
         Notification::make()
@@ -112,7 +113,9 @@ final class AssistantSettings extends Page
                             ->nullable()
                             ->disabled($hasFlows)
                             ->hintIcon($hasFlows ? Heroicon::OutlinedLockClosed : null)
-                            ->hintIconTooltip($hasFlows ? __('assistant.pages.settings.fields.default_language_locked') : null),
+                            ->hintIconTooltip(
+                                $hasFlows ? __('assistant.pages.settings.fields.default_language_locked') : null
+                            ),
                         Select::make('available_languages')
                             ->label(__('assistant.pages.settings.fields.available_languages'))
                             ->options(ContentLanguages::options())

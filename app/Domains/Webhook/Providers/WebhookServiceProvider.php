@@ -16,7 +16,7 @@ final class WebhookServiceProvider extends ServiceProvider
     {
         $this->app->singleton(
             ChannelAdapterResolver::class,
-            fn ($app): ChannelAdapterResolver => new ChannelAdapterResolver(
+            fn($app): ChannelAdapterResolver => new ChannelAdapterResolver(
                 channelRegistry: $app->make(ChannelRegistryInterface::class),
             )
         );

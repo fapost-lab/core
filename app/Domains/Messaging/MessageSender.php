@@ -73,7 +73,7 @@ final readonly class MessageSender implements MessageSenderInterface
      */
     private function reserveIdempotency(string $idempotencyKey): bool
     {
-        return (bool) $this->redis->connection()->set(
+        return (bool)$this->redis->connection()->set(
             $this->idempotencyKey($idempotencyKey),
             'processing',
             'EX',
@@ -83,24 +83,11 @@ final readonly class MessageSender implements MessageSenderInterface
     }
 
     /**
-     * Mark the idempotency key as successfully delivered.
+     * Build the Redis key used to track message delivery idempotency.
      */
-    private function markSent(string $idempotencyKey): void
+    private function idempotencyKey(string $idempotencyKey): string
     {
-        $this->redis->connection()->set(
-            $this->idempotencyKey($idempotencyKey),
-            '1',
-            'EX',
-            86400,
-        );
-    }
-
-    /**
-     * Release the idempotency reservation after an unsuccessful attempt.
-     */
-    private function releaseIdempotency(string $idempotencyKey): void
-    {
-        $this->redis->connection()->del($this->idempotencyKey($idempotencyKey));
+        return "msg:sent:{$idempotencyKey}";
     }
 
     /**
@@ -118,14 +105,27 @@ final readonly class MessageSender implements MessageSenderInterface
             $pipe->expire($key, 60);
         });
 
-        return ((int) $results[0]) > $this->rateLimitPerMinute;
+        return ((int)$results[0]) > $this->rateLimitPerMinute;
     }
 
     /**
-     * Build the Redis key used to track message delivery idempotency.
+     * Release the idempotency reservation after an unsuccessful attempt.
      */
-    private function idempotencyKey(string $idempotencyKey): string
+    private function releaseIdempotency(string $idempotencyKey): void
     {
-        return "msg:sent:{$idempotencyKey}";
+        $this->redis->connection()->del($this->idempotencyKey($idempotencyKey));
+    }
+
+    /**
+     * Mark the idempotency key as successfully delivered.
+     */
+    private function markSent(string $idempotencyKey): void
+    {
+        $this->redis->connection()->set(
+            $this->idempotencyKey($idempotencyKey),
+            '1',
+            'EX',
+            86400,
+        );
     }
 }

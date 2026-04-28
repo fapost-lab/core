@@ -57,6 +57,17 @@ final class UserService
         $target->update(['is_active' => true]);
     }
 
+    private function assertCanChangeStatus(User $actor, User $target, string $ability): void
+    {
+        if ($actor->isAdmin()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'user' => __('You are not allowed to change user activation status.'),
+        ]);
+    }
+
     /**
      * Returns true when $target is the only active admin left in the tenant.
      */
@@ -72,16 +83,5 @@ final class UserService
             ->count();
 
         return $activeAdminCount <= 1;
-    }
-
-    private function assertCanChangeStatus(User $actor, User $target, string $ability): void
-    {
-        if ($actor->isAdmin()) {
-            return;
-        }
-
-        throw ValidationException::withMessages([
-            'user' => __('You are not allowed to change user activation status.'),
-        ]);
     }
 }

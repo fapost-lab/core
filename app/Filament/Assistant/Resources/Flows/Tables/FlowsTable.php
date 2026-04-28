@@ -49,7 +49,7 @@ final class FlowsTable
                 TextColumn::make('published_version')
                     ->label(__('assistant.flows.fields.versions'))
                     ->getStateUsing(fn (FlowDraft $record): string => null !== $record->published_version
-                        ? 'v' . (int) $record->published_version
+                        ? 'v' . (int)$record->published_version
                         : '—'),
             ])
             ->recordClasses(fn (FlowDraft $record): string => $record->is_active
@@ -150,14 +150,6 @@ final class FlowsTable
     }
 
     /**
-     * @param  mixed  $value
-     */
-    private static function stringOrDash(mixed $value): string
-    {
-        return is_string($value) && '' !== mb_trim($value) ? mb_trim($value) : '—';
-    }
-
-    /**
      * @param  mixed  $values
      */
     private static function summarizeList(mixed $values): string
@@ -166,10 +158,16 @@ final class FlowsTable
             return '—';
         }
 
-        $items = array_values(array_filter(array_map(
-            static fn (mixed $value): ?string => is_string($value) && '' !== mb_trim($value) ? mb_trim($value) : null,
-            $values,
-        )));
+        $items = array_values(
+            array_filter(
+                array_map(
+                    static fn (mixed $value): ?string => is_string($value) && '' !== mb_trim($value) ? mb_trim(
+                        $value
+                    ) : null,
+                    $values,
+                )
+            )
+        );
 
         if ([] === $items) {
             return '—';
@@ -183,5 +181,13 @@ final class FlowsTable
         }
 
         return Str::limit($summary, 80);
+    }
+
+    /**
+     * @param  mixed  $value
+     */
+    private static function stringOrDash(mixed $value): string
+    {
+        return is_string($value) && '' !== mb_trim($value) ? mb_trim($value) : '—';
     }
 }

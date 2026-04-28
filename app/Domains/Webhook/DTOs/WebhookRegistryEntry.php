@@ -72,7 +72,8 @@ final class WebhookRegistryEntry extends Data
      * Used by both the write-through writer and the self-heal path in the resolver,
      * so the on-wire format stays in one place.
      *
-     * @return array{tenant_id: string, assistant_id: string, channel_id: string, schema: string, channel: string, secret_token: string}
+     * @return array{tenant_id: string, assistant_id: string, channel_id: string, schema: string, channel: string,
+     *                          secret_token: string}
      */
     public function toRedisPayload(): array
     {

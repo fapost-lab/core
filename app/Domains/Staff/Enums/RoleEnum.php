@@ -42,6 +42,8 @@ enum RoleEnum: string
                 Permission::ManageFlow,
                 Permission::ManageBroadcast,
                 Permission::ManageRag,
+                Permission::ManageMedia,
+                Permission::ViewMedia,
                 Permission::ViewContacts,
                 Permission::ViewAnalytics,
             ],

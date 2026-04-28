@@ -85,7 +85,7 @@ final readonly class ChannelObserver
             SyncChannelWebhookJob::dispatchSync(
                 tenantId: $tenant->getId(),
                 schema: $tenant->getSchemaName(),
-                channelId: (string) $channel->getKey(),
+                channelId: (string)$channel->getKey(),
                 channelType: $channel->type->value,
                 webhookPublicHash: $channel->webhook_public_hash,
                 token: $channel->token,

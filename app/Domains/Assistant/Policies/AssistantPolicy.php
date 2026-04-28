@@ -66,14 +66,14 @@ final class AssistantPolicy
     public function deleteAny(AuthUser $authUser): bool
     {
         return $this->canManageAssistants($authUser)
-            && $authUser instanceof User
-            && $authUser->isAdmin();
+               && $authUser instanceof User
+               && $authUser->isAdmin();
     }
 
     private function canManageAssistants(AuthUser $authUser): bool
     {
         return $authUser instanceof User
-            && $authUser->can(Permission::ManageAssistants->value);
+               && $authUser->can(Permission::ManageAssistants->value);
     }
 
     private function isAssignedOrAdmin(AuthUser $authUser, Assistant $assistant): bool

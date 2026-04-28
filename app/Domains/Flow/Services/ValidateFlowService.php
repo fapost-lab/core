@@ -27,11 +27,16 @@ final readonly class ValidateFlowService
     }
 
     /**
-     * @param  array<string, mixed>  $nodes
-     * @param  array<string, mixed>|null  $trigger
+     * @param  array<string, mixed>              $nodes
+     * @param  array<string, mixed>|null         $trigger
+     * @param  array<int, array<string, mixed>>  $edges
      */
-    public function execute(array $nodes, ?array $trigger = null, ?string $flowId = null): FlowValidationResultDto
-    {
+    public function execute(
+        array $nodes,
+        ?array $trigger = null,
+        ?string $flowId = null,
+        array $edges = []
+    ): FlowValidationResultDto {
         $errors  = [];
         $nodeMap = $this->normalizeNodeMap($nodes, $errors);
 
@@ -44,6 +49,9 @@ final readonly class ValidateFlowService
             $this->validateUnknownModuleReferences($node, $path, $errors);
         }
 
+        $this->validateInlineKeyboardIsTerminal($nodeMap, $edges, $errors);
+        $this->validateButtonEdgesMatchExistingButtons($nodeMap, $edges, $errors);
+        $this->validateButtonValueTypes($nodeMap, $errors);
         $this->validateTrigger($trigger, $errors, $flowId);
 
         return new FlowValidationResultDto(
@@ -54,6 +62,7 @@ final readonly class ValidateFlowService
 
     /**
      * @param  list<FlowValidationErrorDto>  $errors
+     *
      * @return array<string, array<string, mixed>>
      */
     private function normalizeNodeMap(array $nodes, array &$errors): array
@@ -120,33 +129,6 @@ final readonly class ValidateFlowService
      * @param  array<string, mixed>  $node
      * @param  list<FlowValidationErrorDto>  $errors
      */
-    private function validateOutputs(array $node, string $path, array $nodeMap, array &$errors): void
-    {
-        $outputs = $node['outputs'] ?? null;
-        if ( ! is_array($outputs)) {
-            return;
-        }
-
-        foreach ($outputs as $handle => $output) {
-            if ( ! is_array($output)) {
-                continue;
-            }
-
-            $target = $output['next'] ?? $output['target'] ?? null;
-            if ( ! is_string($target) || '' === $target || ! isset($nodeMap[$target])) {
-                $errors[] = new FlowValidationErrorDto(
-                    path: "{$path}.outputs.{$handle}",
-                    code: 'unknown_output_target',
-                    message: 'Output must reference an existing node id.',
-                );
-            }
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $node
-     * @param  list<FlowValidationErrorDto>  $errors
-     */
     private function validateRequiredConfig(array $node, string $path, array &$errors): void
     {
         $type    = $node['type'] ?? null;
@@ -192,6 +174,33 @@ final readonly class ValidateFlowService
                     path: "{$path}.config.{$requiredField}",
                     code: 'missing_config_field',
                     message: "Required config field '{$requiredField}' is missing.",
+                );
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>          $node
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateOutputs(array $node, string $path, array $nodeMap, array &$errors): void
+    {
+        $outputs = $node['outputs'] ?? null;
+        if ( ! is_array($outputs)) {
+            return;
+        }
+
+        foreach ($outputs as $handle => $output) {
+            if ( ! is_array($output)) {
+                continue;
+            }
+
+            $target = $output['next'] ?? $output['target'] ?? null;
+            if ( ! is_string($target) || '' === $target || ! isset($nodeMap[$target])) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "{$path}.outputs.{$handle}",
+                    code: 'unknown_output_target',
+                    message: 'Output must reference an existing node id.',
                 );
             }
         }
@@ -253,6 +262,170 @@ final readonly class ValidateFlowService
                 );
             }
         });
+    }
+
+    /**
+     * A send_message node with an inline keyboard waits for a button press — no node may follow
+     * it via the default handle, as execution would never reach it through normal flow.
+     *
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     * @param  array<int, array<string, mixed>>     $edges
+     * @param  list<FlowValidationErrorDto>         $errors
+     */
+    private function validateInlineKeyboardIsTerminal(array $nodeMap, array $edges, array &$errors): void
+    {
+        // Build set of nodes that have at least one incoming edge.
+        $nodesWithIncoming = [];
+        foreach ($edges as $edge) {
+            if (is_array($edge) && isset($edge['to'])) {
+                $nodesWithIncoming[$edge['to']] = true;
+            }
+        }
+
+        // Ordered list of root node IDs (preserving the sequence order from the frontend).
+        $rootOrder = [];
+        foreach (array_keys($nodeMap) as $nodeId) {
+            if ( ! isset($nodesWithIncoming[$nodeId])) {
+                $rootOrder[] = $nodeId;
+            }
+        }
+
+        foreach ($nodeMap as $nodeId => $node) {
+            if (($node['type'] ?? null) !== 'send_message') {
+                continue;
+            }
+
+            $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+
+            if (($config['content_type'] ?? null) !== 'text_with_keyboard') {
+                continue;
+            }
+
+            // Case 1: explicit default edge leads out of this node (any branch, any keyboard mode).
+            foreach ($edges as $edge) {
+                if ( ! is_array($edge)) {
+                    continue;
+                }
+
+                if (($edge['from'] ?? null) === $nodeId && ($edge['handle'] ?? 'default') === 'default') {
+                    $errors[] = new FlowValidationErrorDto(
+                        path: "nodes.{$nodeId}",
+                        code: 'keyboard_node_must_be_terminal',
+                        message: 'A send_message node with a keyboard cannot have a successor on the default output. It must be the last node in its branch.',
+                    );
+                    break;
+                }
+            }
+
+            // Case 2: this node is a root and other root nodes appear after it in the sequence.
+            // Those trailing roots are visually displayed after this node but are unreachable at runtime.
+            if ( ! isset($nodesWithIncoming[$nodeId])) {
+                $position = array_search($nodeId, $rootOrder, true);
+                if (false !== $position && $position < count($rootOrder) - 1) {
+                    $errors[] = new FlowValidationErrorDto(
+                        path: "nodes.{$nodeId}",
+                        code: 'keyboard_node_must_be_terminal',
+                        message: 'A send_message node with a keyboard must be the last node in the sequence. Nodes placed after it are unreachable at runtime.',
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Verifies that every non-default edge originating from a send_message node references
+     * a button id that actually exists in that node's buttons array. Orphaned handles arise
+     * when a button is deleted without removing the corresponding outgoing edge.
+     *
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     * @param  array<int, array<string, mixed>>     $edges
+     * @param  list<FlowValidationErrorDto>         $errors
+     */
+    private function validateButtonEdgesMatchExistingButtons(array $nodeMap, array $edges, array &$errors): void
+    {
+        foreach ($edges as $edge) {
+            if ( ! is_array($edge)) {
+                continue;
+            }
+
+            $fromId = $edge['from'] ?? null;
+            $handle = $edge['handle'] ?? 'default';
+
+            if ( ! is_string($fromId) || 'default' === $handle) {
+                continue;
+            }
+
+            $node = $nodeMap[$fromId] ?? null;
+            if (null === $node || ($node['type'] ?? null) !== 'send_message') {
+                continue;
+            }
+
+            $config  = is_array($node['config'] ?? null) ? $node['config'] : [];
+            $buttons = is_array($config['buttons'] ?? null) ? $config['buttons'] : [];
+
+            $buttonIds = array_column($buttons, 'id');
+            if ( ! in_array($handle, $buttonIds, true)) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "nodes.{$fromId}",
+                    code: 'orphaned_button_edge',
+                    message: "Edge handle '{$handle}' does not match any button id on this node.",
+                );
+            }
+        }
+    }
+
+    /**
+     * Validates that each button's value conforms to the declared save_to_type.
+     * Only applies to inline keyboard nodes — reply keyboards carry no per-button values.
+     *
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     * @param  list<FlowValidationErrorDto>         $errors
+     */
+    private function validateButtonValueTypes(array $nodeMap, array &$errors): void
+    {
+        foreach ($nodeMap as $nodeId => $node) {
+            if (($node['type'] ?? null) !== 'send_message') {
+                continue;
+            }
+
+            $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+
+            if (($config['content_type'] ?? null) !== 'text_with_keyboard') {
+                continue;
+            }
+
+            if (($config['keyboard_mode'] ?? 'inline') === 'reply') {
+                continue;
+            }
+
+            $saveToType = $config['save_to_type'] ?? 'string';
+            if ( ! in_array($saveToType, ['string', 'number', 'boolean'], true) || 'string' === $saveToType) {
+                continue;
+            }
+
+            $buttons = is_array($config['buttons'] ?? null) ? $config['buttons'] : [];
+
+            foreach ($buttons as $idx => $button) {
+                $value = $button['value'] ?? '';
+                if ( ! is_string($value) || '' === $value) {
+                    continue;
+                }
+
+                $valid = match ($saveToType) {
+                    'number'  => is_numeric($value),
+                    'boolean' => 'true' === $value || 'false' === $value,
+                    default   => true,
+                };
+
+                if ( ! $valid) {
+                    $errors[] = new FlowValidationErrorDto(
+                        path: "nodes.{$nodeId}.config.buttons.{$idx}.value",
+                        code: 'button_value_type_mismatch',
+                        message: "Button value '{$value}' is not a valid {$saveToType}.",
+                    );
+                }
+            }
+        }
     }
 
     /**
@@ -386,12 +559,14 @@ final readonly class ValidateFlowService
         $errors[] = new FlowValidationErrorDto(
             path: 'trigger.config.keywords',
             code: 'duplicate_exact_trigger_keyword',
-            message: 'Exact message trigger keywords must be unique within the same scope: ' . implode(', ', $conflicts) . '.',
+            message: 'Exact message trigger keywords must be unique within the same scope: ' . implode(', ', $conflicts)
+                     . '.',
         );
     }
 
     /**
      * @param  array<string, mixed>  $config
+     *
      * @return list<string>
      */
     private function normalizedTriggerNeedles(array $config): array

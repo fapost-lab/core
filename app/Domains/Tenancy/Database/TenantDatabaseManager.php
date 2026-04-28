@@ -65,7 +65,7 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
      */
     public function switchTo(TenantInterface $tenant): void
     {
-        $tenantConnection   = (string) config('tenancy.tenant_connection', 'tenant');
+        $tenantConnection   = (string)config('tenancy.tenant_connection', 'tenant');
         $previousConnection = DB::getDefaultConnection();
         $previousSearchPath = null;
 
@@ -101,7 +101,7 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
             throw ConnectionStackEmptyException::make();
         }
 
-        $tenantConnection = (string) config('tenancy.tenant_connection', 'tenant');
+        $tenantConnection = (string)config('tenancy.tenant_connection', 'tenant');
         $previous         = array_pop($this->stack);
 
         if ($previous['connection'] === $tenantConnection) {
@@ -127,11 +127,6 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         ]);
     }
 
-    private function connectionDriver(string $connection): string
-    {
-        return (string) config("database.connections.{$connection}.driver", '');
-    }
-
     private function quoteIdentifier(string $name): string
     {
         if ( ! preg_match('/^[a-z][a-z0-9_]*$/', $name)) {
@@ -141,5 +136,10 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         }
 
         return '"' . $name . '"';
+    }
+
+    private function connectionDriver(string $connection): string
+    {
+        return (string)config("database.connections.{$connection}.driver", '');
     }
 }

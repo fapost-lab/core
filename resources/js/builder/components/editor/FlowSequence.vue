@@ -7,6 +7,7 @@ import FlowNodeCard from './FlowNodeCard.vue'
 import FlowInsertPoint from './FlowInsertPoint.vue'
 import FlowConditionCard from './FlowConditionCard.vue'
 import FlowSwitchCard from './FlowSwitchCard.vue'
+import FlowSendMessageCard from './FlowSendMessageCard.vue'
 
 const builderStore = useBuilderStore()
 const selectionStore = useSelectionStore()
@@ -65,9 +66,27 @@ const breadcrumbs = computed(() => {
         const handle = branch[i + 1]
         if (!nodeId) break
         const node = builderStore.definition.nodes.find((n) => n.id === nodeId)
-        const nodeLabel = node?.label ?? (node?.type ?? nodeId)
+        const nodeLabel = node?.label
+            ?? node?.type?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+            ?? nodeId
         segments.push({ label: nodeLabel, key: `${nodeId}` })
-        if (handle) segments.push({ label: handle.toUpperCase(), key: `${nodeId}-${handle}` })
+        if (handle) {
+            let handleLabel = handle
+            if (node?.type === 'send_message' && Array.isArray(node?.config?.buttons)) {
+                const buttons = node.config.buttons
+                const idx = buttons.findIndex((b) => b.id === handle)
+                if (idx !== -1) {
+                    const lbl = buttons[idx].label
+                    const text = typeof lbl === 'object'
+                        ? (Object.values(lbl)[0] ?? '')
+                        : String(lbl ?? '')
+                    handleLabel = text.trim() !== '' ? text.trim() : `Button ${idx + 1}`
+                } else {
+                    handleLabel = 'Button'
+                }
+            }
+            segments.push({ label: handleLabel, key: `${nodeId}-${handle}` })
+        }
     }
     return segments
 })
@@ -114,6 +133,43 @@ const hoveredSlot = ref(null)
 function goToRoot() {
     selectionStore.clearBranch()
 }
+
+/**
+ * True when the last visible node is terminal — no further nodes may be added.
+ * Two cases for send_message:
+ *   - inline keyboard with buttons: branches are the exit path
+ *   - reply keyboard: pressing a reply button triggers a separate flow via
+ *     keyword/trigger matching, so this flow ends here entirely
+ */
+const lastNodeIsTerminal = computed(() => {
+    const last = activeNodes.value[activeNodes.value.length - 1]
+    if (!last) return false
+    const { type, config } = last.node
+    if (type !== 'send_message' || config?.content_type !== 'text_with_keyboard') return false
+    const mode = config?.keyboard_mode ?? 'inline'
+    if (mode === 'reply') return true
+    return (config?.buttons?.length ?? 0) > 0
+})
+
+/**
+ * For the trailing insert point: when inside a branch and no nodes exist yet,
+ * use the branch parent node + handle so insertNode creates the edge correctly
+ * instead of trying to insert at the flow root.
+ */
+const trailingInsertContext = computed(() => {
+    const last = activeNodes.value[activeNodes.value.length - 1]
+    if (last) {
+        return { afterNodeId: last.node.id, handle: 'default' }
+    }
+    const branch = selectionStore.activeBranch
+    if (branch.length >= 2) {
+        return {
+            afterNodeId: branch[branch.length - 2],
+            handle: branch[branch.length - 1],
+        }
+    }
+    return { afterNodeId: null, handle: 'default' }
+})
 </script>
 
 <template>
@@ -172,6 +228,18 @@ function goToRoot() {
                 <FlowSwitchCard
                     v-else-if="item.node.type === 'switch'"
                     :tree-node="item"
+                    :parent-branch="selectionStore.activeBranch"
+                    :index="index + 1"
+                />
+                <FlowSendMessageCard
+                    v-else-if="
+                        item.node.type === 'send_message'
+                            && item.node.config?.content_type === 'text_with_keyboard'
+                            && (item.node.config?.keyboard_mode ?? 'inline') !== 'reply'
+                            && item.node.config?.buttons?.length > 0
+                    "
+                    :tree-node="item"
+                    :parent-branch="selectionStore.activeBranch"
                     :index="index + 1"
                 />
                 <FlowNodeCard
@@ -181,29 +249,32 @@ function goToRoot() {
                 />
             </template>
 
-            <!-- trailing slot before end card -->
-            <div
-                class="seq-slot"
-                @mouseenter="hoveredSlot = 'slot-end'"
-                @mouseleave="hoveredSlot = null"
-            >
-                <div class="seq-connector">
-                    <div class="conn-line" />
-                    <div class="conn-dot" />
-                    <div class="conn-line" />
+            <!-- trailing slot + end card — hidden when last node is inline keyboard (buttons are the exit) -->
+            <template v-if="!lastNodeIsTerminal">
+                <div
+                    class="seq-slot"
+                    @mouseenter="hoveredSlot = 'slot-end'"
+                    @mouseleave="hoveredSlot = null"
+                >
+                    <div class="seq-connector">
+                        <div class="conn-line" />
+                        <div class="conn-dot" />
+                        <div class="conn-line" />
+                    </div>
+                    <FlowInsertPoint
+                        :after-node-id="trailingInsertContext.afterNodeId"
+                        :handle="trailingInsertContext.handle"
+                        :index="activeNodes.length"
+                        :visible="hoveredSlot === 'slot-end'"
+                    />
+                    <div class="seq-connector"><div class="conn-line" /></div>
                 </div>
-                <FlowInsertPoint
-                    :after-node-id="activeNodes[activeNodes.length - 1]?.node.id ?? null"
-                    :index="activeNodes.length"
-                    :visible="hoveredSlot === 'slot-end'"
-                />
-                <div class="seq-connector"><div class="conn-line" /></div>
-            </div>
 
-            <div class="end-card">
-                <div class="end-icon">■</div>
-                <span>End of flow</span>
-            </div>
+                <div class="end-card">
+                    <div class="end-icon">■</div>
+                    <span>End of flow</span>
+                </div>
+            </template>
         </div>
     </div>
 </template>

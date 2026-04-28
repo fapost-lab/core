@@ -10,9 +10,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * @property string $id
- * @property string $slug
- * @property string $schema_name
+ * @property string       $id
+ * @property string       $slug
+ * @property string       $schema_name
  * @property TenantStatus $status
  * @property array<array-key, mixed> $config
  * @property \Illuminate\Support\Carbon|null $created_at

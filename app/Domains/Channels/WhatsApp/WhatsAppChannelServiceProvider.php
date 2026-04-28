@@ -13,10 +13,13 @@ final class WhatsAppChannelServiceProvider extends ServiceProvider
     {
         $this->app->bind(WhatsAppAdapter::class);
 
-        $this->app->singleton('channels.integration.whatsapp', static fn (): ChannelIntegrationDefinition => new ChannelIntegrationDefinition(
-            channelType: 'whatsapp',
-            adapterClass: WhatsAppAdapter::class,
-        ));
+        $this->app->singleton(
+            'channels.integration.whatsapp',
+            static fn (): ChannelIntegrationDefinition => new ChannelIntegrationDefinition(
+                channelType: 'whatsapp',
+                adapterClass: WhatsAppAdapter::class,
+            )
+        );
     }
 
     public function boot(): void

@@ -2,10 +2,10 @@ import { onMounted, onUnmounted, ref } from 'vue'
 
 const MIN_WIDTH = 240
 const MAX_WIDTH = 800
-const DEFAULT_WIDTH = 280
+const CONFIG_RATIO = 0.4
 
 export function useConfigResize() {
-    const width = ref(DEFAULT_WIDTH)
+    const width = ref(Math.round(window.innerWidth * CONFIG_RATIO))
     const isCollapsed = ref(false)
     const handleRef = ref(null)
 
@@ -42,7 +42,7 @@ export function useConfigResize() {
     function toggle() {
         isCollapsed.value = !isCollapsed.value
         if (!isCollapsed.value && width.value < MIN_WIDTH) {
-            width.value = DEFAULT_WIDTH
+            width.value = Math.round(window.innerWidth * CONFIG_RATIO)
         }
     }
 

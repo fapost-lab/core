@@ -29,7 +29,7 @@ final class ChannelsTable
                 TextColumn::make('type')
                     ->label(__('staff.channels.fields.type'))
                     ->formatStateUsing(function (mixed $state): string {
-                        $enum = $state instanceof ChannelTypeEnum ? $state : ChannelTypeEnum::from((string) $state);
+                        $enum = $state instanceof ChannelTypeEnum ? $state : ChannelTypeEnum::from((string)$state);
 
                         return __($enum->labelKey());
                     }),
@@ -51,18 +51,22 @@ final class ChannelsTable
         return $table
             ->recordActions([
                 EditAction::make()
-                    ->using(function (array $data, HasActions&HasSchemas $livewire, Model $record, ?Table $table) use ($channelService): void {
-                        if ('' === ($data['token'] ?? '')) {
-                            unset($data['token']);
-                        }
+                    ->using(
+                        function (array $data, HasActions&HasSchemas $livewire, Model $record, ?Table $table) use (
+                            $channelService
+                        ): void {
+                            if ('' === ($data['token'] ?? '')) {
+                                unset($data['token']);
+                            }
 
-                        if ('' === ($data['secret_token'] ?? '')) {
-                            unset($data['secret_token']);
-                        }
+                            if ('' === ($data['secret_token'] ?? '')) {
+                                unset($data['secret_token']);
+                            }
 
-                        /** @var Channel $record */
-                        $channelService->update($record, $data);
-                    }),
+                            /** @var Channel $record */
+                            $channelService->update($record, $data);
+                        }
+                    ),
                 Action::make('rotateWebhookHash')
                     ->label(__('staff.channels.actions.rotate_webhook_hash'))
                     ->icon(Heroicon::OutlinedArrowPath)

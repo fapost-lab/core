@@ -1,4 +1,6 @@
 <script setup>
+import AccordionSection from '../AccordionSection.vue'
+
 const props = defineProps({
     node:   { type: Object, required: true },
     schema: { type: Object, required: true },
@@ -12,9 +14,8 @@ function update(key, value) {
 </script>
 
 <template>
-    <div>
-        <div class="config-section">
-            <div class="config-label">Expression</div>
+    <div class="accordion">
+        <AccordionSection title="Expression" default-open>
             <div class="config-field">
                 <div class="field-label">Condition <small>boolean expression</small></div>
                 <input
@@ -25,10 +26,9 @@ function update(key, value) {
                     @input="update('expression', $event.target.value)"
                 >
             </div>
-        </div>
+        </AccordionSection>
 
-        <div class="config-section">
-            <div class="config-label">Meta</div>
+        <AccordionSection title="Meta">
             <div class="config-field">
                 <div class="field-label">Node ID</div>
                 <input
@@ -38,6 +38,6 @@ function update(key, value) {
                     readonly
                 >
             </div>
-        </div>
+        </AccordionSection>
     </div>
 </template>

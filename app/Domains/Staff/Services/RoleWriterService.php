@@ -23,7 +23,7 @@ final class RoleWriterService
     {
         $this->assertCanManageRoles($actor);
 
-        $guard       = (string) config('auth.defaults.guard', 'web');
+        $guard       = (string)config('auth.defaults.guard', 'web');
         $permissions = $this->flattenPermissionGroups($data['permission_groups'] ?? []);
 
         $this->assertUniqueRoleName($data['name'], $guard, null);
@@ -42,32 +42,8 @@ final class RoleWriterService
     }
 
     /**
-     * @param  array<string, mixed>  $data
-     */
-    public function update(User $actor, Role $role, array $data): Role
-    {
-        $this->assertCanManageRoles($actor);
-
-        $guard       = (string) config('auth.defaults.guard', 'web');
-        $permissions = $this->flattenPermissionGroups($data['permission_groups'] ?? []);
-
-        $nextName = $role->is_system ? $role->name : $data['name'];
-        $this->assertUniqueRoleName($nextName, $guard, $role->getKey());
-
-        return DB::transaction(function () use ($role, $data, $permissions, $nextName): Role {
-            $role->fill([
-                'name'         => $nextName,
-                'display_name' => $data['display_name'] ?? null,
-            ]);
-            $role->save();
-            $role->syncPermissions($permissions);
-
-            return $role->refresh();
-        });
-    }
-
-    /**
      * @param  array<string, list<string>|null>  $groups
+     *
      * @return list<string>
      */
     public function flattenPermissionGroups(array $groups): array
@@ -89,6 +65,42 @@ final class RoleWriterService
         return array_values(array_unique($out));
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    public function update(User $actor, Role $role, array $data): Role
+    {
+        $this->assertCanManageRoles($actor);
+
+        $guard       = (string)config('auth.defaults.guard', 'web');
+        $permissions = $this->flattenPermissionGroups($data['permission_groups'] ?? []);
+
+        $nextName = $role->is_system ? $role->name : $data['name'];
+        $this->assertUniqueRoleName($nextName, $guard, $role->getKey());
+
+        return DB::transaction(function () use ($role, $data, $permissions, $nextName): Role {
+            $role->fill([
+                'name'         => $nextName,
+                'display_name' => $data['display_name'] ?? null,
+            ]);
+            $role->save();
+            $role->syncPermissions($permissions);
+
+            return $role->refresh();
+        });
+    }
+
+    private function assertCanManageRoles(User $actor): void
+    {
+        if ($actor->isAdmin() && $actor->can(Permission::ManageUsers->value)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'role' => __('You are not allowed to manage roles.'),
+        ]);
+    }
+
     private function assertUniqueRoleName(string $name, string $guard, mixed $ignoreId): void
     {
         $query = Role::query()
@@ -104,16 +116,5 @@ final class RoleWriterService
                 'name' => __('This role name is already taken.'),
             ]);
         }
-    }
-
-    private function assertCanManageRoles(User $actor): void
-    {
-        if ($actor->isAdmin() && $actor->can(Permission::ManageUsers->value)) {
-            return;
-        }
-
-        throw ValidationException::withMessages([
-            'role' => __('You are not allowed to manage roles.'),
-        ]);
     }
 }

@@ -22,14 +22,16 @@ final class SyncChannelWebhookJob implements ShouldQueue
     use Queueable;
 
     /**
-     * @param  string  $tenantId           Tenant identifier for context restoration.
-     * @param  string  $schema             Tenant schema name for context restoration.
-     * @param  string  $channelType        Published channel identifier.
-     * @param  string  $webhookPublicHash  Public routing hash used in inbound webhook URLs.
-     * @param  string  $token              Provider transport token (decrypted at dispatch time).
-     * @param  string  $secretToken        Provider-side webhook signature secret (decrypted at dispatch time).
-     * @param  array<string, mixed>  $config  Transport-specific channel configuration snapshot.
-     * @param  bool  $register  True to create/update the provider webhook, false to delete it.
+     * @param  string                $tenantId           Tenant identifier for context restoration.
+     * @param  string                $schema             Tenant schema name for context restoration.
+     * @param  string                $channelType        Published channel identifier.
+     * @param  string                $webhookPublicHash  Public routing hash used in inbound webhook URLs.
+     * @param  string                $token              Provider transport token (decrypted at dispatch time).
+     * @param  string                $secretToken        Provider-side webhook signature secret (decrypted at dispatch
+     *                                                   time).
+     * @param  array<string, mixed>  $config             Transport-specific channel configuration snapshot.
+     * @param  bool                  $register           True to create/update the provider webhook, false to delete
+     *                                                   it.
      */
     public function __construct(
         public readonly string $tenantId,

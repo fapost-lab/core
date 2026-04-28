@@ -22,26 +22,26 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Extensible via {@see BaseModel} computed attributes (Solutions/Features/Plugins).
  *
  * @property-read \Illuminate\Database\Eloquent\Collection<int, Channel> $channels
- * @property-read int|null $channels_count
+ * @property-read int|null                   $channels_count
  * @property-read \Illuminate\Database\Eloquent\Collection<int, User> $users
- * @property-read int|null $users_count
+ * @property-read int|null                   $users_count
  * @method static AssistantBuilder<static>|Assistant active()
  * @method static \Database\Factories\AssistantFactory factory($count = null, $state = [])
  * @method static AssistantBuilder<static>|Assistant newModelQuery()
  * @method static AssistantBuilder<static>|Assistant newQuery()
  * @method static AssistantBuilder<static>|Assistant query()
- * @property string $id
- * @property string $tenant_id
- * @property string $name
- * @property bool $is_active
- * @property string|null $default_flow_id
- * @property string|null $fallback_message
- * @property array<array-key, mixed> $settings
+ * @property string                          $id
+ * @property string                          $tenant_id
+ * @property string                          $name
+ * @property bool                            $is_active
+ * @property string|null                     $default_flow_id
+ * @property string|null                     $fallback_message
+ * @property array<array-key, mixed>         $settings
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property string $default_language
- * @property-read bool|null $channels_exists
- * @property-read bool|null $users_exists
+ * @property string                          $default_language
+ * @property-read bool|null                  $channels_exists
+ * @property-read bool|null                  $users_exists
  * @method static AssistantBuilder<static>|Assistant whereCreatedAt($value)
  * @method static AssistantBuilder<static>|Assistant whereDefaultFlowId($value)
  * @method static AssistantBuilder<static>|Assistant whereDefaultLanguage($value)
@@ -71,6 +71,7 @@ final class Assistant extends BaseModel implements HasName
         'name',
         'is_active',
         'default_language',
+        'available_languages',
         'default_flow_id',
         'fallback_message',
         'settings',
@@ -120,9 +121,10 @@ final class Assistant extends BaseModel implements HasName
     protected function casts(): array
     {
         return [
-            'settings'         => 'array',
-            'is_active'        => 'boolean',
-            'default_language' => 'string',
+            'settings'            => 'array',
+            'is_active'           => 'boolean',
+            'default_language'    => 'string',
+            'available_languages' => 'array',
         ];
     }
 }

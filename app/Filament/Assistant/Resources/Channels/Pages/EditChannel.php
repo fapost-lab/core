@@ -64,6 +64,7 @@ final class EditChannel extends EditRecord
 
     /**
      * @param  array<string, mixed>  $data
+     *
      * @return array<string, mixed>
      */
     private function normalizeConfigPayload(array $data): array

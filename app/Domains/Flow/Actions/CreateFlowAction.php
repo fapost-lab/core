@@ -18,15 +18,15 @@ final readonly class CreateFlowAction
     public function execute(array $data): FlowDraft
     {
         return FlowDraft::create([
-            'tenant_id'    => $this->tenantContext->get()->id,
-            'flow_id'      => (string) Str::uuid(),
-            'assistant_id' => $data['assistant_id'],
-            'name'         => $data['name'],
-            'description'  => $data['description'] ?? null,
-            'folder'       => $data['folder'] ?? null,
-            'is_public'    => $data['is_public'] ?? true,
-            'is_active'    => true,
-            'nodes'        => ['nodes' => [], 'edges' => []],
+            'tenant_id'     => $this->tenantContext->get()->id,
+            'flow_id'       => (string)Str::uuid(),
+            'assistant_id'  => $data['assistant_id'],
+            'flow_group_id' => $data['flow_group_id'] ?? null,
+            'name'          => $data['name'],
+            'description'   => $data['description'] ?? null,
+            'is_public'     => $data['is_public'] ?? true,
+            'is_active'     => true,
+            'nodes'         => ['nodes' => [], 'edges' => []],
         ]);
     }
 }

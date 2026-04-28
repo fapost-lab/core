@@ -340,7 +340,7 @@ body {
 
 /* condition/switch branches */
 .condition-branches {
-  display: flex; gap: 6px; margin-top: 8px;
+  display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;
 }
 .branch-btn {
   padding: 3px 10px; border-radius: 5px;
@@ -353,6 +353,13 @@ body {
 .branch-no  { background: var(--rose-bg); color: var(--rose); }
 .branch-default { background: var(--sky-bg); color: var(--sky); }
 .branch-btn.active-branch { outline: 2px solid currentColor; outline-offset: 1px; }
+.branch-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: 8px; font-size: 10px; font-weight: 700; line-height: 1;
+  margin-left: 5px; vertical-align: middle;
+  background: rgba(0,0,0,.18); color: #fff;
+}
 
 /* end card */
 .end-card {
@@ -388,7 +395,9 @@ body {
   flex-shrink: 0;
 }
 .config-node-title {
-  font-size: 13px; font-weight: 600; flex: 1;
+  font-size: 12px; font-weight: 600; flex: 1;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text);
 }
 .config-node-type {
   font-size: 10.5px; color: var(--text-3); font-weight: 400;
@@ -398,7 +407,68 @@ body {
 .config-scrollable {
   overflow-y: auto;
   flex: 1;
+  padding: 10px 10px 14px;
 }
+
+/* Accordion sections — used across all node configs as cards on the panel bg. */
+.accordion {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.acc-section {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  overflow: hidden;
+  transition: border-color .12s;
+}
+.acc-section:hover { border-color: var(--border-2); }
+.acc-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px;
+  background: none;
+  border: none;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text-3);
+  cursor: pointer;
+  text-align: left;
+  gap: 6px;
+  transition: color .12s;
+}
+.acc-header:hover { color: var(--text-2); }
+.acc-header > span:first-child { flex: 1; }
+.acc-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--primary);
+  background: var(--primary-bg);
+  border-radius: 10px;
+  padding: 1px 6px;
+  line-height: 1.6;
+}
+.acc-chevron {
+  font-size: 16px;
+  line-height: 1;
+  color: var(--text-3);
+  transition: transform .18s;
+  display: inline-block;
+}
+.acc-chevron--open { transform: rotate(90deg); }
+.acc-body {
+  padding: 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Legacy flat section (kept for backward compatibility — prefer .acc-section). */
 .config-section {
   padding: 12px 14px;
   border-bottom: 1px solid var(--border);
@@ -480,24 +550,29 @@ textarea.field-input { min-height: 72px; line-height: 1.5; }
 /* config resize handle */
 .config-resize-handle {
   position: absolute;
-  left: -1px; top: 0; bottom: 0;
-  width: 5px;
+  left: -6px; top: 0; bottom: 0;
+  width: 12px;
   cursor: col-resize;
   z-index: 20;
   display: flex; align-items: center; justify-content: center;
+  gap: 3px;
 }
+.config-resize-handle::before,
 .config-resize-handle::after {
   content: '';
-  width: 3px; height: 32px;
+  width: 2px; height: 28px;
   border-radius: 2px;
   background: var(--border-2);
-  opacity: 0;
-  transition: opacity .15s, background .15s;
-}
-.config-resize-handle:hover::after,
-.config-resize-handle.dragging::after {
   opacity: 1;
+  transition: background .15s, height .15s;
+  flex-shrink: 0;
+}
+.config-resize-handle:hover::before,
+.config-resize-handle:hover::after,
+.config-resize-handle.dragging::before,
+.config-resize-handle.dragging::after {
   background: var(--primary);
+  height: 36px;
 }
 
 /* ── NODE PALETTE ── */

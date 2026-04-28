@@ -81,7 +81,7 @@ final class ChannelPolicy
     private function canManageAssistants(AuthUser $authUser): bool
     {
         return $authUser instanceof User
-            && $authUser->can(Permission::ManageAssistants->value);
+               && $authUser->can(Permission::ManageAssistants->value);
     }
 
     private function canAccessAssistant(AuthUser $authUser, ?Assistant $assistant): bool

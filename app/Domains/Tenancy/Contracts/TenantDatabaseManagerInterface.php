@@ -10,7 +10,8 @@ use App\Domains\Tenancy\ValueObjects\MigrationScope;
 /**
  * Landlord DDL for tenant schemas and stack-based switching of the default DB connection to a tenant.
  *
- * Application flows should use {@see \App\Domains\Tenancy\Services\TenantSwitcher::runForTenant()} instead of managing {@see switchTo()}/{@see restore()} manually.
+ * Application flows should use {@see \App\Domains\Tenancy\Services\TenantSwitcher::runForTenant()} instead of managing
+ * {@see switchTo()}/{@see restore()} manually.
  */
 interface TenantDatabaseManagerInterface
 {
@@ -37,7 +38,8 @@ interface TenantDatabaseManagerInterface
     /**
      * Runs Laravel migrate against the then-current default connection.
      *
-     * Constraint: invoke while tenant DB is active when migrating tenant paths (e.g. inside {@see \App\Domains\Tenancy\Services\TenantSwitcher::runForTenant()}).
+     * Constraint: invoke while tenant DB is active when migrating tenant paths (e.g. inside
+     * {@see \App\Domains\Tenancy\Services\TenantSwitcher::runForTenant()}).
      */
     public function runMigrations(MigrationScope $scope): void;
 }

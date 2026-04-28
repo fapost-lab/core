@@ -12,8 +12,17 @@ use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\FlowMessageSender;
+use App\Domains\Flow\Support\CallbackDataCodec;
+use App\Domains\Media\Contracts\MediaDispatcherInterface;
+use App\Domains\Media\Contracts\MediaServiceInterface;
+use App\Domains\Media\DTO\DispatchResult;
+use App\Domains\Media\Enums\MediaSource;
+use App\Domains\Media\Models\MediaBlob;
+use App\Domains\Media\Models\MediaFile;
+use FAPost\Foundation\Media\Enums\MediaKind;
 use FAPost\Foundation\Messaging\DeliveryResult;
 use FAPost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
+use Mockery;
 use Mockery\MockInterface;
 use Tests\Feature\FeatureTestCase;
 
@@ -68,14 +77,19 @@ final class FlowMessageSenderTest extends FeatureTestCase
                     && 'keyboard' === $message->payload->type
                     && 'Choose' === $message->payload->text
                     && (string) $session->getKey() === $message->metadata['flow_session_id']
-                    && sprintf(
-                        '{"session_id":"%s","button_id":"11111111-1111-4111-8111-111111111111"}',
-                        $session->getKey(),
-                    )
-                        === $message->payload->keyboard['inline_keyboard'][0][0]['callback_data'])->andReturn(new DeliveryResult(sent: true, providerMessageId: 'provider-1'));
+                                                                                  && CallbackDataCodec::encode(
+                    (string)$session->getKey(),
+                    '11111111-1111-4111-8111-111111111111',
+                ) === $message->payload->keyboard['inline_keyboard'][0][0]['callback_data'])->andReturn(
+                new DeliveryResult(sent: true, providerMessageId: 'provider-1')
+            );
         });
 
-        $flowSender = new FlowMessageSender($sender);
+        $flowSender = new FlowMessageSender(
+            $sender,
+            Mockery::mock(MediaServiceInterface::class),
+            Mockery::mock(MediaDispatcherInterface::class),
+        );
 
         $providerMessageId = $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
             'node_id'         => 'node-1',
@@ -151,7 +165,11 @@ final class FlowMessageSenderTest extends FeatureTestCase
             )->andReturn(new DeliveryResult(sent: true, providerMessageId: 'provider-reply'));
         });
 
-        $flowSender = new FlowMessageSender($sender);
+        $flowSender = new FlowMessageSender(
+            $sender,
+            Mockery::mock(MediaServiceInterface::class),
+            Mockery::mock(MediaDispatcherInterface::class),
+        );
 
         $providerMessageId = $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
             'node_id'         => 'node-reply',
@@ -216,24 +234,143 @@ final class FlowMessageSenderTest extends FeatureTestCase
             'version'            => 1,
         ]);
 
+        $blob = MediaBlob::query()->create([
+            'tenant_id'    => $tenantId,
+            'content_hash' => str_repeat('a', 64),
+            'storage_path' => 'tenants/test/media/foo.jpg',
+            'storage_disk' => 'local',
+            'size'         => 100,
+            'mime_type'    => 'image/jpeg',
+        ]);
+
+        $mediaFile = MediaFile::query()->create([
+            'tenant_id' => $tenantId,
+            'blob_id'   => $blob->id,
+            'name'      => 'photo.jpg',
+            'kind'      => MediaKind::Image,
+            'metadata'  => [],
+            'source'    => MediaSource::Upload,
+        ]);
+
         $sender = $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock): void {
             $mock->shouldReceive('send')->once()->withArgs(
                 fn ($message): bool => 'photo' === $message->payload->type
-                    && 'https://example.com/photo.jpg' === ($message->payload->media['photo'] ?? null)
+                                       && 'cached-file-id' === ($message->payload->media['photo'] ?? null)
                     && 'Nice photo' === $message->payload->text
             )->andReturn(new DeliveryResult(sent: true, providerMessageId: 'provider-img'));
         });
 
-        $flowSender        = new FlowMessageSender($sender);
+        $mediaService = Mockery::mock(MediaServiceInterface::class);
+        $mediaService->shouldReceive('find')->with($mediaFile->id)->andReturn($mediaFile->fresh());
+
+        $dispatcher = Mockery::mock(MediaDispatcherInterface::class);
+        $dispatcher->shouldReceive('ensureUploadedToChannel')->once()->andReturn(
+            new DispatchResult(providerFileId: 'cached-file-id', alreadyDelivered: false),
+        );
+
+        $flowSender        = new FlowMessageSender($sender, $mediaService, $dispatcher);
         $providerMessageId = $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
             'node_id'         => 'node-img',
             'idempotency_key' => 'idem-img',
             'session_id'      => (string) $session->getKey(),
             'content_type'    => 'image',
-            'media_url'       => 'https://example.com/photo.jpg',
+            'media_file_id' => $mediaFile->id,
             'caption'         => 'Nice photo',
         ]);
 
         $this->assertSame('provider-img', $providerMessageId);
+    }
+
+    public function test_image_send_skips_outbound_when_dispatcher_already_delivered(): void
+    {
+        $tenantId  = '00000000-0000-0000-0000-000000000001';
+        $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+        $contact   = Contact::factory()->forTenant($tenantId)->create([
+            'external_id' => 'chat-uas',
+        ]);
+
+        $channel = Channel::withoutEvents(fn(): Channel => Channel::factory()->create([
+            'assistant_id' => $assistant->getKey(),
+            'tenant_id'    => $tenantId,
+            'type'         => ChannelTypeEnum::Telegram,
+            'token'        => 'bot-token',
+            'is_active'    => true,
+        ]));
+
+        ChannelContact::query()->create([
+            'contact_id'          => $contact->getKey(),
+            'channel_id'          => $channel->getKey(),
+            'last_interaction_at' => now(),
+        ]);
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => 'flow-uas',
+            'version'   => 1,
+            'name'      => 'Test Flow',
+            'nodes'     => [],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        $session = FlowSession::query()->create([
+            'tenant_id'          => $tenantId,
+            'contact_id'         => $contact->getKey(),
+            'assistant_id'       => $assistant->getKey(),
+            'flow_id'            => $definition->flow_id,
+            'flow_definition_id' => (string)$definition->getKey(),
+            'flow_version'       => 1,
+            'current_node_id'    => 'node-uas',
+            'state'              => [],
+            'status'             => 'active',
+            'version'            => 1,
+        ]);
+
+        $blob = MediaBlob::query()->create([
+            'tenant_id'    => $tenantId,
+            'content_hash' => str_repeat('b', 64),
+            'storage_path' => 'tenants/test/media/bar.jpg',
+            'storage_disk' => 'local',
+            'size'         => 50,
+            'mime_type'    => 'image/jpeg',
+        ]);
+
+        $mediaFile = MediaFile::query()->create([
+            'tenant_id' => $tenantId,
+            'blob_id'   => $blob->id,
+            'name'      => 'bar.jpg',
+            'kind'      => MediaKind::Image,
+            'metadata'  => [],
+            'source'    => MediaSource::Upload,
+        ]);
+
+        $sender = $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('send');
+        });
+
+        $mediaService = Mockery::mock(MediaServiceInterface::class);
+        $mediaService->shouldReceive('find')->with($mediaFile->id)->andReturn($mediaFile->fresh());
+
+        $dispatcher = Mockery::mock(MediaDispatcherInterface::class);
+        $dispatcher->shouldReceive('ensureUploadedToChannel')->once()->andReturn(
+            new DispatchResult(
+                providerFileId: 'tg-file-id',
+                alreadyDelivered: true,
+                deliveredMessageId: '999',
+            ),
+        );
+
+        $flowSender = new FlowMessageSender($sender, $mediaService, $dispatcher);
+
+        $providerMessageId = $flowSender->send($tenantId, (string)$contact->getKey(), (string)$session->getKey(), [
+            'node_id'         => 'node-uas',
+            'idempotency_key' => 'idem-uas',
+            'session_id'      => (string)$session->getKey(),
+            'content_type'    => 'image',
+            'media_file_id'   => $mediaFile->id,
+            'caption'         => null,
+        ]);
+
+        $this->assertSame('999', $providerMessageId);
     }
 }

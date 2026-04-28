@@ -19,7 +19,7 @@ final class FlowGraphResolverTest extends TestCase
                 ['id' => 'n2', 'type' => 't', 'version' => 1, 'config' => []],
             ],
             'edges' => [
-                ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
+                ['id' => 'e1', 'from' => 'n1', 'to' => 'n2', 'handle' => 'default'],
             ],
         ]);
 
@@ -36,7 +36,7 @@ final class FlowGraphResolverTest extends TestCase
                 ['id' => 'n2', 'type' => 't', 'version' => 1, 'config' => []],
             ],
             'edges' => [
-                ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
+                ['id' => 'e1', 'from' => 'n1', 'to' => 'n2', 'handle' => 'default'],
             ],
         ]);
 

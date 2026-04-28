@@ -22,6 +22,8 @@ return [
         'manage_flow'       => 'Управление сценариями (flow)',
         'manage_broadcast'  => 'Управление рассылками',
         'manage_rag'        => 'Управление RAG / базой знаний',
+        'view_media'        => 'Просмотр медиа-библиотеки',
+        'manage_media'      => 'Управление медиа-библиотекой',
         'view_contacts'     => 'Просмотр контактов',
         'manage_contacts'   => 'Управление контактами',
         'view_analytics'    => 'Просмотр аналитики',
@@ -69,16 +71,17 @@ return [
         'plural_label' => 'Ассистенты',
 
         'fields' => [
-            'name'              => 'Название',
-            'default_language'  => 'Язык по умолчанию',
-            'is_active'         => 'Активен',
-            'fallback_message'  => 'Сообщение по умолчанию',
-            'default_flow'      => 'Сценарий по умолчанию',
-            'default_flow_help' => 'Будет доступно после включения домена Flow.',
-            'settings'          => 'Настройки',
-            'settings_key'      => 'Ключ',
-            'settings_value'    => 'Значение',
-            'settings_add'      => 'Добавить',
+            'name'                => 'Название',
+            'default_language'    => 'Язык по умолчанию',
+            'available_languages' => 'Доступные языки',
+            'is_active'           => 'Активен',
+            'fallback_message'    => 'Сообщение по умолчанию',
+            'default_flow'        => 'Сценарий по умолчанию',
+            'default_flow_help'   => 'Будет доступно после включения домена Flow.',
+            'settings'            => 'Настройки',
+            'settings_key'        => 'Ключ',
+            'settings_value'      => 'Значение',
+            'settings_add'        => 'Добавить',
         ],
 
         'table' => [
@@ -168,6 +171,42 @@ return [
             'display_name' => 'Отображаемое имя',
             'system'       => 'Системная',
             'permissions'  => 'Права',
+        ],
+    ],
+
+    'dashboard' => [
+        'chart' => [
+            'flow_activity' => [
+                'heading'  => 'Активность сценариев (последние 14 дней)',
+                'executed' => 'Выполнено',
+                'failed'   => 'Ошибки',
+            ],
+        ],
+        'stats' => [
+            'assistants' => [
+                'label'       => 'Ассистенты',
+                'description' => ':count активны',
+            ],
+            'contacts' => [
+                'label'       => 'Контакты',
+                'description' => 'Всего зарегистрировано',
+            ],
+            'channels' => [
+                'label'       => 'Каналы',
+                'description' => 'Всего :total, подключено :active',
+            ],
+            'published_flows' => [
+                'label'       => 'Опубликованные сценарии',
+                'description' => 'Развёрнуто в продакшн',
+            ],
+            'waiting_sessions' => [
+                'label'       => 'Ожидающие сессии',
+                'description' => 'На паузе или ждут ввода',
+            ],
+            'staff_users' => [
+                'label'       => 'Сотрудники',
+                'description' => 'С доступом к этому тенанту',
+            ],
         ],
     ],
 ];

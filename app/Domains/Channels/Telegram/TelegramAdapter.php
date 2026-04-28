@@ -41,7 +41,7 @@ final readonly class TelegramAdapter implements ChannelAdapterInterface
      */
     public function verifySignature(Request $request, string $secret): bool
     {
-        $headerToken = (string) $request->header(self::SECRET_HEADER, '');
+        $headerToken = (string)$request->header(self::SECRET_HEADER, '');
 
         return $this->signatureVerifier->verify($headerToken, $secret);
     }
@@ -59,7 +59,7 @@ final readonly class TelegramAdapter implements ChannelAdapterInterface
      */
     public function extractIdempotencyKey(Request $request, string $channelId): string
     {
-        $updateId = (string) ($request->json('update_id') ?? '');
+        $updateId = (string)($request->json('update_id') ?? '');
 
         return "tg:{$channelId}:{$updateId}";
     }

@@ -9,17 +9,25 @@ use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Media\Contracts\MediaDispatcherInterface;
+use App\Domains\Media\Contracts\MediaServiceInterface;
+use App\Domains\Media\DTO\DispatchResult;
+use App\Domains\Media\Exceptions\MediaDeletedException;
+use App\Domains\Media\Exceptions\MediaNotFoundException;
+use App\Domains\Media\Models\MediaFile;
 use FAPost\Foundation\Flow\Enums\KeyboardMode;
+use FAPost\Foundation\Media\DTO\UploadContext;
 use FAPost\Foundation\Messaging\MessagePayload;
 use FAPost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use FAPost\Foundation\Messaging\OutboundMessage;
-use JsonException;
 use RuntimeException;
 
 final readonly class FlowMessageSender implements MessageSenderInterface
 {
     public function __construct(
         private OutboundMessageSenderInterface $sender,
+        private MediaServiceInterface $mediaService,
+        private MediaDispatcherInterface $mediaDispatcher,
     ) {
     }
 
@@ -52,14 +60,28 @@ final readonly class FlowMessageSender implements MessageSenderInterface
         }
 
         $channel = $channelContact->channel;
+        $chatId  = (string)$channelContact->contact->external_id;
+
+        $contentType = SendMessageContentType::from((string)$payload['content_type']);
+
+        if ($contentType->requiresMediaUrl()) {
+            $dispatch = $this->resolveMediaDispatch($payload, $channel, $chatId);
+
+            if ($dispatch->alreadyDelivered) {
+                return $dispatch->deliveredMessageId ?? 'default';
+            }
+
+            $payload['provider_file_id'] = $dispatch->providerFileId;
+        }
+
         $message = new OutboundMessage(
             idempotencyKey: "{$sessionId}:{$payload['node_id']}:{$payload['idempotency_key']}",
             tenantId: $tenantId,
-            channelId: (string) $channel->getKey(),
+            channelId: (string)$channel->getKey(),
             channelType: $channel->type->value,
             transportToken: $channel->token,
-            chatId: (string) $channelContact->contact->external_id,
-            payload: $this->toMessagePayload($payload),
+            chatId: $chatId,
+            payload: $this->toMessagePayload($payload, $contentType),
             metadata: [
                 'flow_session_id' => $sessionId,
                 'parse_mode'      => 'HTML',
@@ -76,51 +98,86 @@ final readonly class FlowMessageSender implements MessageSenderInterface
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * Resolve the media file referenced by the node payload through the dispatcher.
+     *
+     * For upload-as-send providers (Telegram cache miss) the dispatcher returns
+     * `alreadyDelivered = true` — the bytes were shipped to the recipient as part of
+     * the upload and the sender pipeline must skip its own send.
+     *
+     * @param  array<string, mixed>  $payload
      */
-    private function toMessagePayload(array $payload): MessagePayload
+    private function resolveMediaDispatch(array $payload, Channel $channel, string $chatId): DispatchResult
     {
-        $contentType = SendMessageContentType::from((string) $payload['content_type']);
+        $mediaFileId = is_string($payload['media_file_id'] ?? null) ? $payload['media_file_id'] : null;
 
+        if (null === $mediaFileId) {
+            throw new RuntimeException('Media send payload missing media_file_id.');
+        }
+
+        $media = $this->mediaService->find($mediaFileId);
+
+        if ( ! $media instanceof MediaFile) {
+            throw MediaNotFoundException::forId($mediaFileId);
+        }
+
+        if (null !== $media->deleted_at) {
+            throw MediaDeletedException::forId($mediaFileId);
+        }
+
+        $caption = is_string($payload['caption'] ?? null) ? $payload['caption'] : null;
+
+        return $this->mediaDispatcher->ensureUploadedToChannel(
+            media: $media,
+            channel: $channel,
+            context: new UploadContext(targetChatId: $chatId, caption: $caption),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function toMessagePayload(array $payload, SendMessageContentType $contentType): MessagePayload
+    {
         return match ($contentType) {
             SendMessageContentType::Text => new MessagePayload(
                 type: 'text',
-                text: (string) ($payload['text'] ?? ''),
+                text: (string)($payload['text'] ?? ''),
             ),
             SendMessageContentType::TextWithKeyboard => new MessagePayload(
                 type: 'keyboard',
-                text: (string) ($payload['text'] ?? ''),
+                text: (string)($payload['text'] ?? ''),
                 keyboard: $this->buildKeyboard(
                     buttons: is_array($payload['buttons'] ?? null) ? $payload['buttons'] : [],
-                    keyboardMode: KeyboardMode::from((string) $payload['keyboard_mode']),
-                    sessionId: (string) $payload['session_id'],
+                    keyboardMode: KeyboardMode::from((string)$payload['keyboard_mode']),
+                    sessionId: (string)$payload['session_id'],
                 ),
             ),
             SendMessageContentType::Image => new MessagePayload(
                 type: 'photo',
-                text: (string) ($payload['caption'] ?? ''),
-                media: ['photo' => (string) $payload['media_url']],
+                text: (string)($payload['caption'] ?? ''),
+                media: ['photo' => (string)$payload['provider_file_id']],
             ),
             SendMessageContentType::Document => new MessagePayload(
                 type: 'document',
-                text: (string) ($payload['caption'] ?? ''),
-                media: ['document' => (string) $payload['media_url']],
+                text: (string)($payload['caption'] ?? ''),
+                media: ['document' => (string)$payload['provider_file_id']],
             ),
             SendMessageContentType::Video => new MessagePayload(
                 type: 'video',
-                text: (string) ($payload['caption'] ?? ''),
-                media: ['video' => (string) $payload['media_url']],
+                text: (string)($payload['caption'] ?? ''),
+                media: ['video' => (string)$payload['provider_file_id']],
             ),
             SendMessageContentType::Voice => new MessagePayload(
                 type: 'voice',
                 text: '',
-                media: ['voice' => (string) $payload['media_url']],
+                media: ['voice' => (string)$payload['provider_file_id']],
             ),
         };
     }
 
     /**
-     * @param list<array<string, mixed>> $buttons
+     * @param  list<array<string, mixed>>  $buttons
+     *
      * @return array<string, mixed>
      */
     private function buildKeyboard(array $buttons, KeyboardMode $keyboardMode, string $sessionId): array
@@ -128,27 +185,27 @@ final readonly class FlowMessageSender implements MessageSenderInterface
         $rows = [];
 
         usort($buttons, static function (array $left, array $right): int {
-            $leftRow  = (int) ($left['row'] ?? 0);
-            $rightRow = (int) ($right['row'] ?? 0);
+            $leftRow  = (int)($left['row'] ?? 0);
+            $rightRow = (int)($right['row'] ?? 0);
 
             if ($leftRow !== $rightRow) {
                 return $leftRow <=> $rightRow;
             }
 
-            return ((int) ($left['order'] ?? 0)) <=> ((int) ($right['order'] ?? 0));
+            return ((int)($left['order'] ?? 0)) <=> ((int)($right['order'] ?? 0));
         });
 
         foreach ($buttons as $button) {
-            $rowIndex = (int) ($button['row'] ?? 0);
+            $rowIndex = (int)($button['row'] ?? 0);
             $rows[$rowIndex] ??= [];
 
             $rows[$rowIndex][] = match ($keyboardMode) {
                 KeyboardMode::Inline => [
-                    'text'          => (string) ($button['label'] ?? ''),
-                    'callback_data' => $this->encodeCallbackData($sessionId, (string) ($button['id'] ?? '')),
+                    'text'          => (string)($button['label'] ?? ''),
+                    'callback_data' => $this->encodeCallbackData($sessionId, (string)($button['id'] ?? '')),
                 ],
                 KeyboardMode::Reply => [
-                    'text' => (string) ($button['label'] ?? ''),
+                    'text' => (string)($button['label'] ?? ''),
                 ],
             };
         }
@@ -168,13 +225,8 @@ final readonly class FlowMessageSender implements MessageSenderInterface
 
     private function encodeCallbackData(string $sessionId, string $buttonId): string
     {
-        try {
-            return json_encode([
-                'session_id' => $sessionId,
-                'button_id'  => $buttonId,
-            ], JSON_THROW_ON_ERROR);
-        } catch (JsonException $exception) {
-            throw new RuntimeException('Unable to encode callback payload.', previous: $exception);
-        }
+        // Telegram callback_data limit is 64 bytes.
+        // Two UUIDs without dashes = 32 + 32 = 64 chars exactly.
+        return str_replace('-', '', $sessionId) . str_replace('-', '', $buttonId);
     }
 }

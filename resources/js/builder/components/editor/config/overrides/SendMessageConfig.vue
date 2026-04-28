@@ -1,6 +1,10 @@
 <script setup>
 import { computed } from 'vue'
 import { useBuilderStore } from '@builder/store/builderStore'
+import KeyboardListEditor from './KeyboardListEditor.vue'
+import VariablePicker from '../VariablePicker.vue'
+import AccordionSection from '../AccordionSection.vue'
+import MediaPicker from '@builder/components/media/MediaPicker.vue'
 
 const props = defineProps({
     node:   { type: Object, required: true },
@@ -17,10 +21,34 @@ const keyboardMode = computed(() => config.value.keyboard_mode ?? 'inline')
 const showsButtons = computed(() => contentType.value === 'text_with_keyboard')
 const showsMediaUrl = computed(() => ['image', 'document', 'video', 'voice'].includes(contentType.value))
 const showsCaption = computed(() => ['image', 'document', 'video'].includes(contentType.value))
+const mediaPickerKind = computed(() => {
+    const map = { image: 'image', video: 'video', document: 'document', voice: 'audio' }
+    return map[contentType.value] ?? null
+})
+const mediaFile = computed(() => config.value.media_file ?? null)
+
+/** @param {{ id: string, name: string, kind: string, preview_url: string|null }|null} file */
+function selectMediaFile(file) {
+    if (file) {
+        update({ media_file: file, media_url: file.preview_url ?? '' })
+    } else {
+        update({ media_file: null, media_url: '' })
+    }
+}
 const isReplyKeyboard = computed(() => showsButtons.value && keyboardMode.value === 'reply')
+const saveToType = computed(() => config.value.save_to_type ?? 'string')
 
 function update(patch) {
     emit('update:config', patch)
+}
+
+function dropInsert(e, currentValue) {
+    e.preventDefault()
+    const snippet = e.dataTransfer.getData('text/plain')
+    if (!snippet) return null
+    const el = e.target
+    const at = el.selectionStart ?? currentValue.length
+    return currentValue.slice(0, at) + snippet + currentValue.slice(el.selectionEnd ?? at)
 }
 
 function updateContentType(value) {
@@ -39,8 +67,11 @@ function updateContentType(value) {
 
 function updateKeyboardMode(value) {
     if (value === 'reply') {
+        // Reply keyboard is terminal — pressing a button triggers a separate
+        // flow via keyword/trigger matching, never returns to this session.
+        // Drop ALL outgoing edges (default + per-button callback handles).
         builderStore.definition.edges = builderStore.definition.edges.filter(
-            (edge) => edge.from !== props.node.id || (edge.handle ?? 'default') !== 'default',
+            (edge) => edge.from !== props.node.id,
         )
     }
 
@@ -53,40 +84,11 @@ function updateKeyboardMode(value) {
         timeout_seconds: value === 'reply' ? null : config.value.timeout_seconds ?? null,
     })
 }
-
-function updateButton(index, patch) {
-    const nextButtons = [...buttons.value]
-    nextButtons[index] = { ...nextButtons[index], ...patch }
-    update({ buttons: nextButtons })
-}
-
-function addButton() {
-    update({
-        buttons: [
-            ...buttons.value,
-            {
-                id: crypto.randomUUID(),
-                type: keyboardMode.value === 'reply' ? 'reply' : 'callback',
-                label: '',
-                value: '',
-                order: buttons.value.length,
-                row: 0,
-            },
-        ],
-    })
-}
-
-function removeButton(index) {
-    update({
-        buttons: buttons.value.filter((_, currentIndex) => currentIndex !== index),
-    })
-}
 </script>
 
 <template>
-    <div>
-        <div class="config-section">
-            <div class="config-label">Type</div>
+    <div class="accordion">
+        <AccordionSection title="Type" default-open>
             <div class="config-field">
                 <div class="field-label">Content type</div>
                 <select
@@ -114,92 +116,23 @@ function removeButton(index) {
                     <option value="reply">Reply</option>
                 </select>
             </div>
-        </div>
+        </AccordionSection>
 
-        <div v-if="contentType === 'text' || contentType === 'text_with_keyboard'" class="config-section">
-            <div class="config-label">Body</div>
+        <AccordionSection v-if="showsButtons && !isReplyKeyboard" title="Behaviour">
             <div class="config-field">
-                <div class="field-label">Message text</div>
-                <textarea
-                    class="field-input"
-                    rows="4"
-                    :value="config.text ?? ''"
-                    placeholder="Welcome, {{flow.name}}"
-                    @input="update({ text: $event.target.value })"
-                />
+                <label class="toggle-row">
+                    <span class="field-label" style="margin:0">Remove keyboard after press</span>
+                    <input
+                        type="checkbox"
+                        class="toggle-check"
+                        :checked="config.remove_keyboard_after_press ?? true"
+                        @change="update({ remove_keyboard_after_press: $event.target.checked })"
+                    >
+                </label>
+                <p class="field-hint">
+                    When off, the keyboard stays forever and button presses are handled even after the session ends.
+                </p>
             </div>
-        </div>
-
-        <div v-if="showsMediaUrl" class="config-section">
-            <div class="config-label">Media</div>
-            <div class="config-field">
-                <div class="field-label">Media URL</div>
-                <input
-                    class="field-input"
-                    type="text"
-                    :value="config.media_url ?? ''"
-                    placeholder="https://..."
-                    @input="update({ media_url: $event.target.value })"
-                >
-            </div>
-
-            <div v-if="showsCaption" class="config-field">
-                <div class="field-label">Caption</div>
-                <textarea
-                    class="field-input"
-                    rows="3"
-                    :value="config.caption ?? ''"
-                    placeholder="Optional caption"
-                    @input="update({ caption: $event.target.value })"
-                />
-            </div>
-        </div>
-
-        <div v-if="showsButtons" class="config-section">
-            <div class="config-label">Buttons</div>
-            <div
-                v-for="(btn, index) in buttons"
-                :key="btn.id ?? index"
-                class="repeater-item"
-            >
-                <input
-                    class="field-input"
-                    :value="btn.label ?? ''"
-                    placeholder="Label"
-                    @input="updateButton(index, { label: $event.target.value })"
-                >
-                <input
-                    v-if="!isReplyKeyboard"
-                    class="field-input"
-                    :value="btn.value ?? ''"
-                    placeholder="Value"
-                    @input="updateButton(index, { value: $event.target.value })"
-                >
-                <input
-                    class="field-input field-small"
-                    type="number"
-                    min="0"
-                    :value="btn.row ?? 0"
-                    placeholder="Row"
-                    @input="updateButton(index, { row: Number($event.target.value) || 0 })"
-                >
-                <input
-                    class="field-input field-small"
-                    type="number"
-                    min="0"
-                    :value="btn.order ?? 0"
-                    placeholder="Order"
-                    @input="updateButton(index, { order: Number($event.target.value) || 0 })"
-                >
-                <button class="rep-del" type="button" @click="removeButton(index)">×</button>
-            </div>
-            <button class="add-item-btn" style="margin-top:4px" type="button" @click="addButton">
-                + Add button
-            </button>
-        </div>
-
-        <div v-if="showsButtons && !isReplyKeyboard" class="config-section">
-            <div class="config-label">Waiting</div>
             <div class="config-field">
                 <div class="field-label">Timeout seconds</div>
                 <input
@@ -211,59 +144,143 @@ function removeButton(index) {
                     @input="update({ timeout_seconds: $event.target.value === '' ? null : Number($event.target.value) })"
                 >
             </div>
-        </div>
+        </AccordionSection>
+
+        <AccordionSection
+            v-if="contentType === 'text' || contentType === 'text_with_keyboard'"
+            title="Body"
+        >
+            <div class="config-field">
+                <div class="field-label field-label--row">
+                    Message text
+                    <VariablePicker />
+                </div>
+                <textarea
+                    class="field-input"
+                    rows="4"
+                    :value="config.text ?? ''"
+                    placeholder="Welcome, {{flow.name}}"
+                    @input="update({ text: $event.target.value })"
+                    @drop="v => { const s = dropInsert(v, config.text ?? ''); if (s !== null) update({ text: s }) }"
+                />
+            </div>
+        </AccordionSection>
+
+        <AccordionSection v-if="showsMediaUrl" title="Media">
+            <div class="config-field">
+                <div class="field-label">File</div>
+                <MediaPicker
+                    :value="mediaFile"
+                    :kind="mediaPickerKind"
+                    @update:value="selectMediaFile"
+                />
+            </div>
+
+            <div class="config-field">
+                <div class="field-label">or URL</div>
+                <input
+                    class="field-input"
+                    type="text"
+                    :value="mediaFile ? '' : (config.media_url ?? '')"
+                    :disabled="!!mediaFile"
+                    placeholder="https://..."
+                    @input="update({ media_url: $event.target.value, media_file: null })"
+                >
+            </div>
+
+            <div v-if="showsCaption" class="config-field">
+                <div class="field-label field-label--row">
+                    Caption
+                    <VariablePicker />
+                </div>
+                <textarea
+                    class="field-input"
+                    rows="3"
+                    :value="config.caption ?? ''"
+                    placeholder="Optional caption"
+                    @input="update({ caption: $event.target.value })"
+                    @drop="v => { const s = dropInsert(v, config.caption ?? ''); if (s !== null) update({ caption: s }) }"
+                />
+            </div>
+        </AccordionSection>
+
+        <AccordionSection
+            v-if="showsButtons"
+            title="Buttons"
+            :badge="buttons.length > 0 ? buttons.length : null"
+        >
+            <KeyboardListEditor
+                :buttons="buttons"
+                :is-reply-keyboard="isReplyKeyboard"
+                :save-to-type="saveToType"
+                @update="update({ buttons: $event })"
+            />
+
+            <template v-if="!isReplyKeyboard && buttons.length > 0">
+                <div class="config-field">
+                    <div class="field-label">
+                        Save answer to
+                        <span class="field-hint">flow.<em>variable</em></span>
+                    </div>
+                    <div class="save-to-row">
+                        <select
+                            class="field-input save-to-type"
+                            :value="saveToType"
+                            @change="update({ save_to_type: $event.target.value })"
+                        >
+                            <option value="string">String</option>
+                            <option value="number">Number</option>
+                            <option value="boolean">Boolean</option>
+                        </select>
+                        <input
+                            class="field-input"
+                            :value="config.save_to ?? ''"
+                            placeholder="e.g. menu_choice"
+                            @input="update({ save_to: $event.target.value || null })"
+                        >
+                    </div>
+                </div>
+            </template>
+        </AccordionSection>
     </div>
 </template>
 
 <style scoped>
-.config-section { padding: 12px 0; border-bottom: 1px solid var(--border); }
-.config-section:last-child { border-bottom: none; }
-.config-label {
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    color: var(--text-3);
-    margin-bottom: 7px;
-}
-.config-field { margin-bottom: 10px; }
-.field-label { font-size: 12px; color: var(--text-2); margin-bottom: 4px; font-weight: 500; }
-.field-input {
-    width: 100%;
-    padding: 6px 9px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface-2);
-    font-family: 'DM Sans', sans-serif;
-    font-size: 12.5px;
-    color: var(--text);
-    outline: none;
-    resize: none;
-}
-.repeater-item {
-    display: grid;
-    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 72px 72px 28px;
-    gap: 6px;
-    margin-bottom: 6px;
+.field-label--row {
+    display: flex;
     align-items: center;
+    justify-content: space-between;
 }
-.field-small { text-align: center; }
-.rep-del {
-    background: transparent;
-    border: none;
+
+.field-hint {
+    font-weight: 400;
+    font-size: 10px;
     color: var(--text-3);
-    cursor: pointer;
-    font-size: 16px;
+    margin-left: 4px;
 }
-.add-item-btn {
-    width: 100%;
-    padding: 5px;
-    border: 1px dashed var(--border-2);
-    border-radius: 6px;
-    background: transparent;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 12px;
-    color: var(--text-3);
+.field-hint em { font-style: normal; color: var(--primary); }
+
+.toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     cursor: pointer;
+    gap: 8px;
+}
+.toggle-check {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: var(--primary);
+}
+
+.save-to-row {
+    display: flex;
+    gap: 6px;
+}
+.save-to-type {
+    width: 90px;
+    flex-shrink: 0;
 }
 </style>

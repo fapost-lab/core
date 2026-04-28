@@ -21,8 +21,20 @@ final class PublishFlowServiceTest extends TestCase
     {
         parent::setUp();
 
+        Schema::dropIfExists('media_file_references');
         Schema::dropIfExists('flow_definitions');
         Schema::dropIfExists('flow_drafts');
+
+        Schema::create('media_file_references', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->uuid('media_file_id');
+            $table->string('reference_type', 32);
+            $table->uuid('reference_id');
+            $table->json('snapshot');
+            $table->timestamp('created_at');
+            $table->index('media_file_id');
+            $table->index(['reference_type', 'reference_id']);
+        });
 
         Schema::create('flow_drafts', function (Blueprint $table): void {
             $table->uuid('id')->primary();

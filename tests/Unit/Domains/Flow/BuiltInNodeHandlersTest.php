@@ -7,7 +7,9 @@ namespace Tests\Unit\Domains\Flow;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\HttpClientInterface;
+use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
+use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
 use App\Domains\Flow\DTOs\HttpResponse;
 use App\Domains\Flow\Exceptions\HttpTransportException;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
@@ -20,6 +22,9 @@ use App\Domains\Flow\Handlers\Support\TemplateResolver;
 use App\Domains\Flow\Handlers\WebhookNodeHandler;
 use App\Domains\Flow\State\FlowStateNamespace;
 use App\Domains\Flow\State\SystemStateKeys;
+use App\Domains\Flow\Support\CallbackDataCodec;
+use App\Domains\Media\Contracts\MediaIngestorInterface;
+use App\Domains\Media\Contracts\MediaServiceInterface;
 use FAPost\Foundation\Contracts\DataAccessorInterface;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\IncomingMessageType;
@@ -51,7 +56,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $translator = Mockery::mock(ContentTranslatorInterface::class);
         $translator->shouldReceive('resolveField')->once()->andReturn('hello');
 
-        $handler = new SendMessageNodeHandler($sender, $translator);
+        $handler = $this->makeHandler($sender, $translator);
         $context = $this->context();
         $node    = [
             'id'     => 'node-1',
@@ -78,21 +83,26 @@ final class BuiltInNodeHandlersTest extends TestCase
         $translator = Mockery::mock(ContentTranslatorInterface::class);
         $translator->shouldReceive('resolveField')->times(3)->andReturn('Choose', 'Yes', 'No');
 
-        $handler = new SendMessageNodeHandler($sender, $translator);
+        $sessionUuid = '00000000-0000-4000-8000-000000000001';
+        $buttonUuid  = '11111111-1111-4111-8111-111111111111';
+        $cbData      = CallbackDataCodec::encode($sessionUuid, $buttonUuid);
+
+        $handler = $this->makeHandler($sender, $translator);
         $node    = [
             'id'     => 'node-inline',
             'config' => [
-                'content_type'  => 'text_with_keyboard',
-                'keyboard_mode' => 'inline',
-                'text'          => ['en' => 'Choose'],
-                'buttons'       => [
-                    ['id' => '11111111-1111-4111-8111-111111111111', 'label' => ['en' => 'Yes'], 'value' => 'yes', 'row' => 0, 'order' => 0],
+                'content_type'                => 'text_with_keyboard',
+                'keyboard_mode'               => 'inline',
+                'remove_keyboard_after_press' => false,
+                'text'                        => ['en' => 'Choose'],
+                'buttons'                     => [
+                    ['id' => $buttonUuid, 'label' => ['en' => 'Yes'], 'value' => 'yes', 'row' => 0, 'order' => 0],
                     ['id' => '22222222-2222-4222-8222-222222222222', 'label' => ['en' => 'No'], 'value' => 'no', 'row' => 0, 'order' => 1],
                 ],
             ],
         ];
 
-        $waiting = $handler->execute($node, [], $this->context(nodeId: 'node-inline'));
+        $waiting = $handler->execute($node, [], $this->context(nodeId: 'node-inline', sessionId: $sessionUuid));
 
         $resume = $handler->execute(
             $node,
@@ -106,24 +116,25 @@ final class BuiltInNodeHandlersTest extends TestCase
                     updateId: 'cb-1',
                     externalUserId: 'ext-user',
                     externalChatId: 'ext-chat',
-                    text: '{"session_id":"session-1","button_id":"11111111-1111-4111-8111-111111111111"}',
+                    text: $cbData,
                     type: IncomingMessageType::CallbackQuery,
                     platform: 'telegram',
                 ),
                 nodeId: 'node-inline',
+                sessionId: $sessionUuid,
             ),
         );
 
         $this->assertSame(NodeExecutionStatus::Waiting, $waiting->status);
         $this->assertSame(NodeExecutionStatus::Executed, $resume->status);
-        $this->assertSame('yes', $resume->sourceHandle);
+        $this->assertSame($buttonUuid, $resume->sourceHandle);
     }
 
     public function test_send_message_throws_for_missing_content_type(): void
     {
         $sender     = Mockery::mock(MessageSenderInterface::class);
         $translator = Mockery::mock(ContentTranslatorInterface::class);
-        $handler    = new SendMessageNodeHandler($sender, $translator);
+        $handler = $this->makeHandler($sender, $translator);
 
         $this->expectException(InvalidNodeConfigException::class);
 
@@ -141,7 +152,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $translator = Mockery::mock(ContentTranslatorInterface::class);
         $translator->shouldReceive('resolveField')->times(2)->andReturn('Pick one', 'Option A');
 
-        $handler = new SendMessageNodeHandler($sender, $translator);
+        $handler = $this->makeHandler($sender, $translator);
         $node    = [
             'id'     => 'node-reply',
             'config' => [
@@ -166,14 +177,15 @@ final class BuiltInNodeHandlersTest extends TestCase
         $sender->shouldNotReceive('send');
 
         $translator = Mockery::mock(ContentTranslatorInterface::class);
-        $handler    = new SendMessageNodeHandler($sender, $translator);
+        $handler = $this->makeHandler($sender, $translator);
         $node       = [
             'id'     => 'node-inline',
             'config' => [
-                'content_type'  => 'text_with_keyboard',
-                'keyboard_mode' => 'inline',
-                'text'          => ['en' => 'Choose'],
-                'buttons'       => [
+                'content_type'                => 'text_with_keyboard',
+                'keyboard_mode'               => 'inline',
+                'remove_keyboard_after_press' => false,
+                'text'                        => ['en' => 'Choose'],
+                'buttons'                     => [
                     ['id' => '11111111-1111-4111-8111-111111111111', 'label' => ['en' => 'Yes'], 'value' => 'yes', 'row' => 0, 'order' => 0],
                 ],
             ],
@@ -195,14 +207,15 @@ final class BuiltInNodeHandlersTest extends TestCase
         $sender->shouldNotReceive('send');
 
         $translator = Mockery::mock(ContentTranslatorInterface::class);
-        $handler    = new SendMessageNodeHandler($sender, $translator);
+        $handler = $this->makeHandler($sender, $translator);
         $node       = [
             'id'     => 'node-inline',
             'config' => [
-                'content_type'  => 'text_with_keyboard',
-                'keyboard_mode' => 'inline',
-                'text'          => ['en' => 'Choose'],
-                'buttons'       => [
+                'content_type'                => 'text_with_keyboard',
+                'keyboard_mode'               => 'inline',
+                'remove_keyboard_after_press' => false,
+                'text'                        => ['en' => 'Choose'],
+                'buttons'                     => [
                     ['id' => '11111111-1111-4111-8111-111111111111', 'label' => ['en' => 'Yes'], 'value' => 'yes', 'row' => 0, 'order' => 0],
                 ],
             ],
@@ -234,19 +247,21 @@ final class BuiltInNodeHandlersTest extends TestCase
         $sender = Mockery::mock(MessageSenderInterface::class);
         $sender->shouldReceive('send')->once()->withArgs(
             static fn (string $tenantId, string $contactId, string $sessionId, array $payload): bool => 'image' === ($payload['content_type'] ?? null)
-                && 'https://example.com/img.jpg' === ($payload['media_url'] ?? null)
+                                                                                                        && 'media-file-1'
+                                                                                                           === ($payload['media_file_id']
+                                                                                                                ?? null)
         )->andReturn('ext-img');
 
         $translator = Mockery::mock(ContentTranslatorInterface::class);
         $translator->shouldReceive('resolveField')->once()->andReturn('Caption text');
 
-        $handler = new SendMessageNodeHandler($sender, $translator);
+        $handler = $this->makeHandler($sender, $translator);
         $result  = $handler->execute([
             'id'     => 'node-image',
             'config' => [
-                'content_type' => 'image',
-                'media_url'    => 'https://example.com/img.jpg',
-                'caption'      => ['en' => 'Caption text'],
+                'content_type'  => 'image',
+                'media_file_id' => 'media-file-1',
+                'caption'       => ['en' => 'Caption text'],
             ],
         ], [], $this->context(nodeId: 'node-image'));
 
@@ -254,14 +269,14 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('ext-img', $result->stateChanges[SystemStateKeys::SENT_MESSAGES]['node-image']);
     }
 
-    public function test_send_message_throws_for_image_without_media_url(): void
+    public function test_send_message_throws_for_image_without_media_file_id(): void
     {
         $sender     = Mockery::mock(MessageSenderInterface::class);
         $translator = Mockery::mock(ContentTranslatorInterface::class);
-        $handler    = new SendMessageNodeHandler($sender, $translator);
+        $handler = $this->makeHandler($sender, $translator);
 
         $this->expectException(InvalidNodeConfigException::class);
-        $this->expectExceptionMessage('media_url');
+        $this->expectExceptionMessage('media_file_id');
 
         $handler->execute([
             'id'     => 'node-img-bad',
@@ -269,11 +284,29 @@ final class BuiltInNodeHandlersTest extends TestCase
         ], [], $this->context(nodeId: 'node-img-bad'));
     }
 
+    public function test_send_message_rejects_legacy_media_url_field(): void
+    {
+        $sender     = Mockery::mock(MessageSenderInterface::class);
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $handler    = $this->makeHandler($sender, $translator);
+
+        $this->expectException(InvalidNodeConfigException::class);
+        $this->expectExceptionMessage('media_url');
+
+        $handler->execute([
+            'id'     => 'node-img-legacy',
+            'config' => [
+                'content_type' => 'image',
+                'media_url'    => 'https://example.com/img.jpg',
+            ],
+        ], [], $this->context(nodeId: 'node-img-legacy'));
+    }
+
     public function test_send_message_throws_for_text_with_keyboard_missing_keyboard_mode(): void
     {
         $sender     = Mockery::mock(MessageSenderInterface::class);
         $translator = Mockery::mock(ContentTranslatorInterface::class);
-        $handler    = new SendMessageNodeHandler($sender, $translator);
+        $handler = $this->makeHandler($sender, $translator);
 
         $this->expectException(InvalidNodeConfigException::class);
         $this->expectExceptionMessage('keyboard_mode');
@@ -292,7 +325,10 @@ final class BuiltInNodeHandlersTest extends TestCase
 
     public function test_input_waits_on_first_pass_and_executes_on_second(): void
     {
-        $handler = new InputNodeHandler();
+        $handler = new InputNodeHandler(
+            Mockery::mock(MediaIngestorInterface::class),
+            Mockery::mock(MediaServiceInterface::class),
+        );
         $node    = ['id' => 'input-1', 'config' => ['save_to' => FlowStateNamespace::FLOW . '.user_name']];
 
         $waiting  = $handler->execute($node, [], $this->context(incoming: null));
@@ -437,12 +473,28 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('Hi, Alice !', $resolved);
     }
 
-    private function context(?IncomingMessage $incoming = null, string $nodeId = 'node-1'): NodeExecutionContext
-    {
+    private function makeHandler(
+        MessageSenderInterface $sender,
+        ContentTranslatorInterface $translator,
+    ): SendMessageNodeHandler {
+        return new SendMessageNodeHandler(
+            $sender,
+            $translator,
+            new TemplateResolver(),
+            Mockery::mock(InlineKeyboardEditorInterface::class),
+            Mockery::mock(PersistentButtonRegistryInterface::class),
+        );
+    }
+
+    private function context(
+        ?IncomingMessage $incoming = null,
+        string $nodeId = 'node-1',
+        string $sessionId = 'session-1',
+    ): NodeExecutionContext {
         return new NodeExecutionContext(
             tenantId: 'tenant-1',
             contactId: 'contact-1',
-            sessionId: 'session-1',
+            sessionId: $sessionId,
             nodeId: $nodeId,
             idempotencyKey: 'idem-1',
             platform: 'telegram',

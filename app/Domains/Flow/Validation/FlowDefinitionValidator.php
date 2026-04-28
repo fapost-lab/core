@@ -20,7 +20,9 @@ final readonly class FlowDefinitionValidator
     /**
      * @param  array<int, array<string, mixed>>  $nodes
      * @param  array<int, array<string, mixed>>  $edges
-     * @return array{entry_node_id: string, adjacency: array<string, array<string, string>>, reverse_adjacency: array<string, list<string>>}
+     *
+     * @return array{entry_node_id: string, adjacency: array<string, array<string, string>>, reverse_adjacency:
+     *                              array<string, list<string>>}
      */
     public function validate(array $nodes, array $edges): array
     {
@@ -160,6 +162,17 @@ final readonly class FlowDefinitionValidator
         ];
     }
 
+    private function validationException(string $message, ?Throwable $previous = null): FlowValidationException
+    {
+        return new FlowValidationException([
+            new FlowValidationErrorDto(
+                path: 'flow_definition',
+                code: 'invalid_definition',
+                message: $message,
+            ),
+        ], $previous);
+    }
+
     /**
      * @param  array<string, mixed>  $payload
      */
@@ -186,16 +199,5 @@ final readonly class FlowDefinitionValidator
         }
 
         return $value;
-    }
-
-    private function validationException(string $message, ?Throwable $previous = null): FlowValidationException
-    {
-        return new FlowValidationException([
-            new FlowValidationErrorDto(
-                path: 'flow_definition',
-                code: 'invalid_definition',
-                message: $message,
-            ),
-        ], $previous);
     }
 }

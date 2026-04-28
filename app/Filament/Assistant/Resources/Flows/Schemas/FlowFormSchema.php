@@ -44,7 +44,7 @@ final class FlowFormSchema
                 ])
                 ->createOptionUsing(fn (array $data): string => FlowGroup::create([
                     'tenant_id'    => app(TenantContextInterface::class)->get()->id,
-                    'assistant_id' => (string) Filament::getTenant()->getKey(),
+                    'assistant_id' => (string)Filament::getTenant()->getKey(),
                     'name'         => $data['name'],
                 ])->getKey())
                 ->createOptionModalHeading(__('assistant.flows.groups.create_modal_heading')),

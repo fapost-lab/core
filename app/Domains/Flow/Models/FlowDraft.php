@@ -17,28 +17,29 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft query()
- * @property string $id
- * @property string $tenant_id
- * @property string $flow_id
- * @property string $assistant_id
- * @property int $draft_version
- * @property string $name
- * @property string|null $description
- * @property string|null $folder
- * @property bool $is_public
- * @property bool $is_active
+ * @property string                  $id
+ * @property string                  $tenant_id
+ * @property string                  $flow_id
+ * @property string                  $assistant_id
+ * @property string|null             $flow_group_id
+ * @property int                     $draft_version
+ * @property string                  $name
+ * @property string|null             $description
+ * @property bool                    $is_public
+ * @property bool                    $is_active
  * @property array<array-key, mixed> $nodes
+ * @property array<array-key, mixed> $edges
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read Assistant|null $assistant
- * @property-read FlowGroup|null $group
- * @property-read FlowTrigger|null $trigger
+ * @property-read Assistant|null     $assistant
+ * @property-read FlowGroup|null     $group
+ * @property-read FlowTrigger|null   $trigger
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereAssistantId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereCreatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereDescription($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereDraftVersion($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereFlowId($value)
- * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereFolder($value)
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereFlowGroupId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereIsActive($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowDraft whereIsPublic($value)
@@ -64,11 +65,11 @@ final class FlowDraft extends BaseModel
         'flow_group_id',
         'draft_version',
         'name',
-        'folder',
         'description',
         'is_public',
         'is_active',
         'nodes',
+        'edges',
     ];
 
     public function assistant(): BelongsTo
@@ -98,6 +99,7 @@ final class FlowDraft extends BaseModel
     {
         return [
             'nodes'         => 'array',
+            'edges'         => 'array',
             'draft_version' => 'integer',
             'is_public'     => 'boolean',
             'is_active'     => 'boolean',

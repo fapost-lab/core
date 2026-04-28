@@ -38,7 +38,7 @@ final class RoleFormSchema
                     ->label(__('staff.roles.fields.name'))
                     ->required()
                     ->maxLength(255)
-                    ->disabled((bool) ($record?->is_system)),
+                    ->disabled((bool)($record?->is_system)),
                 TextInput::make('display_name')
                     ->label(__('staff.roles.fields.display_name'))
                     ->maxLength(255),

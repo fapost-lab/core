@@ -16,10 +16,12 @@ final class TelegramVoiceDeliveryAction implements TelegramDeliveryActionInterfa
 
     public function deliver(TelegramBotApiClient $client, OutboundMessage $message): array
     {
-        return $client->sendVoice(new SendVoiceDto(
-            chatId: $message->chatId,
-            voice: (string) ($message->payload->media['voice'] ?? ''),
-            caption: '' !== $message->payload->text ? $message->payload->text : null,
-        ));
+        return $client->sendVoice(
+            new SendVoiceDto(
+                chatId: $message->chatId,
+                voice: (string)($message->payload->media['voice'] ?? ''),
+                caption: '' !== $message->payload->text ? $message->payload->text : null,
+            )
+        );
     }
 }

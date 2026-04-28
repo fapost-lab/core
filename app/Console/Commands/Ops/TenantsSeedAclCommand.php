@@ -9,11 +9,10 @@ use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Console\Command;
-
-use function Laravel\Prompts\multiselect;
-
 use RuntimeException;
 use Throwable;
+
+use function Laravel\Prompts\multiselect;
 
 /**
  * Runs {@see TenantAclSeeder::run()} per selected active tenant via {@see TenantSwitcher}.
@@ -88,8 +87,8 @@ final class TenantsSeedAclCommand extends Command
             $this->newLine();
         }
 
-        $this->components->twoColumnDetail('Success', (string) $success);
-        $this->components->twoColumnDetail('Failed', (string) $fail);
+        $this->components->twoColumnDetail('Success', (string)$success);
+        $this->components->twoColumnDetail('Failed', (string)$fail);
 
         if ([] !== $failedSlugs) {
             $this->newLine();
@@ -101,6 +100,7 @@ final class TenantsSeedAclCommand extends Command
 
     /**
      * @param  array<int, TenantInterface>  $active
+     *
      * @return array<int, TenantInterface>
      */
     private function resolveTenants(array $active): array
@@ -114,10 +114,12 @@ final class TenantsSeedAclCommand extends Command
             return array_values($active);
         }
 
-        $requested = array_unique(array_map(
-            static fn (mixed $slug): string => (string) $slug,
-            $this->option('tenant') ?? [],
-        ));
+        $requested = array_unique(
+            array_map(
+                static fn (mixed $slug): string => (string)$slug,
+                $this->option('tenant') ?? [],
+            )
+        );
 
         if ([] !== $requested) {
             $out = [];
@@ -150,7 +152,7 @@ final class TenantsSeedAclCommand extends Command
 
             $out = [];
             foreach ($chosen as $slug) {
-                $out[] = $bySlug[mb_strtolower((string) $slug)];
+                $out[] = $bySlug[mb_strtolower((string)$slug)];
             }
 
             return $out;

@@ -28,6 +28,14 @@ final class MigrationScope
         );
     }
 
+    public static function settings(): self
+    {
+        return new self(
+            path: database_path('settings'),
+            label: 'settings',
+        );
+    }
+
     public static function module(string $name): self
     {
         return new self(

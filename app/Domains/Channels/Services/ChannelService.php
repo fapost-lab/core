@@ -39,11 +39,11 @@ final readonly class ChannelService implements ChannelServiceInterface
         $channel = new Channel([
             'assistant_id' => $assistant->getKey(),
             'tenant_id'    => $assistant->tenant_id,
-            'type'         => ChannelTypeEnum::from((string) $normalized['type']),
-            'token'        => (string) $normalized['token'],
-            'secret_token' => (string) $normalized['secret_token'],
+            'type'         => ChannelTypeEnum::from((string)$normalized['type']),
+            'token'        => (string)$normalized['token'],
+            'secret_token' => (string)$normalized['secret_token'],
             'config'       => is_array($normalized['config'] ?? null) ? $normalized['config'] : [],
-            'is_active'    => (bool) ($normalized['is_active'] ?? true),
+            'is_active'    => (bool)($normalized['is_active'] ?? true),
         ]);
         $channel->save();
 
@@ -66,7 +66,7 @@ final readonly class ChannelService implements ChannelServiceInterface
         ]);
 
         if (array_key_exists('type', $allowed)) {
-            $channel->type = ChannelTypeEnum::from((string) $allowed['type']);
+            $channel->type = ChannelTypeEnum::from((string)$allowed['type']);
             unset($allowed['type']);
         }
 
@@ -126,6 +126,7 @@ final readonly class ChannelService implements ChannelServiceInterface
      * Normalize channel form payload so service accepts both nested `config` arrays and dotted `config.*` UI keys.
      *
      * @param  array<string, mixed>  $data
+     *
      * @return array<string, mixed>
      */
     private function normalizeInput(array $data): array

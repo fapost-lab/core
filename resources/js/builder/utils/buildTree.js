@@ -55,3 +55,19 @@ export function buildTree(nodes, edges) {
 
     return roots.map((root) => buildNode(root));
 }
+
+/**
+ * Recursively count all descendant nodes reachable from a given TreeNode.
+ *
+ * @param {TreeNode} treeNode
+ * @returns {number}
+ */
+export function countDescendants(treeNode) {
+    let n = 0;
+    for (const children of Object.values(treeNode.childrenByHandle ?? {})) {
+        for (const child of children) {
+            n += 1 + countDescendants(child);
+        }
+    }
+    return n;
+}

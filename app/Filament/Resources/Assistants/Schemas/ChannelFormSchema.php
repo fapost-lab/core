@@ -52,7 +52,11 @@ final class ChannelFormSchema
                             ->multiple()
                             ->searchable()
                             ->preload()
-                            ->dehydrated(fn (Get $get): bool => ChannelTypeEnum::Telegram->value === self::resolveChannelType($get))
+                            ->dehydrated(
+                                fn (Get $get): bool => ChannelTypeEnum::Telegram->value === self::resolveChannelType(
+                                    $get
+                                )
+                            )
                             ->helperText(__('staff.channels.fields.allowed_updates_help')),
                         TextInput::make('config.max_connections')
                             ->label(__('staff.channels.fields.max_connections'))
@@ -60,12 +64,20 @@ final class ChannelFormSchema
                             ->minValue(1)
                             ->maxValue(100)
                             ->default(40)
-                            ->dehydrated(fn (Get $get): bool => ChannelTypeEnum::Telegram->value === self::resolveChannelType($get))
-                            ->afterStateHydrated(fn (TextInput $component, mixed $state): TextInput => $component->state($state ?? 40))
+                            ->dehydrated(
+                                fn (Get $get): bool => ChannelTypeEnum::Telegram->value === self::resolveChannelType(
+                                    $get
+                                )
+                            )
+                            ->afterStateHydrated(
+                                fn (TextInput $component, mixed $state): TextInput => $component->state($state ?? 40)
+                            )
                             ->helperText(__('staff.channels.fields.max_connections_help')),
                     ])
                     ->columnSpanFull()
-                    ->visible(fn (Get $get): bool => ChannelTypeEnum::Telegram->value === self::resolveChannelType($get)),
+                    ->visible(
+                        fn (Get $get): bool => ChannelTypeEnum::Telegram->value === self::resolveChannelType($get)
+                    ),
                 KeyValue::make('config_kv')
                     ->label(__('staff.channels.fields.config'))
                     ->keyLabel(__('staff.channels.fields.config_key'))
@@ -74,17 +86,6 @@ final class ChannelFormSchema
                     ->visible(fn (Get $get): bool => ChannelTypeEnum::Telegram->value !== self::resolveChannelType($get))
                     ->columnSpanFull(),
             ]);
-    }
-
-    private static function resolveChannelType(Get $get): ?string
-    {
-        $type = $get('type') ?? $get('../../type') ?? $get('../type');
-
-        if ($type instanceof ChannelTypeEnum) {
-            return $type->value;
-        }
-
-        return is_string($type) ? $type : null;
     }
 
     /**
@@ -131,5 +132,16 @@ final class ChannelFormSchema
         }
 
         return $options;
+    }
+
+    private static function resolveChannelType(Get $get): ?string
+    {
+        $type = $get('type') ?? $get('../../type') ?? $get('../type');
+
+        if ($type instanceof ChannelTypeEnum) {
+            return $type->value;
+        }
+
+        return is_string($type) ? $type : null;
     }
 }

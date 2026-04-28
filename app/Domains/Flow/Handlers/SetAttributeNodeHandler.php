@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
-use App\Domains\Flow\Handlers\Abstract\AbstractVersionedHandler;
 use App\Domains\Flow\Handlers\Support\TemplateResolver;
 use App\Domains\Flow\State\FlowStateNamespace;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
+use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 
 final class SetAttributeNodeHandler extends AbstractVersionedHandler
 {
@@ -86,10 +86,12 @@ final class SetAttributeNodeHandler extends AbstractVersionedHandler
             return new NodeExecutionResult(
                 status: NodeExecutionStatus::Executed,
                 sourceHandle: 'default',
-                effects: [[
-                    'type'  => 'set_contact_language',
-                    'value' => (string) $value,
-                ]],
+                effects: [
+                    [
+                        'type'  => 'set_contact_language',
+                        'value' => (string)$value,
+                    ],
+                ],
                 metadata: [self::TARGET_META => 'contact', self::KEY_META => $key],
             );
         }
@@ -97,11 +99,13 @@ final class SetAttributeNodeHandler extends AbstractVersionedHandler
         return new NodeExecutionResult(
             status: NodeExecutionStatus::Executed,
             sourceHandle: 'default',
-            effects: [[
-                'type'  => 'set_contact_attribute',
-                'key'   => $key,
-                'value' => $value,
-            ]],
+            effects: [
+                [
+                    'type'  => 'set_contact_attribute',
+                    'key'   => $key,
+                    'value' => $value,
+                ],
+            ],
             metadata: [self::TARGET_META => 'contact', self::KEY_META => $key],
         );
     }

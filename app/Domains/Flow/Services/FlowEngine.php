@@ -70,8 +70,8 @@ final readonly class FlowEngine implements FlowEngineInterface
         $baseState = array_replace_recursive([
             FlowStateNamespace::SYSTEM => [
                 SystemStateKeys::STARTED_AT_LEAF  => now()->toIso8601String(),
-                'flow_definition_id'              => (string) $definition->getKey(),
-                'contact_id'                      => (string) $contact->getKey(),
+                'flow_definition_id'              => (string)$definition->getKey(),
+                'contact_id'                      => (string)$contact->getKey(),
                 SystemStateKeys::RETRY_COUNT_LEAF => 0,
             ],
         ], $initialState);
@@ -91,12 +91,14 @@ final readonly class FlowEngine implements FlowEngineInterface
         ]));
 
         $this->afterCommit(function () use ($session): void {
-            $this->analyticsWriter->record(new AnalyticsEvent(
-                tenantId: (string) $session->tenant_id,
-                eventType: AnalyticsEventType::FlowStarted,
-                payload: ['session_id' => (string) $session->getKey()],
-                occurredAt: new DateTimeImmutable(),
-            ));
+            $this->analyticsWriter->record(
+                new AnalyticsEvent(
+                    tenantId: (string)$session->tenant_id,
+                    eventType: AnalyticsEventType::FlowStarted,
+                    payload: ['session_id' => (string)$session->getKey()],
+                    occurredAt: new DateTimeImmutable(),
+                )
+            );
         });
 
         $this->executeLoop($definition, $session, null, $contact);
@@ -124,13 +126,75 @@ final readonly class FlowEngine implements FlowEngineInterface
     /**
      * @throws Throwable
      */
+    public function resumeFromNode(
+        FlowDefinition $definition,
+        Contact $contact,
+        string $nodeId,
+        string $outputHandle,
+        array $initialState = [],
+    ): FlowSession {
+        $nextNodeId = $this->graphResolver->resolveNextNode($definition, $nodeId, $outputHandle);
+
+        $baseState = array_replace_recursive([
+            FlowStateNamespace::SYSTEM => [
+                SystemStateKeys::STARTED_AT_LEAF  => now()->toIso8601String(),
+                'flow_definition_id'              => (string)$definition->getKey(),
+                'contact_id'                      => (string)$contact->getKey(),
+                SystemStateKeys::RETRY_COUNT_LEAF => 0,
+            ],
+        ], $initialState);
+
+        $assistant = $this->currentAssistant->get();
+
+        $status  = null !== $nextNodeId ? FlowSessionStatus::Active : FlowSessionStatus::Completed;
+        $session = $this->connection->transaction(fn (): FlowSession => $this->sessions->create([
+            'tenant_id'          => $contact->tenant_id,
+            'assistant_id'       => $assistant->getKey(),
+            'contact_id'         => $contact->getKey(),
+            'flow_definition_id' => $definition->getKey(),
+            'flow_version'       => $definition->version,
+            'current_node_id'    => $nextNodeId,
+            'state'              => $baseState,
+            'status'             => $status,
+            'version'            => 1,
+        ]));
+
+        $this->afterCommit(function () use ($session): void {
+            $this->analyticsWriter->record(
+                new AnalyticsEvent(
+                    tenantId: (string)$session->tenant_id,
+                    eventType: AnalyticsEventType::FlowStarted,
+                    payload: ['session_id' => (string)$session->getKey()],
+                    occurredAt: new DateTimeImmutable(),
+                )
+            );
+        });
+
+        if (null !== $nextNodeId) {
+            $this->executeLoop($definition, $session, null, $contact);
+            $session->refresh();
+        }
+
+        return $session;
+    }
+
+    private function afterCommit(callable $callback): void
+    {
+        // Flow engine transactions run on the default tenant connection in current runtime,
+        // so facade-level afterCommit is coupled to the same transaction lifecycle.
+        DB::afterCommit($callback);
+    }
+
+    /**
+     * @throws Throwable
+     */
     private function executeLoop(
         FlowDefinition $definition,
         FlowSession $session,
         ?IncomingMessage $incoming,
         Contact $contact,
     ): void {
-        $maxIterations = (int) $this->config->get("flow.execution.max_iterations", 100);
+        $maxIterations = (int)$this->config->get("flow.execution.max_iterations", 100);
         $iterations    = 0;
         $incomingStep  = $incoming;
 
@@ -142,16 +206,18 @@ final readonly class FlowEngine implements FlowEngineInterface
                             'status' => FlowSessionStatus::Failed,
                         ]);
                     } catch (OptimisticLockConflictException $exception) {
-                        throw FlowConcurrencyException::forSession((string) $session->getKey(), $exception);
+                        throw FlowConcurrencyException::forSession((string)$session->getKey(), $exception);
                     }
 
                     $this->afterCommit(function () use ($session): void {
-                        $this->analyticsWriter->record(new AnalyticsEvent(
-                            tenantId: (string) $session->tenant_id,
-                            eventType: AnalyticsEventType::FlowFailed,
-                            payload: ['session_id' => (string) $session->getKey()],
-                            occurredAt: new DateTimeImmutable(),
-                        ));
+                        $this->analyticsWriter->record(
+                            new AnalyticsEvent(
+                                tenantId: (string)$session->tenant_id,
+                                eventType: AnalyticsEventType::FlowFailed,
+                                payload: ['session_id' => (string)$session->getKey()],
+                                occurredAt: new DateTimeImmutable(),
+                            )
+                        );
                     });
                 });
 
@@ -196,7 +262,7 @@ final readonly class FlowEngine implements FlowEngineInterface
             $handlerContext = new FoundationNodeExecutionContext(
                 tenantId: $session->tenant_id,
                 contactId: $session->contact_id,
-                sessionId: (string) $session->getKey(),
+                sessionId: (string)$session->getKey(),
                 nodeId: $nodeId,
                 idempotencyKey: $idempotencyKey,
                 platform: $platform,
@@ -221,12 +287,14 @@ final readonly class FlowEngine implements FlowEngineInterface
                 $analyticsEventType = $this->resolveAnalyticsEventType($result, $nextNodeId);
                 if (null !== $analyticsEventType) {
                     $this->afterCommit(function () use ($analyticsEventType, $session): void {
-                        $this->analyticsWriter->record(new AnalyticsEvent(
-                            tenantId: (string) $session->tenant_id,
-                            eventType: $analyticsEventType,
-                            payload: ['session_id' => (string) $session->getKey()],
-                            occurredAt: new DateTimeImmutable(),
-                        ));
+                        $this->analyticsWriter->record(
+                            new AnalyticsEvent(
+                                tenantId: (string)$session->tenant_id,
+                                eventType: $analyticsEventType,
+                                payload: ['session_id' => (string)$session->getKey()],
+                                occurredAt: new DateTimeImmutable(),
+                            )
+                        );
                     });
                 }
             });
@@ -248,47 +316,52 @@ final readonly class FlowEngine implements FlowEngineInterface
         }
     }
 
-    private function resolveAnalyticsEventType(NodeExecutionResult $result, ?string $nextNodeId): ?AnalyticsEventType
-    {
-        if (NodeExecutionStatus::Executed === $result->status && null === $nextNodeId) {
-            return AnalyticsEventType::FlowCompleted;
-        }
-
-        if (NodeExecutionStatus::Finished === $result->status) {
-            return AnalyticsEventType::FlowCompleted;
-        }
-
-        if (NodeExecutionStatus::Failed === $result->status) {
-            return AnalyticsEventType::FlowFailed;
-        }
-
-        return null;
-    }
-
     /**
      * @param  array<string, mixed>  $node
      */
-    private function buildLogEntry(
-        FlowSession $session,
-        array $node,
-        NodeExecutionResult $result,
-        ?string $nextNodeId,
-    ): FlowLogEntry {
-        return new FlowLogEntry(
-            sessionId: (string) $session->getKey(),
-            nodeId: (string) ($node['id'] ?? ''),
-            nodeType: (string) ($node['type'] ?? ''),
-            nodeVersion: $this->resolveNodeVersion($node),
-            status: match (true) {
-                NodeExecutionStatus::Failed === $result->status                           => FlowLogStatus::Failed,
-                NodeExecutionStatus::Finished === $result->status                         => FlowLogStatus::Terminal,
-                NodeExecutionStatus::Executed === $result->status && null === $nextNodeId => FlowLogStatus::Terminal,
-                default                                                                   => FlowLogStatus::Executed,
-            },
+    private function resolveNodeVersion(array $node): int
+    {
+        $raw = $node['version'] ?? 1;
+
+        if (is_int($raw)) {
+            return $raw;
+        }
+
+        if (is_numeric($raw)) {
+            return (int)$raw;
+        }
+
+        return 1;
+    }
+
+    private function applySystemStateEffects(NodeExecutionResult $result): NodeExecutionResult
+    {
+        $stateChanges = $result->stateChanges;
+
+        foreach ($result->effects as $effect) {
+            if ( ! is_array($effect) || 'set_contact_language' !== ($effect['type'] ?? null)) {
+                continue;
+            }
+
+            $value = $effect['value'] ?? null;
+
+            if (is_string($value) && '' !== $value) {
+                $stateChanges[SystemStateKeys::LANGUAGE] = $value;
+            }
+        }
+
+        if ($stateChanges === $result->stateChanges) {
+            return $result;
+        }
+
+        return new NodeExecutionResult(
+            status: $result->status,
             sourceHandle: $result->sourceHandle,
-            stateChanges: [] !== $result->stateChanges ? $result->stateChanges : null,
-            resolved: [] !== $result->logResolved ? $result->logResolved : null,
-            error: null !== $result->errorMessage ? ['message' => $result->errorMessage] : null,
+            stateChanges: $stateChanges,
+            logResolved: $result->logResolved,
+            effects: $result->effects,
+            metadata: $result->metadata,
+            errorMessage: $result->errorMessage,
         );
     }
 
@@ -325,59 +398,47 @@ final readonly class FlowEngine implements FlowEngineInterface
         }
     }
 
-    private function applySystemStateEffects(NodeExecutionResult $result): NodeExecutionResult
-    {
-        $stateChanges = $result->stateChanges;
-
-        foreach ($result->effects as $effect) {
-            if ( ! is_array($effect) || 'set_contact_language' !== ($effect['type'] ?? null)) {
-                continue;
-            }
-
-            $value = $effect['value'] ?? null;
-
-            if (is_string($value) && '' !== $value) {
-                $stateChanges[SystemStateKeys::LANGUAGE] = $value;
-            }
-        }
-
-        if ($stateChanges === $result->stateChanges) {
-            return $result;
-        }
-
-        return new NodeExecutionResult(
-            status: $result->status,
-            sourceHandle: $result->sourceHandle,
-            stateChanges: $stateChanges,
-            logResolved: $result->logResolved,
-            effects: $result->effects,
-            metadata: $result->metadata,
-            errorMessage: $result->errorMessage,
-        );
-    }
-
     /**
      * @param  array<string, mixed>  $node
      */
-    private function resolveNodeVersion(array $node): int
-    {
-        $raw = $node['version'] ?? 1;
-
-        if (is_int($raw)) {
-            return $raw;
-        }
-
-        if (is_numeric($raw)) {
-            return (int) $raw;
-        }
-
-        return 1;
+    private function buildLogEntry(
+        FlowSession $session,
+        array $node,
+        NodeExecutionResult $result,
+        ?string $nextNodeId,
+    ): FlowLogEntry {
+        return new FlowLogEntry(
+            sessionId: (string)$session->getKey(),
+            nodeId: (string)($node['id'] ?? ''),
+            nodeType: (string)($node['type'] ?? ''),
+            nodeVersion: $this->resolveNodeVersion($node),
+            status: match (true) {
+                NodeExecutionStatus::Failed === $result->status                           => FlowLogStatus::Failed,
+                NodeExecutionStatus::Finished === $result->status                         => FlowLogStatus::Terminal,
+                NodeExecutionStatus::Executed === $result->status && null === $nextNodeId => FlowLogStatus::Terminal,
+                default                                                                   => FlowLogStatus::Executed,
+            },
+            sourceHandle: $result->sourceHandle,
+            stateChanges: [] !== $result->stateChanges ? $result->stateChanges : null,
+            resolved: [] !== $result->logResolved ? $result->logResolved : null,
+            error: null !== $result->errorMessage ? ['message' => $result->errorMessage] : null,
+        );
     }
 
-    private function afterCommit(callable $callback): void
+    private function resolveAnalyticsEventType(NodeExecutionResult $result, ?string $nextNodeId): ?AnalyticsEventType
     {
-        // Flow engine transactions run on the default tenant connection in current runtime,
-        // so facade-level afterCommit is coupled to the same transaction lifecycle.
-        DB::afterCommit($callback);
+        if (NodeExecutionStatus::Executed === $result->status && null === $nextNodeId) {
+            return AnalyticsEventType::FlowCompleted;
+        }
+
+        if (NodeExecutionStatus::Finished === $result->status) {
+            return AnalyticsEventType::FlowCompleted;
+        }
+
+        if (NodeExecutionStatus::Failed === $result->status) {
+            return AnalyticsEventType::FlowFailed;
+        }
+
+        return null;
     }
 }

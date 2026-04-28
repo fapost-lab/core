@@ -94,8 +94,6 @@ useEventListener(document, 'keydown', (event) => {
             @redo="builderStore.redo"
             @publish="runPublish"
             @validate="runValidate"
-            @rollback="() => {}"
-            @preview="() => {}"
         />
 
         <div v-if="builderStore.activeTab === 'builder'" class="editor-main">

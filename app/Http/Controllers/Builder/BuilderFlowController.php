@@ -26,14 +26,16 @@ final class BuilderFlowController extends Controller
 
         return Inertia::render('FlowBuilder/FlowEditor', [
             'flow' => [
-                'flowId'           => $dto->flowId,
-                'name'             => $dto->name,
-                'draftVersion'     => $dto->draftVersion,
-                'publishedVersion' => $dto->publishedVersion,
-                'definition'       => $dto->definition,
-                'trigger'          => $dto->trigger,
-                'availableEvents'  => $dto->availableEvents,
-                'publishedAt'      => $dto->publishedAt?->toIso8601String(),
+                'flowId'              => $dto->flowId,
+                'name'                => $dto->name,
+                'draftVersion'        => $dto->draftVersion,
+                'publishedVersion'    => $dto->publishedVersion,
+                'definition'          => $dto->definition,
+                'trigger'             => $dto->trigger,
+                'availableEvents'     => $dto->availableEvents,
+                'publishedAt'         => $dto->publishedAt?->toIso8601String(),
+                'contentBaseLanguage' => $dto->contentBaseLanguage,
+                'availableLanguages'  => $dto->availableLanguages,
             ],
             'backUrl' => route('filament.assistant.resources.flows.index', ['tenant' => $dto->assistantId]),
         ]);
@@ -45,13 +47,16 @@ final class BuilderFlowController extends Controller
         SaveDraftService $service,
         ValidateFlowService $validator,
     ): JsonResponse {
-        $definitionNodes = $this->extractDefinitionNodes($request->validated('definition'));
+        $definition      = $request->validated('definition');
+        $definitionNodes = $this->extractDefinitionNodes($definition);
+        $definitionEdges = $this->extractDefinitionEdges($definition);
         $triggerPayload  = $this->normalizeTriggerPayload($request->validated('trigger'));
 
         $validation = $validator->execute(
             nodes: $definitionNodes,
             trigger: $triggerPayload,
             flowId: $flow,
+            edges: $definitionEdges,
         );
 
         if ( ! $validation->valid) {
@@ -62,16 +67,19 @@ final class BuilderFlowController extends Controller
             $newDraftVersion = $service->execute(
                 flowId: $flow,
                 nodes: $definitionNodes,
+                edges: $definitionEdges,
                 trigger: $triggerPayload,
                 expectedDraftVersion: $request->validated('draft_version'),
             );
         } catch (InvalidTriggerPayloadException $exception) {
             return response()->json([
                 'message' => $exception->getMessage(),
-                'errors'  => [[
-                    'path'    => 'trigger.config',
-                    'message' => $exception->getMessage(),
-                ]],
+                'errors'  => [
+                    [
+                        'path'    => 'trigger.config',
+                        'message' => $exception->getMessage(),
+                    ],
+                ],
             ], 422);
         }
 
@@ -83,13 +91,16 @@ final class BuilderFlowController extends Controller
         string $flow,
         ValidateFlowService $service,
     ): JsonResponse {
-        $definitionNodes = $this->extractDefinitionNodes($request->validated('definition'));
+        $definition      = $request->validated('definition');
+        $definitionNodes = $this->extractDefinitionNodes($definition);
+        $definitionEdges = $this->extractDefinitionEdges($definition);
         $triggerPayload  = $this->normalizeTriggerPayload($request->validated('trigger'));
 
         $result = $service->execute(
             nodes: $definitionNodes,
             trigger: $triggerPayload,
             flowId: $flow,
+            edges: $definitionEdges,
         );
 
         return response()->json($result);
@@ -109,6 +120,7 @@ final class BuilderFlowController extends Controller
 
     /**
      * @param  array<string, mixed>  $definition
+     *
      * @return array<int|string, mixed>
      */
     private function extractDefinitionNodes(array $definition): array
@@ -119,7 +131,20 @@ final class BuilderFlowController extends Controller
     }
 
     /**
+     * @param  array<string, mixed>  $definition
+     *
+     * @return array<int|string, mixed>
+     */
+    private function extractDefinitionEdges(array $definition): array
+    {
+        $edges = $definition['edges'] ?? [];
+
+        return is_array($edges) ? $edges : [];
+    }
+
+    /**
      * @param  array<string, mixed>|null  $trigger
+     *
      * @return array<string, mixed>|null
      */
     private function normalizeTriggerPayload(?array $trigger): ?array

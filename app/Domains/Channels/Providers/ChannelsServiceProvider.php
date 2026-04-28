@@ -28,7 +28,7 @@ final class ChannelsServiceProvider extends ServiceProvider
 
         $this->app->singleton(
             ChannelRegistryInterface::class,
-            fn ($app): ChannelRegistry => new ChannelRegistry(
+            fn($app): ChannelRegistry => new ChannelRegistry(
                 definitions: $app->tagged('channels.integration'),
                 container: $app,
             )

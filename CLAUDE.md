@@ -768,6 +768,8 @@ Fallback: `tenant translation → core translation → core fallback language`.
 
 Lazy fallback при runtime — обновление core defaults не требует миграции данных tenant.
 
+Все UI компоненты и модлю, всегда должны иметь перевод на системные языки.
+
 ### Flow multilingual content
 
 Локализуемые поля inline в JSON ноды:

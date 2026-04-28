@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import AccordionSection from '../AccordionSection.vue'
 
 const props = defineProps({
     trigger: { type: Object, default: null },
@@ -97,10 +98,8 @@ function defaultConfig(type) {
 </script>
 
 <template>
-    <div class="trigger-config">
-        <div class="config-section">
-            <div class="config-label">General</div>
-
+    <div class="accordion">
+        <AccordionSection title="General" default-open>
             <div class="config-field">
                 <div class="field-label">Trigger type</div>
                 <select
@@ -135,11 +134,9 @@ function defaultConfig(type) {
                 >
                 <span>Trigger is active</span>
             </label>
-        </div>
+        </AccordionSection>
 
-        <div v-if="currentTrigger.type === 'message'" class="config-section">
-            <div class="config-label">Message Matching</div>
-
+        <AccordionSection v-if="currentTrigger.type === 'message'" title="Message matching" default-open>
             <div class="config-field">
                 <div class="field-label">Keywords</div>
                 <div
@@ -173,11 +170,9 @@ function defaultConfig(type) {
                 </div>
                 <button type="button" class="add-item-btn" @click="addArrayItem('phrases')">+ Add phrase</button>
             </div>
-        </div>
+        </AccordionSection>
 
-        <div v-else-if="currentTrigger.type === 'schedule'" class="config-section">
-            <div class="config-label">Schedule</div>
-
+        <AccordionSection v-else-if="currentTrigger.type === 'schedule'" title="Schedule" default-open>
             <div class="config-field">
                 <div class="field-label">Cron</div>
                 <input
@@ -196,11 +191,9 @@ function defaultConfig(type) {
                     @input="update({ config: { timezone: $event.target.value } })"
                 >
             </div>
-        </div>
+        </AccordionSection>
 
-        <div v-else-if="currentTrigger.type === 'webhook'" class="config-section">
-            <div class="config-label">Webhook</div>
-
+        <AccordionSection v-else-if="currentTrigger.type === 'webhook'" title="Webhook" default-open>
             <div class="config-field">
                 <div class="field-label">Method</div>
                 <select
@@ -234,11 +227,9 @@ function defaultConfig(type) {
                     @input="update({ config: { secret: $event.target.value } })"
                 >
             </div>
-        </div>
+        </AccordionSection>
 
-        <div v-else-if="currentTrigger.type === 'api'" class="config-section">
-            <div class="config-label">API</div>
-
+        <AccordionSection v-else-if="currentTrigger.type === 'api'" title="API" default-open>
             <div class="config-field">
                 <div class="field-label">Route key</div>
                 <input
@@ -265,11 +256,9 @@ function defaultConfig(type) {
                 </div>
                 <button type="button" class="add-item-btn" @click="addArrayItem('allowed_sources')">+ Add source</button>
             </div>
-        </div>
+        </AccordionSection>
 
-        <div v-else-if="currentTrigger.type === 'event'" class="config-section">
-            <div class="config-label">Event</div>
-
+        <AccordionSection v-else-if="currentTrigger.type === 'event'" title="Event" default-open>
             <div class="config-field">
                 <div class="field-label">Event name</div>
                 <select
@@ -289,67 +278,29 @@ function defaultConfig(type) {
                     Events are created in the Event node. Trigger can only use events that already exist.
                 </div>
             </div>
-        </div>
+        </AccordionSection>
 
-        <div class="config-section">
+        <AccordionSection title="Danger zone">
             <button type="button" class="delete-trigger-btn" @click="removeTrigger">Delete trigger</button>
-        </div>
+        </AccordionSection>
     </div>
 </template>
 
 <style scoped>
-.trigger-config {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.config-section {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.config-label,
-.field-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-2);
-}
-
-.config-field {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.field-input {
-    width: 100%;
-    min-height: 36px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    padding: 8px 10px;
-    color: var(--text);
-}
-
-.field-hint {
-    font-size: 12px;
-    color: var(--text-3);
-}
-
 .toggle-row {
     display: flex;
     align-items: center;
     gap: 8px;
     font-size: 12px;
     color: var(--text-2);
+    cursor: pointer;
 }
 
 .array-row {
     display: flex;
     align-items: center;
     gap: 8px;
+    margin-bottom: 4px;
 }
 
 .delete-inline {
@@ -360,19 +311,48 @@ function defaultConfig(type) {
     font-size: 18px;
     line-height: 1;
 }
+.delete-inline:hover { color: #e53e3e; }
 
-.delete-trigger-btn,
 .add-item-btn {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--surface);
-    color: var(--text-2);
+    width: 100%;
+    margin-top: 4px;
+    padding: 6px 10px;
+    border: 1.5px dashed var(--border-2);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-3);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
     cursor: pointer;
-    padding: 8px 10px;
-    text-align: left;
+    transition: border-color .12s, color .12s, background .12s;
+}
+.add-item-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-bg);
 }
 
 .delete-trigger-btn {
-    color: var(--rose);
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--rose, #e53e3e);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--rose, #e53e3e);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background .12s, color .12s;
+}
+.delete-trigger-btn:hover {
+    background: var(--rose, #e53e3e);
+    color: #fff;
+}
+
+.field-hint {
+    font-size: 11px;
+    color: var(--text-3);
+    margin-top: 4px;
+    line-height: 1.4;
 }
 </style>

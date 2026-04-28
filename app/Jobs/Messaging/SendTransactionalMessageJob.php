@@ -44,7 +44,7 @@ final class SendTransactionalMessageJob implements ShouldQueue
             return;
         }
 
-        if ( ! $result->sent) {
+        if (!$result->sent) {
             throw new RuntimeException($result->error ?? 'Transactional message delivery failed.');
         }
     }

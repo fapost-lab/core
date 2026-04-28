@@ -22,6 +22,8 @@ return [
         'manage_flow'       => 'Manage flows',
         'manage_broadcast'  => 'Manage broadcasts',
         'manage_rag'        => 'Manage RAG / knowledge',
+        'view_media'        => 'View media library',
+        'manage_media'      => 'Manage media library',
         'view_contacts'     => 'View contacts',
         'manage_contacts'   => 'Manage contacts',
         'view_analytics'    => 'View analytics',
@@ -69,16 +71,17 @@ return [
         'plural_label' => 'Assistants',
 
         'fields' => [
-            'name'              => 'Name',
-            'default_language'  => 'Default language',
-            'is_active'         => 'Active',
-            'fallback_message'  => 'Fallback message',
-            'default_flow'      => 'Default flow',
-            'default_flow_help' => 'Available after Flow domain is enabled.',
-            'settings'          => 'Settings',
-            'settings_key'      => 'Key',
-            'settings_value'    => 'Value',
-            'settings_add'      => 'Add entry',
+            'name'                => 'Name',
+            'default_language'    => 'Default language',
+            'available_languages' => 'Available languages',
+            'is_active'           => 'Active',
+            'fallback_message'    => 'Fallback message',
+            'default_flow'        => 'Default flow',
+            'default_flow_help'   => 'Available after Flow domain is enabled.',
+            'settings'            => 'Settings',
+            'settings_key'        => 'Key',
+            'settings_value'      => 'Value',
+            'settings_add'        => 'Add entry',
         ],
 
         'table' => [
@@ -168,6 +171,42 @@ return [
             'display_name' => 'Display name',
             'system'       => 'System',
             'permissions'  => 'Permissions',
+        ],
+    ],
+
+    'dashboard' => [
+        'chart' => [
+            'flow_activity' => [
+                'heading'  => 'Flow Activity (last 14 days)',
+                'executed' => 'Executed',
+                'failed'   => 'Failed',
+            ],
+        ],
+        'stats' => [
+            'assistants' => [
+                'label'       => 'Assistants',
+                'description' => ':count active',
+            ],
+            'contacts' => [
+                'label'       => 'Contacts',
+                'description' => 'Total registered',
+            ],
+            'channels' => [
+                'label'       => 'Channels',
+                'description' => ':total total, :active connected',
+            ],
+            'published_flows' => [
+                'label'       => 'Published flows',
+                'description' => 'Deployed to production',
+            ],
+            'waiting_sessions' => [
+                'label'       => 'Waiting sessions',
+                'description' => 'Paused or awaiting user input',
+            ],
+            'staff_users' => [
+                'label'       => 'Staff users',
+                'description' => 'With access to this tenant',
+            ],
         ],
     ],
 ];

@@ -15,6 +15,8 @@ enum Permission: string
     case ManageFlow       = 'manage_flow';
     case ManageBroadcast  = 'manage_broadcast';
     case ManageRag        = 'manage_rag';
+    case ViewMedia        = 'view_media';
+    case ManageMedia      = 'manage_media';
     case ViewContacts     = 'view_contacts';
     case ManageContacts   = 'manage_contacts';
     case ViewAnalytics    = 'view_analytics';
@@ -68,10 +70,11 @@ enum Permission: string
             self::ManageAssistants => 'assistants',
             self::ManageUsers      => 'users',
             self::ManageFlow, self::ManageBroadcast,
-            self::ManageRag => 'content',
+            self::ManageRag,
+            self::ViewMedia, self::ManageMedia       => 'content',
             self::ViewContacts, self::ManageContacts => 'contacts',
-            self::ViewAnalytics => 'analytics',
-            self::ViewSystem, self::ManageSettings => 'system',
+            self::ViewAnalytics                      => 'analytics',
+            self::ViewSystem, self::ManageSettings   => 'system',
         };
     }
 }

@@ -16,10 +16,12 @@ final class TelegramVideoDeliveryAction implements TelegramDeliveryActionInterfa
 
     public function deliver(TelegramBotApiClient $client, OutboundMessage $message): array
     {
-        return $client->sendVideo(new SendVideoDto(
-            chatId: $message->chatId,
-            video: (string) ($message->payload->media['video'] ?? ''),
-            caption: '' !== $message->payload->text ? $message->payload->text : null,
-        ));
+        return $client->sendVideo(
+            new SendVideoDto(
+                chatId: $message->chatId,
+                video: (string)($message->payload->media['video'] ?? ''),
+                caption: '' !== $message->payload->text ? $message->payload->text : null,
+            )
+        );
     }
 }

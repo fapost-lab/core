@@ -35,7 +35,9 @@ final class ChannelRegistry implements ChannelRegistryInterface
             }
 
             if (isset($this->definitionsByType[$definition->channelType])) {
-                throw new InvalidArgumentException("Duplicate channel integration definition [{$definition->channelType}].");
+                throw new InvalidArgumentException(
+                    "Duplicate channel integration definition [{$definition->channelType}]."
+                );
             }
 
             $this->definitionsByType[$definition->channelType] = $definition;

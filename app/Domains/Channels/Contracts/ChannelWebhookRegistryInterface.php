@@ -8,7 +8,8 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 
 /**
- * Application port for assistant/channel webhook routing cache (Redis). Bind the concrete implementation in the service provider; depend on this interface from services, provisioning, and tests.
+ * Application port for assistant/channel webhook routing cache (Redis). Bind the concrete implementation in the
+ * service provider; depend on this interface from services, provisioning, and tests.
  */
 interface ChannelWebhookRegistryInterface
 {

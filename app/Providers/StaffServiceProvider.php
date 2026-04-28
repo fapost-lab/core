@@ -36,6 +36,9 @@ final class StaffServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Admin role bypasses all permission checks — no need to re-seed when new permissions are added.
+        Gate::before(static fn (User $user): ?bool => $user->isAdmin() ? true : null);
+
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
     }

@@ -37,10 +37,10 @@ final readonly class ChannelWebhookRegistry implements ChannelWebhookRegistryInt
         $this->writer->write(
             $channel->webhook_public_hash,
             $tenant,
-            (string) $channel->assistant_id,
-            (string) $channel->getKey(),
+            (string)$channel->assistant_id,
+            (string)$channel->getKey(),
             $channel->type->value,
-            (string) $channel->getAttribute('secret_token'),
+            (string)$channel->getAttribute('secret_token'),
         );
     }
 

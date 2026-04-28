@@ -7,11 +7,11 @@ namespace App\Domains\Flow\Handlers;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Exceptions\UnknownDataAccessorNamespacePrefixException;
-use App\Domains\Flow\Handlers\Abstract\AbstractVersionedHandler;
 use App\Domains\Flow\State\FlowStateNamespace;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
+use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 
 final class ConditionNodeHandler extends AbstractVersionedHandler
 {
@@ -85,43 +85,6 @@ final class ConditionNodeHandler extends AbstractVersionedHandler
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $rules
-     * @return array{0: string, 1: array<string, mixed>|null}
-     */
-    private function evaluateRules(mixed $value, array $rules): array
-    {
-        foreach ($rules as $rule) {
-            if (is_array($rule) && $this->matchesRule($value, $rule)) {
-                $handle = is_string($rule['handle'] ?? null) ? $rule['handle'] : 'default';
-
-                return [$handle, $rule];
-            }
-        }
-
-        return ['default', null];
-    }
-
-    /**
-     * @param  array<string, mixed>  $rule
-     */
-    private function matchesRule(mixed $value, array $rule): bool
-    {
-        return match ($rule['operator'] ?? null) {
-            'eq'        => $value === ($rule['value'] ?? null),
-            'neq'       => $value !== ($rule['value'] ?? null),
-            'gt'        => $value > ($rule['value'] ?? null),
-            'gte'       => $value >= ($rule['value'] ?? null),
-            'lt'        => $value < ($rule['value'] ?? null),
-            'lte'       => $value <= ($rule['value'] ?? null),
-            'contains'  => str_contains((string) $value, (string) ($rule['value'] ?? '')),
-            'in'        => in_array($value, is_array($rule['value'] ?? null) ? $rule['value'] : [], true),
-            'empty'     => empty($value),
-            'not_empty' => ! empty($value),
-            default     => false,
-        };
-    }
-
-    /**
      * @param  array<string, mixed>  $state
      */
     private function resolveOperandValue(string $path, array $state, NodeExecutionContext $context): mixed
@@ -167,5 +130,43 @@ final class ConditionNodeHandler extends AbstractVersionedHandler
         }
 
         return [$prefix, $key];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $rules
+     *
+     * @return array{0: string, 1: array<string, mixed>|null}
+     */
+    private function evaluateRules(mixed $value, array $rules): array
+    {
+        foreach ($rules as $rule) {
+            if (is_array($rule) && $this->matchesRule($value, $rule)) {
+                $handle = is_string($rule['handle'] ?? null) ? $rule['handle'] : 'default';
+
+                return [$handle, $rule];
+            }
+        }
+
+        return ['default', null];
+    }
+
+    /**
+     * @param  array<string, mixed>  $rule
+     */
+    private function matchesRule(mixed $value, array $rule): bool
+    {
+        return match ($rule['operator'] ?? null) {
+            'eq'        => $value === ($rule['value'] ?? null),
+            'neq'       => $value !== ($rule['value'] ?? null),
+            'gt'        => $value > ($rule['value'] ?? null),
+            'gte'       => $value >= ($rule['value'] ?? null),
+            'lt'        => $value < ($rule['value'] ?? null),
+            'lte'       => $value <= ($rule['value'] ?? null),
+            'contains'  => str_contains((string)$value, (string)($rule['value'] ?? '')),
+            'in'        => in_array($value, is_array($rule['value'] ?? null) ? $rule['value'] : [], true),
+            'empty'     => empty($value),
+            'not_empty' => ! empty($value),
+            default     => false,
+        };
     }
 }

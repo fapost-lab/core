@@ -10,15 +10,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * @property int $id
- * @property string $name
- * @property string $company
- * @property string $email
+ * @property int         $id
+ * @property string      $name
+ * @property string      $company
+ * @property string      $email
  * @property MessengerPreference $messenger_preference
  * @property string|null $message
  * @property string|null $ip_address
  * @property string|null $user_agent
- * @property string $locale
+ * @property string      $locale
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @method static \Illuminate\Database\Eloquent\Builder<static>|PreSaleRequest newModelQuery()

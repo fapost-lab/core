@@ -8,8 +8,8 @@ use App\Domains\Assistant\Exceptions\CurrentAssistantNotResolvedException;
 use App\Domains\Assistant\Models\Assistant;
 
 /**
- * UI-scoped assistant for the assistant Filament panel: resolved from Filament tenancy when present, with an optional override for tests.
- * Platform (schema) tenant remains {@see \App\Domains\Tenancy\Contracts\TenantContextInterface}.
+ * UI-scoped assistant for the assistant Filament panel: resolved from Filament tenancy when present, with an optional
+ * override for tests. Platform (schema) tenant remains {@see \App\Domains\Tenancy\Contracts\TenantContextInterface}.
  */
 interface CurrentAssistantInterface
 {

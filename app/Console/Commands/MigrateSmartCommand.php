@@ -55,9 +55,9 @@ final class MigrateSmartCommand extends Command
      */
     private function resolveChecks(): array
     {
-        $checkAll      = (bool) $this->option('all');
-        $checkLandlord = $checkAll || (bool) $this->option('landlord');
-        $checkTenant   = $checkAll || (bool) $this->option('tenant');
+        $checkAll      = (bool)$this->option('all');
+        $checkLandlord = $checkAll || (bool)$this->option('landlord');
+        $checkTenant   = $checkAll || (bool)$this->option('tenant');
 
         if ( ! $checkLandlord && ! $checkTenant) {
             return [
@@ -80,23 +80,6 @@ final class MigrateSmartCommand extends Command
         );
     }
 
-    private function countPendingTenantMigrations(): int
-    {
-        $defaultTenantSlug = (string) config('tenancy.default_tenant_slug', 'app');
-        $tenant            = $this->tenantRepository->findBySlug($defaultTenantSlug);
-
-        if (null === $tenant) {
-            throw new RuntimeException(
-                "Default local tenant [{$defaultTenantSlug}] was not found. Run platform:install or create that tenant before checking tenant migrations.",
-            );
-        }
-
-        return $this->tenantSwitcher->runForTenant($tenant, fn (): int => $this->countPendingMigrationsForConnection(
-            connection: (string) config('tenancy.tenant_connection', 'tenant'),
-            paths: [MigrationScope::tenant()->path],
-        ));
-    }
-
     /**
      * @param  list<string>  $paths
      */
@@ -111,14 +94,33 @@ final class MigrateSmartCommand extends Command
 
             $ranMigrations = $this->migrator->getRepository()->getRan();
 
-            return count(array_filter(
-                $migrationFiles,
-                fn (string $migrationFile): bool => ! in_array(
-                    $this->migrator->getMigrationName($migrationFile),
-                    $ranMigrations,
-                    true,
-                ),
-            ));
+            return count(
+                array_filter(
+                    $migrationFiles,
+                    fn (string $migrationFile): bool => ! in_array(
+                        $this->migrator->getMigrationName($migrationFile),
+                        $ranMigrations,
+                        true,
+                    ),
+                )
+            );
         });
+    }
+
+    private function countPendingTenantMigrations(): int
+    {
+        $defaultTenantSlug = (string)config('tenancy.default_tenant_slug', 'app');
+        $tenant            = $this->tenantRepository->findBySlug($defaultTenantSlug);
+
+        if (null === $tenant) {
+            throw new RuntimeException(
+                "Default local tenant [{$defaultTenantSlug}] was not found. Run platform:install or create that tenant before checking tenant migrations.",
+            );
+        }
+
+        return $this->tenantSwitcher->runForTenant($tenant, fn (): int => $this->countPendingMigrationsForConnection(
+            connection: (string)config('tenancy.tenant_connection', 'tenant'),
+            paths: [MigrationScope::tenant()->path],
+        ));
     }
 }

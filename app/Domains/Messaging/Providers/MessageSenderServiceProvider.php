@@ -24,7 +24,7 @@ final class MessageSenderServiceProvider extends ServiceProvider
             fn ($app): MessageSender => new MessageSender(
                 channelRegistry: $app->make(ChannelRegistryInterface::class),
                 redis: $app->make('redis'),
-                rateLimitPerMinute: (int) config('messaging.rate_limit_per_minute', 30),
+                rateLimitPerMinute: (int)config('messaging.rate_limit_per_minute', 30),
             )
         );
     }

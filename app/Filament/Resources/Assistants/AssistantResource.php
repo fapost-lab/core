@@ -23,7 +23,8 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * Admin panel only: CRUD for {@see Assistant} records and related admin relation managers.
- * The operational assistant console is {@see \App\Providers\Filament\AssistantPanelProvider} (dashboard + channels); do not duplicate assistant CRUD there.
+ * The operational assistant console is {@see \App\Providers\Filament\AssistantPanelProvider} (dashboard + channels);
+ * do not duplicate assistant CRUD there.
  */
 final class AssistantResource extends Resource
 {

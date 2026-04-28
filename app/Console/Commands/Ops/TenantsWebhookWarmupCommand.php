@@ -69,8 +69,8 @@ final class TenantsWebhookWarmupCommand extends Command
             }
         }
 
-        $this->components->twoColumnDetail('Success', (string) $ok);
-        $this->components->twoColumnDetail('Failed', (string) $fail);
+        $this->components->twoColumnDetail('Success', (string)$ok);
+        $this->components->twoColumnDetail('Failed', (string)$fail);
 
         return $fail > 0 ? self::FAILURE : self::SUCCESS;
     }
@@ -78,6 +78,7 @@ final class TenantsWebhookWarmupCommand extends Command
     /**
      * @param  array<int, TenantInterface>  $active
      * @param  array<int, string>  $slugs
+     *
      * @return array<int, TenantInterface>
      */
     private function resolveTenantsBySlug(array $active, array $slugs): array
@@ -93,7 +94,7 @@ final class TenantsWebhookWarmupCommand extends Command
 
         $out = [];
         foreach ($slugs as $slug) {
-            $key = mb_strtolower((string) $slug);
+            $key = mb_strtolower((string)$slug);
             if (isset($bySlug[$key])) {
                 $out[] = $bySlug[$key];
             }

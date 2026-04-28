@@ -32,8 +32,11 @@ final class LegacyUuidUserProvider extends EloquentUserProvider
      *
      * @param  mixed  $identifier
      */
-    public function retrieveByToken($identifier, #[SensitiveParameter] $token): ?\Illuminate\Contracts\Auth\Authenticatable
-    {
+    public function retrieveByToken(
+        $identifier,
+        #[SensitiveParameter]
+        $token
+    ): ?\Illuminate\Contracts\Auth\Authenticatable {
         if ( ! $this->isValidAuthIdentifier($identifier)) {
             return null;
         }

@@ -61,8 +61,8 @@ final readonly class SyncFlowTriggerService
             'assistant_id' => $draft->assistant_id,
             'flow_id'      => $draft->flow_id,
             'type'         => $type,
-            'is_active'    => (bool) ($triggerPayload['is_active'] ?? true),
-            'priority'     => (int) ($triggerPayload['priority'] ?? 100),
+            'is_active'    => (bool)($triggerPayload['is_active'] ?? true),
+            'priority'     => (int)($triggerPayload['priority'] ?? 100),
             'config'       => $config,
         ]);
     }

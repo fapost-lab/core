@@ -21,7 +21,6 @@ final class HrSolutionServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-
     }
 
     /**

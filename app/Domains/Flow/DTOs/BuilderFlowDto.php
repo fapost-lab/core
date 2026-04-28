@@ -25,17 +25,23 @@ final class BuilderFlowDto extends Data
         /** @var list<string> */
         public readonly array $availableEvents,
         public readonly ?Carbon $publishedAt,
+        public readonly string $contentBaseLanguage,
+        /** @var list<string> */
+        public readonly array $availableLanguages,
     ) {
     }
 
     /**
      * @param  list<string>  $availableEvents
+     * @param  list<string>  $availableLanguages
      */
     public static function fromDraftAndDefinition(
         FlowDraft $draft,
         ?FlowDefinition $published,
         ?FlowTrigger $trigger,
         array $availableEvents,
+        string $contentBaseLanguage,
+        array $availableLanguages,
     ): self {
         return new self(
             flowId: $draft->flow_id,
@@ -43,15 +49,22 @@ final class BuilderFlowDto extends Data
             name: $draft->name,
             draftVersion: $draft->draft_version,
             publishedVersion: $published?->version,
-            definition: is_array($draft->nodes) ? $draft->nodes : [],
-            trigger: null === $trigger ? null : [
-                'type'      => $trigger->type->value,
-                'is_active' => $trigger->is_active,
-                'priority'  => $trigger->priority,
-                'config'    => $trigger->config,
+            definition: [
+                'nodes' => is_array($draft->nodes) ? $draft->nodes : [],
+                'edges' => is_array($draft->edges) ? $draft->edges : [],
             ],
+            trigger: null === $trigger
+                ? null
+                : [
+                    'type'      => $trigger->type->value,
+                    'is_active' => $trigger->is_active,
+                    'priority'  => $trigger->priority,
+                    'config'    => $trigger->config,
+                ],
             availableEvents: $availableEvents,
             publishedAt: $published?->published_at,
+            contentBaseLanguage: $contentBaseLanguage,
+            availableLanguages: $availableLanguages,
         );
     }
 }

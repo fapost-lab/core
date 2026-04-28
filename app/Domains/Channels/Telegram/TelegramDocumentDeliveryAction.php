@@ -16,10 +16,12 @@ final class TelegramDocumentDeliveryAction implements TelegramDeliveryActionInte
 
     public function deliver(TelegramBotApiClient $client, OutboundMessage $message): array
     {
-        return $client->sendDocument(new SendDocumentDto(
-            chatId: $message->chatId,
-            document: (string) ($message->payload->media['document'] ?? ''),
-            caption: '' !== $message->payload->text ? $message->payload->text : null,
-        ));
+        return $client->sendDocument(
+            new SendDocumentDto(
+                chatId: $message->chatId,
+                document: (string)($message->payload->media['document'] ?? ''),
+                caption: '' !== $message->payload->text ? $message->payload->text : null,
+            )
+        );
     }
 }

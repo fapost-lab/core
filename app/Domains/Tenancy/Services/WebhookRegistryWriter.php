@@ -61,6 +61,11 @@ final class WebhookRegistryWriter implements WebhookRegistryWriterInterface
         );
     }
 
+    private function key(string $publicHash): string
+    {
+        return 'webhook:' . $publicHash;
+    }
+
     public function delete(string $publicHash): void
     {
         Redis::del($this->key($publicHash));
@@ -68,10 +73,5 @@ final class WebhookRegistryWriter implements WebhookRegistryWriterInterface
         DB::connection('landlord')->table('webhook_registry')
             ->where('webhook_public_hash', $publicHash)
             ->delete();
-    }
-
-    private function key(string $publicHash): string
-    {
-        return 'webhook:' . $publicHash;
     }
 }

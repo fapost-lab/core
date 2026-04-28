@@ -1,4 +1,6 @@
 <script setup>
+import AccordionSection from '../AccordionSection.vue'
+
 const props = defineProps({
     node:   { type: Object, required: true },
     schema: { type: Object, required: true },
@@ -17,9 +19,8 @@ function update(key, value) {
 </script>
 
 <template>
-    <div>
-        <div class="config-section">
-            <div class="config-label">Variable</div>
+    <div class="accordion">
+        <AccordionSection title="Variable" default-open>
             <div class="config-field">
                 <div class="field-label">Save to</div>
                 <input
@@ -40,10 +41,9 @@ function update(key, value) {
                     <option v-for="type in EXPECTED_TYPES" :key="type" :value="type">{{ type }}</option>
                 </select>
             </div>
-        </div>
+        </AccordionSection>
 
-        <div class="config-section">
-            <div class="config-label">Validation</div>
+        <AccordionSection title="Validation">
             <div class="config-field">
                 <div class="field-label">Retry limit</div>
                 <input
@@ -72,10 +72,9 @@ function update(key, value) {
                     @input="update('timeout', $event.target.value)"
                 >
             </div>
-        </div>
+        </AccordionSection>
 
-        <div class="config-section">
-            <div class="config-label">Meta</div>
+        <AccordionSection title="Meta">
             <div class="config-field">
                 <div class="field-label">Node ID</div>
                 <input
@@ -85,6 +84,6 @@ function update(key, value) {
                     readonly
                 >
             </div>
-        </div>
+        </AccordionSection>
     </div>
 </template>

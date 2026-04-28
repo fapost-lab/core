@@ -16,10 +16,12 @@ final class TelegramPhotoDeliveryAction implements TelegramDeliveryActionInterfa
 
     public function deliver(TelegramBotApiClient $client, OutboundMessage $message): array
     {
-        return $client->sendPhoto(new SendPhotoDto(
-            chatId: $message->chatId,
-            photo: (string) ($message->payload->media['photo'] ?? ''),
-            caption: '' !== $message->payload->text ? $message->payload->text : null,
-        ));
+        return $client->sendPhoto(
+            new SendPhotoDto(
+                chatId: $message->chatId,
+                photo: (string)($message->payload->media['photo'] ?? ''),
+                caption: '' !== $message->payload->text ? $message->payload->text : null,
+            )
+        );
     }
 }

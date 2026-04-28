@@ -7,7 +7,8 @@ namespace App\Domains\Tenancy\Contracts;
 use App\Domains\Tenancy\Exceptions\TenantNotResolvedException;
 
 /**
- * In-memory active tenant for the current scope (HTTP, job, or nested {@see \App\Domains\Tenancy\Services\TenantSwitcher::runForTenant()}).
+ * In-memory active tenant for the current scope (HTTP, job, or nested
+ * {@see \App\Domains\Tenancy\Services\TenantSwitcher::runForTenant()}).
  *
  * Does not change the database; full runtime is coordinated by {@see \App\Domains\Tenancy\Services\TenantSwitcher}.
  */
@@ -25,7 +26,8 @@ interface TenantContextInterface
     public function isResolved(): bool;
 
     /**
-     * Clears the bound tenant so a new scope can start clean (e.g. after {@see \App\Domains\Tenancy\Services\TenantSwitcher} unwinds).
+     * Clears the bound tenant so a new scope can start clean (e.g. after
+     * {@see \App\Domains\Tenancy\Services\TenantSwitcher} unwinds).
      */
     public function reset(): void;
 }

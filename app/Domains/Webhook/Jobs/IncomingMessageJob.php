@@ -108,6 +108,11 @@ final class IncomingMessageJob implements ShouldQueue
 
                     $activeSession = $sessions->findActiveForContact($contact, $this->payload->assistantId);
 
+                    if (null !== $activeSession && $this->isResetCommand($inboundMessage->text)) {
+                        $sessions->cancel($activeSession);
+                        $activeSession = null;
+                    }
+
                     $trigger = null;
 
                     if (null === $activeSession) {
@@ -146,5 +151,14 @@ final class IncomingMessageJob implements ShouldQueue
             3       => 5,
             default => 10,
         };
+    }
+
+    private function isResetCommand(?string $text): bool
+    {
+        if (null === $text) {
+            return false;
+        }
+
+        return in_array(mb_strtolower(mb_trim($text)), ['/start', '/reset', '/stop'], true);
     }
 }

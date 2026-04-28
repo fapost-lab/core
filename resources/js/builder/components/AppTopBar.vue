@@ -18,7 +18,7 @@ defineProps({
 })
 
 const emit = defineEmits([
-    'tabChange', 'rollback', 'preview', 'validate', 'saveDraft', 'publish', 'undo', 'redo',
+    'tabChange', 'validate', 'saveDraft', 'publish', 'undo', 'redo',
 ])
 
 const SAVE_COLORS = {
@@ -39,7 +39,6 @@ const SAVE_COLORS = {
             </a>
             <span class="flow-name">{{ flowName }}</span>
             <div class="version-badge">
-                <span v-if="draftVersion != null" class="badge badge-draft">Draft v{{ draftVersion }}</span>
                 <span v-if="publishedVersion != null" class="badge badge-pub">Published v{{ publishedVersion }}</span>
                 <span v-else class="badge badge-muted">Not published</span>
             </div>
@@ -77,9 +76,6 @@ const SAVE_COLORS = {
         <div class="topbar-right">
             <button class="btn btn-ghost" :disabled="!canUndo" @click="emit('undo')">↩ Undo</button>
             <button class="btn btn-ghost" :disabled="!canRedo" @click="emit('redo')">↪ Redo</button>
-            <button class="btn btn-ghost" @click="emit('rollback')">↩ {{ t('topbar.rollback') }}</button>
-            <div class="sep"></div>
-            <button class="btn btn-ghost" @click="emit('preview')">▷ {{ t('topbar.preview') }}</button>
             <button class="btn btn-outline" :disabled="validating" @click="emit('validate')">
                 {{ validating ? 'Validating…' : `✓ ${t('topbar.validate')}` }}
             </button>
@@ -104,6 +100,7 @@ const SAVE_COLORS = {
     padding: 0 16px;
     gap: 12px;
     flex-shrink: 0;
+    position: relative;
     z-index: 10;
 }
 .topbar-left {
@@ -111,6 +108,7 @@ const SAVE_COLORS = {
     align-items: center;
     gap: 8px;
     flex: 1;
+    min-width: 0;
 }
 .btn-back {
     display: flex;
@@ -151,32 +149,36 @@ const SAVE_COLORS = {
 .sep { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
 
 .topbar-tabs {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
     display: flex;
     gap: 2px;
     background: var(--surface-2);
-    border: 1px solid var(--border);
-    border-radius: 7px;
+    border: 1px solid var(--border-2);
+    border-radius: 8px;
     padding: 3px;
 }
 .tab-btn {
-    padding: 4px 14px;
-    border-radius: 5px;
+    padding: 5px 20px;
+    border-radius: 6px;
     border: none;
     background: transparent;
     font-family: 'DM Sans', sans-serif;
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 500;
-    color: var(--text-2);
+    color: var(--text-3);
     cursor: pointer;
     transition: all .15s;
 }
 .tab-btn.active {
     background: var(--surface);
     color: var(--text);
-    box-shadow: var(--shadow);
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(0,0,0,.12);
 }
 
-.topbar-right { display: flex; align-items: center; gap: 6px; }
+.topbar-right { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: flex-end; }
 .btn {
     padding: 6px 12px;
     border-radius: var(--radius);

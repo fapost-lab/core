@@ -22,6 +22,8 @@ return [
         'manage_flow'       => 'Керування сценаріями (flow)',
         'manage_broadcast'  => 'Керування розсилками',
         'manage_rag'        => 'Керування RAG / базою знань',
+        'view_media'        => 'Перегляд медіа-бібліотеки',
+        'manage_media'      => 'Керування медіа-бібліотекою',
         'view_contacts'     => 'Перегляд контактів',
         'manage_contacts'   => 'Керування контактами',
         'view_analytics'    => 'Перегляд аналітики',
@@ -69,16 +71,17 @@ return [
         'plural_label' => 'Асистенти',
 
         'fields' => [
-            'name'              => 'Назва',
-            'default_language'  => 'Мова за замовчуванням',
-            'is_active'         => 'Активний',
-            'fallback_message'  => 'Повідомлення за замовчуванням',
-            'default_flow'      => 'Сценарій за замовчуванням',
-            'default_flow_help' => 'Буде доступно після ввімкнення домену Flow.',
-            'settings'          => 'Налаштування',
-            'settings_key'      => 'Ключ',
-            'settings_value'    => 'Значення',
-            'settings_add'      => 'Додати',
+            'name'                => 'Назва',
+            'default_language'    => 'Мова за замовчуванням',
+            'available_languages' => 'Доступні мови',
+            'is_active'           => 'Активний',
+            'fallback_message'    => 'Повідомлення за замовчуванням',
+            'default_flow'        => 'Сценарій за замовчуванням',
+            'default_flow_help'   => 'Буде доступно після ввімкнення домену Flow.',
+            'settings'            => 'Налаштування',
+            'settings_key'        => 'Ключ',
+            'settings_value'      => 'Значення',
+            'settings_add'        => 'Додати',
         ],
 
         'table' => [
@@ -168,6 +171,42 @@ return [
             'display_name' => 'Відображувана назва',
             'system'       => 'Системна',
             'permissions'  => 'Права',
+        ],
+    ],
+
+    'dashboard' => [
+        'chart' => [
+            'flow_activity' => [
+                'heading'  => 'Активність сценаріїв (останні 14 днів)',
+                'executed' => 'Виконано',
+                'failed'   => 'Помилки',
+            ],
+        ],
+        'stats' => [
+            'assistants' => [
+                'label'       => 'Асистенти',
+                'description' => ':count активні',
+            ],
+            'contacts' => [
+                'label'       => 'Контакти',
+                'description' => 'Всього зареєстровано',
+            ],
+            'channels' => [
+                'label'       => 'Канали',
+                'description' => 'Всього :total, підключено :active',
+            ],
+            'published_flows' => [
+                'label'       => 'Опубліковані сценарії',
+                'description' => 'Розгорнуто в продакшн',
+            ],
+            'waiting_sessions' => [
+                'label'       => 'Сесії в очікуванні',
+                'description' => 'На паузі або чекають введення',
+            ],
+            'staff_users' => [
+                'label'       => 'Співробітники',
+                'description' => 'З доступом до цього тенанта',
+            ],
         ],
     ],
 ];

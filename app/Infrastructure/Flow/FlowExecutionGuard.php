@@ -26,7 +26,7 @@ final readonly class FlowExecutionGuard implements FlowExecutionGuardInterface
         $key  = "session_lock:{$tenantId}:{$contactId}:{$assistantId}";
         $lock = $this->store->lock($key, $this->ttl);
 
-        if ( ! $lock->get()) {
+        if (!$lock->get()) {
             throw new SessionLockTimeoutException($key);
         }
 

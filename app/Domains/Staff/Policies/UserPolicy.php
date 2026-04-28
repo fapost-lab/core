@@ -42,11 +42,7 @@ final class UserPolicy
             return false;
         }
 
-        return ! ($user->isAdmin() && ! $authUser->isAdmin())
-
-
-
-        ;
+        return ! ($user->isAdmin() && ! $authUser->isAdmin());
     }
 
     public function delete(AuthUser $authUser, User $user): bool
@@ -59,11 +55,7 @@ final class UserPolicy
             return false;
         }
 
-        return ! ($user->isAdmin() && ! $authUser->isAdmin())
-
-
-
-        ;
+        return ! ($user->isAdmin() && ! $authUser->isAdmin());
     }
 
     public function deleteAny(AuthUser $authUser): bool
@@ -83,7 +75,7 @@ final class UserPolicy
         }
 
         return $authUser->can(Permission::ManageUsers->value)
-            && $authUser->isAdmin();
+               && $authUser->isAdmin();
     }
 
     public function activate(AuthUser $authUser, User $user): bool
@@ -93,7 +85,7 @@ final class UserPolicy
         }
 
         return $authUser->can(Permission::ManageUsers->value)
-            && $authUser->isAdmin();
+               && $authUser->isAdmin();
     }
 
     /**

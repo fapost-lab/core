@@ -13,9 +13,10 @@ use Illuminate\Support\Facades\Gate;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Resolves the operational assistant for the assistant Filament panel: query param {@see self::QUERY_PARAM} first, then session fallback.
- * Sets {@see CurrentAssistantInterface}. Does not call {@see \Filament\Facades\Filament::setTenant()} — that would make
- * Filament append a {@code tenant} query parameter to generated URLs; assistant identity is {@code assistant} only.
+ * Resolves the operational assistant for the assistant Filament panel: query param {@see self::QUERY_PARAM} first,
+ * then session fallback. Sets {@see CurrentAssistantInterface}. Does not call
+ * {@see \Filament\Facades\Filament::setTenant()} — that would make Filament append a {@code tenant} query parameter to
+ * generated URLs; assistant identity is {@code assistant} only.
  */
 final readonly class ResolveAssistantMiddleware
 {
@@ -60,7 +61,7 @@ final readonly class ResolveAssistantMiddleware
         Gate::authorize('view', $assistant);
 
         if ($request->has(self::QUERY_PARAM)) {
-            session([self::SESSION_KEY => (string) $assistant->getKey()]);
+            session([self::SESSION_KEY => (string)$assistant->getKey()]);
         }
 
         $this->currentAssistant->set($assistant);

@@ -13,24 +13,26 @@ use FAPost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * @property string $id
- * @property string $tenant_id
- * @property string $assistant_id
- * @property string $contact_id
- * @property string $flow_definition_id  FK to {@see FlowDefinition::$id} — immutable definition snapshot for this session (specific version row), not only logical {@see FlowDefinition::$flow_id}
- * @property int $flow_version
- * @property string|null $current_node_id
+ * @property string              $id
+ * @property string              $tenant_id
+ * @property string              $assistant_id
+ * @property string              $contact_id
+ * @property string              $flow_definition_id  FK to {@see FlowDefinition::$id} — immutable
+ *           definition snapshot for this session (specific version row), not only logical
+ *           {@see FlowDefinition::$flow_id}
+ * @property int                 $flow_version
+ * @property string|null         $current_node_id
  * @property array<string, mixed> $state
- * @property FlowSessionStatus $status
- * @property int $version
+ * @property FlowSessionStatus   $status
+ * @property int                 $version
  * @property \Illuminate\Support\Carbon|null $expires_at
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession query()
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property-read Assistant $assistant
- * @property-read Contact $contact
+ * @property-read Assistant      $assistant
+ * @property-read Contact        $contact
  * @property-read FlowDefinition $flowDefinition
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereAssistantId($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|FlowSession whereContactId($value)
@@ -101,13 +103,15 @@ final class FlowSession extends BaseModel
         $updated = $this->newQuery()
             ->whereKey($this->getKey())
             ->where('version', $this->version)
-            ->update(array_merge(
-                $attributes,
-                [
-                    'version'    => $this->version + 1,
-                    'updated_at' => $updatedAt,
-                ],
-            ));
+            ->update(
+                array_merge(
+                    $attributes,
+                    [
+                        'version'    => $this->version + 1,
+                        'updated_at' => $updatedAt,
+                    ],
+                )
+            );
 
         if (1 !== $updated) {
             throw new OptimisticLockConflictException(

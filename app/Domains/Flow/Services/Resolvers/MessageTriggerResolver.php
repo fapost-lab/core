@@ -72,6 +72,14 @@ final readonly class MessageTriggerResolver implements TriggerTypeResolverInterf
         return null;
     }
 
+    private function normalizeText(string $value): string
+    {
+        $normalized = mb_strtolower(mb_trim($value));
+        $normalized = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $normalized) ?? $normalized;
+
+        return preg_replace('/\s+/u', ' ', mb_trim($normalized)) ?? mb_trim($normalized);
+    }
+
     private function matchType(FlowTrigger $trigger, string $normalizedText): ?string
     {
         $keywords = $trigger->config['keywords'] ?? null;
@@ -101,6 +109,7 @@ final readonly class MessageTriggerResolver implements TriggerTypeResolverInterf
     /**
      * @param  array<int, mixed>  $keywords
      * @param  array<int, mixed>  $phrases
+     *
      * @return list<string>
      */
     private function normalizedNeedles(array $keywords, array $phrases): array
@@ -116,13 +125,5 @@ final readonly class MessageTriggerResolver implements TriggerTypeResolverInterf
         }
 
         return array_values(array_unique($needles));
-    }
-
-    private function normalizeText(string $value): string
-    {
-        $normalized = mb_strtolower(mb_trim($value));
-        $normalized = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $normalized) ?? $normalized;
-
-        return preg_replace('/\s+/u', ' ', mb_trim($normalized)) ?? mb_trim($normalized);
     }
 }

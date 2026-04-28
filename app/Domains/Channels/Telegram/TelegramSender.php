@@ -25,7 +25,7 @@ final readonly class TelegramSender implements ProviderSenderInterface
      */
     public function deliver(OutboundMessage $message): DeliveryResult
     {
-        $token = (string) ($message->transportToken ?? '');
+        $token = (string)($message->transportToken ?? '');
 
         if ('' === $token) {
             return new DeliveryResult(sent: false, error: 'Telegram transport token is missing.');
@@ -43,7 +43,7 @@ final readonly class TelegramSender implements ProviderSenderInterface
 
         return new DeliveryResult(
             sent: true,
-            providerMessageId: isset($response['result']['message_id']) ? (string) $response['result']['message_id'] : null,
+            providerMessageId: isset($response['result']['message_id']) ? (string)$response['result']['message_id'] : null,
         );
     }
 }

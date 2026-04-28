@@ -27,7 +27,7 @@ final class CreateAssistant extends CreateRecord
         $user = auth()->user();
 
         if ($user instanceof User && ! $user->isAdmin()) {
-            $user->assistants()->syncWithoutDetaching([(string) $this->record->getKey()]);
+            $user->assistants()->syncWithoutDetaching([(string)$this->record->getKey()]);
         }
     }
 }

@@ -25,7 +25,7 @@ final readonly class LaravelHttpClient implements HttpClientInterface
                 ->timeout($timeout)
                 ->post($url, $payload);
         } catch (ConnectionException $exception) {
-            throw new HttpTransportException($exception->getMessage(), (int) $exception->getCode(), $exception);
+            throw new HttpTransportException($exception->getMessage(), (int)$exception->getCode(), $exception);
         }
 
         $body = $response->json();

@@ -47,7 +47,7 @@ final readonly class PublishFlowService
                 'version'      => $newVersion,
                 'name'         => $draft->name,
                 'nodes'        => $draft->nodes,
-                'edges'        => [],
+                'edges'        => is_array($draft->edges) ? $draft->edges : [],
                 'is_active'    => true,
                 'published_at' => now(),
             ]);

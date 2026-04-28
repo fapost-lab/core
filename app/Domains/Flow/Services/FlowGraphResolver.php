@@ -24,7 +24,7 @@ final class FlowGraphResolver
                 continue;
             }
 
-            $target = $edge['target_node_id'] ?? null;
+            $target = $edge['to'] ?? null;
 
             if (is_string($target) && '' !== $target) {
                 $incoming[$target] = true;
@@ -84,13 +84,13 @@ final class FlowGraphResolver
                 continue;
             }
 
-            $source     = $edge['source_node_id'] ?? null;
-            $target     = $edge['target_node_id'] ?? null;
-            $transition = $edge['transition'] ?? null;
+            $source = $edge['from'] ?? null;
+            $target = $edge['to'] ?? null;
+            $handle = $edge['handle'] ?? 'default';
 
             if ($source === $nodeId
-                && is_string($transition)
-                && $transition === $sourceHandle
+                && is_string($handle)
+                && $handle === $sourceHandle
                 && is_string($target)
                 && '' !== $target) {
                 return $target;

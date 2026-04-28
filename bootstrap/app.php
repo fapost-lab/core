@@ -27,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->group(base_path('routes/tenant.php'));
 
             Route::middleware('web')->group(base_path('routes/builder.php'));
+            Route::middleware('web')->group(base_path('routes/media.php'));
             Route::middleware('web')->group(base_path('routes/tma.php'));
         }
     )

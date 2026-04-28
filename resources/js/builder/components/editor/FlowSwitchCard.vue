@@ -4,6 +4,7 @@ import { computed, ref, watch } from 'vue'
 import { useSelectionStore } from '@builder/store/selectionStore'
 import { useBuilderStore } from '@builder/store/builderStore'
 import { nodeColors } from '@builder/utils/nodeColors'
+import { countDescendants } from '@builder/utils/buildTree'
 
 const props = defineProps({
     treeNode:     { type: Object, required: true },
@@ -34,7 +35,8 @@ function selectBranch(handle) {
 }
 
 function childCount(handle) {
-    return props.treeNode.childrenByHandle?.[handle]?.length ?? 0
+    const children = props.treeNode.childrenByHandle?.[handle] ?? []
+    return children.reduce((sum, child) => sum + 1 + countDescendants(child), 0)
 }
 </script>
 
@@ -77,7 +79,7 @@ function childCount(handle) {
                     :class="{ 'active-branch': activeHandle === handle }"
                     @click.stop="selectBranch(handle)"
                 >
-                    ▶ {{ handle }}
+                    {{ handle }}
                 </button>
             </div>
         </div>

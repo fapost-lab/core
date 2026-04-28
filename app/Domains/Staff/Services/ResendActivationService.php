@@ -46,7 +46,10 @@ final readonly class ResendActivationService
 
         if ( ! $executed) {
             throw ValidationException::withMessages([
-                'email' => __('Please wait :minutes minutes before requesting another activation email.', ['minutes' => 5]),
+                'email' => __(
+                    'Please wait :minutes minutes before requesting another activation email.',
+                    ['minutes' => 5]
+                ),
             ]);
         }
     }

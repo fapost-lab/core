@@ -35,22 +35,22 @@ final class UserForm
                     ->label(__('staff.users.fields.password'))
                     ->password()
                     ->revealable()
-                    ->visible(fn (string $operation): bool => 'edit' === $operation)
-                    ->dehydrated(fn (?string $state): bool => filled($state))
+                    ->visible(fn(string $operation): bool => 'edit' === $operation)
+                    ->dehydrated(fn(?string $state): bool => filled($state))
                     ->maxLength(255),
                 Select::make('role_id')
                     ->label(__('staff.users.fields.role'))
-                    ->options(fn (): array => self::rolesForActor())
+                    ->options(fn(): array => self::rolesForActor())
                     ->searchable()
                     ->preload()
                     ->required()
-                    ->visible(fn (string $operation): bool => 'create' === $operation),
+                    ->visible(fn(string $operation): bool => 'create' === $operation),
                 Select::make('roles')
                     ->label(__('staff.users.fields.roles'))
                     ->relationship(
                         name: 'roles',
                         titleAttribute: 'name',
-                        modifyQueryUsing: fn ($query) => $query
+                        modifyQueryUsing: fn($query) => $query
                             ->where('guard_name', 'web')
                             ->where('priority', '<', self::actorMaxPriority()),
                     )

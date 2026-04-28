@@ -62,11 +62,11 @@ final readonly class CachedContentTranslator implements ContentTranslatorInterfa
         $baseLanguage = $this->tenantSettings->content_base_language;
 
         if (isset($content[$language]) && is_scalar($content[$language])) {
-            return (string) $content[$language];
+            return (string)$content[$language];
         }
 
         if (isset($content[$baseLanguage]) && is_scalar($content[$baseLanguage])) {
-            return (string) $content[$baseLanguage];
+            return (string)$content[$baseLanguage];
         }
 
         $firstKey = array_key_first($content);
@@ -75,7 +75,7 @@ final readonly class CachedContentTranslator implements ContentTranslatorInterfa
             return '';
         }
 
-        return (string) $content[$firstKey];
+        return (string)$content[$firstKey];
     }
 
     public function invalidate(string $tenantId, string $language): void

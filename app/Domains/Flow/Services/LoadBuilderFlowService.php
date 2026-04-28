@@ -9,6 +9,7 @@ use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\DTOs\BuilderFlowDto;
+use App\Domains\Tenancy\Settings\TenantSettings;
 
 final readonly class LoadBuilderFlowService
 {
@@ -17,6 +18,7 @@ final readonly class LoadBuilderFlowService
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowTriggerRepositoryInterface $triggers,
         private TenantEventRepositoryInterface $tenantEvents,
+        private TenantSettings $tenantSettings,
     ) {
     }
 
@@ -27,10 +29,12 @@ final readonly class LoadBuilderFlowService
         $trigger   = $this->triggers->findByFlowId($flowId);
 
         return BuilderFlowDto::fromDraftAndDefinition(
-            $draft,
-            $published,
-            $trigger,
-            $this->tenantEvents->getEventNamesByTenant($draft->tenant_id),
+            draft: $draft,
+            published: $published,
+            trigger: $trigger,
+            availableEvents: $this->tenantEvents->getEventNamesByTenant($draft->tenant_id),
+            contentBaseLanguage: $this->tenantSettings->content_base_language,
+            availableLanguages: $this->tenantSettings->available_languages,
         );
     }
 }

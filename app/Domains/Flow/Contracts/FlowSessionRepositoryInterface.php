@@ -15,4 +15,7 @@ interface FlowSessionRepositoryInterface
      * @param  array<string, mixed>  $attributes
      */
     public function create(array $attributes): FlowSession;
+
+    /** Marks the session as cancelled (used for reset commands). */
+    public function cancel(FlowSession $session): void;
 }

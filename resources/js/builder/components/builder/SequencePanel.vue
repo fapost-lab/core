@@ -101,6 +101,35 @@ function onSelectNode(nodeId) {
 function onNavigateBranch(nodeId, branchKey) {
     nav.navigateToBranch(nodeId, branchKey)
 }
+
+/**
+ * Returns true when the last node in the current sequence is a branching terminal —
+ * i.e., a send_message with inline keyboard or a condition node.
+ * In that case "+ Add block" at the tail makes no logical sense.
+ */
+const lastNodeIsBranchingTerminal = computed(() => {
+    const last = displayedNodes.value.at(-1)
+    if (!last) return false
+    if (last.type === 'condition' || last.type === 'switch') return true
+    if (last.type === 'send_message') {
+        const cfg = last.config ?? {}
+        return cfg.content_type === 'text_with_keyboard' && cfg.keyboard_mode === 'inline'
+    }
+    return false
+})
+
+/** Branch buttons of the last branching terminal node, for direct navigation. */
+const terminalBranchButtons = computed(() => {
+    const last = displayedNodes.value.at(-1)
+    if (!last || !lastNodeIsBranchingTerminal.value) return []
+    if (last.type === 'send_message') {
+        return (last.config?.buttons ?? []).map((btn) => ({
+            key: btn.id,
+            label: typeof btn.label === 'object' ? Object.values(btn.label)[0] ?? 'Button' : (btn.label || 'Button'),
+        }))
+    }
+    return []
+})
 </script>
 
 <template>
@@ -131,11 +160,33 @@ function onNavigateBranch(nodeId, branchKey) {
                 />
             </template>
 
-            <!-- End -->
-            <SeqConnector />
-            <InsertPoint :after-node-id="displayedNodes.at(-1)?.id ?? null" />
-            <SeqConnector />
-            <EndCard />
+            <!-- End: normal sequence tail -->
+            <template v-if="!lastNodeIsBranchingTerminal">
+                <SeqConnector />
+                <InsertPoint :after-node-id="displayedNodes.at(-1)?.id ?? null" />
+                <SeqConnector />
+                <EndCard />
+            </template>
+
+            <!-- End: branching terminal — show branch entry buttons instead of + Add block -->
+            <template v-else>
+                <SeqConnector />
+                <div class="branch-entry-list">
+                    <button
+                        v-for="btn in terminalBranchButtons"
+                        :key="btn.key"
+                        class="branch-entry-btn"
+                        @click="onNavigateBranch(displayedNodes.at(-1).id, btn.key)"
+                    >
+                        ▶ {{ btn.label }}
+                    </button>
+                    <!-- condition / switch have no extra buttons here; EndCard still makes sense -->
+                    <template v-if="terminalBranchButtons.length === 0">
+                        <SeqConnector />
+                        <EndCard />
+                    </template>
+                </div>
+            </template>
         </div>
     </div>
 </template>
@@ -154,5 +205,30 @@ function onNavigateBranch(nodeId, branchKey) {
     padding: 20px 16px 60px;
     gap: 0;
     min-height: 100%;
+}
+.branch-entry-list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    max-width: 320px;
+    padding: 8px 0 16px;
+}
+.branch-entry-btn {
+    width: 100%;
+    padding: 10px 16px;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+}
+.branch-entry-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-light, color-mix(in srgb, var(--accent) 10%, transparent));
 }
 </style>

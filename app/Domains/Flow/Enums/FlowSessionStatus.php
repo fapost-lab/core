@@ -12,4 +12,5 @@ enum FlowSessionStatus: string
     case Paused       = 'paused';
     case Completed    = 'completed';
     case Failed       = 'failed';
+    case Cancelled    = 'cancelled';
 }

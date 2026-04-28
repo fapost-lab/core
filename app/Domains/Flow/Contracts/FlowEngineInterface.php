@@ -28,4 +28,22 @@ interface FlowEngineInterface
         FlowSession $session,
         IncomingMessage $message,
     ): FlowSession;
+
+    /**
+     * Creates a new session starting at the node connected to the given output handle of $nodeId,
+     * using $definition as the frozen snapshot.
+     *
+     * Used for keep-forever inline button re-entry: the user pressed a button from a completed
+     * session, and we need to continue the flow from the branch that button leads to.
+     * If $outputHandle has no connected node the session is created in Completed status immediately.
+     *
+     * @param  array<string, mixed>  $initialState
+     */
+    public function resumeFromNode(
+        FlowDefinition $definition,
+        Contact $contact,
+        string $nodeId,
+        string $outputHandle,
+        array $initialState = [],
+    ): FlowSession;
 }

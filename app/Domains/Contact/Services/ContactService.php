@@ -31,7 +31,7 @@ final readonly class ContactService implements ContactServiceInterface
         ?string $defaultLanguage = null,
     ): Contact {
         try {
-            return Contact::query()->firstOrCreate(
+            $contact = Contact::query()->firstOrCreate(
                 [
                     'tenant_id'   => $tenantId,
                     'platform'    => $platform,
@@ -44,12 +44,19 @@ final readonly class ContactService implements ContactServiceInterface
                 ],
             );
         } catch (UniqueConstraintViolationException) {
-            return Contact::query()
+            $contact = Contact::query()
                 ->where('tenant_id', $tenantId)
                 ->where('platform', $platform)
                 ->where('external_id', $externalId)
                 ->firstOrFail();
         }
+
+        if (!$contact->wasRecentlyCreated && [] !== $meta) {
+            $contact->meta = array_merge(is_array($contact->meta) ? $contact->meta : [], $meta);
+            $contact->save();
+        }
+
+        return $contact;
     }
 
     /**
@@ -74,7 +81,7 @@ final readonly class ContactService implements ContactServiceInterface
                 ->firstOrFail();
         }
 
-        if ( ! $channelContact->wasRecentlyCreated) {
+        if (!$channelContact->wasRecentlyCreated) {
             $channelContact->last_interaction_at = now();
             $channelContact->save();
         }
@@ -87,7 +94,7 @@ final readonly class ContactService implements ContactServiceInterface
         $contact = $this->findById($contactId);
         $current = $contact->attributes ?? [];
 
-        if ( ! is_array($current)) {
+        if (!is_array($current)) {
             $current = [];
         }
 
@@ -98,6 +105,11 @@ final readonly class ContactService implements ContactServiceInterface
         return $contact;
     }
 
+    public function findById(string $contactId): Contact
+    {
+        return Contact::query()->findOrFail($contactId);
+    }
+
     public function updateLanguage(string $contactId, string $language): Contact
     {
         Contact::query()->whereKey($contactId)->update([
@@ -105,10 +117,5 @@ final readonly class ContactService implements ContactServiceInterface
         ]);
 
         return $this->findById($contactId);
-    }
-
-    public function findById(string $contactId): Contact
-    {
-        return Contact::query()->findOrFail($contactId);
     }
 }

@@ -14,24 +14,24 @@ use Spatie\Permission\Models\Role as SpatieRole;
  * Tenant-scoped role; table lives in the active tenant schema.
  *
  * @property-read Collection<int, Permission> $permissions
- * @property-read int|null $permissions_count
+ * @property-read int|null              $permissions_count
  * @property-read Collection<int, User> $users
- * @property-read int|null $users_count
+ * @property-read int|null              $users_count
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Role newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Role newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Role permission($permissions, $without = false)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Role query()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Role withoutPermission($permissions)
- * @property string $id
- * @property string $name
- * @property string $guard_name
+ * @property string                     $id
+ * @property string                     $name
+ * @property string                     $guard_name
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property string|null $display_name
- * @property bool $is_system
- * @property int $priority
- * @property-read bool|null $permissions_exists
- * @property-read bool|null $users_exists
+ * @property string|null                $display_name
+ * @property bool                       $is_system
+ * @property int                        $priority
+ * @property-read bool|null             $permissions_exists
+ * @property-read bool|null             $users_exists
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Role whereCreatedAt($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Role whereDisplayName($value)
  * @method static \Illuminate\Database\Eloquent\Builder<static>|Role whereGuardName($value)
@@ -55,17 +55,17 @@ final class Role extends SpatieRole
      */
     public static function maxPriority(Collection|\Illuminate\Support\Collection $roles): int
     {
-        return (int) $roles->max('priority');
-    }
-
-    public function isAdminRole(): bool
-    {
-        return $this->name === RoleEnum::Admin->value;
+        return (int)$roles->max('priority');
     }
 
     public function isSystemRole(): bool
     {
         return $this->is_system;
+    }
+
+    public function isAdminRole(): bool
+    {
+        return $this->name === RoleEnum::Admin->value;
     }
 
     protected static function booted(): void

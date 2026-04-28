@@ -35,8 +35,9 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
  * Assistant operational Filament panel (UI “tenant” = {@see Assistant}, independent of platform schema tenant).
  *
  * HTTP stack order: base web middleware → {@see TenancyMiddleware} (platform tenant) → {@see Authenticate} →
- * {@see EnsureUserIsActive} → Filament {@see \Filament\Http\Middleware\IdentifyTenant} (resolves {@code assistant/{tenant}}; requires an authenticated user).
- * Same rule as legacy {@code ResolveAssistantMiddleware}: authentication must run before assistant UI identity resolution.
+ * {@see EnsureUserIsActive} → Filament {@see \Filament\Http\Middleware\IdentifyTenant} (resolves
+ * {@code assistant/{tenant}}; requires an authenticated user). Same rule as legacy {@code ResolveAssistantMiddleware}:
+ * authentication must run before assistant UI identity resolution.
  */
 final class AssistantPanelProvider extends PanelProvider
 {
@@ -60,7 +61,10 @@ final class AssistantPanelProvider extends PanelProvider
                     // Default USER_MENU_BEFORE is easy to miss in the topbar; this hook is inside the topbar actions area.
                     ->renderHook(PanelsRenderHook::GLOBAL_SEARCH_AFTER),
             ])
-            ->discoverResources(in: app_path('Filament/Assistant/Resources'), for: 'App\\Filament\\Assistant\\Resources')
+            ->discoverResources(
+                in: app_path('Filament/Assistant/Resources'),
+                for: 'App\\Filament\\Assistant\\Resources'
+            )
             ->discoverPages(in: app_path('Filament/Assistant/Pages'), for: 'App\\Filament\\Assistant\\Pages')
             ->homeUrl(function (): ?string {
                 $tenant = Filament::getTenant();
@@ -80,7 +84,7 @@ final class AssistantPanelProvider extends PanelProvider
             ])
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
-                fn (): string => (string) view('filament.assistant.partials.flow-row-colors')
+                fn (): string => (string)view('filament.assistant.partials.flow-row-colors')
             )
             ->middleware([
                 TenancyMiddleware::class,

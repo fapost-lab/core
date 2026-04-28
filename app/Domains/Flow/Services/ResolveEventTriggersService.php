@@ -27,7 +27,7 @@ final readonly class ResolveEventTriggersService
 
         foreach ($this->triggers->getActiveEventTriggers($tenantId, $eventName) as $trigger) {
             $resolved[] = new ResolvedTrigger(
-                triggerId: (string) $trigger->getKey(),
+                triggerId: (string)$trigger->getKey(),
                 flowId: $trigger->flow_id,
                 type: $trigger->type->value,
                 config: $trigger->config,

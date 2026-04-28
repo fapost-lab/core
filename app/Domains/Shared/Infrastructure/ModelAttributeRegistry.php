@@ -42,11 +42,13 @@ final class ModelAttributeRegistry implements ModelAttributeResolverInterface
         }
 
         if (isset($this->entries[$modelClass][$name])) {
-            throw new LogicException(sprintf(
-                'Model attribute [%s] is already registered on [%s].',
-                $name,
-                $modelClass,
-            ));
+            throw new LogicException(
+                sprintf(
+                    'Model attribute [%s] is already registered on [%s].',
+                    $name,
+                    $modelClass,
+                )
+            );
         }
 
         $this->entries[$modelClass][$name] = [$resolver, $append];
@@ -63,22 +65,24 @@ final class ModelAttributeRegistry implements ModelAttributeResolverInterface
     /**
      * Resolve a computed attribute value for the provided model instance.
      *
-     * @throws LogicException If the attribute is not registered.
-     *
-     * @param  string                               $modelClass
-     * @param  string                               $name
-     * @param  Model  $model
+     * @param  string  $modelClass
+     * @param  string  $name
+     * @param  Model   $model
      *
      * @return mixed
+     * @throws LogicException If the attribute is not registered.
+     *
      */
     public function resolve(string $modelClass, string $name, Model $model): mixed
     {
         if ( ! isset($this->entries[$modelClass][$name])) {
-            throw new LogicException(sprintf(
-                'No model attribute [%s] registered on [%s].',
-                $name,
-                $modelClass,
-            ));
+            throw new LogicException(
+                sprintf(
+                    'No model attribute [%s] registered on [%s].',
+                    $name,
+                    $modelClass,
+                )
+            );
         }
 
         return ($this->entries[$modelClass][$name][0])($model);

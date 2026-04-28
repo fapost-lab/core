@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
-use App\Domains\Flow\Handlers\Abstract\AbstractVersionedHandler;
 use App\Domains\Flow\State\SystemStateKeys;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
+use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 
 final class DelayNodeHandler extends AbstractVersionedHandler
 {
@@ -51,7 +51,7 @@ final class DelayNodeHandler extends AbstractVersionedHandler
         }
 
         $config   = is_array($nodeConfig['config'] ?? null) ? $nodeConfig['config'] : [];
-        $seconds  = (int) ($config['seconds'] ?? 60);
+        $seconds  = (int)($config['seconds'] ?? 60);
         $now      = now();
         $resumeAt = $now->clone()->addSeconds($seconds);
 

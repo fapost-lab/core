@@ -41,11 +41,11 @@ final class UsersTable
                     ->formatStateUsing(function ($state): string {
                         $status = $state instanceof UserStatus
                             ? $state
-                            : UserStatus::tryFrom((string) $state);
+                            : UserStatus::tryFrom((string)$state);
 
                         return $status instanceof UserStatus
                             ? __('staff.users.status.' . $status->value)
-                            : (string) $state;
+                            : (string)$state;
                     })
                     ->sortable(),
                 IconColumn::make('is_active')
@@ -66,8 +66,8 @@ final class UsersTable
                         $actor = Auth::user();
 
                         return UserStatus::Pending === $record->status
-                            && $actor instanceof User
-                            && $actor->can('resendActivation', $record);
+                               && $actor instanceof User
+                               && $actor->can('resendActivation', $record);
                     })
                     ->action(function (User $record, ResendActivationService $resend): void {
                         $resend->resend($record);
@@ -82,8 +82,8 @@ final class UsersTable
                         $actor = Auth::user();
 
                         return $record->is_active
-                            && ! $actor->is($record)
-                            && $actor->can('deactivate', $record);
+                               && ! $actor->is($record)
+                               && $actor->can('deactivate', $record);
                     })
                     ->action(function (User $record, UserService $userService): void {
                         /** @var User $actor */
@@ -99,8 +99,8 @@ final class UsersTable
                         $actor = Auth::user();
 
                         return ! $record->is_active
-                            && $actor instanceof User
-                            && $actor->can('activate', $record);
+                               && $actor instanceof User
+                               && $actor->can('activate', $record);
                     })
                     ->action(function (User $record, UserService $userService): void {
                         /** @var User $actor */

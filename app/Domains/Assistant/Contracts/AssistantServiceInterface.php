@@ -20,15 +20,16 @@ interface AssistantServiceInterface
      *
      * Changing {@see Assistant::$is_active} here updates the assistant row only. It does not cascade to channels or
      * Redis webhook routing; use {@see deactivate}/{@see activate} for assistant lifecycle, and per-channel
-     * {@see ChannelServiceInterface::reactivate} (or {@see ChannelServiceInterface::update} with {@code is_active => true})
-     * when channels should register in {@see ChannelWebhookRegistryInterface} again.
+     * {@see ChannelServiceInterface::reactivate} (or {@see ChannelServiceInterface::update} with
+     * {@code is_active => true}) when channels should register in {@see ChannelWebhookRegistryInterface} again.
      *
      * @param  array<string, mixed>  $data
      */
     public function update(Assistant $assistant, array $data): Assistant;
 
     /**
-     * Sets the assistant active flag. Does not reactivate channels or write Redis; use {@see ChannelServiceInterface::reactivate}
+     * Sets the assistant active flag. Does not reactivate channels or write Redis; use
+     * {@see ChannelServiceInterface::reactivate}
      * (or {@see ChannelServiceInterface::update}) per channel when webhooks should be served again.
      */
     public function activate(Assistant $assistant): void;

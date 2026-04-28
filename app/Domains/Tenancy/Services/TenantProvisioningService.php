@@ -52,7 +52,7 @@ final readonly class TenantProvisioningService
         string $firstAdminName = 'Administrator',
         array $config = [],
     ): TenantInterface {
-        if ('' === mb_trim($firstAdminEmail) || '' === $firstAdminPassword) {
+        if ('' === $firstAdminPassword || '' === mb_trim($firstAdminEmail)) {
             throw new TenantProvisioningException('First admin email and password are required.');
         }
 
@@ -80,6 +80,7 @@ final readonly class TenantProvisioningService
                 $firstAdminName,
                 $tenant,
             ): void {
+                $this->databaseManager->runMigrations(MigrationScope::settings());
                 $this->databaseManager->runMigrations(MigrationScope::tenant());
                 $this->aclBootstrapService->bootstrap();
                 $this->createFirstTenantAdminUser($firstAdminEmail, $firstAdminPassword, $firstAdminName);
@@ -99,22 +100,6 @@ final readonly class TenantProvisioningService
         $this->tenantRepository->save($tenant);
 
         return $tenant;
-    }
-
-    /**
-     * @internal Invoked only inside {@see TenantSwitcher::runForTenant()} after tenant migrations.
-     */
-    private function createFirstTenantAdminUser(string $email, string $password, string $name): void
-    {
-        $user = User::query()->create([
-            'name'              => $name,
-            'email'             => $email,
-            'password'          => $password,
-            'email_verified_at' => now(),
-            'status'            => UserStatus::Active,
-        ]);
-
-        $user->assignRole('admin');
     }
 
     private function makeTemporaryTenant(string $slug, string $schemaName): TenantInterface
@@ -151,5 +136,21 @@ final readonly class TenantProvisioningService
                 return $default;
             }
         };
+    }
+
+    /**
+     * @internal Invoked only inside {@see TenantSwitcher::runForTenant()} after tenant migrations.
+     */
+    private function createFirstTenantAdminUser(string $email, string $password, string $name): void
+    {
+        $user = User::query()->create([
+            'name'              => $name,
+            'email'             => $email,
+            'password'          => $password,
+            'email_verified_at' => now(),
+            'status'            => UserStatus::Active,
+        ]);
+
+        $user->assignRole('admin');
     }
 }

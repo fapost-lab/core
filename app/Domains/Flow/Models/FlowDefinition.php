@@ -12,11 +12,11 @@ use FAPost\Support\Models\BaseModel;
  * @property string $id
  * @property string $tenant_id
  * @property string $flow_id
- * @property int $version
+ * @property int    $version
  * @property string $name
  * @property array<int, array<string, mixed>> $nodes
  * @property array<int, array<string, mixed>> $edges
- * @property bool $is_active
+ * @property bool   $is_active
  * @property \Illuminate\Support\Carbon|null $published_at
  * @method static FlowDefinitionBuilder<static>|FlowDefinition active()
  * @method static FlowDefinitionBuilder<static>|FlowDefinition newModelQuery()

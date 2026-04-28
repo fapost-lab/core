@@ -29,4 +29,10 @@ final class FlowSessionRepository implements FlowSessionRepositoryInterface
     {
         return FlowSession::query()->create($attributes);
     }
+
+    public function cancel(FlowSession $session): void
+    {
+        $session->status = FlowSessionStatus::Cancelled;
+        $session->save();
+    }
 }

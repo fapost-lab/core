@@ -25,6 +25,15 @@ final class AssistantsTable
                 IconColumn::make('is_active')
                     ->label(__('staff.assistants.fields.is_active'))
                     ->boolean(),
+                TextColumn::make('default_language')
+                    ->label(__('staff.assistants.fields.default_language'))
+                    ->badge()
+                    ->color('gray'),
+                TextColumn::make('available_languages')
+                    ->label(__('staff.assistants.fields.available_languages'))
+                    ->badge()
+                    ->color('gray')
+                    ->separator(','),
                 TextColumn::make('updated_at')
                     ->label(__('staff.assistants.table.updated_at'))
                     ->dateTime(),

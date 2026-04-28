@@ -38,6 +38,27 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
     }
 
     /**
+     * @param  array<int, mixed>  $keywords
+     * @param  array<int, mixed>  $phrases
+     *
+     * @return list<string>
+     */
+    private function filterStringList(array $keywords, array $phrases): array
+    {
+        $values = [];
+
+        foreach ([...$keywords, ...$phrases] as $value) {
+            if ( ! is_string($value) || '' === mb_trim($value)) {
+                continue;
+            }
+
+            $values[] = mb_trim($value);
+        }
+
+        return $values;
+    }
+
+    /**
      * @param  array<string, mixed>  $config
      */
     private function validateScheduleConfig(array $config): void
@@ -45,7 +66,8 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
         $target = $config['timezone'] ?? $config['target'] ?? null;
 
         if ( ! is_string($config['cron'] ?? null) || '' === mb_trim($config['cron'])
-            || ! is_string($target) || '' === mb_trim($target)) {
+             || ! is_string($target)
+             || '' === mb_trim($target)) {
             throw new InvalidArgumentException('Invalid schedule trigger config.');
         }
     }
@@ -60,7 +82,8 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
         $secret = $config['secret'] ?? null;
 
         if ( ! is_string($method) || ! in_array($method, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], true)
-            || ! is_string($secret) || '' === mb_trim($secret)) {
+             || ! is_string($secret)
+             || '' === mb_trim($secret)) {
             throw new InvalidArgumentException('Invalid webhook trigger config.');
         }
 
@@ -92,25 +115,5 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
         if ( ! is_string($eventName) || 1 !== preg_match('/^[a-z0-9]+(?:_[a-z0-9]+)*$/', $eventName)) {
             throw new InvalidArgumentException('Invalid event trigger config.');
         }
-    }
-
-    /**
-     * @param  array<int, mixed>  $keywords
-     * @param  array<int, mixed>  $phrases
-     * @return list<string>
-     */
-    private function filterStringList(array $keywords, array $phrases): array
-    {
-        $values = [];
-
-        foreach ([...$keywords, ...$phrases] as $value) {
-            if ( ! is_string($value) || '' === mb_trim($value)) {
-                continue;
-            }
-
-            $values[] = mb_trim($value);
-        }
-
-        return $values;
     }
 }

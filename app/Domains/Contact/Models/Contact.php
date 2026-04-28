@@ -18,22 +18,22 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Stores platform-specific identity and arbitrary metadata. Computed attributes can be extended via
  * {@see BaseModel} (e.g. via HR solution).
  *
- * @property PlatformEnum $platform
+ * @property PlatformEnum            $platform
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ChannelContact> $channelContacts
- * @property-read int|null $channel_contacts_count
- * @property-read bool|null $channel_contacts_exists
+ * @property-read int|null           $channel_contacts_count
+ * @property-read bool|null          $channel_contacts_exists
  * @method static \Database\Factories\ContactFactory factory($count = null, $state = [])
  * @method static Builder<static>|Contact newModelQuery()
  * @method static Builder<static>|Contact newQuery()
  * @method static Builder<static>|Contact query()
- * @property string $id
- * @property string $tenant_id
- * @property string $external_id
+ * @property string                  $id
+ * @property string                  $tenant_id
+ * @property string                  $external_id
  * @property array<array-key, mixed> $meta
  * @property array<array-key, mixed> $attributes
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
- * @property string $language
+ * @property string                  $language
  * @method static Builder<static>|Contact whereAttributes($value)
  * @method static Builder<static>|Contact whereCreatedAt($value)
  * @method static Builder<static>|Contact whereExternalId($value)
@@ -65,6 +65,7 @@ final class Contact extends BaseModel
 
     /**
      * Channel linkages for this contact.
+     *
      * @return HasMany<ChannelContact, $this>
      */
     public function channelContacts(): HasMany

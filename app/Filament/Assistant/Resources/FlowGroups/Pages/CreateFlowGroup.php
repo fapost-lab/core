@@ -19,7 +19,7 @@ final class CreateFlowGroup extends CreateRecord
     {
         return FlowGroup::create([
             'tenant_id'    => app(TenantContextInterface::class)->get()->id,
-            'assistant_id' => (string) Filament::getTenant()->getKey(),
+            'assistant_id' => (string)Filament::getTenant()->getKey(),
             'name'         => $data['name'],
         ]);
     }

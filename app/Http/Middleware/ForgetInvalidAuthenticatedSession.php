@@ -44,21 +44,6 @@ final readonly class ForgetInvalidAuthenticatedSession
         }
     }
 
-    private function forgetInvalidRememberCookie(Request $request, SessionGuard $guard): void
-    {
-        $recaller = $request->cookies->get($guard->getRecallerName());
-
-        if ( ! is_string($recaller) || '' === $recaller) {
-            return;
-        }
-
-        [$identifier] = explode('|', $recaller, 2);
-
-        if ( ! $this->isValidIdentifier($guard->getProvider(), $identifier)) {
-            $this->cookies->queue($this->cookies->forget($guard->getRecallerName()));
-        }
-    }
-
     /**
      * @param  mixed  $identifier
      */
@@ -83,5 +68,20 @@ final readonly class ForgetInvalidAuthenticatedSession
         }
 
         return Str::isUuid($identifier);
+    }
+
+    private function forgetInvalidRememberCookie(Request $request, SessionGuard $guard): void
+    {
+        $recaller = $request->cookies->get($guard->getRecallerName());
+
+        if ( ! is_string($recaller) || '' === $recaller) {
+            return;
+        }
+
+        [$identifier] = explode('|', $recaller, 2);
+
+        if ( ! $this->isValidIdentifier($guard->getProvider(), $identifier)) {
+            $this->cookies->queue($this->cookies->forget($guard->getRecallerName()));
+        }
     }
 }

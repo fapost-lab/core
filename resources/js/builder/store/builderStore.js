@@ -3,6 +3,7 @@ import { computed, ref } from 'vue';
 import { nanoid } from 'nanoid';
 import { buildTree } from '@builder/utils/buildTree';
 import { useSelectionStore } from '@builder/store/selectionStore';
+import { useRegistryStore } from '@builder/store/registryStore';
 
 /**
  * @param {unknown} raw
@@ -37,6 +38,8 @@ export const useBuilderStore = defineStore('builder', () => {
     const definition = ref({ nodes: [], edges: [] });
     const trigger = ref(null);
     const availableEvents = ref([]);
+    const contentBaseLanguage = ref('en');
+    const availableLanguages = ref([]);
     const tree = computed(() => buildTree(
         definition.value.nodes ?? [],
         definition.value.edges ?? [],
@@ -76,6 +79,8 @@ export const useBuilderStore = defineStore('builder', () => {
         definition.value = normalizeDefinition(flow.definition);
         trigger.value = normalizeTrigger(flow.trigger);
         availableEvents.value = Array.isArray(flow.availableEvents) ? flow.availableEvents : [];
+        contentBaseLanguage.value = flow.contentBaseLanguage ?? 'en';
+        availableLanguages.value = Array.isArray(flow.availableLanguages) ? flow.availableLanguages : [];
     }
 
     /**
@@ -198,11 +203,14 @@ export const useBuilderStore = defineStore('builder', () => {
             (edge) => edge.from === afterNodeId && (edge.handle ?? 'default') === handle,
         );
 
+        const registryStore = useRegistryStore();
+        const defaultConfig = registryStore.getByType(type, version)?.config_schema?.default_config ?? {};
+
         const newNode = {
             id: newNodeId,
             type,
             version,
-            config: {},
+            config: { ...defaultConfig },
         };
 
         definition.value.nodes.push(newNode);
@@ -211,12 +219,14 @@ export const useBuilderStore = defineStore('builder', () => {
             const incomingNodeIds = new Set(definition.value.edges.map((edge) => edge.to));
             const roots = definition.value.nodes.filter((node) => node.id !== newNodeId && !incomingNodeIds.has(node.id));
 
-            definition.value.edges.push({
-                id: nanoid(10),
-                from: newNodeId,
-                to: roots[0].id,
-                handle: 'default',
-            });
+            if (roots.length > 0) {
+                definition.value.edges.push({
+                    id: nanoid(10),
+                    from: newNodeId,
+                    to: roots[0].id,
+                    handle: 'default',
+                });
+            }
         } else if (edgeIndex !== -1) {
             const existingEdge = definition.value.edges[edgeIndex];
             const previousTargetId = existingEdge.to;
@@ -358,11 +368,22 @@ export const useBuilderStore = defineStore('builder', () => {
      * @param {string} nodeId
      * @param {Record<string, unknown>} patch
      * Merges a partial config patch into existing node config.
+     * For send_message nodes, automatically removes edges whose handle references
+     * a button that no longer exists after the patch.
      */
     function updateNodeConfig(nodeId, patch) {
         const node = definition.value.nodes.find((n) => n.id === nodeId);
-        if (node) {
-            node.config = { ...(node.config ?? {}), ...patch };
+        if (!node) return;
+
+        node.config = { ...(node.config ?? {}), ...patch };
+
+        if (node.type === 'send_message' && Array.isArray(patch.buttons)) {
+            const validHandles = new Set(patch.buttons.map((b) => b.id).filter(Boolean));
+            definition.value.edges = definition.value.edges.filter((edge) => {
+                if (edge.from !== nodeId) return true;
+                const handle = edge.handle ?? 'default';
+                return handle === 'default' || validHandles.has(handle);
+            });
         }
     }
 
@@ -374,6 +395,8 @@ export const useBuilderStore = defineStore('builder', () => {
         definition,
         trigger,
         availableEvents,
+        contentBaseLanguage,
+        availableLanguages,
         tree,
         saveStatus,
         activeTab,

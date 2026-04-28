@@ -36,12 +36,12 @@ final readonly class AssistantService implements AssistantServiceInterface
     {
         $assistant = new Assistant([
             'tenant_id'        => $tenant->getId(),
-            'name'             => (string) $data['name'],
-            'is_active'        => (bool) ($data['is_active'] ?? true),
-            'default_language' => isset($data['default_language']) ? (string) $data['default_language'] : 'en',
-            'fallback_message' => isset($data['fallback_message']) ? (string) $data['fallback_message'] : null,
-            'default_flow_id'  => isset($data['default_flow_id']) && '' !== (string) $data['default_flow_id']
-                ? (string) $data['default_flow_id']
+            'name'             => (string)$data['name'],
+            'is_active'        => (bool)($data['is_active'] ?? true),
+            'default_language' => isset($data['default_language']) ? (string)$data['default_language'] : 'en',
+            'fallback_message' => isset($data['fallback_message']) ? (string)$data['fallback_message'] : null,
+            'default_flow_id'  => isset($data['default_flow_id']) && '' !== (string)$data['default_flow_id']
+                ? (string)$data['default_flow_id']
                 : null,
             'settings' => is_array($data['settings'] ?? null) ? $data['settings'] : [],
         ]);
@@ -73,7 +73,7 @@ final readonly class AssistantService implements AssistantServiceInterface
 
         if (array_key_exists('default_flow_id', $allowed)) {
             $v                          = $allowed['default_flow_id'];
-            $assistant->default_flow_id = null !== $v && '' !== (string) $v ? (string) $v : null;
+            $assistant->default_flow_id = null !== $v && '' !== (string)$v ? (string)$v : null;
             unset($allowed['default_flow_id']);
         }
 

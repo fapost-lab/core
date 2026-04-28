@@ -28,6 +28,7 @@ final class SaveDraftServiceTest extends TestCase
             $table->integer('draft_version')->default(1);
             $table->string('name');
             $table->json('nodes')->nullable();
+            $table->json('edges')->nullable();
             $table->timestamps();
         });
 
@@ -62,7 +63,7 @@ final class SaveDraftServiceTest extends TestCase
 
         $this->expectException(DraftVersionConflictException::class);
 
-        $service->execute($draft->flow_id, [], null, expectedDraftVersion: 3);
+        $service->execute($draft->flow_id, [], [], null, expectedDraftVersion: 3);
     }
 
     public function test_updates_nodes_and_returns_incremented_version(): void
@@ -76,6 +77,7 @@ final class SaveDraftServiceTest extends TestCase
         $newVersion = $service->execute(
             $draft->flow_id,
             ['node_1' => ['id' => 'node_1', 'type' => 'input']],
+            [],
             [
                 'type'      => 'message',
                 'is_active' => true,
@@ -121,6 +123,7 @@ final class SaveDraftServiceTest extends TestCase
         $service->execute(
             $draft->flow_id,
             [],
+            [],
             null,
             expectedDraftVersion: 2,
         );
@@ -152,6 +155,7 @@ final class SaveDraftServiceTest extends TestCase
 
         $service->execute(
             $draft->flow_id,
+            [],
             [],
             ['_delete' => true],
             expectedDraftVersion: 2,
@@ -187,6 +191,7 @@ final class SaveDraftServiceTest extends TestCase
         $service->execute(
             $draft->flow_id,
             [],
+            [],
             [
                 'type'      => 'schedule',
                 'is_active' => true,
@@ -220,6 +225,7 @@ final class SaveDraftServiceTest extends TestCase
 
         $service->execute(
             $draft->flow_id,
+            [],
             [],
             [
                 'type'      => 'event',

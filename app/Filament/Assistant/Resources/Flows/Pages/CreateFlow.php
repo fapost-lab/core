@@ -24,7 +24,7 @@ final class CreateFlow extends CreateRecord
 
     protected function handleRecordCreation(array $data): Model
     {
-        $data['assistant_id'] = (string) $this->currentAssistant->get()->getKey();
+        $data['assistant_id'] = (string)$this->currentAssistant->get()->getKey();
 
         return app(CreateFlowAction::class)->execute($data);
     }

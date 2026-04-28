@@ -11,7 +11,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
 /**
- * Assistants the current user may operate on in the assistant panel (same rules as {@see \App\Domains\Assistant\Policies\AssistantPolicy} view scope).
+ * Assistants the current user may operate on in the assistant panel (same rules as
+ * {@see \App\Domains\Assistant\Policies\AssistantPolicy} view scope).
  */
 final class AssistantSwitchListService
 {

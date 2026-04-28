@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue'
+import AccordionSection from './AccordionSection.vue'
 import TextField from './fields/TextField.vue'
 import TextareaField from './fields/TextareaField.vue'
 import SelectField from './fields/SelectField.vue'
@@ -30,19 +31,17 @@ function update(key, value) {
 </script>
 
 <template>
-    <div class="flex flex-col gap-4">
-        <template
-            v-for="[key, fieldSchema] in schemaEntries"
-            :key="key"
-        >
-            <div class="flex flex-col gap-1">
-                <label class="text-xs font-medium text-gray-500">
+    <div class="accordion">
+        <AccordionSection title="Configuration" default-open>
+            <div
+                v-for="[key, fieldSchema] in schemaEntries"
+                :key="key"
+                class="config-field"
+            >
+                <div class="field-label">
                     {{ fieldSchema.label ?? key }}
-                    <span
-                        v-if="fieldSchema.required"
-                        class="text-red-400 ml-0.5"
-                    >*</span>
-                </label>
+                    <span v-if="fieldSchema.required" class="schema-required">*</span>
+                </div>
                 <component
                     :is="FIELD_COMPONENTS[fieldSchema.type] ?? TextField"
                     :value="node.config?.[key]"
@@ -50,6 +49,25 @@ function update(key, value) {
                     @update:value="update(key, $event)"
                 />
             </div>
-        </template>
+        </AccordionSection>
+
+        <AccordionSection title="Meta">
+            <div class="config-field">
+                <div class="field-label">Node ID</div>
+                <input
+                    class="field-input"
+                    style="font-family:'DM Mono',monospace;font-size:11.5px"
+                    :value="node.id"
+                    readonly
+                >
+            </div>
+        </AccordionSection>
     </div>
 </template>
+
+<style scoped>
+.schema-required {
+    color: #e53e3e;
+    margin-left: 2px;
+}
+</style>

@@ -23,7 +23,7 @@ final class PruneFlowLogsCommand extends Command
 
     public function handle(): int
     {
-        $dryRun = (bool) $this->option('dry-run');
+        $dryRun = (bool)$this->option('dry-run');
         $cutoff = CarbonImmutable::now()->subDays(30);
 
         $dropped = 0;

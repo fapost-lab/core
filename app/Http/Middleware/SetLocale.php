@@ -34,7 +34,12 @@ final class SetLocale
 
         if ($request->hasSession()) {
             $sessionLocale = $request->session()->get('locale');
-            if (filled($sessionLocale) && is_string($sessionLocale) && in_array($sessionLocale, self::SUPPORTED_LOCALES, true)) {
+            if (filled($sessionLocale) && is_string($sessionLocale)
+                && in_array(
+                    $sessionLocale,
+                    self::SUPPORTED_LOCALES,
+                    true
+                )) {
                 return $sessionLocale;
             }
         }
