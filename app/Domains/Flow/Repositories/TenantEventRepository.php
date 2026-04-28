@@ -12,7 +12,7 @@ final class TenantEventRepository implements TenantEventRepositoryInterface
 {
     public function getEventNamesByTenant(string $tenantId): array
     {
-        if (!Schema::hasTable('tenant_events')) {
+        if ( ! Schema::hasTable('tenant_events')) {
             return [];
         }
 

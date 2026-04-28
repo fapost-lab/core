@@ -70,7 +70,7 @@ final class TenantRepository implements TenantRepositoryInterface
      */
     public function save(TenantInterface $tenant): void
     {
-        if (!$tenant instanceof Tenant) {
+        if ( ! $tenant instanceof Tenant) {
             throw new InvalidArgumentException(
                 sprintf('Expected %s, got %s.', Tenant::class, $tenant::class),
             );

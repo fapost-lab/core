@@ -1,11 +1,17 @@
-<script setup>
-import { ref } from 'vue'
-import { useMediaPickerStore } from '@builder/store/mediaPickerStore'
-import { uploadMediaFile } from '@builder/composables/useMediaApi'
+<script setup lang="ts">
+import {ref} from 'vue'
+import {useMediaPickerStore} from '@builder/store/mediaPickerStore'
+import {type PickerFile, uploadMediaFile} from '@builder/composables/useMediaApi'
 import MediaProviderWarning from './MediaProviderWarning.vue'
 
+interface UploadResult {
+    data?: unknown
+    provider_warnings?: string[]
+    [key: string]: unknown
+}
+
 const props = defineProps({
-    folderId: { type: String, default: null },
+    folderId: { type: String as () => string | null, default: null },
 })
 
 const emit = defineEmits(['uploaded'])
@@ -13,10 +19,10 @@ const emit = defineEmits(['uploaded'])
 const store = useMediaPickerStore()
 
 const dragging = ref(false)
-const inputRef = ref(null)
-const warnings = ref([])
+const inputRef = ref<HTMLInputElement | null>(null)
+const warnings = ref<string[]>([])
 
-function handleDragOver(e) {
+function handleDragOver(e: DragEvent) {
     e.preventDefault()
     dragging.value = true
 }
@@ -25,7 +31,7 @@ function handleDragLeave() {
     dragging.value = false
 }
 
-function handleDrop(e) {
+function handleDrop(e: DragEvent) {
     e.preventDefault()
     dragging.value = false
     const files = Array.from(e.dataTransfer?.files ?? [])
@@ -36,16 +42,14 @@ function openPicker() {
     inputRef.value?.click()
 }
 
-function handleInputChange(e) {
-    const files = Array.from(e.target.files ?? [])
+function handleInputChange(e: Event) {
+    const input = e.target as HTMLInputElement
+    const files = Array.from(input.files ?? [])
     uploadFiles(files)
-    e.target.value = ''
+    input.value = ''
 }
 
-/**
- * @param {File[]} files
- */
-async function uploadFiles(files) {
+async function uploadFiles(files: File[]) {
     warnings.value = []
 
     for (const file of files) {
@@ -53,15 +57,15 @@ async function uploadFiles(files) {
         store.addUpload(entryId, file.name)
 
         try {
-            const result = await uploadMediaFile(
+            const result = (await uploadMediaFile(
                 file,
                 props.folderId,
-                (pct) => store.setUploadProgress(entryId, pct),
-            )
+                (pct: number) => store.setUploadProgress(entryId, pct),
+            ) as unknown) as UploadResult
 
             store.markUploadDone(entryId)
 
-            const fileData = result.data ?? result
+            const fileData = (result.data ?? result) as PickerFile
             store.prependFile(fileData)
             emit('uploaded', fileData)
 
@@ -70,8 +74,9 @@ async function uploadFiles(files) {
             }
 
             setTimeout(() => store.removeUpload(entryId), 1500)
-        } catch (err) {
-            const message = err?.body?.message ?? err?.message ?? 'Upload failed'
+        } catch (err: unknown) {
+            const error = err as { body?: { message?: string }; message?: string }
+            const message = error?.body?.message ?? error?.message ?? 'Upload failed'
             store.markUploadError(entryId, message)
         }
     }

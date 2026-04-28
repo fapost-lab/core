@@ -1,5 +1,5 @@
-<script setup>
-import { ref } from 'vue'
+<script setup lang="ts">
+import {ref} from 'vue'
 import MediaPickerModal from './MediaPickerModal.vue'
 
 /**
@@ -13,9 +13,9 @@ import MediaPickerModal from './MediaPickerModal.vue'
 
 const props = defineProps({
     /** Currently selected file, or null. */
-    value: { type: Object, default: null },
+    value: { type: Object as () => Record<string, unknown> | null, default: null },
     /** Optional kind filter passed to the modal. */
-    kind: { type: String, default: null },
+    kind: { type: String as () => string | null, default: null },
     placeholder: { type: String, default: 'Select a file…' },
 })
 
@@ -27,8 +27,15 @@ function openModal() {
     modalOpen.value = true
 }
 
-/** @param {PickedFile} file */
-function handleSelect(file) {
+interface PickedFile {
+    id: string
+    name: string
+    kind: string
+    preview_url: string | null
+    [key: string]: unknown
+}
+
+function handleSelect(file: PickedFile) {
     emit('update:value', file)
     modalOpen.value = false
 }
@@ -37,7 +44,7 @@ function clearSelection() {
     emit('update:value', null)
 }
 
-const isImage = (v) => v?.kind === 'image'
+const isImage = (v: Record<string, unknown> | null | undefined) => v?.kind === 'image'
 </script>
 
 <template>
@@ -47,8 +54,8 @@ const isImage = (v) => v?.kind === 'image'
             <div class="mp-selected-thumb">
                 <img
                     v-if="isImage(value) && value.preview_url"
-                    :src="value.preview_url"
-                    :alt="value.name"
+                    :src="value.preview_url as string"
+                    :alt="value.name as string"
                     class="mp-selected-img"
                 />
                 <svg
@@ -64,7 +71,7 @@ const isImage = (v) => v?.kind === 'image'
                     <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
             </div>
-            <span class="mp-selected-name" :title="value.name">{{ value.name }}</span>
+            <span class="mp-selected-name" :title="value.name as string">{{ value.name }}</span>
             <div class="mp-selected-actions">
                 <button type="button" class="mp-btn mp-btn--ghost" @click="openModal">Change</button>
                 <button type="button" class="mp-btn mp-btn--ghost mp-btn--danger" @click="clearSelection">×</button>
@@ -82,7 +89,7 @@ const isImage = (v) => v?.kind === 'image'
         <MediaPickerModal
             :open="modalOpen"
             :kind="kind"
-            :selected-file-id="value?.id ?? null"
+            :selected-file-id="(value?.id as string | null) ?? null"
             @close="modalOpen = false"
             @select="handleSelect"
         />

@@ -11,7 +11,7 @@ final class NamespaceResolverRegistry
 {
     /** @var array<string, NamespaceResolverInterface> */
     private array $resolvers = [];
-    private bool $frozen = false;
+    private bool $frozen     = false;
 
     public function register(StateNamespace $namespace, NamespaceResolverInterface $resolver): void
     {
@@ -24,7 +24,7 @@ final class NamespaceResolverRegistry
 
     public function for(StateNamespace $namespace): NamespaceResolverInterface
     {
-        if (!isset($this->resolvers[$namespace->value])) {
+        if ( ! isset($this->resolvers[$namespace->value])) {
             throw new LogicException("No resolver registered for namespace '{$namespace->value}'");
         }
 
@@ -34,7 +34,7 @@ final class NamespaceResolverRegistry
     public function freeze(): void
     {
         foreach (StateNamespace::cases() as $namespace) {
-            if (!isset($this->resolvers[$namespace->value])) {
+            if ( ! isset($this->resolvers[$namespace->value])) {
                 throw new LogicException("No resolver registered for namespace '{$namespace->value}'");
             }
         }

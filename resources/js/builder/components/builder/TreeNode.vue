@@ -1,17 +1,18 @@
-<script setup>
-import { computed, inject, ref } from 'vue'
-import { useSelectionStore }  from '@builder/store/selectionStore'
-import { nodeColors }         from '@builder/utils/nodeColors'
+<script setup lang="ts">
+import {computed, inject, ref} from 'vue'
+import {useSelectionStore} from '@builder/store/selectionStore'
+import type {FlowNode} from '@builder/dto/types'
+import {nodeColors} from '@builder/utils/nodeColors'
 
 const props = defineProps({
-    node:     { type: Object,  required: true },
-    nodeMap:  { type: Object,  required: true },
+    node:     { type: Object as () => FlowNode, required: true },
+    nodeMap:  { type: Object as () => Record<string, FlowNode>, required: true },
     depth:    { type: Number,  default: 0 },
     isActive: { type: Boolean, default: false },
 })
 
 const selection    = useSelectionStore()
-const scrollToNode = inject('scrollToNode', null)
+const scrollToNode = inject<((id: string) => void) | null>('scrollToNode', null)
 const expanded     = ref(true)
 
 const colors = computed(() => nodeColors(props.node.type))
@@ -20,8 +21,8 @@ const colors = computed(() => nodeColors(props.node.type))
 const children = computed(() => {
     const outputs = props.node.outputs ?? {}
     return Object.entries(outputs)
-        .map(([key, out]) => ({ key, node: props.nodeMap[out?.next] ?? null }))
-        .filter((e) => e.node !== null)
+        .map(([key, out]) => ({ key, node: out?.next ? (props.nodeMap[out.next] ?? null) : null }))
+        .filter((e): e is { key: string; node: FlowNode } => e.node !== null)
 })
 
 function selectNode() {

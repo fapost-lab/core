@@ -8,23 +8,23 @@ use Spatie\LaravelSettings\Settings;
 
 final class TenantSettings extends Settings
 {
-    public int $messaging_rate_limit;
+    public int $messaging_rate_limit = 30;
 
-    public int $broadcast_chunk_size;
+    public int $broadcast_chunk_size = 100;
 
-    public bool $broadcast_backpressure;
+    public bool $broadcast_backpressure = true;
 
-    public int $flow_session_ttl;
+    public int $flow_session_ttl = 86400;
 
-    public int $max_retry_attempts;
+    public int $max_retry_attempts = 3;
 
-    public string $flow_fallback_message;
+    public string $flow_fallback_message = 'An error occurred. Please try again later.';
 
-    public int $webhook_timeout;
+    public int $webhook_timeout = 10;
 
-    public int $webhook_rate_limit;
+    public int $webhook_rate_limit = 60;
 
-    public int $max_contacts;
+    public int $max_contacts = 0;
 
     public string $content_base_language = 'en';
 

@@ -1,8 +1,10 @@
-<script setup>
+<script setup lang="ts">
 import ContentKeyItem from './ContentKeyItem.vue'
 
+interface ContentKeyEntry { key: string; translationCount?: number }
+
 defineProps({
-    keys:        { type: Array,  default: () => [] },
+    keys:        { type: Array as () => ContentKeyEntry[], default: () => [] },
     selectedKey: { type: String, default: null },
     languages:   { type: Array,  default: () => [] },
 })

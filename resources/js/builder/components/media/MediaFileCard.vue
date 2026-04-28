@@ -1,5 +1,5 @@
-<script setup>
-import { computed } from 'vue'
+<script setup lang="ts">
+import {computed} from 'vue'
 
 const props = defineProps({
     file: { type: Object, required: true },
@@ -15,8 +15,8 @@ const previewUrl = computed(() => props.file.preview?.signed_url ?? null)
  * SVG paths for common heroicon names used in preview metadata.
  * @param {string} icon
  */
-function iconPath(icon) {
-    const paths = {
+function iconPath(icon: string): string {
+    const paths: Record<string, string> = {
         'document': 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z',
         'film': 'M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75.125v-10.5c0-.621.504-1.125 1.125-1.125h1.5c.621 0 1.125.504 1.125 1.125v10.5m0 0c0 .621.504 1.125 1.125 1.125h10.5c.621 0 1.125-.504 1.125-1.125m0-11.25V6.375c0-.621-.504-1.125-1.125-1.125H6.375A1.125 1.125 0 005.25 6.375v1.875M21 19.5h-1.5a1.125 1.125 0 01-1.125-1.125V9m0 10.5c0 .621-.504 1.125-1.125 1.125',
         'musical-note': 'M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 11-.99-3.467l2.31-.66a2.25 2.25 0 001.632-2.163zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 01-1.632 2.163l-1.32.377a1.803 1.803 0 01-.99-3.467l2.31-.66A2.25 2.25 0 009 15.553z',

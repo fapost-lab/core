@@ -1,12 +1,13 @@
-<script setup>
-import { computed } from 'vue'
-import { useBuilderStore } from '@builder/store/builderStore'
+<script setup lang="ts">
+import {computed} from 'vue'
+import {useBuilderStore} from '@builder/store/builderStore'
+import type {FlowNode} from '@builder/dto/types'
 import TreeNode from './TreeNode.vue'
 
 const builder = useBuilderStore()
 
-const nodeMap = computed(() => {
-    const map = {}
+const nodeMap = computed((): Record<string, FlowNode> => {
+    const map: Record<string, FlowNode> = {}
     for (const n of builder.definition.nodes) {
         map[n.id] = n
     }

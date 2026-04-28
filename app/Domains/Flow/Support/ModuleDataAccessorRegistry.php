@@ -30,7 +30,7 @@ final class ModuleDataAccessorRegistry implements DataAccessorRegistryInterface,
             throw new LogicException("Namespace prefix '{$namespacePrefix}' is reserved by engine.");
         }
 
-        if (!str_starts_with($namespacePrefix, 'module.')) {
+        if ( ! str_starts_with($namespacePrefix, 'module.')) {
             throw new LogicException(
                 "Namespace prefix '{$namespacePrefix}' must start with 'module.'."
             );
@@ -45,7 +45,7 @@ final class ModuleDataAccessorRegistry implements DataAccessorRegistryInterface,
 
     public function resolve(string $namespacePrefix): DataAccessorInterface
     {
-        if (!$this->has($namespacePrefix)) {
+        if ( ! $this->has($namespacePrefix)) {
             throw new UnknownDataAccessorNamespacePrefixException(
                 "No data accessor registered for namespace prefix '{$namespacePrefix}'."
             );

@@ -1,27 +1,33 @@
-<script setup>
-import { computed } from 'vue'
+<script setup lang="ts">
+import {computed} from 'vue'
+
+interface Language { code: string; name: string }
 
 const props = defineProps({
     contentKey:   { type: String, default: null },
-    translations: { type: Object, default: () => ({}) },
-    languages:    { type: Array,  default: () => [] },
+    translations: { type: Object as () => Record<string, string>, default: () => ({}) },
+    languages:    { type: Array as () => Language[], default: () => [] },
 })
 
 const emit = defineEmits(['update', 'save', 'delete'])
 
-const FLAG_MAP = {
+const FLAG_MAP: Record<string, string> = {
     uk: '🇺🇦', en: '🇬🇧', ru: '🇷🇺', pl: '🇵🇱',
     de: '🇩🇪', fr: '🇫🇷', es: '🇪🇸', it: '🇮🇹',
 }
 
-function flag(code) { return FLAG_MAP[code] ?? '🌐' }
+function flag(code: string) { return FLAG_MAP[code] ?? '🌐' }
 
-function onInput(langCode, value) {
+function onInput(langCode: string, value: string) {
     emit('update', props.contentKey, langCode, value)
 }
 
+function onTextareaInput(langCode: string, e: Event) {
+    onInput(langCode, (e.target as HTMLTextAreaElement).value)
+}
+
 const translatedCount = computed(() =>
-    props.languages.filter((l) => props.translations[l.code]?.trim()).length,
+    props.languages.filter((l: Language) => props.translations[l.code]?.trim()).length,
 )
 </script>
 
@@ -63,21 +69,21 @@ const translatedCount = computed(() =>
 
             <div
                 v-for="lang in languages"
-                :key="lang.code"
+                :key="(lang as Language).code"
                 class="lang-field"
             >
                 <div class="lang-label">
-                    <span class="lang-flag">{{ flag(lang.code) }}</span>
-                    {{ lang.name }}
+                    <span class="lang-flag">{{ flag((lang as Language).code) }}</span>
+                    {{ (lang as Language).name }}
                     <span class="char-count">
-                        {{ (translations[lang.code] ?? '').length }}
+                        {{ (translations[(lang as Language).code] ?? '').length }}
                     </span>
                 </div>
                 <textarea
                     class="lang-textarea"
                     rows="3"
-                    :value="translations[lang.code] ?? ''"
-                    @input="onInput(lang.code, $event.target.value)"
+                    :value="translations[(lang as Language).code] ?? ''"
+                    @input="onTextareaInput((lang as Language).code, $event)"
                 />
             </div>
         </div>

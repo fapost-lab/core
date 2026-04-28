@@ -1,21 +1,23 @@
-<script setup>
-import { onMounted, ref } from 'vue'
-import { useEventListener } from '@vueuse/core'
-import { useBuilderStore }  from '@builder/store/builderStore'
-import { useRegistryStore } from '@builder/store/registryStore'
-import { useAutoSave }      from '@builder/composables/useAutoSave'
-import { useValidation }    from '@builder/composables/useValidation'
-import { usePublish }       from '@builder/composables/usePublish'
-import AppTopBar            from '@builder/components/AppTopBar.vue'
-import FlowStructure        from '@builder/components/editor/FlowStructure.vue'
-import FlowSequence         from '@builder/components/editor/FlowSequence.vue'
-import ConfigPanel          from '@builder/components/editor/ConfigPanel.vue'
-import ContentTab           from '@builder/components/content/ContentTab.vue'
-import ValidationPanel      from '@builder/components/editor/ValidationPanel.vue'
+<script setup lang="ts">
+import {onMounted, ref} from 'vue'
+import {useEventListener} from '@vueuse/core'
+import {useBuilderStore} from '@builder/store/builderStore'
+import {useRegistryStore} from '@builder/store/registryStore'
+import {useAutoSave} from '@builder/composables/useAutoSave'
+import {useValidation} from '@builder/composables/useValidation'
+import {usePublish} from '@builder/composables/usePublish'
+import AppTopBar from '@builder/components/AppTopBar.vue'
+import FlowStructure from '@builder/components/editor/FlowStructure.vue'
+import FlowSequence from '@builder/components/editor/FlowSequence.vue'
+import ConfigPanel from '@builder/components/editor/ConfigPanel.vue'
+import ContentTab from '@builder/components/content/ContentTab.vue'
+import ValidationPanel from '@builder/components/editor/ValidationPanel.vue'
+
+import type {BuilderFlowPayload} from '@builder/dto/types'
 
 const props = defineProps({
-    flow:    { type: Object, required: true },
-    backUrl: { type: String, default: null },
+    flow:    { type: Object as () => BuilderFlowPayload, required: true },
+    backUrl: { type: String as () => string | null, default: null },
 })
 
 const builderStore  = useBuilderStore()
@@ -25,7 +27,7 @@ const { validate }  = useValidation()
 const { publish }   = usePublish()
 const validating = ref(false)
 const publishing = ref(false)
-const publishedMsg = ref(null)
+const publishedMsg = ref<string | null>(null)
 
 builderStore.init(props.flow)
 

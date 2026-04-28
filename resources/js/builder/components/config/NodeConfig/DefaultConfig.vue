@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import ConfigField from '../ConfigField.vue'
 
 const props = defineProps({
@@ -8,7 +8,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
-function onFieldUpdate(key, value) {
+function onFieldUpdate(key: string, value: unknown) {
     emit('update:modelValue', { ...props.modelValue, [key]: value })
 }
 </script>

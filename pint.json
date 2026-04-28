@@ -84,5 +84,19 @@
       ],
       "sort_algorithm": "none"
     }
-  }
+  },
+  "exclude": [
+    "vendor",
+    "tools",
+    "database",
+    "bootstrap",
+    "storage",
+    "resources",
+    "config",
+    "public",
+    "routes",
+    "tests",
+    "docs",
+    "drafts"
+  ]
 }

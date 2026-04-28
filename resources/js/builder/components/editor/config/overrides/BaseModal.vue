@@ -1,6 +1,6 @@
-<script setup>
-import { useTemplateRef, watch } from 'vue'
-import { onClickOutside, useEventListener } from '@vueuse/core'
+<script setup lang="ts">
+import {useTemplateRef, watch} from 'vue'
+import {onClickOutside, useEventListener} from '@vueuse/core'
 
 const props = defineProps({
     open:  { type: Boolean, required: true },

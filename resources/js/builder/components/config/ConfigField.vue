@@ -1,35 +1,51 @@
-<script setup>
-import { computed } from 'vue'
+<script setup lang="ts">
+import {computed} from 'vue'
 
 const props = defineProps({
     fieldKey:   { type: String, required: true },
-    schema:     { type: Object, required: true },
+    schema:     { type: Object as () => Record<string, unknown>, required: true },
     modelValue: { default: undefined },
 })
 
 const emit = defineEmits(['update:modelValue'])
 
 const val = computed({
-    get: () => props.modelValue ?? props.schema.default ?? '',
+    get: () => props.modelValue ?? (props.schema as Record<string, unknown>).default ?? '',
     set: (v) => emit('update:modelValue', v),
 })
 
 function addItem() {
-    const arr = Array.isArray(props.modelValue) ? [...props.modelValue] : []
+    const arr: unknown[] = Array.isArray(props.modelValue) ? [...(props.modelValue as unknown[])] : []
     arr.push('')
     emit('update:modelValue', arr)
 }
 
-function removeItem(i) {
-    const arr = [...(props.modelValue ?? [])]
+function removeItem(i: number) {
+    const arr: unknown[] = Array.isArray(props.modelValue) ? [...(props.modelValue as unknown[])] : []
     arr.splice(i, 1)
     emit('update:modelValue', arr)
 }
 
-function updateItem(i, v) {
-    const arr = [...(props.modelValue ?? [])]
+function updateItem(i: number, v: unknown) {
+    const arr: unknown[] = Array.isArray(props.modelValue) ? [...(props.modelValue as unknown[])] : []
     arr[i] = v
     emit('update:modelValue', arr)
+}
+
+function onInputText(e: Event) {
+    val.value = (e.target as HTMLInputElement).value
+}
+
+function onInputNumber(e: Event) {
+    val.value = Number((e.target as HTMLInputElement).value)
+}
+
+function onChangeSelect(e: Event) {
+    val.value = (e.target as HTMLSelectElement).value
+}
+
+function onUpdateItem(i: number, e: Event) {
+    updateItem(i, (e.target as HTMLInputElement).value)
 }
 </script>
 
@@ -44,9 +60,9 @@ function updateItem(i, v) {
         <template v-if="schema.type === 'text'">
             <textarea
                 class="field-input"
-                :placeholder="schema.placeholder ?? ''"
-                :value="val"
-                @input="val = $event.target.value"
+                :placeholder="(schema.placeholder as string) ?? ''"
+                :value="val as string"
+                @input="onInputText"
             />
         </template>
 
@@ -55,9 +71,9 @@ function updateItem(i, v) {
                 type="text"
                 class="field-input"
                 :class="{ mono: schema.type === 'state-picker' }"
-                :placeholder="schema.placeholder ?? ''"
-                :value="val"
-                @input="val = $event.target.value"
+                :placeholder="(schema.placeholder as string) ?? ''"
+                :value="val as string"
+                @input="onInputText"
             />
         </template>
 
@@ -66,16 +82,16 @@ function updateItem(i, v) {
                 type="number"
                 class="field-input"
                 style="width:120px"
-                :placeholder="schema.placeholder ?? ''"
-                :value="val"
-                @input="val = Number($event.target.value)"
+                :placeholder="(schema.placeholder as string) ?? ''"
+                :value="val as number"
+                @input="onInputNumber"
             />
         </template>
 
         <template v-else-if="schema.type === 'enum'">
-            <select class="field-input" :value="val" @change="val = $event.target.value">
+            <select class="field-input" :value="val as string" @change="onChangeSelect">
                 <option
-                    v-for="opt in schema.options"
+                    v-for="opt in (schema.options as string[])"
                     :key="opt"
                     :value="opt"
                 >
@@ -86,12 +102,12 @@ function updateItem(i, v) {
 
         <!-- array of strings -->
         <template v-else-if="schema.type === 'array'">
-            <div v-for="(item, i) in (modelValue ?? [])" :key="i" class="array-row">
+            <div v-for="(item, i) in (Array.isArray(modelValue) ? modelValue as unknown[] : [])" :key="i" class="array-row">
                 <input
                     type="text"
                     class="field-input"
-                    :value="item"
-                    @input="updateItem(i, $event.target.value)"
+                    :value="item as string"
+                    @input="onUpdateItem(i, $event)"
                 />
                 <button type="button" class="del-btn" @click="removeItem(i)">×</button>
             </div>
@@ -100,12 +116,12 @@ function updateItem(i, v) {
 
         <!-- repeater (generic — rows are strings; specialised repeaters live in NodeConfig/*) -->
         <template v-else-if="schema.type === 'repeater'">
-            <div v-for="(item, i) in (modelValue ?? [])" :key="i" class="array-row">
+            <div v-for="(item, i) in (Array.isArray(modelValue) ? modelValue as unknown[] : [])" :key="i" class="array-row">
                 <input
                     type="text"
                     class="field-input"
-                    :value="typeof item === 'object' ? JSON.stringify(item) : item"
-                    @input="updateItem(i, $event.target.value)"
+                    :value="typeof item === 'object' ? JSON.stringify(item) : item as string"
+                    @input="onUpdateItem(i, $event)"
                 />
                 <button type="button" class="del-btn" @click="removeItem(i)">×</button>
             </div>
@@ -116,8 +132,8 @@ function updateItem(i, v) {
             <input
                 type="text"
                 class="field-input"
-                :value="val"
-                @input="val = $event.target.value"
+                :value="val as string"
+                @input="onInputText"
             />
         </template>
     </div>

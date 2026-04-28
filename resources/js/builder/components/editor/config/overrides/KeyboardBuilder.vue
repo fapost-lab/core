@@ -1,8 +1,16 @@
-<script setup>
-import { computed, ref } from 'vue'
+<script setup lang="ts">
+import {computed, ref} from 'vue'
+
+interface KbButton {
+    id: string
+    label?: unknown
+    row?: number
+    order?: number
+    [key: string]: unknown
+}
 
 const props = defineProps({
-    buttons: { type: Array, required: true },
+    buttons: { type: Array as () => KbButton[], required: true },
 })
 
 const emit = defineEmits(['update'])
@@ -12,25 +20,25 @@ const MIN_DIM  = 1
 const MAX_DIM  = 10
 
 // Initialise from existing button positions
-function initDim(axis) {
-    const vals = props.buttons.map(b => axis === 'col' ? (b.order ?? 0) : (b.row ?? 0))
-        .filter(n => n < UNPLACED)
+function initDim(axis: string): number {
+    const vals = props.buttons.map((b: KbButton) => axis === 'col' ? (b.order ?? 0) : (b.row ?? 0))
+        .filter((n: number) => n < UNPLACED)
     return Math.min(MAX_DIM, Math.max(MIN_DIM, vals.length > 0 ? Math.max(...vals) + 1 : axis === 'col' ? 2 : 1))
 }
 
 const cols = ref(initDim('col'))
 const rows = ref(initDim('row'))
 
-function resolveLabel(btn) {
+function resolveLabel(btn: KbButton): string {
     const lbl = btn?.label
     if (!lbl) return '…'
-    return typeof lbl === 'object' ? (Object.values(lbl)[0] || '…') : String(lbl) || '…'
+    return typeof lbl === 'object' ? (Object.values(lbl as Record<string, unknown>)[0] as string || '…') : String(lbl) || '…'
 }
 
-const btnMap = computed(() => Object.fromEntries(props.buttons.map(b => [b.id, b])))
+const btnMap = computed((): Record<string, KbButton> => Object.fromEntries(props.buttons.map((b: KbButton) => [b.id, b])))
 
 const grid = computed(() => {
-    const g = Array.from({ length: rows.value }, () => Array(cols.value).fill(null))
+    const g: (string | null)[][] = Array.from({ length: rows.value }, () => Array(cols.value).fill(null))
     for (const btn of props.buttons) {
         const r = btn.row ?? 0
         const c = btn.order ?? 0
@@ -41,31 +49,31 @@ const grid = computed(() => {
     return g
 })
 
-const unplaced = computed(() =>
-    props.buttons.filter(b => (b.order ?? UNPLACED) >= cols.value || (b.row ?? 0) >= rows.value),
+const unplaced = computed((): KbButton[] =>
+    props.buttons.filter((b: KbButton) => (b.order ?? UNPLACED) >= cols.value || (b.row ?? 0) >= rows.value),
 )
 
 // ── Dim controls ─────────────────────────────────────────────────────────────
-function ejectOutOfBounds(nextCols, nextRows) {
-    const next = props.buttons.map(b => {
+function ejectOutOfBounds(nextCols: number, nextRows: number) {
+    const next = props.buttons.map((b: KbButton) => {
         const c = b.order ?? UNPLACED
         const r = b.row ?? 0
         if (c >= nextCols || r >= nextRows) return { ...b, order: UNPLACED }
         return { ...b }
     })
-    if (next.some((b, i) => b.order !== props.buttons[i].order)) {
+    if (next.some((b: KbButton, i: number) => b.order !== props.buttons[i].order)) {
         emit('update', next)
     }
 }
 
-function setCols(delta) {
+function setCols(delta: number) {
     const next = Math.min(MAX_DIM, Math.max(MIN_DIM, cols.value + delta))
     if (next === cols.value) return
     cols.value = next
     ejectOutOfBounds(next, rows.value)
 }
 
-function setRows(delta) {
+function setRows(delta: number) {
     const next = Math.min(MAX_DIM, Math.max(MIN_DIM, rows.value + delta))
     if (next === rows.value) return
     rows.value = next
@@ -73,38 +81,38 @@ function setRows(delta) {
 }
 
 // ── Drag & drop ──────────────────────────────────────────────────────────────
-const dragId  = ref(null)
-const overKey = ref(null)
+const dragId  = ref<string | null>(null)
+const overKey = ref<string | null>(null)
 
-function onDragStart(id, e) {
+function onDragStart(id: string, e: DragEvent) {
     dragId.value = id
-    e.dataTransfer.effectAllowed = 'move'
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move'
 }
 function onDragEnd() { dragId.value = null; overKey.value = null }
 
-function onDragOverCell(e, r, c) {
+function onDragOverCell(e: DragEvent, r: number, c: number) {
     e.preventDefault()
     overKey.value = `${r}-${c}`
 }
-function onDragOverUnplaced(e) { e.preventDefault(); overKey.value = 'unplaced' }
-function onDragLeave(key)       { if (overKey.value === key) overKey.value = null }
+function onDragOverUnplaced(e: DragEvent) { e.preventDefault(); overKey.value = 'unplaced' }
+function onDragLeave(key: string)       { if (overKey.value === key) overKey.value = null }
 
-function isCellOver(r, c) { return overKey.value === `${r}-${c}` }
+function isCellOver(r: number, c: number) { return overKey.value === `${r}-${c}` }
 function isUnplacedOver()  { return overKey.value === 'unplaced' }
 
-function onDropCell(r, c) {
+function onDropCell(r: number, c: number) {
     const srcId = dragId.value
     if (!srcId) return
 
     const occupantId = grid.value[r]?.[c] ?? null
     if (srcId === occupantId) { onDragEnd(); return }
 
-    const next = props.buttons.map(b => ({ ...b }))
-    const src  = next.find(b => b.id === srcId)
+    const next = props.buttons.map((b: KbButton) => ({ ...b }))
+    const src  = next.find((b: KbButton) => b.id === srcId)
     if (!src) { onDragEnd(); return }
 
     if (occupantId) {
-        const occ = next.find(b => b.id === occupantId)
+        const occ = next.find((b: KbButton) => b.id === occupantId)
         if (occ) { occ.row = src.row ?? 0; occ.order = src.order ?? UNPLACED }
     }
 
@@ -118,7 +126,7 @@ function onDropCell(r, c) {
 function onDropUnplaced() {
     const srcId = dragId.value
     if (!srcId) return
-    emit('update', props.buttons.map(b => b.id === srcId ? { ...b, row: 0, order: UNPLACED } : { ...b }))
+    emit('update', props.buttons.map((b: KbButton) => b.id === srcId ? { ...b, row: 0, order: UNPLACED } : { ...b }))
     onDragEnd()
 }
 </script>

@@ -1,3 +1,5 @@
+import {xsrfHeaders} from '@shared/http'
+
 const BASE = '/media'
 
 export interface PickerFilePreview {
@@ -40,30 +42,6 @@ interface MediaApiError extends Error {
     body: unknown
 }
 
-function getCookie(name: string): string {
-    const raw =
-        document.cookie
-            .split('; ')
-            .find((row) => row.startsWith(`${name}=`))
-            ?.split('=')
-            .slice(1)
-            .join('=') ?? ''
-
-    if (!raw) {
-        return ''
-    }
-
-    try {
-        return decodeURIComponent(raw)
-    } catch {
-        return raw
-    }
-}
-
-function xsrfToken(): string {
-    return getCookie('XSRF-TOKEN')
-}
-
 export async function fetchPickerContents(
     folderId: string | null,
     kind: string | null,
@@ -79,10 +57,7 @@ export async function fetchPickerContents(
     }
 
     const res = await fetch(`${BASE}/picker/contents?${params}`, {
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-XSRF-TOKEN': xsrfToken(),
-        },
+        headers: xsrfHeaders(),
     })
 
     if (!res.ok) {
@@ -93,7 +68,7 @@ export async function fetchPickerContents(
         }) as MediaApiError
     }
 
-    return res.json() as Promise<PickerContentsResponse>
+    return await res.json() as Promise<PickerContentsResponse>
 }
 
 /** Upload a file via XHR so upload progress events are available. */
@@ -115,8 +90,8 @@ export function uploadMediaFile(
         const xhr = new XMLHttpRequest()
 
         xhr.open('POST', `${BASE}/files`)
-        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest')
-        xhr.setRequestHeader('X-XSRF-TOKEN', xsrfToken())
+        const headers = xsrfHeaders()
+        Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v))
 
         xhr.upload.addEventListener('progress', (e) => {
             if (e.lengthComputable) {

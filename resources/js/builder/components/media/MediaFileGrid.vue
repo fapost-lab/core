@@ -1,10 +1,16 @@
-<script setup>
+<script setup lang="ts">
 import MediaFileCard from './MediaFileCard.vue'
 
+interface MediaFile {
+    id: string
+    name: string
+    [key: string]: unknown
+}
+
 defineProps({
-    files: { type: Array, default: () => [] },
+    files: { type: Array as () => MediaFile[], default: () => [] },
     loading: { type: Boolean, default: false },
-    selectedFileId: { type: String, default: null },
+    selectedFileId: { type: String as () => string | null, default: null },
 })
 
 const emit = defineEmits(['select'])

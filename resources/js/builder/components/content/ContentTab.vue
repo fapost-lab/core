@@ -1,11 +1,11 @@
-<script setup>
-import { computed, ref } from 'vue'
-import { useBuilderStore } from '@builder/store/builderStore'
+<script setup lang="ts">
+import {computed, ref} from 'vue'
+import {useBuilderStore} from '@builder/store/builderStore'
 import ContentEditorPanel from './ContentEditorPanel.vue'
 
 const builderStore = useBuilderStore()
 
-const LANGUAGE_NAMES = {
+const LANGUAGE_NAMES: Record<string, string> = {
     uk: 'Ukrainian', en: 'English', ru: 'Russian', pl: 'Polish',
     de: 'German', fr: 'French', es: 'Spanish', it: 'Italian',
 }
@@ -31,7 +31,7 @@ const contentEntries = computed(() => {
         const label  = node.label ?? type
 
         if (type === 'send_message') {
-            const ct = config.content_type ?? 'text'
+            const ct = String(config.content_type ?? 'text')
 
             if (ct === 'text' || ct === 'text_with_keyboard') {
                 entries.push({
@@ -55,11 +55,11 @@ const contentEntries = computed(() => {
                 })
             }
 
-            const buttons = Array.isArray(config.buttons) ? config.buttons : []
-            buttons.forEach((btn, idx) => {
+            const buttons = Array.isArray(config.buttons) ? config.buttons as Array<Record<string, unknown>> : []
+            buttons.forEach((btn: Record<string, unknown>, idx: number) => {
                 const raw = btn.label ?? ''
                 const baseText = typeof raw === 'object'
-                    ? (raw[builderStore.contentBaseLanguage] ?? Object.values(raw)[0] ?? '')
+                    ? ((raw as Record<string, unknown>)[builderStore.contentBaseLanguage] as string ?? Object.values(raw as Record<string, unknown>)[0] as string ?? '')
                     : String(raw)
                 entries.push({
                     key:        `${node.id}.buttons.${idx}.label`,
@@ -90,26 +90,26 @@ const groupedEntries = computed(() => {
     return [...groups.values()]
 })
 
-function resolveValues(raw) {
+function resolveValues(raw: unknown): Record<string, string> {
     if (raw === null || raw === undefined) return {}
-    if (typeof raw === 'object') return { ...raw }
+    if (typeof raw === 'object') return { ...(raw as Record<string, string>) }
     // plain string — treat as base language value
     return { [builderStore.contentBaseLanguage]: String(raw) }
 }
 
-const selectedKey = ref(null)
+const selectedKey = ref<string | null>(null)
 const selectedEntry = computed(() => contentEntries.value.find((e) => e.key === selectedKey.value) ?? null)
 
-const localTranslations = ref({})
+const localTranslations = ref<Record<string, string>>({})
 
-function selectEntry(key) {
+function selectEntry(key: string) {
     if (selectedKey.value === key) return
     selectedKey.value = key
     const entry = contentEntries.value.find((e) => e.key === key)
     localTranslations.value = entry ? { ...entry.values } : {}
 }
 
-function onUpdate(key, langCode, value) {
+function onUpdate(key: string, langCode: string, value: string) {
     localTranslations.value[langCode] = value
 }
 
@@ -132,8 +132,8 @@ function onSave() {
         config.caption = { ...localTranslations.value }
     } else if (parts[0] === 'buttons' && parts[2] === 'label') {
         const idx = Number(parts[1])
-        const buttons = [...(config.buttons ?? [])]
-        buttons[idx] = { ...buttons[idx], label: { ...localTranslations.value } }
+        const buttons = [...(Array.isArray(config.buttons) ? config.buttons as Array<Record<string, unknown>> : [])]
+        buttons[idx] = { ...(buttons[idx] as Record<string, unknown>), label: { ...localTranslations.value } }
         config.buttons = buttons
     }
 
@@ -169,7 +169,7 @@ function onSave() {
 
         <!-- Right: translation editor -->
         <ContentEditorPanel
-            :content-key="selectedEntry?.fieldLabel ?? null"
+            :content-key="selectedEntry?.fieldLabel ?? undefined"
             :translations="localTranslations"
             :languages="languages"
             @update="onUpdate"

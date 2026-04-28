@@ -1,11 +1,21 @@
-<script setup>
-import { computed, ref } from 'vue'
+<script setup lang="ts">
+import {computed, ref} from 'vue'
 import QuickAddButtonsModal from './QuickAddButtonsModal.vue'
 import KeyboardLayoutModal from './KeyboardLayoutModal.vue'
 import VariablePicker from '../VariablePicker.vue'
 
+interface KbButton {
+    id: string
+    label?: unknown
+    row?: number
+    order?: number
+    type?: string
+    value?: string
+    [key: string]: unknown
+}
+
 const props = defineProps({
-    buttons:         { type: Array,   required: true },
+    buttons:         { type: Array as () => KbButton[], required: true },
     isReplyKeyboard: { type: Boolean, default: false },
     saveToType:      { type: String,  default: 'string' },
 })
@@ -15,27 +25,24 @@ const emit = defineEmits(['update'])
 const UNPLACED = 999
 
 // ── Derive flat list + row sizes ─────────────────────────────────────────────
-// Buttons are sorted by (row, order) into a flat sequence. Row boundaries are
-// preserved through `rowSizes`, an array of row lengths. The main list shows
-// the flat sequence with subtle separators between rows.
 const flat = computed(() => {
-    const groups = new Map()
+    const groups = new Map<number, KbButton[]>()
     for (const btn of props.buttons) {
         const r = clampRow(btn?.row)
         if (!groups.has(r)) groups.set(r, [])
-        groups.get(r).push(btn)
+        groups.get(r)!.push(btn)
     }
     const sortedKeys = [...groups.keys()].sort((a, b) => a - b)
-    const result = []
+    const result: { btn: KbButton; rowIdx: number }[] = []
     sortedKeys.forEach((k, rowIdx) => {
-        const sorted = [...groups.get(k)].sort((a, b) => (a.order ?? UNPLACED) - (b.order ?? UNPLACED))
+        const sorted = [...groups.get(k)!].sort((a, b) => (a.order ?? UNPLACED) - (b.order ?? UNPLACED))
         sorted.forEach((btn) => result.push({ btn, rowIdx }))
     })
     return result
 })
 
 const rowSizes = computed(() => {
-    const sizes = []
+    const sizes: number[] = []
     let current = -1
     for (const { rowIdx } of flat.value) {
         if (rowIdx !== current) { sizes.push(0); current = rowIdx }
@@ -44,19 +51,17 @@ const rowSizes = computed(() => {
     return sizes
 })
 
-function clampRow(v) { return Number.isInteger(v) ? v : 0 }
+function clampRow(v: unknown): number { return Number.isInteger(v) ? (v as number) : 0 }
 
 // ── Mutations ────────────────────────────────────────────────────────────────
-function emitFlat(newFlatBtns, sizes) {
-    // Re-pack flat list into rows of given sizes, renumber (row, order).
-    const out = []
+function emitFlat(newFlatBtns: KbButton[], sizes: number[]) {
+    const out: KbButton[] = []
     let i = 0
     sizes.forEach((sz, rowIdx) => {
         for (let o = 0; o < sz && i < newFlatBtns.length; o++, i++) {
             out.push({ ...newFlatBtns[i], row: rowIdx, order: o })
         }
     })
-    // If sizes don't cover all buttons (shouldn't happen), append to last row.
     while (i < newFlatBtns.length) {
         const lastRow = sizes.length - 1
         const orderInRow = (sizes[lastRow] ?? 0)
@@ -73,7 +78,7 @@ function addButton() {
     const lastRow = sizes.length - 1
     sizes[lastRow]++
 
-    const newBtn = {
+    const newBtn: KbButton = {
         id:    crypto.randomUUID(),
         type:  props.isReplyKeyboard ? 'reply' : 'callback',
         label: '',
@@ -83,32 +88,26 @@ function addButton() {
     emitFlat(newFlat, sizes)
 }
 
-function updateButton(flatIdx, patch) {
+function updateButton(flatIdx: number, patch: Partial<KbButton>) {
     const newFlat = flat.value.map(({ btn }, i) => (i === flatIdx ? { ...btn, ...patch } : btn))
     emitFlat(newFlat, [...rowSizes.value])
 }
 
-function removeButton(flatIdx) {
+function removeButton(flatIdx: number) {
     const sizes = [...rowSizes.value]
-    // Decrement size of the row this button belongs to.
     const rowIdx = flat.value[flatIdx]?.rowIdx ?? 0
     sizes[rowIdx] = Math.max(0, (sizes[rowIdx] ?? 0) - 1)
-    // Drop empty trailing rows.
     const cleanedSizes = sizes.filter((s) => s > 0)
 
     const newFlat = flat.value.filter((_, i) => i !== flatIdx).map(({ btn }) => btn)
     emitFlat(newFlat, cleanedSizes)
 }
 
-function applyLayout(updatedButtons) {
-    // Layout modal returns buttons with updated row/order. Trust them and pass
-    // through to parent — emitFlat would re-normalize and lose intentional
-    // empty cells/UNPLACED markers.
+function applyLayout(updatedButtons: KbButton[]) {
     emit('update', updatedButtons)
 }
 
-function applyQuickAdd(newButtons) {
-    // Append all new chips to the end of the last row.
+function applyQuickAdd(newButtons: KbButton[]) {
     const sizes = [...rowSizes.value]
     if (sizes.length === 0) sizes.push(0)
     const lastRow = sizes.length - 1
@@ -119,18 +118,16 @@ function applyQuickAdd(newButtons) {
 }
 
 // ── Vertical drag ────────────────────────────────────────────────────────────
-// Each row is its own drop target. Mouse Y relative to the row's midpoint
-// decides whether the dragged button lands above or below that row. Tiny
-// fixed drop slots between rows were unreliable — full-row targets give us
-// the entire row height (~36px) to aim at.
-const dragIdx = ref(null)
-const overIdx = ref(null)
-const overPos = ref(null) // 'before' | 'after'
+const dragIdx = ref<number | null>(null)
+const overIdx = ref<number | null>(null)
+const overPos = ref<'before' | 'after' | null>(null)
 
-function onDragStart(idx, e) {
+function onDragStart(idx: number, e: DragEvent) {
     dragIdx.value = idx
-    e.dataTransfer.effectAllowed = 'move'
-    try { e.dataTransfer.setData('text/plain', String(idx)) } catch { /* Safari quirk */ }
+    if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move'
+        try { e.dataTransfer.setData('text/plain', String(idx)) } catch { /* Safari quirk */ }
+    }
 }
 
 function onDragEnd() {
@@ -139,18 +136,18 @@ function onDragEnd() {
     overPos.value = null
 }
 
-function onRowDragOver(idx, e) {
+function onRowDragOver(idx: number, e: DragEvent) {
     if (dragIdx.value === null) return
     e.preventDefault()
-    const rect = e.currentTarget.getBoundingClientRect()
-    const pos = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const pos: 'before' | 'after' = e.clientY < rect.top + rect.height / 2 ? 'before' : 'after'
     if (overIdx.value !== idx || overPos.value !== pos) {
         overIdx.value = idx
         overPos.value = pos
     }
 }
 
-function onRowDrop(idx) {
+function onRowDrop(idx: number) {
     const src = dragIdx.value
     if (src === null) return onDragEnd()
 
@@ -166,31 +163,31 @@ function onRowDrop(idx) {
     onDragEnd()
 }
 
-function resolveLabel(btn) {
+function resolveLabel(btn: KbButton): string {
     const lbl = btn?.label
-    if (typeof lbl === 'object' && lbl !== null) return Object.values(lbl)[0] ?? ''
-    return lbl ?? ''
+    if (typeof lbl === 'object' && lbl !== null) return String(Object.values(lbl as Record<string, unknown>)[0] ?? '')
+    return String(lbl ?? '')
 }
 
 // ── Drop-insert ───────────────────────────────────────────────────────────────
-function dropInsert(e, currentValue) {
+function dropInsert(e: DragEvent, currentValue: string): string | null {
     e.preventDefault()
-    const snippet = e.dataTransfer.getData('text/plain')
+    const snippet = e.dataTransfer?.getData('text/plain')
     if (!snippet) return null
-    const el = e.target
+    const el = e.target as HTMLInputElement
     const at = el.selectionStart ?? currentValue.length
     return currentValue.slice(0, at) + snippet + currentValue.slice(el.selectionEnd ?? at)
 }
 
 // ── Validation ───────────────────────────────────────────────────────────────
-function checkValueType(value) {
+function checkValueType(value: string): string | null {
     if (!value || value === '') return null
     if (props.saveToType === 'number' && Number.isNaN(Number(value))) return 'Must be a number'
     if (props.saveToType === 'boolean' && value !== 'true' && value !== 'false') return 'Must be "true" or "false"'
     return null
 }
 
-function valuePlaceholder() {
+function valuePlaceholder(): string {
     if (props.saveToType === 'number') return 'e.g. 42'
     if (props.saveToType === 'boolean') return 'true or false'
     return 'Saved to flow state'
@@ -261,8 +258,8 @@ const layoutOpen   = ref(false)
                             class="field-input kl-input"
                             :value="resolveLabel(item.btn)"
                             placeholder="Label"
-                            @input="updateButton(idx, { label: $event.target.value })"
-                            @drop="e => { const s = dropInsert(e, resolveLabel(item.btn)); if (s !== null) updateButton(idx, { label: s }) }"
+                            @input="updateButton(idx, { label: ($event.target as HTMLInputElement).value })"
+                            @drop="(e: DragEvent) => { const s = dropInsert(e, resolveLabel(item.btn)); if (s !== null) updateButton(idx, { label: s }) }"
                         >
                         <input
                             v-if="!isReplyKeyboard"
@@ -270,7 +267,7 @@ const layoutOpen   = ref(false)
                             :class="{ 'kl-input--invalid': checkValueType(item.btn.value ?? '') }"
                             :value="item.btn.value ?? ''"
                             :placeholder="valuePlaceholder()"
-                            @input="updateButton(idx, { value: $event.target.value })"
+                            @input="updateButton(idx, { value: ($event.target as HTMLInputElement).value })"
                         >
                     </div>
 

@@ -43,7 +43,7 @@ final class EditRole extends EditRecord
     {
         return [
             DeleteAction::make()
-                ->visible(fn(): bool => !$this->getRecord()->is_system),
+                ->visible(fn (): bool => ! $this->getRecord()->is_system),
         ];
     }
 }

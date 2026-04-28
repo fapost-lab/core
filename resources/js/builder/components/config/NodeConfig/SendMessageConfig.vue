@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import SendMessageConfig from '../../editor/config/overrides/SendMessageConfig.vue'
 
 const props = defineProps({

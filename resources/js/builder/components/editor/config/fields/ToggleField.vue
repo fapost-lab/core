@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 defineProps({
     value: { type: Boolean, default: false },
     schema: { type: Object, default: () => ({}) },
@@ -13,7 +13,7 @@ defineEmits(['update:value'])
             type="checkbox"
             class="rounded"
             :checked="value"
-            @change="$emit('update:value', $event.target.checked)"
+            @change="$emit('update:value', ($event.target as HTMLInputElement).checked)"
         >
         <span class="text-sm text-gray-600">{{ schema?.label ?? 'Enabled' }}</span>
     </label>

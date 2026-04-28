@@ -1,17 +1,19 @@
-<script setup>
-import { ref } from 'vue'
+<script setup lang="ts">
+import {ref} from 'vue'
 import NodePalette from './NodePalette.vue'
 
 const props = defineProps({
-    afterNodeId: { type: String, default: null },
+    afterNodeId: { type: String as () => string | null, default: null },
     handle:      { type: String, default: 'default' },
     index:       { type: Number, default: 0 },
     visible:     { type: Boolean, default: false },
 })
 
+interface PalettePos { top: number; left: number; anchorTop?: number }
+
 const open      = ref(false)
-const btnRef    = ref(null)
-const palettePos = ref({ top: 0, left: 0 })
+const btnRef    = ref<HTMLButtonElement | null>(null)
+const palettePos = ref<PalettePos>({ top: 0, left: 0 })
 
 function toggle() {
     if (!open.value && btnRef.value) {

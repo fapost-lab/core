@@ -51,11 +51,6 @@ final readonly class ContactService implements ContactServiceInterface
                 ->firstOrFail();
         }
 
-        if (!$contact->wasRecentlyCreated && [] !== $meta) {
-            $contact->meta = array_merge(is_array($contact->meta) ? $contact->meta : [], $meta);
-            $contact->save();
-        }
-
         return $contact;
     }
 
@@ -81,7 +76,7 @@ final readonly class ContactService implements ContactServiceInterface
                 ->firstOrFail();
         }
 
-        if (!$channelContact->wasRecentlyCreated) {
+        if ( ! $channelContact->wasRecentlyCreated) {
             $channelContact->last_interaction_at = now();
             $channelContact->save();
         }
@@ -94,7 +89,7 @@ final readonly class ContactService implements ContactServiceInterface
         $contact = $this->findById($contactId);
         $current = $contact->attributes ?? [];
 
-        if (!is_array($current)) {
+        if ( ! is_array($current)) {
             $current = [];
         }
 

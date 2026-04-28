@@ -14,7 +14,7 @@ final class NodeTypesController extends Controller
     public function index(NodeHandlerRegistryInterface $registry): JsonResponse
     {
         $types = collect($registry->all())
-            ->map(fn(NodeHandlerInterface $handler): array => [
+            ->map(fn (NodeHandlerInterface $handler): array => [
                 'type'          => $handler->type(),
                 'version'       => $handler->version(),
                 'label'         => $handler->label(),

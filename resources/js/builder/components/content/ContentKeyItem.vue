@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 defineProps({
     contentKey:        { type: String,  required: true },
     translationCount:  { type: Number,  default: 0 },

@@ -7,7 +7,7 @@
 
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
-    @vite(['resources/css/app.css', 'resources/js/tma/app.js'])
+    @vite(['resources/css/app.css', 'resources/js/tma/app.ts'])
 </head>
 <body class="bg-white">
     <div id="app"></div>

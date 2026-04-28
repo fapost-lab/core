@@ -1,10 +1,10 @@
-<script setup>
-import { computed } from 'vue'
-import { nodeColors } from '@builder/utils/nodeColors'
+<script setup lang="ts">
+import {computed} from 'vue'
+import {nodeColors} from '@builder/utils/nodeColors'
 import SendMessageBody from './NodeCardBody/SendMessageBody.vue'
-import InputBody       from './NodeCardBody/InputBody.vue'
-import ConditionBody   from './NodeCardBody/ConditionBody.vue'
-import DelayBody       from './NodeCardBody/DelayBody.vue'
+import InputBody from './NodeCardBody/InputBody.vue'
+import ConditionBody from './NodeCardBody/ConditionBody.vue'
+import DelayBody from './NodeCardBody/DelayBody.vue'
 
 const props = defineProps({
     node:       { type: Object,  required: true },
@@ -17,7 +17,7 @@ const emit = defineEmits(['select', 'navigateBranch'])
 const colors = computed(() => nodeColors(props.node.type))
 
 const bodyComponent = computed(() => {
-    const map = {
+    const map: Record<string, object> = {
         send_message:  SendMessageBody,
         input:         InputBody,
         condition:     ConditionBody,
@@ -52,7 +52,7 @@ const bodyComponent = computed(() => {
                 :is="bodyComponent"
                 :config="node.config ?? {}"
                 :node="node"
-                @navigate-branch="(nid, bk) => emit('navigateBranch', nid, bk)"
+                @navigate-branch="(nid: string, bk: string) => emit('navigateBranch', nid, bk)"
             />
         </div>
     </div>

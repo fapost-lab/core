@@ -1,6 +1,6 @@
-<script setup>
+<script setup lang="ts">
 defineProps({
-    afterNodeId: { type: String, default: null },
+    afterNodeId: { type: String as () => string | null, default: null },
 })
 
 const emit = defineEmits(['insert'])

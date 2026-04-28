@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import AccordionSection from '../AccordionSection.vue'
 
 const props = defineProps({
@@ -8,7 +8,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:config'])
 
-function update(key, value) {
+function update(key: string, value: unknown) {
     emit('update:config', { [key]: value })
 }
 </script>
@@ -23,7 +23,7 @@ function update(key, value) {
                     style="font-family:'DM Mono',monospace"
                     :value="props.node.config?.expression ?? ''"
                     placeholder="flow.department == 'hr'"
-                    @input="update('expression', $event.target.value)"
+                    @input="update('expression', ($event.target as HTMLInputElement).value)"
                 >
             </div>
         </AccordionSection>

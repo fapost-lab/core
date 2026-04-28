@@ -23,7 +23,7 @@ final class NodeHandlerRegistry implements NodeHandlerRegistryInterface
             throw new LogicException('Cannot register handlers after boot.');
         }
 
-        if (!in_array($handler->version(), $handler->supportedVersions(), true)) {
+        if ( ! in_array($handler->version(), $handler->supportedVersions(), true)) {
             throw new LogicException(
                 "Handler {$handler->type()}@{$handler->version()} must include own version in supportedVersions()."
             );
@@ -38,16 +38,11 @@ final class NodeHandlerRegistry implements NodeHandlerRegistryInterface
         $this->handlers[$key] = $handler;
     }
 
-    private function key(string $type, int $version): string
-    {
-        return "{$type}@{$version}";
-    }
-
     public function resolve(string $type, int $version): NodeHandlerInterface
     {
         $key = $this->key($type, $version);
 
-        if (!isset($this->handlers[$key])) {
+        if ( ! isset($this->handlers[$key])) {
             throw new LogicException("Handler not found: {$key}");
         }
 
@@ -61,7 +56,7 @@ final class NodeHandlerRegistry implements NodeHandlerRegistryInterface
         foreach ($this->handlers as $handler) {
             $type = $handler->type();
 
-            if (!isset($latestByType[$type]) || $handler->version() > $latestByType[$type]->version()) {
+            if ( ! isset($latestByType[$type]) || $handler->version() > $latestByType[$type]->version()) {
                 $latestByType[$type] = $handler;
             }
         }
@@ -72,5 +67,10 @@ final class NodeHandlerRegistry implements NodeHandlerRegistryInterface
     public function freeze(): void
     {
         $this->frozen = true;
+    }
+
+    private function key(string $type, int $version): string
+    {
+        return "{$type}@{$version}";
     }
 }

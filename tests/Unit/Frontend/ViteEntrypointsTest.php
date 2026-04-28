@@ -12,7 +12,7 @@ final class ViteEntrypointsTest extends TestCase
     {
         $projectRoot = dirname(__DIR__, 3);
 
-        $viteConfig = (string) file_get_contents($projectRoot . '/vite.config.js');
+        $viteConfig = (string) file_get_contents($projectRoot . '/vite.config.ts');
         $this->assertNotSame('', $viteConfig);
 
         preg_match_all("/'resources\\/[^\']+'/", $viteConfig, $matches);

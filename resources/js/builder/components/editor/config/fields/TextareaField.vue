@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 defineProps({
     value: { type: String, default: '' },
     schema: { type: Object, default: () => ({}) },
@@ -13,6 +13,6 @@ defineEmits(['update:value'])
         rows="3"
         :value="value ?? ''"
         :placeholder="schema?.placeholder ?? ''"
-        @input="$emit('update:value', $event.target.value)"
+        @input="$emit('update:value', ($event.target as HTMLTextAreaElement).value)"
     />
 </template>

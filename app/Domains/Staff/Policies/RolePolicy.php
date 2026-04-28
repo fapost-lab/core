@@ -19,15 +19,6 @@ final class RolePolicy
         return $this->isAdminWithUserManagement($authUser);
     }
 
-    private function isAdminWithUserManagement(AuthUser $authUser): bool
-    {
-        if (!$authUser instanceof User) {
-            return false;
-        }
-
-        return $authUser->can(Permission::ManageUsers->value) && $authUser->isAdmin();
-    }
-
     public function view(AuthUser $authUser, Role $role): bool
     {
         return $this->isAdminWithUserManagement($authUser);
@@ -55,5 +46,14 @@ final class RolePolicy
     public function deleteAny(AuthUser $authUser): bool
     {
         return $this->isAdminWithUserManagement($authUser);
+    }
+
+    private function isAdminWithUserManagement(AuthUser $authUser): bool
+    {
+        if ( ! $authUser instanceof User) {
+            return false;
+        }
+
+        return $authUser->can(Permission::ManageUsers->value) && $authUser->isAdmin();
     }
 }

@@ -1,25 +1,37 @@
-<script setup>
-import { computed, ref } from 'vue'
-import { useSelectionStore } from '@builder/store/selectionStore'
-import { nodeColors } from '@builder/utils/nodeColors'
+<script setup lang="ts">
+import {computed, ref} from 'vue'
+import {useSelectionStore} from '@builder/store/selectionStore'
+import {nodeColors} from '@builder/utils/nodeColors'
+
+interface FlowNodeMeta {
+    id: string
+    type: string
+    label?: string
+    config?: Record<string, unknown>
+}
+
+interface TreeNode {
+    node: FlowNodeMeta
+    childrenByHandle?: Record<string, TreeNode[]>
+}
 
 const props = defineProps({
-    treeNode: { type: Object, required: true },
+    treeNode: { type: Object as () => TreeNode, required: true },
     depth: { type: Number, default: 0 },
-    parentBranch: { type: Array, default: () => [] },
+    parentBranch: { type: Array as () => string[], default: () => [] },
 })
 
 const selectionStore = useSelectionStore()
 const expanded = ref(true)
 
-const handles = computed(() => Object.keys(props.treeNode.childrenByHandle ?? {}))
+const handles = computed((): string[] => Object.keys(props.treeNode.childrenByHandle ?? {}))
 
 /** Only condition/switch have meaningful branches — default is just linear continuation */
-const branchHandles = computed(() => handles.value.filter(h => h !== 'default'))
-const defaultChildren = computed(() => props.treeNode.childrenByHandle?.default ?? [])
+const branchHandles = computed((): string[] => handles.value.filter((h: string) => h !== 'default'))
+const defaultChildren = computed((): TreeNode[] => props.treeNode.childrenByHandle?.default ?? [])
 const colors = computed(() => nodeColors(props.treeNode.node.type))
 
-const nodeLabel = computed(() => {
+const nodeLabel = computed((): string => {
     const type = props.treeNode.node.type
     return props.treeNode.node.label
         ?? type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -27,7 +39,7 @@ const nodeLabel = computed(() => {
 
 function selectNode() {
     selectionStore.select(props.treeNode.node.id)
-    const meaningfulBranch = []
+    const meaningfulBranch: string[] = []
 
     for (let i = 0; i < props.parentBranch.length; i += 2) {
         const nodeId = props.parentBranch[i]
@@ -48,19 +60,19 @@ function selectNode() {
     selectionStore.clearBranch()
 }
 
-function focusBranch(handle) {
+function focusBranch(handle: string) {
     selectionStore.select(props.treeNode.node.id)
     selectionStore.setActiveBranch([...props.parentBranch, props.treeNode.node.id, handle])
 }
 
-function resolveHandleLabel(handle) {
+function resolveHandleLabel(handle: string): string {
     if (props.treeNode.node.type === 'send_message') {
-        const buttons = props.treeNode.node.config?.buttons ?? []
+        const buttons = (props.treeNode.node.config?.buttons as Array<Record<string, unknown>>) ?? []
         const idx = buttons.findIndex((b) => b.id === handle)
         if (idx !== -1) {
             const lbl = buttons[idx].label
             const text = typeof lbl === 'object'
-                ? (Object.values(lbl)[0] ?? '')
+                ? String(Object.values(lbl as Record<string, unknown>)[0] ?? '')
                 : String(lbl ?? '')
             return text.trim() !== '' ? text.trim() : `Button ${idx + 1}`
         }
@@ -108,7 +120,7 @@ function resolveHandleLabel(handle) {
                 </div>
                 <div class="tree-children">
                     <FlowStructureNode
-                        v-for="child in treeNode.childrenByHandle[handle] ?? []"
+                        v-for="child in (treeNode.childrenByHandle ?? {})[handle] ?? []"
                         :key="child.node.id"
                         :tree-node="child"
                         :depth="depth + 1"

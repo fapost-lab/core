@@ -20,7 +20,7 @@ final class RagStateResolver implements NamespaceResolverInterface
 
     public function set(StatePath $path, mixed $value, FlowState $state, WriteContext $context): void
     {
-        if (!$context->isNode(self::ALLOWED_NODE)) {
+        if ( ! $context->isNode(self::ALLOWED_NODE)) {
             throw new ReadonlyNamespaceException(
                 "Namespace 'rag' is node-restricted. Only 'rag_query' node can write. "
                 . "Got: type='{$context->type}', name='{$context->name}'."

@@ -1,21 +1,25 @@
-<script setup>
-import { computed, ref } from 'vue'
-import { useBuilderStore } from '@builder/store/builderStore'
-import { useSelectionStore } from '@builder/store/selectionStore'
-import { useNavigationStore } from '@builder/store/navigationStore'
+<script setup lang="ts">
+import {computed, ref} from 'vue'
+import {useBuilderStore} from '@builder/store/builderStore'
+import {useSelectionStore} from '@builder/store/selectionStore'
+import {useNavigationStore} from '@builder/store/navigationStore'
 import FlowNodeCard from './FlowNodeCard.vue'
 import FlowInsertPoint from './FlowInsertPoint.vue'
 import FlowConditionCard from './FlowConditionCard.vue'
 import FlowSwitchCard from './FlowSwitchCard.vue'
 import FlowSendMessageCard from './FlowSendMessageCard.vue'
 
+interface TreeNode {
+    node: { id: string; type: string; label?: string; config?: Record<string, unknown> }
+    childrenByHandle?: Record<string, TreeNode[]>
+}
+
 const builderStore = useBuilderStore()
 const selectionStore = useSelectionStore()
 const navigationStore = useNavigationStore()
 
-/** @param {Array<object>} nodes */
-function flattenLinear(nodes) {
-    const result = []
+function flattenLinear(nodes: TreeNode[]): TreeNode[] {
+    const result: TreeNode[] = []
     for (const node of nodes ?? []) {
         result.push(node)
         const nextDefault = node.childrenByHandle?.default ?? []
@@ -26,21 +30,19 @@ function flattenLinear(nodes) {
     return result
 }
 
-/** @param {Array<object>} nodes @param {string} targetNodeId */
-function findNodeInTree(nodes, targetNodeId) {
+function findNodeInTree(nodes: TreeNode[], targetNodeId: string): TreeNode | null {
     for (const treeNode of nodes ?? []) {
         if (treeNode.node.id === targetNodeId) return treeNode
         for (const handleChildren of Object.values(treeNode.childrenByHandle ?? {})) {
-            const found = findNodeInTree(handleChildren, targetNodeId)
+            const found: TreeNode | null = findNodeInTree(handleChildren, targetNodeId)
             if (found) return found
         }
     }
     return null
 }
 
-/** @param {Array<object>} tree @param {Array<string>} activeBranch */
-function resolveBranchNodes(tree, activeBranch) {
-    let currentLevel = tree ?? []
+function resolveBranchNodes(tree: TreeNode[], activeBranch: string[]): TreeNode[] {
+    let currentLevel: TreeNode[] = tree ?? []
     for (let i = 0; i < activeBranch.length; i += 2) {
         const nodeId = activeBranch[i]
         const handle = activeBranch[i + 1]
@@ -73,12 +75,12 @@ const breadcrumbs = computed(() => {
         if (handle) {
             let handleLabel = handle
             if (node?.type === 'send_message' && Array.isArray(node?.config?.buttons)) {
-                const buttons = node.config.buttons
+                const buttons = node.config.buttons as Array<Record<string, unknown>>
                 const idx = buttons.findIndex((b) => b.id === handle)
                 if (idx !== -1) {
                     const lbl = buttons[idx].label
                     const text = typeof lbl === 'object'
-                        ? (Object.values(lbl)[0] ?? '')
+                        ? String(Object.values(lbl as Record<string, unknown>)[0] ?? '')
                         : String(lbl ?? '')
                     handleLabel = text.trim() !== '' ? text.trim() : `Button ${idx + 1}`
                 } else {
@@ -105,8 +107,8 @@ const triggerLabel = computed(() => {
     const label = `${type.charAt(0).toUpperCase()}${type.slice(1)} trigger`
 
     if (builderStore.trigger.type === 'message') {
-        const keywords = builderStore.trigger.config?.keywords ?? []
-        const phrases = builderStore.trigger.config?.phrases ?? []
+        const keywords = (builderStore.trigger.config?.keywords as unknown[]) ?? []
+        const phrases = (builderStore.trigger.config?.phrases as unknown[]) ?? []
         const total = keywords.length + phrases.length
 
         return {
@@ -128,7 +130,7 @@ const triggerLabel = computed(() => {
     }
 })
 
-const hoveredSlot = ref(null)
+const hoveredSlot = ref<string | null>(null)
 
 function goToRoot() {
     selectionStore.clearBranch()
@@ -148,7 +150,7 @@ const lastNodeIsTerminal = computed(() => {
     if (type !== 'send_message' || config?.content_type !== 'text_with_keyboard') return false
     const mode = config?.keyboard_mode ?? 'inline'
     if (mode === 'reply') return true
-    return (config?.buttons?.length ?? 0) > 0
+    return ((config?.buttons as unknown[] | undefined)?.length ?? 0) > 0
 })
 
 /**
@@ -236,7 +238,7 @@ const trailingInsertContext = computed(() => {
                         item.node.type === 'send_message'
                             && item.node.config?.content_type === 'text_with_keyboard'
                             && (item.node.config?.keyboard_mode ?? 'inline') !== 'reply'
-                            && item.node.config?.buttons?.length > 0
+                            && ((item.node.config?.buttons as unknown[] | undefined)?.length ?? 0) > 0
                     "
                     :tree-node="item"
                     :parent-branch="selectionStore.activeBranch"

@@ -49,7 +49,7 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->bind(TenantResolverInterface::class, ConfigTenantResolver::class);
 
         $this->app->scoped(CoreBootstrap::class);
-        $this->app->scoped(CoreBootstrapInterface::class, fn($app): CoreBootstrap => $app->make(CoreBootstrap::class));
+        $this->app->scoped(CoreBootstrapInterface::class, fn ($app): CoreBootstrap => $app->make(CoreBootstrap::class));
         $this->app->scoped(DomainBootstrapper::class);
         $this->app->scoped(TenantSwitcher::class);
         $this->app->singleton(WebhookRegistryWriterInterface::class, WebhookRegistryWriter::class);

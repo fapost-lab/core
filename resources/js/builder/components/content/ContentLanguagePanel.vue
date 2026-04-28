@@ -1,16 +1,18 @@
-<script setup>
+<script setup lang="ts">
+interface Language { code: string; name: string }
+
 defineProps({
-    languages: { type: Array, default: () => [] },
+    languages: { type: Array as () => Language[], default: () => [] },
 })
 
 const emit = defineEmits(['addLanguage'])
 
-const FLAG_MAP = {
+const FLAG_MAP: Record<string, string> = {
     uk: '🇺🇦', en: '🇬🇧', ru: '🇷🇺', pl: '🇵🇱',
     de: '🇩🇪', fr: '🇫🇷', es: '🇪🇸', it: '🇮🇹',
 }
 
-function flag(code) {
+function flag(code: string) {
     return FLAG_MAP[code] ?? '🌐'
 }
 </script>
@@ -21,11 +23,11 @@ function flag(code) {
         <div class="panel-body">
             <div
                 v-for="lang in languages"
-                :key="lang.code"
+                :key="(lang as Language).code"
                 class="lang-item"
             >
                 <div class="lang-dot"></div>
-                <span>{{ flag(lang.code) }} {{ lang.name }}</span>
+                <span>{{ flag((lang as Language).code) }} {{ (lang as Language).name }}</span>
             </div>
             <div class="add-wrap">
                 <button type="button" class="add-btn" @click="emit('addLanguage')">

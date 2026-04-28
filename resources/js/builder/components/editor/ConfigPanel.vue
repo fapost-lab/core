@@ -1,17 +1,18 @@
-<script setup>
-import { computed } from 'vue'
-import { useSelectionStore } from '@builder/store/selectionStore'
-import { useBuilderStore } from '@builder/store/builderStore'
-import { useRegistryStore } from '@builder/store/registryStore'
-import { useConfigResize } from '@builder/composables/useConfigResize'
-import { nodeColors } from '@builder/utils/nodeColors'
+<script setup lang="ts">
+import {computed} from 'vue'
+import {useSelectionStore} from '@builder/store/selectionStore'
+import {useBuilderStore} from '@builder/store/builderStore'
+import {useRegistryStore} from '@builder/store/registryStore'
+import type {BuilderTriggerPayload, NodeConfig} from '@builder/dto/types'
+import {useConfigResize} from '@builder/composables/useConfigResize'
+import {nodeColors} from '@builder/utils/nodeColors'
 import SchemaConfigRenderer from './config/SchemaConfigRenderer.vue'
 import SendMessageConfig from './config/overrides/SendMessageConfig.vue'
 import InputConfig from './config/overrides/InputConfig.vue'
 import ConditionConfig from './config/overrides/ConditionConfig.vue'
 import TriggerConfig from './config/overrides/TriggerConfig.vue'
 
-const OVERRIDES = {
+const OVERRIDES: Record<string, object> = {
     send_message: SendMessageConfig,
     input: InputConfig,
     condition: ConditionConfig,
@@ -48,13 +49,13 @@ const nodeTypeLabel = computed(() => {
     return selectedNode.value.type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 })
 
-function updateConfig(patch) {
+function updateConfig(patch: unknown) {
     if (!selectionStore.selectedNodeId) return
-    builderStore.updateNodeConfig(selectionStore.selectedNodeId, patch)
+    builderStore.updateNodeConfig(selectionStore.selectedNodeId, patch as NodeConfig)
 }
 
-function updateTrigger(trigger) {
-    builderStore.setTrigger(trigger)
+function updateTrigger(trigger: unknown) {
+    builderStore.setTrigger(trigger as BuilderTriggerPayload | null)
 }
 
 function deleteTrigger() {

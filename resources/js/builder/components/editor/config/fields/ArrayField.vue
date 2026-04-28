@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 const props = defineProps({
     value: { type: Array, default: () => [] },
     schema: { type: Object, default: () => ({}) },
@@ -10,14 +10,14 @@ function add() {
     emit('update:value', [...props.value, ''])
 }
 
-function update(index, nextValue) {
+function update(index: number, nextValue: string) {
     const updated = [...props.value]
     updated[index] = nextValue
     emit('update:value', updated)
 }
 
-function remove(index) {
-    emit('update:value', props.value.filter((_, i) => i !== index))
+function remove(index: number) {
+    emit('update:value', props.value.filter((_: unknown, i: number) => i !== index))
 }
 </script>
 
@@ -31,7 +31,7 @@ function remove(index) {
             <input
                 class="flex-1 rounded border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
                 :value="item"
-                @input="update(index, $event.target.value)"
+                @input="update(index, ($event.target as HTMLInputElement).value)"
             >
             <button
                 class="text-gray-300 hover:text-red-400 text-xs px-2"

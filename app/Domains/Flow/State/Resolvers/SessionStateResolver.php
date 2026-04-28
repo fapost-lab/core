@@ -35,7 +35,7 @@ final readonly class SessionStateResolver implements NamespaceResolverInterface
     {
         $policy = $this->namespace->writePolicy();
 
-        if (NamespaceWritePolicy::EngineOnly === $policy && !$context->isEngine()) {
+        if (NamespaceWritePolicy::EngineOnly === $policy && ! $context->isEngine()) {
             throw new ReadonlyNamespaceException(
                 "Namespace '{$this->namespace->value}' is engine-only. Got write context type '{$context->type}'."
             );

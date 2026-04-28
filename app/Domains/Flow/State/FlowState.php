@@ -44,7 +44,7 @@ final class FlowState
         $value = $this->data;
 
         foreach ($keys as $key) {
-            if (!is_array($value) || !array_key_exists($key, $value)) {
+            if ( ! is_array($value) || ! array_key_exists($key, $value)) {
                 return null;
             }
 
@@ -60,11 +60,11 @@ final class FlowState
         $ref  = &$this->data;
 
         foreach (array_slice($keys, 0, -1) as $key) {
-            if (!array_key_exists($key, $ref)) {
+            if ( ! array_key_exists($key, $ref)) {
                 $ref[$key] = [];
             }
 
-            if (!is_array($ref[$key])) {
+            if ( ! is_array($ref[$key])) {
                 throw new InvalidStatePathException(
                     "Cannot write path '{$path->toString()}': segment '{$key}' points to scalar value."
                 );

@@ -1,7 +1,14 @@
-<script setup>
+<script setup lang="ts">
+interface Folder {
+    id: string
+    name: string
+    file_count_filtered?: number
+    file_count_total?: number
+}
+
 defineProps({
-    subfolders: { type: Array, default: () => [] },
-    kindFilter: { type: String, default: null },
+    subfolders: { type: Array as () => Folder[], default: () => [] },
+    kindFilter: { type: String as () => string | null, default: null },
 })
 
 const emit = defineEmits(['navigate'])

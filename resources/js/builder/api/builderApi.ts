@@ -1,9 +1,5 @@
-import type {
-    BuilderTriggerPayload,
-    FlowDefinition,
-    NodeTypePayload,
-    ValidationResult,
-} from '@builder/dto/types'
+import type {BuilderTriggerPayload, FlowDefinition, NodeTypePayload, ValidationResult,} from '@builder/dto/types'
+import {xsrfHeaders} from '@shared/http'
 
 const BASE = '/builder'
 
@@ -12,33 +8,12 @@ export interface ApiError extends Error {
     body: unknown
 }
 
-function getCookie(name: string): string {
-    const raw =
-        document.cookie
-            .split('; ')
-            .find((row) => row.startsWith(`${name}=`))
-            ?.split('=')
-            .slice(1)
-            .join('=') ?? ''
-
-    if (!raw) {
-        return ''
-    }
-
-    try {
-        return decodeURIComponent(raw)
-    } catch {
-        return raw
-    }
-}
-
 async function request<T>(method: string, url: string, body: unknown = null): Promise<T> {
     const options: RequestInit & { headers: Record<string, string> } = {
         method,
         headers: {
             'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest',
-            'X-XSRF-TOKEN': getCookie('XSRF-TOKEN'),
+            ...xsrfHeaders(),
         },
     }
 

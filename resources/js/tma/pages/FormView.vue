@@ -1,12 +1,13 @@
-<script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { useTelegram } from '@tma/composables/useTelegram'
-import { useForm } from '@tma/composables/useForm'
+<script setup lang="ts">
+import {computed, onMounted, onUnmounted, ref} from 'vue'
+import {useRoute} from 'vue-router'
+import {useTelegram} from '@tma/composables/useTelegram'
+import {useForm} from '@tma/composables/useForm'
 import TmaFormRenderer from '@tma/components/TmaFormRenderer.vue'
 
 const route = useRoute()
 const telegram = useTelegram()
+const formId = Array.isArray(route.params.formId) ? route.params.formId[0] : route.params.formId
 const {
     definition,
     answers,
@@ -17,7 +18,7 @@ const {
     isValid,
     load,
     submit,
-} = useForm(route.params.formId)
+} = useForm(formId)
 
 const hasAttemptedSubmit = ref(false)
 

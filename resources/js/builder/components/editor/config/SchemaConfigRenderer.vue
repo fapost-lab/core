@@ -1,5 +1,5 @@
-<script setup>
-import { computed } from 'vue'
+<script setup lang="ts">
+import {computed} from 'vue'
 import AccordionSection from './AccordionSection.vue'
 import TextField from './fields/TextField.vue'
 import TextareaField from './fields/TextareaField.vue'
@@ -14,7 +14,7 @@ const props = defineProps({
 
 const emit = defineEmits(['update:config'])
 
-const FIELD_COMPONENTS = {
+const FIELD_COMPONENTS: Record<string, object> = {
     string: TextField,
     text: TextareaField,
     number: TextField,
@@ -25,7 +25,7 @@ const FIELD_COMPONENTS = {
 
 const schemaEntries = computed(() => Object.entries(props.schema ?? {}))
 
-function update(key, value) {
+function update(key: string, value: unknown) {
     emit('update:config', { [key]: value })
 }
 </script>

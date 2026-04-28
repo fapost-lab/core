@@ -1,17 +1,17 @@
-<script setup>
-import { ref, watch } from 'vue'
+<script setup lang="ts">
+import {ref, watch} from 'vue'
 import BaseModal from '@builder/components/editor/config/overrides/BaseModal.vue'
 import MediaBreadcrumbs from './MediaBreadcrumbs.vue'
 import MediaFolderTree from './MediaFolderTree.vue'
 import MediaFileGrid from './MediaFileGrid.vue'
 import MediaUploadDropZone from './MediaUploadDropZone.vue'
-import { useMediaPickerStore } from '@builder/store/mediaPickerStore'
+import {useMediaPickerStore} from '@builder/store/mediaPickerStore'
 
 const props = defineProps({
     open: { type: Boolean, required: true },
     /** Optional kind filter: 'image'|'video'|'audio'|'document'|'sticker'|null */
-    kind: { type: String, default: null },
-    selectedFileId: { type: String, default: null },
+    kind: { type: String as () => string | null, default: null },
+    selectedFileId: { type: String as () => string | null, default: null },
 })
 
 const emit = defineEmits(['close', 'select'])
@@ -27,11 +27,20 @@ watch(() => props.open, async (val) => {
     }
 })
 
-function navigate(folderId) {
+interface MediaFile {
+    id: string
+    name: string
+    kind: string
+    preview_url?: string | null
+    preview?: { signed_url?: string | null }
+    [key: string]: unknown
+}
+
+function navigate(folderId: string | null) {
     store.navigate(folderId)
 }
 
-function selectFile(file) {
+function selectFile(file: MediaFile) {
     localSelectedId.value = file.id
     emit('select', {
         id: file.id,
@@ -42,7 +51,7 @@ function selectFile(file) {
     emit('close')
 }
 
-const kindLabels = {
+const kindLabels: Record<string, string> = {
     image:    'Images',
     video:    'Videos',
     audio:    'Audio',

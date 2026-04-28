@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import AccordionSection from '../AccordionSection.vue'
 
 const props = defineProps({
@@ -13,7 +13,7 @@ const EXPECTED_TYPES = [
     'reply', 'contact', 'location', 'document', 'image', 'any',
 ]
 
-function update(key, value) {
+function update(key: string, value: unknown) {
     emit('update:config', { [key]: value })
 }
 </script>
@@ -28,7 +28,7 @@ function update(key, value) {
                     style="font-family:'DM Mono',monospace"
                     :value="props.node.config?.save_to ?? ''"
                     placeholder="flow.variable_name"
-                    @input="update('save_to', $event.target.value)"
+                    @input="update('save_to', ($event.target as HTMLInputElement).value)"
                 >
             </div>
             <div class="config-field">
@@ -36,7 +36,7 @@ function update(key, value) {
                 <select
                     class="field-input"
                     :value="props.node.config?.expected_type ?? 'text'"
-                    @change="update('expected_type', $event.target.value)"
+                    @change="update('expected_type', ($event.target as HTMLSelectElement).value)"
                 >
                     <option v-for="type in EXPECTED_TYPES" :key="type" :value="type">{{ type }}</option>
                 </select>
@@ -51,7 +51,7 @@ function update(key, value) {
                     type="number"
                     style="width:100px"
                     :value="props.node.config?.retry_limit ?? 3"
-                    @input="update('retry_limit', $event.target.value === '' ? null : Number($event.target.value))"
+                    @input="update('retry_limit', ($event.target as HTMLInputElement).value === '' ? null : Number(($event.target as HTMLInputElement).value))"
                 >
             </div>
             <div class="config-field">
@@ -60,7 +60,7 @@ function update(key, value) {
                     class="field-input"
                     :value="props.node.config?.on_invalid_message ?? ''"
                     placeholder="Please enter a valid value"
-                    @input="update('on_invalid_message', $event.target.value)"
+                    @input="update('on_invalid_message', ($event.target as HTMLInputElement).value)"
                 >
             </div>
             <div class="config-field">
@@ -69,7 +69,7 @@ function update(key, value) {
                     class="field-input"
                     :value="props.node.config?.timeout ?? ''"
                     placeholder="24h"
-                    @input="update('timeout', $event.target.value)"
+                    @input="update('timeout', ($event.target as HTMLInputElement).value)"
                 >
             </div>
         </AccordionSection>

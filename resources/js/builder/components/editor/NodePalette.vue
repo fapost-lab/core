@@ -1,13 +1,13 @@
-<script setup>
-import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
-import { onClickOutside, useEventListener } from '@vueuse/core'
-import { useRegistryStore } from '@builder/store/registryStore'
-import { useBuilderStore } from '@builder/store/builderStore'
-import { useSelectionStore } from '@builder/store/selectionStore'
-import { nodeColors } from '@builder/utils/nodeColors'
+<script setup lang="ts">
+import {computed, type CSSProperties, nextTick, onMounted, ref, useTemplateRef, watch} from 'vue'
+import {onClickOutside, useEventListener} from '@vueuse/core'
+import {useRegistryStore} from '@builder/store/registryStore'
+import {useBuilderStore} from '@builder/store/builderStore'
+import {useSelectionStore} from '@builder/store/selectionStore'
+import {nodeColors} from '@builder/utils/nodeColors'
 
 const props = defineProps({
-    afterNodeId: { type: String, default: null },
+    afterNodeId: { type: String as () => string | null, default: null },
     handle:      { type: String, default: 'default' },
     palettePos:  { type: Object, default: () => ({ top: 0, left: 0 }) },
 })
@@ -20,7 +20,7 @@ const selectionStore = useSelectionStore()
 const searchQuery    = ref('')
 const paletteRef     = useTemplateRef('paletteRef')
 const openCategories = ref(new Set(['Core']))
-const paletteStyle   = ref({
+const paletteStyle   = ref<CSSProperties>({
     position: 'fixed',
     top: '0px',
     left: '0px',
@@ -33,12 +33,14 @@ const filteredNodeTypes = computed(() => {
     return registryStore.nodeTypes.filter((n) => (n.label ?? '').toLowerCase().includes(query))
 })
 
-const grouped = computed(() => filteredNodeTypes.value.reduce((acc, n) => {
-    const cat = n.category ?? 'Core'
-    if (!acc[cat]) acc[cat] = []
-    acc[cat].push(n)
-    return acc
-}, {}))
+const grouped = computed((): Record<string, typeof filteredNodeTypes.value> =>
+    filteredNodeTypes.value.reduce((acc: Record<string, typeof filteredNodeTypes.value>, n) => {
+        const cat = n.category ?? 'Core'
+        if (!acc[cat]) acc[cat] = []
+        acc[cat].push(n)
+        return acc
+    }, {}),
+)
 
 const categoryNames = computed(() => Object.keys(grouped.value))
 
@@ -50,15 +52,15 @@ const visibleCategoryNames = computed(() => {
     return categoryNames.value.filter((categoryName) => openCategories.value.has(categoryName))
 })
 
-function insert(type, version) {
-    const newId = builderStore.insertNode(props.afterNodeId, props.handle, type, version)
+function insert(type: string, version: number) {
+    const newId = builderStore.insertNode(props.afterNodeId ?? '', props.handle, type, version)
     if (newId != null) {
         selectionStore.select(newId)
     }
     emit('select')  // always close palette regardless of whether insertion succeeded
 }
 
-function isCategoryOpen(categoryName) {
+function isCategoryOpen(categoryName: string) {
     if (searchQuery.value.trim()) {
         return true
     }
@@ -66,7 +68,7 @@ function isCategoryOpen(categoryName) {
     return openCategories.value.has(categoryName)
 }
 
-function toggleCategory(categoryName) {
+function toggleCategory(categoryName: string) {
     if (searchQuery.value.trim()) {
         return
     }
@@ -108,7 +110,7 @@ function repositionPalette() {
     left = Math.min(Math.max(margin + halfWidth, left), Math.max(margin + halfWidth, viewportWidth - halfWidth - margin))
 
     paletteStyle.value = {
-        position: 'fixed',
+        position: 'fixed' as const,
         top: `${top}px`,
         left: `${left}px`,
         transform: 'translateX(-50%)',

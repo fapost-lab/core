@@ -33,7 +33,7 @@ final class BroadcastSendJob implements ShouldQueue
     {
         $result = $sender->send($this->message);
 
-        if (!$result->sent && !$result->duplicate) {
+        if ( ! $result->sent && ! $result->duplicate) {
             throw new RuntimeException($result->error ?? 'Broadcast message delivery failed.');
         }
     }

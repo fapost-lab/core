@@ -50,13 +50,13 @@ final class WebhookController extends Controller
         $entry   = $this->registryResolver->resolve($hash);
         $adapter = $this->adapterResolver->resolve($entry->platform);
 
-        if (!$adapter->verifySignature($request, $entry->secretToken)) {
+        if ( ! $adapter->verifySignature($request, $entry->secretToken)) {
             throw new InvalidSignatureException('Invalid channel signature.');
         }
 
         $idempotencyKey = $adapter->extractIdempotencyKey($request, $entry->channelId);
 
-        if (!$this->markProcessed($idempotencyKey)) {
+        if ( ! $this->markProcessed($idempotencyKey)) {
             return response()->json(['ok' => true]);
         }
 

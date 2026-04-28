@@ -1,10 +1,10 @@
-<script setup>
-import { computed, ref, watch } from 'vue'
+<script setup lang="ts">
+import {computed, ref, watch} from 'vue'
 
-import { useSelectionStore } from '@builder/store/selectionStore'
-import { useBuilderStore } from '@builder/store/builderStore'
-import { nodeColors } from '@builder/utils/nodeColors'
-import { countDescendants } from '@builder/utils/buildTree'
+import {useSelectionStore} from '@builder/store/selectionStore'
+import {useBuilderStore} from '@builder/store/builderStore'
+import {nodeColors} from '@builder/utils/nodeColors'
+import {countDescendants, type TreeNode} from '@builder/utils/buildTree'
 
 const props = defineProps({
     treeNode:     { type: Object, required: true },
@@ -29,14 +29,14 @@ function selectCard() {
     selectionStore.select(props.treeNode.node.id)
 }
 
-function selectBranch(handle) {
+function selectBranch(handle: string) {
     activeHandle.value = handle
-    selectionStore.setActiveBranch([...props.parentBranch, props.treeNode.node.id, handle])
+    selectionStore.setActiveBranch([...(props.parentBranch as string[]), props.treeNode.node.id, handle])
 }
 
-function childCount(handle) {
-    const children = props.treeNode.childrenByHandle?.[handle] ?? []
-    return children.reduce((sum, child) => sum + 1 + countDescendants(child), 0)
+function childCount(handle: string): number {
+    const children: TreeNode[] = (props.treeNode.childrenByHandle?.[handle] ?? []) as TreeNode[]
+    return children.reduce((sum: number, child: TreeNode) => sum + 1 + countDescendants(child), 0)
 }
 </script>
 

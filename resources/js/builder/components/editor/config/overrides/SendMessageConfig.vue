@@ -1,34 +1,47 @@
-<script setup>
-import { computed } from 'vue'
-import { useBuilderStore } from '@builder/store/builderStore'
+<script setup lang="ts">
+import {computed} from 'vue'
+import {useBuilderStore} from '@builder/store/builderStore'
 import KeyboardListEditor from './KeyboardListEditor.vue'
 import VariablePicker from '../VariablePicker.vue'
 import AccordionSection from '../AccordionSection.vue'
 import MediaPicker from '@builder/components/media/MediaPicker.vue'
 
+interface KbButton {
+    id: string
+    type?: string
+    [key: string]: unknown
+}
+
+interface MediaFile {
+    id: string
+    name: string
+    kind: string
+    preview_url: string | null
+    [key: string]: unknown
+}
+
 const props = defineProps({
-    node:   { type: Object, required: true },
-    schema: { type: Object, required: true },
+    node:   { type: Object as () => Record<string, unknown>, required: true },
+    schema: { type: Object as () => Record<string, unknown>, required: true },
 })
 
 const emit = defineEmits(['update:config'])
 const builderStore = useBuilderStore()
 
-const config = computed(() => props.node.config ?? {})
-const buttons = computed(() => config.value.buttons ?? [])
-const contentType = computed(() => config.value.content_type ?? 'text')
-const keyboardMode = computed(() => config.value.keyboard_mode ?? 'inline')
+const config = computed((): Record<string, unknown> => (props.node.config as Record<string, unknown>) ?? {})
+const buttons = computed((): KbButton[] => (config.value.buttons as KbButton[]) ?? [])
+const contentType = computed(() => String(config.value.content_type ?? 'text'))
+const keyboardMode = computed(() => String(config.value.keyboard_mode ?? 'inline'))
 const showsButtons = computed(() => contentType.value === 'text_with_keyboard')
 const showsMediaUrl = computed(() => ['image', 'document', 'video', 'voice'].includes(contentType.value))
 const showsCaption = computed(() => ['image', 'document', 'video'].includes(contentType.value))
-const mediaPickerKind = computed(() => {
-    const map = { image: 'image', video: 'video', document: 'document', voice: 'audio' }
+const mediaPickerKind = computed((): string | null => {
+    const map: Record<string, string> = { image: 'image', video: 'video', document: 'document', voice: 'audio' }
     return map[contentType.value] ?? null
 })
-const mediaFile = computed(() => config.value.media_file ?? null)
+const mediaFile = computed(() => (config.value.media_file as MediaFile | null) ?? null)
 
-/** @param {{ id: string, name: string, kind: string, preview_url: string|null }|null} file */
-function selectMediaFile(file) {
+function selectMediaFile(file: MediaFile | null) {
     if (file) {
         update({ media_file: file, media_url: file.preview_url ?? '' })
     } else {
@@ -36,23 +49,23 @@ function selectMediaFile(file) {
     }
 }
 const isReplyKeyboard = computed(() => showsButtons.value && keyboardMode.value === 'reply')
-const saveToType = computed(() => config.value.save_to_type ?? 'string')
+const saveToType = computed(() => String(config.value.save_to_type ?? 'string'))
 
-function update(patch) {
+function update(patch: unknown) {
     emit('update:config', patch)
 }
 
-function dropInsert(e, currentValue) {
+function dropInsert(e: DragEvent, currentValue: string): string | null {
     e.preventDefault()
-    const snippet = e.dataTransfer.getData('text/plain')
+    const snippet = e.dataTransfer?.getData('text/plain')
     if (!snippet) return null
-    const el = e.target
+    const el = e.target as HTMLTextAreaElement
     const at = el.selectionStart ?? currentValue.length
     return currentValue.slice(0, at) + snippet + currentValue.slice(el.selectionEnd ?? at)
 }
 
-function updateContentType(value) {
-    const patch = { content_type: value }
+function updateContentType(value: string) {
+    const patch: Record<string, unknown> = { content_type: value }
 
     if (value !== 'text_with_keyboard') {
         patch.keyboard_mode = null
@@ -65,11 +78,8 @@ function updateContentType(value) {
     update(patch)
 }
 
-function updateKeyboardMode(value) {
+function updateKeyboardMode(value: string) {
     if (value === 'reply') {
-        // Reply keyboard is terminal — pressing a button triggers a separate
-        // flow via keyword/trigger matching, never returns to this session.
-        // Drop ALL outgoing edges (default + per-button callback handles).
         builderStore.definition.edges = builderStore.definition.edges.filter(
             (edge) => edge.from !== props.node.id,
         )
@@ -77,7 +87,7 @@ function updateKeyboardMode(value) {
 
     update({
         keyboard_mode: value,
-        buttons: buttons.value.map((button) => ({
+        buttons: buttons.value.map((button: KbButton) => ({
             ...button,
             type: value === 'reply' ? 'reply' : 'callback',
         })),
@@ -94,7 +104,7 @@ function updateKeyboardMode(value) {
                 <select
                     class="field-input"
                     :value="contentType"
-                    @change="updateContentType($event.target.value)"
+                    @change="updateContentType(($event.target as HTMLSelectElement).value)"
                 >
                     <option value="text">Text</option>
                     <option value="text_with_keyboard">Text with keyboard</option>
@@ -110,7 +120,7 @@ function updateKeyboardMode(value) {
                 <select
                     class="field-input"
                     :value="keyboardMode"
-                    @change="updateKeyboardMode($event.target.value)"
+                    @change="updateKeyboardMode(($event.target as HTMLSelectElement).value)"
                 >
                     <option value="inline">Inline</option>
                     <option value="reply">Reply</option>
@@ -125,8 +135,8 @@ function updateKeyboardMode(value) {
                     <input
                         type="checkbox"
                         class="toggle-check"
-                        :checked="config.remove_keyboard_after_press ?? true"
-                        @change="update({ remove_keyboard_after_press: $event.target.checked })"
+                        :checked="(config.remove_keyboard_after_press as boolean) ?? true"
+                        @change="update({ remove_keyboard_after_press: ($event.target as HTMLInputElement).checked })"
                     >
                 </label>
                 <p class="field-hint">
@@ -139,9 +149,9 @@ function updateKeyboardMode(value) {
                     class="field-input"
                     type="number"
                     min="1"
-                    :value="config.timeout_seconds ?? ''"
+                    :value="(config.timeout_seconds as number | string | undefined) ?? ''"
                     placeholder="Optional"
-                    @input="update({ timeout_seconds: $event.target.value === '' ? null : Number($event.target.value) })"
+                    @input="update({ timeout_seconds: ($event.target as HTMLInputElement).value === '' ? null : Number(($event.target as HTMLInputElement).value) })"
                 >
             </div>
         </AccordionSection>
@@ -158,10 +168,10 @@ function updateKeyboardMode(value) {
                 <textarea
                     class="field-input"
                     rows="4"
-                    :value="config.text ?? ''"
+                    :value="String(config.text ?? '')"
                     placeholder="Welcome, {{flow.name}}"
-                    @input="update({ text: $event.target.value })"
-                    @drop="v => { const s = dropInsert(v, config.text ?? ''); if (s !== null) update({ text: s }) }"
+                    @input="update({ text: ($event.target as HTMLTextAreaElement).value })"
+                    @drop="(v: DragEvent) => { const s = dropInsert(v, String(config.text ?? '')); if (s !== null) update({ text: s }) }"
                 />
             </div>
         </AccordionSection>
@@ -181,10 +191,10 @@ function updateKeyboardMode(value) {
                 <input
                     class="field-input"
                     type="text"
-                    :value="mediaFile ? '' : (config.media_url ?? '')"
+                    :value="mediaFile ? '' : String(config.media_url ?? '')"
                     :disabled="!!mediaFile"
                     placeholder="https://..."
-                    @input="update({ media_url: $event.target.value, media_file: null })"
+                    @input="update({ media_url: ($event.target as HTMLInputElement).value, media_file: null })"
                 >
             </div>
 
@@ -196,10 +206,10 @@ function updateKeyboardMode(value) {
                 <textarea
                     class="field-input"
                     rows="3"
-                    :value="config.caption ?? ''"
+                    :value="String(config.caption ?? '')"
                     placeholder="Optional caption"
-                    @input="update({ caption: $event.target.value })"
-                    @drop="v => { const s = dropInsert(v, config.caption ?? ''); if (s !== null) update({ caption: s }) }"
+                    @input="update({ caption: ($event.target as HTMLTextAreaElement).value })"
+                    @drop="(v: DragEvent) => { const s = dropInsert(v, String(config.caption ?? '')); if (s !== null) update({ caption: s }) }"
                 />
             </div>
         </AccordionSection>
@@ -226,7 +236,7 @@ function updateKeyboardMode(value) {
                         <select
                             class="field-input save-to-type"
                             :value="saveToType"
-                            @change="update({ save_to_type: $event.target.value })"
+                            @change="update({ save_to_type: ($event.target as HTMLSelectElement).value })"
                         >
                             <option value="string">String</option>
                             <option value="number">Number</option>
@@ -236,7 +246,7 @@ function updateKeyboardMode(value) {
                             class="field-input"
                             :value="config.save_to ?? ''"
                             placeholder="e.g. menu_choice"
-                            @input="update({ save_to: $event.target.value || null })"
+                            @input="update({ save_to: ($event.target as HTMLInputElement).value || null })"
                         >
                     </div>
                 </div>

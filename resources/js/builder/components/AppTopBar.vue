@@ -1,27 +1,27 @@
-<script setup>
-import { useTranslations } from '../composables/useTranslations.js'
+<script setup lang="ts">
+import {useTranslations} from '../composables/useTranslations.js'
 
 const { t } = useTranslations()
 
 defineProps({
     flowName:         { type: String,  required: true },
-    draftVersion:     { type: Number,  default: null },
-    publishedVersion: { type: Number,  default: null },
+    draftVersion:     { type: Number as () => number | null,  default: null },
+    publishedVersion: { type: Number as () => number | null,  default: null },
     saveStatus:       { type: String,  default: 'idle' },
     activeTab:        { type: String,  default: 'builder' },
-    backUrl:          { type: String,  default: null },
+    backUrl:          { type: String as () => string | null,  default: null },
     canUndo:          { type: Boolean, default: false },
     canRedo:          { type: Boolean, default: false },
     validating:       { type: Boolean, default: false },
     publishing:       { type: Boolean, default: false },
-    publishedMsg:     { type: String, default: null },
+    publishedMsg:     { type: String as () => string | null, default: null },
 })
 
 const emit = defineEmits([
     'tabChange', 'validate', 'saveDraft', 'publish', 'undo', 'redo',
 ])
 
-const SAVE_COLORS = {
+const SAVE_COLORS: Record<string, string> = {
     idle:     'var(--text-3)',
     saving:   'var(--text-3)',
     saved:    'var(--sage)',

@@ -1,13 +1,13 @@
-<script setup>
-import { useBuilderStore } from '@builder/store/builderStore';
-import { useSelectionStore } from '@builder/store/selectionStore';
-import { useValidation } from '@builder/composables/useValidation';
+<script setup lang="ts">
+import {useBuilderStore} from '@builder/store/builderStore';
+import {useSelectionStore} from '@builder/store/selectionStore';
+import {useValidation} from '@builder/composables/useValidation';
 
 const store = useBuilderStore();
 const selectionStore = useSelectionStore();
 const { validate } = useValidation();
 
-function jumpToNode(error) {
+function jumpToNode(error: { path?: string; message?: string }) {
     if (error?.path?.startsWith('trigger.')) {
         selectionStore.selectTrigger()
         return
@@ -32,11 +32,11 @@ function jumpToNode(error) {
                         class="val-badge"
                         :class="store.validationResult.valid ? 'val-badge--ok' : 'val-badge--err'"
                     >
-                        {{ store.validationResult.valid ? 'Valid' : `${store.validationResult.errors.length} errors` }}
+                        {{ store.validationResult.valid ? 'Valid' : `${store.validationResult.errors?.length ?? 0} errors` }}
                     </span>
                 </div>
                 <div class="val-header-right">
-                    <button class="btn btn-ghost" style="font-size:11.5px;padding:3px 8px" @click="validate">Revalidate</button>
+                    <button class="btn btn-ghost" style="font-size:11.5px;padding:3px 8px" @click="() => validate()">Revalidate</button>
                     <button class="val-close" @click="store.closeValidation()">✕</button>
                 </div>
             </div>

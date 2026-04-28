@@ -1,9 +1,9 @@
-<script setup>
-import { computed } from 'vue'
-import { useSelectionStore } from '@builder/store/selectionStore'
-import { useRegistryStore } from '@builder/store/registryStore'
-import { useBuilderStore } from '@builder/store/builderStore'
-import { nodeColors } from '@builder/utils/nodeColors'
+<script setup lang="ts">
+import {computed} from 'vue'
+import {useSelectionStore} from '@builder/store/selectionStore'
+import {useRegistryStore} from '@builder/store/registryStore'
+import {useBuilderStore} from '@builder/store/builderStore'
+import {nodeColors} from '@builder/utils/nodeColors'
 
 const props = defineProps({
     treeNode: { type: Object, required: true },
@@ -21,7 +21,7 @@ const handlerMeta = computed(() => registryStore.getByType(props.treeNode.node.t
 
 const typeLabel = computed(() => {
     if (handlerMeta.value?.label) return handlerMeta.value.label
-    return props.treeNode.node.type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    return props.treeNode.node.type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
 })
 
 /** Compact summary rows for the card body */
@@ -31,13 +31,13 @@ const summaryRows = computed(() => {
     const type   = node.type
 
     if (type === 'send_message') {
-        const CONTENT_TYPE_LABELS = {
+        const CONTENT_TYPE_LABELS: Record<string, string> = {
             text: 'Text', text_with_keyboard: 'Text with keyboard',
             image: 'Image', document: 'Document', video: 'Video', voice: 'Voice',
         }
         const rows = []
         const text = config.text ?? config.caption ?? config.media_url ?? config.body ?? config.content_key ?? null
-        const rawType = config.content_type ?? 'text'
+        const rawType = String(config.content_type ?? 'text')
         if (text) rows.push({ key: 'Text', val: typeof text === 'object' ? Object.values(text)[0] : text, mono: false })
         rows.push({ key: 'Type', val: CONTENT_TYPE_LABELS[rawType] ?? rawType, muted: true })
         const btns = config.buttons?.length ?? 0

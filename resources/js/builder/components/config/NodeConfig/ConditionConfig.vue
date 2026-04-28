@@ -1,5 +1,5 @@
-<script setup>
-import { computed } from 'vue'
+<script setup lang="ts">
+import {computed} from 'vue'
 
 const props = defineProps({
     modelValue: { type: Object, default: () => ({}) },
@@ -20,29 +20,34 @@ const OPERATORS = [
     { value: 'not_empty', label: 'is not empty' },
 ]
 
+type Rule = { operator: string; value: string; handle: string }
+type ConditionValue = { check?: string; rules?: Rule[] }
+
+const modelAsObj = computed((): ConditionValue => props.modelValue as ConditionValue ?? {})
+
 const checkVal = computed({
-    get: () => props.modelValue.check ?? '',
-    set: (v) => emit('update:modelValue', { ...props.modelValue, check: v }),
+    get: () => modelAsObj.value.check ?? '',
+    set: (v) => emit('update:modelValue', { ...modelAsObj.value, check: v }),
 })
 
-const rules = computed(() => props.modelValue.rules ?? [])
+const rules = computed((): Rule[] => modelAsObj.value.rules ?? [])
 
-function updateRule(i, patch) {
-    const updated = rules.value.map((r, idx) => idx === i ? { ...r, ...patch } : r)
-    emit('update:modelValue', { ...props.modelValue, rules: updated })
+function updateRule(i: number, patch: Partial<Rule>) {
+    const updated = rules.value.map((r: Rule, idx: number) => idx === i ? { ...r, ...patch } : r)
+    emit('update:modelValue', { ...modelAsObj.value, rules: updated })
 }
 
 function addRule() {
     emit('update:modelValue', {
-        ...props.modelValue,
+        ...modelAsObj.value,
         rules: [...rules.value, { operator: 'eq', value: '', handle: 'yes' }],
     })
 }
 
-function removeRule(i) {
+function removeRule(i: number) {
     emit('update:modelValue', {
-        ...props.modelValue,
-        rules: rules.value.filter((_, idx) => idx !== i),
+        ...modelAsObj.value,
+        rules: rules.value.filter((_: Rule, idx: number) => idx !== i),
     })
 }
 
@@ -60,7 +65,7 @@ const noValueOps = new Set(['empty', 'not_empty'])
                 class="field-input mono"
                 placeholder="flow.status"
                 :value="checkVal"
-                @input="checkVal = $event.target.value"
+                @input="checkVal = ($event.target as HTMLInputElement).value"
             />
         </div>
     </div>
@@ -77,7 +82,7 @@ const noValueOps = new Set(['empty', 'not_empty'])
             <select
                 class="field-input"
                 :value="rule.operator"
-                @change="updateRule(i, { operator: $event.target.value })"
+                @change="updateRule(i, { operator: ($event.target as HTMLSelectElement).value })"
             >
                 <option v-for="op in OPERATORS" :key="op.value" :value="op.value">
                     {{ op.label }}
@@ -90,13 +95,13 @@ const noValueOps = new Set(['empty', 'not_empty'])
                 class="field-input"
                 placeholder="value"
                 :value="rule.value"
-                @input="updateRule(i, { value: $event.target.value })"
+                @input="updateRule(i, { value: ($event.target as HTMLInputElement).value })"
             />
 
             <select
                 class="field-input handle-sel"
                 :value="rule.handle"
-                @change="updateRule(i, { handle: $event.target.value })"
+                @change="updateRule(i, { handle: ($event.target as HTMLSelectElement).value })"
             >
                 <option value="yes">→ yes</option>
                 <option value="no">→ no</option>

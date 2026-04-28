@@ -16,7 +16,7 @@ final class ViewAssistant extends ViewRecord
     {
         return [
             EditAction::make()
-                ->url(fn($record): string => EditAssistant::getUrl(['record' => $record])),
+                ->url(fn ($record): string => EditAssistant::getUrl(['record' => $record])),
         ];
     }
 }

@@ -1,14 +1,15 @@
-<script setup>
-import { computed, provide } from 'vue'
-import { useBuilderStore }    from '@builder/store/builderStore'
-import { useSelectionStore }  from '@builder/store/selectionStore'
-import { useNavigationStore } from '@builder/store/navigationStore'
-import Breadcrumb   from './Breadcrumb.vue'
-import TriggerCard  from './TriggerCard.vue'
+<script setup lang="ts">
+import {computed, provide} from 'vue'
+import {useBuilderStore} from '@builder/store/builderStore'
+import {useSelectionStore} from '@builder/store/selectionStore'
+import {useNavigationStore} from '@builder/store/navigationStore'
+import type {FlowNode} from '@builder/dto/types'
+import Breadcrumb from './Breadcrumb.vue'
+import TriggerCard from './TriggerCard.vue'
 import SeqConnector from './SeqConnector.vue'
-import InsertPoint  from './InsertPoint.vue'
-import NodeCard     from './NodeCard.vue'
-import EndCard      from './EndCard.vue'
+import InsertPoint from './InsertPoint.vue'
+import NodeCard from './NodeCard.vue'
+import EndCard from './EndCard.vue'
 
 const builder  = useBuilderStore()
 const selection = useSelectionStore()
@@ -18,12 +19,8 @@ const nav      = useNavigationStore()
  * Build ordered chain of nodes starting from a given nodeId,
  * following outputs.default.next until no next exists.
  * Stops before condition children (they live in branches, not the main chain).
- *
- * @param {string|null} startId
- * @param {Record<string, object>} nodeMap
- * @returns {object[]}
  */
-function buildChain(startId, nodeMap) {
+function buildChain(startId: string | null, nodeMap: Record<string, FlowNode>): FlowNode[] {
     const chain = []
     const visited = new Set()
     let id = startId
@@ -37,8 +34,8 @@ function buildChain(startId, nodeMap) {
     return chain
 }
 
-const nodeMap = computed(() => {
-    const map = {}
+const nodeMap = computed((): Record<string, FlowNode> => {
+    const map: Record<string, FlowNode> = {}
     for (const n of builder.definition.nodes) {
         map[n.id] = n
     }
@@ -87,18 +84,18 @@ const displayedNodes = computed(() => {
     return buildChain(branchStartId, nodeMap.value)
 })
 
-function scrollToNode(nodeId) {
+function scrollToNode(nodeId: string) {
     const el = document.getElementById(`node-${nodeId}`)
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 provide('scrollToNode', scrollToNode)
 
-function onSelectNode(nodeId) {
+function onSelectNode(nodeId: string) {
     selection.select(nodeId)
 }
 
-function onNavigateBranch(nodeId, branchKey) {
+function onNavigateBranch(nodeId: string, branchKey: string) {
     nav.navigateToBranch(nodeId, branchKey)
 }
 
@@ -123,9 +120,9 @@ const terminalBranchButtons = computed(() => {
     const last = displayedNodes.value.at(-1)
     if (!last || !lastNodeIsBranchingTerminal.value) return []
     if (last.type === 'send_message') {
-        return (last.config?.buttons ?? []).map((btn) => ({
-            key: btn.id,
-            label: typeof btn.label === 'object' ? Object.values(btn.label)[0] ?? 'Button' : (btn.label || 'Button'),
+        return (last.config?.buttons as Array<Record<string, unknown>> ?? []).map((btn) => ({
+            key: btn.id as string,
+            label: typeof btn.label === 'object' ? (Object.values(btn.label as Record<string, unknown>)[0] as string ?? 'Button') : (String(btn.label) || 'Button'),
         }))
     }
     return []
@@ -140,7 +137,7 @@ const terminalBranchButtons = computed(() => {
             <!-- Trigger (root only) -->
             <template v-if="nav.path.length === 0">
                 <TriggerCard
-                    :trigger="trigger"
+                    :trigger="trigger ?? undefined"
                     @select="selection.select('__trigger__')"
                 />
             </template>
@@ -148,7 +145,7 @@ const terminalBranchButtons = computed(() => {
             <!-- Nodes -->
             <template v-for="(node, i) in displayedNodes" :key="node.id">
                 <SeqConnector />
-                <InsertPoint :after-node-id="i === 0 ? null : displayedNodes[i - 1]?.id" />
+                <InsertPoint :after-node-id="i === 0 ? null : (displayedNodes[i - 1]?.id ?? null)" />
                 <SeqConnector />
 
                 <NodeCard
@@ -163,7 +160,7 @@ const terminalBranchButtons = computed(() => {
             <!-- End: normal sequence tail -->
             <template v-if="!lastNodeIsBranchingTerminal">
                 <SeqConnector />
-                <InsertPoint :after-node-id="displayedNodes.at(-1)?.id ?? null" />
+                <InsertPoint :after-node-id="(displayedNodes.at(-1)?.id) ?? null" />
                 <SeqConnector />
                 <EndCard />
             </template>
@@ -176,7 +173,7 @@ const terminalBranchButtons = computed(() => {
                         v-for="btn in terminalBranchButtons"
                         :key="btn.key"
                         class="branch-entry-btn"
-                        @click="onNavigateBranch(displayedNodes.at(-1).id, btn.key)"
+                        @click="onNavigateBranch(displayedNodes.at(-1)!.id, btn.key)"
                     >
                         ▶ {{ btn.label }}
                     </button>

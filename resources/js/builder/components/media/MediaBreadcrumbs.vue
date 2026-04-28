@@ -1,7 +1,9 @@
-<script setup>
+<script setup lang="ts">
+interface Crumb { id: string; name: string }
+
 defineProps({
-    breadcrumbs: { type: Array, default: () => [] },
-    currentFolderId: { type: String, default: null },
+    breadcrumbs: { type: Array as () => Crumb[], default: () => [] },
+    currentFolderId: { type: String as () => string | null, default: null },
 })
 
 const emit = defineEmits(['navigate'])

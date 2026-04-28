@@ -1,8 +1,8 @@
-<script setup>
-import { computed, ref, watch } from 'vue'
-import { useSelectionStore } from '@builder/store/selectionStore'
-import { useBuilderStore } from '@builder/store/builderStore'
-import { nodeColors } from '@builder/utils/nodeColors'
+<script setup lang="ts">
+import {computed, ref, watch} from 'vue'
+import {useSelectionStore} from '@builder/store/selectionStore'
+import {useBuilderStore} from '@builder/store/builderStore'
+import {nodeColors} from '@builder/utils/nodeColors'
 
 
 const props = defineProps({
@@ -28,19 +28,19 @@ function selectCard() {
     selectionStore.select(props.treeNode.node.id)
 }
 
-function selectBranch(handle) {
+function selectBranch(handle: string) {
     activeHandle.value = handle
-    selectionStore.setActiveBranch([...props.parentBranch, props.treeNode.node.id, handle])
+    selectionStore.setActiveBranch([...(props.parentBranch as string[]), props.treeNode.node.id, handle])
 }
 
-function branchClass(handle) {
+function branchClass(handle: string): string {
     if (handle === 'yes') return 'branch-btn branch-yes'
     if (handle === 'no')  return 'branch-btn branch-no'
     return 'branch-btn branch-default'
 }
 
-function childCount(handle) {
-    return props.treeNode.childrenByHandle?.[handle]?.length ?? 0
+function childCount(handle: string): number {
+    return (props.treeNode.childrenByHandle?.[handle] as unknown[])?.length ?? 0
 }
 </script>
 

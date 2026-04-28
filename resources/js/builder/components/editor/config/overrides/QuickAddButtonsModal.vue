@@ -1,5 +1,5 @@
-<script setup>
-import { nextTick, ref, useTemplateRef, watch } from 'vue'
+<script setup lang="ts">
+import {nextTick, ref, useTemplateRef, watch} from 'vue'
 import BaseModal from './BaseModal.vue'
 
 const props = defineProps({
@@ -9,7 +9,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'confirm'])
 
-const chips = ref([])
+const chips = ref<string[]>([])
 const inputValue = ref('')
 const inputRef = useTemplateRef('inputRef')
 
@@ -29,7 +29,7 @@ function commitChip() {
     inputValue.value = ''
 }
 
-function onInputKeydown(e) {
+function onInputKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter' || e.key === ',') {
         e.preventDefault()
         commitChip()
@@ -40,7 +40,7 @@ function onInputKeydown(e) {
     }
 }
 
-function removeChip(index) {
+function removeChip(index: number) {
     chips.value.splice(index, 1)
 }
 

@@ -1,5 +1,5 @@
-<script setup>
-import { useBuilderStore } from '@builder/store/builderStore'
+<script setup lang="ts">
+import {useBuilderStore} from '@builder/store/builderStore'
 import FlowStructureNode from './FlowStructureNode.vue'
 
 const builderStore = useBuilderStore()

@@ -1,14 +1,14 @@
-<script setup>
-import { nextTick, onUnmounted, ref, watch } from 'vue'
-import { useFlowVariables } from '@builder/composables/useFlowVariables'
+<script setup lang="ts">
+import {nextTick, onUnmounted, ref, watch} from 'vue'
+import {useFlowVariables} from '@builder/composables/useFlowVariables'
 
 const { groups } = useFlowVariables()
 
 const open         = ref(false)
-const copied       = ref(null)
-const rootRef      = ref(null)
-const popoverRef   = ref(null)
-const popoverStyle = ref({})
+const copied       = ref<string | null>(null)
+const rootRef      = ref<HTMLElement | null>(null)
+const popoverRef   = ref<HTMLElement | null>(null)
+const popoverStyle = ref<Record<string, string>>({})
 
 function reposition() {
     if (!rootRef.value) return
@@ -21,9 +21,9 @@ function reposition() {
 }
 
 // ── Click-outside to close ────────────────────────────────────────────────────
-function onDocClick(e) {
-    const inTrigger = rootRef.value?.contains(e.target)
-    const inPopover = popoverRef.value?.contains(e.target)
+function onDocClick(e: MouseEvent) {
+    const inTrigger = rootRef.value?.contains(e.target as Node)
+    const inPopover = popoverRef.value?.contains(e.target as Node)
     if (!inTrigger && !inPopover) open.value = false
 }
 
@@ -40,18 +40,20 @@ watch(open, async (val) => {
 onUnmounted(() => document.removeEventListener('mousedown', onDocClick, { capture: true }))
 
 // ── Actions ───────────────────────────────────────────────────────────────────
-function snippet(key) { return `{{${key}}}` }
+function snippet(key: string) { return `{{${key}}}` }
 
-async function copyVar(key) {
+async function copyVar(key: string) {
     const snippet = `{{${key}}}`
     try { await navigator.clipboard.writeText(snippet) } catch { /* ignore */ }
     copied.value = key
     setTimeout(() => { copied.value = null }, 1400)
 }
 
-function onDragStart(key, e) {
-    e.dataTransfer.setData('text/plain', `{{${key}}}`)
-    e.dataTransfer.effectAllowed = 'copy'
+function onDragStart(key: string, e: DragEvent) {
+    if (e.dataTransfer) {
+        e.dataTransfer.setData('text/plain', `{{${key}}}`)
+        e.dataTransfer.effectAllowed = 'copy'
+    }
 }
 </script>
 

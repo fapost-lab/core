@@ -1,10 +1,18 @@
-<script setup>
-import { computed, ref, watch } from 'vue'
+<script setup lang="ts">
+import {computed, ref, watch} from 'vue'
 import BaseModal from './BaseModal.vue'
+
+interface KbButton {
+    id: string
+    label?: unknown
+    row?: number
+    order?: number
+    [key: string]: unknown
+}
 
 const props = defineProps({
     open:    { type: Boolean, required: true },
-    buttons: { type: Array,   required: true },
+    buttons: { type: Array as () => KbButton[], required: true },
 })
 
 const emit = defineEmits(['close', 'update'])
@@ -14,7 +22,7 @@ const MIN_DIM  = 1
 const MAX_DIM  = 10
 
 // Working copy of buttons — committed only on Apply
-const draft = ref([])
+const draft = ref<KbButton[]>([])
 const cols  = ref(1)
 const rows  = ref(1)
 
@@ -25,19 +33,19 @@ watch(() => props.open, (val) => {
 // Initial setup. If existing layout looks "unset" (all in row 0 with sequential
 // orders, or all unplaced), default to a single horizontal row of buttons.
 function initFromProps() {
-    const src = props.buttons.map((b) => ({ ...b }))
-    const placed = src.filter((b) => (b.order ?? UNPLACED) < UNPLACED)
-    const distinctRows = new Set(placed.map((b) => b.row ?? 0))
+    const src: KbButton[] = props.buttons.map((b: KbButton) => ({ ...b }))
+    const placed = src.filter((b: KbButton) => (b.order ?? UNPLACED) < UNPLACED)
+    const distinctRows = new Set(placed.map((b: KbButton) => b.row ?? 0))
     const isFlat = placed.length === src.length && distinctRows.size <= 1
 
     if (isFlat || src.length === 0) {
         // Lay everything in row 0, columns = buttons count.
-        src.forEach((b, idx) => { b.row = 0; b.order = idx })
+        src.forEach((b: KbButton, idx: number) => { b.row = 0; b.order = idx })
         cols.value = Math.min(MAX_DIM, Math.max(MIN_DIM, src.length || 1))
         rows.value = 1
     } else {
-        const maxCol = Math.max(0, ...placed.map((b) => b.order ?? 0))
-        const maxRow = Math.max(0, ...placed.map((b) => b.row ?? 0))
+        const maxCol = Math.max(0, ...placed.map((b: KbButton) => b.order ?? 0))
+        const maxRow = Math.max(0, ...placed.map((b: KbButton) => b.row ?? 0))
         cols.value = Math.min(MAX_DIM, Math.max(MIN_DIM, maxCol + 1))
         rows.value = Math.min(MAX_DIM, Math.max(MIN_DIM, maxRow + 1))
     }
@@ -46,7 +54,7 @@ function initFromProps() {
 
 // Map: { 'row-col': button-id } for current draft
 const grid = computed(() => {
-    const g = Array.from({ length: rows.value }, () => Array(cols.value).fill(null))
+    const g: (string | null)[][] = Array.from({ length: rows.value }, () => Array(cols.value).fill(null))
     for (const btn of draft.value) {
         const r = btn.row ?? 0
         const c = btn.order ?? UNPLACED
@@ -57,37 +65,37 @@ const grid = computed(() => {
     return g
 })
 
-const unplaced = computed(() =>
-    draft.value.filter((b) => (b.order ?? UNPLACED) >= cols.value || (b.row ?? 0) >= rows.value),
+const unplaced = computed((): KbButton[] =>
+    draft.value.filter((b: KbButton) => (b.order ?? UNPLACED) >= cols.value || (b.row ?? 0) >= rows.value),
 )
 
-const btnMap = computed(() => Object.fromEntries(draft.value.map((b) => [b.id, b])))
+const btnMap = computed((): Record<string, KbButton> => Object.fromEntries(draft.value.map((b: KbButton) => [b.id, b])))
 
-function resolveLabel(btn) {
+function resolveLabel(btn: KbButton): string {
     const lbl = btn?.label
     if (!lbl) return '…'
-    return typeof lbl === 'object' ? (Object.values(lbl)[0] || '…') : (String(lbl) || '…')
+    return typeof lbl === 'object' ? (Object.values(lbl as Record<string, unknown>)[0] as string || '…') : (String(lbl) || '…')
 }
 
 // Resize controls — buttons that fall out of new bounds become unplaced.
-function setCols(delta) {
+function setCols(delta: number) {
     const next = clamp(cols.value + delta)
     if (next === cols.value) return
     cols.value = next
     ejectOutOfBounds()
 }
 
-function setRows(delta) {
+function setRows(delta: number) {
     const next = clamp(rows.value + delta)
     if (next === rows.value) return
     rows.value = next
     ejectOutOfBounds()
 }
 
-function clamp(v) { return Math.min(MAX_DIM, Math.max(MIN_DIM, v)) }
+function clamp(v: number) { return Math.min(MAX_DIM, Math.max(MIN_DIM, v)) }
 
 function ejectOutOfBounds() {
-    draft.value = draft.value.map((b) => {
+    draft.value = draft.value.map((b: KbButton) => {
         const c = b.order ?? UNPLACED
         const r = b.row ?? 0
         if (c >= cols.value || r >= rows.value) return { ...b, order: UNPLACED }
@@ -96,36 +104,38 @@ function ejectOutOfBounds() {
 }
 
 // ── Drag & drop ──────────────────────────────────────────────────────────────
-const dragId  = ref(null)
-const overKey = ref(null)
+const dragId  = ref<string | null>(null)
+const overKey = ref<string | null>(null)
 
-function onDragStart(id, e) {
+function onDragStart(id: string, e: DragEvent) {
     dragId.value = id
-    e.dataTransfer.effectAllowed = 'move'
-    try { e.dataTransfer.setData('text/plain', id) } catch { /* Safari quirk */ }
+    if (e.dataTransfer) {
+        e.dataTransfer.effectAllowed = 'move'
+        try { e.dataTransfer.setData('text/plain', id) } catch { /* Safari quirk */ }
+    }
 }
 function onDragEnd() { dragId.value = null; overKey.value = null }
 
-function onCellDragOver(e, r, c) { e.preventDefault(); overKey.value = `${r}-${c}` }
-function onUnplacedDragOver(e)    { e.preventDefault(); overKey.value = 'unplaced' }
-function onDragLeave(key)         { if (overKey.value === key) overKey.value = null }
+function onCellDragOver(e: DragEvent, r: number, c: number) { e.preventDefault(); overKey.value = `${r}-${c}` }
+function onUnplacedDragOver(e: DragEvent)    { e.preventDefault(); overKey.value = 'unplaced' }
+function onDragLeave(key: string)         { if (overKey.value === key) overKey.value = null }
 
-function isCellOver(r, c) { return overKey.value === `${r}-${c}` }
+function isCellOver(r: number, c: number) { return overKey.value === `${r}-${c}` }
 function isUnplacedOver()  { return overKey.value === 'unplaced' }
 
-function onDropCell(r, c) {
+function onDropCell(r: number, c: number) {
     const srcId = dragId.value
     if (!srcId) return
 
     const occupantId = grid.value[r]?.[c] ?? null
     if (srcId === occupantId) return onDragEnd()
 
-    const next = draft.value.map((b) => ({ ...b }))
-    const src  = next.find((b) => b.id === srcId)
+    const next = draft.value.map((b: KbButton) => ({ ...b }))
+    const src  = next.find((b: KbButton) => b.id === srcId)
     if (!src) return onDragEnd()
 
     if (occupantId) {
-        const occ = next.find((b) => b.id === occupantId)
+        const occ = next.find((b: KbButton) => b.id === occupantId)
         if (occ) { occ.row = src.row ?? 0; occ.order = src.order ?? UNPLACED }
     }
     src.row = r
@@ -138,7 +148,7 @@ function onDropCell(r, c) {
 function onDropUnplaced() {
     const srcId = dragId.value
     if (!srcId) return
-    draft.value = draft.value.map((b) => b.id === srcId ? { ...b, row: 0, order: UNPLACED } : b)
+    draft.value = draft.value.map((b: KbButton) => b.id === srcId ? { ...b, row: 0, order: UNPLACED } : b)
     onDragEnd()
 }
 
@@ -146,7 +156,7 @@ function apply() {
     // Normalize: drop any UNPLACED markers — main panel decides their fate.
     // Rather than dumping them into row 0, we leave them with order=UNPLACED;
     // the parent normalizes them into the last materialized row on save.
-    emit('update', draft.value.map((b) => ({ ...b })))
+    emit('update', draft.value.map((b: KbButton) => ({ ...b })))
     emit('close')
 }
 

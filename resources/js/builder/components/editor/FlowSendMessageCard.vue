@@ -1,9 +1,9 @@
-<script setup>
-import { computed } from 'vue'
-import { useSelectionStore } from '@builder/store/selectionStore'
-import { useBuilderStore } from '@builder/store/builderStore'
-import { nodeColors } from '@builder/utils/nodeColors'
-import { countDescendants } from '@builder/utils/buildTree'
+<script setup lang="ts">
+import {computed} from 'vue'
+import {useSelectionStore} from '@builder/store/selectionStore'
+import {useBuilderStore} from '@builder/store/builderStore'
+import {nodeColors} from '@builder/utils/nodeColors'
+import {countDescendants, type TreeNode} from '@builder/utils/buildTree'
 
 const props = defineProps({
     treeNode:     { type: Object, required: true },
@@ -25,20 +25,26 @@ function selectCard() {
     selectionStore.select(node.value.id)
 }
 
-function selectBranch(buttonId) {
-    selectionStore.setActiveBranch([...props.parentBranch, node.value.id, buttonId])
+interface KbButton {
+    id: string
+    label?: unknown
+    [key: string]: unknown
 }
 
-function btnLabel(btn) {
+function selectBranch(buttonId: string) {
+    selectionStore.setActiveBranch([...(props.parentBranch as string[]), node.value.id, buttonId])
+}
+
+function btnLabel(btn: KbButton): string {
     const lbl = btn.label
     if (!lbl) return 'Button'
-    if (typeof lbl === 'object') return Object.values(lbl)[0] ?? 'Button'
-    return lbl
+    if (typeof lbl === 'object') return String(Object.values(lbl as Record<string, unknown>)[0] ?? 'Button')
+    return String(lbl)
 }
 
-function childCount(buttonId) {
-    const children = props.treeNode.childrenByHandle?.[buttonId] ?? []
-    return children.reduce((sum, child) => sum + 1 + countDescendants(child), 0)
+function childCount(buttonId: string): number {
+    const children: TreeNode[] = (props.treeNode.childrenByHandle?.[buttonId] ?? []) as TreeNode[]
+    return children.reduce((sum: number, child: TreeNode) => sum + 1 + countDescendants(child), 0)
 }
 
 const textPreview = computed(() => {

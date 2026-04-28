@@ -34,7 +34,7 @@ final readonly class ConfigTenantResolver implements TenantResolverInterface
             throw TenantNotFoundException::forSlug($slug);
         }
 
-        if (!$tenant->isActive()) {
+        if ( ! $tenant->isActive()) {
             throw new TenantNotActiveException(
                 "Tenant [{$slug}] is not active."
             );

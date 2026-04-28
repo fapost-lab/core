@@ -1,10 +1,10 @@
-<script setup>
-import { computed } from 'vue'
-import { useRegistryStore }  from '@builder/store/registryStore'
-import { nodeColors }        from '@builder/utils/nodeColors'
-import ConditionConfig   from './NodeConfig/ConditionConfig.vue'
+<script setup lang="ts">
+import {computed} from 'vue'
+import {useRegistryStore} from '@builder/store/registryStore'
+import {nodeColors} from '@builder/utils/nodeColors'
+import ConditionConfig from './NodeConfig/ConditionConfig.vue'
 import SendMessageConfig from './NodeConfig/SendMessageConfig.vue'
-import DefaultConfig     from './NodeConfig/DefaultConfig.vue'
+import DefaultConfig from './NodeConfig/DefaultConfig.vue'
 
 const props = defineProps({
     node: { type: Object, required: true },
@@ -16,7 +16,7 @@ const registry = useRegistryStore()
 const colors   = computed(() => nodeColors(props.node.type))
 
 const configComponent = computed(() => {
-    const map = {
+    const map: Record<string, object> = {
         condition:    ConditionConfig,
         send_message: SendMessageConfig,
     }
@@ -28,7 +28,7 @@ const schema = computed(() => {
     return handler?.config_schema ?? {}
 })
 
-function onConfigUpdate(newConfig) {
+function onConfigUpdate(newConfig: unknown) {
     emit('update', props.node.id, newConfig)
 }
 </script>

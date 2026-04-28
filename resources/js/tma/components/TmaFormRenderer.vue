@@ -1,4 +1,5 @@
-<script setup>
+<script setup lang="ts">
+import type {FormAnswers, FormField} from '@tma/dto/types'
 import TmaTextField from './fields/TmaTextField.vue'
 import TmaSelectField from './fields/TmaSelectField.vue'
 import TmaCheckboxField from './fields/TmaCheckboxField.vue'
@@ -9,14 +10,18 @@ const FIELD_COMPONENTS = {
     checkbox: TmaCheckboxField,
 }
 
-const props = defineProps({
-    fields: { type: Array, required: true },
-    answers: { type: Object, required: true },
-})
+interface Props {
+    fields: FormField[]
+    answers: FormAnswers
+}
 
-const emit = defineEmits(['update:answers'])
+const props = defineProps<Props>()
 
-function update(fieldId, value) {
+const emit = defineEmits<{
+    'update:answers': [value: FormAnswers]
+}>()
+
+function update(fieldId: string, value: string | boolean) {
     emit('update:answers', { ...props.answers, [fieldId]: value })
 }
 </script>

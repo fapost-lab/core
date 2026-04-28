@@ -1,8 +1,8 @@
-<script setup>
-import { computed } from 'vue'
+<script setup lang="ts">
+import {computed} from 'vue'
 
 const props = defineProps({
-    config: { type: Object, default: () => ({}) },
+    config: { type: Object as () => Record<string, unknown>, default: () => ({}) },
 })
 
 const text = computed(() => {
@@ -16,7 +16,7 @@ const buttonCount = computed(() => {
     return Array.isArray(props.config.buttons) ? props.config.buttons.length : 0
 })
 
-const CONTENT_TYPE_LABELS = {
+const CONTENT_TYPE_LABELS: Record<string, string> = {
     text:               'Text',
     text_with_keyboard: 'Text with keyboard',
     image:              'Image',
@@ -27,7 +27,7 @@ const CONTENT_TYPE_LABELS = {
 
 const contentType = computed(() => {
     const raw = props.config.content_type ?? 'text'
-    return CONTENT_TYPE_LABELS[raw] ?? raw
+    return CONTENT_TYPE_LABELS[String(raw)] ?? String(raw)
 })
 </script>
 
