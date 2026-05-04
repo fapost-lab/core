@@ -25,7 +25,10 @@ final readonly class PublishFlowService
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            $result = $this->validator->execute(is_array($draft->nodes) ? $draft->nodes : []);
+            $result = $this->validator->execute(
+                nodes: is_array($draft->nodes) ? $draft->nodes : [],
+                edges: is_array($draft->edges) ? $draft->edges : [],
+            );
             if ( ! $result->valid) {
                 throw new FlowValidationException($result->errors);
             }

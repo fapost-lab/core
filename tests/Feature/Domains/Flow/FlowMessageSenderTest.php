@@ -14,7 +14,6 @@ use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\FlowMessageSender;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
-use App\Domains\Media\Contracts\MediaServiceInterface;
 use App\Domains\Media\DTO\DispatchResult;
 use App\Domains\Media\Enums\MediaSource;
 use App\Domains\Media\Models\MediaBlob;
@@ -87,7 +86,6 @@ final class FlowMessageSenderTest extends FeatureTestCase
 
         $flowSender = new FlowMessageSender(
             $sender,
-            Mockery::mock(MediaServiceInterface::class),
             Mockery::mock(MediaDispatcherInterface::class),
         );
 
@@ -167,7 +165,6 @@ final class FlowMessageSenderTest extends FeatureTestCase
 
         $flowSender = new FlowMessageSender(
             $sender,
-            Mockery::mock(MediaServiceInterface::class),
             Mockery::mock(MediaDispatcherInterface::class),
         );
 
@@ -260,15 +257,12 @@ final class FlowMessageSenderTest extends FeatureTestCase
             )->andReturn(new DeliveryResult(sent: true, providerMessageId: 'provider-img'));
         });
 
-        $mediaService = Mockery::mock(MediaServiceInterface::class);
-        $mediaService->shouldReceive('find')->with($mediaFile->id)->andReturn($mediaFile->fresh());
-
         $dispatcher = Mockery::mock(MediaDispatcherInterface::class);
         $dispatcher->shouldReceive('ensureUploadedToChannel')->once()->andReturn(
             new DispatchResult(providerFileId: 'cached-file-id', alreadyDelivered: false),
         );
 
-        $flowSender        = new FlowMessageSender($sender, $mediaService, $dispatcher);
+        $flowSender        = new FlowMessageSender($sender, $dispatcher);
         $providerMessageId = $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
             'node_id'         => 'node-img',
             'idempotency_key' => 'idem-img',
@@ -348,9 +342,6 @@ final class FlowMessageSenderTest extends FeatureTestCase
             $mock->shouldNotReceive('send');
         });
 
-        $mediaService = Mockery::mock(MediaServiceInterface::class);
-        $mediaService->shouldReceive('find')->with($mediaFile->id)->andReturn($mediaFile->fresh());
-
         $dispatcher = Mockery::mock(MediaDispatcherInterface::class);
         $dispatcher->shouldReceive('ensureUploadedToChannel')->once()->andReturn(
             new DispatchResult(
@@ -360,7 +351,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
             ),
         );
 
-        $flowSender = new FlowMessageSender($sender, $mediaService, $dispatcher);
+        $flowSender = new FlowMessageSender($sender, $dispatcher);
 
         $providerMessageId = $flowSender->send($tenantId, (string)$contact->getKey(), (string)$session->getKey(), [
             'node_id'         => 'node-uas',

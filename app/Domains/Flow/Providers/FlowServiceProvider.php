@@ -160,7 +160,6 @@ final class FlowServiceProvider extends ServiceProvider
             MessageSenderInterface::class,
             fn ($app): FlowMessageSender => new FlowMessageSender(
                 $app->make(OutboundMessageSenderInterface::class),
-                $app->make(MediaServiceInterface::class),
                 $app->make(\App\Domains\Media\Contracts\MediaDispatcherInterface::class),
             )
         );

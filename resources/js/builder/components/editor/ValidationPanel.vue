@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import {useBuilderStore} from '@builder/store/builderStore';
+import {useRegistryStore} from '@builder/store/registryStore';
 import {useSelectionStore} from '@builder/store/selectionStore';
 import {useValidation} from '@builder/composables/useValidation';
 
 const store = useBuilderStore();
+const registryStore = useRegistryStore();
 const selectionStore = useSelectionStore();
 const { validate } = useValidation();
 
@@ -18,6 +20,29 @@ function jumpToNode(error: { path?: string; message?: string }) {
     selectionStore.select(nodeId);
     const target = document.getElementById(`node-card-${nodeId}`);
     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function humanPath(path: string | undefined): string {
+    if (!path) return '';
+
+    if (path.startsWith('trigger.')) {
+        const rest = path.slice('trigger.'.length);
+        return rest ? `Trigger → ${rest}` : 'Trigger';
+    }
+
+    const match = path.match(/^nodes\.([^.]+)(?:\.(.+))?$/);
+    if (!match) return path;
+
+    const nodeId = match[1];
+    const rest   = match[2];
+
+    const node = store.definition.nodes.find((n) => n.id === nodeId);
+    if (!node) return path;
+
+    const typeInfo  = registryStore.getByType(node.type, node.version ?? 1);
+    const nodeLabel = typeInfo?.label ?? node.type;
+
+    return rest ? `${nodeLabel} → ${rest}` : nodeLabel;
 }
 </script>
 
@@ -53,7 +78,7 @@ function jumpToNode(error: { path?: string; message?: string }) {
                     >
                         <span class="val-dot">●</span>
                         <div>
-                            <code class="val-path">{{ error.path }}</code>
+                            <code class="val-path">{{ humanPath(error.path) }}</code>
                             <div class="val-msg">{{ error.message }}</div>
                         </div>
                     </button>

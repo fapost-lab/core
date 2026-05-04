@@ -10,7 +10,6 @@ use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
-use App\Domains\Media\Contracts\MediaServiceInterface;
 use App\Domains\Media\DTO\DispatchResult;
 use App\Domains\Media\Exceptions\MediaDeletedException;
 use App\Domains\Media\Exceptions\MediaNotFoundException;
@@ -26,7 +25,6 @@ final readonly class FlowMessageSender implements MessageSenderInterface
 {
     public function __construct(
         private OutboundMessageSenderInterface $sender,
-        private MediaServiceInterface $mediaService,
         private MediaDispatcherInterface $mediaDispatcher,
     ) {
     }
@@ -65,7 +63,7 @@ final readonly class FlowMessageSender implements MessageSenderInterface
         $contentType = SendMessageContentType::from((string)$payload['content_type']);
 
         if ($contentType->requiresMediaUrl()) {
-            $dispatch = $this->resolveMediaDispatch($payload, $channel, $chatId);
+            $dispatch = $this->resolveMediaDispatch($payload, $channel, $chatId, $tenantId);
 
             if ($dispatch->alreadyDelivered) {
                 return $dispatch->deliveredMessageId ?? 'default';
@@ -104,9 +102,12 @@ final readonly class FlowMessageSender implements MessageSenderInterface
      * `alreadyDelivered = true` — the bytes were shipped to the recipient as part of
      * the upload and the sender pipeline must skip its own send.
      *
+     * Queries MediaFile directly with tenantId to avoid a scoped-in-singleton
+     * dependency issue: FlowMessageSender is a singleton while MediaService is scoped.
+     *
      * @param  array<string, mixed>  $payload
      */
-    private function resolveMediaDispatch(array $payload, Channel $channel, string $chatId): DispatchResult
+    private function resolveMediaDispatch(array $payload, Channel $channel, string $chatId, string $tenantId): DispatchResult
     {
         $mediaFileId = is_string($payload['media_file_id'] ?? null) ? $payload['media_file_id'] : null;
 
@@ -114,7 +115,11 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             throw new RuntimeException('Media send payload missing media_file_id.');
         }
 
-        $media = $this->mediaService->find($mediaFileId);
+        $media = MediaFile::query()
+            ->withTrashed()
+            ->where('tenant_id', $tenantId)
+            ->whereKey($mediaFileId)
+            ->first();
 
         if ( ! $media instanceof MediaFile) {
             throw MediaNotFoundException::forId($mediaFileId);

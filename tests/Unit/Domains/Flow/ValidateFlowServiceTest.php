@@ -9,6 +9,8 @@ use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Services\ValidateFlowService;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Contracts\TenantInterface;
 use FAPost\Foundation\Contracts\DataAccessorInterface;
 use FAPost\Foundation\Contracts\NodeHandlerInterface;
 use FAPost\Foundation\DTO\NodeExecutionContext;
@@ -200,6 +202,7 @@ final class ValidateFlowServiceTest extends TestCase
             dataAccessors: new NullDataAccessorRegistry(),
             triggerValidator: new NullTriggerConfigValidator(),
             tenantEvents: new NullTenantEventRepository(),
+            tenantContext: new NullTenantContext(),
         );
 
         $result = $service->execute([
@@ -370,6 +373,54 @@ final class ValidateFlowServiceTest extends TestCase
         $this->assertTrue($result->valid);
     }
 
+    public function test_send_message_with_legacy_media_url_fails_validation(): void
+    {
+        $service = $this->makeServiceWithSendMessage();
+
+        $result = $service->execute([
+            'n1' => [
+                'id'      => 'n1',
+                'type'    => 'send_message',
+                'version' => 1,
+                'config'  => [
+                    'content_type' => 'image',
+                    'media_url'    => 'https://example.com/img.jpg',
+                ],
+            ],
+        ]);
+
+        $this->assertFalse($result->valid);
+        $codes = array_column(
+            array_map(fn ($e) => ['code' => $e->code], $result->errors),
+            'code',
+        );
+        $this->assertContains('legacy_media_field', $codes);
+    }
+
+    public function test_send_message_with_legacy_media_path_fails_validation(): void
+    {
+        $service = $this->makeServiceWithSendMessage();
+
+        $result = $service->execute([
+            'n1' => [
+                'id'      => 'n1',
+                'type'    => 'send_message',
+                'version' => 1,
+                'config'  => [
+                    'content_type' => 'document',
+                    'media_path'   => '/storage/file.pdf',
+                ],
+            ],
+        ]);
+
+        $this->assertFalse($result->valid);
+        $codes = array_column(
+            array_map(fn ($e) => ['code' => $e->code], $result->errors),
+            'code',
+        );
+        $this->assertContains('legacy_media_field', $codes);
+    }
+
     private function makeServiceWithSendMessage(): ValidateFlowService
     {
         $registry = new NodeHandlerRegistry();
@@ -380,6 +431,7 @@ final class ValidateFlowServiceTest extends TestCase
             dataAccessors: new NullDataAccessorRegistry(),
             triggerValidator: new NullTriggerConfigValidator(),
             tenantEvents: new NullTenantEventRepository(),
+            tenantContext: new NullTenantContext(),
         );
     }
 }
@@ -450,6 +502,23 @@ final class NullTenantEventRepository implements TenantEventRepositoryInterface
     {
         return [];
     }
+}
+
+final class NullTenantContext implements TenantContextInterface
+{
+    public function set(TenantInterface $tenant): void {}
+
+    public function get(): TenantInterface
+    {
+        throw new LogicException('Tenant context not set in unit test.');
+    }
+
+    public function isResolved(): bool
+    {
+        return false;
+    }
+
+    public function reset(): void {}
 }
 
 final class SendMessageStubHandler implements NodeHandlerInterface

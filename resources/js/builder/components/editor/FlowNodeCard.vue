@@ -36,7 +36,8 @@ const summaryRows = computed(() => {
             image: 'Image', document: 'Document', video: 'Video', voice: 'Voice',
         }
         const rows = []
-        const text = config.text ?? config.caption ?? config.media_url ?? config.body ?? config.content_key ?? null
+        const mediaHint = config.media_file?.name ?? (config.media_file_id ? '(media)' : null)
+        const text = config.text ?? config.caption ?? mediaHint ?? config.body ?? config.content_key ?? null
         const rawType = String(config.content_type ?? 'text')
         if (text) rows.push({ key: 'Text', val: typeof text === 'object' ? Object.values(text)[0] : text, mono: false })
         rows.push({ key: 'Type', val: CONTENT_TYPE_LABELS[rawType] ?? rawType, muted: true })

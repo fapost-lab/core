@@ -51,9 +51,10 @@ final class AssistantPanelProvider extends PanelProvider
             ->path('assistant')
             ->login()
             ->spa()
+            ->sidebarFullyCollapsibleOnDesktop()
             ->font('Poppins')
             ->colors([
-                'primary' => Color::Amber,
+                'primary' => Color::Olive,
             ])
             ->plugins([
                 FilamentLanguageSwitcherPlugin::make()

@@ -7,6 +7,7 @@ namespace App\Filament\Resources\Media\Pages;
 use App\Domains\Media\Contracts\MediaServiceInterface;
 use App\Domains\Media\Contracts\MediaUploaderInterface;
 use App\Domains\Media\Enums\MediaSource;
+use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFolder;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
@@ -37,8 +38,22 @@ final class ListMedia extends ListRecords
     /** Currently browsed folder id; null = root. Persisted in URL so back-navigation works. */
     #[Url(as: 'folder', except: '')]
     public ?string          $currentFolderId = null;
-    protected static string $resource        = MediaResource::class;
-    protected string        $view            = 'filament.resources.media.pages.list-media';
+
+    // ── Delete-folder dialog state ────────────────────────────────────────────
+
+    public ?string $deleteFolderId       = null;
+    public string  $deleteFolderName     = '';
+    public int     $deleteFolderFiles    = 0;
+    public int     $deleteFolderChildren = 0;
+    public string  $deleteMoveToId       = '';
+
+    // ── Rename-folder dialog state ────────────────────────────────────────────
+
+    public ?string $renameFolderId   = null;
+    public string  $renameFolderName = '';
+
+    protected static string $resource = MediaResource::class;
+    protected string        $view     = 'filament.resources.media.pages.list-media';
 
     // ── Folder navigation ────────────────────────────────────────────────────
 
@@ -46,6 +61,166 @@ final class ListMedia extends ListRecords
     {
         $this->currentFolderId = $folderId;
         $this->resetTable();
+    }
+
+    // ── Delete folder ─────────────────────────────────────────────────────────
+
+    /**
+     * Populates dialog state and dispatches the Alpine open event.
+     */
+    public function initDeleteFolder(string $folderId): void
+    {
+        if ( ! $this->canManage()) {
+            return;
+        }
+
+        $folder = MediaFolder::query()->find($folderId);
+
+        if (null === $folder) {
+            return;
+        }
+
+        $this->deleteFolderId       = $folderId;
+        $this->deleteFolderName     = $folder->name;
+        $this->deleteFolderFiles    = MediaFile::query()->where('folder_id', $folderId)->count();
+        $this->deleteFolderChildren = MediaFolder::query()->where('parent_id', $folderId)->count();
+        $this->deleteMoveToId       = '';
+
+        $this->dispatch('open-delete-folder-dialog');
+    }
+
+    /**
+     * Moves direct files and direct subfolders to the chosen target (or root), then deletes the folder.
+     *
+     * Subfolders are re-parented via moveFolder() so their descendants' path_cache is updated correctly.
+     */
+    public function executeDeleteFolder(MediaServiceInterface $service): void
+    {
+        if ( ! $this->canManage() || null === $this->deleteFolderId) {
+            return;
+        }
+
+        $folder = MediaFolder::query()->find($this->deleteFolderId);
+
+        if (null === $folder) {
+            $this->deleteFolderId = null;
+
+            return;
+        }
+
+        $target = '' !== $this->deleteMoveToId
+            ? MediaFolder::query()->find($this->deleteMoveToId)
+            : null;
+
+        // Move direct files
+        MediaFile::query()
+            ->where('folder_id', $folder->id)
+            ->each(static fn (MediaFile $f) => $service->move($f, $target));
+
+        // Re-parent direct subfolders so they are not orphaned
+        MediaFolder::query()
+            ->where('parent_id', $folder->id)
+            ->each(static fn (MediaFolder $child) => $service->moveFolder($child, $target));
+
+        if ($this->currentFolderId === $folder->id) {
+            $this->currentFolderId = $target?->id ?? $folder->parent_id;
+        }
+
+        $service->deleteFolder($folder);
+
+        $this->deleteFolderId = null;
+
+        $this->resetTable();
+
+        Notification::make()
+            ->title(__('media.notifications.folder_deleted'))
+            ->success()
+            ->send();
+    }
+
+    /**
+     * Folder options for the move-to select — excludes the deleted folder and all its descendants
+     * (moving a folder into its own subtree would corrupt the tree).
+     *
+     * @return array<string, string>
+     */
+    public function folderOptionsForDelete(): array
+    {
+        if (null === $this->deleteFolderId) {
+            return $this->folderOptions();
+        }
+
+        $folder = MediaFolder::query()->find($this->deleteFolderId);
+
+        if (null === $folder) {
+            return $this->folderOptions();
+        }
+
+        $tenantId = app(TenantContextInterface::class)->get()->getId();
+
+        return MediaFolder::query()
+            ->where('tenant_id', $tenantId)
+            ->where('id', '!=', $this->deleteFolderId)
+            ->where('path_cache', 'not like', $folder->path_cache . '/%')
+            ->orderBy('path_cache')
+            ->pluck('path_cache', 'id')
+            ->all();
+    }
+
+    // ── Rename folder ─────────────────────────────────────────────────────────
+
+    /**
+     * Opens the rename dialog pre-filled with the current folder name.
+     */
+    public function initRenameFolder(string $folderId): void
+    {
+        if ( ! $this->canManage()) {
+            return;
+        }
+
+        $folder = MediaFolder::query()->find($folderId);
+
+        if (null === $folder) {
+            return;
+        }
+
+        $this->renameFolderId   = $folderId;
+        $this->renameFolderName = $folder->name;
+
+        $this->dispatch('open-rename-folder-dialog');
+    }
+
+    /**
+     * Persists the new folder name via the service layer.
+     */
+    public function executeRenameFolder(MediaServiceInterface $service): void
+    {
+        if ( ! $this->canManage() || null === $this->renameFolderId) {
+            return;
+        }
+
+        $name = mb_trim($this->renameFolderName);
+
+        if ('' === $name) {
+            return;
+        }
+
+        $folder = MediaFolder::query()->find($this->renameFolderId);
+
+        if (null === $folder) {
+            $this->renameFolderId = null;
+
+            return;
+        }
+
+        $service->renameFolder($folder, $name);
+
+        $this->renameFolderId = null;
+
+        Notification::make()
+            ->title(__('media.notifications.folder_renamed'))
+            ->success()
+            ->send();
     }
 
     public function table(Table $table): Table
@@ -64,18 +239,23 @@ final class ListMedia extends ListRecords
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /**
-     * @return array<int, array{id:string,name:string}>
+     * Flat list of all tenant folders ordered by path, with computed depth for indentation.
+     *
+     * @return array<int, array{id:string,name:string,depth:int}>
      */
-    public function getCurrentSubfolders(): array
+    public function getFolderTree(): array
     {
         $tenantId = app(TenantContextInterface::class)->get()->getId();
 
         return MediaFolder::query()
             ->where('tenant_id', $tenantId)
-            ->where('parent_id', $this->currentFolderId)
-            ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(static fn (MediaFolder $f): array => ['id' => $f->id, 'name' => $f->name])
+            ->orderBy('path_cache')
+            ->get(['id', 'name', 'path_cache'])
+            ->map(static fn (MediaFolder $f): array => [
+                'id'    => $f->id,
+                'name'  => $f->name,
+                'depth' => max(0, mb_substr_count($f->path_cache, '/') - 1),
+            ])
             ->all();
     }
 
@@ -206,7 +386,7 @@ final class ListMedia extends ListRecords
     protected function getViewData(): array
     {
         return [
-            'subfolders'        => $this->getCurrentSubfolders(),
+            'folderTree'        => $this->getFolderTree(),
             'folderBreadcrumbs' => $this->getFolderBreadcrumbs(),
         ];
     }
@@ -225,12 +405,13 @@ final class ListMedia extends ListRecords
     /**
      * @return array<string, string>
      */
-    private function folderOptions(): array
+    private function folderOptions(?string $exclude = null): array
     {
         $tenantId = app(TenantContextInterface::class)->get()->getId();
 
         return MediaFolder::query()
             ->where('tenant_id', $tenantId)
+            ->when(null !== $exclude, static fn ($q) => $q->where('id', '!=', $exclude))
             ->orderBy('path_cache')
             ->pluck('path_cache', 'id')
             ->all();

@@ -284,14 +284,15 @@ final class BuiltInNodeHandlersTest extends TestCase
         ], [], $this->context(nodeId: 'node-img-bad'));
     }
 
-    public function test_send_message_rejects_legacy_media_url_field(): void
+    public function test_send_message_strips_legacy_media_url_and_requires_media_file_id(): void
     {
         $sender     = Mockery::mock(MessageSenderInterface::class);
         $translator = Mockery::mock(ContentTranslatorInterface::class);
         $handler    = $this->makeHandler($sender, $translator);
 
+        // legacy media_url is silently stripped; image without media_file_id fails on the next check
         $this->expectException(InvalidNodeConfigException::class);
-        $this->expectExceptionMessage('media_url');
+        $this->expectExceptionMessage('media_file_id');
 
         $handler->execute([
             'id'     => 'node-img-legacy',

@@ -29,7 +29,7 @@ return [
             'updated_at'     => 'Updated',
         ],
         'actions' => [
-            'open_builder' => 'Open builder',
+            'open_builder' => 'Builder',
             'activate'     => 'Activate',
             'deactivate'   => 'Deactivate',
         ],

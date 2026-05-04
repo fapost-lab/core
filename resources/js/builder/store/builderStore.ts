@@ -1,20 +1,20 @@
-import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
-import { nanoid } from 'nanoid'
-import { buildTree } from '@builder/utils/buildTree'
-import { useSelectionStore } from '@builder/store/selectionStore'
-import { useRegistryStore } from '@builder/store/registryStore'
+import {defineStore} from 'pinia'
+import {computed, ref} from 'vue'
+import {nanoid} from 'nanoid'
+import {buildTree} from '@builder/utils/buildTree'
+import {useSelectionStore} from '@builder/store/selectionStore'
+import {useRegistryStore} from '@builder/store/registryStore'
 import type {
-    ActiveTab,
-    BuilderFlowPayload,
-    BuilderTriggerPayload,
-    FlowDefinition,
-    FlowEdge,
-    FlowNode,
-    NodeConfig,
-    SaveStatus,
-    TriggerType,
-    ValidationResult,
+  ActiveTab,
+  BuilderFlowPayload,
+  BuilderTriggerPayload,
+  FlowDefinition,
+  FlowEdge,
+  FlowNode,
+  NodeConfig,
+  SaveStatus,
+  TriggerType,
+  ValidationResult,
 } from '@builder/dto/types'
 
 /** Internal full trigger shape (no delete marker). */
@@ -352,7 +352,13 @@ export const useBuilderStore = defineStore('builder', () => {
         const node = definition.value.nodes.find((n) => n.id === nodeId)
         if (!node) return
 
-        node.config = { ...(node.config ?? {}), ...patch }
+        const merged: NodeConfig = { ...(node.config ?? {}), ...patch }
+        for (const key of Object.keys(patch)) {
+            if ((patch as Record<string, unknown>)[key] === undefined) {
+                delete (merged as Record<string, unknown>)[key]
+            }
+        }
+        node.config = merged
 
         if (node.type === 'send_message' && Array.isArray(patch.buttons)) {
             const validHandles = new Set(

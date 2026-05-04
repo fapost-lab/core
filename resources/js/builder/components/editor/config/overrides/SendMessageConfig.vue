@@ -43,9 +43,9 @@ const mediaFile = computed(() => (config.value.media_file as MediaFile | null) ?
 
 function selectMediaFile(file: MediaFile | null) {
     if (file) {
-        update({ media_file: file, media_url: file.preview_url ?? '' })
+        update({ media_file: file, media_file_id: file.id, media_url: undefined, media_path: undefined })
     } else {
-        update({ media_file: null, media_url: '' })
+        update({ media_file: null, media_file_id: undefined })
     }
 }
 const isReplyKeyboard = computed(() => showsButtons.value && keyboardMode.value === 'reply')
@@ -184,18 +184,6 @@ function updateKeyboardMode(value: string) {
                     :kind="mediaPickerKind"
                     @update:value="selectMediaFile"
                 />
-            </div>
-
-            <div class="config-field">
-                <div class="field-label">or URL</div>
-                <input
-                    class="field-input"
-                    type="text"
-                    :value="mediaFile ? '' : String(config.media_url ?? '')"
-                    :disabled="!!mediaFile"
-                    placeholder="https://..."
-                    @input="update({ media_url: ($event.target as HTMLInputElement).value, media_file: null })"
-                >
             </div>
 
             <div v-if="showsCaption" class="config-field">

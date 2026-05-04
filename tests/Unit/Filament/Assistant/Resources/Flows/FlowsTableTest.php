@@ -21,7 +21,7 @@ final class FlowsTableTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_it_formats_message_trigger_summary(): void
+    public function test_it_formats_message_trigger_hint(): void
     {
         $trigger = new FlowTrigger();
         $trigger->forceFill([
@@ -32,15 +32,25 @@ final class FlowsTableTest extends TestCase
             ],
         ]);
 
-        $summary = FlowsTable::summarizeTrigger($trigger);
+        $html = FlowsTable::triggerHint($trigger);
 
-        $this->assertSame(
-            'Message: keywords help, support; phrases reset password',
-            $summary,
-        );
+        $this->assertNotNull($html);
+        $this->assertStringContainsString('help, support, reset password', $html);
+        $this->assertStringContainsString('class="fth"', $html);
     }
 
-    public function test_it_formats_event_trigger_summary(): void
+    public function test_it_returns_null_for_message_trigger_with_no_keywords(): void
+    {
+        $trigger = new FlowTrigger();
+        $trigger->forceFill([
+            'type'   => FlowTriggerType::Message,
+            'config' => ['keywords' => [], 'phrases' => []],
+        ]);
+
+        $this->assertNull(FlowsTable::triggerHint($trigger));
+    }
+
+    public function test_it_formats_event_trigger_hint(): void
     {
         $trigger = new FlowTrigger();
         $trigger->forceFill([
@@ -50,25 +60,50 @@ final class FlowsTableTest extends TestCase
             ],
         ]);
 
-        $summary = FlowsTable::summarizeTrigger($trigger);
+        $html = FlowsTable::triggerHint($trigger);
 
-        $this->assertSame('Event: employee_registered', $summary);
+        $this->assertNotNull($html);
+        $this->assertStringContainsString('employee_registered', $html);
+        $this->assertStringContainsString('class="fth"', $html);
     }
 
-    public function test_it_limits_long_lists_in_trigger_summary(): void
+    public function test_it_formats_api_trigger_hint(): void
     {
         $trigger = new FlowTrigger();
         $trigger->forceFill([
             'type'   => FlowTriggerType::Api,
             'config' => [
-                'route_key'       => 'start_onboarding',
-                'allowed_sources' => ['crm', 'portal', 'widget', 'mobile'],
+                'route_key' => 'start_onboarding',
             ],
         ]);
 
-        $summary = FlowsTable::summarizeTrigger($trigger);
+        $html = FlowsTable::triggerHint($trigger);
 
-        $this->assertStringContainsString('API: start_onboarding; sources crm, portal, widget +1', $summary);
+        $this->assertNotNull($html);
+        $this->assertStringContainsString('start_onboarding', $html);
+        $this->assertStringContainsString('class="fth"', $html);
+    }
+
+    public function test_it_limits_long_keyword_lists(): void
+    {
+        $trigger = new FlowTrigger();
+        $trigger->forceFill([
+            'type'   => FlowTriggerType::Message,
+            'config' => [
+                'keywords' => ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+                'phrases'  => [],
+            ],
+        ]);
+
+        $html = FlowsTable::triggerHint($trigger);
+
+        $this->assertNotNull($html);
+        $this->assertStringContainsString('+1', $html);
+    }
+
+    public function test_it_returns_null_for_null_trigger(): void
+    {
+        $this->assertNull(FlowsTable::triggerHint(null));
     }
 
     public function test_it_keeps_grouping_available_but_disabled_by_default(): void

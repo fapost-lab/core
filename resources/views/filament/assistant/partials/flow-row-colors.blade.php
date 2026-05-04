@@ -1,21 +1,26 @@
 <style>
-    tr.flow-row-active td {
-        background-color: rgb(220 252 231) !important;
-        border-top-color: rgb(134 239 172) !important;
-        border-bottom-color: rgb(134 239 172) !important;
+    .flow-name {
+        display: block;
     }
 
-    tr.flow-row-inactive td {
-        background-color: rgb(243 244 246) !important;
-        border-top-color: rgb(209 213 219) !important;
-        border-bottom-color: rgb(209 213 219) !important;
+    .fth {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+        margin-top: 0.125rem;
+        font-size: 0.6875rem;
+        font-style: italic;
+        color: var(--color-gray-400, #9ca3af);
+        line-height: 1.2;
     }
 
-    .dark tr.flow-row-active td {
-        background-color: rgb(6 78 59 / 0.18) !important;
+    .fth-icon {
+        width: 0.75rem;
+        height: 0.75rem;
+        flex-shrink: 0;
     }
 
-    .dark tr.flow-row-inactive td {
-        background-color: rgb(55 65 81 / 0.18) !important;
+    .dark .fth {
+        color: var(--color-gray-500, #6b7280);
     }
 </style>

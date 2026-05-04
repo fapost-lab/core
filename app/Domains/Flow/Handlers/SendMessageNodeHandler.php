@@ -109,6 +109,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                               . ".{$nodeId}.at"] = $timeoutAt->toIso8601String();
 
                 ResumeTimedOutSendMessageNodeJob::dispatch(
+                    tenantId: $context->tenantId,
                     sessionId: $context->sessionId,
                     nodeId: $nodeId,
                     platform: $context->platform,
@@ -184,10 +185,19 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
             throw new InvalidNodeConfigException('send_message text content requires text.');
         }
 
+        // Legacy fields from pre-media-library nodes.
+        // Try to recover media_file_id from the URL path (/media/files/{uuid}) before stripping.
         if (array_key_exists('media_url', $config) || array_key_exists('media_path', $config)) {
-            throw new InvalidNodeConfigException(
-                'send_message no longer accepts media_url/media_path; use media_file_id pointing at a media domain entry.',
-            );
+            $legacyUrl = is_string($config['media_url'] ?? null) ? $config['media_url'] : '';
+            if (
+                '' !== $legacyUrl
+                && ! isset($config['media_file_id'])
+                && preg_match('/\/media\/files\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i', $legacyUrl, $match)
+            ) {
+                $config['media_file_id'] = $match[1];
+            }
+
+            unset($config['media_url'], $config['media_path']);
         }
 
         if ($contentType->requiresMediaUrl() && ! is_string($config['media_file_id'] ?? null)) {

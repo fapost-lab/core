@@ -12,6 +12,7 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use FAPost\Foundation\Media\Enums\MediaKind;
 use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -20,12 +21,14 @@ use Filament\Actions\RestoreAction;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use RuntimeException;
 
@@ -145,6 +148,30 @@ final class MediaFilesTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    BulkAction::make('move')
+                        ->label(__('media.actions.move'))
+                        ->icon('heroicon-o-arrow-right-circle')
+                        ->color('gray')
+                        ->visible(static fn (): bool => self::userCanManage())
+                        ->schema(static fn (Schema $schema): Schema => $schema->components([
+                            Select::make('folder_id')
+                                ->label(__('media.fields.folder'))
+                                ->options(static fn (): array => self::folderOptions())
+                                ->placeholder(__('media.filters.root_folder')),
+                        ]))
+                        ->action(static function (array $data, Collection $records, MediaServiceInterface $service): void {
+                            $folder = isset($data['folder_id']) && '' !== $data['folder_id']
+                                ? MediaFolder::query()->find($data['folder_id'])
+                                : null;
+
+                            $records->each(static fn (MediaFile $record) => $service->move($record, $folder));
+
+                            Notification::make()
+                                ->title(__('media.notifications.files_moved', ['count' => $records->count()]))
+                                ->success()
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
                     DeleteBulkAction::make()->visible(static fn (): bool => self::userCanManage()),
                 ]),
             ])

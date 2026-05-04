@@ -11,8 +11,11 @@ use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\DTOs\FlowValidationResultDto;
 use App\Domains\Flow\Enums\FlowTriggerType;
+use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Media\Models\MediaFile;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use InvalidArgumentException;
 use LogicException;
 
@@ -23,6 +26,7 @@ final readonly class ValidateFlowService
         private DataAccessorRegistryInterface $dataAccessors,
         private FlowTriggerConfigValidatorInterface $triggerValidator,
         private TenantEventRepositoryInterface $tenantEvents,
+        private TenantContextInterface $tenantContext,
     ) {
     }
 
@@ -47,6 +51,7 @@ final readonly class ValidateFlowService
             $this->validateOutputs($node, $path, $nodeMap, $errors);
             $this->validateConditionNodeConnections($node, $path, $errors);
             $this->validateUnknownModuleReferences($node, $path, $errors);
+            $this->validateSendMessageMediaConfig($node, $path, $errors);
         }
 
         $this->validateInlineKeyboardIsTerminal($nodeMap, $edges, $errors);
@@ -262,6 +267,57 @@ final readonly class ValidateFlowService
                 );
             }
         });
+    }
+
+    /**
+     * Checks send_message nodes for legacy media fields and validates that any media_file_id
+     * references a non-deleted file in the media library.
+     *
+     * @param  array<string, mixed>  $node
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateSendMessageMediaConfig(array $node, string $path, array &$errors): void
+    {
+        if (($node['type'] ?? null) !== 'send_message') {
+            return;
+        }
+
+        $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+
+        if (array_key_exists('media_url', $config) || array_key_exists('media_path', $config)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config",
+                code: 'legacy_media_field',
+                message: 'This node uses a legacy media_url/media_path field. Please re-attach the file using the media library (media_file_id).',
+            );
+
+            return;
+        }
+
+        $rawContentType = $config['content_type'] ?? null;
+        $contentType    = is_string($rawContentType) ? SendMessageContentType::tryFrom($rawContentType) : null;
+
+        if ( ! $contentType instanceof SendMessageContentType || ! $contentType->requiresMediaUrl()) {
+            return;
+        }
+
+        $mediaFileId = $config['media_file_id'] ?? null;
+
+        if ( ! is_string($mediaFileId) || '' === $mediaFileId) {
+            return;
+        }
+
+        if ( ! $this->tenantContext->isResolved()) {
+            return;
+        }
+
+        if ( ! MediaFile::query()->where('id', $mediaFileId)->exists()) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.media_file_id",
+                code: 'media_file_not_found',
+                message: 'The referenced media file does not exist or has been deleted. Please re-attach the file.',
+            );
+        }
     }
 
     /**

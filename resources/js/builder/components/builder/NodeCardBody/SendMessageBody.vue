@@ -6,7 +6,8 @@ const props = defineProps({
 })
 
 const text = computed(() => {
-    const raw = props.config.text ?? props.config.caption ?? props.config.media_url
+    const mediaHint = (props.config.media_file as Record<string, unknown> | null)?.name ?? (props.config.media_file_id ? '(media)' : null)
+    const raw = props.config.text ?? props.config.caption ?? mediaHint
     if (!raw) return null
     const str = typeof raw === 'object' ? Object.values(raw)[0] ?? '' : String(raw)
     return str.length > 80 ? str.slice(0, 80) + '…' : str

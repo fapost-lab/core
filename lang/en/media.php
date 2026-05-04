@@ -8,15 +8,17 @@ return [
     'plural_model_label' => 'Media',
 
     'fields' => [
-        'name'          => 'Name',
-        'kind'          => 'Type',
-        'size'          => 'Size',
-        'folder'        => 'Folder',
-        'parent_folder' => 'Parent folder',
-        'mime_type'     => 'Mime type',
-        'references'    => 'Used in',
-        'uploaded_at'   => 'Uploaded',
-        'file'          => 'File',
+        'name'             => 'Name',
+        'kind'             => 'Type',
+        'size'             => 'Size',
+        'folder'           => 'Folder',
+        'parent_folder'    => 'Parent folder',
+        'mime_type'        => 'Mime type',
+        'references'       => 'Used in',
+        'uploaded_at'      => 'Uploaded',
+        'file'             => 'File',
+        'move_files_to'    => 'Move files to',
+        'move_contents_to' => 'Move contents to',
     ],
 
     'kinds' => [
@@ -33,23 +35,37 @@ return [
     ],
 
     'navigation' => [
-        'root' => 'All files',
-        'back' => 'Back',
+        'root'       => 'Root',
+        'back'       => 'Back',
+        'no_folders' => 'No folders yet',
     ],
 
     'actions' => [
-        'upload'        => 'Upload files',
-        'create_folder' => 'Create folder',
-        'rename'        => 'Rename',
-        'move'          => 'Move',
-        'references'    => 'See usage',
-        'close'         => 'Close',
-        'download'      => 'Download',
+        'upload'                     => 'Upload files',
+        'create_folder'              => 'Create folder',
+        'delete_folder'              => 'Delete folder',
+        'delete_folder_heading'      => 'Delete folder',
+        'delete_folder_confirm'      => 'This folder is empty. It will be permanently deleted.',
+        'delete_folder_has_files'    => 'This folder contains :count file(s). Choose where to move them before deleting.',
+        'delete_folder_has_children' => 'This folder contains :count subfolder(s). Choose where to move them before deleting.',
+        'delete_folder_has_both'     => 'This folder contains :files file(s) and :folders subfolder(s). Choose where to move everything before deleting.',
+        'rename_folder'              => 'Rename folder',
+        'rename'                     => 'Rename',
+        'save'                       => 'Save',
+        'move'                       => 'Move',
+        'references'                 => 'See usage',
+        'close'                      => 'Close',
+        'download'                   => 'Download',
+        'cancel'                     => 'Cancel',
+        'delete'                     => 'Delete',
     ],
 
     'notifications' => [
         'uploaded'       => ':count file(s) uploaded.',
         'folder_created' => 'Folder created.',
+        'folder_deleted' => 'Folder deleted.',
+        'folder_renamed' => 'Folder renamed.',
+        'files_moved'    => ':count file(s) moved.',
     ],
 
     'references' => [
