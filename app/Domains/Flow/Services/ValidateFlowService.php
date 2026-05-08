@@ -12,10 +12,13 @@ use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\DTOs\FlowValidationResultDto;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Enums\SendMessageContentType;
+use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Subflow\CallGraphValidator;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use Exception;
 use InvalidArgumentException;
 use LogicException;
 
@@ -27,6 +30,7 @@ final readonly class ValidateFlowService
         private FlowTriggerConfigValidatorInterface $triggerValidator,
         private TenantEventRepositoryInterface $tenantEvents,
         private TenantContextInterface $tenantContext,
+        private ?CallGraphValidator $callGraphValidator = null,
     ) {
     }
 
@@ -49,10 +53,17 @@ final readonly class ValidateFlowService
             $this->validateRegisteredNodeType($node, $path, $errors);
             $this->validateRequiredConfig($node, $path, $errors);
             $this->validateOutputs($node, $path, $nodeMap, $errors);
-            $this->validateConditionNodeConnections($node, $path, $errors);
+            $this->validateBranchNodeConnections($node, $path, $errors);
             $this->validateUnknownModuleReferences($node, $path, $errors);
             $this->validateSendMessageMediaConfig($node, $path, $errors);
+            $this->validateEmitEventConfig($node, $path, $errors);
+            $this->validateEndNodeConfig($node, $path, $errors);
+            $this->validateRagQueryConfig($node, $path, $errors);
+            $this->validateSubflowConfig($node, $path, $errors);
         }
+
+        $this->validateEndNodeOutgoingEdges($nodeMap, $edges, $errors);
+        $this->validateSubflowCallGraph($flowId, $nodeMap, $errors);
 
         $this->validateInlineKeyboardIsTerminal($nodeMap, $edges, $errors);
         $this->validateButtonEdgesMatchExistingButtons($nodeMap, $edges, $errors);
@@ -215,9 +226,9 @@ final readonly class ValidateFlowService
      * @param  array<string, mixed>  $node
      * @param  list<FlowValidationErrorDto>  $errors
      */
-    private function validateConditionNodeConnections(array $node, string $path, array &$errors): void
+    private function validateBranchNodeConnections(array $node, string $path, array &$errors): void
     {
-        if (($node['type'] ?? null) !== 'condition') {
+        if (($node['type'] ?? null) !== 'branch') {
             return;
         }
 
@@ -225,8 +236,8 @@ final readonly class ValidateFlowService
         if ( ! is_array($outputs) || ! isset($outputs['true'], $outputs['false'])) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.outputs",
-                code: 'condition_outputs_missing',
-                message: 'Condition nodes must have both true/false outputs.',
+                code: 'branch_outputs_missing',
+                message: 'Branch nodes must have both true/false outputs.',
             );
         }
     }
@@ -316,6 +327,257 @@ final readonly class ValidateFlowService
                 path: "{$path}.config.media_file_id",
                 code: 'media_file_not_found',
                 message: 'The referenced media file does not exist or has been deleted. Please re-attach the file.',
+            );
+        }
+    }
+
+    /**
+     * Enforces emit_event constraints from spec §07: event_type is a non-empty
+     * string, literal (no template placeholders), and matches the recommended
+     * naming convention (alphanumeric segments + dot). The full validity of
+     * the resolved payload is the handler's runtime responsibility.
+     *
+     * @param  array<string, mixed>  $node
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateEmitEventConfig(array $node, string $path, array &$errors): void
+    {
+        if (($node['type'] ?? null) !== 'emit_event') {
+            return;
+        }
+
+        $config    = is_array($node['config'] ?? null) ? $node['config'] : [];
+        $eventType = $config['event_type'] ?? null;
+
+        if ( ! is_string($eventType) || '' === mb_trim($eventType)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.event_type",
+                code: 'emit_event_missing_type',
+                message: 'emit_event requires a non-empty event_type.',
+            );
+
+            return;
+        }
+
+        if (str_contains($eventType, '{{')) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.event_type",
+                code: 'emit_event_template_in_type',
+                message: 'event_type must be a literal value, not a template expression.',
+            );
+
+            return;
+        }
+
+        if (1 !== preg_match('/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$/', $eventType)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.event_type",
+                code: 'emit_event_invalid_type',
+                message: 'event_type must contain only alphanumerics, underscores and dots (e.g. "sales.order.created").',
+            );
+        }
+    }
+
+    /**
+     * Enforces end-node config: status must be one of success / cancelled /
+     * failed (literal). Default applies if omitted at runtime, but a save-time
+     * value, if present, must match the allowed set.
+     *
+     * @param  array<string, mixed>  $node
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateEndNodeConfig(array $node, string $path, array &$errors): void
+    {
+        if (($node['type'] ?? null) !== EndNodeHandler::TYPE) {
+            return;
+        }
+
+        $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+        $status = $config['status'] ?? null;
+
+        if (null === $status) {
+            return; // handler applies default at runtime
+        }
+
+        if ( ! is_string($status) || ! in_array($status, EndNodeHandler::ALLOWED_END_STATUSES, true)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.status",
+                code: 'end_invalid_status',
+                message: 'end.status must be one of: ' . implode(', ', EndNodeHandler::ALLOWED_END_STATUSES) . '.',
+            );
+        }
+    }
+
+    /**
+     * Structural checks for the rag_query node config: knowledge_base_id is a
+     * non-empty literal, provider is a non-empty literal, query is present
+     * (template placeholders allowed). Existence of the KB row and validity
+     * of provider-specific options is the runtime registry's responsibility.
+     *
+     * @param  array<string, mixed>          $node
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateRagQueryConfig(array $node, string $path, array &$errors): void
+    {
+        if (($node['type'] ?? null) !== \App\Domains\Flow\Handlers\RagQueryNodeHandler::TYPE) {
+            return;
+        }
+
+        $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+
+        $kb = $config['knowledge_base_id'] ?? null;
+        if ( ! is_string($kb) || '' === mb_trim($kb)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.knowledge_base_id",
+                code: 'rag_missing_knowledge_base_id',
+                message: 'rag_query requires a non-empty knowledge_base_id.',
+            );
+        } elseif (str_contains($kb, '{{')) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.knowledge_base_id",
+                code: 'rag_template_in_knowledge_base_id',
+                message: 'knowledge_base_id must be a literal value, not a template expression.',
+            );
+        }
+
+        $provider = $config['provider'] ?? null;
+        if ( ! is_string($provider) || '' === mb_trim($provider)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.provider",
+                code: 'rag_missing_provider',
+                message: 'rag_query requires a non-empty provider id.',
+            );
+        }
+
+        $query = $config['query'] ?? null;
+        if ( ! is_string($query) || '' === mb_trim($query)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.query",
+                code: 'rag_missing_query',
+                message: 'rag_query requires a non-empty query template.',
+            );
+        }
+    }
+
+    /**
+     * subflow node config: flow_id is a non-empty literal, timeout (when
+     * specified) parses as ISO 8601 duration. Cycle / depth / cross-assistant
+     * checks are aggregated separately in {@see validateSubflowCallGraph()}.
+     *
+     * @param  array<string, mixed>          $node
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateSubflowConfig(array $node, string $path, array &$errors): void
+    {
+        if (($node['type'] ?? null) !== \App\Domains\Flow\Handlers\SubflowNodeHandler::TYPE) {
+            return;
+        }
+
+        $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+
+        $flowId = $config['flow_id'] ?? null;
+        if ( ! is_string($flowId) || '' === mb_trim($flowId)) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.flow_id",
+                code: 'subflow_missing_flow_id',
+                message: 'subflow requires a non-empty flow_id.',
+            );
+        } elseif (str_contains($flowId, '{{')) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.flow_id",
+                code: 'subflow_template_in_flow_id',
+                message: 'flow_id must be a literal value, not a template expression.',
+            );
+        }
+
+        $timeout = $config['timeout'] ?? null;
+        if (null !== $timeout) {
+            if ( ! is_string($timeout) || '' === mb_trim($timeout)) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "{$path}.config.timeout",
+                    code: 'subflow_invalid_timeout',
+                    message: 'timeout must be a non-empty ISO 8601 duration string (e.g. PT24H).',
+                );
+            } else {
+                try {
+                    \App\Domains\Flow\Subflow\SubflowStarterService::parseTimeout($timeout);
+                } catch (Exception) {
+                    $errors[] = new FlowValidationErrorDto(
+                        path: "{$path}.config.timeout",
+                        code: 'subflow_invalid_timeout',
+                        message: "timeout '{$timeout}' is not a valid ISO 8601 duration.",
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * Aggregates direct subflow callees and runs them through the
+     * {@see CallGraphValidator}. Skipped when the validator wasn't injected
+     * (legacy unit tests) or no flow_id is known yet (draft path).
+     *
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     * @param  list<FlowValidationErrorDto>         $errors
+     */
+    private function validateSubflowCallGraph(?string $flowId, array $nodeMap, array &$errors): void
+    {
+        if (null === $this->callGraphValidator || null === $flowId || '' === $flowId) {
+            return;
+        }
+
+        $callees = [];
+        foreach ($nodeMap as $node) {
+            if (\App\Domains\Flow\Handlers\SubflowNodeHandler::TYPE !== ($node['type'] ?? null)) {
+                continue;
+            }
+            $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+            $cid    = $config['flow_id'] ?? null;
+            if (is_string($cid) && '' !== mb_trim($cid)) {
+                $callees[] = $cid;
+            }
+        }
+
+        if ([] === $callees) {
+            return;
+        }
+
+        foreach ($this->callGraphValidator->validate($flowId, $callees) as $violation) {
+            $errors[] = new FlowValidationErrorDto(
+                path: 'subflow.call_graph',
+                code: $violation->code,
+                message: $violation->message,
+            );
+        }
+    }
+
+    /**
+     * end nodes are terminal — they MUST NOT have outgoing edges. Catches the
+     * accidental connection in the editor that would otherwise be silently
+     * dropped at runtime (no source handle on Finished status).
+     *
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     * @param  array<int, array<string, mixed>>     $edges
+     * @param  list<FlowValidationErrorDto>         $errors
+     */
+    private function validateEndNodeOutgoingEdges(array $nodeMap, array $edges, array &$errors): void
+    {
+        foreach ($edges as $edge) {
+            if ( ! is_array($edge) || ! isset($edge['from']) || ! is_string($edge['from'])) {
+                continue;
+            }
+
+            $sourceId   = $edge['from'];
+            $sourceNode = $nodeMap[$sourceId] ?? null;
+
+            if (null === $sourceNode || EndNodeHandler::TYPE !== ($sourceNode['type'] ?? null)) {
+                continue;
+            }
+
+            $errors[] = new FlowValidationErrorDto(
+                path: "nodes.{$sourceId}",
+                code: 'end_node_has_outgoing_edge',
+                message: 'end node must be terminal — outgoing edges are not allowed.',
             );
         }
     }

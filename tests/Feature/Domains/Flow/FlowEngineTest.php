@@ -192,7 +192,7 @@ final class FlowEngineTest extends FeatureTestCase
             'nodes'     => [
                 [
                     'id'      => 'c1',
-                    'type'    => 'condition',
+                    'type'    => 'branch',
                     'version' => 1,
                     'config'  => [
                         'check' => 'module.hr.department',
@@ -214,7 +214,7 @@ final class FlowEngineTest extends FeatureTestCase
 
         $conditionLog = DB::table('flow_logs')
             ->where('node_id', 'c1')
-            ->where('node_type', 'condition')
+            ->where('node_type', 'branch')
             ->first();
 
         $this->assertNotNull($conditionLog);
@@ -462,11 +462,8 @@ final class SetLanguageEffectTestHandler implements NodeHandlerInterface
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
-        return NodeExecutionResult::executed(
-            effects: [[
-                'type'  => 'set_contact_language',
-                'value' => 'es',
-            ]],
-        );
+        $context->contactWriter?->write('contact.language', 'es');
+
+        return NodeExecutionResult::executed();
     }
 }

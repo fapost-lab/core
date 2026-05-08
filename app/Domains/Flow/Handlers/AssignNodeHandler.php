@@ -5,22 +5,22 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
-use App\Domains\Flow\Handlers\Support\TemplateResolver;
+use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\FlowStateNamespace;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 
-final class SetAttributeNodeHandler extends AbstractVersionedHandler
+final class AssignNodeHandler extends AbstractVersionedHandler
 {
-    final public const string TYPE = "set_attribute";
+    final public const string TYPE = "assign";
 
     private const string TARGET_META = "target";
     private const string KEY_META    = "key";
 
     public function __construct(
-        private readonly TemplateResolver $templates,
+        private readonly TemplateRenderer $templates,
     ) {
     }
 
@@ -68,10 +68,10 @@ final class SetAttributeNodeHandler extends AbstractVersionedHandler
         $key    = is_string($config['key'] ?? null) ? $config['key'] : null;
 
         if (null === $target || null === $key) {
-            throw new InvalidNodeConfigException('set_attribute: missing target or key');
+            throw new InvalidNodeConfigException('assign: missing target or key');
         }
 
-        $value = $this->templates->resolve($config['value'] ?? null, $state);
+        $value = $this->templates->render($config['value'] ?? null, $context, $state);
 
         if ('flow' === $target) {
             return new NodeExecutionResult(
@@ -82,30 +82,29 @@ final class SetAttributeNodeHandler extends AbstractVersionedHandler
             );
         }
 
-        if ('contact' === $target && ('language' === $key || 'contact.language' === $key)) {
-            return new NodeExecutionResult(
-                status: NodeExecutionStatus::Executed,
-                sourceHandle: 'default',
-                effects: [
-                    [
-                        'type'  => 'set_contact_language',
-                        'value' => (string)$value,
-                    ],
-                ],
-                metadata: [self::TARGET_META => 'contact', self::KEY_META => $key],
+        // 'contact' target: write through the immediate-write ContactWriter.
+        // Engine wiring guarantees the writer is present at runtime; legacy unit
+        // tests that build NodeExecutionContext by hand are required to inject it.
+        $writer = $context->contactWriter;
+
+        if (null === $writer) {
+            throw new InvalidNodeConfigException(
+                'assign: ContactWriter is unavailable in this NodeExecutionContext.',
             );
         }
+
+        // ContactWriter expects fully-qualified `contact.*` paths. Pre-existing
+        // shorthand 'language'/'contact.language' both alias to the canonical
+        // language column; everything else is treated as a contact attribute.
+        $path = ('language' === $key || 'contact.language' === $key)
+            ? 'contact.language'
+            : "contact.{$key}";
+
+        $writer->write($path, $value);
 
         return new NodeExecutionResult(
             status: NodeExecutionStatus::Executed,
             sourceHandle: 'default',
-            effects: [
-                [
-                    'type'  => 'set_contact_attribute',
-                    'key'   => $key,
-                    'value' => $value,
-                ],
-            ],
             metadata: [self::TARGET_META => 'contact', self::KEY_META => $key],
         );
     }

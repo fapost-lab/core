@@ -7,16 +7,28 @@ namespace App\Domains\Channels\Telegram;
 use App\Domains\Channels\Telegram\Exceptions\TelegramApiException;
 use FAPost\Foundation\Messaging\DeliveryResult;
 use FAPost\Foundation\Messaging\OutboundMessage;
+use FAPost\Foundation\Messaging\ProcessingIndicatorHandle;
 use FAPost\Foundation\Messaging\ProviderSenderInterface;
+use FAPost\Foundation\Messaging\TypingCapableProviderInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use Throwable;
 
 /**
  * Telegram outbound sender used by the generic messaging engine.
+ *
+ * Implements {@see TypingCapableProviderInterface} as well — Telegram supports
+ * a "typing" chat action that auto-clears after ~5 seconds. Indicator failures
+ * are swallowed (logged at debug level) since they must never break delivery.
  */
-final readonly class TelegramSender implements ProviderSenderInterface
+final readonly class TelegramSender implements ProviderSenderInterface, TypingCapableProviderInterface
 {
+    private const string PROVIDER_ID = 'telegram';
+
     public function __construct(
         private TelegramBotApiClientFactory $clientFactory,
         private TelegramDeliveryResolver $deliveryResolver,
+        private LoggerInterface $logger = new NullLogger(),
     ) {
     }
 
@@ -45,5 +57,41 @@ final readonly class TelegramSender implements ProviderSenderInterface
             sent: true,
             providerMessageId: isset($response['result']['message_id']) ? (string)$response['result']['message_id'] : null,
         );
+    }
+
+    public function indicateProcessing(string $chatId, string $transportToken): ProcessingIndicatorHandle
+    {
+        $this->safeChatAction($chatId, $transportToken);
+
+        return new ProcessingIndicatorHandle(
+            providerId: self::PROVIDER_ID,
+            chatId: $chatId,
+        );
+    }
+
+    public function refreshProcessing(ProcessingIndicatorHandle $handle, string $transportToken): void
+    {
+        $this->safeChatAction($handle->chatId, $transportToken);
+    }
+
+    public function stopProcessing(ProcessingIndicatorHandle $handle, string $transportToken): void
+    {
+        // No-op for Telegram: indicator auto-clears after ~5s or on next sent message.
+    }
+
+    private function safeChatAction(string $chatId, string $transportToken): void
+    {
+        if ('' === $transportToken) {
+            return;
+        }
+
+        try {
+            $this->clientFactory->make($transportToken)->sendChatAction($chatId, 'typing');
+        } catch (Throwable $exception) {
+            $this->logger->debug('telegram.chat_action_failed', [
+                'chat_id' => $chatId,
+                'error'   => $exception->getMessage(),
+            ]);
+        }
     }
 }

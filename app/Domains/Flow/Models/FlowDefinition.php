@@ -17,6 +17,8 @@ use FAPost\Support\Models\BaseModel;
  * @property array<int, array<string, mixed>> $nodes
  * @property array<int, array<string, mixed>> $edges
  * @property bool   $is_active
+ * @property string $expression_engine  Engine id snapshot (immutable per definition row)
+ * @property bool   $logging_enabled    Opt-in audit trail into flow_session_history
  * @property \Illuminate\Support\Carbon|null $published_at
  * @method static FlowDefinitionBuilder<static>|FlowDefinition active()
  * @method static FlowDefinitionBuilder<static>|FlowDefinition newModelQuery()
@@ -54,6 +56,8 @@ final class FlowDefinition extends BaseModel
         'nodes',
         'edges',
         'is_active',
+        'expression_engine',
+        'logging_enabled',
         'published_at',
     ];
 
@@ -63,10 +67,11 @@ final class FlowDefinition extends BaseModel
     protected function casts(): array
     {
         return [
-            'nodes'        => 'array',
-            'edges'        => 'array',
-            'is_active'    => 'boolean',
-            'published_at' => 'datetime',
+            'nodes'           => 'array',
+            'edges'           => 'array',
+            'is_active'       => 'boolean',
+            'logging_enabled' => 'boolean',
+            'published_at'    => 'datetime',
         ];
     }
 }

@@ -34,7 +34,7 @@ final class HandlerVersionContractTest
     {
         return PHPat::rule()
             ->classes(
-                Selector::classname('App\\Domains\\Flow\\Handlers\\ConditionNodeHandler'),
+                Selector::classname('App\\Domains\\Flow\\Handlers\\BranchNodeHandler'),
             )
             ->shouldNotDependOn()
             ->classes(

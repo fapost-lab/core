@@ -20,7 +20,7 @@ final class FlowDefinitionValidatorTest extends TestCase
 
         $result = $validator->validate(
             nodes: [
-                ['id' => 'n1', 'type' => 'condition', 'version' => 2, 'config' => []],
+                ['id' => 'n1', 'type'    => 'branch', 'version' => 2, 'config' => []],
                 ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
             ],
             edges: [
@@ -64,7 +64,7 @@ final class FlowDefinitionValidatorTest extends TestCase
         $validator = $this->validator();
         try {
             $validator->validate(
-                nodes: [['id' => 'n1', 'type' => 'condition', 'config' => []]],
+                nodes: [['id' => 'n1', 'type'    => 'branch', 'config' => []]],
                 edges: [],
             );
             $this->fail('Expected FlowValidationException was not thrown.');
@@ -79,7 +79,7 @@ final class FlowDefinitionValidatorTest extends TestCase
         try {
             $validator->validate(
                 nodes: [
-                    ['id' => 'n1', 'type' => 'condition', 'version' => 2, 'config' => []],
+                    ['id' => 'n1', 'type'    => 'branch', 'version' => 2, 'config' => []],
                     ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
                     ['id' => 'n3', 'type' => 'input', 'version' => 1, 'config' => []],
                 ],
@@ -100,7 +100,7 @@ final class FlowDefinitionValidatorTest extends TestCase
         try {
             $validator->validate(
                 nodes: [
-                    ['id' => 'n1', 'type' => 'condition', 'version' => 2, 'config' => []],
+                    ['id' => 'n1', 'type'    => 'branch', 'version' => 2, 'config' => []],
                     ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
                     ['id' => 'n3', 'type' => 'input', 'version' => 1, 'config' => []],
                 ],
@@ -123,7 +123,7 @@ final class FlowDefinitionValidatorTest extends TestCase
                 nodes: [
                     [
                         'id'                   => 'n1',
-                        'type'                 => 'condition',
+                        'type'    => 'branch',
                         'version'              => 2,
                         'config'               => [],
                         'required_transitions' => ['timeout'],
@@ -146,13 +146,13 @@ final class FlowDefinitionValidatorTest extends TestCase
         try {
             $validator->validate(
                 nodes: [
-                    ['id' => 'n1', 'type' => 'condition', 'version' => 99, 'config' => []],
+                    ['id' => 'n1', 'type'    => 'branch', 'version' => 99, 'config' => []],
                 ],
                 edges: [],
             );
             $this->fail('Expected FlowValidationException was not thrown.');
         } catch (FlowValidationException $exception) {
-            $this->assertStringContainsString('references unknown handler version: condition@99', $exception->errors[0]->message);
+            $this->assertStringContainsString('references unknown handler version: branch@99', $exception->errors[0]->message);
         }
     }
 
@@ -212,7 +212,7 @@ final class TestConditionHandlerV2 implements NodeHandlerInterface
 {
     public function type(): string
     {
-        return 'condition';
+        return 'branch';
     }
 
     public function version(): int

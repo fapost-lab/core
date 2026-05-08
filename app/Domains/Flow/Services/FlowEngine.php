@@ -54,6 +54,11 @@ final readonly class FlowEngine implements FlowEngineInterface
         private LanguageResolverInterface $languageResolver,
         private ConnectionInterface $connection,
         private Repository $config,
+        private \App\Domains\Flow\Expression\ExpressionEngineRegistry $expressionEngines,
+        private \App\Domains\Flow\Contracts\DataAccessorRegistryInterface $dataAccessors,
+        private \App\Domains\Flow\History\HistoryWriterFactory $historyWriterFactory,
+        private \App\Domains\Flow\Subflow\SubflowResumerInterface $subflowResumer,
+        private \App\Domains\Messaging\Typing\TypingHeartbeatRegistry $typingHeartbeat,
     ) {
     }
 
@@ -178,6 +183,54 @@ final readonly class FlowEngine implements FlowEngineInterface
         return $session;
     }
 
+    public function runSession(FlowSession $session): FlowSession
+    {
+        $session->refresh();
+
+        $definition = $this->definitions->findById($session->flow_definition_id);
+        $contact    = $this->contactService->findById($session->contact_id);
+
+        $this->executeLoop($definition, $session, null, $contact);
+        $session->refresh();
+
+        return $session;
+    }
+
+    public function resumeAfterSubflow(FlowSession $parent, string $sourceHandle): FlowSession
+    {
+        $parent->refresh();
+
+        $definition = $this->definitions->findById($parent->flow_definition_id);
+        $contact    = $this->contactService->findById($parent->contact_id);
+        $resumeNode = (string) ($parent->current_node_id ?? '');
+
+        if ('' === $resumeNode) {
+            // Parent was already advanced past the subflow node — nothing to do.
+            return $parent;
+        }
+
+        $nextNodeId = $this->graphResolver->resolveNextNode($definition, $resumeNode, $sourceHandle);
+
+        $this->connection->transaction(function () use ($parent, $nextNodeId): void {
+            try {
+                $parent->saveWithOptimisticLock([
+                    'status'          => null !== $nextNodeId ? FlowSessionStatus::Active : FlowSessionStatus::Completed,
+                    'current_node_id' => $nextNodeId,
+                ]);
+            } catch (OptimisticLockConflictException $exception) {
+                throw FlowConcurrencyException::forSession((string)$parent->getKey(), $exception);
+            }
+        });
+
+        if (null !== $nextNodeId) {
+            $this->executeLoop($definition, $parent, null, $contact);
+        }
+
+        $parent->refresh();
+
+        return $parent;
+    }
+
     private function afterCommit(callable $callback): void
     {
         // Flow engine transactions run on the default tenant connection in current runtime,
@@ -259,6 +312,27 @@ final readonly class FlowEngine implements FlowEngineInterface
                 ? $incomingStep->updateId . '|' . $session->getKey()
                 : $session->getKey() . ':' . $currentNodeId . ':' . $session->version;
 
+            $engineId = '' !== (string) ($definition->expression_engine ?? '')
+                ? (string) $definition->expression_engine
+                : \App\Domains\Flow\Expression\Engines\TemplateEngine::ID;
+            $expressionEngine = $this->expressionEngines->has($engineId)
+                ? $this->expressionEngines->get($engineId)
+                : $this->expressionEngines->get(\App\Domains\Flow\Expression\Engines\TemplateEngine::ID);
+
+            $stateReader = new \App\Domains\Flow\State\Readers\ScopedStateReader(
+                sessionState: $session->state ?? [],
+                contact: $contact,
+                accessors: $this->dataAccessors,
+            );
+
+            $contactWriter = new \App\Domains\Flow\State\Writers\ContactWriter(
+                contact: $contact,
+                sessionId: (string)$session->getKey(),
+                nodeId: $nodeId,
+                connection: $this->connection,
+                historyWriter: $this->historyWriterFactory->for($definition),
+            );
+
             $handlerContext = new FoundationNodeExecutionContext(
                 tenantId: $session->tenant_id,
                 contactId: $session->contact_id,
@@ -268,10 +342,18 @@ final readonly class FlowEngine implements FlowEngineInterface
                 platform: $platform,
                 resolvedLanguage: $resolvedLanguage,
                 incoming: $incomingStep,
+                stateReader: $stateReader,
+                contactWriter: $contactWriter,
+                expressionEngine: $expressionEngine,
             );
 
+            // Keep the user-visible "typing…" indicator alive across multi-node
+            // execution: providers like Telegram drop the chat action after ~5s.
+            // No-op when no typing session is registered (e.g. queue jobs that
+            // bypass the routing pipeline).
+            $this->typingHeartbeat->current()?->refresh();
+
             $result = $handler->execute($node, $session->state ?? [], $handlerContext);
-            $result = $this->applySystemStateEffects($result);
 
             $nextNodeId = null;
 
@@ -279,12 +361,49 @@ final readonly class FlowEngine implements FlowEngineInterface
                 $nextNodeId = $this->graphResolver->resolveNextNode($definition, $nodeId, $result->sourceHandle);
             }
 
-            $this->connection->transaction(function () use ($session, $contact, $node, $result, $nextNodeId): void {
-                $this->applyEffects($contact, $result);
-                $this->persister->persist($session, $result, $nextNodeId);
+            $isEndNode = \App\Domains\Flow\Handlers\EndNodeHandler::TYPE === $type;
+            $endStatus = null;
+
+            if ($isEndNode && NodeExecutionStatus::Finished === $result->status) {
+                $rawEndStatus = $result->metadata[\App\Domains\Flow\Handlers\EndNodeHandler::END_STATUS_META] ?? null;
+                $endStatus    = is_string($rawEndStatus) && in_array(
+                    $rawEndStatus,
+                    \App\Domains\Flow\Handlers\EndNodeHandler::ALLOWED_END_STATUSES,
+                    true,
+                )
+                    ? $rawEndStatus
+                    : \App\Domains\Flow\Handlers\EndNodeHandler::END_STATUS_SUCCESS;
+            }
+
+            // Subflow special case: SubflowStarter pauses the parent (paused_subflow)
+            // and runs the child synchronously. If the child reaches an end node
+            // during this execution tick, DefaultSubflowResumer will already have
+            // advanced the parent to its post-subflow position. Trying to persist
+            // the stale Waiting result here would either lose that progress or
+            // raise an OptimisticLockConflict. Skip persistence in that scenario.
+            $skipPersist = false;
+            if (\App\Domains\Flow\Handlers\SubflowNodeHandler::TYPE === $type
+                && NodeExecutionStatus::Waiting === $result->status
+            ) {
+                $latest = FlowSession::query()->find($session->getKey());
+                if (null !== $latest && $latest->version !== $session->version) {
+                    $skipPersist = true;
+                    $session->setRawAttributes($latest->getAttributes(), true);
+                }
+            }
+
+            $this->connection->transaction(function () use ($session, $node, $result, $nextNodeId, $endStatus, $skipPersist): void {
+                if ($skipPersist) {
+                    // No-op: state already reflects the most recent write.
+                } elseif (null !== $endStatus) {
+                    $this->persister->persistEnd($session, $result, $endStatus);
+                } else {
+                    $this->persister->persist($session, $result, $nextNodeId);
+                }
+
                 $this->logWriter->write($this->buildLogEntry($session, $node, $result, $nextNodeId));
 
-                $analyticsEventType = $this->resolveAnalyticsEventType($result, $nextNodeId);
+                $analyticsEventType = $this->resolveAnalyticsEventType($result, $nextNodeId, $endStatus);
                 if (null !== $analyticsEventType) {
                     $this->afterCommit(function () use ($analyticsEventType, $session): void {
                         $this->analyticsWriter->record(
@@ -298,6 +417,10 @@ final readonly class FlowEngine implements FlowEngineInterface
                     });
                 }
             });
+
+            if (null !== $endStatus) {
+                $this->subflowResumer->resumeIfChild($session, $endStatus);
+            }
 
             $incomingStep = null;
 
@@ -334,70 +457,6 @@ final readonly class FlowEngine implements FlowEngineInterface
         return 1;
     }
 
-    private function applySystemStateEffects(NodeExecutionResult $result): NodeExecutionResult
-    {
-        $stateChanges = $result->stateChanges;
-
-        foreach ($result->effects as $effect) {
-            if ( ! is_array($effect) || 'set_contact_language' !== ($effect['type'] ?? null)) {
-                continue;
-            }
-
-            $value = $effect['value'] ?? null;
-
-            if (is_string($value) && '' !== $value) {
-                $stateChanges[SystemStateKeys::LANGUAGE] = $value;
-            }
-        }
-
-        if ($stateChanges === $result->stateChanges) {
-            return $result;
-        }
-
-        return new NodeExecutionResult(
-            status: $result->status,
-            sourceHandle: $result->sourceHandle,
-            stateChanges: $stateChanges,
-            logResolved: $result->logResolved,
-            effects: $result->effects,
-            metadata: $result->metadata,
-            errorMessage: $result->errorMessage,
-        );
-    }
-
-    private function applyEffects(Contact $contact, NodeExecutionResult $result): void
-    {
-        foreach ($result->effects as $effect) {
-            if ( ! is_array($effect)) {
-                continue;
-            }
-
-            if ('set_contact_attribute' === ($effect['type'] ?? null)) {
-                $key = $effect['key'] ?? null;
-                if ( ! is_string($key) || '' === $key) {
-                    continue;
-                }
-
-                $this->contactService->updateAttributes(
-                    $contact->getKey(),
-                    [$key => $effect['value'] ?? null],
-                );
-
-                continue;
-            }
-
-            if ('set_contact_language' === ($effect['type'] ?? null)) {
-                $value = $effect['value'] ?? null;
-
-                if ( ! is_string($value) || '' === $value) {
-                    continue;
-                }
-
-                $this->contactService->updateLanguage($contact->getKey(), $value);
-            }
-        }
-    }
-
     /**
      * @param  array<string, mixed>  $node
      */
@@ -425,8 +484,19 @@ final readonly class FlowEngine implements FlowEngineInterface
         );
     }
 
-    private function resolveAnalyticsEventType(NodeExecutionResult $result, ?string $nextNodeId): ?AnalyticsEventType
-    {
+    private function resolveAnalyticsEventType(
+        NodeExecutionResult $result,
+        ?string $nextNodeId,
+        ?string $endStatus = null,
+    ): ?AnalyticsEventType {
+        if (null !== $endStatus) {
+            return match ($endStatus) {
+                \App\Domains\Flow\Handlers\EndNodeHandler::END_STATUS_FAILED    => AnalyticsEventType::FlowFailed,
+                \App\Domains\Flow\Handlers\EndNodeHandler::END_STATUS_CANCELLED => AnalyticsEventType::FlowCancelled,
+                default                                                         => AnalyticsEventType::FlowCompleted,
+            };
+        }
+
         if (NodeExecutionStatus::Executed === $result->status && null === $nextNodeId) {
             return AnalyticsEventType::FlowCompleted;
         }

@@ -6,32 +6,30 @@ namespace App\Domains\Webhook\Jobs;
 
 use App\Domains\Assistant\Contracts\AssistantRepositoryInterface;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Enums\PlatformEnum;
-use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
-use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
-use App\Domains\Flow\Enums\FlowTriggerType;
-use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
+use App\Domains\Flow\Routing\MessageRouter;
+use App\Domains\Flow\Routing\RoutingOutcome;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Domains\Webhook\Services\ChannelAdapterResolver;
 use FAPost\Foundation\DTO\InboundWebhookPayload;
-use FAPost\Foundation\Flow\Contracts\TriggerResolverInterface;
-use FAPost\Foundation\Flow\DTO\TriggerContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use Illuminate\Support\Facades\Cache;
 
 /**
- * Processes an inbound webhook event inside the tenant context.
+ * Webhook ingress job. Performs only transport-level work and then hands
+ * off to the {@see MessageRouter}, which owns the full message routing
+ * pipeline (commands, typing, lock, session state, execution, cleanup).
  *
  * Execution order (must be strictly preserved):
  *   1. Switch to tenant schema.
- *   2. Normalize raw payload → IncomingMessage.
- *   3. Acquire distributed lock (platform_user_id based, before any DB write).
- *   4. findOrCreate contact.
- *   5. Resume / start flow session.
- *   6. Release lock.
+ *   2. Normalize raw payload → IncomingMessage via channel adapter.
+ *   3. Resolve assistant + contact + channel.
+ *   4. Delegate to MessageRouter::route().
+ *   5. Release-with-delay if the router signalled a transient lock miss
+ *      that warrants retrying this job (vs the user-facing busy notice).
  */
 final class IncomingMessageJob implements ShouldQueue
 {
@@ -50,9 +48,7 @@ final class IncomingMessageJob implements ShouldQueue
         CurrentAssistantInterface $currentAssistant,
         AssistantRepositoryInterface $assistants,
         ContactServiceInterface $contactService,
-        FlowSessionRepositoryInterface $sessions,
-        TriggerResolverInterface $triggerResolver,
-        FlowOrchestratorInterface $orchestrator,
+        MessageRouter $router,
     ): void {
         $tenant = new RuntimeTenant(
             id: $this->payload->tenantId,
@@ -66,81 +62,50 @@ final class IncomingMessageJob implements ShouldQueue
                 $currentAssistant,
                 $assistants,
                 $contactService,
-                $sessions,
-                $triggerResolver,
-                $orchestrator,
+                $router,
             ): void {
-                $adapter        = $adapterResolver->resolve(PlatformEnum::from($this->payload->platform));
+                $platform       = PlatformEnum::from($this->payload->platform);
+                $adapter        = $adapterResolver->resolve($platform);
                 $inboundMessage = $adapter->normalize($this->payload->rawPayload);
 
-                $lockKey = sprintf(
-                    'session_lock:%s:%s:%s:%s',
-                    $this->payload->tenantId,
-                    $this->payload->platform,
-                    $inboundMessage->externalUserId,
-                    $this->payload->assistantId,
+                $assistant = $assistants->findById($this->payload->assistantId);
+                $currentAssistant->set($assistant);
+
+                $contact = $contactService->findOrCreate(
+                    tenantId: $this->payload->tenantId,
+                    platform: $platform,
+                    externalId: $inboundMessage->externalUserId,
+                    meta: $inboundMessage->payload,
+                    defaultLanguage: $assistant->default_language,
                 );
 
-                $lock = Cache::lock($lockKey, 30);
+                $contactService->findOrCreateChannelContact(
+                    contact: $contact,
+                    channelId: $this->payload->channelId,
+                );
 
-                if ( ! $lock->get()) {
+                $channel = Channel::query()->findOrFail($this->payload->channelId);
+
+                $outcome = $router->route(
+                    contact: $contact,
+                    message: $inboundMessage,
+                    assistant: $assistant,
+                    channel: $channel,
+                );
+
+                if ($this->shouldRetry($outcome)) {
                     $this->release($this->lockMissDelay($this->attempts()));
-
-                    return;
-                }
-
-                try {
-                    $assistant = $assistants->findById($this->payload->assistantId);
-                    $currentAssistant->set($assistant);
-
-                    $contact = $contactService->findOrCreate(
-                        tenantId: $this->payload->tenantId,
-                        platform: PlatformEnum::from($this->payload->platform),
-                        externalId: $inboundMessage->externalUserId,
-                        meta: $inboundMessage->payload,
-                        defaultLanguage: $assistant->default_language,
-                    );
-
-                    $contactService->findOrCreateChannelContact(
-                        contact: $contact,
-                        channelId: $this->payload->channelId,
-                    );
-
-                    $activeSession = $sessions->findActiveForContact($contact, $this->payload->assistantId);
-
-                    if (null !== $activeSession && $this->isResetCommand($inboundMessage->text)) {
-                        $sessions->cancel($activeSession);
-                        $activeSession = null;
-                    }
-
-                    $trigger = null;
-
-                    if (null === $activeSession) {
-                        $trigger = $triggerResolver->resolve(
-                            new TriggerContext(
-                                type: FlowTriggerType::Message->value,
-                                tenantId: $this->payload->tenantId,
-                                assistantId: $this->payload->assistantId,
-                                payload: [
-                                    'text'             => $inboundMessage->text,
-                                    'incoming_payload' => $inboundMessage->payload,
-                                ],
-                            )
-                        );
-                    }
-
-                    try {
-                        $orchestrator->handle($contact, $inboundMessage, $this->payload->assistantId, $trigger);
-                    } catch (SessionLockTimeoutException) {
-                        $this->release($this->lockMissDelay($this->attempts()));
-
-                        return;
-                    }
-                } finally {
-                    $lock->release();
                 }
             }
         );
+    }
+
+    private function shouldRetry(RoutingOutcome $outcome): bool
+    {
+        // Retry only on engine-level lock contention so the worker doesn't
+        // spin on a stuck session. User-facing busy drop ('lock_timeout')
+        // already informed the contact — no retry needed.
+        return $outcome->wasDropped() && 'engine_lock_timeout' === $outcome->reason;
     }
 
     private function lockMissDelay(int $attempt): int
@@ -151,14 +116,5 @@ final class IncomingMessageJob implements ShouldQueue
             3       => 5,
             default => 10,
         };
-    }
-
-    private function isResetCommand(?string $text): bool
-    {
-        if (null === $text) {
-            return false;
-        }
-
-        return in_array(mb_strtolower(mb_trim($text)), ['/start', '/reset', '/stop'], true);
     }
 }

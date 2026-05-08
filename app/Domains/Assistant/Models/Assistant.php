@@ -75,6 +75,8 @@ final class Assistant extends BaseModel implements HasName
         'default_flow_id',
         'fallback_message',
         'settings',
+        'commands',
+        'busy_message',
     ];
 
     /**
@@ -125,6 +127,7 @@ final class Assistant extends BaseModel implements HasName
             'is_active'           => 'boolean',
             'default_language'    => 'string',
             'available_languages' => 'array',
+            'commands'            => 'array',
         ];
     }
 }

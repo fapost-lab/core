@@ -35,7 +35,7 @@ final class FlowDraftFactory extends Factory
             'nodes' => [
                 [
                     'id'      => 'condition_1',
-                    'type'    => 'condition',
+                    'type'    => 'branch',
                     'version' => 1,
                     'config'  => [
                         'check' => 'flow.answer',

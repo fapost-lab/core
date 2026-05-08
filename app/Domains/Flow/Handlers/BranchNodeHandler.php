@@ -13,9 +13,9 @@ use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 
-final class ConditionNodeHandler extends AbstractVersionedHandler
+final class BranchNodeHandler extends AbstractVersionedHandler
 {
-    final public const string TYPE = "condition";
+    final public const string TYPE = "branch";
 
     private const string EXPRESSION_META = "expression";
 
@@ -60,7 +60,7 @@ final class ConditionNodeHandler extends AbstractVersionedHandler
         $path   = $config['check'] ?? null;
 
         if ( ! is_string($path) || '' === $path) {
-            throw new InvalidNodeConfigException('condition: missing check');
+            throw new InvalidNodeConfigException('branch: missing check');
         }
 
         $value = $this->resolveOperandValue($path, $state, $context);
@@ -108,7 +108,7 @@ final class ConditionNodeHandler extends AbstractVersionedHandler
             return data_get($state, $path);
         }
 
-        throw new InvalidNodeConfigException("condition: unsupported namespace in check '{$path}'");
+        throw new InvalidNodeConfigException("branch: unsupported namespace in check '{$path}'");
     }
 
     /**
@@ -119,14 +119,14 @@ final class ConditionNodeHandler extends AbstractVersionedHandler
         $segments = explode('.', $path, 4);
 
         if (count($segments) < 3 || 'module' !== $segments[0] || '' === $segments[1]) {
-            throw new InvalidNodeConfigException("condition: invalid module path '{$path}'");
+            throw new InvalidNodeConfigException("branch: invalid module path '{$path}'");
         }
 
         $prefix = "{$segments[0]}.{$segments[1]}";
         $key    = implode('.', array_slice($segments, 2));
 
         if ('' === $key) {
-            throw new InvalidNodeConfigException("condition: invalid module path '{$path}'");
+            throw new InvalidNodeConfigException("branch: invalid module path '{$path}'");
         }
 
         return [$prefix, $key];

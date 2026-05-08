@@ -1,0 +1,75 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domains\Flow\Subflow;
+
+use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Handlers\EndNodeHandler;
+use App\Domains\Flow\Handlers\SubflowNodeHandler;
+use App\Domains\Flow\Models\FlowSession;
+use Closure;
+use Illuminate\Support\Facades\Log;
+
+/**
+ * Production resumer: walks the parent → success/cancelled/failed handle when
+ * a subflow child has reached an end node. Maps the child's {@code end_status}
+ * to a parent output handle 1:1 (success → success, cancelled → cancelled,
+ * failed → failed). Inconsistencies (parent missing, parent not in
+ * paused_subflow) are logged but never throw — the child is already terminal.
+ */
+final readonly class DefaultSubflowResumer implements SubflowResumerInterface
+{
+    /**
+     * @param  Closure(): FlowEngineInterface  $engineResolver  Lazy resolver to break the
+     *         circular dependency FlowEngine → SubflowResumer → FlowEngine.
+     */
+    public function __construct(
+        private Closure $engineResolver,
+    ) {
+    }
+
+    public function resumeIfChild(FlowSession $child, string $endStatus): void
+    {
+        $parentId = $child->parent_session_id;
+
+        if (null === $parentId || '' === $parentId) {
+            return; // top-level session, nothing to resume.
+        }
+
+        $parent = FlowSession::query()->find($parentId);
+
+        if ( ! $parent instanceof FlowSession) {
+            Log::warning('flow.subflow.resume.parent_missing', [
+                'child_id'  => (string)$child->getKey(),
+                'parent_id' => $parentId,
+            ]);
+
+            return;
+        }
+
+        if (FlowSessionStatus::PausedSubflow !== $parent->status) {
+            Log::warning('flow.subflow.resume.parent_not_paused', [
+                'child_id'      => (string)$child->getKey(),
+                'parent_id'     => (string)$parent->getKey(),
+                'parent_status' => $parent->status?->value,
+            ]);
+
+            // Continue anyway — child finished, parent might have been advanced
+            // by another path. Resume call will be a no-op if current_node_id
+            // doesn't match a subflow-shaped position.
+        }
+
+        ($this->engineResolver)()->resumeAfterSubflow($parent, $this->handleFor($endStatus));
+    }
+
+    private function handleFor(string $endStatus): string
+    {
+        return match ($endStatus) {
+            EndNodeHandler::END_STATUS_CANCELLED => SubflowNodeHandler::HANDLE_CANCELLED,
+            EndNodeHandler::END_STATUS_FAILED    => SubflowNodeHandler::HANDLE_FAILED,
+            default                              => SubflowNodeHandler::HANDLE_SUCCESS,
+        };
+    }
+}

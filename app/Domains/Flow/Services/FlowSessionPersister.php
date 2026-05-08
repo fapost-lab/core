@@ -17,6 +17,32 @@ use FAPost\Foundation\DTO\NodeExecutionStatus;
  */
 final class FlowSessionPersister
 {
+    /**
+     * Persist a session terminated by an explicit {@code end} node. Differs from
+     * the regular {@see persist()} path: status is forced to {@code ended}
+     * (not {@code completed}) and {@code end_status} is recorded so subflow
+     * parents can pick the right resume handle. State changes accumulated by
+     * the handler are still merged into the session JSON.
+     */
+    public function persistEnd(
+        FlowSession $session,
+        NodeExecutionResult $result,
+        string $endStatus,
+    ): void {
+        $state = $this->applyStateChanges($session->state ?? [], $result->stateChanges);
+
+        try {
+            $session->saveWithOptimisticLock([
+                'state'           => $state,
+                'current_node_id' => null,
+                'status'          => FlowSessionStatus::Ended,
+                'end_status'      => $endStatus,
+            ]);
+        } catch (OptimisticLockConflictException $exception) {
+            throw FlowConcurrencyException::forSession((string)$session->getKey(), $exception);
+        }
+    }
+
     public function persist(
         FlowSession $session,
         NodeExecutionResult $result,

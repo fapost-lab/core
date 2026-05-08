@@ -421,6 +421,204 @@ final class ValidateFlowServiceTest extends TestCase
         $this->assertContains('legacy_media_field', $codes);
     }
 
+    public function test_emit_event_rejects_missing_event_type(): void
+    {
+        $service = $this->makeServiceWithEmitEvent();
+
+        $result = $service->execute([
+            'ev_1' => [
+                'id'      => 'ev_1',
+                'type'    => 'emit_event',
+                'version' => 1,
+                'config'  => ['event_type' => '   '],
+            ],
+        ]);
+
+        $this->assertFalse($result->valid);
+        $codes = array_map(static fn ($e) => $e->code, $result->errors);
+        $this->assertContains('emit_event_missing_type', $codes);
+    }
+
+    public function test_emit_event_rejects_template_in_event_type(): void
+    {
+        $service = $this->makeServiceWithEmitEvent();
+
+        $result = $service->execute([
+            'ev_1' => [
+                'id'      => 'ev_1',
+                'type'    => 'emit_event',
+                'version' => 1,
+                'config'  => ['event_type' => 'sales.{{flow.kind}}'],
+            ],
+        ]);
+
+        $codes = array_map(static fn ($e) => $e->code, $result->errors);
+        $this->assertContains('emit_event_template_in_type', $codes);
+    }
+
+    public function test_emit_event_rejects_invalid_characters_in_event_type(): void
+    {
+        $service = $this->makeServiceWithEmitEvent();
+
+        $result = $service->execute([
+            'ev_1' => [
+                'id'      => 'ev_1',
+                'type'    => 'emit_event',
+                'version' => 1,
+                'config'  => ['event_type' => 'sales/order/created'],
+            ],
+        ]);
+
+        $codes = array_map(static fn ($e) => $e->code, $result->errors);
+        $this->assertContains('emit_event_invalid_type', $codes);
+    }
+
+    public function test_emit_event_accepts_dotted_alphanumeric_type(): void
+    {
+        $service = $this->makeServiceWithEmitEvent();
+
+        $result = $service->execute([
+            'ev_1' => [
+                'id'      => 'ev_1',
+                'type'    => 'emit_event',
+                'version' => 1,
+                'config'  => ['event_type' => 'sales.order.created', 'payload' => []],
+            ],
+        ]);
+
+        $this->assertTrue($result->valid, implode(', ', array_map(static fn ($e) => $e->code, $result->errors)));
+    }
+
+    private function makeServiceWithEmitEvent(): ValidateFlowService
+    {
+        $registry = new NodeHandlerRegistry();
+        $registry->register(new EmitEventStubHandler());
+
+        return new ValidateFlowService(
+            registry: $registry,
+            dataAccessors: new NullDataAccessorRegistry(),
+            triggerValidator: new NullTriggerConfigValidator(),
+            tenantEvents: new NullTenantEventRepository(),
+            tenantContext: new NullTenantContext(),
+        );
+    }
+
+    public function test_end_node_with_invalid_status_fails_validation(): void
+    {
+        $service = $this->makeServiceWithEnd();
+
+        $result = $service->execute([
+            'end_1' => ['id' => 'end_1', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'unknown']],
+        ]);
+
+        $codes = array_map(static fn ($e) => $e->code, $result->errors);
+        $this->assertContains('end_invalid_status', $codes);
+    }
+
+    public function test_end_node_with_outgoing_edge_fails_validation(): void
+    {
+        $service = $this->makeServiceWithEnd();
+
+        $result = $service->execute(
+            nodes: [
+                'end_1' => ['id' => 'end_1', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+                'tail'  => ['id' => 'tail',  'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [
+                ['id' => 'e', 'from' => 'end_1', 'to' => 'tail', 'handle' => 'default'],
+            ],
+        );
+
+        $codes = array_map(static fn ($e) => $e->code, $result->errors);
+        $this->assertContains('end_node_has_outgoing_edge', $codes);
+    }
+
+    public function test_end_node_terminal_passes_validation(): void
+    {
+        $service = $this->makeServiceWithEnd();
+
+        $result = $service->execute([
+            'end_1' => ['id' => 'end_1', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ]);
+
+        $this->assertTrue($result->valid, implode(', ', array_map(static fn ($e) => $e->code, $result->errors)));
+    }
+
+    public function test_subflow_node_with_missing_flow_id_fails_validation(): void
+    {
+        $service = $this->makeServiceWithSubflow();
+
+        $result = $service->execute([
+            'sf_1' => ['id' => 'sf_1', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => '   ']],
+        ]);
+
+        $codes = array_map(static fn ($e) => $e->code, $result->errors);
+        $this->assertContains('subflow_missing_flow_id', $codes);
+    }
+
+    public function test_subflow_node_rejects_template_in_flow_id(): void
+    {
+        $service = $this->makeServiceWithSubflow();
+
+        $result = $service->execute([
+            'sf_1' => ['id' => 'sf_1', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => 'flow-{{flow.target}}']],
+        ]);
+
+        $codes = array_map(static fn ($e) => $e->code, $result->errors);
+        $this->assertContains('subflow_template_in_flow_id', $codes);
+    }
+
+    public function test_subflow_node_rejects_invalid_timeout(): void
+    {
+        $service = $this->makeServiceWithSubflow();
+
+        $result = $service->execute([
+            'sf_1' => ['id' => 'sf_1', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => 'child-flow', 'timeout' => 'not-iso']],
+        ]);
+
+        $codes = array_map(static fn ($e) => $e->code, $result->errors);
+        $this->assertContains('subflow_invalid_timeout', $codes);
+    }
+
+    public function test_subflow_node_passes_with_valid_config(): void
+    {
+        $service = $this->makeServiceWithSubflow();
+
+        $result = $service->execute([
+            'sf_1' => ['id' => 'sf_1', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => 'child-flow', 'timeout' => 'PT24H']],
+        ]);
+
+        $this->assertTrue($result->valid, implode(', ', array_map(static fn ($e) => $e->code, $result->errors)));
+    }
+
+    private function makeServiceWithSubflow(): ValidateFlowService
+    {
+        $registry = new NodeHandlerRegistry();
+        $registry->register(new SubflowStubHandler());
+
+        return new ValidateFlowService(
+            registry: $registry,
+            dataAccessors: new NullDataAccessorRegistry(),
+            triggerValidator: new NullTriggerConfigValidator(),
+            tenantEvents: new NullTenantEventRepository(),
+            tenantContext: new NullTenantContext(),
+        );
+    }
+
+    private function makeServiceWithEnd(): ValidateFlowService
+    {
+        $registry = new NodeHandlerRegistry();
+        $registry->register(new EndStubHandler());
+
+        return new ValidateFlowService(
+            registry: $registry,
+            dataAccessors: new NullDataAccessorRegistry(),
+            triggerValidator: new NullTriggerConfigValidator(),
+            tenantEvents: new NullTenantEventRepository(),
+            tenantContext: new NullTenantContext(),
+        );
+    }
+
     private function makeServiceWithSendMessage(): ValidateFlowService
     {
         $registry = new NodeHandlerRegistry();
@@ -546,6 +744,120 @@ final class SendMessageStubHandler implements NodeHandlerInterface
     public function category(): string
     {
         return 'Test';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return NodeExecutionResult::executed();
+    }
+}
+
+final class EmitEventStubHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'emit_event';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Emit Event';
+    }
+
+    public function category(): string
+    {
+        return 'Logic';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return NodeExecutionResult::executed();
+    }
+}
+
+final class EndStubHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'end';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'End';
+    }
+
+    public function category(): string
+    {
+        return 'Logic';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return NodeExecutionResult::executed();
+    }
+}
+
+final class SubflowStubHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'subflow';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Subflow';
+    }
+
+    public function category(): string
+    {
+        return 'Logic';
     }
 
     public function configSchema(): array

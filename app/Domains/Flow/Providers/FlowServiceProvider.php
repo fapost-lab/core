@@ -4,6 +4,15 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Providers;
 
+use App\Domains\Flow\Action\ActionHandlerRegistry;
+use App\Domains\Flow\Call\CallTransportRegistry;
+use App\Domains\Flow\Call\Transports\HandlerTransport;
+use App\Domains\Flow\Call\Transports\HttpTransport;
+use App\Domains\Flow\Commands\BuiltinCommandsRegistry;
+use App\Domains\Flow\Commands\CommandMatcher;
+use App\Domains\Flow\Concurrency\LockAcquisitionPolicy;
+use App\Domains\Flow\Concurrency\LockHeartbeat;
+use App\Domains\Flow\Concurrency\SessionLockManager;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
@@ -14,6 +23,7 @@ use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
+use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Contracts\HttpClientInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
@@ -25,17 +35,29 @@ use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationServiceInterface;
-use App\Domains\Flow\Handlers\ConditionNodeHandler;
+use App\Domains\Flow\Events\QueuedFlowTriggerEventPublisher;
+use App\Domains\Flow\Expression\Engines\TemplateEngine;
+use App\Domains\Flow\Expression\ExpressionEngineRegistry;
+use App\Domains\Flow\Handlers\AssignNodeHandler;
+use App\Domains\Flow\Handlers\BranchNodeHandler;
+use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\DelayNodeHandler;
+use App\Domains\Flow\Handlers\EmitEventNodeHandler;
+use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\InputNodeHandler;
+use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
-use App\Domains\Flow\Handlers\SetAttributeNodeHandler;
+use App\Domains\Flow\Handlers\SubflowNodeHandler;
+use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Handlers\Support\TemplateResolver;
-use App\Domains\Flow\Handlers\WebhookNodeHandler;
+use App\Domains\Flow\History\DefaultHistoryWriter;
+use App\Domains\Flow\History\HistoryWriterFactory;
+use App\Domains\Flow\History\NoOpHistoryWriter;
 use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
 use App\Domains\Flow\Logging\FlowLogPartitionManager;
 use App\Domains\Flow\Logging\FlowLogWriter;
 use App\Domains\Flow\Orchestration\FlowOrchestrator;
+use App\Domains\Flow\Rag\RagAdapterRegistry;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Repositories\FlowDefinitionRepository;
 use App\Domains\Flow\Repositories\FlowDraftRepository;
@@ -63,8 +85,15 @@ use App\Domains\Flow\State\Resolvers\NamespaceResolverRegistry;
 use App\Domains\Flow\State\Resolvers\RagStateResolver;
 use App\Domains\Flow\State\Resolvers\SessionStateResolver;
 use App\Domains\Flow\State\StateNamespace;
+use App\Domains\Flow\Subflow\CallGraphRepository;
+use App\Domains\Flow\Subflow\CallGraphValidator;
+use App\Domains\Flow\Subflow\DefaultSubflowResumer;
+use App\Domains\Flow\Subflow\SubflowResumerInterface;
+use App\Domains\Flow\Subflow\SubflowStarterService;
+use App\Domains\Flow\Subflow\SubflowTimeoutSweeper;
 use App\Domains\Flow\Support\LaravelHttpClient;
 use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
+use App\Domains\Flow\Validation\AssistantCommandsValidator;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
 use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
@@ -86,7 +115,7 @@ final class FlowServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $registry  = $this->app->make(NodeHandlerRegistryInterface::class);
-        $templates = $this->app->make(TemplateResolver::class);
+        $templates = $this->app->make(TemplateRenderer::class);
 
         $registry->register(
             new SendMessageNodeHandler(
@@ -103,14 +132,44 @@ final class FlowServiceProvider extends ServiceProvider
                 $this->app->make(MediaServiceInterface::class),
             )
         );
-        $registry->register(new ConditionNodeHandler($this->app->make(DataAccessorRegistryInterface::class)));
+        $registry->register(new BranchNodeHandler($this->app->make(DataAccessorRegistryInterface::class)));
         $registry->register(new DelayNodeHandler());
-        $registry->register(new SetAttributeNodeHandler($templates));
-        $registry->register(new WebhookNodeHandler($this->app->make(HttpClientInterface::class)));
+        $registry->register(new AssignNodeHandler($templates));
+        $registry->register(new CallNodeHandler($this->app->make(HttpClientInterface::class)));
+        $registry->register(
+            new EmitEventNodeHandler(
+                $this->app->make(FlowTriggerEventPublisherInterface::class),
+                $templates,
+            )
+        );
+        $registry->register(new EndNodeHandler());
+        $registry->register(
+            new RagQueryNodeHandler(
+                $this->app->make(RagAdapterRegistry::class),
+                $templates,
+            )
+        );
+        $registry->register(
+            new SubflowNodeHandler(
+                $this->app->make(SubflowStarterService::class),
+                $this->app->make(FlowSessionRepositoryInterface::class),
+            )
+        );
+
+        $expressions = $this->app->make(ExpressionEngineRegistry::class);
+        $expressions->register(new TemplateEngine());
+
+        $callTransports = $this->app->make(CallTransportRegistry::class);
+        $callTransports->register($this->app->make(HttpTransport::class));
+        $callTransports->register($this->app->make(HandlerTransport::class));
 
         $this->app->booted(function (): void {
             if ( ! $this->app->environment('testing')) {
                 $this->app->make(NodeHandlerRegistryInterface::class)->freeze();
+                $this->app->make(ExpressionEngineRegistry::class)->freeze();
+                $this->app->make(CallTransportRegistry::class)->freeze();
+                $this->app->make(ActionHandlerRegistry::class)->freeze();
+                $this->app->make(RagAdapterRegistry::class)->freeze();
             }
 
             $this->app->make(NamespaceResolverRegistry::class)->freeze();
@@ -167,8 +226,44 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->bind(ContentTranslatorInterface::class, CachedContentTranslator::class);
         $this->app->bind(TenantTranslationRepositoryInterface::class, TenantTranslationRepository::class);
         $this->app->bind(TenantEventRepositoryInterface::class, TenantEventRepository::class);
+        $this->app->bind(FlowTriggerEventPublisherInterface::class, QueuedFlowTriggerEventPublisher::class);
+        $this->app->bind(
+            SubflowResumerInterface::class,
+            fn ($app): DefaultSubflowResumer => new DefaultSubflowResumer(
+                fn (): FlowEngineInterface => $app->make(FlowEngineInterface::class),
+            ),
+        );
+        $this->app->scoped(CallGraphRepository::class);
+        $this->app->scoped(CallGraphValidator::class);
+        $this->app->scoped(SubflowStarterService::class);
+        $this->app->scoped(SubflowTimeoutSweeper::class);
+
+        $this->app->scoped(\App\Domains\Flow\Commands\GlobalCommandExecutor::class);
+        $this->app->scoped(\App\Domains\Flow\Commands\GlobalCommandExecutorInterface::class, \App\Domains\Flow\Commands\GlobalCommandExecutor::class);
+        $this->app->scoped(\App\Domains\Flow\Routing\SessionStateRouter::class);
+        $this->app->scoped(\App\Domains\Flow\Routing\DropPolicy::class);
+        $this->app->scoped(\App\Domains\Flow\Routing\DropPolicyInterface::class, \App\Domains\Flow\Routing\DropPolicy::class);
+        $this->app->scoped(\App\Domains\Flow\Routing\MessageRouter::class);
+        $this->app->scoped(\App\Domains\Messaging\Typing\TypingIndicatorService::class);
+        $this->app->scoped(\App\Domains\Messaging\Typing\TypingHeartbeatRegistry::class);
         $this->app->bind(TenantTranslationServiceInterface::class, TenantTranslationService::class);
         $this->app->singleton(TemplateResolver::class);
+        $this->app->singleton(TemplateRenderer::class);
+        $this->app->singleton(ExpressionEngineRegistry::class);
+        $this->app->singleton(DefaultHistoryWriter::class);
+        $this->app->singleton(NoOpHistoryWriter::class);
+        $this->app->singleton(HistoryWriterFactory::class);
+        $this->app->singleton(SessionLockManager::class);
+        $this->app->singleton(LockHeartbeat::class);
+        $this->app->singleton(LockAcquisitionPolicy::class);
+        $this->app->singleton(CallTransportRegistry::class);
+        $this->app->singleton(ActionHandlerRegistry::class);
+        $this->app->singleton(RagAdapterRegistry::class);
+        $this->app->singleton(HttpTransport::class);
+        $this->app->singleton(HandlerTransport::class);
+        $this->app->singleton(BuiltinCommandsRegistry::class);
+        $this->app->singleton(CommandMatcher::class);
+        $this->app->singleton(AssistantCommandsValidator::class);
 
         $this->app->scoped(FlowEngineInterface::class, FlowEngine::class);
         $this->app->scoped(FlowGraphResolver::class);

@@ -77,7 +77,7 @@ final class StateContractTest extends TestCase
         $this->assertSame('ok', $state->get(StatePath::from('rag.answer')));
 
         $this->expectException(ReadonlyNamespaceException::class);
-        $writer->set('rag.answer', 'forbidden', WriteContext::node('set_attribute'));
+        $writer->set('rag.answer', 'forbidden', WriteContext::node('assign'));
     }
 
     public function test_module_namespace_is_lazy_and_not_written_to_flow_state(): void

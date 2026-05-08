@@ -12,9 +12,9 @@ use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 
-final class WebhookNodeHandler extends AbstractVersionedHandler
+final class CallNodeHandler extends AbstractVersionedHandler
 {
-    final public const string TYPE = "webhook";
+    final public const string TYPE = "call";
 
     private const string ERROR_META           = "error";
     private const string ERROR_TYPE_META      = "error_type";
@@ -75,7 +75,7 @@ final class WebhookNodeHandler extends AbstractVersionedHandler
         $url    = $config['url'] ?? null;
 
         if ( ! is_string($url) || '' === $url) {
-            throw new InvalidNodeConfigException('webhook: missing url');
+            throw new InvalidNodeConfigException('call: missing url');
         }
 
         $idempotencyKey = "{$context->sessionId}:{$context->nodeId}";

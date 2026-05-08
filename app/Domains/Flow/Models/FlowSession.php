@@ -65,6 +65,9 @@ final class FlowSession extends BaseModel
         'current_node_id',
         'state',
         'status',
+        'end_status',
+        'parent_session_id',
+        'parent_resume_node_id',
         'version',
         'expires_at',
     ];

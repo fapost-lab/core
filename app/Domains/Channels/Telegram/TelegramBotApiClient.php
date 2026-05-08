@@ -106,6 +106,23 @@ final readonly class TelegramBotApiClient
     }
 
     /**
+     * Show a chat action (typing, upload_photo, …) to the user.
+     *
+     * Telegram auto-clears the action after ~5 seconds or when the bot sends
+     * the next message — used by the typing indicator service to signal
+     * "bot is processing" during long-running flow execution.
+     *
+     * @return array<string, mixed>
+     */
+    public function sendChatAction(string $chatId, string $action = 'typing'): array
+    {
+        return $this->request('sendChatAction', [
+            'chat_id' => $chatId,
+            'action'  => $action,
+        ]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function deleteWebhook(): array

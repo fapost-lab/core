@@ -6,6 +6,7 @@ namespace Tests\Unit\Domains\Flow;
 
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
 use App\Domains\Flow\Contracts\HttpClientInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
@@ -13,23 +14,31 @@ use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
 use App\Domains\Flow\DTOs\HttpResponse;
 use App\Domains\Flow\Exceptions\HttpTransportException;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
-use App\Domains\Flow\Handlers\ConditionNodeHandler;
+use App\Domains\Flow\Handlers\AssignNodeHandler;
+use App\Domains\Flow\Handlers\BranchNodeHandler;
+use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\DelayNodeHandler;
+use App\Domains\Flow\Handlers\EmitEventNodeHandler;
+use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\InputNodeHandler;
+use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
-use App\Domains\Flow\Handlers\SetAttributeNodeHandler;
-use App\Domains\Flow\Handlers\Support\TemplateResolver;
-use App\Domains\Flow\Handlers\WebhookNodeHandler;
+use App\Domains\Flow\Handlers\Support\TemplateRenderer;
+use App\Domains\Flow\Rag\RagAdapterRegistry;
 use App\Domains\Flow\State\FlowStateNamespace;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
 use App\Domains\Media\Contracts\MediaServiceInterface;
 use FAPost\Foundation\Contracts\DataAccessorInterface;
+use FAPost\Foundation\Contracts\RagAdapterInterface;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\IncomingMessageType;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
+use FAPost\Foundation\DTO\RagConfidence;
+use FAPost\Foundation\DTO\RagQueryContext;
+use FAPost\Foundation\DTO\StructuredRagResult;
 use Mockery;
 use Tests\TestCase;
 
@@ -347,7 +356,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $accessor->shouldReceive('get')->once()->with('department', 'contact-1', 'tenant-1')->andReturn('sales');
         $registry->shouldReceive('resolve')->once()->with('module.hr')->andReturn($accessor);
 
-        $handler  = new ConditionNodeHandler($registry);
+        $handler  = new BranchNodeHandler($registry);
         $flowNode = [
             'id'     => 'condition-flow',
             'config' => [
@@ -397,46 +406,49 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame([], $second->stateChanges);
     }
 
-    public function test_set_attribute_returns_contact_effect_or_flow_change(): void
+    public function test_assign_writes_to_flow_state_or_contact_writer_by_target(): void
     {
-        $handler = new SetAttributeNodeHandler(new TemplateResolver());
-        $context = $this->context();
+        $handler = new AssignNodeHandler(new TemplateRenderer());
 
-        $contact = $handler->execute([
+        $writer = Mockery::mock(\FAPost\Foundation\Flow\Contracts\ContactWriterInterface::class);
+        $writer->shouldReceive('write')->once()->with('contact.first_name', 'Jane');
+
+        $contextWithWriter = $this->contextWithContactWriter($writer);
+
+        $handler->execute([
             'id'     => 'set-contact',
             'config' => ['target' => 'contact', 'key' => 'first_name', 'value' => '{{flow.name}}'],
-        ], [FlowStateNamespace::FLOW => ['name' => 'Jane']], $context);
+        ], [FlowStateNamespace::FLOW => ['name' => 'Jane']], $contextWithWriter);
 
         $flow = $handler->execute([
             'id'     => 'set-flow',
             'config' => ['target' => 'flow', 'key' => 'nickname', 'value' => '{{flow.name}}'],
-        ], [FlowStateNamespace::FLOW => ['name' => 'Jane']], $context);
+        ], [FlowStateNamespace::FLOW => ['name' => 'Jane']], $this->context());
 
-        $this->assertSame('set_contact_attribute', $contact->effects[0]['type']);
-        $this->assertSame('Jane', $contact->effects[0]['value']);
         $this->assertSame('Jane', $flow->stateChanges[FlowStateNamespace::FLOW . '.nickname']);
     }
 
-    public function test_set_attribute_contact_language_returns_language_effect(): void
+    public function test_assign_contact_language_aliases_route_to_canonical_path(): void
     {
-        $handler = new SetAttributeNodeHandler(new TemplateResolver());
-        $context = $this->context();
+        $handler = new AssignNodeHandler(new TemplateRenderer());
 
-        $result = $handler->execute([
+        $writer = Mockery::mock(\FAPost\Foundation\Flow\Contracts\ContactWriterInterface::class);
+        $writer->shouldReceive('write')->once()->with('contact.language', 'es');
+        $writer->shouldReceive('write')->once()->with('contact.language', 'de');
+
+        $context = $this->contextWithContactWriter($writer);
+
+        $handler->execute([
             'id'     => 'set-contact-language',
             'config' => ['target' => 'contact', 'key' => 'contact.language', 'value' => 'es'],
         ], [], $context);
 
-        $this->assertSame('set_contact_language', $result->effects[0]['type']);
-        $this->assertSame('es', $result->effects[0]['value']);
-
-        $canonical = $handler->execute([
+        $handler->execute([
             'id'     => 'set-contact-language-canonical',
             'config' => ['target' => 'contact', 'key' => 'language', 'value' => 'de'],
         ], [], $context);
 
-        $this->assertSame('set_contact_language', $canonical->effects[0]['type']);
-        $this->assertSame('de', $canonical->effects[0]['value']);
+        $this->addToAssertionCount(1); // mockery expectations are the assertion
     }
 
     public function test_webhook_returns_failed_on_transport_error_and_success_on_http_2xx(): void
@@ -444,7 +456,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $errorHttp = Mockery::mock(HttpClientInterface::class);
         $errorHttp->shouldReceive('post')->once()->andThrow(new HttpTransportException('timeout'));
 
-        $errorHandler = new WebhookNodeHandler($errorHttp);
+        $errorHandler = new CallNodeHandler($errorHttp);
         $failed       = $errorHandler->execute([
             'id'     => 'hook-1',
             'config' => ['url' => 'https://example.test/hook'],
@@ -453,7 +465,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $okHttp = Mockery::mock(HttpClientInterface::class);
         $okHttp->shouldReceive('post')->once()->andReturn(new HttpResponse(200, ['ok' => true]));
 
-        $okHandler = new WebhookNodeHandler($okHttp);
+        $okHandler = new CallNodeHandler($okHttp);
         $executed  = $okHandler->execute([
             'id'     => 'hook-2',
             'config' => ['url' => 'https://example.test/hook', 'save_response_to' => 'flow.webhook'],
@@ -465,11 +477,185 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('success', $executed->sourceHandle);
     }
 
-    public function test_template_resolver_replaces_placeholders_and_defaults_to_empty_string(): void
+    public function test_emit_event_publishes_resolved_payload_and_returns_success_handle(): void
     {
-        $resolver = new TemplateResolver();
+        $publisher = Mockery::mock(FlowTriggerEventPublisherInterface::class);
+        $publisher->shouldReceive('publish')
+            ->once()
+            ->with(
+                'tenant-1',
+                'sales.order.created',
+                ['order_id' => 'ORD-7', 'amount' => '199', 'meta' => ['source' => 'web']],
+                Mockery::on(static function (array $source): bool {
+                    return 'tenant-1' === $source['tenant_id']
+                        && 'session-1' === $source['session_id']
+                        && 'emit-1' === $source['node_id']
+                        && 'contact-1' === $source['contact_id'];
+                })
+            );
 
-        $resolved = $resolver->resolve('Hi, {{flow.name}} {{flow.missing}}!', ['flow' => ['name' => 'Alice']]);
+        $handler = new EmitEventNodeHandler($publisher, new TemplateRenderer());
+        $context = $this->context(nodeId: 'emit-1');
+
+        $result = $handler->execute([
+            'id'     => 'emit-1',
+            'config' => [
+                'event_type' => 'sales.order.created',
+                'payload'    => [
+                    'order_id' => '{{flow.order_id}}',
+                    'amount'   => '{{flow.amount}}',
+                    'meta'     => ['source' => 'web'],
+                ],
+            ],
+        ], [
+            FlowStateNamespace::FLOW => ['order_id' => 'ORD-7', 'amount' => 199],
+        ], $context);
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('success', $result->sourceHandle);
+        $this->assertSame('sales.order.created', $result->metadata['event_type']);
+    }
+
+    public function test_emit_event_throws_when_event_type_is_missing(): void
+    {
+        $publisher = Mockery::mock(FlowTriggerEventPublisherInterface::class);
+        $publisher->shouldNotReceive('publish');
+
+        $handler = new EmitEventNodeHandler($publisher, new TemplateRenderer());
+
+        $this->expectException(InvalidNodeConfigException::class);
+
+        $handler->execute(['id' => 'emit-x', 'config' => ['event_type' => '   ']], [], $this->context());
+    }
+
+    public function test_end_handler_returns_finished_with_chosen_status(): void
+    {
+        $handler = new EndNodeHandler();
+
+        $success = $handler->execute(['id' => 'end-1', 'config' => ['status' => 'success']], [], $this->context());
+        $this->assertSame(NodeExecutionStatus::Finished, $success->status);
+        $this->assertSame('success', $success->metadata['end_status']);
+
+        $cancelled = $handler->execute(['id' => 'end-2', 'config' => ['status' => 'cancelled']], [], $this->context());
+        $this->assertSame('cancelled', $cancelled->metadata['end_status']);
+
+        $failed = $handler->execute(['id' => 'end-3', 'config' => ['status' => 'failed']], [], $this->context());
+        $this->assertSame('failed', $failed->metadata['end_status']);
+    }
+
+    public function test_end_handler_defaults_to_success_when_status_missing(): void
+    {
+        $handler = new EndNodeHandler();
+
+        $result = $handler->execute(['id' => 'end-x', 'config' => []], [], $this->context());
+
+        $this->assertSame('success', $result->metadata['end_status']);
+    }
+
+    public function test_end_handler_throws_for_invalid_status(): void
+    {
+        $handler = new EndNodeHandler();
+
+        $this->expectException(InvalidNodeConfigException::class);
+        $handler->execute(['id' => 'end-bad', 'config' => ['status' => 'unknown']], [], $this->context());
+    }
+
+    public function test_rag_query_writes_state_and_routes_success_when_found(): void
+    {
+        $registry = new RagAdapterRegistry();
+        $registry->register(new TestRagAdapter(
+            new StructuredRagResult(
+                found: true,
+                confidence: RagConfidence::High,
+                answer: 'Office hours are 9-6.',
+                intent: 'business_hours',
+                metadata: ['source' => 'kb-1'],
+            ),
+        ));
+
+        $handler = new RagQueryNodeHandler($registry, new TemplateRenderer());
+        $result  = $handler->execute([
+            'id'     => 'rag-1',
+            'config' => [
+                'knowledge_base_id' => 'kb-main',
+                'provider'          => 'test-rag',
+                'query'             => 'When do you open, {{flow.contact_name}}?',
+            ],
+        ], [FlowStateNamespace::FLOW => ['contact_name' => 'Alice']], $this->context(nodeId: 'rag-1'));
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('success', $result->sourceHandle);
+        $this->assertSame('Office hours are 9-6.', $result->stateChanges[FlowStateNamespace::RAG . '.answer']);
+        $this->assertTrue($result->stateChanges[FlowStateNamespace::RAG . '.found']);
+        $this->assertSame('high', $result->stateChanges[FlowStateNamespace::RAG . '.confidence']);
+    }
+
+    public function test_rag_query_routes_not_found_when_adapter_signals_no_match(): void
+    {
+        $registry = new RagAdapterRegistry();
+        $registry->register(new TestRagAdapter(StructuredRagResult::notFound()));
+
+        $handler = new RagQueryNodeHandler($registry, new TemplateRenderer());
+        $result  = $handler->execute([
+            'id'     => 'rag-1',
+            'config' => [
+                'knowledge_base_id' => 'kb-main',
+                'provider'          => 'test-rag',
+                'query'             => 'whatever',
+            ],
+        ], [], $this->context());
+
+        $this->assertSame('not_found', $result->sourceHandle);
+        $this->assertFalse($result->stateChanges[FlowStateNamespace::RAG . '.found']);
+    }
+
+    public function test_rag_query_routes_error_on_adapter_throw(): void
+    {
+        $registry = new RagAdapterRegistry();
+        $registry->register(new ThrowingRagAdapter('upstream timeout'));
+
+        $handler = new RagQueryNodeHandler($registry, new TemplateRenderer());
+        $result  = $handler->execute([
+            'id'     => 'rag-1',
+            'config' => [
+                'knowledge_base_id' => 'kb-main',
+                'provider'          => 'throw-rag',
+                'query'             => 'whatever',
+            ],
+        ], [], $this->context());
+
+        $this->assertSame('error', $result->sourceHandle);
+        $this->assertSame('adapter_failure', $result->metadata['error_type']);
+        $this->assertSame('upstream timeout', $result->metadata['error']);
+    }
+
+    public function test_rag_query_routes_error_when_provider_unknown(): void
+    {
+        $registry = new RagAdapterRegistry();
+
+        $handler = new RagQueryNodeHandler($registry, new TemplateRenderer());
+        $result  = $handler->execute([
+            'id'     => 'rag-1',
+            'config' => [
+                'knowledge_base_id' => 'kb-main',
+                'provider'          => 'absent',
+                'query'             => 'q',
+            ],
+        ], [], $this->context());
+
+        $this->assertSame('error', $result->sourceHandle);
+        $this->assertSame('unknown_provider', $result->metadata['error_type']);
+    }
+
+    public function test_template_renderer_falls_back_to_session_state_when_engine_is_unavailable(): void
+    {
+        $renderer = new TemplateRenderer();
+
+        $resolved = $renderer->render(
+            'Hi, {{flow.name}} {{flow.missing}}!',
+            $this->context(),
+            ['flow' => ['name' => 'Alice']],
+        );
 
         $this->assertSame('Hi, Alice !', $resolved);
     }
@@ -481,7 +667,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         return new SendMessageNodeHandler(
             $sender,
             $translator,
-            new TemplateResolver(),
+            new TemplateRenderer(),
             Mockery::mock(InlineKeyboardEditorInterface::class),
             Mockery::mock(PersistentButtonRegistryInterface::class),
         );
@@ -503,6 +689,20 @@ final class BuiltInNodeHandlersTest extends TestCase
         );
     }
 
+    private function contextWithContactWriter(
+        \FAPost\Foundation\Flow\Contracts\ContactWriterInterface $writer,
+    ): NodeExecutionContext {
+        return new NodeExecutionContext(
+            tenantId: 'tenant-1',
+            contactId: 'contact-1',
+            sessionId: 'session-1',
+            nodeId: 'node-1',
+            idempotencyKey: 'idem-1',
+            platform: 'telegram',
+            contactWriter: $writer,
+        );
+    }
+
     private function incoming(string $text): IncomingMessage
     {
         return new IncomingMessage(
@@ -513,5 +713,39 @@ final class BuiltInNodeHandlersTest extends TestCase
             type: IncomingMessageType::Text,
             platform: 'telegram',
         );
+    }
+}
+
+final class TestRagAdapter implements RagAdapterInterface
+{
+    public function __construct(private readonly StructuredRagResult $result)
+    {
+    }
+
+    public function provider(): string
+    {
+        return 'test-rag';
+    }
+
+    public function query(string $prompt, RagQueryContext $context): StructuredRagResult
+    {
+        return $this->result;
+    }
+}
+
+final class ThrowingRagAdapter implements RagAdapterInterface
+{
+    public function __construct(private readonly string $message)
+    {
+    }
+
+    public function provider(): string
+    {
+        return 'throw-rag';
+    }
+
+    public function query(string $prompt, RagQueryContext $context): StructuredRagResult
+    {
+        throw new \RuntimeException($this->message);
     }
 }

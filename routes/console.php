@@ -14,3 +14,4 @@ Artisan::command('inspire', function (): void {
 Schedule::command('logs:prune-flow')->dailyAt('03:00');
 Schedule::command('logs:create-partition')->monthlyOn(1, '00:00');
 Schedule::job(new CleanupSoftDeletedMediaJob())->dailyAt('03:30');
+Schedule::command('flow:sweep-subflow-timeouts')->everyMinute()->withoutOverlapping();

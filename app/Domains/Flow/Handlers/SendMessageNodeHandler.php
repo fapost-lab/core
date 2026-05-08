@@ -11,7 +11,7 @@ use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
-use App\Domains\Flow\Handlers\Support\TemplateResolver;
+use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\FlowStateNamespace;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\Support\CallbackDataCodec;
@@ -34,7 +34,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
     public function __construct(
         private readonly MessageSenderInterface $sender,
         private readonly ContentTranslatorInterface $translator,
-        private readonly TemplateResolver $templates,
+        private readonly TemplateRenderer $templates,
         private readonly InlineKeyboardEditorInterface $keyboardEditor,
         private readonly PersistentButtonRegistryInterface $persistentButtonRegistry,
     ) {
@@ -407,13 +407,14 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
     ): array {
         if (isset($config['text']) && (is_array($config['text']) || is_string($config['text']))) {
             $resolved       = $this->translator->resolveField($config['text'], $context->resolvedLanguage);
-            $config['text'] = is_string($resolved) ? $this->templates->resolve($resolved, $templateContext) : $resolved;
+            $config['text'] = is_string($resolved) ? $this->templates->render($resolved, $context, $templateContext) : $resolved;
         }
 
         if (isset($config['caption']) && (is_array($config['caption']) || is_string($config['caption']))) {
             $resolved          = $this->translator->resolveField($config['caption'], $context->resolvedLanguage);
-            $config['caption'] = is_string($resolved) ? $this->templates->resolve(
+            $config['caption'] = is_string($resolved) ? $this->templates->render(
                 $resolved,
+                $context,
                 $templateContext
             ) : $resolved;
         }
@@ -431,8 +432,9 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                         $button['label'],
                         $context->resolvedLanguage
                     );
-                    $buttons[$index]['label'] = is_string($resolved) ? $this->templates->resolve(
+                    $buttons[$index]['label'] = is_string($resolved) ? $this->templates->render(
                         $resolved,
+                        $context,
                         $templateContext
                     ) : $resolved;
                 }
