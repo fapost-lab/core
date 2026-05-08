@@ -7,6 +7,43 @@ return [
         'group' => 'Персонал',
     ],
 
+    'tenant_settings' => [
+        'title'      => 'Настройки',
+        'navigation' => 'Настройки',
+        'subtitle'   => 'Общие настройки, разделяемые всеми ассистентами тенанта.',
+        'saved'      => 'Настройки сохранены',
+        'tabs'       => [
+            'languages'  => 'Языки',
+            'runtime'    => 'Исполнение',
+            'broadcasts' => 'Рассылки',
+        ],
+        'sections' => [
+            'messaging' => 'Сообщения',
+            'flow'      => 'Сценарии',
+        ],
+        'fields' => [
+            'content_base_language'      => 'Базовый язык контента',
+            'content_base_language_help' => 'Язык, на котором авторятся сценарии. Нельзя изменить после публикации первого сценария.',
+            'available_languages'        => 'Доступные языки',
+            'available_languages_help'   => 'Языки, на которые можно перевести контент в редакторе сценариев.',
+            'fallback_language'          => 'Резервный язык',
+            'fallback_language_help'     => 'Используется, когда у контакта и ассистента не определён язык.',
+            'messaging_rate_limit'       => 'Сообщений в минуту (на чат)',
+            'broadcast_chunk_size'       => 'Размер чанка рассылки',
+            'broadcast_backpressure'     => 'Backpressure для рассылок',
+            'flow_session_ttl'           => 'TTL сессии сценария (сек)',
+            'max_retry_attempts'         => 'Макс. количество ретраев ноды',
+            'flow_fallback_message'      => 'Резервное сообщение сценария',
+        ],
+        'actions' => [
+            'save' => 'Сохранить',
+        ],
+        'errors' => [
+            'fallback_not_in_available' => 'Резервный язык должен быть в списке доступных.',
+            'base_lang_locked'          => 'Нельзя изменить базовый язык после публикации сценариев.',
+        ],
+    ],
+
     'permission_groups' => [
         'assistants' => 'Ассистенты',
         'users'      => 'Пользователи',
@@ -154,6 +191,28 @@ return [
 
         'notifications' => [
             'hash_rotated_title' => 'Webhook hash обновлён',
+        ],
+    ],
+
+    'tenant_translations' => [
+        'label'        => 'Перевод',
+        'plural_label' => 'Переводы',
+        'navigation'   => 'Переводы',
+        'subtitle'     => 'Системные сообщения и подписи, которые бот отправляет пользователям. Системные значения уже заполнены — введите своё, чтобы переопределить для конкретного языка.',
+        'saved'        => 'Переводы сохранены',
+        'reset_done'   => 'Переопределения для ключа удалены',
+
+        'fields' => [
+            'key'                 => 'Ключ',
+            'group'               => 'Группа',
+            'description'         => 'Описание',
+            'locale_default_hint' => 'Системное значение: «:default»',
+        ],
+
+        'actions' => [
+            'edit'  => 'Редактировать',
+            'save'  => 'Сохранить',
+            'reset' => 'Сбросить к системным',
         ],
     ],
 

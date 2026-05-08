@@ -45,6 +45,8 @@ final class PublishFlowServiceTest extends TestCase
             $table->string('name');
             $table->json('nodes')->nullable();
             $table->json('edges')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->boolean('logging_enabled')->default(false);
             $table->timestamps();
         });
 
@@ -67,6 +69,7 @@ final class PublishFlowServiceTest extends TestCase
             $table->json('nodes');
             $table->json('edges')->nullable();
             $table->boolean('is_active')->default(false);
+            $table->boolean('logging_enabled')->default(false);
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
             $table->unique(['flow_id', 'version']);
@@ -85,6 +88,39 @@ final class PublishFlowServiceTest extends TestCase
                 }
             };
         });
+    }
+
+    public function test_publishes_logging_enabled_flag_from_draft_onto_new_definition(): void
+    {
+        $flowId = '00000000-0000-0000-0000-000000000777';
+
+        FlowDraft::factory()->create([
+            'flow_id'         => $flowId,
+            'logging_enabled' => true,
+            'nodes'           => [
+                ['id' => 'start', 'type' => 'input', 'version' => 1, 'config' => []],
+            ],
+        ]);
+
+        $definition = app(PublishFlowService::class)->execute($flowId);
+
+        $this->assertTrue((bool) $definition->logging_enabled);
+    }
+
+    public function test_publish_defaults_logging_enabled_false_when_draft_flag_unset(): void
+    {
+        $flowId = '00000000-0000-0000-0000-000000000888';
+
+        FlowDraft::factory()->create([
+            'flow_id' => $flowId,
+            'nodes'   => [
+                ['id' => 'start', 'type' => 'input', 'version' => 1, 'config' => []],
+            ],
+        ]);
+
+        $definition = app(PublishFlowService::class)->execute($flowId);
+
+        $this->assertFalse((bool) $definition->logging_enabled);
     }
 
     public function test_assigns_unique_versions_for_repeated_publish_calls(): void

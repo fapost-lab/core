@@ -7,6 +7,43 @@ return [
         'group' => 'Staff',
     ],
 
+    'tenant_settings' => [
+        'title'      => 'Settings',
+        'navigation' => 'Settings',
+        'subtitle'   => 'Tenant-wide configuration shared across all assistants.',
+        'saved'      => 'Settings saved',
+        'tabs'       => [
+            'languages'  => 'Languages',
+            'runtime'    => 'Runtime',
+            'broadcasts' => 'Broadcasts',
+        ],
+        'sections' => [
+            'messaging' => 'Messaging',
+            'flow'      => 'Flow execution',
+        ],
+        'fields' => [
+            'content_base_language'      => 'Content base language',
+            'content_base_language_help' => 'Source language used to author flow content. Cannot be changed after the first flow is published.',
+            'available_languages'        => 'Available languages',
+            'available_languages_help'   => 'Languages available for translation in the flow content manager.',
+            'fallback_language'          => 'Fallback language',
+            'fallback_language_help'     => 'Used when neither contact nor assistant define a language.',
+            'messaging_rate_limit'       => 'Messages per minute (per chat)',
+            'broadcast_chunk_size'       => 'Broadcast chunk size',
+            'broadcast_backpressure'     => 'Broadcast backpressure',
+            'flow_session_ttl'           => 'Flow session TTL (seconds)',
+            'max_retry_attempts'         => 'Max node retry attempts',
+            'flow_fallback_message'      => 'Flow fallback message',
+        ],
+        'actions' => [
+            'save' => 'Save',
+        ],
+        'errors' => [
+            'fallback_not_in_available' => 'Fallback language must be one of the available languages.',
+            'base_lang_locked'          => 'Content base language cannot be changed after publishing flows.',
+        ],
+    ],
+
     'permission_groups' => [
         'assistants' => 'Assistants',
         'users'      => 'Users',
@@ -154,6 +191,28 @@ return [
 
         'notifications' => [
             'hash_rotated_title' => 'Webhook hash rotated',
+        ],
+    ],
+
+    'tenant_translations' => [
+        'label'        => 'Translation',
+        'plural_label' => 'Translations',
+        'navigation'   => 'Translations',
+        'subtitle'     => 'System messages and labels the bot sends to end users. Catalog defaults are pre-filled — fill any cell to override per language.',
+        'saved'        => 'Translations saved',
+        'reset_done'   => 'Overrides removed for this key',
+
+        'fields' => [
+            'key'                 => 'Key',
+            'group'               => 'Group',
+            'description'         => 'Description',
+            'locale_default_hint' => 'System default: ":default"',
+        ],
+
+        'actions' => [
+            'edit'  => 'Edit',
+            'save'  => 'Save',
+            'reset' => 'Reset to defaults',
         ],
     ],
 

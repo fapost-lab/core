@@ -16,5 +16,6 @@ return [
         'status_saved'    => '✓ Збережено',
         'status_conflict' => '⚠ Конфлікт',
         'status_error'    => '✕ Помилка',
+        'dirty_title'     => 'Незбережені зміни',
     ],
 ];

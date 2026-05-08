@@ -9,16 +9,20 @@ use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
+use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\FlowStateNamespace;
 use App\Domains\Flow\State\SystemStateKeys;
+use App\Domains\Flow\State\Variables\Variable;
+use App\Domains\Flow\State\Variables\VariableStorage;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use App\Jobs\Flow\ResumeTimedOutSendMessageNodeJob;
 use Carbon\Carbon;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
+use FAPost\Foundation\Flow\Contracts\ContactWriterInterface;
 use FAPost\Foundation\Flow\Enums\KeyboardMode;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use Ramsey\Uuid\Uuid;
@@ -37,6 +41,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
         private readonly TemplateRenderer $templates,
         private readonly InlineKeyboardEditorInterface $keyboardEditor,
         private readonly PersistentButtonRegistryInterface $persistentButtonRegistry,
+        private readonly VariableResolverInterface $variableResolver,
     ) {
     }
 
@@ -146,6 +151,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
      *   caption?: array<string, mixed>|string|null,
      *   timeout_seconds: int|null,
      *   save_to: string|null,
+     *   save_to_variable: array<string, mixed>|null,
      *   remove_keyboard_after_press: bool
      * }
      */
@@ -214,6 +220,10 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
             ? $config['save_to']
             : null;
 
+        $saveToVariable = is_array($config['save_to_variable'] ?? null)
+            ? $config['save_to_variable']
+            : null;
+
         return [
             'content_type'  => $contentType,
             'text'          => $config['text'] ?? null,
@@ -227,6 +237,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                 $config['timeout_seconds'] ?? null
             ) ? (int)$config['timeout_seconds'] : null,
             'save_to'                     => $saveTo,
+            'save_to_variable'            => $saveToVariable,
             'remove_keyboard_after_press' => true === ($config['remove_keyboard_after_press'] ?? true),
         ];
     }
@@ -292,9 +303,24 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                 "{$responsePath}.update_id" => (string)$context->incoming?->updateId,
             ];
 
-            // Write button value to flow state only when a save_to variable is configured.
-            if (is_string($config['save_to'] ?? null)) {
-                $stateChanges["flow.{$config['save_to']}"] = (string)($button['value'] ?? '');
+            // Write button value to the configured save target. New
+            // {@code save_to_variable} shape takes precedence over the
+            // legacy {@code save_to} string.
+            $variable = $this->resolveSaveTarget($config);
+            $value    = (string)($button['value'] ?? '');
+
+            if ($variable instanceof Variable) {
+                $path = $this->variableResolver->resolveTargetPath($variable);
+
+                if (VariableStorage::Contact === $variable->storage) {
+                    $writer = $context->contactWriter;
+
+                    if ($writer instanceof ContactWriterInterface) {
+                        $writer->write($path, $value);
+                    }
+                } else {
+                    $stateChanges[$path] = $value;
+                }
             }
 
             return NodeExecutionResult::executed(
@@ -304,6 +330,29 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
         }
 
         return NodeExecutionResult::waiting();
+    }
+
+    /**
+     * Resolve the configured "save button value" target to a {@see Variable}.
+     *
+     * New {@code save_to_variable} payload (UI shape) wins over legacy
+     * {@code save_to} string; absent values yield {@code null}.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function resolveSaveTarget(array $config): ?Variable
+    {
+        if (is_array($config['save_to_variable'] ?? null)) {
+            return Variable::tryFromArray($config['save_to_variable']);
+        }
+
+        $saveTo = $config['save_to'] ?? null;
+
+        if ( ! is_string($saveTo) || '' === $saveTo) {
+            return null;
+        }
+
+        return $this->variableResolver->fromLegacyPath($saveTo);
     }
 
     /**

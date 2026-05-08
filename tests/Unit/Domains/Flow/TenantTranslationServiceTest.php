@@ -36,4 +36,22 @@ final class TenantTranslationServiceTest extends TestCase
         $service->upsert('tenant-1', 'welcome', 'es', 'Hola');
         $this->addToAssertionCount(1);
     }
+
+    public function test_delete_invalidates_cached_language_map_after_removing_override(): void
+    {
+        $repository = Mockery::mock(TenantTranslationRepositoryInterface::class);
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+
+        $repository->shouldReceive('delete')
+            ->once()
+            ->with('tenant-1', 'welcome', 'es');
+
+        $translator->shouldReceive('invalidate')
+            ->once()
+            ->with('tenant-1', 'es');
+
+        $service = new TenantTranslationService($repository, $translator);
+        $service->delete('tenant-1', 'welcome', 'es');
+        $this->addToAssertionCount(1);
+    }
 }

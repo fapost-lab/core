@@ -27,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string|null             $description
  * @property bool                    $is_public
  * @property bool                    $is_active
+ * @property bool                    $logging_enabled
  * @property array<array-key, mixed> $nodes
  * @property array<array-key, mixed> $edges
  * @property \Illuminate\Support\Carbon|null $created_at
@@ -68,6 +69,7 @@ final class FlowDraft extends BaseModel
         'description',
         'is_public',
         'is_active',
+        'logging_enabled',
         'nodes',
         'edges',
     ];
@@ -98,11 +100,12 @@ final class FlowDraft extends BaseModel
     protected function casts(): array
     {
         return [
-            'nodes'         => 'array',
-            'edges'         => 'array',
-            'draft_version' => 'integer',
-            'is_public'     => 'boolean',
-            'is_active'     => 'boolean',
+            'nodes'           => 'array',
+            'edges'           => 'array',
+            'draft_version'   => 'integer',
+            'is_public'       => 'boolean',
+            'is_active'       => 'boolean',
+            'logging_enabled' => 'boolean',
         ];
     }
 }

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Contracts;
 
-interface TenantTranslationRepositoryInterface
+/**
+ * Marker interface for binding clarity — tenants have their own repository
+ * instance even though the contract is identical to {@see TranslationOverrideRepositoryInterface}.
+ * The container binds this to a concrete implementation backed by the
+ * `tenant_translations` table.
+ */
+interface TenantTranslationRepositoryInterface extends TranslationOverrideRepositoryInterface
 {
-    /**
-     * @return array<string, string>
-     */
-    public function getAllForLanguage(string $tenantId, string $language): array;
-
-    public function upsert(string $tenantId, string $key, string $language, string $value): void;
 }

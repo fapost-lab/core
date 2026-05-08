@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Commands;
 
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Tenancy\Settings\TenantSettings;
 
 /**
  * Carries out the action implied by a {@see ResolvedCommand} returned by
@@ -33,6 +35,8 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowEngineInterface $engine,
         private FallbackMessageServiceInterface $messenger,
+        private ContentTranslatorInterface $translator,
+        private TenantSettings $tenantSettings,
     ) {
     }
 
@@ -56,8 +60,10 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
             $this->markTerminated($session);
         }
 
-        if (null !== $command->response) {
-            $this->messenger->send($contact, $assistantId, $command->response);
+        $message = $this->resolveResponse($command, $contact);
+
+        if (null !== $message) {
+            $this->messenger->send($contact, $assistantId, $message);
         }
     }
 
@@ -84,18 +90,66 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
 
         // Optional ack message (commands typed by the user usually don't ack
         // before the flow's first send_message — but tenants can configure one).
-        if (null !== $command->response) {
-            $this->messenger->send($contact, $assistantId, $command->response);
+        $message = $this->resolveResponse($command, $contact);
+
+        if (null !== $message) {
+            $this->messenger->send($contact, $assistantId, $message);
         }
     }
 
     private function sendInformational(ResolvedCommand $command, Contact $contact, string $assistantId): void
     {
-        $text = $command->text ?? $command->response;
+        $text = $this->resolveText($command, $contact) ?? $this->resolveResponse($command, $contact);
 
         if (null !== $text) {
             $this->messenger->send($contact, $assistantId, $text);
         }
+    }
+
+    /**
+     * Built-in commands carry a translation key (responseKey); tenant-defined
+     * commands carry either a literal string (legacy) or a `lang => text`
+     * locale map (after the localization migration). Both shapes are
+     * resolved through ContentTranslator. No active session is required
+     * (commands run before lock acquisition) so we don't consult session.state.
+     */
+    private function resolveResponse(ResolvedCommand $command, Contact $contact): ?string
+    {
+        $language = $this->resolveLanguage($contact);
+
+        if (null !== $command->responseKey) {
+            return $this->translator->translate($command->responseKey, $language);
+        }
+
+        return $this->resolveLocalized($command->response, $language);
+    }
+
+    private function resolveText(ResolvedCommand $command, Contact $contact): ?string
+    {
+        return $this->resolveLocalized($command->text, $this->resolveLanguage($contact));
+    }
+
+    /**
+     * @param  string|array<string, string>|null  $field
+     */
+    private function resolveLocalized(string|array|null $field, string $language): ?string
+    {
+        if (null === $field) {
+            return null;
+        }
+
+        $resolved = $this->translator->resolveField($field, $language);
+
+        return '' === $resolved ? null : $resolved;
+    }
+
+    private function resolveLanguage(Contact $contact): string
+    {
+        if (is_string($contact->language) && '' !== $contact->language) {
+            return $contact->language;
+        }
+
+        return $this->tenantSettings->fallback_language;
     }
 
     /**

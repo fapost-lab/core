@@ -16,5 +16,6 @@ return [
         'status_saved'    => '✓ Сохранено',
         'status_conflict' => '⚠ Конфликт',
         'status_error'    => '✕ Ошибка',
+        'dirty_title'     => 'Несохранённые изменения',
     ],
 ];

@@ -10,12 +10,14 @@ import SchemaConfigRenderer from './config/SchemaConfigRenderer.vue'
 import SendMessageConfig from './config/overrides/SendMessageConfig.vue'
 import InputConfig from './config/overrides/InputConfig.vue'
 import ConditionConfig from './config/overrides/ConditionConfig.vue'
+import AssignConfig from './config/overrides/AssignConfig.vue'
 import TriggerConfig from './config/overrides/TriggerConfig.vue'
 
 const OVERRIDES: Record<string, object> = {
     send_message: SendMessageConfig,
     input: InputConfig,
     condition: ConditionConfig,
+    assign: AssignConfig,
 }
 
 const selectionStore = useSelectionStore()

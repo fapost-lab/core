@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Contracts;
 
-interface TenantTranslationServiceInterface
+/**
+ * Tenant-scoped flavour of {@see TranslationOverrideServiceInterface} —
+ * exists as a separate marker so the container can bind it independently of
+ * the assistant-scoped service.
+ */
+interface TenantTranslationServiceInterface extends TranslationOverrideServiceInterface
 {
-    public function upsert(string $tenantId, string $key, string $language, string $value): void;
 }

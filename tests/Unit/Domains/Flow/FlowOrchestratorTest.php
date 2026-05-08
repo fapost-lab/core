@@ -7,6 +7,7 @@ namespace Tests\Unit\Domains\Flow;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
@@ -20,6 +21,7 @@ use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\PersistentInlineButton;
 use App\Domains\Flow\Orchestration\FlowOrchestrator;
 use App\Domains\Flow\Support\CallbackDataCodec;
+use App\Domains\Tenancy\Settings\TenantSettings;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\IncomingMessageType;
 use FAPost\Foundation\Flow\DTO\ResolvedTrigger;
@@ -382,16 +384,26 @@ final class FlowOrchestratorTest extends TestCase
     ): FlowOrchestrator {
         $currentAssistant ??= tap(
             $this->mock(CurrentAssistantInterface::class),
-            fn($m) => $m->shouldReceive('isResolved')->andReturn(false)->byDefault()
+            fn ($m) => $m->shouldReceive('isResolved')->andReturn(false)->byDefault()
         );
         $fallbackSender   ??= tap(
             $this->mock(FallbackMessageServiceInterface::class),
-            fn($m) => $m->shouldNotReceive('send')->byDefault()
+            fn ($m) => $m->shouldNotReceive('send')->byDefault()
         );
-        $registry         ??= tap(
+        $registry ??= tap(
             $this->mock(PersistentButtonRegistryInterface::class),
-            fn($m) => $m->shouldNotReceive('find')->byDefault()
+            fn ($m) => $m->shouldNotReceive('find')->byDefault()
         );
+
+        $translator = tap(
+            $this->mock(ContentTranslatorInterface::class),
+            fn ($m) => $m->shouldReceive('resolveField')->byDefault()->andReturnUsing(
+                static fn (mixed $field): string => is_string($field) ? $field : '',
+            ),
+        );
+
+        $settings                    = (new \ReflectionClass(TenantSettings::class))->newInstanceWithoutConstructor();
+        $settings->fallback_language = 'en';
 
         return new FlowOrchestrator(
             $guard,
@@ -400,7 +412,9 @@ final class FlowOrchestratorTest extends TestCase
             $definitions,
             $currentAssistant,
             $fallbackSender,
-            $registry
+            $registry,
+            $translator,
+            $settings,
         );
     }
 }

@@ -8,6 +8,7 @@ defineProps({
     draftVersion:     { type: Number as () => number | null,  default: null },
     publishedVersion: { type: Number as () => number | null,  default: null },
     saveStatus:       { type: String,  default: 'idle' },
+    isDirty:          { type: Boolean, default: false },
     activeTab:        { type: String,  default: 'builder' },
     backUrl:          { type: String as () => string | null,  default: null },
     canUndo:          { type: Boolean, default: false },
@@ -37,7 +38,14 @@ const SAVE_COLORS: Record<string, string> = {
             <a v-if="backUrl" :href="backUrl" class="btn-back" :title="t('topbar.back')">
                 ←
             </a>
-            <span class="flow-name">{{ flowName }}</span>
+            <span class="flow-name">
+                {{ flowName }}
+                <span
+                    v-if="isDirty"
+                    class="dirty-bullet"
+                    :title="t('topbar.dirty_title')"
+                >●</span>
+            </span>
             <div class="version-badge">
                 <span v-if="publishedVersion != null" class="badge badge-pub">Published v{{ publishedVersion }}</span>
                 <span v-else class="badge badge-muted">Not published</span>
@@ -110,6 +118,14 @@ const SAVE_COLORS: Record<string, string> = {
     flex: 1;
     min-width: 0;
 }
+.dirty-bullet {
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 13px;
+    line-height: 1;
+    color: var(--amber, #d69e2e);
+    transform: translateY(-1px);
+}
 .btn-back {
     display: flex;
     align-items: center;
@@ -136,7 +152,7 @@ const SAVE_COLORS: Record<string, string> = {
 .version-badge { display: flex; align-items: center; gap: 5px; }
 .badge {
     font-size: 11px;
-    font-family: 'DM Mono', monospace;
+    font-family: 'Victor Mono', monospace;
     padding: 2px 7px;
     border-radius: 4px;
     font-weight: 500;

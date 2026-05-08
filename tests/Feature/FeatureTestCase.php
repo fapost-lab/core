@@ -26,6 +26,22 @@ abstract class FeatureTestCase extends TestCase
         RefreshDatabaseState::$migrated = false;
         parent::setUp();
         $this->setUpLandlord();
+        $this->setUpSettingsTable();
+    }
+
+    /**
+     * Spatie's settings table migration lives in {@code database/settings/} and
+     * is run by {@see \App\Domains\Tenancy\Services\TenantProvisioningService}
+     * via {@code MigrationScope::settings()} in production. For tests we run
+     * it explicitly on the default tenant connection so code reading
+     * {@code TenantSettings} works.
+     */
+    private function setUpSettingsTable(): void
+    {
+        $this->artisan('migrate', [
+            '--path'  => 'database/settings',
+            '--force' => true,
+        ]);
     }
 
     /**

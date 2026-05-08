@@ -107,7 +107,7 @@ const translatedCount = computed(() =>
     align-items: center;
     justify-content: space-between;
 }
-.key-title { font-family: 'DM Mono', monospace; font-weight: 500; font-size: 12px; text-transform: none; letter-spacing: 0; }
+.key-title { font-family: 'Victor Mono', monospace; font-weight: 500; font-size: 12px; text-transform: none; letter-spacing: 0; }
 .header-actions { display: flex; gap: 6px; }
 .btn {
     padding: 3px 10px;

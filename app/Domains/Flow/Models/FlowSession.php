@@ -11,6 +11,7 @@ use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
 use FAPost\Support\Concerns\HasUlidPrimaryKey;
 use FAPost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property string              $id
@@ -94,6 +95,18 @@ final class FlowSession extends BaseModel
     public function flowDefinition(): BelongsTo
     {
         return $this->belongsTo(FlowDefinition::class);
+    }
+
+    /**
+     * Opt-in audit trail rows persisted by DefaultHistoryWriter while this
+     * session was running. Empty unless the underlying flow_definition had
+     * logging_enabled = true at execution time.
+     *
+     * @return HasMany<FlowSessionHistoryEntry, $this>
+     */
+    public function historyEntries(): HasMany
+    {
+        return $this->hasMany(FlowSessionHistoryEntry::class, 'session_id');
     }
 
     /**

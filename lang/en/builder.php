@@ -16,5 +16,6 @@ return [
         'status_saved'    => '✓ Saved',
         'status_conflict' => '⚠ Conflict',
         'status_error'    => '✕ Error',
+        'dirty_title'     => 'Unsaved changes',
     ],
 ];

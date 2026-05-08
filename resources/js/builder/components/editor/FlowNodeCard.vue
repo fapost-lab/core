@@ -116,7 +116,7 @@ function deleteNode() {
                 <span
                     class="node-summary-val"
                     :class="{ muted: row.muted }"
-                    :style="row.mono ? { fontFamily: 'DM Mono, monospace', fontSize: '12px' } : {}"
+                    :style="row.mono ? { fontFamily: 'Victor Mono, monospace', fontSize: '12px' } : {}"
                 >{{ typeof row.val === 'string' ? row.val.slice(0, 60) : row.val }}</span>
             </div>
         </div>

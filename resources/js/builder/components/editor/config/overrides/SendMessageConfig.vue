@@ -1,10 +1,27 @@
 <script setup lang="ts">
-import {computed} from 'vue'
+import {computed, ref, watch} from 'vue'
 import {useBuilderStore} from '@builder/store/builderStore'
+import {useInsertAtCursor} from '@builder/composables/useInsertAtCursor'
+import {useKnownGroups} from '@builder/composables/useKnownGroups'
 import KeyboardListEditor from './KeyboardListEditor.vue'
 import VariablePicker from '../VariablePicker.vue'
 import AccordionSection from '../AccordionSection.vue'
 import MediaPicker from '@builder/components/media/MediaPicker.vue'
+import VariableStorageEditor from '@builder/components/editor/variables/VariableStorageEditor.vue'
+import {
+    compileVariable,
+    decodeSendMessageVariable,
+    variableTypeToLegacySaveToType,
+} from '@builder/utils/variableCompiler'
+import type {Variable} from '@builder/dto/types'
+
+// Aligned with SendMessage button-answer taxonomy. Only three types make
+// sense for a tap-on-button scenario: free text, numeric label, or yes/no.
+const BUTTON_VALUE_TYPES = [
+    { value: 'text',    label: 'Text' },
+    { value: 'number',  label: 'Number' },
+    { value: 'confirm', label: 'Yes/No' },
+]
 
 interface KbButton {
     id: string
@@ -49,11 +66,49 @@ function selectMediaFile(file: MediaFile | null) {
     }
 }
 const isReplyKeyboard = computed(() => showsButtons.value && keyboardMode.value === 'reply')
-const saveToType = computed(() => String(config.value.save_to_type ?? 'string'))
+
+const knownGroups = useKnownGroups()
+
+// `null` = user has not configured a save target. We surface an empty
+// editor in that case so they can opt-in without any pre-filled name.
+const answerVariable = ref<Variable | null>(decodeSendMessageVariable(config.value))
+
+watch(
+    () => props.node.id,
+    () => {
+        answerVariable.value = decodeSendMessageVariable(config.value)
+    },
+)
+
+// KeyboardListEditor still validates per-button values against the legacy
+// string|number|boolean taxonomy. Map our richer VariableType down so that
+// component keeps working unchanged.
+const saveToType = computed(() => variableTypeToLegacySaveToType(answerVariable.value?.type))
 
 function update(patch: unknown) {
     emit('update:config', patch)
 }
+
+function onAnswerVariableUpdate(next: Variable) {
+    answerVariable.value = next
+    // Compiler is the sole writer of the save target — drop legacy
+    // `save_to` / `save_to_type` keys so the backend validator does not
+    // reject coexistence of both shapes.
+    emit('update:config', {
+        save_to_variable: compileVariable(next),
+        save_to:          undefined,
+        save_to_type:     undefined,
+    })
+}
+
+// Refs + cursor-insert handlers for the variable picker. Each textarea
+// owns its own ref so click-to-insert lands in the field next to the
+// picker that triggered it; clipboard + drag&drop continue to work
+// for cross-field reuse.
+const textRef    = ref<HTMLTextAreaElement | null>(null)
+const captionRef = ref<HTMLTextAreaElement | null>(null)
+const insertText    = useInsertAtCursor(textRef,    (next) => update({ text: next }))
+const insertCaption = useInsertAtCursor(captionRef, (next) => update({ caption: next }))
 
 function dropInsert(e: DragEvent, currentValue: string): string | null {
     e.preventDefault()
@@ -163,9 +218,10 @@ function updateKeyboardMode(value: string) {
             <div class="config-field">
                 <div class="field-label field-label--row">
                     Message text
-                    <VariablePicker />
+                    <VariablePicker @select="insertText" />
                 </div>
                 <textarea
+                    ref="textRef"
                     class="field-input"
                     rows="4"
                     :value="String(config.text ?? '')"
@@ -189,9 +245,10 @@ function updateKeyboardMode(value: string) {
             <div v-if="showsCaption" class="config-field">
                 <div class="field-label field-label--row">
                     Caption
-                    <VariablePicker />
+                    <VariablePicker @select="insertCaption" />
                 </div>
                 <textarea
+                    ref="captionRef"
                     class="field-input"
                     rows="3"
                     :value="String(config.caption ?? '')"
@@ -216,27 +273,15 @@ function updateKeyboardMode(value: string) {
 
             <template v-if="!isReplyKeyboard && buttons.length > 0">
                 <div class="config-field">
-                    <div class="field-label">
-                        Save answer to
-                        <span class="field-hint">flow.<em>variable</em></span>
-                    </div>
-                    <div class="save-to-row">
-                        <select
-                            class="field-input save-to-type"
-                            :value="saveToType"
-                            @change="update({ save_to_type: ($event.target as HTMLSelectElement).value })"
-                        >
-                            <option value="string">String</option>
-                            <option value="number">Number</option>
-                            <option value="boolean">Boolean</option>
-                        </select>
-                        <input
-                            class="field-input"
-                            :value="config.save_to ?? ''"
-                            placeholder="e.g. menu_choice"
-                            @input="update({ save_to: ($event.target as HTMLInputElement).value || null })"
-                        >
-                    </div>
+                    <div class="field-label">Save answer to</div>
+                    <VariableStorageEditor
+                        :model-value="answerVariable"
+                        :type-options="BUTTON_VALUE_TYPES"
+                        :known-groups="knownGroups"
+                        show-storage
+                        show-group
+                        @update:model-value="onAnswerVariableUpdate"
+                    />
                 </div>
             </template>
         </AccordionSection>

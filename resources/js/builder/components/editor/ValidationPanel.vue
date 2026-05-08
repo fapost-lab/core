@@ -131,7 +131,7 @@ function humanPath(path: string | undefined): string {
 }
 .val-error-row:hover { background: var(--rose-bg); }
 .val-dot { color: var(--rose); font-size: 10px; margin-top: 3px; flex-shrink: 0; }
-.val-path { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text-3); }
+.val-path { font-family: 'Victor Mono', monospace; font-size: 11px; color: var(--text-3); }
 .val-msg  { font-size: 12.5px; color: var(--text-2); margin-top: 1px; }
 
 .btn { padding: 6px 12px; border-radius: var(--radius); font-family: 'DM Sans', sans-serif;

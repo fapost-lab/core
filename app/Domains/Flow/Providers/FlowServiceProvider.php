@@ -13,6 +13,8 @@ use App\Domains\Flow\Commands\CommandMatcher;
 use App\Domains\Flow\Concurrency\LockAcquisitionPolicy;
 use App\Domains\Flow\Concurrency\LockHeartbeat;
 use App\Domains\Flow\Concurrency\SessionLockManager;
+use App\Domains\Flow\Contracts\AssistantTranslationRepositoryInterface;
+use App\Domains\Flow\Contracts\AssistantTranslationServiceInterface;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
@@ -32,9 +34,11 @@ use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
+use App\Domains\Flow\Contracts\SystemTranslationCatalogInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationServiceInterface;
+use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Events\QueuedFlowTriggerEventPublisher;
 use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
@@ -59,12 +63,14 @@ use App\Domains\Flow\Logging\FlowLogWriter;
 use App\Domains\Flow\Orchestration\FlowOrchestrator;
 use App\Domains\Flow\Rag\RagAdapterRegistry;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\Repositories\AssistantTranslationRepository;
 use App\Domains\Flow\Repositories\FlowDefinitionRepository;
 use App\Domains\Flow\Repositories\FlowDraftRepository;
 use App\Domains\Flow\Repositories\FlowSessionRepository;
 use App\Domains\Flow\Repositories\FlowTriggerRepository;
 use App\Domains\Flow\Repositories\TenantEventRepository;
 use App\Domains\Flow\Repositories\TenantTranslationRepository;
+use App\Domains\Flow\Services\AssistantTranslationService;
 use App\Domains\Flow\Services\FallbackMessageService;
 use App\Domains\Flow\Services\FlowEngine;
 use App\Domains\Flow\Services\FlowGraphResolver;
@@ -85,6 +91,7 @@ use App\Domains\Flow\State\Resolvers\NamespaceResolverRegistry;
 use App\Domains\Flow\State\Resolvers\RagStateResolver;
 use App\Domains\Flow\State\Resolvers\SessionStateResolver;
 use App\Domains\Flow\State\StateNamespace;
+use App\Domains\Flow\State\Variables\VariableResolver;
 use App\Domains\Flow\Subflow\CallGraphRepository;
 use App\Domains\Flow\Subflow\CallGraphValidator;
 use App\Domains\Flow\Subflow\DefaultSubflowResumer;
@@ -93,6 +100,8 @@ use App\Domains\Flow\Subflow\SubflowStarterService;
 use App\Domains\Flow\Subflow\SubflowTimeoutSweeper;
 use App\Domains\Flow\Support\LaravelHttpClient;
 use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
+use App\Domains\Flow\Translations\CoreSystemTranslations;
+use App\Domains\Flow\Translations\InMemorySystemTranslationCatalog;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
 use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
@@ -117,6 +126,8 @@ final class FlowServiceProvider extends ServiceProvider
         $registry  = $this->app->make(NodeHandlerRegistryInterface::class);
         $templates = $this->app->make(TemplateRenderer::class);
 
+        $variableResolver = $this->app->make(VariableResolverInterface::class);
+
         $registry->register(
             new SendMessageNodeHandler(
                 $this->app->make(MessageSenderInterface::class),
@@ -124,17 +135,22 @@ final class FlowServiceProvider extends ServiceProvider
                 $templates,
                 $this->app->make(InlineKeyboardEditorInterface::class),
                 $this->app->make(PersistentButtonRegistryInterface::class),
+                $variableResolver,
             )
         );
         $registry->register(
             new InputNodeHandler(
                 $this->app->make(MediaIngestorInterface::class),
                 $this->app->make(MediaServiceInterface::class),
+                $variableResolver,
             )
         );
-        $registry->register(new BranchNodeHandler($this->app->make(DataAccessorRegistryInterface::class)));
+        $registry->register(new BranchNodeHandler(
+            $this->app->make(DataAccessorRegistryInterface::class),
+            $variableResolver,
+        ));
         $registry->register(new DelayNodeHandler());
-        $registry->register(new AssignNodeHandler($templates));
+        $registry->register(new AssignNodeHandler($templates, $variableResolver));
         $registry->register(new CallNodeHandler($this->app->make(HttpClientInterface::class)));
         $registry->register(
             new EmitEventNodeHandler(
@@ -158,6 +174,14 @@ final class FlowServiceProvider extends ServiceProvider
 
         $expressions = $this->app->make(ExpressionEngineRegistry::class);
         $expressions->register(new TemplateEngine());
+
+        // Seed Core's system translation keys. Features and Solutions register
+        // their own keys through the same catalog from their providers.
+        // Idempotent so the test bootstrap can boot the provider repeatedly.
+        $catalog = $this->app->make(SystemTranslationCatalogInterface::class);
+        if ([] === $catalog->entries()) {
+            CoreSystemTranslations::seed($catalog);
+        }
 
         $callTransports = $this->app->make(CallTransportRegistry::class);
         $callTransports->register($this->app->make(HttpTransport::class));
@@ -205,6 +229,7 @@ final class FlowServiceProvider extends ServiceProvider
             fn ($app): NodeHandlerRegistry => $app->make(NodeHandlerRegistry::class)
         );
         $this->app->singleton(FlowDefinitionValidator::class);
+        $this->app->singleton(VariableResolverInterface::class, VariableResolver::class);
         $this->app->singleton(ModuleDataAccessorRegistry::class);
         $this->app->singleton(
             DataAccessorRegistryInterface::class,
@@ -225,6 +250,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->bind(LanguageResolverInterface::class, LanguageResolver::class);
         $this->app->bind(ContentTranslatorInterface::class, CachedContentTranslator::class);
         $this->app->bind(TenantTranslationRepositoryInterface::class, TenantTranslationRepository::class);
+        $this->app->bind(AssistantTranslationRepositoryInterface::class, AssistantTranslationRepository::class);
         $this->app->bind(TenantEventRepositoryInterface::class, TenantEventRepository::class);
         $this->app->bind(FlowTriggerEventPublisherInterface::class, QueuedFlowTriggerEventPublisher::class);
         $this->app->bind(
@@ -247,6 +273,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(\App\Domains\Messaging\Typing\TypingIndicatorService::class);
         $this->app->scoped(\App\Domains\Messaging\Typing\TypingHeartbeatRegistry::class);
         $this->app->bind(TenantTranslationServiceInterface::class, TenantTranslationService::class);
+        $this->app->bind(AssistantTranslationServiceInterface::class, AssistantTranslationService::class);
         $this->app->singleton(TemplateResolver::class);
         $this->app->singleton(TemplateRenderer::class);
         $this->app->singleton(ExpressionEngineRegistry::class);
@@ -264,6 +291,10 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->singleton(BuiltinCommandsRegistry::class);
         $this->app->singleton(CommandMatcher::class);
         $this->app->singleton(AssistantCommandsValidator::class);
+
+        // System translation catalog is platform-global metadata — seeded once
+        // at boot, then read-only for the rest of the lifecycle.
+        $this->app->singleton(SystemTranslationCatalogInterface::class, InMemorySystemTranslationCatalog::class);
 
         $this->app->scoped(FlowEngineInterface::class, FlowEngine::class);
         $this->app->scoped(FlowGraphResolver::class);

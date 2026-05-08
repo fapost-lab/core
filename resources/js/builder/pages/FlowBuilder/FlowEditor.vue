@@ -74,6 +74,19 @@ useEventListener(document, 'keydown', (event) => {
         builderStore.redo()
     }
 })
+
+// Browser-level navigation guard. Auto-save debounces 1.5s before pushing
+// to the API, so closing the tab in that window would silently drop edits.
+// Returning a string from the handler triggers the standard "leave site?"
+// prompt; we only opt in while there is something genuinely unsaved.
+useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
+    if (builderStore.isDirty) {
+        event.preventDefault()
+        // Modern browsers ignore the message, but `returnValue` is still
+        // required to actually surface the prompt.
+        event.returnValue = ''
+    }
+})
 </script>
 
 <template>
@@ -83,6 +96,7 @@ useEventListener(document, 'keydown', (event) => {
             :draft-version="builderStore.draftVersion"
             :published-version="builderStore.publishedVersion"
             :save-status="builderStore.saveStatus"
+            :is-dirty="builderStore.isDirty"
             :active-tab="builderStore.activeTab"
             :back-url="backUrl"
             :can-undo="builderStore.undoStack.length > 0"

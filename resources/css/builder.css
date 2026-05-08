@@ -41,7 +41,7 @@ body {
 }
 
 .font-mono {
-  font-family: 'DM Mono', monospace;
+  font-family: 'Victor Mono', monospace;
 }
 
 /* Scrollbar */
@@ -323,7 +323,7 @@ body {
   font-size: 10px;
 }
 .node-num {
-  font-size: 11px; font-family: 'DM Mono', monospace;
+  font-size: 11px; font-family: 'Victor Mono', monospace;
   color: var(--text-3); font-weight: 500;
 }
 .node-card-body {
@@ -665,7 +665,7 @@ textarea.field-input { min-height: 72px; line-height: 1.5; }
 .content-key-item {
   padding: 7px 12px;
   font-size: 12.5px;
-  font-family: 'DM Mono', monospace;
+  font-family: 'Victor Mono', monospace;
   color: var(--text-2); cursor: pointer;
   border-radius: 6px; margin: 1px 6px;
   transition: all .12s;
@@ -683,7 +683,7 @@ textarea.field-input { min-height: 72px; line-height: 1.5; }
 }
 .content-key-title {
   font-size: 14px; font-weight: 600; margin-bottom: 4px;
-  font-family: 'DM Mono', monospace; color: var(--text);
+  font-family: 'Victor Mono', monospace; color: var(--text);
 }
 .content-key-meta {
   font-size: 12px; color: var(--text-3); margin-bottom: 20px;

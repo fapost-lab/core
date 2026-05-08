@@ -35,7 +35,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string                          $name
  * @property bool                            $is_active
  * @property string|null                     $default_flow_id
- * @property string|null                     $fallback_message
+ * @property array<string, string>|null      $fallback_message
+ * @property array<string, string>|null      $busy_message
+ * @property list<array<string, mixed>>|null $commands
  * @property array<array-key, mixed>         $settings
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
@@ -71,7 +73,6 @@ final class Assistant extends BaseModel implements HasName
         'name',
         'is_active',
         'default_language',
-        'available_languages',
         'default_flow_id',
         'fallback_message',
         'settings',
@@ -123,11 +124,15 @@ final class Assistant extends BaseModel implements HasName
     protected function casts(): array
     {
         return [
-            'settings'            => 'array',
-            'is_active'           => 'boolean',
-            'default_language'    => 'string',
-            'available_languages' => 'array',
-            'commands'            => 'array',
+            'settings'         => 'array',
+            'is_active'        => 'boolean',
+            'default_language' => 'string',
+            'commands'         => 'array',
+            // Both message fields are jsonb locale maps `{lang: text}`. The
+            // {@see \App\Domains\Flow\Contracts\ContentTranslatorInterface}
+            // resolves them via {@see ContentTranslatorInterface::resolveField}.
+            'fallback_message' => 'array',
+            'busy_message'     => 'array',
         ];
     }
 }

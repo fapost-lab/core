@@ -70,7 +70,7 @@ function childCount(handle: string): number {
                 <span class="node-summary-key">Expr</span>
                 <span
                     class="node-summary-val"
-                    style="font-family:'DM Mono',monospace;font-size:12px"
+                    style="font-family:'Victor Mono',monospace;font-size:12px"
                 >{{ treeNode.node.config.expression }}</span>
             </div>
             <div

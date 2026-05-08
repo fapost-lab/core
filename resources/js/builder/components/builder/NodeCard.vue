@@ -103,7 +103,7 @@ const bodyComponent = computed(() => {
 }
 .node-num {
     font-size: 11px;
-    font-family: 'DM Mono', monospace;
+    font-family: 'Victor Mono', monospace;
     color: var(--text-3);
     font-weight: 500;
 }

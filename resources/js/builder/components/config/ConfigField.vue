@@ -166,7 +166,7 @@ function onUpdateItem(i: number, e: Event) {
 }
 .field-input:focus { border-color: var(--primary); background: #fff; }
 textarea.field-input { min-height: 72px; line-height: 1.5; }
-.mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+.mono { font-family: 'Victor Mono', monospace; font-size: 12px; }
 
 .array-row { display: flex; gap: 4px; margin-bottom: 4px; }
 .del-btn {

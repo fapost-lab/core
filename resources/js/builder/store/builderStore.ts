@@ -1,5 +1,5 @@
 import {defineStore} from 'pinia'
-import {computed, ref} from 'vue'
+import {computed, ref, watch} from 'vue'
 import {nanoid} from 'nanoid'
 import {buildTree} from '@builder/utils/buildTree'
 import {useSelectionStore} from '@builder/store/selectionStore'
@@ -93,6 +93,12 @@ export const useBuilderStore = defineStore('builder', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tree = computed(() => buildTree(definition.value.nodes ?? [], definition.value.edges ?? []) as any)
     const saveStatus = ref<SaveStatus>('idle')
+    // True from the moment the user mutates definition or trigger after the
+    // last successful save. Flips back to false on `setSaveStatus('saved')`
+    // and on `init()` (fresh hydrate). Watch is enabled only post-hydration
+    // so the initial assignment in init() doesn't mark the flow dirty.
+    const isDirty   = ref(false)
+    let hydrated    = false
     const activeTab = ref<ActiveTab>('builder')
     const validationResult = ref<ValidationResult | null>(null)
     const validationOpen = ref(false)
@@ -123,6 +129,8 @@ export const useBuilderStore = defineStore('builder', () => {
         availableEvents.value = Array.isArray(flow.availableEvents) ? flow.availableEvents : []
         contentBaseLanguage.value = flow.contentBaseLanguage ?? 'en'
         availableLanguages.value = Array.isArray(flow.availableLanguages) ? flow.availableLanguages : []
+        isDirty.value = false
+        hydrated      = true
     }
 
     function setDraftVersion(v: number | null) {
@@ -155,6 +163,9 @@ export const useBuilderStore = defineStore('builder', () => {
 
     function setSaveStatus(status: SaveStatus) {
         saveStatus.value = status
+        if (status === 'saved') {
+            isDirty.value = false
+        }
     }
 
     function setActiveTab(tab: ActiveTab) {
@@ -372,6 +383,18 @@ export const useBuilderStore = defineStore('builder', () => {
         }
     }
 
+    // Mark the flow dirty on any post-hydration mutation of definition or
+    // trigger. Cleared again by `setSaveStatus('saved')` and by `init()`.
+    watch(
+        [definition, trigger],
+        () => {
+            if (hydrated) {
+                isDirty.value = true
+            }
+        },
+        { deep: true },
+    )
+
     return {
         flowId,
         flowName,
@@ -384,6 +407,7 @@ export const useBuilderStore = defineStore('builder', () => {
         availableLanguages,
         tree,
         saveStatus,
+        isDirty,
         activeTab,
         validationResult,
         validationOpen,

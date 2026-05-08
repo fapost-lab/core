@@ -57,6 +57,11 @@ final class FlowFormSchema
                 ->label(__('assistant.flows.fields.is_public'))
                 ->helperText(__('assistant.flows.fields.is_public_hint'))
                 ->default(true),
+
+            Toggle::make('logging_enabled')
+                ->label(__('assistant.flows.fields.logging_enabled'))
+                ->helperText(__('assistant.flows.fields.logging_enabled_hint'))
+                ->default(false),
         ]);
     }
 }

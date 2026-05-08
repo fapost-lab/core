@@ -127,5 +127,5 @@ function onConfigUpdate(newConfig: unknown) {
     color: var(--text);
     outline: none;
 }
-.mono { font-family: 'DM Mono', monospace; font-size: 11.5px; }
+.mono { font-family: 'Victor Mono', monospace; font-size: 11.5px; }
 </style>

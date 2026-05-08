@@ -49,7 +49,7 @@ final class AdminPanelProvider extends PanelProvider
                     // Default USER_MENU_BEFORE is easy to miss in the topbar; this hook is inside the topbar actions area.
                     ->renderHook(PanelsRenderHook::GLOBAL_SEARCH_AFTER),
             ])
-            ->font('Poppins')
+            ->font('Play')
             ->colors([
                 'primary' => Color::Amber,
             ])

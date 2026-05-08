@@ -65,9 +65,9 @@ final readonly class CommandMatcher
             return new ResolvedCommand(
                 command: $command,
                 type: $type,
-                response: $this->stringOrNull($entry['response'] ?? null),
+                response: $this->stringOrLocaleMapOrNull($entry['response'] ?? null),
                 flowId: $this->stringOrNull($entry['flow_id'] ?? null),
-                text: $this->stringOrNull($entry['text'] ?? null),
+                text: $this->stringOrLocaleMapOrNull($entry['text'] ?? null),
                 origin: 'tenant',
             );
         }
@@ -83,11 +83,14 @@ final readonly class CommandMatcher
             return null;
         }
 
+        // Built-in response is always a translation key — the executor resolves
+        // it through ContentTranslator using the contact's language so tenant
+        // overrides in tenant_translations apply.
         return new ResolvedCommand(
             command: $command,
             type: $spec['type'],
-            response: $spec['default_response'],
             origin: 'builtin',
+            responseKey: $spec['response_key'],
         );
     }
 
@@ -98,5 +101,33 @@ final readonly class CommandMatcher
         }
 
         return null;
+    }
+
+    /**
+     * Tenants may store a flat string (legacy) or a locale map (after the
+     * localization migration). The executor resolves either shape through
+     * the translator, so we just pass the value through after rejecting
+     * empty strings and non-string array entries.
+     *
+     * @return string|array<string, string>|null
+     */
+    private function stringOrLocaleMapOrNull(mixed $value): string|array|null
+    {
+        if (is_string($value)) {
+            return '' === $value ? null : $value;
+        }
+
+        if ( ! is_array($value)) {
+            return null;
+        }
+
+        $clean = [];
+        foreach ($value as $lang => $text) {
+            if (is_string($lang) && is_string($text) && '' !== $text) {
+                $clean[$lang] = $text;
+            }
+        }
+
+        return [] === $clean ? null : $clean;
     }
 }

@@ -18,6 +18,6 @@ defineProps({
 .summary-row { display:flex; align-items:baseline; gap:6px; font-size:12.5px; margin-bottom:3px; }
 .key  { color:var(--text-3); min-width:56px; }
 .val  { color:var(--text); font-weight:500; }
-.mono { font-family:'DM Mono',monospace; font-size:12px; }
+.mono { font-family:'Victor Mono',monospace; font-size:12px; }
 .muted { color:var(--text-2); font-weight:400; }
 </style>

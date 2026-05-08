@@ -27,6 +27,7 @@ use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Rag\RagAdapterRegistry;
 use App\Domains\Flow\State\FlowStateNamespace;
 use App\Domains\Flow\State\SystemStateKeys;
+use App\Domains\Flow\State\Variables\VariableResolver;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
 use App\Domains\Media\Contracts\MediaServiceInterface;
@@ -338,6 +339,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $handler = new InputNodeHandler(
             Mockery::mock(MediaIngestorInterface::class),
             Mockery::mock(MediaServiceInterface::class),
+            new VariableResolver(),
         );
         $node    = ['id' => 'input-1', 'config' => ['save_to' => FlowStateNamespace::FLOW . '.user_name']];
 
@@ -356,7 +358,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $accessor->shouldReceive('get')->once()->with('department', 'contact-1', 'tenant-1')->andReturn('sales');
         $registry->shouldReceive('resolve')->once()->with('module.hr')->andReturn($accessor);
 
-        $handler  = new BranchNodeHandler($registry);
+        $handler  = new BranchNodeHandler($registry, new VariableResolver());
         $flowNode = [
             'id'     => 'condition-flow',
             'config' => [
@@ -390,6 +392,117 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('in', $module->metadata['expression']['operator'] ?? null);
     }
 
+    public function test_condition_resolves_user_variable_left_via_variable_resolver(): void
+    {
+        $registry = Mockery::mock(DataAccessorRegistryInterface::class);
+        $handler  = new BranchNodeHandler($registry, new VariableResolver());
+
+        // Session-scoped variable: {storage:session, name:code} → flow.code
+        $sessionNode = [
+            'id'     => 'cond-session',
+            'config' => [
+                'rules' => [
+                    [
+                        'left' => [
+                            'ref'      => 'user_variable',
+                            'variable' => ['name' => 'code', 'storage' => 'session', 'group' => null],
+                        ],
+                        'operator' => 'eq',
+                        'value'    => '1234',
+                        'handle'   => 'yes',
+                    ],
+                ],
+            ],
+        ];
+
+        $session = $handler->execute(
+            $sessionNode,
+            [FlowStateNamespace::FLOW => ['code' => '1234']],
+            $this->context(),
+        );
+
+        $this->assertSame('yes', $session->sourceHandle);
+
+        // Contact-grouped variable: {storage:contact, group:survey, name:score} → contact.survey.score
+        $contactNode = [
+            'id'     => 'cond-contact',
+            'config' => [
+                'rules' => [
+                    [
+                        'left' => [
+                            'ref'      => 'user_variable',
+                            'variable' => ['name' => 'score', 'storage' => 'contact', 'group' => 'survey'],
+                        ],
+                        'operator' => 'gt',
+                        'value'    => 5,
+                        'handle'   => 'yes',
+                    ],
+                ],
+            ],
+        ];
+
+        $contact = $handler->execute(
+            $contactNode,
+            ['contact' => ['survey' => ['score' => 7]]],
+            $this->context(),
+        );
+
+        $this->assertSame('yes', $contact->sourceHandle);
+    }
+
+    public function test_condition_resolves_source_left_for_known_namespaces(): void
+    {
+        $registry = Mockery::mock(DataAccessorRegistryInterface::class);
+        $handler  = new BranchNodeHandler($registry, new VariableResolver());
+
+        $node = [
+            'id'     => 'cond-rag',
+            'config' => [
+                'rules' => [
+                    [
+                        'left'     => ['ref' => 'source', 'source' => 'rag', 'field' => 'found'],
+                        'operator' => 'eq',
+                        'value'    => true,
+                        'handle'   => 'route',
+                    ],
+                ],
+            ],
+        ];
+
+        $result = $handler->execute(
+            $node,
+            [FlowStateNamespace::RAG => ['found' => true]],
+            $this->context(),
+        );
+
+        $this->assertSame('route', $result->sourceHandle);
+        $this->assertSame('rag.found', $result->metadata['expression']['operand'] ?? null);
+    }
+
+    public function test_condition_legacy_string_left_falls_back_to_check(): void
+    {
+        $registry = Mockery::mock(DataAccessorRegistryInterface::class);
+        $handler  = new BranchNodeHandler($registry, new VariableResolver());
+
+        $node = [
+            'id'     => 'cond-legacy',
+            'config' => [
+                'check' => FlowStateNamespace::FLOW . '.code',
+                'rules' => [
+                    ['operator' => 'eq', 'value' => '1234', 'handle' => 'yes'],
+                ],
+            ],
+        ];
+
+        $result = $handler->execute(
+            $node,
+            [FlowStateNamespace::FLOW => ['code' => '1234']],
+            $this->context(),
+        );
+
+        $this->assertSame('yes', $result->sourceHandle);
+    }
+
     public function test_delay_is_idempotent_when_already_scheduled(): void
     {
         $handler = new DelayNodeHandler();
@@ -408,7 +521,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
     public function test_assign_writes_to_flow_state_or_contact_writer_by_target(): void
     {
-        $handler = new AssignNodeHandler(new TemplateRenderer());
+        $handler = new AssignNodeHandler(new TemplateRenderer(), new VariableResolver());
 
         $writer = Mockery::mock(\FAPost\Foundation\Flow\Contracts\ContactWriterInterface::class);
         $writer->shouldReceive('write')->once()->with('contact.first_name', 'Jane');
@@ -430,7 +543,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
     public function test_assign_contact_language_aliases_route_to_canonical_path(): void
     {
-        $handler = new AssignNodeHandler(new TemplateRenderer());
+        $handler = new AssignNodeHandler(new TemplateRenderer(), new VariableResolver());
 
         $writer = Mockery::mock(\FAPost\Foundation\Flow\Contracts\ContactWriterInterface::class);
         $writer->shouldReceive('write')->once()->with('contact.language', 'es');
@@ -449,6 +562,231 @@ final class BuiltInNodeHandlersTest extends TestCase
         ], [], $context);
 
         $this->addToAssertionCount(1); // mockery expectations are the assertion
+    }
+
+    public function test_input_with_legacy_save_to_writes_to_flow_namespace(): void
+    {
+        $handler = new InputNodeHandler(
+            Mockery::mock(MediaIngestorInterface::class),
+            Mockery::mock(MediaServiceInterface::class),
+            new VariableResolver(),
+        );
+
+        $node = ['id' => 'input-legacy', 'config' => ['save_to' => 'user_name']];
+
+        $result = $handler->execute($node, [], $this->context(incoming: $this->incoming('Alice')));
+
+        $this->assertSame('Alice', $result->stateChanges['flow.user_name']);
+    }
+
+    public function test_input_with_new_variable_session_storage(): void
+    {
+        $handler = new InputNodeHandler(
+            Mockery::mock(MediaIngestorInterface::class),
+            Mockery::mock(MediaServiceInterface::class),
+            new VariableResolver(),
+        );
+
+        $node = [
+            'id'     => 'input-new',
+            'config' => [
+                'variable' => ['name' => 'phone', 'storage' => 'session'],
+            ],
+        ];
+
+        $result = $handler->execute($node, [], $this->context(incoming: $this->incoming('+1234')));
+
+        $this->assertSame('+1234', $result->stateChanges['flow.phone']);
+    }
+
+    public function test_input_with_new_variable_contact_storage_writes_through_writer(): void
+    {
+        $writer = Mockery::mock(\FAPost\Foundation\Flow\Contracts\ContactWriterInterface::class);
+        $writer->shouldReceive('write')->once()->with('contact.profile.first_name', 'Jane');
+
+        $handler = new InputNodeHandler(
+            Mockery::mock(MediaIngestorInterface::class),
+            Mockery::mock(MediaServiceInterface::class),
+            new VariableResolver(),
+        );
+
+        $node = [
+            'id'     => 'input-contact',
+            'config' => [
+                'variable' => ['name' => 'first_name', 'storage' => 'contact', 'group' => 'profile'],
+            ],
+        ];
+
+        $context = new NodeExecutionContext(
+            tenantId: 'tenant-1',
+            contactId: 'contact-1',
+            sessionId: 'session-1',
+            nodeId: 'input-contact',
+            idempotencyKey: 'idem-1',
+            platform: 'telegram',
+            incoming: $this->incoming('Jane'),
+            contactWriter: $writer,
+        );
+
+        $result = $handler->execute($node, [], $context);
+
+        $this->assertSame([], $result->stateChanges);
+    }
+
+    public function test_assign_with_operations_writes_session_and_contact_in_one_node(): void
+    {
+        $writer = Mockery::mock(\FAPost\Foundation\Flow\Contracts\ContactWriterInterface::class);
+        $writer->shouldReceive('write')->once()->with('contact.first_name', 'Jane');
+
+        $handler = new AssignNodeHandler(new TemplateRenderer(), new VariableResolver());
+
+        $node = [
+            'id'     => 'assign-multi',
+            'config' => [
+                'operations' => [
+                    [
+                        'variable' => ['name' => 'first_name', 'storage' => 'contact'],
+                        'value'    => '{{flow.name}}',
+                    ],
+                    [
+                        'variable' => ['name' => 'tier', 'storage' => 'session'],
+                        'value'    => 'gold',
+                    ],
+                ],
+            ],
+        ];
+
+        $context = new NodeExecutionContext(
+            tenantId: 'tenant-1',
+            contactId: 'contact-1',
+            sessionId: 'session-1',
+            nodeId: 'assign-multi',
+            idempotencyKey: 'idem-1',
+            platform: 'telegram',
+            contactWriter: $writer,
+        );
+
+        $result = $handler->execute(
+            $node,
+            [FlowStateNamespace::FLOW => ['name' => 'Jane']],
+            $context,
+        );
+
+        $this->assertSame('gold', $result->stateChanges['flow.tier']);
+    }
+
+    public function test_send_message_save_to_variable_writes_button_value_via_resolver(): void
+    {
+        $sessionUuid = '00000000-0000-4000-8000-000000000099';
+        $buttonUuid  = '11111111-1111-4111-8111-111111111199';
+        $cbData      = CallbackDataCodec::encode($sessionUuid, $buttonUuid);
+
+        $sender = Mockery::mock(MessageSenderInterface::class);
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $keyboardEditor = Mockery::mock(InlineKeyboardEditorInterface::class);
+        $keyboardEditor->shouldReceive('removeKeyboard')->zeroOrMoreTimes();
+
+        $handler = new SendMessageNodeHandler(
+            $sender,
+            $translator,
+            new TemplateRenderer(),
+            $keyboardEditor,
+            Mockery::mock(PersistentButtonRegistryInterface::class),
+            new VariableResolver(),
+        );
+
+        $context = new NodeExecutionContext(
+            tenantId: 'tenant-1',
+            contactId: 'contact-1',
+            sessionId: $sessionUuid,
+            nodeId: 'sm-1',
+            idempotencyKey: 'idem-1',
+            platform: 'telegram',
+            incoming: new IncomingMessage(
+                updateId: 'upd-99',
+                externalUserId: 'ext-user',
+                externalChatId: 'ext-chat',
+                text: $cbData,
+                type: IncomingMessageType::CallbackQuery,
+                platform: 'telegram',
+            ),
+        );
+
+        $node = [
+            'id'     => 'sm-1',
+            'config' => [
+                'content_type'    => 'text_with_keyboard',
+                'text'            => ['en' => 'pick'],
+                'keyboard_mode'   => 'inline',
+                'save_to_variable' => ['name' => 'choice', 'storage' => 'session'],
+                'buttons'         => [
+                    ['id' => $buttonUuid, 'label' => ['en' => 'Yes'], 'value' => 'yes', 'row' => 0, 'order' => 0],
+                ],
+            ],
+        ];
+
+        $state = ['system' => ['sent_messages' => ['sm-1' => 'ext-99']]];
+
+        $result = $handler->execute($node, $state, $context);
+
+        $this->assertSame('yes', $result->stateChanges['flow.choice']);
+    }
+
+    public function test_send_message_legacy_save_to_still_works(): void
+    {
+        $sessionUuid = '00000000-0000-4000-8000-000000000098';
+        $buttonUuid  = '11111111-1111-4111-8111-111111111198';
+        $cbData      = CallbackDataCodec::encode($sessionUuid, $buttonUuid);
+
+        $sender         = Mockery::mock(MessageSenderInterface::class);
+        $translator     = Mockery::mock(ContentTranslatorInterface::class);
+        $keyboardEditor = Mockery::mock(InlineKeyboardEditorInterface::class);
+        $keyboardEditor->shouldReceive('removeKeyboard')->zeroOrMoreTimes();
+
+        $handler = new SendMessageNodeHandler(
+            $sender,
+            $translator,
+            new TemplateRenderer(),
+            $keyboardEditor,
+            Mockery::mock(PersistentButtonRegistryInterface::class),
+            new VariableResolver(),
+        );
+
+        $context = new NodeExecutionContext(
+            tenantId: 'tenant-1',
+            contactId: 'contact-1',
+            sessionId: $sessionUuid,
+            nodeId: 'sm-2',
+            idempotencyKey: 'idem-2',
+            platform: 'telegram',
+            incoming: new IncomingMessage(
+                updateId: 'upd-98',
+                externalUserId: 'ext-user',
+                externalChatId: 'ext-chat',
+                text: $cbData,
+                type: IncomingMessageType::CallbackQuery,
+                platform: 'telegram',
+            ),
+        );
+
+        $node = [
+            'id'     => 'sm-2',
+            'config' => [
+                'content_type'  => 'text_with_keyboard',
+                'text'          => ['en' => 'pick'],
+                'keyboard_mode' => 'inline',
+                'save_to'       => 'pick',
+                'buttons'       => [
+                    ['id' => $buttonUuid, 'label' => ['en' => 'Yes'], 'value' => 'yes', 'row' => 0, 'order' => 0],
+                ],
+            ],
+        ];
+
+        $state = ['system' => ['sent_messages' => ['sm-2' => 'ext-98']]];
+
+        $result = $handler->execute($node, $state, $context);
+
+        $this->assertSame('yes', $result->stateChanges['flow.pick']);
     }
 
     public function test_webhook_returns_failed_on_transport_error_and_success_on_http_2xx(): void
@@ -670,6 +1008,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             new TemplateRenderer(),
             Mockery::mock(InlineKeyboardEditorInterface::class),
             Mockery::mock(PersistentButtonRegistryInterface::class),
+            new VariableResolver(),
         );
     }
 

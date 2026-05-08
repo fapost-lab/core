@@ -1,0 +1,281 @@
+<script setup lang="ts">
+import {computed, nextTick, onUnmounted, ref, watch} from 'vue'
+
+const props = defineProps<{
+    modelValue:  string | null
+    knownGroups: string[]
+}>()
+
+const emit = defineEmits<{
+    (e: 'update:modelValue', value: string | null): void
+    (e: 'create', value: string): void
+}>()
+
+const open        = ref(false)
+const isCreating  = ref(false)
+const draftName   = ref('')
+const rootRef     = ref<HTMLElement | null>(null)
+const createInput = ref<HTMLInputElement | null>(null)
+
+const triggerLabel = computed<string>(() => props.modelValue ?? '(No group)')
+const hasGroups    = computed<boolean>(() => props.knownGroups.length > 0)
+
+function toggle() {
+    if (isCreating.value) return
+    open.value = !open.value
+}
+
+function close() {
+    open.value = false
+}
+
+function pick(value: string | null) {
+    emit('update:modelValue', value)
+    close()
+}
+
+async function startCreate() {
+    open.value      = false
+    isCreating.value = true
+    draftName.value = ''
+    await nextTick()
+    createInput.value?.focus()
+}
+
+function commitCreate() {
+    const name = draftName.value.trim()
+    if (name === '') {
+        cancelCreate()
+        return
+    }
+    emit('create', name)
+    emit('update:modelValue', name)
+    isCreating.value = false
+    draftName.value  = ''
+}
+
+function cancelCreate() {
+    isCreating.value = false
+    draftName.value  = ''
+}
+
+function onCreateKeydown(event: KeyboardEvent) {
+    if (event.key === 'Enter') {
+        event.preventDefault()
+        commitCreate()
+    } else if (event.key === 'Escape') {
+        event.preventDefault()
+        cancelCreate()
+    }
+}
+
+function onDocClick(e: MouseEvent) {
+    if (!rootRef.value?.contains(e.target as Node)) {
+        close()
+    }
+}
+
+watch(open, (val) => {
+    if (val) {
+        document.addEventListener('mousedown', onDocClick, { capture: true })
+    } else {
+        document.removeEventListener('mousedown', onDocClick, { capture: true })
+    }
+})
+
+onUnmounted(() => {
+    document.removeEventListener('mousedown', onDocClick, { capture: true })
+})
+</script>
+
+<template>
+    <div ref="rootRef" class="group-select">
+        <input
+            v-if="isCreating"
+            ref="createInput"
+            v-model="draftName"
+            type="text"
+            class="group-create-input"
+            placeholder="New group name"
+            @keydown="onCreateKeydown"
+            @blur="commitCreate"
+        >
+
+        <template v-else>
+            <button
+                type="button"
+                class="group-trigger"
+                :class="{ 'group-trigger--placeholder': modelValue === null, 'group-trigger--open': open }"
+                :aria-expanded="open"
+                @click="toggle"
+            >
+                <span class="group-trigger-label">{{ triggerLabel }}</span>
+                <span class="group-trigger-caret" :class="{ 'group-trigger-caret--open': open }">▾</span>
+            </button>
+
+            <div v-if="open" class="group-menu" role="listbox">
+                <button
+                    type="button"
+                    class="group-option"
+                    :class="{ 'group-option--active': modelValue === null }"
+                    role="option"
+                    :aria-selected="modelValue === null"
+                    @click="pick(null)"
+                >
+                    <span class="group-option-mark">{{ modelValue === null ? '✓' : '' }}</span>
+                    <span class="group-option-label group-option-label--muted">(No group)</span>
+                </button>
+
+                <div v-if="hasGroups" class="group-divider" />
+
+                <button
+                    v-for="group in props.knownGroups"
+                    :key="group"
+                    type="button"
+                    class="group-option"
+                    :class="{ 'group-option--active': modelValue === group }"
+                    role="option"
+                    :aria-selected="modelValue === group"
+                    @click="pick(group)"
+                >
+                    <span class="group-option-mark">{{ modelValue === group ? '✓' : '' }}</span>
+                    <span class="group-option-label">{{ group }}</span>
+                </button>
+
+                <div class="group-divider" />
+
+                <button
+                    type="button"
+                    class="group-option group-option--create"
+                    @click="startCreate"
+                >
+                    <span class="group-option-mark">+</span>
+                    <span class="group-option-label">Create new group…</span>
+                </button>
+            </div>
+        </template>
+    </div>
+</template>
+
+<style scoped>
+.group-select {
+    position: relative;
+    width: 100%;
+}
+
+.group-trigger,
+.group-create-input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+}
+.group-create-input:focus,
+.group-trigger:focus,
+.group-trigger--open {
+    outline: none;
+    border-color: var(--primary);
+}
+
+.group-trigger {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    cursor: pointer;
+    text-align: left;
+}
+.group-trigger--placeholder .group-trigger-label {
+    color: var(--text-3);
+}
+.group-trigger-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.group-trigger-caret {
+    color: var(--text-3);
+    font-size: 11px;
+    transition: transform 120ms;
+}
+.group-trigger-caret--open {
+    transform: rotate(180deg);
+}
+
+.group-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 50;
+    padding: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    max-height: 240px;
+    overflow-y: auto;
+}
+
+.group-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 8px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    cursor: pointer;
+    transition: background 100ms;
+}
+.group-option:hover {
+    background: var(--surface-2, #f4f5f6);
+}
+.group-option--active {
+    background: var(--primary-bg, rgba(0, 0, 0, 0.04));
+    color: var(--text);
+}
+.group-option-mark {
+    flex: 0 0 14px;
+    text-align: center;
+    color: var(--primary);
+    font-size: 11px;
+    line-height: 1;
+}
+.group-option-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.group-option-label--muted {
+    color: var(--text-2);
+    font-style: italic;
+}
+.group-option--create {
+    color: var(--primary);
+}
+.group-option--create:hover {
+    background: var(--primary-bg, rgba(0, 0, 0, 0.04));
+}
+.group-option--create .group-option-mark {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.group-divider {
+    height: 1px;
+    margin: 4px 0;
+    background: var(--border);
+}
+</style>

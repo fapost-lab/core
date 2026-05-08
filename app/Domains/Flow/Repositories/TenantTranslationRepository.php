@@ -41,4 +41,28 @@ final class TenantTranslationRepository implements TenantTranslationRepositoryIn
                 ->update(['value' => $value]);
         }
     }
+
+    public function delete(string $tenantId, string $key, string $language): void
+    {
+        TenantTranslation::query()
+            ->where('tenant_id', $tenantId)
+            ->where('key', $key)
+            ->where('language', $language)
+            ->delete();
+    }
+
+    public function matrix(string $tenantId): array
+    {
+        $matrix = [];
+
+        TenantTranslation::query()
+            ->where('tenant_id', $tenantId)
+            ->select(['key', 'language', 'value'])
+            ->cursor()
+            ->each(static function ($row) use (&$matrix): void {
+                $matrix[(string) $row->key][(string) $row->language] = (string) $row->value;
+            });
+
+        return $matrix;
+    }
 }

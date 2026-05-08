@@ -18,7 +18,7 @@ final class CommandMatcherTest extends TestCase
         $this->assertNull($matcher->match('hello', $this->assistant([])));
     }
 
-    public function test_returns_builtin_reset_with_default_response(): void
+    public function test_returns_builtin_reset_with_translation_key(): void
     {
         $matcher = new CommandMatcher(new BuiltinCommandsRegistry());
         $resolved = $matcher->match('/reset', $this->assistant([]));
@@ -26,7 +26,11 @@ final class CommandMatcherTest extends TestCase
         $this->assertNotNull($resolved);
         $this->assertSame('/reset', $resolved->command);
         $this->assertSame(CommandActionType::TerminateSession, $resolved->type);
-        $this->assertSame('Диалог сброшен.', $resolved->response);
+        // Built-in commands carry a translation key — the literal text is
+        // resolved by the executor through ContentTranslator, not by the
+        // matcher itself.
+        $this->assertNull($resolved->response);
+        $this->assertSame('commands.reset.response', $resolved->responseKey);
         $this->assertSame('builtin', $resolved->origin);
     }
 

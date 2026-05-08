@@ -1,5 +1,10 @@
 <script setup lang="ts">
+import {ref, watch} from 'vue'
 import AccordionSection from '../AccordionSection.vue'
+import VariableStorageEditor from '@builder/components/editor/variables/VariableStorageEditor.vue'
+import {useKnownGroups} from '@builder/composables/useKnownGroups'
+import {compileVariable, decodeInputVariable} from '@builder/utils/variableCompiler'
+import type {Variable} from '@builder/dto/types'
 
 const props = defineProps({
     node:   { type: Object, required: true },
@@ -8,39 +13,63 @@ const props = defineProps({
 
 const emit = defineEmits(['update:config'])
 
-const EXPECTED_TYPES = [
-    'text', 'number', 'phone', 'email', 'callback',
-    'reply', 'contact', 'location', 'document', 'image', 'any',
+// Aligned with Input node taxonomy from spec 02 — both `expected_type`
+// (validation) and `variable.type` (UI metadata) are written from this
+// single picker.
+const INPUT_TYPES = [
+    { value: 'text',     label: 'Text' },
+    { value: 'number',   label: 'Number' },
+    { value: 'email',    label: 'Email' },
+    { value: 'phone',    label: 'Phone' },
+    { value: 'contact',  label: 'Contact (button)' },
+    { value: 'select',   label: 'Select (from buttons)' },
+    { value: 'confirm',  label: 'Yes/No' },
+    { value: 'file',     label: 'File' },
+    { value: 'photo',    label: 'Photo' },
+    { value: 'location', label: 'Location' },
+    { value: 'date',     label: 'Date' },
 ]
+
+const knownGroups = useKnownGroups()
+
+const variable = ref<Variable>(decodeInputVariable(props.node.config as Record<string, unknown>))
+
+// Re-decode when the selected node changes or upstream config mutates.
+watch(
+    () => props.node.id,
+    () => {
+        variable.value = decodeInputVariable(props.node.config as Record<string, unknown>)
+    },
+)
 
 function update(key: string, value: unknown) {
     emit('update:config', { [key]: value })
+}
+
+function onVariableUpdate(next: Variable) {
+    variable.value = next
+    const compiled = compileVariable(next)
+    // Compiler is the sole writer of save target — drop legacy `save_to`
+    // so the backend validator does not reject coexistence of both shapes.
+    emit('update:config', {
+        variable:      compiled,
+        expected_type: next.type,
+        save_to:       undefined,
+    })
 }
 </script>
 
 <template>
     <div class="accordion">
         <AccordionSection title="Variable" default-open>
-            <div class="config-field">
-                <div class="field-label">Save to</div>
-                <input
-                    class="field-input"
-                    style="font-family:'DM Mono',monospace"
-                    :value="props.node.config?.save_to ?? ''"
-                    placeholder="flow.variable_name"
-                    @input="update('save_to', ($event.target as HTMLInputElement).value)"
-                >
-            </div>
-            <div class="config-field">
-                <div class="field-label">Expected type</div>
-                <select
-                    class="field-input"
-                    :value="props.node.config?.expected_type ?? 'text'"
-                    @change="update('expected_type', ($event.target as HTMLSelectElement).value)"
-                >
-                    <option v-for="type in EXPECTED_TYPES" :key="type" :value="type">{{ type }}</option>
-                </select>
-            </div>
+            <VariableStorageEditor
+                :model-value="variable"
+                :type-options="INPUT_TYPES"
+                :known-groups="knownGroups"
+                show-storage
+                show-group
+                @update:model-value="onVariableUpdate"
+            />
         </AccordionSection>
 
         <AccordionSection title="Validation">
@@ -79,7 +108,7 @@ function update(key: string, value: unknown) {
                 <div class="field-label">Node ID</div>
                 <input
                     class="field-input"
-                    style="font-family:'DM Mono',monospace;font-size:11.5px"
+                    style="font-family:'Victor Mono',monospace;font-size:11.5px"
                     :value="props.node.id"
                     readonly
                 >

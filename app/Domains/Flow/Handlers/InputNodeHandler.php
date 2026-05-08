@@ -6,13 +6,17 @@ namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
+use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\State\Variables\Variable;
+use App\Domains\Flow\State\Variables\VariableStorage;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
 use App\Domains\Media\Contracts\MediaServiceInterface;
 use FAPost\Foundation\DTO\IncomingMedia;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
+use FAPost\Foundation\Flow\Contracts\ContactWriterInterface;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use RuntimeException;
 use Throwable;
@@ -35,6 +39,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
     public function __construct(
         private readonly MediaIngestorInterface $mediaIngestor,
         private readonly MediaServiceInterface $mediaService,
+        private readonly VariableResolverInterface $variableResolver,
     ) {
     }
 
@@ -70,13 +75,14 @@ final class InputNodeHandler extends AbstractVersionedHandler
         $expectedType = is_string(
             $config['expected_type'] ?? null
         ) ? $config['expected_type'] : self::EXPECTED_TYPE_TEXT;
-        $saveToKey = is_string($config['save_to'] ?? null) ? $config['save_to'] : null;
+
+        $variable = $this->resolveVariable($config);
 
         if (in_array($expectedType, self::MEDIA_EXPECTED_TYPES, true)) {
-            return $this->handleMediaInput($expectedType, $saveToKey, $context);
+            return $this->handleMediaInput($expectedType, $variable, $context);
         }
 
-        return $this->handleTextInput($saveToKey, $context);
+        return $this->handleTextInput($variable, $context);
     }
 
     /**
@@ -87,7 +93,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
      */
     private function handleMediaInput(
         string $expectedType,
-        ?string $saveToKey,
+        ?Variable $variable,
         NodeExecutionContext $context
     ): NodeExecutionResult {
         $incoming = $context->incoming;
@@ -138,10 +144,12 @@ final class InputNodeHandler extends AbstractVersionedHandler
             ];
         }
 
+        $stateChanges = $this->buildStateChanges($variable, $stored, $context);
+
         return new NodeExecutionResult(
             status: NodeExecutionStatus::Executed,
             sourceHandle: 'default',
-            stateChanges: null !== $saveToKey ? [$saveToKey => $stored] : [],
+            stateChanges: $stateChanges,
             metadata: [self::RECEIVED_META => array_column($stored, 'media_file_id')],
         );
     }
@@ -208,7 +216,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
         return $channelContact->channel;
     }
 
-    private function handleTextInput(?string $saveToKey, NodeExecutionContext $context): NodeExecutionResult
+    private function handleTextInput(?Variable $variable, NodeExecutionContext $context): NodeExecutionResult
     {
         $incomingText = $context->incoming?->text;
 
@@ -216,11 +224,65 @@ final class InputNodeHandler extends AbstractVersionedHandler
             return new NodeExecutionResult(status: NodeExecutionStatus::Waiting);
         }
 
+        $stateChanges = $this->buildStateChanges($variable, $incomingText, $context);
+
         return new NodeExecutionResult(
             status: NodeExecutionStatus::Executed,
             sourceHandle: 'default',
-            stateChanges: null !== $saveToKey ? [$saveToKey => $incomingText] : [],
+            stateChanges: $stateChanges,
             metadata: [self::RECEIVED_META => $incomingText],
         );
+    }
+
+    /**
+     * Resolve the configured save target. New {@code variable} shape takes
+     * precedence — the legacy {@code save_to} string is parsed through
+     * {@see VariableResolverInterface::fromLegacyPath()} for backward
+     * compatibility with snapshots authored before the contract migration.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function resolveVariable(array $config): ?Variable
+    {
+        if (is_array($config['variable'] ?? null)) {
+            return Variable::tryFromArray($config['variable']);
+        }
+
+        $saveTo = $config['save_to'] ?? null;
+
+        if ( ! is_string($saveTo) || '' === $saveTo) {
+            return null;
+        }
+
+        return $this->variableResolver->fromLegacyPath($saveTo);
+    }
+
+    /**
+     * Apply the resolved {@see Variable} to the appropriate write surface:
+     * contact-scoped variables are written immediately through
+     * {@see ContactWriterInterface}; session-scoped variables flow through
+     * the engine's {@code stateChanges} batch.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildStateChanges(?Variable $variable, mixed $value, NodeExecutionContext $context): array
+    {
+        if (null === $variable) {
+            return [];
+        }
+
+        $path = $this->variableResolver->resolveTargetPath($variable);
+
+        if (VariableStorage::Contact === $variable->storage) {
+            $writer = $context->contactWriter;
+
+            if ($writer instanceof ContactWriterInterface) {
+                $writer->write($path, $value);
+            }
+
+            return [];
+        }
+
+        return [$path => $value];
     }
 }

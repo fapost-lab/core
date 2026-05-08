@@ -5,6 +5,9 @@ declare(strict_types=1);
 use Spatie\LaravelSettings\Migrations\SettingsMigration;
 
 return new class () extends SettingsMigration {
+    /**
+     * @throws \Spatie\LaravelSettings\Exceptions\SettingAlreadyExists
+     */
     public function up(): void
     {
         $this->migrator->add('platform.version', '1.0.0');

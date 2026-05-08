@@ -760,15 +760,27 @@ session.state.system.language
 
 ### System translations (tenant-level)
 
-Для auth/validation/fallback/default service buttons.
+Для auth/validation/fallback/default service buttons и любых текстов, которые **бот отправляет конечному пользователю**, не из flow.
 
-Таблица `tenant_translations`: `tenant_id`, `key`, `language`, `value`.
+**Каталог системных ключей** — `app/Domains/Flow/Translations/` (`SystemTranslationCatalogInterface`, `InMemorySystemTranslationCatalog`). Все известные ключи + дефолты на en/ru/uk регистрируются в коде. Core seed — `CoreSystemTranslations::seed()` в `FlowServiceProvider::boot()`. Features и Solutions регистрируют свои ключи через тот же catalog из своих провайдеров.
 
-Fallback: `tenant translation → core translation → core fallback language`.
+**Таблица `tenant_translations`** хранит **только overrides**: `tenant_id`, `key`, `language`, `value`. Если строки нет — резолвер падает в catalog default.
 
-Lazy fallback при runtime — обновление core defaults не требует миграции данных tenant.
+**Resolver chain** (`CachedContentTranslator::translate`):
 
-Все UI компоненты и модлю, всегда должны иметь перевод на системные языки.
+```
+tenant_translations[key, lang]
+  → tenant_translations[key, content_base_language]
+  → catalog[key, lang]
+  → catalog[key, fallback='en']
+  → key  (last resort, пишется warning в лог)
+```
+
+**Filament UI** — `app/Filament/Resources/TenantTranslations/`. Не CRUD «введите что хотите»: создание override = выбор ключа из каталога + языка + значение. `Reset` (DeleteAction) удаляет override → возврат к catalog default.
+
+**Жёсткое правило при любом изменении кода:** если в Core/Feature/Solution появляется текст, который бот будет отправлять пользователю **не из flow** (busy notice, ack команды, fallback, валидационные сообщения, дефолтные label кнопок) — он **обязательно** регистрируется как `SystemTranslationEntry` в каталоге со всеми платформенными locales (en/ru/uk минимум). Литералы в коде запрещены: вместо них — `$translator->translate('...', $language)`.
+
+Прецеденты, где правило применено: `commands.{reset,cancel}.response`, `errors.{busy,session_expired,fallback,flow_not_found}`, `buttons.{yes,no,confirm,cancel,back}`.
 
 ### Flow multilingual content
 

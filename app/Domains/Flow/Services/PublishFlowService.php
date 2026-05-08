@@ -64,14 +64,15 @@ final readonly class PublishFlowService
                 ->update(['is_active' => false]);
 
             $definition = FlowDefinition::query()->create([
-                'tenant_id'    => $draft->tenant_id,
-                'flow_id'      => $draft->flow_id,
-                'version'      => $newVersion,
-                'name'         => $draft->name,
-                'nodes'        => $nodes,
-                'edges'        => $edges,
-                'is_active'    => true,
-                'published_at' => now(),
+                'tenant_id'       => $draft->tenant_id,
+                'flow_id'         => $draft->flow_id,
+                'version'         => $newVersion,
+                'name'            => $draft->name,
+                'nodes'           => $nodes,
+                'edges'           => $edges,
+                'is_active'       => true,
+                'logging_enabled' => (bool) $draft->logging_enabled,
+                'published_at'    => now(),
             ]);
 
             // Reverse-index subflow.flow_id references so the next publish can

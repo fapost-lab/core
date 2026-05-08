@@ -7,6 +7,43 @@ return [
         'group' => 'Персонал',
     ],
 
+    'tenant_settings' => [
+        'title'      => 'Налаштування',
+        'navigation' => 'Налаштування',
+        'subtitle'   => 'Загальні налаштування, що поширюються на всіх асистентів тенанта.',
+        'saved'      => 'Налаштування збережено',
+        'tabs'       => [
+            'languages'  => 'Мови',
+            'runtime'    => 'Виконання',
+            'broadcasts' => 'Розсилки',
+        ],
+        'sections' => [
+            'messaging' => 'Повідомлення',
+            'flow'      => 'Сценарії',
+        ],
+        'fields' => [
+            'content_base_language'      => 'Базова мова контенту',
+            'content_base_language_help' => 'Мова, якою створюються сценарії. Не можна змінити після публікації першого сценарію.',
+            'available_languages'        => 'Доступні мови',
+            'available_languages_help'   => 'Мови, на які можна перекласти контент у редакторі сценаріїв.',
+            'fallback_language'          => 'Резервна мова',
+            'fallback_language_help'     => 'Використовується, коли в контакта та асистента не визначено мову.',
+            'messaging_rate_limit'       => 'Повідомлень на хвилину (на чат)',
+            'broadcast_chunk_size'       => 'Розмір частини розсилки',
+            'broadcast_backpressure'     => 'Backpressure для розсилок',
+            'flow_session_ttl'           => 'TTL сесії сценарію (с)',
+            'max_retry_attempts'         => 'Макс. кількість ретраїв вузла',
+            'flow_fallback_message'      => 'Резервне повідомлення сценарію',
+        ],
+        'actions' => [
+            'save' => 'Зберегти',
+        ],
+        'errors' => [
+            'fallback_not_in_available' => 'Резервна мова має бути в списку доступних.',
+            'base_lang_locked'          => 'Не можна змінити базову мову після публікації сценаріїв.',
+        ],
+    ],
+
     'permission_groups' => [
         'assistants' => 'Асистенти',
         'users'      => 'Користувачі',
@@ -154,6 +191,28 @@ return [
 
         'notifications' => [
             'hash_rotated_title' => 'Webhook hash оновлено',
+        ],
+    ],
+
+    'tenant_translations' => [
+        'label'        => 'Переклад',
+        'plural_label' => 'Переклади',
+        'navigation'   => 'Переклади',
+        'subtitle'     => 'Системні повідомлення та підписи, які бот надсилає користувачам. Системні значення вже заповнені — введіть своє, щоб перевизначити для конкретної мови.',
+        'saved'        => 'Переклади збережено',
+        'reset_done'   => 'Перевизначення для ключа видалено',
+
+        'fields' => [
+            'key'                 => 'Ключ',
+            'group'               => 'Група',
+            'description'         => 'Опис',
+            'locale_default_hint' => 'Системне значення: «:default»',
+        ],
+
+        'actions' => [
+            'edit'  => 'Редагувати',
+            'save'  => 'Зберегти',
+            'reset' => 'Скинути до системних',
         ],
     ],
 

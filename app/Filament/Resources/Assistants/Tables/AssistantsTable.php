@@ -29,11 +29,6 @@ final class AssistantsTable
                     ->label(__('staff.assistants.fields.default_language'))
                     ->badge()
                     ->color('gray'),
-                TextColumn::make('available_languages')
-                    ->label(__('staff.assistants.fields.available_languages'))
-                    ->badge()
-                    ->color('gray')
-                    ->separator(','),
                 TextColumn::make('updated_at')
                     ->label(__('staff.assistants.table.updated_at'))
                     ->dateTime(),

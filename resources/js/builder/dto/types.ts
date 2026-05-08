@@ -62,6 +62,24 @@ export interface NodeTypePayload {
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'conflict' | 'error'
 
+/**
+ * Variable descriptor used by nodes that persist user input — Input,
+ * SendMessage save_to, Assign. The component VariableStorageEditor edits
+ * this shape; nodes compile it into their own JSON snapshot.
+ */
+export type VariableType =
+    | 'text' | 'number' | 'phone' | 'email' | 'contact'
+    | 'select' | 'confirm' | 'file' | 'photo' | 'location' | 'date'
+
+export type VariableStorage = 'contact' | 'session'
+
+export interface Variable {
+    name: string
+    type: VariableType
+    storage: VariableStorage
+    group: string | null
+}
+
 export type ActiveTab = 'builder' | 'content'
 
 export interface ValidationError {

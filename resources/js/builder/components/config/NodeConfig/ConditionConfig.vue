@@ -144,7 +144,7 @@ const noValueOps = new Set(['empty', 'not_empty'])
     transition: border-color .15s;
 }
 .field-input:focus { border-color: var(--primary); background: #fff; }
-.mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+.mono { font-family: 'Victor Mono', monospace; font-size: 12px; }
 
 .rule-row { display: flex; gap: 4px; margin-bottom: 6px; align-items: center; }
 .rule-row .field-input { flex: 1; }

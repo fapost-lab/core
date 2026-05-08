@@ -21,4 +21,10 @@ final readonly class TenantTranslationService implements TenantTranslationServic
         $this->translations->upsert($tenantId, $key, $language, $value);
         $this->translator->invalidate($tenantId, $language);
     }
+
+    public function delete(string $tenantId, string $key, string $language): void
+    {
+        $this->translations->delete($tenantId, $key, $language);
+        $this->translator->invalidate($tenantId, $language);
+    }
 }

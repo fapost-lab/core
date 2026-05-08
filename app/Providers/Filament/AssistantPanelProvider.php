@@ -52,7 +52,7 @@ final class AssistantPanelProvider extends PanelProvider
             ->login()
             ->spa()
             ->sidebarFullyCollapsibleOnDesktop()
-            ->font('Poppins')
+            ->font('Play')
             ->colors([
                 'primary' => Color::Olive,
             ])

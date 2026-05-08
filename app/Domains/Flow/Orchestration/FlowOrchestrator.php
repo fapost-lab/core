@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Orchestration;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
@@ -16,6 +17,7 @@ use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
 use App\Domains\Flow\Exceptions\FlowConcurrencyException;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Support\CallbackDataCodec;
+use App\Domains\Tenancy\Settings\TenantSettings;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\IncomingMessageType;
 use FAPost\Foundation\Flow\DTO\ResolvedTrigger;
@@ -33,6 +35,8 @@ final class FlowOrchestrator implements FlowOrchestratorInterface
         private readonly CurrentAssistantInterface $currentAssistant,
         private readonly FallbackMessageServiceInterface $fallbackSender,
         private readonly PersistentButtonRegistryInterface $persistentButtonRegistry,
+        private readonly ContentTranslatorInterface $translator,
+        private readonly TenantSettings $tenantSettings,
     ) {
     }
 
@@ -182,9 +186,22 @@ final class FlowOrchestrator implements FlowOrchestratorInterface
             return;
         }
 
-        $message = $this->currentAssistant->get()->fallback_message;
+        $field = $this->currentAssistant->get()->fallback_message;
 
-        if (is_string($message) && '' !== $message) {
+        if ( ! is_array($field) && ! is_string($field)) {
+            return;
+        }
+
+        // Resolve the locale map against the contact's language; old plain
+        // strings written before the localization migration also pass through
+        // resolveField unchanged.
+        $language = is_string($contact->language) && '' !== $contact->language
+            ? $contact->language
+            : $this->tenantSettings->fallback_language;
+
+        $message = $this->translator->resolveField($field, $language);
+
+        if ('' !== $message) {
             $this->fallbackSender->send($contact, $assistantId, $message);
         }
     }
