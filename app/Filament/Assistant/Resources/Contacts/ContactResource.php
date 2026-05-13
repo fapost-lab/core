@@ -37,6 +37,14 @@ final class ContactResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedUserCircle;
 
+    /**
+     * Contact has no direct `assistants` relation (link runs through
+     * `channel_contacts → channels.assistant_id`), so the auto-scope from
+     * Filament tenancy can't bind. We disable it here and apply the
+     * assistant filter manually in {@see getEloquentQuery()}.
+     */
+    protected static bool $isScopedToTenant = false;
+
     public static function getNavigationGroup(): string|UnitEnum|null
     {
         return __('assistant.navigation.groups.operations');

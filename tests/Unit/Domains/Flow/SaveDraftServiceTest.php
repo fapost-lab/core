@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Flow;
 
 use App\Domains\Flow\Exceptions\DraftVersionConflictException;
-use App\Domains\Flow\Exceptions\InvalidTriggerPayloadException;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Services\SaveDraftService;
@@ -211,7 +210,14 @@ final class SaveDraftServiceTest extends TestCase
         $this->assertSame('2026-04-02 09:00:00', $trigger->next_run_at?->format('Y-m-d H:i:s'));
     }
 
-    public function test_it_rejects_event_trigger_when_selected_event_does_not_exist(): void
+    /**
+     * SaveDraft no longer enforces tenant-event registry membership — that
+     * check moved to {@see \App\Domains\Flow\Services\ValidateFlowService}
+     * (covered by `test_validate_endpoint_reports_unknown_event_trigger`).
+     * Drafts may reference an event before it appears in the registry; the
+     * trigger row simply never fires at runtime until the event is declared.
+     */
+    public function test_it_persists_event_trigger_even_when_event_is_not_yet_registered(): void
     {
         $draft = FlowDraft::factory()->create([
             'draft_version' => 2,
@@ -219,9 +225,6 @@ final class SaveDraftServiceTest extends TestCase
         ]);
 
         $service = app(SaveDraftService::class);
-
-        $this->expectException(InvalidTriggerPayloadException::class);
-        $this->expectExceptionMessage('Selected event does not exist in the tenant event registry.');
 
         $service->execute(
             $draft->flow_id,
@@ -237,5 +240,10 @@ final class SaveDraftServiceTest extends TestCase
             ],
             expectedDraftVersion: 2,
         );
+
+        $this->assertDatabaseHas('flow_triggers', [
+            'flow_id' => $draft->flow_id,
+            'type'    => 'event',
+        ]);
     }
 }

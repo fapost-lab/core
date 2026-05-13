@@ -113,7 +113,14 @@ final class BuilderApiTest extends FeatureTestCase
         ]);
     }
 
-    public function test_save_draft_rejects_duplicate_exact_message_keywords_within_same_scope(): void
+    /**
+     * SaveDraft does NOT validate (per builder UX contract — drafts can be
+     * saved in any state). Duplicate trigger keywords are caught by the
+     * /validate endpoint and on publish; they no longer block saving the
+     * draft itself. This lets authors create empty/half-edited flows and
+     * attach them as default_flow_id without forcing immediate cleanup.
+     */
+    public function test_save_draft_persists_even_with_duplicate_message_keywords(): void
     {
         $draft = $this->draft(['draft_version' => 5]);
 
@@ -147,16 +154,52 @@ final class BuilderApiTest extends FeatureTestCase
                     ],
                 ],
             ])
-            ->assertStatus(422)
-            ->assertJsonPath('valid', false)
-            ->assertJsonPath('errors.0.code', 'duplicate_exact_trigger_keyword');
+            ->assertOk();
 
         $draft->refresh();
-        $this->assertSame(5, $draft->draft_version);
-        $this->assertDatabaseMissing('flow_triggers', [
+        $this->assertSame(6, $draft->draft_version);
+        $this->assertDatabaseHas('flow_triggers', [
             'flow_id' => $draft->flow_id,
             'type'    => 'message',
         ]);
+    }
+
+    public function test_validate_endpoint_reports_duplicate_message_keywords(): void
+    {
+        $draft = $this->draft(['draft_version' => 5]);
+
+        FlowTrigger::query()->create([
+            'tenant_id'    => $draft->tenant_id,
+            'assistant_id' => $draft->assistant_id,
+            'flow_id'      => 'other-flow',
+            'type'         => 'message',
+            'is_active'    => true,
+            'priority'     => 10,
+            'config'       => [
+                'keywords' => ['help'],
+                'phrases'  => [],
+            ],
+        ]);
+
+        $user = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        $this->actingAs($user)
+            ->postJson("/builder/flows/{$draft->flow_id}/validate", [
+                'definition' => ['nodes' => []],
+                'trigger'    => [
+                    'type'      => 'message',
+                    'is_active' => true,
+                    'priority'  => 100,
+                    'config'    => [
+                        'keywords' => ['HELP!!!'],
+                        'phrases'  => [],
+                    ],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('valid', false)
+            ->assertJsonPath('errors.0.code', 'duplicate_exact_trigger_keyword');
     }
 
     public function test_validate_returns_trigger_errors_when_trigger_payload_is_invalid(): void
@@ -284,7 +327,11 @@ final class BuilderApiTest extends FeatureTestCase
             ->assertJsonStructure(['error', 'errors']);
     }
 
-    public function test_save_draft_rejects_unknown_event_trigger_selection(): void
+    /**
+     * Same contract as duplicate-keywords above: unknown event_name flags
+     * a validation error but does not block draft persistence.
+     */
+    public function test_save_draft_persists_even_with_unknown_event_trigger(): void
     {
         $draft = $this->draft(['draft_version' => 5]);
         $user  = $this->staffUser();
@@ -303,14 +350,35 @@ final class BuilderApiTest extends FeatureTestCase
                     ],
                 ],
             ])
-            ->assertStatus(422)
-            ->assertJsonPath('valid', false)
-            ->assertJsonPath('errors.0.code', 'unknown_event_trigger_selection');
+            ->assertOk();
 
-        $this->assertDatabaseMissing('flow_triggers', [
+        $this->assertDatabaseHas('flow_triggers', [
             'flow_id' => $draft->flow_id,
             'type'    => 'event',
         ]);
+    }
+
+    public function test_validate_endpoint_reports_unknown_event_trigger(): void
+    {
+        $draft = $this->draft(['draft_version' => 5]);
+        $user  = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        $this->actingAs($user)
+            ->postJson("/builder/flows/{$draft->flow_id}/validate", [
+                'definition' => ['nodes' => []],
+                'trigger'    => [
+                    'type'      => 'event',
+                    'is_active' => true,
+                    'priority'  => 100,
+                    'config'    => [
+                        'event_name' => 'employee_registered',
+                    ],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('valid', false)
+            ->assertJsonPath('errors.0.code', 'unknown_event_trigger_selection');
     }
 
     public function test_node_types_returns_registered_handlers(): void

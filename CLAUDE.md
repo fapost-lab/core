@@ -487,7 +487,7 @@ Incoming webhook
 username), `attributes` (JSON: данные собранные платформенными нодами).
 
 **`contacts.attributes` — НЕ кеш модульных данных.** Только данные собранные платформенными нодами (`input`,
-`set_attribute`). Модули не пишут сюда напрямую — для модульных данных есть `DataAccessorInterface`.
+`assign`). Модули не пишут сюда напрямую — для модульных данных есть `DataAccessorInterface`.
 
 **Canonical contact-level поля выносятся из `attributes` если участвуют в hot path резолвинга.** Прецедент: `language`.
 Решение принимается по факту использования, не превентивно.
@@ -553,7 +553,7 @@ lookup по `outputs[sourceHandle].next`.
 | Namespace | Владелец | Описание |
 |-----------|----------|----------|
 | `system.*` | Engine + явно whitelisted system handlers | started_at, current_node, retry_count, language. |
-| `flow.*` | input / set_attribute ноды | Данные текущего диалога. |
+| `flow.*` | input / assign ноды | Данные текущего диалога. |
 | `rag.*` | rag_query нода | Структурированный результат RAG. Умирает с сессией. |
 | `module.*` | Модуль через `DataAccessorInterface` | Резолвится лениво, **не пишется** в state JSON. |
 
@@ -635,22 +635,25 @@ Flow engine не читает напрямую из модульных табл�
 |-----|---------|---|
 | `send_message` | Core | P0 |
 | `input` | Core | P0 |
-| `condition` | Core | P0 |
-| `switch` | Core | P0 |
+| `condition` (handler `branch`) | Core | P0 |
 | `end` | Core | P0 |
 | `delay` | Core | P1 |
-| `set_attribute` | Core | P1 |
-| `set_variable` | Core | P1 |
-| `webhook` | Core | P1 |
-| `notify_staff` | Core | P1 |
 | `assign` | Core | P1 |
+| `call` | Core | P1 |
+| `notify_staff` | Core | P1 |
 | `set_tag` | Core | P1 |
 | `handler` | Core + Solution/Plugin | P1 |
 | `go_to_flow` | Core | P2 |
 | `emit_event` | Core | P2 |
+| `subflow` | Core | P2 |
 | `rag_query` | Feature: RAG | P2 |
 | `auth_request` | Feature: AccessControl | P3 |
 | `comment` | Core (конструктор) | P3 |
+
+**Удалено из taxonomy (май 2026):**
+- `switch` — функционал перекрывается `condition`/`branch` через множественные правила в одной ноде. Иконка и color-scheme удалены из builder.
+- `set_attribute`, `set_variable` — оба покрываются `assign` (multi-operations). Один writer, один UI.
+- `webhook` — переименован в `call` (matches `CallNodeHandler`). Не путать с triggers: `webhook` остаётся как **trigger type** (входящий HTTP запрос для старта flow).
 
 **`send_message` content_type:** `text`, `text_with_keyboard`, `image`, `document`, `video`, `voice`.
 

@@ -30,6 +30,7 @@ final class CreateFlowActionTest extends TestCase
             $table->boolean('is_public')->default(true);
             $table->boolean('is_active')->default(true);
             $table->json('nodes')->nullable();
+            $table->json('edges')->nullable();
             $table->timestamps();
         });
     }
@@ -113,5 +114,17 @@ final class CreateFlowActionTest extends TestCase
             'id'            => $draft->id,
             'flow_group_id' => $groupId,
         ]);
+
+        $nodes = $draft->nodes;
+        $this->assertIsArray($nodes);
+        $this->assertCount(1, $nodes, 'A new draft is seeded with one end node.');
+
+        $endNode = $nodes[0];
+        $this->assertSame('end', $endNode['type']);
+        $this->assertSame(1, $endNode['version']);
+        $this->assertSame('success', $endNode['config']['status']);
+        $this->assertNotEmpty($endNode['id']);
+
+        $this->assertSame([], $draft->edges);
     }
 }

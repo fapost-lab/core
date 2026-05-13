@@ -6,7 +6,6 @@ import {useNavigationStore} from '@builder/store/navigationStore'
 import FlowNodeCard from './FlowNodeCard.vue'
 import FlowInsertPoint from './FlowInsertPoint.vue'
 import FlowConditionCard from './FlowConditionCard.vue'
-import FlowSwitchCard from './FlowSwitchCard.vue'
 import FlowSendMessageCard from './FlowSendMessageCard.vue'
 
 interface TreeNode {
@@ -147,6 +146,8 @@ const lastNodeIsTerminal = computed(() => {
     const last = activeNodes.value[activeNodes.value.length - 1]
     if (!last) return false
     const { type, config } = last.node
+    // Real `end` node already terminates the chain — no decorative tail card.
+    if (type === 'end') return true
     if (type !== 'send_message' || config?.content_type !== 'text_with_keyboard') return false
     const mode = config?.keyboard_mode ?? 'inline'
     if (mode === 'reply') return true
@@ -227,12 +228,6 @@ const trailingInsertContext = computed(() => {
                     :parent-branch="selectionStore.activeBranch"
                     :index="index + 1"
                 />
-                <FlowSwitchCard
-                    v-else-if="item.node.type === 'switch'"
-                    :tree-node="item"
-                    :parent-branch="selectionStore.activeBranch"
-                    :index="index + 1"
-                />
                 <FlowSendMessageCard
                     v-else-if="
                         item.node.type === 'send_message'
@@ -270,11 +265,6 @@ const trailingInsertContext = computed(() => {
                         :visible="hoveredSlot === 'slot-end'"
                     />
                     <div class="seq-connector"><div class="conn-line" /></div>
-                </div>
-
-                <div class="end-card">
-                    <div class="end-icon">■</div>
-                    <span>End of flow</span>
                 </div>
             </template>
         </div>

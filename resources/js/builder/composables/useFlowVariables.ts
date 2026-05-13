@@ -241,11 +241,6 @@ export function useFlowVariables() {
                 }
                 continue
             }
-
-            // Legacy set_attribute — kept for backwards compat
-            if (node.type === 'set_attribute' && typeof cfg.key === 'string') {
-                push(fromLegacyPath(`flow.${cfg.key}`, nodeLabel))
-            }
         }
 
         return [...seen.values()]

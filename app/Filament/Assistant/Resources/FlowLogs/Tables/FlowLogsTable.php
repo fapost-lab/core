@@ -133,19 +133,17 @@ final class FlowLogsTable
     private static function nodeTypeOptions(): array
     {
         return [
-            'send_message'  => 'send_message',
-            'input'         => 'input',
-            'branch'        => 'branch',
-            'condition'     => 'condition',
-            'delay'         => 'delay',
-            'assign'        => 'assign',
-            'set_attribute' => 'set_attribute',
-            'call'          => 'call',
-            'webhook'       => 'webhook',
-            'emit_event'    => 'emit_event',
-            'rag_query'     => 'rag_query',
-            'subflow'       => 'subflow',
-            'end'           => 'end',
+            'send_message' => 'send_message',
+            'input'        => 'input',
+            'branch'       => 'branch',
+            'condition'    => 'condition',
+            'delay'        => 'delay',
+            'assign'       => 'assign',
+            'call'         => 'call',
+            'emit_event'   => 'emit_event',
+            'rag_query'    => 'rag_query',
+            'subflow'      => 'subflow',
+            'end'          => 'end',
         ];
     }
 }

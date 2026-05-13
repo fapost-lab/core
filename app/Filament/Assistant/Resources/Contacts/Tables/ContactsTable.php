@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Filament\Assistant\Resources\Contacts\Tables;
 
 use App\Domains\Contact\Enums\PlatformEnum;
+use App\Domains\Contact\Models\Contact;
 use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Compact contact list for the assistant panel. Columns surface the operator's
@@ -81,10 +81,14 @@ final class ContactsTable
 
                 SelectFilter::make('language')
                     ->label(__('contact.filters.language'))
-                    ->options(static fn (Builder $query): array => $query
-                        ->getModel()
-                        ->newQuery()
+                    // Build the option list from a fresh Contact query —
+                    // Filament's `options(Closure)` evaluator does not inject
+                    // the table's underlying Builder here (signature varies
+                    // by Filament version), so we go through the model
+                    // directly to dodge a null-argument call to newQuery().
+                    ->options(static fn (): array => Contact::query()
                         ->select('language')
+                        ->whereNotNull('language')
                         ->distinct()
                         ->orderBy('language')
                         ->pluck('language', 'language')

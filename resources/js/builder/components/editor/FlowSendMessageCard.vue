@@ -3,6 +3,7 @@ import {computed} from 'vue'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {nodeColors} from '@builder/utils/nodeColors'
+import NodeIcon from '@builder/components/NodeIcon.vue'
 import {countDescendants, type TreeNode} from '@builder/utils/buildTree'
 
 const props = defineProps({
@@ -69,7 +70,7 @@ const textPreview = computed(() => {
             <div
                 class="node-type-icon"
                 :style="{ background: colors.bg, color: colors.color }"
-            >{{ colors.icon }}</div>
+            ><NodeIcon type="send_message" /></div>
             <span class="node-type-label">Send message</span>
             <div v-if="hasError" class="node-warn" title="Validation error">!</div>
             <span v-if="index != null" class="node-num">#{{ index }}</span>

@@ -4,6 +4,7 @@ import {useSelectionStore} from '@builder/store/selectionStore'
 import {useRegistryStore} from '@builder/store/registryStore'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {nodeColors} from '@builder/utils/nodeColors'
+import NodeIcon from '@builder/components/NodeIcon.vue'
 
 const props = defineProps({
     treeNode: { type: Object, required: true },
@@ -23,6 +24,22 @@ const typeLabel = computed(() => {
     if (handlerMeta.value?.label) return handlerMeta.value.label
     return props.treeNode.node.type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
 })
+
+/**
+ * For `end` nodes, surface the configured completion status as a colour accent
+ * on the card so authors can see at a glance whether a terminal marks success,
+ * cancellation, or failure.
+ */
+const endStatus = computed<string | null>(() => {
+    if (props.treeNode.node.type !== 'end') return null
+    const cfg = (props.treeNode.node.config ?? {}) as Record<string, unknown>
+    const raw = typeof cfg.status === 'string' ? cfg.status : 'success'
+    return ['success', 'cancelled', 'failed'].includes(raw) ? raw : 'success'
+})
+
+const endStatusLabel = computed<string | null>(() =>
+    endStatus.value ? endStatus.value.charAt(0).toUpperCase() + endStatus.value.slice(1) : null,
+)
 
 /** Compact summary rows for the card body */
 const summaryRows = computed(() => {
@@ -65,14 +82,6 @@ const summaryRows = computed(() => {
         return [{ key: 'Wait', val, muted: false }]
     }
 
-    if (type === 'set_attribute') {
-        return config.key ? [{ key: 'Key', val: config.key, mono: true }] : []
-    }
-
-    if (type === 'webhook') {
-        return config.url ? [{ key: 'URL', val: config.url, muted: true }] : []
-    }
-
     return []
 })
 
@@ -89,18 +98,22 @@ function deleteNode() {
     <div
         :id="`node-card-${treeNode.node.id}`"
         class="node-card"
-        :class="{
-            selected: isSelected,
-            'has-error': hasError && !isSelected,
-        }"
+        :class="[
+            {
+                selected: isSelected,
+                'has-error': hasError && !isSelected,
+            },
+            endStatus ? `node-card--end node-card--end-${endStatus}` : null,
+        ]"
         @click="select"
     >
         <div class="node-card-head">
             <div
                 class="node-type-icon"
-                :style="{ background: colors.bg, color: colors.color }"
-            >{{ colors.icon }}</div>
+                :style="endStatus ? undefined : { background: colors.bg, color: colors.color }"
+            ><NodeIcon :type="treeNode.node.type" /></div>
             <span class="node-type-label">{{ typeLabel }}</span>
+            <span v-if="endStatusLabel" class="end-status-badge">{{ endStatusLabel }}</span>
             <div v-if="hasError" class="node-warn" title="Validation error">!</div>
             <span v-if="index != null" class="node-num">#{{ index }}</span>
             <button class="node-delete-btn" title="Delete node" @click.stop="deleteNode">×</button>

@@ -49,11 +49,14 @@ final readonly class SyncFlowTriggerService
                 throw new InvalidTriggerPayloadException('Event trigger requires an existing event selection.');
             }
 
-            $availableEvents = $this->tenantEvents->getEventNamesByTenant($draft->tenant_id);
-
-            if ( ! in_array($eventName, $availableEvents, true)) {
-                throw new InvalidTriggerPayloadException('Selected event does not exist in the tenant event registry.');
-            }
+            // NOTE: existence in TenantEvents registry is intentionally NOT
+            // enforced here — it's a soft check that belongs to
+            // ValidateFlowService and runs on /validate or on publish.
+            // Drafts may reference an event that the tenant has not yet
+            // declared (e.g. user is sketching the flow before the event
+            // gets registered). Persisting a trigger with an unknown event
+            // is a no-op at runtime — it simply never fires until the event
+            // appears in the registry.
         }
 
         $this->triggers->upsertForFlow($draft->flow_id, [

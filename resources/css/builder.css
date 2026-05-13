@@ -270,6 +270,35 @@ body {
 .node-card.selected { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(90,110,88,.1); }
 .node-card.has-error { border-color: var(--rose); box-shadow: 0 0 0 3px rgba(176,112,112,.1); }
 
+/* End node — status-driven accent. Colours mirror the EndConfig radio so the
+   canvas and the right-pane stay visually consistent. */
+.node-card--end .node-type-icon { background: var(--surface-2); color: var(--text-3); }
+.node-card--end-success {
+  border-color: color-mix(in srgb, var(--sage, #5a6e58) 60%, var(--border));
+  background: color-mix(in srgb, var(--sage, #5a6e58) 4%, var(--surface));
+}
+.node-card--end-success .node-type-icon { background: var(--sage-bg, #e6ede4); color: var(--sage, #5a6e58); }
+.node-card--end-cancelled {
+  border-color: color-mix(in srgb, var(--amber, #b07c2c) 55%, var(--border));
+  background: color-mix(in srgb, var(--amber, #b07c2c) 4%, var(--surface));
+}
+.node-card--end-cancelled .node-type-icon { background: var(--amber-bg, #f6ecd6); color: var(--amber, #b07c2c); }
+.node-card--end-failed {
+  border-color: color-mix(in srgb, var(--rose, #b94a4a) 55%, var(--border));
+  background: color-mix(in srgb, var(--rose, #b94a4a) 4%, var(--surface));
+}
+.node-card--end-failed .node-type-icon { background: var(--rose-bg, #f3dada); color: var(--rose, #b94a4a); }
+
+.end-status-badge {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .03em;
+  padding: 2px 7px; border-radius: 999px;
+  background: var(--surface-2); color: var(--text-3);
+  text-transform: uppercase;
+}
+.node-card--end-success   .end-status-badge { background: var(--sage-bg, #e6ede4); color: var(--sage, #5a6e58); }
+.node-card--end-cancelled .end-status-badge { background: var(--amber-bg, #f6ecd6); color: var(--amber, #b07c2c); }
+.node-card--end-failed    .end-status-badge { background: var(--rose-bg, #f3dada); color: var(--rose, #b94a4a); }
+
 .node-card-head {
   padding: 9px 12px;
   display: flex; align-items: center; gap: 8px;
@@ -304,7 +333,10 @@ body {
 .node-type-icon {
   width: 24px; height: 24px; border-radius: 5px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; flex-shrink: 0;
+  /* Emoji glyph fills the box — keep line-height 1 so the icon doesn't
+     drift downward inside the rounded square. */
+  font-size: 16px; line-height: 1;
+  flex-shrink: 0;
 }
 .icon-msg  { background: var(--sky-bg);   color: var(--sky);  }
 .icon-cond { background: var(--amber-bg); color: var(--amber);}
@@ -359,23 +391,6 @@ body {
   border-radius: 8px; font-size: 10px; font-weight: 700; line-height: 1;
   margin-left: 5px; vertical-align: middle;
   background: rgba(0,0,0,.18); color: #fff;
-}
-
-/* end card */
-.end-card {
-  width: 100%; max-width: 480px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: 10px 14px;
-  display: flex; align-items: center; gap: 10px;
-  color: var(--text-3); font-size: 12.5px;
-}
-.end-icon {
-  width: 24px; height: 24px; border-radius: 5px;
-  background: var(--rose-bg); color: var(--rose);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px;
 }
 
 /* ── CONFIG PANEL ── */
@@ -637,9 +652,12 @@ textarea.field-input { min-height: 72px; line-height: 1.5; }
 }
 .node-palette-item:hover { background: var(--primary-bg); color: var(--primary); }
 .node-palette-item .palette-icon {
-  width: 20px; height: 20px; border-radius: 4px;
+  width: 22px; height: 22px; border-radius: 5px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 10px; flex-shrink: 0;
+  /* Glyph fills the box — emoji at line-height 1 maximises visible area
+     inside the rounded square. */
+  font-size: 14px; line-height: 1;
+  flex-shrink: 0;
 }
 .node-palette-empty {
   padding: 16px 12px;

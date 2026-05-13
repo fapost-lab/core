@@ -2,6 +2,7 @@
 import {computed, ref} from 'vue'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {nodeColors} from '@builder/utils/nodeColors'
+import NodeIcon from '@builder/components/NodeIcon.vue'
 
 interface FlowNodeMeta {
     id: string
@@ -92,7 +93,7 @@ function resolveHandleLabel(handle: string): string {
             <div
                 class="node-icon"
                 :style="{ background: colors.bg, color: colors.color }"
-            >{{ colors.icon }}</div>
+            ><NodeIcon :type="treeNode.node.type" /></div>
             <span class="truncate" style="min-width:0;flex:1">{{ nodeLabel }}</span>
             <button
                 v-if="branchHandles.length > 0"

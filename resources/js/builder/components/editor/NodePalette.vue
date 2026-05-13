@@ -5,6 +5,7 @@ import {useRegistryStore} from '@builder/store/registryStore'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {nodeColors} from '@builder/utils/nodeColors'
+import NodeIcon from '@builder/components/NodeIcon.vue'
 
 const props = defineProps({
     afterNodeId: { type: String as () => string | null, default: null },
@@ -169,7 +170,9 @@ useEventListener(document, 'keydown', (e) => { if (e.key === 'Escape') emit('clo
                             <div
                                 class="palette-icon"
                                 :style="{ background: nodeColors(nodeType.type).bg, color: nodeColors(nodeType.type).color }"
-                            >{{ nodeColors(nodeType.type).icon }}</div>
+                            >
+                                <NodeIcon :type="nodeType.type" />
+                            </div>
                             {{ nodeType.label }}
                         </button>
                     </template>

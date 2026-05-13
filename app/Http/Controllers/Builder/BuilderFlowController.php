@@ -41,27 +41,26 @@ final class BuilderFlowController extends Controller
         ]);
     }
 
+    /**
+     * Save the in-progress draft. Intentionally does **not** run the flow
+     * validator — drafts may be empty or half-edited. Validation is an
+     * explicit user action (`validate` endpoint) and runs atomically on
+     * publish ({@see PublishFlowService}).
+     *
+     * The only failure modes here are structural: optimistic-lock conflict
+     * (handled by SaveDraftService → 409) and unparseable trigger payload.
+     * This lets authors create an empty flow and immediately attach it as
+     * `default_flow_id` on an assistant before fleshing out the graph.
+     */
     public function saveDraft(
         SaveDraftRequest $request,
         string $flow,
         SaveDraftService $service,
-        ValidateFlowService $validator,
     ): JsonResponse {
         $definition      = $request->validated('definition');
         $definitionNodes = $this->extractDefinitionNodes($definition);
         $definitionEdges = $this->extractDefinitionEdges($definition);
         $triggerPayload  = $this->normalizeTriggerPayload($request->validated('trigger'));
-
-        $validation = $validator->execute(
-            nodes: $definitionNodes,
-            trigger: $triggerPayload,
-            flowId: $flow,
-            edges: $definitionEdges,
-        );
-
-        if ( ! $validation->valid) {
-            return response()->json($validation, 422);
-        }
 
         try {
             $newDraftVersion = $service->execute(

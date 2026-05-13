@@ -6,11 +6,13 @@ import {useRegistryStore} from '@builder/store/registryStore'
 import type {BuilderTriggerPayload, NodeConfig} from '@builder/dto/types'
 import {useConfigResize} from '@builder/composables/useConfigResize'
 import {nodeColors} from '@builder/utils/nodeColors'
+import NodeIcon from '@builder/components/NodeIcon.vue'
 import SchemaConfigRenderer from './config/SchemaConfigRenderer.vue'
 import SendMessageConfig from './config/overrides/SendMessageConfig.vue'
 import InputConfig from './config/overrides/InputConfig.vue'
 import ConditionConfig from './config/overrides/ConditionConfig.vue'
 import AssignConfig from './config/overrides/AssignConfig.vue'
+import EndConfig from './config/overrides/EndConfig.vue'
 import TriggerConfig from './config/overrides/TriggerConfig.vue'
 
 const OVERRIDES: Record<string, object> = {
@@ -18,6 +20,7 @@ const OVERRIDES: Record<string, object> = {
     input: InputConfig,
     condition: ConditionConfig,
     assign: AssignConfig,
+    end: EndConfig,
 }
 
 const selectionStore = useSelectionStore()
@@ -89,8 +92,16 @@ function deleteTrigger() {
                 <div class="config-node-header">
                     <div
                         class="node-type-icon"
-                        style="width:28px;height:28px;font-size:13px;background:var(--sky-bg);color:var(--sky)"
-                    >⚡</div>
+                        style="width:28px;height:28px;background:var(--sky-bg);color:var(--sky)"
+                    >
+                        <!-- Trigger isn't a node — render its own custom svg
+                             inline. Same monochrome line style as NodeIcon. -->
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+                             style="width:100%;height:100%;padding:14%;box-sizing:border-box">
+                            <path d="M13 3L5 13h6l-1 8 8-10h-6z" />
+                        </svg>
+                    </div>
                     <div style="flex:1;min-width:0">
                         <div class="config-node-title">Trigger</div>
                         <span class="config-node-type">Flow entry configuration</span>
@@ -113,9 +124,9 @@ function deleteTrigger() {
                     <div
                         v-if="colors"
                         class="node-type-icon"
-                        style="width:28px;height:28px;font-size:13px"
+                        style="width:28px;height:28px"
                         :style="{ background: colors.bg, color: colors.color }"
-                    >{{ colors.icon }}</div>
+                    ><NodeIcon :type="selectedNode.type" /></div>
                     <div style="flex:1;min-width:0">
                         <div class="config-node-title">{{ nodeTypeLabel }}</div>
                         <span class="config-node-type">
