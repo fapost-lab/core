@@ -284,10 +284,35 @@ const lastNodeIsTerminal = computed(() => {
 })
 
 /**
- * For the trailing insert point: when inside a branch and no nodes exist yet,
- * use the branch parent node + handle so insertNode creates the edge correctly
- * instead of trying to insert at the flow root.
+ * Slot context computed per slot index. Two edge cases the renderer
+ * has to special-case:
+ *
+ *   - **Top slot inside a branch (index 0 with active branch)** — the
+ *     "previous" node doesn't exist in `activeNodes`, but we still
+ *     want the new node to land under the branch parent + handle.
+ *     Passing `afterNodeId = null` would route through
+ *     {@link builderStore.insertNode}'s root-insertion path and lift
+ *     the new node out of the branch entirely.
+ *   - **Trailing slot of an empty branch** — same shape, with no
+ *     activeNodes to anchor against.
  */
+function slotContext(index: number): { afterNodeId: string | null; handle: string } {
+    if (index > 0) {
+        const previous = activeNodes.value[index - 1]
+        if (previous) {
+            return {afterNodeId: previous.node.id, handle: 'default'}
+        }
+    }
+    const branch = selectionStore.activeBranch
+    if (branch.length >= 2) {
+        return {
+            afterNodeId: branch[branch.length - 2],
+            handle: branch[branch.length - 1],
+        }
+    }
+    return {afterNodeId: null, handle: 'default'}
+}
+
 const trailingInsertContext = computed(() => {
     const last = activeNodes.value[activeNodes.value.length - 1]
     if (last) {
@@ -344,7 +369,8 @@ const trailingInsertContext = computed(() => {
                         <div class="conn-line" />
                     </div>
                     <FlowInsertPoint
-                        :after-node-id="activeNodes[index - 1]?.node.id ?? null"
+                        :after-node-id="slotContext(index).afterNodeId"
+                        :handle="slotContext(index).handle"
                         :index="index"
                         :visible="hoveredSlot === `slot-${index}`"
                     />

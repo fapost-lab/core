@@ -40,6 +40,7 @@ const contentEntries = computed(() => {
                     nodeType:   type,
                     nodeLabel:  label,
                     fieldLabel: 'Message text',
+                    fieldKind: 'text',
                     values:     resolveValues(config.text ?? ''),
                 })
             }
@@ -51,6 +52,7 @@ const contentEntries = computed(() => {
                     nodeType:   type,
                     nodeLabel:  label,
                     fieldLabel: 'Caption',
+                    fieldKind: 'caption',
                     values:     resolveValues(config.caption ?? ''),
                 })
             }
@@ -67,9 +69,35 @@ const contentEntries = computed(() => {
                     nodeType:   type,
                     nodeLabel:  label,
                     fieldLabel: baseText.trim() !== '' ? baseText : `Button ${idx + 1}`,
+                    fieldKind: 'button',
                     values:     resolveValues(raw),
                 })
             })
+        }
+
+        if (type === 'input') {
+            if (config.prompt !== undefined && config.prompt !== null && config.prompt !== '') {
+                entries.push({
+                    key: `${node.id}.prompt`,
+                    nodeId: node.id,
+                    nodeType: type,
+                    nodeLabel: label,
+                    fieldLabel: 'Prompt',
+                    fieldKind: 'prompt',
+                    values: resolveValues(config.prompt),
+                })
+            }
+            if (config.on_invalid_message !== undefined && config.on_invalid_message !== null && config.on_invalid_message !== '') {
+                entries.push({
+                    key: `${node.id}.on_invalid_message`,
+                    nodeId: node.id,
+                    nodeType: type,
+                    nodeLabel: label,
+                    fieldLabel: 'On invalid',
+                    fieldKind: 'invalid',
+                    values: resolveValues(config.on_invalid_message),
+                })
+            }
         }
     }
 
@@ -95,6 +123,19 @@ function resolveValues(raw: unknown): Record<string, string> {
     if (typeof raw === 'object') return { ...(raw as Record<string, string>) }
     // plain string — treat as base language value
     return { [builderStore.contentBaseLanguage]: String(raw) }
+}
+
+/**
+ * Count how many language slots have a non-empty translation. Mirrors
+ * the heading inside ContentEditorPanel ("0/4 translations") — a key
+ * present with an empty string is still untranslated, not "1 of 4".
+ */
+function filledTranslationCount(field: { values: Record<string, string> }): number {
+    let count = 0
+    for (const value of Object.values(field.values)) {
+        if (typeof value === 'string' && value.trim() !== '') count++
+    }
+    return count
 }
 
 const selectedKey = ref<string | null>(null)
@@ -130,6 +171,10 @@ function onSave() {
         config.text = { ...localTranslations.value }
     } else if (parts[0] === 'caption') {
         config.caption = { ...localTranslations.value }
+    } else if (parts[0] === 'prompt') {
+        config.prompt = {...localTranslations.value}
+    } else if (parts[0] === 'on_invalid_message') {
+        config.on_invalid_message = {...localTranslations.value}
     } else if (parts[0] === 'buttons' && parts[2] === 'label') {
         const idx = Number(parts[1])
         const buttons = [...(Array.isArray(config.buttons) ? config.buttons as Array<Record<string, unknown>> : [])]
@@ -160,8 +205,19 @@ function onSave() {
                         type="button"
                         @click="selectEntry(field.key)"
                     >
+                        <span
+                            v-if="field.fieldKind && field.fieldKind !== 'text'"
+                            :class="`field-kind--${field.fieldKind}`"
+                            class="field-kind"
+                        >{{
+                                field.fieldKind === 'button' ? 'Btn'
+                                    : field.fieldKind === 'caption' ? 'Cap'
+                                        : field.fieldKind === 'prompt' ? 'Ask'
+                                            : field.fieldKind === 'invalid' ? 'Err'
+                                                : field.fieldKind
+                            }}</span>
                         <span class="field-name">{{ field.fieldLabel }}</span>
-                        <span class="lang-count">{{ Object.keys(field.values).length }}/{{ languages.length }}</span>
+                        <span class="lang-count">{{ filledTranslationCount(field) }}/{{ languages.length }}</span>
                     </button>
                 </template>
             </div>
@@ -229,6 +285,48 @@ function onSave() {
 }
 .field-item:hover { background: var(--surface-2); color: var(--text); }
 .field-item.is-selected { background: var(--primary-bg, #eef2ee); color: var(--primary); }
-.field-name { flex: 1; }
-.lang-count { font-size: 10px; color: var(--text-3); }
+
+.field-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.lang-count {
+    font-size: 10px;
+    color: var(--text-3);
+    flex-shrink: 0;
+}
+
+.field-kind {
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    padding: 1px 5px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.field-kind--button {
+    background: var(--sky-bg);
+    color: var(--sky);
+}
+
+.field-kind--caption {
+    background: var(--amber-bg);
+    color: var(--amber);
+}
+
+.field-kind--prompt {
+    background: var(--sage-bg);
+    color: var(--sage);
+}
+
+.field-kind--invalid {
+    background: var(--rose-bg);
+    color: var(--rose);
+}
 </style>

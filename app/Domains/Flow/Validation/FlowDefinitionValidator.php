@@ -21,6 +21,7 @@ final readonly class FlowDefinitionValidator
         'system',
         'flow',
     ];
+
     public function __construct(
         private NodeHandlerRegistryInterface $registry,
     ) {
@@ -244,7 +245,11 @@ final readonly class FlowDefinitionValidator
             if ('user_variable' === $ref) {
                 $variableConfig = is_array($left['variable'] ?? null)
                     ? $left['variable']
-                    : ['name' => $left['name'] ?? null, 'storage' => $left['storage'] ?? null, 'group' => $left['group'] ?? null];
+                    : [
+                        'name'    => $left['name'] ?? null,
+                        'storage' => $left['storage'] ?? null,
+                        'group'   => $left['group'] ?? null,
+                    ];
 
                 if ( ! is_string($variableConfig['name'] ?? null) || '' === $variableConfig['name']) {
                     throw $this->validationException(
@@ -304,6 +309,12 @@ final readonly class FlowDefinitionValidator
         if ($hasNew && $hasLegacy) {
             throw $this->validationException(
                 "Node {$nodeId} (input) cannot define both 'variable' and 'save_to' simultaneously."
+            );
+        }
+
+        if ( ! $hasNew && ! $hasLegacy) {
+            throw $this->validationException(
+                "Node {$nodeId} (input) requires a 'variable' save target.",
             );
         }
 

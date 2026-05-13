@@ -60,6 +60,7 @@ final readonly class ValidateFlowService
             $this->validateEndNodeConfig($node, $path, $errors);
             $this->validateRagQueryConfig($node, $path, $errors);
             $this->validateSubflowConfig($node, $path, $errors);
+            $this->validateInputSaveTarget($node, $path, $errors);
         }
 
         $this->validateEndNodeOutgoingEdges($nodeMap, $edges, $errors);
@@ -467,6 +468,44 @@ final readonly class ValidateFlowService
      * @param  array<string, mixed>          $node
      * @param  list<FlowValidationErrorDto>  $errors
      */
+    /**
+     * Input nodes must store the captured value somewhere — accept either
+     * the new {@code variable: { name, storage, ... }} shape or the legacy
+     * {@code save_to: 'flow.foo'} string. An empty `variable.name` counts
+     * as missing (mirrors the inline UI badge) so the author sees the
+     * same error in the Validate panel as next to the field.
+     *
+     * @param  array<string, mixed>          $node
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateInputSaveTarget(array $node, string $path, array &$errors): void
+    {
+        if (($node['type'] ?? null) !== 'input') {
+            return;
+        }
+
+        $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+
+        $legacy = $config['save_to'] ?? null;
+        if (is_string($legacy) && '' !== mb_trim($legacy)) {
+            return;
+        }
+
+        $variable = $config['variable'] ?? null;
+        if (is_array($variable)) {
+            $name = $variable['name'] ?? null;
+            if (is_string($name) && '' !== mb_trim($name)) {
+                return;
+            }
+        }
+
+        $errors[] = new FlowValidationErrorDto(
+            path: "{$path}.config.variable.name",
+            code: 'input_missing_save_target',
+            message: 'input requires a variable name to save the captured value into.',
+        );
+    }
+
     private function validateSubflowConfig(array $node, string $path, array &$errors): void
     {
         if (($node['type'] ?? null) !== \App\Domains\Flow\Handlers\SubflowNodeHandler::TYPE) {

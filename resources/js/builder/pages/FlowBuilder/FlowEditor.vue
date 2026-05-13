@@ -13,6 +13,8 @@ import ConfigPanel from '@builder/components/editor/ConfigPanel.vue'
 import ContentTab from '@builder/components/content/ContentTab.vue'
 import ValidationPanel from '@builder/components/editor/ValidationPanel.vue'
 import ConfirmDialog from '@builder/components/editor/ConfirmDialog.vue'
+import MoveNodeDialog from '@builder/components/editor/MoveNodeDialog.vue'
+import {useMoveNode} from '@builder/composables/useMoveNode'
 
 import type {BuilderFlowPayload} from '@builder/dto/types'
 
@@ -26,6 +28,7 @@ const registryStore = useRegistryStore()
 const { save }      = useAutoSave()
 const { validate }  = useValidation()
 const { publish }   = usePublish()
+const moveNode = useMoveNode()
 const validating = ref(false)
 const publishing = ref(false)
 const publishedMsg = ref<string | null>(null)
@@ -126,6 +129,11 @@ useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
         <ContentTab v-else class="editor-main" />
         <ValidationPanel />
         <ConfirmDialog />
+        <MoveNodeDialog
+            :node-id="moveNode.targetNodeId.value"
+            :open="moveNode.targetNodeId.value !== null"
+            @close="moveNode.close"
+        />
     </div>
 </template>
 

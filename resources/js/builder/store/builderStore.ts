@@ -88,11 +88,36 @@ export const useBuilderStore = defineStore('builder', () => {
     const publishedVersion = ref<number | null>(null)
     const definition = ref<FlowDefinition>({ nodes: [], edges: [] })
     const trigger = ref<BuilderTriggerPayload | null>(null)
-    const availableEvents = ref<string[]>([])
+  /**
+   * Tenant-wide event registry as loaded from the server when the flow
+   * opened. `availableEvents` (below) merges this with locally declared
+   * `emit_event` nodes so the trigger picker can use brand-new event
+   * names before the first publish round-trips them through the
+   * tenant registry.
+   */
+  const tenantEvents = ref<string[]>([])
     const contentBaseLanguage = ref('en')
     const availableLanguages = ref<string[]>([])
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tree = computed(() => buildTree(definition.value.nodes ?? [], definition.value.edges ?? []) as any)
+
+  /**
+   * Union of tenant-published events (from server registry) and event
+   * names declared on `emit_event` nodes that currently live in this
+   * flow's draft. Lets the trigger picker reference a freshly created
+   * event before it's been through a publish cycle.
+   */
+  const availableEvents = computed<string[]>(() => {
+    const fromNodes = definition.value.nodes
+      .filter((node) => node.type === 'emit_event')
+      .map((node) => {
+        const cfg = (node.config ?? {}) as Record<string, unknown>
+        const name = cfg.event_type ?? cfg.event_name
+        return typeof name === 'string' ? name.trim() : ''
+      })
+      .filter((name) => name !== '')
+    return Array.from(new Set([...tenantEvents.value, ...fromNodes])).sort()
+  })
     const saveStatus = ref<SaveStatus>('idle')
     // True from the moment the user mutates definition or trigger after the
     // last successful save. Flips back to false on `setSaveStatus('saved')`
@@ -127,7 +152,7 @@ export const useBuilderStore = defineStore('builder', () => {
         publishedVersion.value = flow.publishedVersion ?? null
         definition.value = normalizeDefinition(flow.definition)
         trigger.value = normalizeTrigger(flow.trigger)
-        availableEvents.value = Array.isArray(flow.availableEvents) ? flow.availableEvents : []
+      tenantEvents.value = Array.isArray(flow.availableEvents) ? flow.availableEvents : []
         contentBaseLanguage.value = flow.contentBaseLanguage ?? 'en'
         availableLanguages.value = Array.isArray(flow.availableLanguages) ? flow.availableLanguages : []
         isDirty.value = false
@@ -346,50 +371,223 @@ export const useBuilderStore = defineStore('builder', () => {
      * — nothing gets clobbered. The original incoming edge of the head
      * is removed in the same snapshot so Undo restores both halves.
      */
-    function moveChain(headNodeId: string, sourceNodeId: string, handle: string): boolean {
-        if (!headNodeId || !sourceNodeId || headNodeId === sourceNodeId) return false
+
+  /**
+   * Re-parent a single node — the moving node detaches from its
+   * current slot, the gap it leaves behind is bridged (predecessor
+   * → default-successor), and the node lands at the chosen
+   * destination as a leaf of the picked branch.
+   *
+   * Non-default outgoing edges (button branches, condition rules)
+   * travel WITH the node since those are part of its identity — a
+   * SendMessage with buttons doesn't make sense without its button
+   * subtrees, a condition without its rule branches doesn't either.
+   *
+   * @see moveChain for the variant that takes every descendant —
+   *       including the default-successor — along for the ride.
+   */
+  /**
+   * Pass `targetNodeId = null` to promote the moving node to the
+   * flow entry — the current entry becomes its default successor.
+   */
+  function moveNode(movingId: string, targetNodeId: string | null, handle: string): boolean {
+    if (!movingId || movingId === targetNodeId) return false
+
+    const movingExists = definition.value.nodes.some((node) => node.id === movingId)
+    if (!movingExists) return false
+
+    if (targetNodeId !== null) {
+      const targetExists = definition.value.nodes.some((node) => node.id === targetNodeId)
+      if (!targetExists) return false
+    }
+
+    snapshot()
+
+    const incoming = definition.value.edges.find((edge) => edge.to === movingId)
+    const outgoingDefault = definition.value.edges.find(
+      (edge) => edge.from === movingId && (edge.handle ?? 'default') === 'default',
+    )
+
+    // Root mode (targetNodeId === null): the moving node becomes
+    // the new entry; the current root takes its place as the new
+    // node's default-successor.
+    if (targetNodeId === null) {
+      // Detach moving node's incoming + outgoing default. Keep
+      // non-default outgoing (button branches travel along).
+      definition.value.edges = definition.value.edges.filter((edge) => {
+        if (edge.to === movingId) return false
+        return !(edge.from === movingId && (edge.handle ?? 'default') === 'default');
+
+      })
+
+      // Bridge old gap so the chain we left keeps flowing.
+      if (incoming && outgoingDefault) {
+        definition.value.edges.push({
+          id: nanoid(10),
+          from: incoming.from,
+          to: outgoingDefault.to,
+          handle: incoming.handle ?? 'default',
+        })
+      }
+
+      // Find the current entry (root with no incoming edge,
+      // excluding the moving node itself) and chain it under
+      // the new entry.
+      const incomingByTarget = new Set(definition.value.edges.map((edge) => edge.to))
+      const currentRoot = definition.value.nodes.find(
+        (n) => n.id !== movingId && !incomingByTarget.has(n.id),
+      )
+      if (currentRoot) {
+        definition.value.edges.push({
+          id: nanoid(10),
+          from: movingId,
+          to: currentRoot.id,
+          handle: 'default',
+        })
+      }
+
+      return true
+    }
+
+    // Existing occupant of the destination slot — we splice the
+    // moving node in front of it, so this becomes the moving
+    // node's new default-successor.
+    const destOccupant = definition.value.edges.find(
+      (edge) => edge.from === targetNodeId && (edge.handle ?? 'default') === handle,
+    )
+
+    // Detach: drop the broken incoming, the outgoing default edge
+    // (its target becomes the gap-fill), and the destination slot's
+    // existing edge (we're replacing it with the spliced chain).
+    // Non-default outgoing edges of the moving node stay attached.
+    definition.value.edges = definition.value.edges.filter((edge) => {
+      if (edge.to === movingId) return false
+      if (edge.from === movingId && (edge.handle ?? 'default') === 'default') return false
+      return !(edge.from === targetNodeId && (edge.handle ?? 'default') === handle);
+
+    })
+
+    // Bridge the original gap so the linear chain keeps flowing.
+    if (incoming && outgoingDefault) {
+      definition.value.edges.push({
+        id: nanoid(10),
+        from: incoming.from,
+        to: outgoingDefault.to,
+        handle: incoming.handle ?? 'default',
+      })
+    }
+
+    // Splice: dest → movingNode at the picked handle.
+    definition.value.edges.push({
+      id: nanoid(10),
+      from: targetNodeId,
+      to: movingId,
+      handle,
+    })
+
+    // If the slot was occupied, reattach the old occupant as the
+    // moving node's default-successor — the user wanted the node
+    // to live AT this slot, not past everything that was there.
+    if (destOccupant) {
+      definition.value.edges.push({
+        id: nanoid(10),
+        from: movingId,
+        to: destOccupant.to,
+        handle: 'default',
+      })
+    }
+
+    return true
+  }
+
+  /**
+   * Pass `sourceNodeId = null` to promote the chain head to the flow
+   * entry — current entry latches onto the chain's tail.
+   */
+  function moveChain(headNodeId: string, sourceNodeId: string | null, handle: string): boolean {
+    if (!headNodeId || headNodeId === sourceNodeId) return false
 
         const headExists = definition.value.nodes.some((node) => node.id === headNodeId)
-        const sourceExists = definition.value.nodes.some((node) => node.id === sourceNodeId)
-        if (!headExists || !sourceExists) return false
+    if (!headExists) return false
 
-        // Walk the destination branch down its `default` tail so we
-        // graft on the end, not on top of pre-existing children.
-        let tailNodeId = sourceNodeId
-        let tailHandle = handle
-        // Guard against accidental cycles in case the chain head sits
-        // somewhere along the destination's existing tail.
-        const visited = new Set<string>([headNodeId])
+    if (sourceNodeId !== null) {
+      const sourceExists = definition.value.nodes.some((node) => node.id === sourceNodeId)
+      if (!sourceExists) return false
+    }
+
+    // Walk the moving chain's own default tail — that's where the
+    // destination's previous occupant will reattach after splice.
+    // Stops at the first cycle or terminal so we don't follow
+    // graphs the engine wouldn't have followed either.
+    let chainTailId = headNodeId
+    const chainVisited = new Set<string>([headNodeId])
         while (true) {
-            if (visited.has(tailNodeId)) return false
-            visited.add(tailNodeId)
-
             const next = definition.value.edges.find(
-                (edge) => edge.from === tailNodeId && (edge.handle ?? 'default') === tailHandle,
+              (edge) => edge.from === chainTailId && (edge.handle ?? 'default') === 'default',
             )
             if (!next) break
-            tailNodeId = next.to
-            tailHandle = 'default'
+          if (chainVisited.has(next.to)) break
+          chainVisited.add(next.to)
+          chainTailId = next.to
         }
+
+    // Refuse if the destination sits anywhere inside the chain we
+    // would otherwise relocate — that's a cycle.
+    if (sourceNodeId !== null && chainVisited.has(sourceNodeId)) return false
 
         snapshot()
 
-        // Drop the broken inbound edge to the chain head, if any. Orphan
-        // chains created by prior bugs may already be rootless — in that
-        // case there's nothing to remove, we just add the new edge.
-        definition.value.edges = definition.value.edges.filter(
-            (edge) => edge.to !== headNodeId,
+    // Root mode: drop the chain's inbound edge and chain the
+    // existing entry under the chain's tail.
+    if (sourceNodeId === null) {
+      definition.value.edges = definition.value.edges.filter(
+        (edge) => edge.to !== headNodeId,
+      )
+      const incomingByTarget = new Set(definition.value.edges.map((edge) => edge.to))
+      const currentRoot = definition.value.nodes.find(
+        (n) => !chainVisited.has(n.id) && !incomingByTarget.has(n.id),
+      )
+      if (currentRoot) {
+        definition.value.edges.push({
+          id: nanoid(10),
+          from: chainTailId,
+          to: currentRoot.id,
+          handle: 'default',
+        })
+      }
+      return true
+    }
+
+    const destOccupant = definition.value.edges.find(
+      (edge) => edge.from === sourceNodeId && (edge.handle ?? 'default') === handle,
         )
 
-        // Connect the chain head to the destination tail with the
-        // appropriate handle (the picked one if the destination is the
-        // original target, `default` if we walked further down).
+    // Drop the broken inbound edge to the chain head (if any) and
+    // the destination slot's existing edge — we're splicing the
+    // chain in between.
+    definition.value.edges = definition.value.edges.filter((edge) => {
+      if (edge.to === headNodeId) return false
+
+      return !(edge.from === sourceNodeId && (edge.handle ?? 'default') === handle);
+    })
+
+    // Splice: dest → chain head at the picked handle.
         definition.value.edges.push({
             id: nanoid(10),
-            from: tailNodeId,
+          from: sourceNodeId,
             to: headNodeId,
-            handle: tailNodeId === sourceNodeId ? handle : 'default',
+          handle,
         })
+
+    // If the slot had a child, reattach it after the chain's tail.
+    if (destOccupant) {
+      definition.value.edges.push({
+        id: nanoid(10),
+        from: chainTailId,
+        to: destOccupant.to,
+        handle: 'default',
+      })
+    }
 
         return true
     }
@@ -527,6 +725,7 @@ export const useBuilderStore = defineStore('builder', () => {
         insertNode,
         deleteNode,
         removeNodes,
+      moveNode,
         moveChain,
         moveNodeUp,
         moveNodeDown,

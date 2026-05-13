@@ -63,7 +63,25 @@ function selectNode() {
 
 function focusBranch(handle: string) {
     selectionStore.select(props.treeNode.node.id)
-    selectionStore.setActiveBranch([...props.parentBranch, props.treeNode.node.id, handle])
+
+    // `parentBranch` accumulates `(nodeId, 'default')` pairs while the
+    // tree walks linear-continuation children — those are noise for the
+    // breadcrumb and for the canvas branch context, which only cares
+    // about meaningful branching points (button.id, rule handles).
+    // `resolveBranchRoots` uses a recursive lookup, so skipping default
+    // pairs here doesn't break navigation into deeply nested branches.
+    const meaningful: string[] = []
+    for (let i = 0; i < props.parentBranch.length; i += 2) {
+        const nodeId = props.parentBranch[i]
+        const segmentHandle = props.parentBranch[i + 1]
+        if (!nodeId || !segmentHandle || segmentHandle === 'default') {
+            continue
+        }
+        meaningful.push(nodeId, segmentHandle)
+    }
+    meaningful.push(props.treeNode.node.id, handle)
+
+    selectionStore.setActiveBranch(meaningful)
 }
 
 function resolveHandleLabel(handle: string): string {

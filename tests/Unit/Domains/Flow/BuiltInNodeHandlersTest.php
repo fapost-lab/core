@@ -340,6 +340,8 @@ final class BuiltInNodeHandlersTest extends TestCase
             Mockery::mock(MediaIngestorInterface::class),
             Mockery::mock(MediaServiceInterface::class),
             new VariableResolver(),
+            Mockery::mock(MessageSenderInterface::class),
+            Mockery::mock(ContentTranslatorInterface::class),
         );
         $node    = ['id' => 'input-1', 'config' => ['save_to' => FlowStateNamespace::FLOW . '.user_name']];
 
@@ -570,6 +572,8 @@ final class BuiltInNodeHandlersTest extends TestCase
             Mockery::mock(MediaIngestorInterface::class),
             Mockery::mock(MediaServiceInterface::class),
             new VariableResolver(),
+            Mockery::mock(MessageSenderInterface::class),
+            Mockery::mock(ContentTranslatorInterface::class),
         );
 
         $node = ['id' => 'input-legacy', 'config' => ['save_to' => 'user_name']];
@@ -585,6 +589,8 @@ final class BuiltInNodeHandlersTest extends TestCase
             Mockery::mock(MediaIngestorInterface::class),
             Mockery::mock(MediaServiceInterface::class),
             new VariableResolver(),
+            Mockery::mock(MessageSenderInterface::class),
+            Mockery::mock(ContentTranslatorInterface::class),
         );
 
         $node = [
@@ -608,6 +614,8 @@ final class BuiltInNodeHandlersTest extends TestCase
             Mockery::mock(MediaIngestorInterface::class),
             Mockery::mock(MediaServiceInterface::class),
             new VariableResolver(),
+            Mockery::mock(MessageSenderInterface::class),
+            Mockery::mock(ContentTranslatorInterface::class),
         );
 
         $node = [

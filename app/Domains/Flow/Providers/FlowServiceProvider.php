@@ -143,6 +143,8 @@ final class FlowServiceProvider extends ServiceProvider
                 $this->app->make(MediaIngestorInterface::class),
                 $this->app->make(MediaServiceInterface::class),
                 $variableResolver,
+                $this->app->make(MessageSenderInterface::class),
+                $this->app->make(ContentTranslatorInterface::class),
             )
         );
         $registry->register(new BranchNodeHandler(

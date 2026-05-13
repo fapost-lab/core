@@ -4,6 +4,7 @@ import {useSelectionStore} from '@builder/store/selectionStore'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {nodeColors} from '@builder/utils/nodeColors'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
+import {useMoveNode} from '@builder/composables/useMoveNode'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 
 
@@ -48,7 +49,11 @@ function childCount(handle: string): number {
 const canMoveUp = computed(() => {
     const node = props.treeNode.node
     if (nodeMustBeLast(node)) return false
-    return builderStore.definition.edges.some((edge) => edge.to === node.id)
+    // Only same-chain peers (linked via `default`) are swap-eligible.
+    // Non-default incoming = first child of a branch, no sibling above.
+    const incoming = builderStore.definition.edges.find((edge) => edge.to === node.id)
+    if (!incoming) return false
+    return (incoming.handle ?? 'default') === 'default'
 })
 
 const canMoveDown = computed(() => {
@@ -58,9 +63,15 @@ const canMoveDown = computed(() => {
     )
     if (!out) return false
     const successor = builderStore.definition.nodes.find((n) => n.id === out.to)
-    if (successor && nodeMustBeLast(successor)) return false
-    return true
+    return !(successor && nodeMustBeLast(successor));
+
 })
+
+const moveDialog = useMoveNode()
+
+function openMoveDialog() {
+    moveDialog.open(props.treeNode.node.id)
+}
 </script>
 
 <template>
@@ -128,6 +139,12 @@ const canMoveDown = computed(() => {
             :disabled="!canMoveDown"
             @click.stop="builderStore.moveNodeDown(treeNode.node.id)"
         >↓</button>
+        <button
+            class="node-side-btn"
+            title="Move to another branch…"
+            @click.stop="openMoveDialog"
+        >⇆
+        </button>
     </div>
     </div>
 </template>

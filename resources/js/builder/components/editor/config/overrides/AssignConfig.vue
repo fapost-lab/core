@@ -78,6 +78,9 @@ const duplicateIndexes = computed<Set<number>>(() => {
 })
 
 function persist() {
+    // SaveDraft persists whatever the UI shows. We don't filter empty-
+    // name rows here — Publish + the Validate button surface them as
+    // proper errors so the author can see what to fix.
     const compiled = operations.value.map((op) => ({
         variable: {
             name:    op.variable.name,

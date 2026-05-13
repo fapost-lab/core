@@ -15,13 +15,35 @@ const open        = ref(false)
 const isCreating  = ref(false)
 const draftName   = ref('')
 const rootRef     = ref<HTMLElement | null>(null)
+const triggerRef = ref<HTMLButtonElement | null>(null)
+const menuRef = ref<HTMLElement | null>(null)
 const createInput = ref<HTMLInputElement | null>(null)
+
+interface MenuPos {
+    top: number;
+    left: number;
+    width: number
+}
+
+const menuPos = ref<MenuPos>({top: 0, left: 0, width: 0})
 
 const triggerLabel = computed<string>(() => props.modelValue ?? '(No group)')
 const hasGroups    = computed<boolean>(() => props.knownGroups.length > 0)
 
+function reposition() {
+    const el = triggerRef.value
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    menuPos.value = {
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+    }
+}
+
 function toggle() {
     if (isCreating.value) return
+    if (!open.value) reposition()
     open.value = !open.value
 }
 
@@ -70,21 +92,32 @@ function onCreateKeydown(event: KeyboardEvent) {
 }
 
 function onDocClick(e: MouseEvent) {
-    if (!rootRef.value?.contains(e.target as Node)) {
-        close()
-    }
+    const target = e.target as Node
+    if (rootRef.value?.contains(target)) return
+    if (menuRef.value?.contains(target)) return
+    close()
+}
+
+function onReposition() {
+    if (open.value) reposition()
 }
 
 watch(open, (val) => {
     if (val) {
         document.addEventListener('mousedown', onDocClick, { capture: true })
+        window.addEventListener('scroll', onReposition, true)
+        window.addEventListener('resize', onReposition)
     } else {
         document.removeEventListener('mousedown', onDocClick, { capture: true })
+        window.removeEventListener('scroll', onReposition, true)
+        window.removeEventListener('resize', onReposition)
     }
 })
 
 onUnmounted(() => {
     document.removeEventListener('mousedown', onDocClick, { capture: true })
+    window.removeEventListener('scroll', onReposition, true)
+    window.removeEventListener('resize', onReposition)
 })
 </script>
 
@@ -103,6 +136,7 @@ onUnmounted(() => {
 
         <template v-else>
             <button
+                ref="triggerRef"
                 type="button"
                 class="group-trigger"
                 :class="{ 'group-trigger--placeholder': modelValue === null, 'group-trigger--open': open }"
@@ -113,46 +147,58 @@ onUnmounted(() => {
                 <span class="group-trigger-caret" :class="{ 'group-trigger-caret--open': open }">▾</span>
             </button>
 
-            <div v-if="open" class="group-menu" role="listbox">
-                <button
-                    type="button"
-                    class="group-option"
-                    :class="{ 'group-option--active': modelValue === null }"
-                    role="option"
-                    :aria-selected="modelValue === null"
-                    @click="pick(null)"
+            <Teleport to="body">
+                <div
+                    v-if="open"
+                    ref="menuRef"
+                    :style="{
+                        top:   `${menuPos.top}px`,
+                        left:  `${menuPos.left}px`,
+                        width: `${menuPos.width}px`,
+                    }"
+                    class="group-menu"
+                    role="listbox"
                 >
-                    <span class="group-option-mark">{{ modelValue === null ? '✓' : '' }}</span>
-                    <span class="group-option-label group-option-label--muted">(No group)</span>
-                </button>
+                    <button
+                        :aria-selected="modelValue === null"
+                        :class="{ 'group-option--active': modelValue === null }"
+                        class="group-option"
+                        role="option"
+                        type="button"
+                        @click="pick(null)"
+                    >
+                        <span class="group-option-mark">{{ modelValue === null ? '✓' : '' }}</span>
+                        <span class="group-option-label group-option-label--muted">(No group)</span>
+                    </button>
 
-                <div v-if="hasGroups" class="group-divider" />
+                    <div v-if="hasGroups" class="group-divider"/>
 
-                <button
-                    v-for="group in props.knownGroups"
-                    :key="group"
-                    type="button"
-                    class="group-option"
-                    :class="{ 'group-option--active': modelValue === group }"
-                    role="option"
-                    :aria-selected="modelValue === group"
-                    @click="pick(group)"
-                >
-                    <span class="group-option-mark">{{ modelValue === group ? '✓' : '' }}</span>
-                    <span class="group-option-label">{{ group }}</span>
-                </button>
+                    <button
+                        v-for="group in props.knownGroups"
+                        :key="group"
+                        :aria-selected="modelValue === group"
+                        :class="{ 'group-option--active': modelValue === group }"
+                        class="group-option"
+                        role="option"
+                        type="button"
+                        @click="pick(group)"
+                    >
+                        <span class="group-option-mark">{{ modelValue === group ? '✓' : '' }}</span>
+                        <span class="group-option-label">{{ group }}</span>
+                    </button>
 
-                <div class="group-divider" />
+                    <div class="group-divider"/>
 
-                <button
-                    type="button"
-                    class="group-option group-option--create"
-                    @click="startCreate"
-                >
-                    <span class="group-option-mark">+</span>
-                    <span class="group-option-label">Create new group…</span>
-                </button>
-            </div>
+                    <button
+                        class="group-option group-option--create"
+                        type="button"
+                        @click="startCreate"
+                    >
+                        <span class="group-option-mark">+</span>
+                        <span class="group-option-label">Create new group…</span>
+                    </button>
+                </div>
+            </Teleport>
         </template>
     </div>
 </template>
@@ -208,11 +254,8 @@ onUnmounted(() => {
 }
 
 .group-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    right: 0;
-    z-index: 50;
+    position: fixed;
+    z-index: 60;
     padding: 4px;
     background: var(--surface);
     border: 1px solid var(--border);

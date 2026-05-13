@@ -98,7 +98,19 @@ final class PublishFlowServiceTest extends TestCase
             'flow_id'         => $flowId,
             'logging_enabled' => true,
             'nodes'           => [
-                ['id' => 'start', 'type' => 'input', 'version' => 1, 'config' => []],
+                [
+                    'id'      => 'start',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
+                ],
             ],
         ]);
 
@@ -114,7 +126,19 @@ final class PublishFlowServiceTest extends TestCase
         FlowDraft::factory()->create([
             'flow_id' => $flowId,
             'nodes'   => [
-                ['id' => 'start', 'type' => 'input', 'version' => 1, 'config' => []],
+                [
+                    'id'      => 'start',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
+                ],
             ],
         ]);
 
@@ -134,7 +158,14 @@ final class PublishFlowServiceTest extends TestCase
                     'id'      => 'start',
                     'type'    => 'input',
                     'version' => 1,
-                    'config'  => [],
+                    'config' => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
                 ],
             ],
         ]);

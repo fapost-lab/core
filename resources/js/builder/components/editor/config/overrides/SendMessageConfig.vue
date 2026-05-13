@@ -98,9 +98,9 @@ function update(patch: unknown) {
 
 function onAnswerVariableUpdate(next: Variable) {
     answerVariable.value = next
-    // Compiler is the sole writer of the save target — drop legacy
-    // `save_to` / `save_to_type` keys so the backend validator does not
-    // reject coexistence of both shapes.
+    // SaveDraft persists whatever the UI shows — even half-filled
+    // descriptors. Publish + the Validate button surface empty names
+    // as proper validation errors; we don't pre-filter them here.
     emit('update:config', {
         save_to_variable: compileVariable(next),
         save_to:          undefined,

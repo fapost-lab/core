@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import {ref, watch} from 'vue'
+import {computed, ref, watch} from 'vue'
 import AccordionSection from '../AccordionSection.vue'
 import VariableStorageEditor from '@builder/components/editor/variables/VariableStorageEditor.vue'
 import {useKnownGroups} from '@builder/composables/useKnownGroups'
+import {useBuilderStore} from '@builder/store/builderStore'
 import {compileVariable, decodeInputVariable} from '@builder/utils/variableCompiler'
 import type {Variable} from '@builder/dto/types'
+
+const builderStore = useBuilderStore()
 
 const props = defineProps({
     node:   { type: Object, required: true },
@@ -32,6 +35,29 @@ const INPUT_TYPES = [
 
 const knownGroups = useKnownGroups()
 
+const baseLanguage = computed(() => builderStore.contentBaseLanguage)
+
+function localizedFieldValue(raw: unknown): string {
+    if (raw == null) return ''
+    if (typeof raw === 'string') return raw
+    if (typeof raw === 'object') {
+        const map = raw as Record<string, unknown>
+        return String(map[baseLanguage.value] ?? Object.values(map)[0] ?? '')
+    }
+    return String(raw)
+}
+
+function emitLocalizedField(key: string, value: string) {
+    const existing = props.node.config?.[key]
+    if (existing && typeof existing === 'object') {
+        emit('update:config', {[key]: {...(existing as Record<string, unknown>), [baseLanguage.value]: value}})
+        return
+    }
+    // Promote plain strings to a language-keyed object so subsequent
+    // Content-tab translations don't clobber the base-language value.
+    emit('update:config', {[key]: {[baseLanguage.value]: value}})
+}
+
 const variable = ref<Variable>(decodeInputVariable(props.node.config as Record<string, unknown>))
 
 // Re-decode when the selected node changes or upstream config mutates.
@@ -48,11 +74,11 @@ function update(key: string, value: unknown) {
 
 function onVariableUpdate(next: Variable) {
     variable.value = next
-    const compiled = compileVariable(next)
-    // Compiler is the sole writer of save target — drop legacy `save_to`
-    // so the backend validator does not reject coexistence of both shapes.
+    // SaveDraft persists whatever the UI shows, including half-filled
+    // descriptors. Publish + the Validate button surface empty names
+    // as validation errors — no client-side gating here.
     emit('update:config', {
-        variable:      compiled,
+        variable: compileVariable(next),
         expected_type: next.type,
         save_to:       undefined,
     })
@@ -61,6 +87,23 @@ function onVariableUpdate(next: Variable) {
 
 <template>
     <div class="accordion">
+        <AccordionSection default-open title="Prompt">
+            <div class="config-field">
+                <div class="field-label">Question</div>
+                <textarea
+                    :value="localizedFieldValue(props.node.config?.prompt)"
+                    class="field-input"
+                    placeholder="What the bot asks before waiting (e.g. «Send me your phone number»)"
+                    rows="3"
+                    @input="emitLocalizedField('prompt', ($event.target as HTMLTextAreaElement).value)"
+                />
+                <p class="field-help">
+                    Sent to the user right before the bot starts waiting for input.
+                    Leave empty to skip — useful when a preceding send_message already asked the question.
+                </p>
+            </div>
+        </AccordionSection>
+
         <AccordionSection title="Variable" default-open>
             <VariableStorageEditor
                 :model-value="variable"
@@ -87,9 +130,9 @@ function onVariableUpdate(next: Variable) {
                 <div class="field-label">On invalid message</div>
                 <input
                     class="field-input"
-                    :value="props.node.config?.on_invalid_message ?? ''"
+                    :value="localizedFieldValue(props.node.config?.on_invalid_message)"
                     placeholder="Please enter a valid value"
-                    @input="update('on_invalid_message', ($event.target as HTMLInputElement).value)"
+                    @input="emitLocalizedField('on_invalid_message', ($event.target as HTMLInputElement).value)"
                 >
             </div>
             <div class="config-field">

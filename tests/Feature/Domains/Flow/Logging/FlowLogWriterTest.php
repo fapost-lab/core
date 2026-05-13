@@ -62,7 +62,21 @@ final class FlowLogWriterTest extends FeatureTestCase
             'flow_id'   => (string) Str::uuid(),
             'version'   => 1,
             'name'      => 'Flow',
-            'nodes'     => [['id' => 'n1', 'type' => 'input', 'version' => 1, 'config' => []]],
+            'nodes' => [
+                [
+                    'id'      => 'n1',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
+                ],
+            ],
             'edges'     => [],
             'is_active' => true,
         ]);

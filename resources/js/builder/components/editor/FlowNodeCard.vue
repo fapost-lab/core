@@ -5,6 +5,7 @@ import {useRegistryStore} from '@builder/store/registryStore'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {nodeColors} from '@builder/utils/nodeColors'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
+import {useMoveNode} from '@builder/composables/useMoveNode'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 
 const props = defineProps({
@@ -104,10 +105,17 @@ const canMoveUp = computed(() => {
     // can't be lifted — moving them up would push another node behind a
     // terminator, breaking the chain semantics.
     if (nodeMustBeLast(node)) return false
-    // Otherwise any node with an incoming default edge can swap with its
-    // predecessor — including the very first node, which is the graph
-    // root with no incoming edge of its own.
-    return builderStore.definition.edges.some((edge) => edge.to === node.id)
+    // Only a `default`-incoming edge represents a same-chain peer that
+    // we can swap with. A non-default incoming means the node is the
+    // first child of a branch (button / rule handle) — there's no
+    // sibling above it in the same scope.
+    const incoming = builderStore.definition.edges.find((edge) => edge.to === node.id)
+    if (!incoming) {
+        // Graph root with no incoming edge — only valid swap partner is
+        // the rest of the root chain, which sits below. Up is N/A.
+        return false
+    }
+    return (incoming.handle ?? 'default') === 'default'
 })
 
 const canMoveDown = computed(() => {
@@ -120,8 +128,8 @@ const canMoveDown = computed(() => {
     // send_message), swapping past it would demote the terminator —
     // refuse the move.
     const successor = builderStore.definition.nodes.find((n) => n.id === out.to)
-    if (successor && nodeMustBeLast(successor)) return false
-    return true
+    return !(successor && nodeMustBeLast(successor));
+
 })
 
 function moveUp() {
@@ -130,6 +138,12 @@ function moveUp() {
 
 function moveDown() {
     builderStore.moveNodeDown(props.treeNode.node.id)
+}
+
+const moveDialog = useMoveNode()
+
+function openMoveDialog() {
+    moveDialog.open(props.treeNode.node.id)
 }
 </script>
 
@@ -188,6 +202,13 @@ function moveDown() {
             :disabled="!canMoveDown"
             @click.stop="moveDown"
         >↓</button>
+        <button
+            v-if="treeNode.node.type !== 'end'"
+            class="node-side-btn"
+            title="Move to another branch…"
+            @click.stop="openMoveDialog"
+        >⇆
+        </button>
     </div>
     </div>
 </template>

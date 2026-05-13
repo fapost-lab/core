@@ -214,7 +214,14 @@ final class BuilderApiTest extends FeatureTestCase
                     'id'      => 'input_1',
                     'type'    => 'input',
                     'version' => 1,
-                    'config'  => [],
+                    'config' => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
                 ]],
                 'trigger' => [
                     'type'      => 'event',
@@ -258,7 +265,14 @@ final class BuilderApiTest extends FeatureTestCase
                     'id'      => 'input_1',
                     'type'    => 'input',
                     'version' => 1,
-                    'config'  => [],
+                    'config' => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
                 ]],
                 'trigger' => [
                     'type'      => 'event',
@@ -298,7 +312,14 @@ final class BuilderApiTest extends FeatureTestCase
                     'id'      => 'input_1',
                     'type'    => 'input',
                     'version' => 1,
-                    'config'  => [],
+                    'config' => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
                 ]],
                 'trigger' => [
                     'type'      => 'message',

@@ -6,8 +6,11 @@ namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
+use App\Domains\Flow\Contracts\ContentTranslatorInterface;
+use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableStorage;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
@@ -40,6 +43,8 @@ final class InputNodeHandler extends AbstractVersionedHandler
         private readonly MediaIngestorInterface $mediaIngestor,
         private readonly MediaServiceInterface $mediaService,
         private readonly VariableResolverInterface $variableResolver,
+        private readonly MessageSenderInterface $sender,
+        private readonly ContentTranslatorInterface $translator,
     ) {
     }
 
@@ -78,11 +83,72 @@ final class InputNodeHandler extends AbstractVersionedHandler
 
         $variable = $this->resolveVariable($config);
 
+        $promptResult = $this->sendPromptIfNeeded($config, $state, $context);
+        if (null !== $promptResult) {
+            return $promptResult;
+        }
+
         if (in_array($expectedType, self::MEDIA_EXPECTED_TYPES, true)) {
             return $this->handleMediaInput($expectedType, $variable, $context);
         }
 
         return $this->handleTextInput($variable, $context);
+    }
+
+    /**
+     * Optionally send the configured prompt before parking the session
+     * in `Waiting`. Idempotent through {@see SystemStateKeys::SENT_MESSAGES}:
+     * once the prompt for this node id has gone out, subsequent passes
+     * skip the send entirely. Returns:
+     *
+     *   - the result the engine should propagate (prompt was just sent
+     *     → waiting), or
+     *   - `null` to mean "carry on with normal input handling".
+     *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $state
+     */
+    private function sendPromptIfNeeded(
+        array $config,
+        array $state,
+        NodeExecutionContext $context
+    ): ?NodeExecutionResult {
+        $promptRaw = $config['prompt'] ?? null;
+        if ( ! is_string($promptRaw) && ! is_array($promptRaw)) {
+            return null;
+        }
+
+        $resolved = $this->translator->resolveField($promptRaw, $context->resolvedLanguage);
+        if ( ! is_string($resolved) || '' === mb_trim($resolved)) {
+            return null;
+        }
+
+        $sentIds = data_get($state, SystemStateKeys::SENT_MESSAGES, []);
+        if (is_array($sentIds) && array_key_exists($context->nodeId, $sentIds)) {
+            // Prompt already sent on a previous pass; let the input
+            // handling continue (or wait, if no incoming yet).
+            return null;
+        }
+
+        $externalMessageId = $this->sender->send(
+            tenantId: $context->tenantId,
+            contactId: $context->contactId,
+            sessionId: $context->sessionId,
+            payload: [
+                'content_type' => 'text',
+                'text'         => $resolved,
+            ],
+        );
+
+        $nextSent                   = is_array($sentIds) ? $sentIds : [];
+        $nextSent[$context->nodeId] = $externalMessageId;
+
+        return new NodeExecutionResult(
+            status: NodeExecutionStatus::Waiting,
+            stateChanges: [
+                SystemStateKeys::SENT_MESSAGES => $nextSent,
+            ],
+        );
     }
 
     /**

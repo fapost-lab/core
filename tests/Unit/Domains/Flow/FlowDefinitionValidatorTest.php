@@ -21,7 +21,19 @@ final class FlowDefinitionValidatorTest extends TestCase
         $result = $validator->validate(
             nodes: [
                 ['id' => 'n1', 'type'    => 'branch', 'version' => 2, 'config' => []],
-                ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
+                [
+                    'id'      => 'n2',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
+                ],
             ],
             edges: [
                 ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
@@ -47,7 +59,19 @@ final class FlowDefinitionValidatorTest extends TestCase
                             'keyboard_mode' => 'reply',
                         ],
                     ],
-                    ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
+                    [
+                        'id'      => 'n2',
+                        'type'    => 'input',
+                        'version' => 1,
+                        'config'  => [
+                            'variable' => [
+                                'name'    => 'answer',
+                                'type'    => 'text',
+                                'storage' => 'session',
+                                'group'   => null,
+                            ],
+                        ],
+                    ],
                 ],
                 edges: [
                     ['id' => 'e1', 'source_node_id' => 'send-1', 'target_node_id' => 'n2', 'transition' => 'default'],
@@ -77,7 +101,19 @@ final class FlowDefinitionValidatorTest extends TestCase
                             ],
                         ],
                     ],
-                    ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
+                    [
+                        'id'      => 'n2',
+                        'type'    => 'input',
+                        'version' => 1,
+                        'config'  => [
+                            'variable' => [
+                                'name'    => 'answer',
+                                'type'    => 'text',
+                                'storage' => 'session',
+                                'group'   => null,
+                            ],
+                        ],
+                    ],
                 ],
                 edges: [
                     ['id' => 'e1', 'source_node_id' => 'send-1', 'target_node_id' => 'n2', 'transition' => 'default'],
@@ -108,8 +144,32 @@ final class FlowDefinitionValidatorTest extends TestCase
                         ],
                     ],
                 ],
-                ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
-                ['id' => 'n3', 'type' => 'input', 'version' => 1, 'config' => []],
+                [
+                    'id'      => 'n2',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
+                ],
+                [
+                    'id'      => 'n3',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
+                ],
             ],
             edges: [
                 ['id' => 'e1', 'source_node_id' => 'send-1', 'target_node_id' => 'n2', 'transition' => 'b1'],
@@ -136,7 +196,19 @@ final class FlowDefinitionValidatorTest extends TestCase
                         'buttons'       => [],
                     ],
                 ],
-                ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
+                [
+                    'id'      => 'n2',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
+                ],
             ],
             edges: [
                 ['id' => 'e1', 'source_node_id' => 'send-1', 'target_node_id' => 'n2', 'transition' => 'default'],
@@ -167,8 +239,32 @@ final class FlowDefinitionValidatorTest extends TestCase
             $validator->validate(
                 nodes: [
                     ['id' => 'n1', 'type'    => 'branch', 'version' => 2, 'config' => []],
-                    ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
-                    ['id' => 'n3', 'type' => 'input', 'version' => 1, 'config' => []],
+                    [
+                        'id'      => 'n2',
+                        'type'    => 'input',
+                        'version' => 1,
+                        'config'  => [
+                            'variable' => [
+                                'name'    => 'answer',
+                                'type'    => 'text',
+                                'storage' => 'session',
+                                'group'   => null,
+                            ],
+                        ],
+                    ],
+                    [
+                        'id'      => 'n3',
+                        'type'    => 'input',
+                        'version' => 1,
+                        'config'  => [
+                            'variable' => [
+                                'name'    => 'answer',
+                                'type'    => 'text',
+                                'storage' => 'session',
+                                'group'   => null,
+                            ],
+                        ],
+                    ],
                 ],
                 edges: [
                     ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
@@ -188,8 +284,32 @@ final class FlowDefinitionValidatorTest extends TestCase
             $validator->validate(
                 nodes: [
                     ['id' => 'n1', 'type'    => 'branch', 'version' => 2, 'config' => []],
-                    ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
-                    ['id' => 'n3', 'type' => 'input', 'version' => 1, 'config' => []],
+                    [
+                        'id'      => 'n2',
+                        'type'    => 'input',
+                        'version' => 1,
+                        'config'  => [
+                            'variable' => [
+                                'name'    => 'answer',
+                                'type'    => 'text',
+                                'storage' => 'session',
+                                'group'   => null,
+                            ],
+                        ],
+                    ],
+                    [
+                        'id'      => 'n3',
+                        'type'    => 'input',
+                        'version' => 1,
+                        'config'  => [
+                            'variable' => [
+                                'name'    => 'answer',
+                                'type'    => 'text',
+                                'storage' => 'session',
+                                'group'   => null,
+                            ],
+                        ],
+                    ],
                 ],
                 edges: [
                     ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
@@ -215,7 +335,19 @@ final class FlowDefinitionValidatorTest extends TestCase
                         'config'               => [],
                         'required_transitions' => ['timeout'],
                     ],
-                    ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
+                    [
+                        'id'      => 'n2',
+                        'type'    => 'input',
+                        'version' => 1,
+                        'config'  => [
+                            'variable' => [
+                                'name'    => 'answer',
+                                'type'    => 'text',
+                                'storage' => 'session',
+                                'group'   => null,
+                            ],
+                        ],
+                    ],
                 ],
                 edges: [
                     ['id' => 'e1', 'source_node_id' => 'n1', 'target_node_id' => 'n2', 'transition' => 'default'],
