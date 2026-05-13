@@ -13,6 +13,9 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Schema;
+use FAPost\Support\Builder\Schema\Section;
 use RuntimeException;
 
 /**
@@ -56,35 +59,29 @@ final class SubflowNodeHandler extends AbstractVersionedHandler
      */
     public function configSchema(): array
     {
-        return [
-            'required' => ['flow_id', 'timeout'],
-            'sections' => [
-                [
-                    'key'    => 'target',
-                    'label'  => 'Target flow',
-                    'icon'   => 'arrow-right-circle',
-                    'fields' => ['flow_id'],
-                ],
-                [
-                    'key'    => 'behavior',
-                    'label'  => 'Behavior',
-                    'icon'   => 'clock',
-                    'fields' => ['timeout'],
-                ],
-            ],
-            'flow_id' => [
-                'type'     => 'string',
-                'label'    => 'Subflow flow_id',
-                'required' => true,
-            ],
-            'timeout' => [
-                'type'        => 'string',
-                'label'       => 'Timeout (ISO 8601 duration)',
-                'required'    => true,
-                'default'     => self::DEFAULT_TIMEOUT,
-                'placeholder' => 'PT24H',
-            ],
-        ];
+        return Schema::make()
+            ->required(['flow_id', 'timeout'])
+            ->section(
+                Section::make('target', 'Target flow')
+                    ->icon('arrow-right-circle')
+                    ->fields([
+                        Field::string('flow_id')
+                            ->label('Subflow flow_id')
+                            ->required(),
+                    ]),
+            )
+            ->section(
+                Section::make('behavior', 'Behavior')
+                    ->icon('clock')
+                    ->fields([
+                        Field::string('timeout')
+                            ->label('Timeout (ISO 8601 duration)')
+                            ->required()
+                            ->default(self::DEFAULT_TIMEOUT)
+                            ->placeholder('PT24H'),
+                    ]),
+            )
+            ->toArray();
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult

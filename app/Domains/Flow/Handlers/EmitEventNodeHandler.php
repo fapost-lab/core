@@ -11,6 +11,9 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Schema;
+use FAPost\Support\Builder\Schema\Section;
 
 /**
  * Publishes a tenant-scoped event so subscribed event-triggers can asynchronously
@@ -47,34 +50,27 @@ final class EmitEventNodeHandler extends AbstractVersionedHandler
      */
     public function configSchema(): array
     {
-        return [
-            'sections' => [
-                [
-                    'key'    => 'event',
-                    'label'  => 'Event',
-                    'icon'   => 'bolt',
-                    'fields' => ['event_type'],
-                ],
-                [
-                    'key'    => 'payload',
-                    'label'  => 'Payload',
-                    'icon'   => 'cube',
-                    'fields' => ['payload'],
-                ],
-            ],
-            'event_type' => [
-                'type'        => 'string',
-                'label'       => 'Event type',
-                'required'    => true,
-                'placeholder' => 'sales.order.created',
-            ],
-            'payload' => [
-                'type'     => 'json',
-                'label'    => 'Payload',
-                'required' => false,
-                'default'  => [],
-            ],
-        ];
+        return Schema::make()
+            ->section(
+                Section::make('event', 'Event')
+                    ->icon('bolt')
+                    ->fields([
+                        Field::string('event_type')
+                            ->label('Event type')
+                            ->required()
+                            ->placeholder('sales.order.created'),
+                    ]),
+            )
+            ->section(
+                Section::make('payload', 'Payload')
+                    ->icon('cube')
+                    ->fields([
+                        Field::json('payload')
+                            ->label('Payload')
+                            ->default([]),
+                    ]),
+            )
+            ->toArray();
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult

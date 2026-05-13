@@ -9,6 +9,8 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Schema;
 
 final class DelayNodeHandler extends AbstractVersionedHandler
 {
@@ -32,14 +34,13 @@ final class DelayNodeHandler extends AbstractVersionedHandler
      */
     public function configSchema(): array
     {
-        return [
-            'seconds' => [
-                'type'     => 'number',
-                'label'    => 'Delay (seconds)',
-                'required' => false,
-                'default'  => 60,
-            ],
-        ];
+        return Schema::make()
+            ->fields([
+                Field::number('seconds')
+                    ->label('Delay (seconds)')
+                    ->default(60),
+            ])
+            ->toArray();
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult

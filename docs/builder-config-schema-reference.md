@@ -12,22 +12,53 @@ add a new field type to the renderer, extend the matching section here in the sa
 
 ## 1. Overview
 
+Two equivalent ways to express a schema — the fluent builder from `fapost/support` (recommended) or the raw array. The
+renderer reads the same wire shape in both cases.
+
+**Fluent (preferred):**
+
 ```php
-final class CallNodeHandler extends AbstractVersionedHandler
+use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Schema;
+use FAPost\Support\Builder\Schema\Section;
+
+public function configSchema(): array
 {
-    public function configSchema(): array
-    {
-        return [
-            'required' => ['url'],
-            'sections' => [
-                ['key' => 'connection', 'label' => 'Connection', 'icon' => 'globe-alt', 'fields' => ['url', 'timeout']],
-                ['key' => 'advanced',   'label' => 'Advanced',   'icon' => 'cog-6-tooth', 'fields' => ['headers'], 'collapsed' => true],
-            ],
-            'url'     => ['type' => 'string', 'label' => 'URL', 'required' => true],
-            'timeout' => ['type' => 'number', 'label' => 'Timeout', 'default' => 10, 'min' => 1, 'max' => 300],
-            'headers' => ['type' => 'key-value', 'label' => 'Custom headers'],
-        ];
-    }
+    return Schema::make()
+        ->section(
+            Section::make('connection', 'Connection')
+                ->icon('globe-alt')
+                ->fields([
+                    Field::string('url')->label('URL')->required(),
+                    Field::number('timeout')->label('Timeout')->default(10)->min(1)->max(300),
+                ]),
+        )
+        ->section(
+            Section::make('advanced', 'Advanced')
+                ->icon('cog-6-tooth')
+                ->collapsed()
+                ->fields([
+                    Field::keyValue('headers')->label('Custom headers'),
+                ]),
+        )
+        ->toArray();
+}
+```
+
+**Raw array (still supported):**
+
+```php
+public function configSchema(): array
+{
+    return [
+        'sections' => [
+            ['key' => 'connection', 'label' => 'Connection', 'icon' => 'globe-alt', 'fields' => ['url', 'timeout']],
+            ['key' => 'advanced',   'label' => 'Advanced',   'icon' => 'cog-6-tooth', 'fields' => ['headers'], 'collapsed' => true],
+        ],
+        'url'     => ['type' => 'string', 'label' => 'URL', 'required' => true],
+        'timeout' => ['type' => 'number', 'label' => 'Timeout', 'default' => 10, 'min' => 1, 'max' => 300],
+        'headers' => ['type' => 'key-value', 'label' => 'Custom headers'],
+    ];
 }
 ```
 
@@ -95,6 +126,14 @@ Single-line text input. Renders `TextField.vue` with `VariablePicker` for `{{pat
 | `regex_message` | `string`   | error text shown under input when `regex` fails |
 
 ```php
+// Fluent
+Field::string('event_type')
+    ->label('Event type')
+    ->placeholder('sales.order.created')
+    ->required()
+    ->regex('^[a-z][a-z0-9_.]*$', 'Lowercase letters, digits, underscores, dots');
+
+// Raw
 'event_type' => [
     'type'          => 'string',
     'label'         => 'Event type',
@@ -112,11 +151,10 @@ Multi-line textarea. Renders `TextareaField.vue` with `VariablePicker`.
 Same prop set as `string` plus a default of 4 rows of height. No regex validator at the moment.
 
 ```php
-'message' => [
-    'type'        => 'text',
-    'label'       => 'Message text',
-    'placeholder' => 'Welcome, {{contact.name}}',
-],
+Field::text('message')->label('Message text')->placeholder('Welcome, {{contact.name}}');
+
+// Raw
+'message' => ['type' => 'text', 'label' => 'Message text', 'placeholder' => 'Welcome, {{contact.name}}'],
 ```
 
 ### 3.3 `number`
@@ -130,13 +168,10 @@ numeric fields).
 | `max` | `number` | inline-validated upper bound (inclusive) |
 
 ```php
-'timeout' => [
-    'type'    => 'number',
-    'label'   => 'Timeout (s)',
-    'default' => 10,
-    'min'     => 1,
-    'max'     => 300,
-],
+Field::number('timeout')->label('Timeout (s)')->default(10)->min(1)->max(300);
+
+// Raw
+'timeout' => ['type' => 'number', 'label' => 'Timeout (s)', 'default' => 10, 'min' => 1, 'max' => 300],
 ```
 
 ### 3.4 `boolean`
@@ -144,11 +179,10 @@ numeric fields).
 Checkbox toggle. Renders `ToggleField.vue`.
 
 ```php
-'remove_keyboard_after_press' => [
-    'type'    => 'boolean',
-    'label'   => 'Remove keyboard after press',
-    'default' => true,
-],
+Field::toggle('remove_keyboard_after_press')->label('Remove keyboard after press')->default(true);
+
+// Raw
+'remove_keyboard_after_press' => ['type' => 'boolean', 'label' => 'Remove keyboard after press', 'default' => true],
 ```
 
 ### 3.5 `enum`
@@ -160,11 +194,12 @@ Dropdown select. Renders `SelectField.vue`.
 | `options` | `array<string>` or `array<string, string>` | List of values, or value→label map. `values` is also accepted. |
 
 ```php
+Field::select('method')->label('HTTP method')->options(['GET' => 'GET', 'POST' => 'POST'])->default('POST');
+
+// Raw
 'method' => [
-    'type'    => 'enum',
-    'label'   => 'HTTP method',
-    'options' => ['GET' => 'GET', 'POST' => 'POST', 'PUT' => 'PUT'],
-    'default' => 'POST',
+    'type' => 'enum', 'label' => 'HTTP method',
+    'options' => ['GET' => 'GET', 'POST' => 'POST', 'PUT' => 'PUT'], 'default' => 'POST',
 ],
 ```
 
@@ -173,11 +208,10 @@ Dropdown select. Renders `SelectField.vue`.
 List of strings. Renders `ArrayField.vue` — one input per item, `+ Add item` button, per-row delete.
 
 ```php
-'include_state' => [
-    'type'  => 'array',
-    'label' => 'Include state',
-    'help'  => 'State paths whose values are forwarded in the payload.',
-],
+Field::array('include_state')->label('Include state')->help('State paths whose values are forwarded in the payload.');
+
+// Raw
+'include_state' => ['type' => 'array', 'label' => 'Include state', 'help' => '…'],
 ```
 
 ### 3.7 `json`
@@ -186,11 +220,10 @@ Raw JSON textarea. Renders `JsonField.vue` with `Victor Mono` font and inline pa
 object/array, not the raw string.
 
 ```php
-'metadata' => [
-    'type'    => 'json',
-    'label'   => 'Metadata',
-    'default' => [],
-],
+Field::json('metadata')->label('Metadata')->default([]);
+
+// Raw
+'metadata' => ['type' => 'json', 'label' => 'Metadata', 'default' => []],
 ```
 
 ### 3.8 `state-picker`
@@ -198,11 +231,10 @@ object/array, not the raw string.
 Flow-state path input. Renders `StatePickerField.vue` — monospace input with `VariablePicker`.
 
 ```php
-'save_response_to' => [
-    'type'        => 'state-picker',
-    'label'       => 'Save response to',
-    'placeholder' => 'flow.webhook_response',
-],
+Field::statePicker('save_response_to')->label('Save response to')->placeholder('flow.webhook_response');
+
+// Raw
+'save_response_to' => ['type' => 'state-picker', 'label' => 'Save response to', 'placeholder' => 'flow.webhook_response'],
 ```
 
 ### 3.9 `key-value`
@@ -217,11 +249,16 @@ inline (last-write-wins on commit). Empty keys are dropped on commit.
 | `placeholder` | `array{string: string}` | one entry used as placeholder for empty rows |
 
 ```php
+Field::keyValue('headers')
+    ->label('Custom headers')
+    ->keyLabel('Header')
+    ->valueLabel('Value')
+    ->placeholder(['Authorization' => 'Bearer ...']);
+
+// Raw
 'headers' => [
-    'type'        => 'key-value',
-    'label'       => 'Custom headers',
-    'key_label'   => 'Header',
-    'value_label' => 'Value',
+    'type' => 'key-value', 'label' => 'Custom headers',
+    'key_label' => 'Header', 'value_label' => 'Value',
     'placeholder' => ['Authorization' => 'Bearer ...'],
 ],
 ```
@@ -238,9 +275,16 @@ merge in the store.
 | `required` | `array<string>`              | required sub-field keys                    |
 
 ```php
+Field::object('transport_options')
+    ->label('Transport options')
+    ->fields([
+        Field::number('retries')->label('Retries')->default(0),
+        Field::toggle('verify_ssl')->label('Verify SSL')->default(true),
+    ]);
+
+// Raw
 'transport_options' => [
-    'type'   => 'object',
-    'label'  => 'Transport options',
+    'type' => 'object', 'label' => 'Transport options',
     'fields' => [
         'retries' => ['type' => 'number', 'label' => 'Retries', 'default' => 0],
         'verify_ssl' => ['type' => 'boolean', 'label' => 'Verify SSL', 'default' => true],
@@ -265,12 +309,21 @@ Repeater of structured objects. Renders `ObjectArrayField.vue` — each item is 
 The `item_label` template substitutes `{key}` for top-level item values — handy for the collapsed-row preview.
 
 ```php
+Field::objectArray('result_mapping')
+    ->label('Result mapping')
+    ->minItems(0)
+    ->maxItems(50)
+    ->itemLabel('{from_path} → {to_state}')
+    ->itemFields([
+        Field::statePicker('from_path')->label('From response'),
+        Field::statePicker('to_state')->label('To state'),
+    ]);
+
+// Raw
 'result_mapping' => [
-    'type'      => 'object-array',
-    'label'     => 'Result mapping',
-    'min_items' => 0,
-    'max_items' => 50,
-    'item'      => [
+    'type' => 'object-array', 'label' => 'Result mapping',
+    'min_items' => 0, 'max_items' => 50,
+    'item' => [
         'item_label' => '{from_path} → {to_state}',
         'fields' => [
             'from_path' => ['type' => 'state-picker', 'label' => 'From response'],
@@ -368,7 +421,35 @@ references declared field keys.
 
 ---
 
-## 9. Where the renderer lives
+## 9. Fluent builders (`fapost/support`)
+
+The wire format from §2–§3 is generated by the `FAPost\Support\Builder\Schema` namespace. It's a thin layer over the
+same shape — `toArray()` is the only contract — giving authors autocomplete, type-safe field-specific methods (only
+`min()`/`max()` on `NumberField`, only `regex()` on `TextField`, etc.) and refactor-safety on a vocabulary that's
+growing. Handlers may mix fluent and raw arrays during migration; the renderer can't tell the difference.
+
+| Class / factory               | Returns            | Field-specific methods                                    |
+|-------------------------------|--------------------|-----------------------------------------------------------|
+| `Schema::make()`              | `Schema`           | `section()`, `fields()`, `required()`, `toArray()`        |
+| `Section::make($key, $label)` | `Section`          | `icon()`, `collapsed()`, `fields()`                       |
+| `Field::string($name)`        | `TextField`        | `regex(pattern, message?)`                                |
+| `Field::text($name)`          | `TextareaField`    | —                                                         |
+| `Field::number($name)`        | `NumberField`      | `min()`, `max()`                                          |
+| `Field::select($name)`        | `SelectField`      | `options(array)`                                          |
+| `Field::toggle($name)`        | `ToggleField`      | —                                                         |
+| `Field::array($name)`         | `ArrayField`       | —                                                         |
+| `Field::json($name)`          | `JsonField`        | —                                                         |
+| `Field::statePicker($name)`   | `StatePickerField` | —                                                         |
+| `Field::keyValue($name)`      | `KeyValueField`    | `keyLabel()`, `valueLabel()`                              |
+| `Field::object($name)`        | `ObjectField`      | `fields(array)`                                           |
+| `Field::objectArray($name)`   | `ObjectArrayField` | `itemFields()`, `itemLabel()`, `minItems()`, `maxItems()` |
+
+Common methods on every field: `label()`, `help()`, `default()`, `placeholder()`, `required(bool = true)`,
+`visibleWhen(array)`.
+
+---
+
+## 10. Where the renderer lives
 
 | File                                                                     | Role                                   |
 |--------------------------------------------------------------------------|----------------------------------------|
@@ -377,3 +458,4 @@ references declared field keys.
 | `resources/js/builder/components/editor/config/sectionIcons.ts`          | Heroicon name registry                 |
 | `resources/js/builder/components/editor/config/fields/*.vue`             | Per-type field components              |
 | `resources/js/builder/composables/useFieldVisibility.ts`                 | `visible_when` resolver                |
+| `packages/fapost-support/src/Builder/Schema/`                            | Fluent PHP builders (see §9)           |

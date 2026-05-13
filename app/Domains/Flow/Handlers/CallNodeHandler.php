@@ -11,6 +11,9 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Schema;
+use FAPost\Support\Builder\Schema\Section;
 
 final class CallNodeHandler extends AbstractVersionedHandler
 {
@@ -42,64 +45,50 @@ final class CallNodeHandler extends AbstractVersionedHandler
      */
     public function configSchema(): array
     {
-        return [
-            'sections' => [
-                [
-                    'key'    => 'connection',
-                    'label'  => 'Connection',
-                    'icon'   => 'globe-alt',
-                    'fields' => ['url', 'timeout'],
-                ],
-                [
-                    'key'    => 'response',
-                    'label'  => 'Response handling',
-                    'icon'   => 'arrow-down-tray',
-                    'fields' => ['save_response_to'],
-                ],
-                [
-                    'key'       => 'advanced',
-                    'label'     => 'Advanced',
-                    'icon'      => 'cog-6-tooth',
-                    'fields'    => ['headers', 'include_state'],
-                    'collapsed' => true,
-                ],
-            ],
-            'url' => [
-                'type'        => 'string',
-                'label'       => 'URL',
-                'required'    => true,
-                'placeholder' => 'https://example.com/webhook',
-            ],
-            'timeout' => [
-                'type'     => 'number',
-                'label'    => 'Timeout (seconds)',
-                'required' => false,
-                'default'  => 10,
-                'min'      => 1,
-                'max'      => 300,
-            ],
-            'save_response_to' => [
-                'type'        => 'state-picker',
-                'label'       => 'Save response to',
-                'required'    => false,
-                'placeholder' => 'flow.webhook_response',
-            ],
-            'headers' => [
-                'type'        => 'key-value',
-                'label'       => 'Custom headers',
-                'required'    => false,
-                'key_label'   => 'Header',
-                'value_label' => 'Value',
-                'placeholder' => ['Authorization' => 'Bearer ...'],
-                'help'        => 'Sent alongside the request. Reserved X-* headers set by the engine cannot be overridden.',
-            ],
-            'include_state' => [
-                'type'     => 'array',
-                'label'    => 'Include state',
-                'required' => false,
-                'help'     => 'State paths whose values are forwarded in the request payload.',
-            ],
-        ];
+        return Schema::make()
+            ->section(
+                Section::make('connection', 'Connection')
+                    ->icon('globe-alt')
+                    ->fields([
+                        Field::string('url')
+                            ->label('URL')
+                            ->required()
+                            ->placeholder('https://example.com/webhook'),
+                        Field::number('timeout')
+                            ->label('Timeout (seconds)')
+                            ->default(10)
+                            ->min(1)
+                            ->max(300),
+                    ]),
+            )
+            ->section(
+                Section::make('response', 'Response handling')
+                    ->icon('arrow-down-tray')
+                    ->fields([
+                        Field::statePicker('save_response_to')
+                            ->label('Save response to')
+                            ->placeholder('flow.webhook_response'),
+                    ]),
+            )
+            ->section(
+                Section::make('advanced', 'Advanced')
+                    ->icon('cog-6-tooth')
+                    ->collapsed()
+                    ->fields([
+                        Field::keyValue('headers')
+                            ->label('Custom headers')
+                            ->keyLabel('Header')
+                            ->valueLabel('Value')
+                            ->placeholder(['Authorization' => 'Bearer ...'])
+                            ->help(
+                                'Sent alongside the request. Reserved X-* headers set by the engine cannot be overridden.'
+                            ),
+                        Field::array('include_state')
+                            ->label('Include state')
+                            ->help('State paths whose values are forwarded in the request payload.'),
+                    ]),
+            )
+            ->toArray();
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult

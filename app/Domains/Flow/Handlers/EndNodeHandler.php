@@ -9,6 +9,8 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Schema;
 
 /**
  * Explicit terminal node — marks the session ended with a discriminated status
@@ -54,15 +56,15 @@ final class EndNodeHandler extends AbstractVersionedHandler
      */
     public function configSchema(): array
     {
-        return [
-            'status' => [
-                'type'     => 'enum',
-                'label'    => 'End status',
-                'required' => true,
-                'options'  => self::ALLOWED_END_STATUSES,
-                'default'  => self::END_STATUS_SUCCESS,
-            ],
-        ];
+        return Schema::make()
+            ->fields([
+                Field::select('status')
+                    ->label('End status')
+                    ->required()
+                    ->options(self::ALLOWED_END_STATUSES)
+                    ->default(self::END_STATUS_SUCCESS),
+            ])
+            ->toArray();
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult

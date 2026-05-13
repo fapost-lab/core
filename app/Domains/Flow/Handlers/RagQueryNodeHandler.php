@@ -13,6 +13,9 @@ use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\DTO\RagQueryContext;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Schema;
+use FAPost\Support\Builder\Schema\Section;
 use LogicException;
 use Throwable;
 
@@ -56,53 +59,42 @@ final class RagQueryNodeHandler extends AbstractVersionedHandler
      */
     public function configSchema(): array
     {
-        return [
-            'required' => ['knowledge_base_id', 'query', 'provider'],
-            'sections' => [
-                [
-                    'key'    => 'knowledge_base',
-                    'label'  => 'Knowledge base',
-                    'icon'   => 'book-open',
-                    'fields' => ['knowledge_base_id', 'provider'],
-                ],
-                [
-                    'key'    => 'query',
-                    'label'  => 'Query',
-                    'icon'   => 'magnifying-glass',
-                    'fields' => ['query'],
-                ],
-                [
-                    'key'       => 'options',
-                    'label'     => 'Options',
-                    'icon'      => 'adjustments-horizontal',
-                    'fields'    => ['options'],
-                    'collapsed' => true,
-                ],
-            ],
-            'knowledge_base_id' => [
-                'type'     => 'string',
-                'label'    => 'Knowledge base',
-                'required' => true,
-            ],
-            'provider' => [
-                'type'     => 'string',
-                'label'    => 'Provider',
-                'required' => true,
-                'help'     => 'Identifier of a registered RAG adapter (e.g. openai_assistants, pgvector).',
-            ],
-            'query' => [
-                'type'        => 'text',
-                'label'       => 'Query',
-                'required'    => true,
-                'placeholder' => '{{flow.last_user_message}}',
-            ],
-            'options' => [
-                'type'     => 'json',
-                'label'    => 'Options',
-                'required' => false,
-                'default'  => [],
-            ],
-        ];
+        return Schema::make()
+            ->required(['knowledge_base_id', 'query', 'provider'])
+            ->section(
+                Section::make('knowledge_base', 'Knowledge base')
+                    ->icon('book-open')
+                    ->fields([
+                        Field::string('knowledge_base_id')
+                            ->label('Knowledge base')
+                            ->required(),
+                        Field::string('provider')
+                            ->label('Provider')
+                            ->required()
+                            ->help('Identifier of a registered RAG adapter (e.g. openai_assistants, pgvector).'),
+                    ]),
+            )
+            ->section(
+                Section::make('query', 'Query')
+                    ->icon('magnifying-glass')
+                    ->fields([
+                        Field::text('query')
+                            ->label('Query')
+                            ->required()
+                            ->placeholder('{{flow.last_user_message}}'),
+                    ]),
+            )
+            ->section(
+                Section::make('options', 'Options')
+                    ->icon('adjustments-horizontal')
+                    ->collapsed()
+                    ->fields([
+                        Field::json('options')
+                            ->label('Options')
+                            ->default([]),
+                    ]),
+            )
+            ->toArray();
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
