@@ -73,10 +73,17 @@ const knownGroups = useKnownGroups()
 // editor in that case so they can opt-in without any pre-filled name.
 const answerVariable = ref<Variable | null>(decodeSendMessageVariable(config.value))
 
+// Saving the button answer is opt-in. Toggle defaults to `true` for any
+// node that already has a save target configured (legacy or new shape),
+// and to `false` for fresh nodes — so authors don't see a half-filled
+// editor demanding a variable name on every new send_message.
+const saveAnswerEnabled = ref<boolean>(answerVariable.value !== null)
+
 watch(
     () => props.node.id,
     () => {
         answerVariable.value = decodeSendMessageVariable(config.value)
+        saveAnswerEnabled.value = answerVariable.value !== null
     },
 )
 
@@ -99,6 +106,20 @@ function onAnswerVariableUpdate(next: Variable) {
         save_to:          undefined,
         save_to_type:     undefined,
     })
+}
+
+function onSaveAnswerToggle(enabled: boolean) {
+    saveAnswerEnabled.value = enabled
+    if (!enabled) {
+        // Clear all save-target keys so the backend treats the button press
+        // as a pure routing event without persisting an answer.
+        answerVariable.value = null
+        emit('update:config', {
+            save_to_variable: undefined,
+            save_to:          undefined,
+            save_to_type:     undefined,
+        })
+    }
 }
 
 // Refs + cursor-insert handlers for the variable picker. Each textarea
@@ -273,8 +294,17 @@ function updateKeyboardMode(value: string) {
 
             <template v-if="!isReplyKeyboard && buttons.length > 0">
                 <div class="config-field">
-                    <div class="field-label">Save answer to</div>
+                    <label class="save-answer-toggle">
+                        <input
+                            type="checkbox"
+                            class="toggle-check"
+                            :checked="saveAnswerEnabled"
+                            @change="onSaveAnswerToggle(($event.target as HTMLInputElement).checked)"
+                        >
+                        <span class="save-answer-label">Save answer to variable</span>
+                    </label>
                     <VariableStorageEditor
+                        v-if="saveAnswerEnabled"
                         :model-value="answerVariable"
                         :type-options="BUTTON_VALUE_TYPES"
                         :known-groups="knownGroups"
@@ -325,5 +355,17 @@ function updateKeyboardMode(value: string) {
 .save-to-type {
     width: 90px;
     flex-shrink: 0;
+}
+
+.save-answer-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    margin-bottom: 8px;
+}
+.save-answer-label {
+    font-size: 12.5px;
+    color: var(--text-2);
 }
 </style>

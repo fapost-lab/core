@@ -8,13 +8,33 @@ defineEmits(['update:value'])
 </script>
 
 <template>
-    <label class="flex items-center gap-2 cursor-pointer">
+    <label class="toggle-row">
         <input
             type="checkbox"
-            class="rounded"
+            class="toggle-check"
             :checked="value"
             @change="$emit('update:value', ($event.target as HTMLInputElement).checked)"
         >
-        <span class="text-sm text-gray-600">{{ schema?.label ?? 'Enabled' }}</span>
+        <span class="toggle-label">{{ value ? 'Enabled' : 'Disabled' }}</span>
     </label>
 </template>
+
+<style scoped>
+.toggle-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+.toggle-check {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    cursor: pointer;
+    accent-color: var(--primary);
+}
+.toggle-label {
+    font-size: 12.5px;
+    color: var(--text-2);
+}
+</style>

@@ -71,6 +71,34 @@ export async function fetchPickerContents(
     return await res.json() as Promise<PickerContentsResponse>
 }
 
+/**
+ * Fetch a single media file with a fresh signed preview URL.
+ *
+ * Signed URLs expire — flows that store the preview URL inside a node
+ * config (send_message media, etc.) need to refresh it on load,
+ * otherwise the thumbnail breaks and the channel-side dispatcher
+ * eventually fails to fetch the asset.
+ */
+export async function fetchMediaFile(fileId: string): Promise<PickerFile> {
+    const res = await fetch(`${BASE}/files/${fileId}`, {
+        headers: xsrfHeaders(),
+    })
+
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { message?: string }
+        throw Object.assign(new Error(body.message ?? 'Failed to load media file'), {
+            status: res.status,
+            body,
+        }) as MediaApiError
+    }
+
+    const payload = await res.json() as { data?: PickerFile } | PickerFile
+    // Laravel API resources wrap the body in `{ data: ... }`. Unwrap if present.
+    return (payload && typeof payload === 'object' && 'data' in payload && payload.data
+        ? payload.data
+        : payload) as PickerFile
+}
+
 /** Upload a file via XHR so upload progress events are available. */
 export function uploadMediaFile(
     file: File,

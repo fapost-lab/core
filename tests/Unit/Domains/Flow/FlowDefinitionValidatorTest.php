@@ -59,6 +59,93 @@ final class FlowDefinitionValidatorTest extends TestCase
         }
     }
 
+    public function test_validate_fails_when_inline_keyboard_send_message_with_buttons_has_default_edge(): void
+    {
+        $validator = $this->validator();
+        try {
+            $validator->validate(
+                nodes: [
+                    [
+                        'id'      => 'send-1',
+                        'type'    => 'send_message',
+                        'version' => 1,
+                        'config'  => [
+                            'content_type'  => 'text_with_keyboard',
+                            'keyboard_mode' => 'inline',
+                            'buttons'       => [
+                                ['id' => 'b1', 'label' => 'Yes', 'value' => 'yes', 'type' => 'callback'],
+                            ],
+                        ],
+                    ],
+                    ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
+                ],
+                edges: [
+                    ['id' => 'e1', 'source_node_id' => 'send-1', 'target_node_id' => 'n2', 'transition' => 'default'],
+                ],
+            );
+            $this->fail('Expected FlowValidationException was not thrown.');
+        } catch (FlowValidationException $exception) {
+            $this->assertStringContainsString('inline buttons must be terminal', $exception->errors[0]->message);
+        }
+    }
+
+    public function test_validate_accepts_inline_keyboard_send_message_with_per_button_edges_only(): void
+    {
+        $validator = $this->validator();
+
+        $result = $validator->validate(
+            nodes: [
+                [
+                    'id'      => 'send-1',
+                    'type'    => 'send_message',
+                    'version' => 1,
+                    'config'  => [
+                        'content_type'  => 'text_with_keyboard',
+                        'keyboard_mode' => 'inline',
+                        'buttons'       => [
+                            ['id' => 'b1', 'label' => 'Yes', 'value' => 'yes', 'type' => 'callback'],
+                            ['id' => 'b2', 'label' => 'No',  'value' => 'no',  'type' => 'callback'],
+                        ],
+                    ],
+                ],
+                ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
+                ['id' => 'n3', 'type' => 'input', 'version' => 1, 'config' => []],
+            ],
+            edges: [
+                ['id' => 'e1', 'source_node_id' => 'send-1', 'target_node_id' => 'n2', 'transition' => 'b1'],
+                ['id' => 'e2', 'source_node_id' => 'send-1', 'target_node_id' => 'n3', 'transition' => 'b2'],
+            ],
+        );
+
+        $this->assertSame('send-1', $result['entry_node_id']);
+    }
+
+    public function test_validate_accepts_inline_keyboard_send_message_with_no_buttons_and_default_edge(): void
+    {
+        $validator = $this->validator();
+
+        $result = $validator->validate(
+            nodes: [
+                [
+                    'id'      => 'send-1',
+                    'type'    => 'send_message',
+                    'version' => 1,
+                    'config'  => [
+                        'content_type'  => 'text',
+                        'keyboard_mode' => 'inline',
+                        'buttons'       => [],
+                    ],
+                ],
+                ['id' => 'n2', 'type' => 'input', 'version' => 1, 'config' => []],
+            ],
+            edges: [
+                ['id' => 'e1', 'source_node_id' => 'send-1', 'target_node_id' => 'n2', 'transition' => 'default'],
+            ],
+        );
+
+        $this->assertSame('send-1', $result['entry_node_id']);
+    }
+
     public function test_validate_fails_when_node_version_is_missing(): void
     {
         $validator = $this->validator();

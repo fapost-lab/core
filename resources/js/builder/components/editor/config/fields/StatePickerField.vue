@@ -24,7 +24,7 @@ const insert   = useInsertAtCursor(inputRef, (next) => emit('update:value', next
         <input
             ref="inputRef"
             type="text"
-            class="w-full rounded border border-gray-200 px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-blue-400"
+            class="field-input state-picker-input"
             :value="value ?? ''"
             :placeholder="(schema as { placeholder?: string })?.placeholder ?? 'flow.foo'"
             @input="emit('update:value', ($event.target as HTMLInputElement).value)"
@@ -45,6 +45,10 @@ const insert   = useInsertAtCursor(inputRef, (next) => emit('update:value', next
 .field-with-picker > input {
     flex: 1;
     min-width: 0;
+}
+.state-picker-input {
+    font-family: 'Victor Mono', monospace;
+    font-size: 11.5px;
 }
 .field-picker {
     flex-shrink: 0;

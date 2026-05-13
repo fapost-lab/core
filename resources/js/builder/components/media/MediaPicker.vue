@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import {ref} from 'vue'
+import {ref, watch} from 'vue'
 import MediaPickerModal from './MediaPickerModal.vue'
+import {fetchMediaFile} from '@builder/composables/useMediaApi'
 
 /**
  * @typedef {{
@@ -45,6 +46,41 @@ function clearSelection() {
 }
 
 const isImage = (v: Record<string, unknown> | null | undefined) => v?.kind === 'image'
+
+// Signed preview URLs persisted in node config expire over time. Keep a
+// local fresh URL refreshed from the API and let it take precedence
+// over the (possibly stale) one carried in `value.preview_url`.
+const refreshedPreviewUrl = ref<string | null>(null)
+
+async function refreshPreview(fileId: string | undefined | null) {
+    refreshedPreviewUrl.value = null
+    if (!fileId) return
+    try {
+        const file = await fetchMediaFile(fileId)
+        refreshedPreviewUrl.value = file.preview_url
+            ?? file.preview?.signed_url
+            ?? null
+    } catch {
+        // Silent: the saved URL might still work for a moment, and the
+        // node config is the source of truth for the file id.
+    }
+}
+
+watch(
+    () => (props.value?.id as string | undefined) ?? null,
+    (id) => { refreshPreview(id) },
+    { immediate: true },
+)
+
+function effectivePreviewUrl(): string | null {
+    return refreshedPreviewUrl.value ?? (props.value?.preview_url as string | null | undefined) ?? null
+}
+
+function onImageError() {
+    // Browser failed to load — usually the signed URL just expired.
+    // Refetch metadata to get a fresh URL.
+    refreshPreview(props.value?.id as string | undefined)
+}
 </script>
 
 <template>
@@ -53,10 +89,11 @@ const isImage = (v: Record<string, unknown> | null | undefined) => v?.kind === '
         <div v-if="value" class="mp-selected">
             <div class="mp-selected-thumb">
                 <img
-                    v-if="isImage(value) && value.preview_url"
-                    :src="value.preview_url as string"
+                    v-if="isImage(value) && effectivePreviewUrl()"
+                    :src="effectivePreviewUrl() as string"
                     :alt="value.name as string"
                     class="mp-selected-img"
+                    @error="onImageError"
                 />
                 <svg
                     v-else

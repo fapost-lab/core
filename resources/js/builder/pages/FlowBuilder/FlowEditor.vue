@@ -12,6 +12,7 @@ import FlowSequence from '@builder/components/editor/FlowSequence.vue'
 import ConfigPanel from '@builder/components/editor/ConfigPanel.vue'
 import ContentTab from '@builder/components/content/ContentTab.vue'
 import ValidationPanel from '@builder/components/editor/ValidationPanel.vue'
+import ConfirmDialog from '@builder/components/editor/ConfirmDialog.vue'
 
 import type {BuilderFlowPayload} from '@builder/dto/types'
 
@@ -112,7 +113,11 @@ useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
             @validate="runValidate"
         />
 
-        <div v-if="builderStore.activeTab === 'builder'" class="editor-main">
+        <div
+            v-if="builderStore.activeTab === 'builder'"
+            class="editor-main"
+            :class="{ 'editor-main--val-open': builderStore.validationOpen }"
+        >
             <FlowStructure />
             <FlowSequence />
             <ConfigPanel />
@@ -120,6 +125,7 @@ useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
 
         <ContentTab v-else class="editor-main" />
         <ValidationPanel />
+        <ConfirmDialog />
     </div>
 </template>
 

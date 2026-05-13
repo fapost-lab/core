@@ -67,15 +67,13 @@ function schemaDefault(): unknown {
 }
 
 const inputClass = computed(() => [
-    'w-full rounded border px-3 py-1.5 text-xs font-mono resize-none focus:outline-none',
-    error.value
-        ? 'border-red-300 focus:border-red-400'
-        : 'border-gray-200 focus:border-blue-400',
+    'field-input json-field',
+    error.value ? 'json-field--error' : '',
 ])
 </script>
 
 <template>
-    <div class="flex flex-col gap-1">
+    <div class="json-wrap">
         <textarea
             :class="inputClass"
             rows="6"
@@ -85,8 +83,31 @@ const inputClass = computed(() => [
             @input="onInput"
             @blur="onBlur"
         />
-        <div v-if="error" class="text-xs text-red-500">
+        <div v-if="error" class="json-error">
             {{ error }}
         </div>
     </div>
 </template>
+
+<style scoped>
+.json-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.json-field {
+    font-family: 'Victor Mono', monospace;
+    font-size: 11.5px;
+    line-height: 1.5;
+}
+.json-field--error {
+    border-color: #e8c8c8;
+}
+.json-field--error:focus {
+    border-color: var(--rose);
+}
+.json-error {
+    font-size: 11px;
+    color: var(--rose);
+}
+</style>

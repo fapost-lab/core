@@ -13,6 +13,7 @@
   --accent-2:   #a8967e;
   --sage:       #8fa897;
   --sage-bg:    #eef2ee;
+  --sage-bg-2:  #e3ebe5;
   --rose:       #b07070;
   --rose-bg:    #f5eaea;
   --amber:      #b08040;
@@ -67,6 +68,9 @@ body {
   background: var(--bg);
   min-width: 0;
   overflow-y: auto;
+}
+.editor-main--val-open .panel-sequence {
+  padding-bottom: 260px;
 }
 .panel-config {
   width: 280px;
@@ -271,72 +275,85 @@ body {
 .node-card.has-error { border-color: var(--rose); box-shadow: 0 0 0 3px rgba(176,112,112,.1); }
 
 /* End node — status-driven accent. Colours mirror the EndConfig radio so the
-   canvas and the right-pane stay visually consistent. */
-.node-card--end .node-type-icon { background: var(--surface-2); color: var(--text-3); }
+   canvas and the right-pane stay visually consistent. The colour now
+   lives on the entire head ribbon rather than a separate icon chip. */
 .node-card--end-success {
   border-color: color-mix(in srgb, var(--sage, #5a6e58) 60%, var(--border));
-  background: color-mix(in srgb, var(--sage, #5a6e58) 4%, var(--surface));
 }
-.node-card--end-success .node-type-icon { background: var(--sage-bg, #e6ede4); color: var(--sage, #5a6e58); }
+.node-card--end-success .node-card-head {
+  background: var(--sage-bg, #e6ede4);
+  color: var(--sage, #5a6e58);
+}
 .node-card--end-cancelled {
   border-color: color-mix(in srgb, var(--amber, #b07c2c) 55%, var(--border));
-  background: color-mix(in srgb, var(--amber, #b07c2c) 4%, var(--surface));
 }
-.node-card--end-cancelled .node-type-icon { background: var(--amber-bg, #f6ecd6); color: var(--amber, #b07c2c); }
+.node-card--end-cancelled .node-card-head {
+  background: var(--amber-bg, #f6ecd6);
+  color: var(--amber, #b07c2c);
+}
 .node-card--end-failed {
   border-color: color-mix(in srgb, var(--rose, #b94a4a) 55%, var(--border));
-  background: color-mix(in srgb, var(--rose, #b94a4a) 4%, var(--surface));
 }
-.node-card--end-failed .node-type-icon { background: var(--rose-bg, #f3dada); color: var(--rose, #b94a4a); }
+.node-card--end-failed .node-card-head {
+  background: var(--rose-bg, #f3dada);
+  color: var(--rose, #b94a4a);
+}
 
 .end-status-badge {
   font-size: 10.5px; font-weight: 600; letter-spacing: .03em;
   padding: 2px 7px; border-radius: 999px;
-  background: var(--surface-2); color: var(--text-3);
+  /* Pill sits on the coloured head — frosted white reads on every tint
+     without needing a per-status override. */
+  background: rgba(255, 255, 255, .55);
+  color: inherit;
   text-transform: uppercase;
 }
-.node-card--end-success   .end-status-badge { background: var(--sage-bg, #e6ede4); color: var(--sage, #5a6e58); }
-.node-card--end-cancelled .end-status-badge { background: var(--amber-bg, #f6ecd6); color: var(--amber, #b07c2c); }
-.node-card--end-failed    .end-status-badge { background: var(--rose-bg, #f3dada); color: var(--rose, #b94a4a); }
 
 .node-card-head {
   padding: 9px 12px;
   display: flex; align-items: center; gap: 8px;
-  border-bottom: 1px solid var(--border);
+  /* Background + foreground come from inline `style` per node type so
+     the same ribbon adapts to send_message / condition / end / etc.
+     Fallback values keep the markup readable when no inline style is
+     bound (e.g. dev snapshots, screenshots). */
+  background: var(--surface-2);
+  color: var(--text-2);
 }
 .node-delete-btn {
-  margin-left: auto;
   width: 20px; height: 20px;
   border-radius: 4px;
   border: 1px solid transparent;
-  background: var(--surface-2);
-  color: var(--text-3);
+  /* Sit subtly on the coloured ribbon — translucent white on hover
+     keeps the destructive intent visible without breaking the tint. */
+  background: transparent;
+  color: inherit;
+  opacity: .55;
   font-size: 15px; line-height: 1;
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: background .12s, color .12s, border-color .12s, transform .1s;
+  transition: background .12s, color .12s, opacity .12s, transform .1s;
   flex-shrink: 0;
 }
 .node-delete-btn:hover {
-  background: var(--rose-bg);
+  background: rgba(255, 255, 255, .6);
   color: var(--rose);
-  border-color: rgba(176, 112, 112, 0.35);
+  opacity: 1;
   transform: scale(1.05);
-}
-.node-card:hover .node-delete-btn {
-  border-color: rgba(176, 112, 112, 0.18);
 }
 .node-delete-btn:focus-visible {
   outline: 2px solid rgba(176, 112, 112, 0.35);
   outline-offset: 1px;
 }
 .node-type-icon {
-  width: 24px; height: 24px; border-radius: 5px;
+  width: 20px; height: 20px;
   display: flex; align-items: center; justify-content: center;
-  /* Emoji glyph fills the box — keep line-height 1 so the icon doesn't
-     drift downward inside the rounded square. */
-  font-size: 16px; line-height: 1;
+  font-size: 14px; line-height: 1;
   flex-shrink: 0;
+  /* The colour ribbon already establishes the node identity — the icon
+     inherits its glyph colour and stays transparent so the head reads
+     as a single tinted band, not a chip-inside-a-chip. */
+  background: transparent;
+  color: inherit;
 }
 .icon-msg  { background: var(--sky-bg);   color: var(--sky);  }
 .icon-cond { background: var(--amber-bg); color: var(--amber);}
@@ -344,9 +361,9 @@ body {
 .icon-del  { background: #f0edf8;         color: #7060a8;     }
 .icon-end  { background: var(--rose-bg);  color: var(--rose); }
 .node-type-label {
-  font-size: 11px; font-weight: 600;
-  letter-spacing: .04em; text-transform: uppercase;
-  color: var(--text-3); flex: 1;
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .06em; text-transform: uppercase;
+  color: inherit; flex: 1;
 }
 .node-warn {
   width: 18px; height: 18px; border-radius: 4px;
@@ -356,7 +373,53 @@ body {
 }
 .node-num {
   font-size: 11px; font-family: 'Victor Mono', monospace;
-  color: var(--text-3); font-weight: 500;
+  color: inherit; opacity: .7; font-weight: 500;
+  margin-left: auto;
+}
+
+/* Wrap around each node card so the reorder buttons (↑↓) can sit
+   absolutely positioned to the right of the card without being clipped
+   by its `overflow: hidden`. */
+.node-card-wrap {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+.node-side-actions {
+  position: absolute;
+  top: 50%;
+  left: calc(50% + 240px + 8px);
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.node-card-wrap:hover .node-side-actions { opacity: 1; }
+.node-side-btn {
+  width: 22px; height: 22px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-3);
+  font-size: 13px; line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .12s, color .12s, border-color .12s;
+  font-family: inherit;
+  padding: 0;
+  box-shadow: var(--shadow);
+}
+.node-side-btn:hover:not(:disabled) {
+  background: var(--primary-bg);
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 30%, transparent);
+}
+.node-side-btn:disabled {
+  opacity: .35;
+  cursor: not-allowed;
 }
 .node-card-body {
   padding: 8px 12px 10px;
@@ -392,6 +455,100 @@ body {
   margin-left: 5px; vertical-align: middle;
   background: rgba(0,0,0,.18); color: #fff;
 }
+.branch-chevron {
+  margin-left: 4px;
+  font-size: 14px;
+  line-height: 1;
+  opacity: .6;
+}
+.branch-btn:hover .branch-chevron { opacity: 1; }
+.branch-hint {
+  margin-top: 8px;
+  font-size: 10.5px;
+  color: var(--text-3);
+  font-style: italic;
+}
+
+/* Unreachable orphan chain — surfaces nodes wired past a terminal node */
+.unreachable-block {
+  margin-top: 24px;
+  padding: 14px;
+  border: 1px dashed var(--rose);
+  border-radius: 10px;
+  background: var(--rose-bg);
+}
+.unreachable-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.unreachable-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--rose);
+}
+.unreachable-remove {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rose);
+  background: transparent;
+  border: 1px solid var(--rose);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.unreachable-remove:hover {
+  background: var(--rose);
+  color: #fff;
+}
+.unreachable-hint {
+  font-size: 11px;
+  color: var(--text-2);
+  line-height: 1.45;
+  margin-bottom: 10px;
+}
+.unreachable-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.unreachable-actions-label {
+  font-size: 11px;
+  color: var(--text-3);
+  margin-right: 2px;
+}
+.unreachable-move-btn {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 11.5px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--primary);
+  background: var(--surface);
+  color: var(--primary);
+  cursor: pointer;
+  transition: background .12s, color .12s;
+}
+.unreachable-move-btn:hover {
+  background: var(--primary);
+  color: #fff;
+}
+.unreachable-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: .72;
+}
+.unreachable-list .node-card {
+  filter: grayscale(.3);
+}
 
 /* ── CONFIG PANEL ── */
 .config-empty {
@@ -423,6 +580,75 @@ body {
   overflow-y: auto;
   flex: 1;
   padding: 10px 10px 14px;
+}
+
+/* Single card framing the entire node/trigger config — header + body
+   live inside one rounded container so the title no longer floats. */
+.config-card-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Validation panel is `position: fixed; bottom: 0` and overlays anything
+   underneath. Pad the scrollable wrap when it's open so the last fields
+   in long node configs (Input retries, On-invalid message…) can scroll
+   above the validation footer. */
+.panel-config--val-open .config-card-wrap {
+  padding-bottom: 260px;
+}
+.config-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+.config-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.config-card-body {
+  padding: 10px;
+  background: var(--sage-bg-2);
+  display: flex;
+  flex-direction: column;
+}
+/* Accordion sections inside the config card render as inner cards: own
+   border + light tinted background separates them from the outer body
+   so the card's white frame stays visible even when every group is
+   collapsed. */
+.config-card-body .accordion {
+  gap: 8px;
+}
+.config-card-body .acc-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.config-card-body .acc-section:hover {
+  border-color: var(--border-2);
+}
+.config-card-body .acc-header {
+  padding: 9px 12px;
+  background: var(--surface);
+  transition: background .12s;
+}
+.config-card-body .acc-header:hover {
+  background: #f4f3f0;
+  color: var(--text-2);
+}
+.config-card-body .acc-body {
+  padding: 10px 12px 12px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
 }
 
 /* Accordion sections — used across all node configs as cards on the panel bg. */

@@ -34,7 +34,7 @@ function onInput(event: Event) {
     <div class="field-with-picker">
         <input
             ref="inputRef"
-            class="w-full rounded border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+            class="field-input"
             :type="isNumber ? 'number' : 'text'"
             :value="value ?? ''"
             :placeholder="(schema as { placeholder?: string })?.placeholder ?? ''"

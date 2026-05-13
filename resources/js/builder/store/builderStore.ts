@@ -2,6 +2,7 @@ import {defineStore} from 'pinia'
 import {computed, ref, watch} from 'vue'
 import {nanoid} from 'nanoid'
 import {buildTree} from '@builder/utils/buildTree'
+import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {useRegistryStore} from '@builder/store/registryStore'
 import type {
@@ -303,20 +304,111 @@ export const useBuilderStore = defineStore('builder', () => {
         return true
     }
 
+    /**
+     * Hard-remove a batch of nodes and every edge incident on them.
+     *
+     * Unlike {@link deleteNode}, this does NOT bridge incoming and outgoing
+     * default edges — callers use this when the nodes are unreachable and
+     * any inbound edge from a still-living node is itself part of the
+     * problem (e.g. a `default` edge from a terminal `send_message`).
+     * Bridging in that case would resurrect the broken edge.
+     */
+    function removeNodes(nodeIds: string[]): boolean {
+        if (nodeIds.length === 0) return false
+
+        const targetSet = new Set(nodeIds)
+        const present   = definition.value.nodes.some((node) => targetSet.has(node.id))
+        if (!present) return false
+
+        snapshot()
+
+        const selectionStore = useSelectionStore()
+
+        definition.value.nodes = definition.value.nodes.filter((node) => !targetSet.has(node.id))
+        definition.value.edges = definition.value.edges.filter(
+            (edge) => !targetSet.has(edge.from) && !targetSet.has(edge.to),
+        )
+
+        if (selectionStore.selectedNodeId && targetSet.has(selectionStore.selectedNodeId)) {
+            selectionStore.clear()
+        }
+
+        return true
+    }
+
+    /**
+     * Re-parent the head of an existing chain under a different
+     * (sourceNodeId, handle) slot. The rest of the chain travels with
+     * it untouched.
+     *
+     * If the destination handle already has a child, the chain is
+     * appended at the END of that destination's existing `default`-tail
+     * — nothing gets clobbered. The original incoming edge of the head
+     * is removed in the same snapshot so Undo restores both halves.
+     */
+    function moveChain(headNodeId: string, sourceNodeId: string, handle: string): boolean {
+        if (!headNodeId || !sourceNodeId || headNodeId === sourceNodeId) return false
+
+        const headExists = definition.value.nodes.some((node) => node.id === headNodeId)
+        const sourceExists = definition.value.nodes.some((node) => node.id === sourceNodeId)
+        if (!headExists || !sourceExists) return false
+
+        // Walk the destination branch down its `default` tail so we
+        // graft on the end, not on top of pre-existing children.
+        let tailNodeId = sourceNodeId
+        let tailHandle = handle
+        // Guard against accidental cycles in case the chain head sits
+        // somewhere along the destination's existing tail.
+        const visited = new Set<string>([headNodeId])
+        while (true) {
+            if (visited.has(tailNodeId)) return false
+            visited.add(tailNodeId)
+
+            const next = definition.value.edges.find(
+                (edge) => edge.from === tailNodeId && (edge.handle ?? 'default') === tailHandle,
+            )
+            if (!next) break
+            tailNodeId = next.to
+            tailHandle = 'default'
+        }
+
+        snapshot()
+
+        // Drop the broken inbound edge to the chain head, if any. Orphan
+        // chains created by prior bugs may already be rootless — in that
+        // case there's nothing to remove, we just add the new edge.
+        definition.value.edges = definition.value.edges.filter(
+            (edge) => edge.to !== headNodeId,
+        )
+
+        // Connect the chain head to the destination tail with the
+        // appropriate handle (the picked one if the destination is the
+        // original target, `default` if we walked further down).
+        definition.value.edges.push({
+            id: nanoid(10),
+            from: tailNodeId,
+            to: headNodeId,
+            handle: tailNodeId === sourceNodeId ? handle : 'default',
+        })
+
+        return true
+    }
+
     function moveNodeUp(nodeId: string) {
+        const node = definition.value.nodes.find((n) => n.id === nodeId)
+        if (!node) return
+        // Terminal nodes (end, send_message with buttons / reply keyboard)
+        // must always sit at the tail of their chain — lifting them would
+        // strand whatever was last, see `nodeMustBeLast` for the contract.
+        if (nodeMustBeLast(node)) return
+
         const incomingEdge = definition.value.edges.find((edge) => edge.to === nodeId)
         if (!incomingEdge) {
             return
         }
 
-        const predecessorId = incomingEdge.from
-        const predecessorIncoming = definition.value.edges.find((edge) => edge.to === predecessorId)
-        if (!predecessorIncoming) {
-            return
-        }
-
         snapshot()
-        swapAdjacentNodes(predecessorId, nodeId)
+        swapAdjacentNodes(incomingEdge.from, nodeId)
     }
 
     function moveNodeDown(nodeId: string) {
@@ -326,6 +418,11 @@ export const useBuilderStore = defineStore('builder', () => {
         if (!outgoingEdge) {
             return
         }
+
+        // Refuse to demote a terminator by swapping it backwards — see
+        // `nodeMustBeLast` for the set of types that have to stay last.
+        const successor = definition.value.nodes.find((n) => n.id === outgoingEdge.to)
+        if (successor && nodeMustBeLast(successor)) return
 
         snapshot()
         swapAdjacentNodes(nodeId, outgoingEdge.to)
@@ -429,6 +526,8 @@ export const useBuilderStore = defineStore('builder', () => {
         updateNodeConfig,
         insertNode,
         deleteNode,
+        removeNodes,
+        moveChain,
         moveNodeUp,
         moveNodeDown,
     }

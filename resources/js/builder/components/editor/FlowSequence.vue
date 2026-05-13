@@ -3,6 +3,7 @@ import {computed, ref} from 'vue'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {useNavigationStore} from '@builder/store/navigationStore'
+import {useConfirm} from '@builder/composables/useConfirm'
 import FlowNodeCard from './FlowNodeCard.vue'
 import FlowInsertPoint from './FlowInsertPoint.vue'
 import FlowConditionCard from './FlowConditionCard.vue'
@@ -15,15 +16,60 @@ interface TreeNode {
 
 const builderStore = useBuilderStore()
 const selectionStore = useSelectionStore()
+const { confirm } = useConfirm()
 const navigationStore = useNavigationStore()
 
+function isTerminalSendMessage(node: TreeNode['node']): boolean {
+    if (node.type !== 'send_message') return false
+    const config = (node.config ?? {}) as Record<string, unknown>
+    if (config.content_type !== 'text_with_keyboard') return false
+    if ((config.keyboard_mode ?? 'inline') === 'reply') return true
+    const buttons = Array.isArray(config.buttons) ? (config.buttons as unknown[]) : []
+    return buttons.length > 0
+}
+
+// Walk the linear `default` chain at the current branch level. Stop as
+// soon as we hit a terminal node — anything past it (default-children,
+// sibling roots) is unreachable and surfaces in the orphan block below.
 function flattenLinear(nodes: TreeNode[]): TreeNode[] {
     const result: TreeNode[] = []
     for (const node of nodes ?? []) {
         result.push(node)
+        if (isTerminalSendMessage(node.node)) return result
         const nextDefault = node.childrenByHandle?.default ?? []
         if (nextDefault.length > 0) {
             result.push(...flattenLinear(nextDefault))
+        }
+    }
+    return result
+}
+
+// Collect the linear `default`-chain past a terminal send_message.
+function collectDefaultTail(terminal: TreeNode): TreeNode[] {
+    const result: TreeNode[] = []
+    let cursor: TreeNode[] = (terminal.childrenByHandle?.default ?? []) as TreeNode[]
+    while (cursor.length > 0) {
+        const item = cursor[0]
+        result.push(item)
+        cursor = (item.childrenByHandle?.default ?? []) as TreeNode[]
+    }
+    return result
+}
+
+// Sibling roots in the branch level that aren't part of the main path
+// (i.e., aren't in activeNodes). Each sibling root is itself the head
+// of a linear chain — collect it and its `default` descendants.
+function collectSiblingRoots(branchRoots: TreeNode[], visible: TreeNode[]): TreeNode[] {
+    const visibleIds = new Set(visible.map((n) => n.node.id))
+    const result: TreeNode[] = []
+    for (const root of branchRoots) {
+        if (visibleIds.has(root.node.id)) continue
+        result.push(root)
+        let cursor: TreeNode[] = (root.childrenByHandle?.default ?? []) as TreeNode[]
+        while (cursor.length > 0) {
+            const item = cursor[0]
+            result.push(item)
+            cursor = (item.childrenByHandle?.default ?? []) as TreeNode[]
         }
     }
     return result
@@ -40,7 +86,7 @@ function findNodeInTree(nodes: TreeNode[], targetNodeId: string): TreeNode | nul
     return null
 }
 
-function resolveBranchNodes(tree: TreeNode[], activeBranch: string[]): TreeNode[] {
+function resolveBranchRoots(tree: TreeNode[], activeBranch: string[]): TreeNode[] {
     let currentLevel: TreeNode[] = tree ?? []
     for (let i = 0; i < activeBranch.length; i += 2) {
         const nodeId = activeBranch[i]
@@ -50,13 +96,96 @@ function resolveBranchNodes(tree: TreeNode[], activeBranch: string[]): TreeNode[
         if (!parent) break
         currentLevel = parent.childrenByHandle?.[handle] ?? []
     }
-    return flattenLinear(currentLevel)
+    return currentLevel
 }
 
-const activeNodes = computed(() => resolveBranchNodes(
+const branchRoots = computed(() => resolveBranchRoots(
     builderStore.tree,
     selectionStore.activeBranch,
 ))
+
+const activeNodes = computed(() => flattenLinear(branchRoots.value))
+
+const unreachableNodes = computed<TreeNode[]>(() => {
+    const result: TreeNode[] = []
+    const seen = new Set<string>()
+
+    // 1. Default-tail past a terminal send_message in the main path.
+    const last = activeNodes.value[activeNodes.value.length - 1]
+    if (last && isTerminalSendMessage(last.node)) {
+        for (const tn of collectDefaultTail(last)) {
+            if (!seen.has(tn.node.id)) {
+                seen.add(tn.node.id)
+                result.push(tn)
+            }
+        }
+    }
+
+    // 2. Sibling roots in the current branch — orphan chains not wired
+    //    to anything, e.g. nodes that lost their incoming edge.
+    for (const tn of collectSiblingRoots(branchRoots.value, activeNodes.value)) {
+        if (!seen.has(tn.node.id)) {
+            seen.add(tn.node.id)
+            result.push(tn)
+        }
+    }
+
+    return result
+})
+
+/**
+ * Branches of the terminal send_message that the orphan chain can be
+ * rescued under. We only surface button branches here — moving to a
+ * `default` slot would just reinstate the original broken edge.
+ */
+interface MoveTarget {
+    label: string
+    handle: string
+    sourceNodeId: string
+}
+
+const moveTargets = computed<MoveTarget[]>(() => {
+    const last = activeNodes.value[activeNodes.value.length - 1]
+    if (!last || !isTerminalSendMessage(last.node)) return []
+    const config = (last.node.config ?? {}) as Record<string, unknown>
+    const buttons = Array.isArray(config.buttons) ? (config.buttons as Array<Record<string, unknown>>) : []
+    return buttons.map((btn, idx) => {
+        const raw = btn.label
+        const text = typeof raw === 'object'
+            ? String(Object.values(raw as Record<string, unknown>)[0] ?? '')
+            : String(raw ?? '')
+        return {
+            label:        text.trim() !== '' ? text.trim() : `Button ${idx + 1}`,
+            handle:       String(btn.id ?? ''),
+            sourceNodeId: last.node.id,
+        }
+    }).filter((target) => target.handle !== '')
+})
+
+function moveChainTo(target: MoveTarget) {
+    const head = unreachableNodes.value[0]
+    if (!head) return
+    builderStore.moveChain(head.node.id, target.sourceNodeId, target.handle)
+}
+
+async function removeUnreachable() {
+    if (unreachableNodes.value.length === 0) return
+    const count = unreachableNodes.value.length
+    const ok = await confirm({
+        title:        'Delete unreachable nodes',
+        message:      `Delete ${count} unreachable node${count > 1 ? 's' : ''}? `
+            + 'They are not connected to any executable path and cannot be undone via canvas.',
+        confirmLabel: 'Delete',
+        cancelLabel:  'Keep',
+        danger:       true,
+    })
+    if (!ok) return
+    // Batch removal without per-node bridging: deleteNode() would chain
+    // incoming.default to outgoing.default at every step, which in an
+    // orphan tail re-creates the very `default` edge from the terminal
+    // send_message that made the chain unreachable in the first place.
+    builderStore.removeNodes(unreachableNodes.value.map((tn) => tn.node.id))
+}
 
 /** Breadcrumb segments based on activeBranch + node labels */
 const breadcrumbs = computed(() => {
@@ -267,6 +396,45 @@ const trailingInsertContext = computed(() => {
                     <div class="seq-connector"><div class="conn-line" /></div>
                 </div>
             </template>
+
+            <!-- unreachable orphans: nodes still wired through `default` from a
+                 terminal send_message. Surfaced explicitly so the author can
+                 wipe them in one click rather than chase a Publish error. -->
+            <div v-if="unreachableNodes.length > 0" class="unreachable-block">
+                <div class="unreachable-header">
+                    <span class="unreachable-title">
+                        Unreachable — {{ unreachableNodes.length }} node{{ unreachableNodes.length > 1 ? 's' : '' }}
+                    </span>
+                    <button class="unreachable-remove" type="button" @click="removeUnreachable">
+                        Delete all
+                    </button>
+                </div>
+                <div class="unreachable-hint">
+                    These nodes can never run — the previous send_message exits via its buttons.
+                    Move the whole chain under a button branch, or delete it before publishing.
+                </div>
+                <div v-if="moveTargets.length > 0" class="unreachable-actions">
+                    <span class="unreachable-actions-label">Move chain to:</span>
+                    <button
+                        v-for="target in moveTargets"
+                        :key="target.handle"
+                        type="button"
+                        class="unreachable-move-btn"
+                        :title="`Move ${unreachableNodes.length} node(s) under ${target.label}`"
+                        @click="moveChainTo(target)"
+                    >
+                        {{ target.label }} →
+                    </button>
+                </div>
+                <div class="unreachable-list">
+                    <FlowNodeCard
+                        v-for="(item, idx) in unreachableNodes"
+                        :key="item.node.id"
+                        :tree-node="item"
+                        :index="activeNodes.length + idx + 1"
+                    />
+                </div>
+            </div>
         </div>
     </div>
 </template>

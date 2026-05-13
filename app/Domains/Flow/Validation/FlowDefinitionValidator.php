@@ -153,13 +153,26 @@ final readonly class FlowDefinitionValidator
 
             $config = is_array($node['config'] ?? null) ? $node['config'] : [];
 
-            if (($config['keyboard_mode'] ?? null) !== 'reply') {
+            // Reply keyboard: every press becomes plain text, routed by
+            // triggers — this flow has nothing left to do after the send.
+            if (($config['keyboard_mode'] ?? null) === 'reply') {
+                if (isset($adjacency[$nodeId]['default'])) {
+                    throw $this->validationException(
+                        "send_message node with keyboard_mode=reply must be terminal — 'default' output cannot be connected"
+                    );
+                }
+
                 continue;
             }
 
-            if (isset($adjacency[$nodeId]['default'])) {
+            // Inline keyboard with buttons: each button defines its own
+            // continuation path via its button.id handle. A `default` edge
+            // would race the button branches and is therefore disallowed.
+            $buttons = is_array($config['buttons'] ?? null) ? $config['buttons'] : [];
+            if (count($buttons) > 0 && isset($adjacency[$nodeId]['default'])) {
                 throw $this->validationException(
-                    "send_message node with keyboard_mode=reply must be terminal — 'default' output cannot be connected"
+                    "send_message node with inline buttons must be terminal at the top level — "
+                    . "'default' output cannot be connected when buttons are defined"
                 );
             }
         }

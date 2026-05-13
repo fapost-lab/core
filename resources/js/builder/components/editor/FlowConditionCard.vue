@@ -3,6 +3,7 @@ import {computed, ref, watch} from 'vue'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {nodeColors} from '@builder/utils/nodeColors'
+import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 
 
@@ -43,9 +44,27 @@ function branchClass(handle: string): string {
 function childCount(handle: string): number {
     return (props.treeNode.childrenByHandle?.[handle] as unknown[])?.length ?? 0
 }
+
+const canMoveUp = computed(() => {
+    const node = props.treeNode.node
+    if (nodeMustBeLast(node)) return false
+    return builderStore.definition.edges.some((edge) => edge.to === node.id)
+})
+
+const canMoveDown = computed(() => {
+    const id = props.treeNode.node.id
+    const out = builderStore.definition.edges.find(
+        (edge) => edge.from === id && (edge.handle ?? 'default') === 'default',
+    )
+    if (!out) return false
+    const successor = builderStore.definition.nodes.find((n) => n.id === out.to)
+    if (successor && nodeMustBeLast(successor)) return false
+    return true
+})
 </script>
 
 <template>
+    <div class="node-card-wrap">
     <div
         :id="`node-card-${treeNode.node.id}`"
         class="node-card"
@@ -55,11 +74,11 @@ function childCount(handle: string): number {
         }"
         @click="selectCard"
     >
-        <div class="node-card-head">
-            <div
-                class="node-type-icon"
-                :style="{ background: colors.bg, color: colors.color }"
-            ><NodeIcon type="condition" /></div>
+        <div
+            class="node-card-head"
+            :style="{ background: colors.bg, color: colors.color }"
+        >
+            <div class="node-type-icon"><NodeIcon type="condition" /></div>
             <span class="node-type-label">Condition</span>
             <div v-if="hasError" class="node-warn" title="Validation error">!</div>
             <span v-if="index != null" class="node-num">#{{ index }}</span>
@@ -94,5 +113,21 @@ function childCount(handle: string): number {
                 </button>
             </div>
         </div>
+    </div>
+
+    <div class="node-side-actions" @click.stop>
+        <button
+            class="node-side-btn"
+            title="Move up"
+            :disabled="!canMoveUp"
+            @click.stop="builderStore.moveNodeUp(treeNode.node.id)"
+        >↑</button>
+        <button
+            class="node-side-btn"
+            title="Move down"
+            :disabled="!canMoveDown"
+            @click.stop="builderStore.moveNodeDown(treeNode.node.id)"
+        >↓</button>
+    </div>
     </div>
 </template>

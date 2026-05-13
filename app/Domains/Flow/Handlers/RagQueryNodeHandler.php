@@ -57,7 +57,28 @@ final class RagQueryNodeHandler extends AbstractVersionedHandler
     public function configSchema(): array
     {
         return [
-            'required'          => ['knowledge_base_id', 'query', 'provider'],
+            'required' => ['knowledge_base_id', 'query', 'provider'],
+            'sections' => [
+                [
+                    'key'    => 'knowledge_base',
+                    'label'  => 'Knowledge base',
+                    'icon'   => 'book-open',
+                    'fields' => ['knowledge_base_id', 'provider'],
+                ],
+                [
+                    'key'    => 'query',
+                    'label'  => 'Query',
+                    'icon'   => 'magnifying-glass',
+                    'fields' => ['query'],
+                ],
+                [
+                    'key'       => 'options',
+                    'label'     => 'Options',
+                    'icon'      => 'adjustments-horizontal',
+                    'fields'    => ['options'],
+                    'collapsed' => true,
+                ],
+            ],
             'knowledge_base_id' => [
                 'type'     => 'string',
                 'label'    => 'Knowledge base',

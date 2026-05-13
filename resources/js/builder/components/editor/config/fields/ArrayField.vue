@@ -22,27 +22,63 @@ function remove(index: number) {
 </script>
 
 <template>
-    <div class="flex flex-col gap-2">
+    <div class="array-field">
         <div
             v-for="(item, index) in value"
             :key="index"
-            class="flex gap-2"
+            class="array-row"
         >
             <input
-                class="flex-1 rounded border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+                class="field-input"
                 :value="item"
+                :placeholder="(schema as { placeholder?: string })?.placeholder ?? ''"
                 @input="update(index, ($event.target as HTMLInputElement).value)"
             >
             <button
-                class="text-gray-300 hover:text-red-400 text-xs px-2"
                 type="button"
+                class="array-del"
+                title="Remove"
                 @click="remove(index)"
-            >x</button>
+            >×</button>
         </div>
         <button
-            class="text-xs text-blue-400 hover:text-blue-500 text-left"
             type="button"
+            class="add-item-btn"
             @click="add"
         >+ Add item</button>
     </div>
 </template>
+
+<style scoped>
+.array-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.array-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.array-row > input {
+    flex: 1;
+    min-width: 0;
+}
+.array-del {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border: none;
+    background: transparent;
+    color: var(--text-3);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: color .12s, background .12s;
+}
+.array-del:hover {
+    color: var(--rose);
+    background: var(--rose-bg);
+}
+</style>

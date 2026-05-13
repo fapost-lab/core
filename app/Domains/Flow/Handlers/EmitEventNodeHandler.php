@@ -48,6 +48,20 @@ final class EmitEventNodeHandler extends AbstractVersionedHandler
     public function configSchema(): array
     {
         return [
+            'sections' => [
+                [
+                    'key'    => 'event',
+                    'label'  => 'Event',
+                    'icon'   => 'bolt',
+                    'fields' => ['event_type'],
+                ],
+                [
+                    'key'    => 'payload',
+                    'label'  => 'Payload',
+                    'icon'   => 'cube',
+                    'fields' => ['payload'],
+                ],
+            ],
             'event_type' => [
                 'type'        => 'string',
                 'label'       => 'Event type',

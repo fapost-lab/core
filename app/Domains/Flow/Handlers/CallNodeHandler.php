@@ -43,6 +43,27 @@ final class CallNodeHandler extends AbstractVersionedHandler
     public function configSchema(): array
     {
         return [
+            'sections' => [
+                [
+                    'key'    => 'connection',
+                    'label'  => 'Connection',
+                    'icon'   => 'globe-alt',
+                    'fields' => ['url', 'timeout'],
+                ],
+                [
+                    'key'    => 'response',
+                    'label'  => 'Response handling',
+                    'icon'   => 'arrow-down-tray',
+                    'fields' => ['save_response_to'],
+                ],
+                [
+                    'key'       => 'advanced',
+                    'label'     => 'Advanced',
+                    'icon'      => 'cog-6-tooth',
+                    'fields'    => ['include_state'],
+                    'collapsed' => true,
+                ],
+            ],
             'url' => [
                 'type'        => 'string',
                 'label'       => 'URL',
@@ -65,6 +86,7 @@ final class CallNodeHandler extends AbstractVersionedHandler
                 'type'     => 'array',
                 'label'    => 'Include state',
                 'required' => false,
+                'help'     => 'State paths whose values are forwarded in the request payload.',
             ],
         ];
     }

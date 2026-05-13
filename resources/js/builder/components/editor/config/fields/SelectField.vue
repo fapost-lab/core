@@ -34,7 +34,7 @@ const choices = computed<Array<{ value: string; label: string }>>(() => {
 
 <template>
     <select
-        class="w-full rounded border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400"
+        class="field-input"
         :value="value ?? ''"
         @change="$emit('update:value', ($event.target as HTMLSelectElement).value)"
     >

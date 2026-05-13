@@ -71,6 +71,7 @@ function deleteTrigger() {
 <template>
     <div
         class="panel-config"
+        :class="{ 'panel-config--val-open': builderStore.validationOpen }"
         :style="{ width: isCollapsed ? '0' : `${width}px` }"
     >
         <!-- resize handle -->
@@ -89,60 +90,66 @@ function deleteTrigger() {
             </div>
 
             <template v-else-if="isTriggerSelected">
-                <div class="config-node-header">
-                    <div
-                        class="node-type-icon"
-                        style="width:28px;height:28px;background:var(--sky-bg);color:var(--sky)"
-                    >
-                        <!-- Trigger isn't a node — render its own custom svg
-                             inline. Same monochrome line style as NodeIcon. -->
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                             stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
-                             style="width:100%;height:100%;padding:14%;box-sizing:border-box">
-                            <path d="M13 3L5 13h6l-1 8 8-10h-6z" />
-                        </svg>
+                <div class="config-card-wrap">
+                    <div class="config-card">
+                        <div class="config-card-header">
+                            <div
+                                class="node-type-icon"
+                                style="width:28px;height:28px;background:var(--sky-bg);color:var(--sky)"
+                            >
+                                <!-- Trigger isn't a node — render its own custom svg
+                                     inline. Same monochrome line style as NodeIcon. -->
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                     stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"
+                                     style="width:100%;height:100%;padding:14%;box-sizing:border-box">
+                                    <path d="M13 3L5 13h6l-1 8 8-10h-6z" />
+                                </svg>
+                            </div>
+                            <div style="flex:1;min-width:0">
+                                <div class="config-node-title">Trigger</div>
+                                <span class="config-node-type">Flow entry configuration</span>
+                            </div>
+                        </div>
+                        <div class="config-card-body">
+                            <TriggerConfig
+                                :trigger="builderStore.trigger"
+                                :available-events="builderStore.availableEvents"
+                                @update:trigger="updateTrigger"
+                                @delete:trigger="deleteTrigger"
+                            />
+                        </div>
                     </div>
-                    <div style="flex:1;min-width:0">
-                        <div class="config-node-title">Trigger</div>
-                        <span class="config-node-type">Flow entry configuration</span>
-                    </div>
-                </div>
-
-                <div class="config-scrollable">
-                    <TriggerConfig
-                        :trigger="builderStore.trigger"
-                        :available-events="builderStore.availableEvents"
-                        @update:trigger="updateTrigger"
-                        @delete:trigger="deleteTrigger"
-                    />
                 </div>
             </template>
 
             <!-- node config -->
             <template v-else-if="selectedNode">
-                <div class="config-node-header">
-                    <div
-                        v-if="colors"
-                        class="node-type-icon"
-                        style="width:28px;height:28px"
-                        :style="{ background: colors.bg, color: colors.color }"
-                    ><NodeIcon :type="selectedNode.type" /></div>
-                    <div style="flex:1;min-width:0">
-                        <div class="config-node-title">{{ nodeTypeLabel }}</div>
-                        <span class="config-node-type">
-                            v{{ selectedNode.version }}
-                            <template v-if="selectedNode.id"> · {{ selectedNode.id.slice(-6) }}</template>
-                        </span>
+                <div class="config-card-wrap">
+                    <div class="config-card">
+                        <div class="config-card-header">
+                            <div
+                                v-if="colors"
+                                class="node-type-icon"
+                                style="width:28px;height:28px"
+                                :style="{ background: colors.bg, color: colors.color }"
+                            ><NodeIcon :type="selectedNode.type" /></div>
+                            <div style="flex:1;min-width:0">
+                                <div class="config-node-title">{{ nodeTypeLabel }}</div>
+                                <span class="config-node-type">
+                                    v{{ selectedNode.version }}
+                                    <template v-if="selectedNode.id"> · {{ selectedNode.id.slice(-6) }}</template>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="config-card-body">
+                            <component
+                                :is="configComponent"
+                                :node="selectedNode"
+                                :schema="handlerMeta?.config_schema ?? {}"
+                                @update:config="updateConfig"
+                            />
+                        </div>
                     </div>
-                </div>
-
-                <div class="config-scrollable">
-                    <component
-                        :is="configComponent"
-                        :node="selectedNode"
-                        :schema="handlerMeta?.config_schema ?? {}"
-                        @update:config="updateConfig"
-                    />
                 </div>
             </template>
         </template>

@@ -58,7 +58,21 @@ final class SubflowNodeHandler extends AbstractVersionedHandler
     {
         return [
             'required' => ['flow_id', 'timeout'],
-            'flow_id'  => [
+            'sections' => [
+                [
+                    'key'    => 'target',
+                    'label'  => 'Target flow',
+                    'icon'   => 'arrow-right-circle',
+                    'fields' => ['flow_id'],
+                ],
+                [
+                    'key'    => 'behavior',
+                    'label'  => 'Behavior',
+                    'icon'   => 'clock',
+                    'fields' => ['timeout'],
+                ],
+            ],
+            'flow_id' => [
                 'type'     => 'string',
                 'label'    => 'Subflow flow_id',
                 'required' => true,

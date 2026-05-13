@@ -4,6 +4,7 @@ import {useSelectionStore} from '@builder/store/selectionStore'
 import {useRegistryStore} from '@builder/store/registryStore'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {nodeColors} from '@builder/utils/nodeColors'
+import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 
 const props = defineProps({
@@ -92,9 +93,48 @@ function select() {
 function deleteNode() {
     builderStore.deleteNode(props.treeNode.node.id)
 }
+
+// A node can move up only if it has both an incoming edge AND its
+// predecessor has its own incoming edge — i.e. it's not adjacent to the
+// flow root. It can move down only along a linear `default` outgoing
+// edge — branching/terminal nodes have no default-successor to swap with.
+const canMoveUp = computed(() => {
+    const node = props.treeNode.node
+    // Always-last nodes (end, send_message with buttons / reply keyboard)
+    // can't be lifted — moving them up would push another node behind a
+    // terminator, breaking the chain semantics.
+    if (nodeMustBeLast(node)) return false
+    // Otherwise any node with an incoming default edge can swap with its
+    // predecessor — including the very first node, which is the graph
+    // root with no incoming edge of its own.
+    return builderStore.definition.edges.some((edge) => edge.to === node.id)
+})
+
+const canMoveDown = computed(() => {
+    const id = props.treeNode.node.id
+    const out = builderStore.definition.edges.find(
+        (edge) => edge.from === id && (edge.handle ?? 'default') === 'default',
+    )
+    if (!out) return false
+    // If the immediate successor must stay last (end, terminal
+    // send_message), swapping past it would demote the terminator —
+    // refuse the move.
+    const successor = builderStore.definition.nodes.find((n) => n.id === out.to)
+    if (successor && nodeMustBeLast(successor)) return false
+    return true
+})
+
+function moveUp() {
+    builderStore.moveNodeUp(props.treeNode.node.id)
+}
+
+function moveDown() {
+    builderStore.moveNodeDown(props.treeNode.node.id)
+}
 </script>
 
 <template>
+    <div class="node-card-wrap">
     <div
         :id="`node-card-${treeNode.node.id}`"
         class="node-card"
@@ -107,11 +147,11 @@ function deleteNode() {
         ]"
         @click="select"
     >
-        <div class="node-card-head">
-            <div
-                class="node-type-icon"
-                :style="endStatus ? undefined : { background: colors.bg, color: colors.color }"
-            ><NodeIcon :type="treeNode.node.type" /></div>
+        <div
+            class="node-card-head"
+            :style="endStatus ? undefined : { background: colors.bg, color: colors.color }"
+        >
+            <div class="node-type-icon"><NodeIcon :type="treeNode.node.type" /></div>
             <span class="node-type-label">{{ typeLabel }}</span>
             <span v-if="endStatusLabel" class="end-status-badge">{{ endStatusLabel }}</span>
             <div v-if="hasError" class="node-warn" title="Validation error">!</div>
@@ -133,5 +173,21 @@ function deleteNode() {
                 >{{ typeof row.val === 'string' ? row.val.slice(0, 60) : row.val }}</span>
             </div>
         </div>
+    </div>
+
+    <div class="node-side-actions" @click.stop>
+        <button
+            class="node-side-btn"
+            title="Move up"
+            :disabled="!canMoveUp"
+            @click.stop="moveUp"
+        >↑</button>
+        <button
+            class="node-side-btn"
+            title="Move down"
+            :disabled="!canMoveDown"
+            @click.stop="moveDown"
+        >↓</button>
+    </div>
     </div>
 </template>
