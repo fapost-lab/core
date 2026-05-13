@@ -60,7 +60,7 @@ final class CallNodeHandler extends AbstractVersionedHandler
                     'key'       => 'advanced',
                     'label'     => 'Advanced',
                     'icon'      => 'cog-6-tooth',
-                    'fields'    => ['include_state'],
+                    'fields'    => ['headers', 'include_state'],
                     'collapsed' => true,
                 ],
             ],
@@ -75,12 +75,23 @@ final class CallNodeHandler extends AbstractVersionedHandler
                 'label'    => 'Timeout (seconds)',
                 'required' => false,
                 'default'  => 10,
+                'min'      => 1,
+                'max'      => 300,
             ],
             'save_response_to' => [
                 'type'        => 'state-picker',
                 'label'       => 'Save response to',
                 'required'    => false,
                 'placeholder' => 'flow.webhook_response',
+            ],
+            'headers' => [
+                'type'        => 'key-value',
+                'label'       => 'Custom headers',
+                'required'    => false,
+                'key_label'   => 'Header',
+                'value_label' => 'Value',
+                'placeholder' => ['Authorization' => 'Bearer ...'],
+                'help'        => 'Sent alongside the request. Reserved X-* headers set by the engine cannot be overridden.',
             ],
             'include_state' => [
                 'type'     => 'array',
@@ -103,14 +114,30 @@ final class CallNodeHandler extends AbstractVersionedHandler
         $idempotencyKey = "{$context->sessionId}:{$context->nodeId}";
         $payload        = $this->buildPayload($config, $state, $context);
 
+        // Engine-set headers must always win — they're how the receiving
+        // service correlates retries and traces the originating session.
+        // Author-provided custom headers fill the rest of the request.
+        $headers    = [];
+        $rawHeaders = $config['headers'] ?? null;
+        if (is_array($rawHeaders)) {
+            foreach ($rawHeaders as $headerKey => $headerValue) {
+                if ( ! is_string($headerKey) || '' === $headerKey) {
+                    continue;
+                }
+                if (str_starts_with($headerKey, 'X-Idempotency-Key') || str_starts_with($headerKey, 'X-FAPost-')) {
+                    continue;
+                }
+                $headers[$headerKey] = (string)$headerValue;
+            }
+        }
+        $headers['X-Idempotency-Key'] = $idempotencyKey;
+        $headers['X-FAPost-Session']  = $context->sessionId;
+
         try {
             $response = $this->http->post(
                 url: $url,
                 payload: $payload,
-                headers: [
-                    'X-Idempotency-Key' => $idempotencyKey,
-                    'X-FAPost-Session'  => $context->sessionId,
-                ],
+                headers: $headers,
                 timeout: (int)($config['timeout'] ?? 10),
             );
         } catch (HttpTransportException $exception) {

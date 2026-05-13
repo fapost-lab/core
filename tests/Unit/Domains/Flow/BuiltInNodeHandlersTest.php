@@ -815,6 +815,40 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('success', $executed->sourceHandle);
     }
 
+    public function test_webhook_forwards_custom_headers_and_protects_reserved_ones(): void
+    {
+        $capturedHeaders = [];
+        $http            = Mockery::mock(HttpClientInterface::class);
+        $http->shouldReceive('post')
+            ->once()
+            ->andReturnUsing(
+                function (string $url, array $payload, array $headers, int $timeout) use (&$capturedHeaders) {
+                    $capturedHeaders = $headers;
+
+                    return new HttpResponse(200, ['ok' => true]);
+                }
+            );
+
+        $handler = new CallNodeHandler($http);
+        $handler->execute([
+            'id'     => 'hook-1',
+            'config' => [
+                'url'     => 'https://example.test/hook',
+                'headers' => [
+                    'Authorization'     => 'Bearer abc',
+                    'Accept-Language'   => 'fr-FR',
+                    'X-Idempotency-Key' => 'attacker-controlled',
+                ],
+            ],
+        ], [], $this->context(nodeId: 'hook-1'));
+
+        $this->assertSame('Bearer abc', $capturedHeaders['Authorization']);
+        $this->assertSame('fr-FR', $capturedHeaders['Accept-Language']);
+        // Engine-set headers always win, even when the author tried to override them.
+        $this->assertSame('session-1:hook-1', $capturedHeaders['X-Idempotency-Key']);
+        $this->assertSame('session-1', $capturedHeaders['X-FAPost-Session']);
+    }
+
     public function test_emit_event_publishes_resolved_payload_and_returns_success_handle(): void
     {
         $publisher = Mockery::mock(FlowTriggerEventPublisherInterface::class);

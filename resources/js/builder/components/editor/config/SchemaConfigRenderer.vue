@@ -1,13 +1,8 @@
 <script setup lang="ts">
 import {computed} from 'vue'
 import AccordionSection from './AccordionSection.vue'
-import TextField from './fields/TextField.vue'
-import TextareaField from './fields/TextareaField.vue'
-import SelectField from './fields/SelectField.vue'
-import ToggleField from './fields/ToggleField.vue'
-import ArrayField from './fields/ArrayField.vue'
-import JsonField from './fields/JsonField.vue'
-import StatePickerField from './fields/StatePickerField.vue'
+import type {FieldEntry} from './SchemaFields.vue'
+import SchemaFields from './SchemaFields.vue'
 
 const props = defineProps({
     node:   { type: Object, required: true },
@@ -15,28 +10,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:config'])
-
-// Schema-driven config renderer. Picks the right field component per
-// `schema[key].type`, falling through to TextField when the type is
-// unknown. Bespoke node configs (send_message, input, condition, trigger)
-// are handled outside this component via ConfigPanel's overrides map.
-const FIELD_COMPONENTS: Record<string, object> = {
-    string:         TextField,
-    text:           TextareaField,
-    number:         TextField,
-    boolean:        ToggleField,
-    enum:           SelectField,
-    array:          ArrayField,
-    json:           JsonField,
-    'state-picker': StatePickerField,
-}
-
-interface FieldEntry {
-    key: string
-    schema: Record<string, unknown>
-    required: boolean
-    component: object
-}
 
 interface SectionDescriptor {
     key:       string
@@ -64,22 +37,17 @@ const fields = computed<FieldEntry[]>(() => {
     const requiredList = Array.isArray(raw.required) ? (raw.required as string[]) : []
 
     const entries: FieldEntry[] = []
-
     for (const [key, value] of Object.entries(raw)) {
         if (RESERVED_KEYS.has(key)) continue
         if (!isFieldSchema(value)) continue
 
         const fieldSchema = value as Record<string, unknown>
-        const type = String(fieldSchema.type ?? 'string')
-
         entries.push({
             key,
             schema: fieldSchema,
             required: Boolean(fieldSchema.required) || requiredList.includes(key),
-            component: FIELD_COMPONENTS[type] ?? TextField,
         })
     }
-
     return entries
 })
 
@@ -131,21 +99,16 @@ const sections = computed<SectionDescriptor[]>(() => {
     }]
 })
 
+const rootConfig = computed<Record<string, unknown>>(() =>
+    (props.node?.config ?? {}) as Record<string, unknown>,
+)
+
 function isFieldSchema(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && 'type' in (value as Record<string, unknown>)
 }
 
-function valueFor(key: string, fieldSchema: Record<string, unknown>): unknown {
-    const cfg = (props.node?.config ?? {}) as Record<string, unknown>
-    const stored = cfg[key]
-    if (stored !== undefined) {
-        return stored
-    }
-    return fieldSchema.default
-}
-
-function update(key: string, value: unknown) {
-    emit('update:config', { [key]: value })
+function emitPatch(patch: Record<string, unknown>) {
+    emit('update:config', patch)
 }
 </script>
 
@@ -158,25 +121,12 @@ function update(key: string, value: unknown) {
             :icon="section.icon"
             :default-open="!section.collapsed"
         >
-            <div
-                v-for="field in section.fields"
-                :key="field.key"
-                class="config-field"
-            >
-                <div class="field-label">
-                    {{ field.schema.label ?? field.key }}
-                    <span v-if="field.required" class="schema-required">*</span>
-                </div>
-                <component
-                    :is="field.component"
-                    :value="valueFor(field.key, field.schema)"
-                    :schema="field.schema"
-                    @update:value="update(field.key, $event)"
-                />
-                <p v-if="field.schema.help" class="field-help">
-                    {{ field.schema.help }}
-                </p>
-            </div>
+            <SchemaFields
+                :config="rootConfig"
+                :fields="section.fields"
+                :root-config="rootConfig"
+                @update:config="emitPatch"
+            />
         </AccordionSection>
 
         <AccordionSection title="Meta">
@@ -192,16 +142,3 @@ function update(key: string, value: unknown) {
         </AccordionSection>
     </div>
 </template>
-
-<style scoped>
-.schema-required {
-    color: #e53e3e;
-    margin-left: 2px;
-}
-.field-help {
-    font-size: 11px;
-    color: var(--text-3);
-    margin-top: 4px;
-    line-height: 1.35;
-}
-</style>

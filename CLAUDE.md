@@ -627,6 +627,12 @@ Flow engine не читает напрямую из модульных табл�
 
 **Каждый handler обязан быть safe to retry.** Идемпотентность фиксируется в state самим handler-ом.
 
+### configSchema reference
+
+Полный словарь полей и опций, которые принимает `NodeHandlerInterface::configSchema()` — в [
+`docs/builder-config-schema-reference.md`](docs/builder-config-schema-reference.md). Добавил новый field-тип в
+renderer → расширил reference. Это контракт, не комментарий.
+
 ---
 
 ## Node taxonomy
