@@ -33,96 +33,97 @@ const translatedCount = computed(() =>
 
 <template>
     <div class="editor-panel">
-        <!-- Header -->
-        <div class="panel-header">
-            <span class="key-title">{{ contentKey ?? '—' }}</span>
-            <div class="header-actions">
-                <button
-                    v-if="contentKey"
-                    type="button"
-                    class="btn btn-ghost"
-                    @click="emit('delete', contentKey)"
-                >
-                    Delete
-                </button>
-                <button
-                    v-if="contentKey"
-                    type="button"
-                    class="btn btn-primary"
-                    @click="emit('save')"
-                >
-                    Save
-                </button>
-            </div>
-        </div>
-
         <!-- Empty state -->
         <div v-if="!contentKey" class="empty">
             Select a content key to edit translations
         </div>
 
-        <!-- Editor -->
-        <div v-else class="editor-body">
-            <div class="key-meta">
-                {{ translatedCount }} / {{ languages.length }} translations
-            </div>
-
-            <div
-                v-for="lang in languages"
-                :key="(lang as Language).code"
-                class="lang-field"
-            >
-                <div class="lang-label">
-                    <span class="lang-flag">{{ flag((lang as Language).code) }}</span>
-                    {{ (lang as Language).name }}
-                    <span class="char-count">
-                        {{ (translations[(lang as Language).code] ?? '').length }}
-                    </span>
+        <div v-else class="content-editor-wrap">
+            <div class="content-editor-card">
+                <div class="content-editor-header">
+                    <div style="flex:1;min-width:0">
+                        <div class="content-editor-title">
+                            {{ contentKey }}
+                            <span class="content-editor-meta">· {{ translatedCount }}/{{ languages.length }} translations</span>
+                        </div>
+                    </div>
+                    <button
+                        class="card-header-btn"
+                        type="button"
+                        @click="emit('delete', contentKey)"
+                    >Delete
+                    </button>
+                    <button
+                        class="card-header-btn card-header-btn--primary"
+                        type="button"
+                        @click="emit('save')"
+                    >Save
+                    </button>
                 </div>
-                <textarea
-                    class="lang-textarea"
-                    rows="3"
-                    :value="translations[(lang as Language).code] ?? ''"
-                    @input="onTextareaInput((lang as Language).code, $event)"
-                />
+                <div class="content-editor-body">
+                    <div
+                        v-for="lang in languages"
+                        :key="(lang as Language).code"
+                        class="lang-field"
+                    >
+                        <div class="lang-label">
+                            <span class="lang-flag">{{ flag((lang as Language).code) }}</span>
+                            {{ (lang as Language).name }}
+                            <span class="char-count">
+                                {{ (translations[(lang as Language).code] ?? '').length }}
+                            </span>
+                        </div>
+                        <textarea
+                            :value="translations[(lang as Language).code] ?? ''"
+                            class="lang-textarea"
+                            rows="3"
+                            @input="onTextareaInput((lang as Language).code, $event)"
+                        />
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </template>
 
 <style scoped>
-.editor-panel { flex: 1; background: var(--bg); display: flex; flex-direction: column; overflow: hidden; }
-
-.panel-header {
-    padding: 10px 20px 9px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: .05em;
-    text-transform: uppercase;
-    color: var(--text-3);
-    flex-shrink: 0;
+.editor-panel {
+    flex: 1;
+    background: var(--bg);
     display: flex;
-    align-items: center;
-    justify-content: space-between;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
 }
-.key-title { font-family: 'Victor Mono', monospace; font-weight: 500; font-size: 12px; text-transform: none; letter-spacing: 0; }
-.header-actions { display: flex; gap: 6px; }
-.btn {
+
+.card-header-btn {
     padding: 3px 10px;
-    border-radius: var(--radius);
+    border-radius: 5px;
     font-family: 'DM Sans', sans-serif;
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 500;
     cursor: pointer;
-    border: 1px solid transparent;
-    transition: all .15s;
+    background: rgba(255, 255, 255, .14);
+    color: rgba(255, 255, 255, .9);
+    border: 1px solid rgba(255, 255, 255, .25);
+    transition: background .15s, color .15s;
 }
-.btn-ghost   { background: transparent; color: var(--text-2); border-color: var(--border); }
-.btn-ghost:hover { background: var(--surface-2); }
-.btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
-.btn-primary:hover { background: #4a5c48; }
+
+.card-header-btn:hover {
+    background: rgba(255, 255, 255, .24);
+    color: #fff;
+}
+
+.card-header-btn--primary {
+    background: #fff;
+    color: var(--primary);
+    border-color: #fff;
+}
+
+.card-header-btn--primary:hover {
+    background: rgba(255, 255, 255, .9);
+    color: var(--primary);
+}
 
 .empty {
     flex: 1;
@@ -133,8 +134,91 @@ const translatedCount = computed(() =>
     color: var(--text-3);
 }
 
-.editor-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
-.key-meta { font-size: 12px; color: var(--text-3); margin-bottom: 20px; }
+.content-editor-wrap {
+    flex: 1;
+    min-height: 0;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+}
+
+.content-editor-card {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(107, 120, 97, .9) 0%, rgba(125, 138, 112, .76) 24%, rgba(125, 138, 112, .2) 48%, rgba(125, 138, 112, 0) 68%),
+    var(--primary-bg);
+    box-shadow: var(--shadow);
+    padding: 7px;
+}
+
+.content-editor-header {
+    min-height: 42px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px 8px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, .9);
+    flex-shrink: 0;
+}
+
+.content-editor-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, .9);
+}
+
+.content-editor-meta {
+    color: rgba(255, 255, 255, .68);
+    font-weight: 600;
+}
+
+.content-editor-card .card-header-btn {
+    background: rgba(255, 255, 255, .14);
+    color: rgba(255, 255, 255, .9);
+    border-color: rgba(255, 255, 255, .25);
+}
+
+.content-editor-card .card-header-btn:hover {
+    background: rgba(255, 255, 255, .24);
+    color: #fff;
+}
+
+.content-editor-card .card-header-btn--primary {
+    background: #fff;
+    color: var(--primary);
+    border-color: #fff;
+}
+
+.content-editor-card .card-header-btn--primary:hover {
+    background: rgba(255, 255, 255, .9);
+    color: var(--primary);
+}
+
+.content-editor-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    margin-top: 0;
+    padding: 10px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(255, 255, 255, .9)),
+    var(--primary-bg);
+    border: 1px dashed color-mix(in srgb, var(--primary) 44%, #fff);
+    border-radius: 7px;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+}
 
 .lang-field { margin-bottom: 16px; }
 .lang-label {

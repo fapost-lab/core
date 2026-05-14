@@ -7,15 +7,17 @@ const builderStore = useBuilderStore()
 
 <template>
     <div class="panel panel-structure">
-        <div class="panel-header">Structure</div>
-        <div class="panel-body">
-            <FlowStructureNode
-                v-for="treeNode in builderStore.tree"
-                :key="treeNode.node.id"
-                :tree-node="treeNode"
-                :depth="0"
-                :parent-branch="[]"
-            />
+        <div class="structure-card">
+            <div class="panel-header">Structure</div>
+            <div class="panel-body">
+                <FlowStructureNode
+                    v-for="treeNode in builderStore.tree"
+                    :key="treeNode.node.id"
+                    :depth="0"
+                    :parent-branch="[]"
+                    :tree-node="treeNode"
+                />
+            </div>
         </div>
     </div>
 </template>

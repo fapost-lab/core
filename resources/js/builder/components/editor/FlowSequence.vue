@@ -344,121 +344,127 @@ const trailingInsertContext = computed(() => {
                 </template>
             </div>
 
-            <!-- Trigger card (only at root) -->
-            <template v-if="isAtRoot">
-                <div class="trigger-card" @click="selectionStore.selectTrigger()">
-                    <div class="trigger-icon">⚡</div>
-                    <div>
-                        <div class="trigger-label">{{ triggerLabel.label }}</div>
-                        <div v-if="triggerLabel.sub" class="trigger-sub">{{ triggerLabel.sub }}</div>
+            <div class="sequence-card-body">
+                <!-- Trigger card (only at root) -->
+                <template v-if="isAtRoot">
+                    <div class="trigger-card" @click="selectionStore.selectTrigger()">
+                        <div class="trigger-icon">⚡</div>
+                        <div>
+                            <div class="trigger-label">{{ triggerLabel.label }}</div>
+                            <div v-if="triggerLabel.sub" class="trigger-sub">{{ triggerLabel.sub }}</div>
+                        </div>
                     </div>
-                </div>
-            </template>
+                </template>
 
-            <!-- Nodes -->
-            <template v-for="(item, index) in activeNodes" :key="item.node.id">
-                <!-- slot between nodes: hover group reveals insert button -->
-                <div
-                    class="seq-slot"
-                    @mouseenter="hoveredSlot = `slot-${index}`"
-                    @mouseleave="hoveredSlot = null"
-                >
-                    <div class="seq-connector">
-                        <div class="conn-line" />
-                        <div class="conn-dot" />
-                        <div class="conn-line" />
-                    </div>
-                    <FlowInsertPoint
-                        :after-node-id="slotContext(index).afterNodeId"
-                        :handle="slotContext(index).handle"
-                        :index="index"
-                        :visible="hoveredSlot === `slot-${index}`"
-                    />
-                    <div class="seq-connector"><div class="conn-line" /></div>
-                </div>
-
-                <FlowConditionCard
-                    v-if="item.node.type === 'condition'"
-                    :tree-node="item"
-                    :parent-branch="selectionStore.activeBranch"
-                    :index="index + 1"
-                />
-                <FlowSendMessageCard
-                    v-else-if="
-                        item.node.type === 'send_message'
-                            && item.node.config?.content_type === 'text_with_keyboard'
-                            && (item.node.config?.keyboard_mode ?? 'inline') !== 'reply'
-                            && ((item.node.config?.buttons as unknown[] | undefined)?.length ?? 0) > 0
-                    "
-                    :tree-node="item"
-                    :parent-branch="selectionStore.activeBranch"
-                    :index="index + 1"
-                />
-                <FlowNodeCard
-                    v-else
-                    :tree-node="item"
-                    :index="index + 1"
-                />
-            </template>
-
-            <!-- trailing slot + end card — hidden when last node is inline keyboard (buttons are the exit) -->
-            <template v-if="!lastNodeIsTerminal">
-                <div
-                    class="seq-slot"
-                    @mouseenter="hoveredSlot = 'slot-end'"
-                    @mouseleave="hoveredSlot = null"
-                >
-                    <div class="seq-connector">
-                        <div class="conn-line" />
-                        <div class="conn-dot" />
-                        <div class="conn-line" />
-                    </div>
-                    <FlowInsertPoint
-                        :after-node-id="trailingInsertContext.afterNodeId"
-                        :handle="trailingInsertContext.handle"
-                        :index="activeNodes.length"
-                        :visible="hoveredSlot === 'slot-end'"
-                    />
-                    <div class="seq-connector"><div class="conn-line" /></div>
-                </div>
-            </template>
-
-            <!-- unreachable orphans: nodes still wired through `default` from a
-                 terminal send_message. Surfaced explicitly so the author can
-                 wipe them in one click rather than chase a Publish error. -->
-            <div v-if="unreachableNodes.length > 0" class="unreachable-block">
-                <div class="unreachable-header">
-                    <span class="unreachable-title">
-                        Unreachable — {{ unreachableNodes.length }} node{{ unreachableNodes.length > 1 ? 's' : '' }}
-                    </span>
-                    <button class="unreachable-remove" type="button" @click="removeUnreachable">
-                        Delete all
-                    </button>
-                </div>
-                <div class="unreachable-hint">
-                    These nodes can never run — the previous send_message exits via its buttons.
-                    Move the whole chain under a button branch, or delete it before publishing.
-                </div>
-                <div v-if="moveTargets.length > 0" class="unreachable-actions">
-                    <span class="unreachable-actions-label">Move chain to:</span>
-                    <button
-                        v-for="target in moveTargets"
-                        :key="target.handle"
-                        type="button"
-                        class="unreachable-move-btn"
-                        :title="`Move ${unreachableNodes.length} node(s) under ${target.label}`"
-                        @click="moveChainTo(target)"
+                <!-- Nodes -->
+                <template v-for="(item, index) in activeNodes" :key="item.node.id">
+                    <!-- slot between nodes: hover group reveals insert button -->
+                    <div
+                        class="seq-slot"
+                        @mouseenter="hoveredSlot = `slot-${index}`"
+                        @mouseleave="hoveredSlot = null"
                     >
-                        {{ target.label }} →
-                    </button>
-                </div>
-                <div class="unreachable-list">
-                    <FlowNodeCard
-                        v-for="(item, idx) in unreachableNodes"
-                        :key="item.node.id"
+                        <div class="seq-connector">
+                            <div class="conn-line"/>
+                            <div class="conn-dot"/>
+                            <div class="conn-line"/>
+                        </div>
+                        <FlowInsertPoint
+                            :after-node-id="slotContext(index).afterNodeId"
+                            :handle="slotContext(index).handle"
+                            :index="index"
+                            :visible="hoveredSlot === `slot-${index}`"
+                        />
+                        <div class="seq-connector">
+                            <div class="conn-line"/>
+                        </div>
+                    </div>
+
+                    <FlowConditionCard
+                        v-if="item.node.type === 'condition'"
+                        :index="index + 1"
+                        :parent-branch="selectionStore.activeBranch"
                         :tree-node="item"
-                        :index="activeNodes.length + idx + 1"
                     />
+                    <FlowSendMessageCard
+                        v-else-if="
+                            item.node.type === 'send_message'
+                                && item.node.config?.content_type === 'text_with_keyboard'
+                                && (item.node.config?.keyboard_mode ?? 'inline') !== 'reply'
+                                && ((item.node.config?.buttons as unknown[] | undefined)?.length ?? 0) > 0
+                        "
+                        :index="index + 1"
+                        :parent-branch="selectionStore.activeBranch"
+                        :tree-node="item"
+                    />
+                    <FlowNodeCard
+                        v-else
+                        :index="index + 1"
+                        :tree-node="item"
+                    />
+                </template>
+
+                <!-- trailing slot + end card — hidden when last node is inline keyboard (buttons are the exit) -->
+                <template v-if="!lastNodeIsTerminal">
+                    <div
+                        class="seq-slot"
+                        @mouseenter="hoveredSlot = 'slot-end'"
+                        @mouseleave="hoveredSlot = null"
+                    >
+                        <div class="seq-connector">
+                            <div class="conn-line"/>
+                            <div class="conn-dot"/>
+                            <div class="conn-line"/>
+                        </div>
+                        <FlowInsertPoint
+                            :after-node-id="trailingInsertContext.afterNodeId"
+                            :handle="trailingInsertContext.handle"
+                            :index="activeNodes.length"
+                            :visible="hoveredSlot === 'slot-end'"
+                        />
+                        <div class="seq-connector">
+                            <div class="conn-line"/>
+                        </div>
+                    </div>
+                </template>
+
+                <!-- unreachable orphans: nodes still wired through `default` from a
+                     terminal send_message. Surfaced explicitly so the author can
+                     wipe them in one click rather than chase a Publish error. -->
+                <div v-if="unreachableNodes.length > 0" class="unreachable-block">
+                    <div class="unreachable-header">
+                        <span class="unreachable-title">
+                            Unreachable — {{ unreachableNodes.length }} node{{ unreachableNodes.length > 1 ? 's' : '' }}
+                        </span>
+                        <button class="unreachable-remove" type="button" @click="removeUnreachable">
+                            Delete all
+                        </button>
+                    </div>
+                    <div class="unreachable-hint">
+                        These nodes can never run — the previous send_message exits via its buttons.
+                        Move the whole chain under a button branch, or delete it before publishing.
+                    </div>
+                    <div v-if="moveTargets.length > 0" class="unreachable-actions">
+                        <span class="unreachable-actions-label">Move chain to:</span>
+                        <button
+                            v-for="target in moveTargets"
+                            :key="target.handle"
+                            :title="`Move ${unreachableNodes.length} node(s) under ${target.label}`"
+                            class="unreachable-move-btn"
+                            type="button"
+                            @click="moveChainTo(target)"
+                        >
+                            {{ target.label }} →
+                        </button>
+                    </div>
+                    <div class="unreachable-list">
+                        <FlowNodeCard
+                            v-for="(item, idx) in unreachableNodes"
+                            :key="item.node.id"
+                            :index="activeNodes.length + idx + 1"
+                            :tree-node="item"
+                        />
+                    </div>
                 </div>
             </div>
         </div>

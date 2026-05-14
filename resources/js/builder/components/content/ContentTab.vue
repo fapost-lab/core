@@ -138,6 +138,14 @@ function filledTranslationCount(field: { values: Record<string, string> }): numb
     return count
 }
 
+function formatNodeLabel(label: string): string {
+    return label
+        .replace(/_/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\b\w/g, (char) => char.toUpperCase())
+}
+
 const selectedKey = ref<string | null>(null)
 const selectedEntry = computed(() => contentEntries.value.find((e) => e.key === selectedKey.value) ?? null)
 
@@ -190,13 +198,12 @@ function onSave() {
     <div class="content-tab">
         <!-- Left: content keys grouped by node -->
         <div class="keys-panel">
-            <div class="panel-header">Content</div>
             <div class="panel-body">
                 <div v-if="groupedEntries.length === 0" class="empty">
                     No translatable fields in this flow
                 </div>
                 <template v-for="group in groupedEntries" :key="group.nodeId">
-                    <div class="group-label">{{ group.nodeLabel }}</div>
+                    <div class="group-label">{{ formatNodeLabel(group.nodeLabel) }}</div>
                     <button
                         v-for="field in group.fields"
                         :key="field.key"
@@ -241,41 +248,55 @@ function onSave() {
 .keys-panel {
     width: 220px;
     border-right: 1px solid var(--border);
-    background: var(--surface);
+    background: var(--bg);
     display: flex;
     flex-direction: column;
     overflow: hidden;
     flex-shrink: 0;
 }
 .panel-header {
-    padding: 10px 14px 9px;
-    border-bottom: 1px solid var(--border);
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: .05em;
+    min-height: 42px;
+    padding: 12px 14px 10px;
+    border-bottom: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
+    background: linear-gradient(180deg, rgba(107, 120, 97, .86) 0%, rgba(125, 138, 112, .62) 48%, rgba(125, 138, 112, .08) 100%),
+    var(--primary-bg);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .04em;
     text-transform: uppercase;
-    color: var(--text-3);
+    color: rgba(255, 255, 255, .9);
     flex-shrink: 0;
 }
-.panel-body { flex: 1; overflow-y: auto; padding: 6px 0; }
+
+.panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 8px 12px;
+    background: var(--surface);
+}
 .empty { font-size: 12px; color: var(--text-3); text-align: center; padding: 24px 0; }
 
 .group-label {
-    padding: 8px 14px 4px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: .06em;
-    color: var(--text-3);
+    margin: 8px 0 4px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    background: var(--surface-2);
+    border: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .03em;
+    color: var(--text-2);
 }
 .field-item {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    width: 100%;
-    padding: 5px 14px;
+    width: calc(100% - 12px);
+    margin-left: 12px;
+    padding: 5px 6px 5px 8px;
     background: transparent;
     border: none;
+    border-radius: 6px;
     cursor: pointer;
     text-align: left;
     font-family: 'DM Sans', sans-serif;
@@ -308,6 +329,7 @@ function onSave() {
     padding: 1px 5px;
     border-radius: 3px;
     flex-shrink: 0;
+    margin-right: 4px;
 }
 
 .field-kind--button {

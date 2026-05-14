@@ -134,11 +134,13 @@ function deleteTrigger() {
                                 :style="{ background: colors.bg, color: colors.color }"
                             ><NodeIcon :type="selectedNode.type" /></div>
                             <div style="flex:1;min-width:0">
-                                <div class="config-node-title">{{ nodeTypeLabel }}</div>
-                                <span class="config-node-type">
-                                    v{{ selectedNode.version }}
-                                    <template v-if="selectedNode.id"> · {{ selectedNode.id.slice(-6) }}</template>
-                                </span>
+                                <div class="config-node-title">
+                                    {{ nodeTypeLabel }}
+                                    <span class="config-node-meta">· V{{ selectedNode.version }}</span>
+                                    <span v-if="selectedNode.id" class="config-node-meta">· {{
+                                            selectedNode.id.slice(-6)
+                                        }}</span>
+                                </div>
                             </div>
                         </div>
                         <div class="config-card-body">
