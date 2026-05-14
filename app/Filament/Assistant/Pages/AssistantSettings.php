@@ -9,6 +9,8 @@ use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Domains\Flow\Commands\CommandActionType;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
+use App\Domains\Staff\Enums\Permission;
+use App\Domains\Staff\Models\User;
 use App\Filament\Support\ContentLanguages;
 use App\Filament\Support\LocalizedTextarea;
 use BackedEnum;
@@ -41,6 +43,13 @@ final class AssistantSettings extends Page
     protected string         $view                          = 'filament.assistant.pages.assistant-settings';
 
     protected CurrentAssistantInterface $currentAssistant;
+
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->can(Permission::ManageAssistantSettings->value);
+    }
 
     public static function getNavigationGroup(): string|UnitEnum|null
     {
@@ -84,7 +93,7 @@ final class AssistantSettings extends Page
 
     public function save(AssistantCommandsValidator $validator): void
     {
-        if ( ! $this->persist($validator)) {
+        if (! $this->persist($validator)) {
             return;
         }
 
@@ -146,7 +155,7 @@ final class AssistantSettings extends Page
                                                 // Persist current form first — the redirect leaves the page
                                                 // before the user can press Save and any pending edits would
                                                 // otherwise be lost.
-                                                if ( ! $this->persist(app(AssistantCommandsValidator::class))) {
+                                                if (! $this->persist(app(AssistantCommandsValidator::class))) {
                                                     return;
                                                 }
 
@@ -251,7 +260,7 @@ final class AssistantSettings extends Page
                                                     ->action(function (array $data): void {
                                                         // Persist current form first — pending edits to other
                                                         // commands and settings would be lost on redirect.
-                                                        if ( ! $this->persist(app(AssistantCommandsValidator::class))) {
+                                                        if (! $this->persist(app(AssistantCommandsValidator::class))) {
                                                             return;
                                                         }
 
@@ -336,7 +345,7 @@ final class AssistantSettings extends Page
         $normalized = [];
 
         foreach ($commands as $entry) {
-            if ( ! is_array($entry)) {
+            if (! is_array($entry)) {
                 continue;
             }
 
@@ -394,7 +403,7 @@ final class AssistantSettings extends Page
             return '' === mb_trim($value) ? null : $value;
         }
 
-        if ( ! is_array($value)) {
+        if (! is_array($value)) {
             return null;
         }
 

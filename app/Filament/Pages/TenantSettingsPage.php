@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Domains\Flow\Models\FlowDefinition;
+use App\Domains\Staff\Enums\Permission;
+use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use App\Filament\Support\ContentLanguages;
 use BackedEnum;
@@ -49,6 +51,13 @@ final class TenantSettingsPage extends Page
     protected string $view = 'filament.pages.tenant-settings';
 
     protected TenantSettings $tenantSettings;
+
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->can(Permission::ManageSettings->value);
+    }
 
     public static function getNavigationLabel(): string
     {
@@ -264,7 +273,7 @@ final class TenantSettingsPage extends Page
      */
     private function normalizeLanguageList(mixed $raw): array
     {
-        if ( ! is_array($raw)) {
+        if (! is_array($raw)) {
             return [];
         }
 

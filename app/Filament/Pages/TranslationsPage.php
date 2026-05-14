@@ -8,6 +8,8 @@ use App\Domains\Flow\Contracts\TenantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationServiceInterface;
 use App\Domains\Flow\Contracts\TranslationOverrideRepositoryInterface;
 use App\Domains\Flow\Contracts\TranslationOverrideServiceInterface;
+use App\Domains\Staff\Enums\Permission;
+use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use UnitEnum;
 
@@ -21,6 +23,13 @@ final class TranslationsPage extends AbstractTranslationsPage
     protected static ?string $slug = 'translations';
 
     protected static ?int $navigationSort = 60;
+
+    public static function canAccess(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->can(Permission::ManageTranslations->value);
+    }
 
     public static function getNavigationGroup(): string|UnitEnum|null
     {
