@@ -10,6 +10,8 @@ use App\Domains\Flow\Call\Transports\HandlerTransport;
 use App\Domains\Flow\Call\Transports\HttpTransport;
 use App\Domains\Flow\Commands\BuiltinCommandsRegistry;
 use App\Domains\Flow\Commands\CommandMatcher;
+use App\Domains\Flow\Commands\GlobalCommandExecutor;
+use App\Domains\Flow\Commands\GlobalCommandExecutorInterface;
 use App\Domains\Flow\Concurrency\LockAcquisitionPolicy;
 use App\Domains\Flow\Concurrency\LockHeartbeat;
 use App\Domains\Flow\Concurrency\SessionLockManager;
@@ -38,7 +40,9 @@ use App\Domains\Flow\Contracts\SystemTranslationCatalogInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationServiceInterface;
+use App\Domains\Flow\Contracts\VariableCoercerInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
+use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\Events\QueuedFlowTriggerEventPublisher;
 use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
@@ -60,7 +64,15 @@ use App\Domains\Flow\History\NoOpHistoryWriter;
 use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
 use App\Domains\Flow\Logging\FlowLogPartitionManager;
 use App\Domains\Flow\Logging\FlowLogWriter;
+use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Flow\Models\FlowGroup;
+use App\Domains\Flow\Models\FlowLog;
+use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Orchestration\FlowOrchestrator;
+use App\Domains\Flow\Policies\FlowDraftPolicy;
+use App\Domains\Flow\Policies\FlowGroupPolicy;
+use App\Domains\Flow\Policies\FlowLogPolicy;
+use App\Domains\Flow\Policies\FlowSessionPolicy;
 use App\Domains\Flow\Rag\RagAdapterRegistry;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Repositories\AssistantTranslationRepository;
@@ -70,6 +82,10 @@ use App\Domains\Flow\Repositories\FlowSessionRepository;
 use App\Domains\Flow\Repositories\FlowTriggerRepository;
 use App\Domains\Flow\Repositories\TenantEventRepository;
 use App\Domains\Flow\Repositories\TenantTranslationRepository;
+use App\Domains\Flow\Routing\DropPolicy;
+use App\Domains\Flow\Routing\DropPolicyInterface;
+use App\Domains\Flow\Routing\MessageRouter;
+use App\Domains\Flow\Routing\SessionStateRouter;
 use App\Domains\Flow\Services\AssistantTranslationService;
 use App\Domains\Flow\Services\FallbackMessageService;
 use App\Domains\Flow\Services\FlowEngine;
@@ -91,6 +107,8 @@ use App\Domains\Flow\State\Resolvers\NamespaceResolverRegistry;
 use App\Domains\Flow\State\Resolvers\RagStateResolver;
 use App\Domains\Flow\State\Resolvers\SessionStateResolver;
 use App\Domains\Flow\State\StateNamespace;
+use App\Domains\Flow\State\Variables\CacheBackedVariableSchemaRegistry;
+use App\Domains\Flow\State\Variables\VariableCoercer;
 use App\Domains\Flow\State\Variables\VariableResolver;
 use App\Domains\Flow\Subflow\CallGraphRepository;
 use App\Domains\Flow\Subflow\CallGraphValidator;
@@ -105,14 +123,19 @@ use App\Domains\Flow\Translations\InMemorySystemTranslationCatalog;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
 use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
+use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
 use App\Domains\Media\Contracts\MediaServiceInterface;
+use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
+use App\Domains\Messaging\Typing\TypingIndicatorService;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\FlowExecutionGuard;
 use FAPost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use FAPost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
 
@@ -123,6 +146,11 @@ final class FlowServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(FlowDraft::class, FlowDraftPolicy::class);
+        Gate::policy(FlowGroup::class, FlowGroupPolicy::class);
+        Gate::policy(FlowSession::class, FlowSessionPolicy::class);
+        Gate::policy(FlowLog::class, FlowLogPolicy::class);
+
         $registry  = $this->app->make(NodeHandlerRegistryInterface::class);
         $templates = $this->app->make(TemplateRenderer::class);
 
@@ -147,10 +175,12 @@ final class FlowServiceProvider extends ServiceProvider
                 $this->app->make(ContentTranslatorInterface::class),
             )
         );
-        $registry->register(new BranchNodeHandler(
-            $this->app->make(DataAccessorRegistryInterface::class),
-            $variableResolver,
-        ));
+        $registry->register(
+            new BranchNodeHandler(
+                $this->app->make(DataAccessorRegistryInterface::class),
+                $variableResolver,
+            )
+        );
         $registry->register(new DelayNodeHandler());
         $registry->register(new AssignNodeHandler($templates, $variableResolver));
         $registry->register(new CallNodeHandler($this->app->make(HttpClientInterface::class)));
@@ -190,7 +220,7 @@ final class FlowServiceProvider extends ServiceProvider
         $callTransports->register($this->app->make(HandlerTransport::class));
 
         $this->app->booted(function (): void {
-            if ( ! $this->app->environment('testing')) {
+            if (!$this->app->environment('testing')) {
                 $this->app->make(NodeHandlerRegistryInterface::class)->freeze();
                 $this->app->make(ExpressionEngineRegistry::class)->freeze();
                 $this->app->make(CallTransportRegistry::class)->freeze();
@@ -231,7 +261,22 @@ final class FlowServiceProvider extends ServiceProvider
             fn ($app): NodeHandlerRegistry => $app->make(NodeHandlerRegistry::class)
         );
         $this->app->singleton(FlowDefinitionValidator::class);
-        $this->app->singleton(VariableResolverInterface::class, VariableResolver::class);
+        $this->app->singleton(VariableCoercerInterface::class, VariableCoercer::class);
+        $this->app->bind(
+            VariableSchemaRegistryInterface::class,
+            fn ($app): CacheBackedVariableSchemaRegistry => new CacheBackedVariableSchemaRegistry(
+                tenantContext: $app->make(TenantContextInterface::class),
+                cache: $app->make('cache.store'),
+            )
+        );
+        $this->app->singleton(VariableResolverInterface::class, fn ($app): VariableResolver => new VariableResolver(
+            coercer: $app->make(VariableCoercerInterface::class),
+            // Pass as a resolver closure so the singleton does not capture a
+            // scoped instance — the registry is resolved lazily on each read().
+            schemaRegistryResolver: fn (): VariableSchemaRegistryInterface => $app->make(
+                VariableSchemaRegistryInterface::class
+            ),
+        ));
         $this->app->singleton(ModuleDataAccessorRegistry::class);
         $this->app->singleton(
             DataAccessorRegistryInterface::class,
@@ -246,7 +291,7 @@ final class FlowServiceProvider extends ServiceProvider
             MessageSenderInterface::class,
             fn ($app): FlowMessageSender => new FlowMessageSender(
                 $app->make(OutboundMessageSenderInterface::class),
-                $app->make(\App\Domains\Media\Contracts\MediaDispatcherInterface::class),
+                $app->make(MediaDispatcherInterface::class),
             )
         );
         $this->app->bind(LanguageResolverInterface::class, LanguageResolver::class);
@@ -259,6 +304,7 @@ final class FlowServiceProvider extends ServiceProvider
             SubflowResumerInterface::class,
             fn ($app): DefaultSubflowResumer => new DefaultSubflowResumer(
                 fn (): FlowEngineInterface => $app->make(FlowEngineInterface::class),
+                $app->make(HistoryWriterFactory::class),
             ),
         );
         $this->app->scoped(CallGraphRepository::class);
@@ -266,14 +312,20 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(SubflowStarterService::class);
         $this->app->scoped(SubflowTimeoutSweeper::class);
 
-        $this->app->scoped(\App\Domains\Flow\Commands\GlobalCommandExecutor::class);
-        $this->app->scoped(\App\Domains\Flow\Commands\GlobalCommandExecutorInterface::class, \App\Domains\Flow\Commands\GlobalCommandExecutor::class);
-        $this->app->scoped(\App\Domains\Flow\Routing\SessionStateRouter::class);
-        $this->app->scoped(\App\Domains\Flow\Routing\DropPolicy::class);
-        $this->app->scoped(\App\Domains\Flow\Routing\DropPolicyInterface::class, \App\Domains\Flow\Routing\DropPolicy::class);
-        $this->app->scoped(\App\Domains\Flow\Routing\MessageRouter::class);
-        $this->app->scoped(\App\Domains\Messaging\Typing\TypingIndicatorService::class);
-        $this->app->scoped(\App\Domains\Messaging\Typing\TypingHeartbeatRegistry::class);
+        $this->app->scoped(GlobalCommandExecutor::class);
+        $this->app->scoped(
+            GlobalCommandExecutorInterface::class,
+            GlobalCommandExecutor::class
+        );
+        $this->app->scoped(SessionStateRouter::class);
+        $this->app->scoped(DropPolicy::class);
+        $this->app->scoped(
+            DropPolicyInterface::class,
+            DropPolicy::class
+        );
+        $this->app->scoped(MessageRouter::class);
+        $this->app->scoped(TypingIndicatorService::class);
+        $this->app->scoped(TypingHeartbeatRegistry::class);
         $this->app->bind(TenantTranslationServiceInterface::class, TenantTranslationService::class);
         $this->app->bind(AssistantTranslationServiceInterface::class, AssistantTranslationService::class);
         $this->app->singleton(TemplateResolver::class);
@@ -342,7 +394,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->singleton(FlowExecutionGuardInterface::class, function (): FlowExecutionGuard {
             $store = Cache::store('redis')->getStore();
 
-            if ( ! $store instanceof LockProvider) {
+            if (!$store instanceof LockProvider) {
                 throw new LogicException('Configured redis cache store does not support distributed locks.');
             }
 

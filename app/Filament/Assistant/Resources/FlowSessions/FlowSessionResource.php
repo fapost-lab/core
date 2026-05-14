@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Assistant\Resources\FlowSessions;
 
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Staff\Models\User;
 use App\Filament\Assistant\Resources\FlowSessions\Pages\ListFlowSessions;
 use App\Filament\Assistant\Resources\FlowSessions\Pages\ViewFlowSession;
 use App\Filament\Assistant\Resources\FlowSessions\Schemas\FlowSessionInfolistSchema;
@@ -14,6 +15,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 /**
@@ -66,6 +68,13 @@ final class FlowSessionResource extends Resource
             'index' => ListFlowSessions::route('/'),
             'view'  => ViewFlowSession::route('/{record}'),
         ];
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User && $user->can('viewAny', FlowSession::class);
     }
 
     public static function canCreate(): bool

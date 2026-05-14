@@ -8,8 +8,10 @@ use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
+use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\Models\FlowSession;
 use Closure;
+use FAPost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -27,6 +29,7 @@ final readonly class DefaultSubflowResumer implements SubflowResumerInterface
      */
     public function __construct(
         private Closure $engineResolver,
+        private HistoryWriterFactory $historyWriterFactory,
     ) {
     }
 
@@ -40,7 +43,7 @@ final readonly class DefaultSubflowResumer implements SubflowResumerInterface
 
         $parent = FlowSession::query()->find($parentId);
 
-        if ( ! $parent instanceof FlowSession) {
+        if (!$parent instanceof FlowSession) {
             Log::warning('flow.subflow.resume.parent_missing', [
                 'child_id'  => (string)$child->getKey(),
                 'parent_id' => $parentId,
@@ -61,7 +64,24 @@ final readonly class DefaultSubflowResumer implements SubflowResumerInterface
             // doesn't match a subflow-shaped position.
         }
 
-        ($this->engineResolver)()->resumeAfterSubflow($parent, $this->handleFor($endStatus));
+        $sourceHandle  = $this->handleFor($endStatus);
+        $subflowNodeId = (string)($parent->current_node_id ?? '');
+
+        // Record SubflowReturned in the parent's history before advancing it.
+        // logging_enabled is determined by the parent's own flow_definition.
+        $this->historyWriterFactory->for($parent->flowDefinition)->record(
+            eventType: HistoryEventType::SubflowReturned,
+            tenantId: (string)$parent->tenant_id,
+            sessionId: (string)$parent->getKey(),
+            nodeId: $subflowNodeId,
+            metadata: [
+                'child_session_id' => (string)$child->getKey(),
+                'end_status'       => $endStatus,
+                'source_handle'    => $sourceHandle,
+            ],
+        );
+
+        ($this->engineResolver)()->resumeAfterSubflow($parent, $sourceHandle);
     }
 
     private function handleFor(string $endStatus): string

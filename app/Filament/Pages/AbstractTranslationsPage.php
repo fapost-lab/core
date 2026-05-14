@@ -162,7 +162,7 @@ abstract class AbstractTranslationsPage extends Page implements HasActions, HasT
     {
         $configured = app(TenantSettings::class)->available_languages;
 
-        if ( ! in_array('en', $configured, true)) {
+        if (!in_array('en', $configured, true)) {
             $configured = array_merge(['en'], $configured);
         }
 
@@ -208,7 +208,7 @@ abstract class AbstractTranslationsPage extends Page implements HasActions, HasT
             $rows[] = [
                 'key'         => $entry->key,
                 'group'       => $entry->group,
-                'description' => $entry->description,
+                'description' => $entry->getDescription(app()->getLocale()),
                 'locales'     => $localesPayload,
             ];
         }

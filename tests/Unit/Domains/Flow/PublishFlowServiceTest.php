@@ -11,6 +11,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Services\PublishFlowService;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use LogicException;
 use Tests\TestCase;
@@ -48,6 +49,20 @@ final class PublishFlowServiceTest extends TestCase
             $table->boolean('is_active')->default(true);
             $table->boolean('logging_enabled')->default(false);
             $table->timestamps();
+        });
+
+        Schema::dropIfExists('tenant_variable_schema');
+        Schema::create('tenant_variable_schema', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->uuid('tenant_id');
+            $table->string('storage', 16);
+            $table->string('group', 64)->nullable();
+            $table->string('name', 64);
+            $table->string('type', 16);
+            $table->uuid('declared_in_flow_id')->nullable();
+            $table->string('declared_by_node_id', 128)->nullable();
+            $table->timestampTz('updated_at');
+            $table->unique(['storage', 'group', 'name'], 'tenant_variable_schema_unique');
         });
 
         Schema::dropIfExists('flow_callgraph_edges');
@@ -198,7 +213,7 @@ final class PublishFlowServiceTest extends TestCase
 
         $definition = app(PublishFlowService::class)->execute($callerFlowId);
 
-        $edges = \Illuminate\Support\Facades\DB::table('flow_callgraph_edges')
+        $edges = DB::table('flow_callgraph_edges')
             ->where('caller_definition_id', (string) $definition->getKey())
             ->get();
 
@@ -240,7 +255,7 @@ final class PublishFlowServiceTest extends TestCase
         // First definition's edges remain (different caller_definition_id —
         // each definition is independently indexed). The second definition
         // points at the new callee.
-        $secondEdges = \Illuminate\Support\Facades\DB::table('flow_callgraph_edges')
+        $secondEdges = DB::table('flow_callgraph_edges')
             ->where('caller_definition_id', (string) $secondDefinition->getKey())
             ->pluck('callee_flow_id')
             ->all();
@@ -312,6 +327,86 @@ final class PublishFlowServiceTest extends TestCase
         $definition = app(PublishFlowService::class)->execute($callerFlowId);
 
         $this->assertSame(1, $definition->version);
+    }
+
+    public function test_publish_populates_variable_schema_table(): void
+    {
+        $flowId   = '00000000-0000-0000-0000-000000000901';
+        $tenantId = '00000000-0000-0000-0000-000000000001';
+
+        FlowDraft::factory()->create([
+            'flow_id'   => $flowId,
+            'tenant_id' => $tenantId,
+            'nodes'     => [
+                [
+                    'id'      => 'inp-1',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => [
+                            'name'    => 'user_phone',
+                            'storage' => 'session',
+                            'type'    => 'phone',
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        app(PublishFlowService::class)->execute($flowId);
+
+        $row = DB::table('tenant_variable_schema')
+            ->where('name', 'user_phone')
+            ->first();
+
+        $this->assertNotNull($row);
+        $this->assertSame('session', $row->storage);
+        $this->assertSame('phone', $row->type);
+        $this->assertNull($row->group);
+    }
+
+    public function test_publish_rejects_cross_flow_variable_type_conflict(): void
+    {
+        $flowIdA  = '00000000-0000-0000-0000-000000000902';
+        $flowIdB  = '00000000-0000-0000-0000-000000000903';
+        $tenantId = '00000000-0000-0000-0000-000000000001';
+
+        // Flow A declares `answer` as `text`.
+        FlowDraft::factory()->create([
+            'flow_id'   => $flowIdA,
+            'tenant_id' => $tenantId,
+            'nodes'     => [
+                [
+                    'id'      => 'inp-a',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => ['name' => 'answer', 'storage' => 'session', 'type' => 'text'],
+                    ],
+                ],
+            ],
+        ]);
+        app(PublishFlowService::class)->execute($flowIdA);
+
+        // Flow B declares `answer` as `number` — conflict.
+        FlowDraft::factory()->create([
+            'flow_id'   => $flowIdB,
+            'tenant_id' => $tenantId,
+            'nodes'     => [
+                [
+                    'id'      => 'inp-b',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => ['name' => 'answer', 'storage' => 'session', 'type' => 'number'],
+                    ],
+                ],
+            ],
+        ]);
+
+        $this->expectException(FlowValidationException::class);
+
+        app(PublishFlowService::class)->execute($flowIdB);
     }
 
     public function test_throws_flow_validation_exception_when_draft_is_invalid(): void

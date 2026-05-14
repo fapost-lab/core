@@ -39,17 +39,28 @@ enum RoleEnum: string
             self::Admin => Permission::cases(),
 
             self::ContentManager => [
-                Permission::ManageFlow,
+                Permission::ManageAssistants,
+                Permission::ManageAssistantSettings,
+                // Flow / content
+                Permission::ManageFlowDefinitions,
+                Permission::PublishFlow,
+                Permission::ViewFlowSessions,
+                Permission::ManageFlowGroups,
+                Permission::ManageTranslations,
                 Permission::ManageBroadcast,
                 Permission::ManageRag,
                 Permission::ManageMedia,
                 Permission::ViewMedia,
+                // Contacts
                 Permission::ViewContacts,
+                // Analytics
                 Permission::ViewAnalytics,
             ],
 
             self::Analyst => [
                 Permission::ViewAnalytics,
+                Permission::ViewFlowSessions,
+                Permission::ViewContacts,
             ],
         };
     }

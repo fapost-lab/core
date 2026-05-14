@@ -24,7 +24,7 @@ final class RoleFormSchema
                         ->default([])
                         ->options(
                             collect($cases)->mapWithKeys(static fn (Permission $c) => [
-                                $c->value => __('staff.permissions.' . $c->value),
+                                $c->value => $c->label(),
                             ])->all(),
                         )
                         ->columns(4)

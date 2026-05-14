@@ -6,6 +6,7 @@ namespace App\Filament\Assistant\Resources\Contacts;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Staff\Models\User;
 use App\Filament\Assistant\Resources\Contacts\Pages\ListContacts;
 use App\Filament\Assistant\Resources\Contacts\Pages\ViewContact;
 use App\Filament\Assistant\Resources\Contacts\Schemas\ContactInfolistSchema;
@@ -17,6 +18,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 /**
@@ -76,6 +78,13 @@ final class ContactResource extends Resource
             'index' => ListContacts::route('/'),
             'view'  => ViewContact::route('/{record}'),
         ];
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User && $user->can('viewAny', Contact::class);
     }
 
     public static function canCreate(): bool

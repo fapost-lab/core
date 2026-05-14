@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Assistant\Resources\FlowGroups;
 
 use App\Domains\Flow\Models\FlowGroup;
+use App\Domains\Staff\Models\User;
 use App\Filament\Assistant\Resources\FlowGroups\Pages\CreateFlowGroup;
 use App\Filament\Assistant\Resources\FlowGroups\Pages\EditFlowGroup;
 use App\Filament\Assistant\Resources\FlowGroups\Pages\ListFlowGroups;
@@ -15,6 +16,7 @@ use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 final class FlowGroupResource extends Resource
@@ -50,6 +52,13 @@ final class FlowGroupResource extends Resource
     public static function table(Table $table): Table
     {
         return FlowGroupsTable::configure($table);
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User && $user->can('viewAny', FlowGroup::class);
     }
 
     public static function getPages(): array

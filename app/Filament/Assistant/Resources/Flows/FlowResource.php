@@ -6,6 +6,7 @@ namespace App\Filament\Assistant\Resources\Flows;
 
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Staff\Models\User;
 use App\Filament\Assistant\Resources\Flows\Pages\CreateFlow;
 use App\Filament\Assistant\Resources\Flows\Pages\EditFlow;
 use App\Filament\Assistant\Resources\Flows\Pages\ListFlows;
@@ -17,6 +18,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 final class FlowResource extends Resource
@@ -64,6 +66,13 @@ final class FlowResource extends Resource
                     ->whereColumn('flow_id', 'flow_drafts.flow_id')
                     ->where('is_active', true),
             ]);
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User && $user->can('viewAny', FlowDraft::class);
     }
 
     public static function getPages(): array

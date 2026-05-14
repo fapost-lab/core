@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Assistant\Resources\FlowLogs;
 
 use App\Domains\Flow\Models\FlowLog;
+use App\Domains\Staff\Models\User;
 use App\Filament\Assistant\Resources\FlowLogs\Pages\ListFlowLogs;
 use App\Filament\Assistant\Resources\FlowLogs\Pages\ViewFlowLog;
 use App\Filament\Assistant\Resources\FlowLogs\Tables\FlowLogsTable;
@@ -16,6 +17,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 /**
@@ -134,6 +136,13 @@ final class FlowLogResource extends Resource
             'index' => ListFlowLogs::route('/'),
             'view'  => ViewFlowLog::route('/{record}'),
         ];
+    }
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        $user = Auth::user();
+
+        return $user instanceof User && $user->can('viewAny', FlowLog::class);
     }
 
     public static function canCreate(): bool

@@ -6,10 +6,14 @@ namespace App\Filament\Assistant\Resources\Contacts\Schemas;
 
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
+use App\Domains\Flow\State\Variables\VariableType;
+use Carbon\Carbon;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
+use Throwable;
 
 /**
  * Read-only contact card for the assistant panel.
@@ -24,8 +28,8 @@ use Filament\Schemas\Schema;
  * Group/Profile sections start expanded when the contact has ≤ 3 groups, else
  * collapsed by default — keeps the page scannable for survey-heavy contacts.
  *
- * Field rendering uses plain string formatting (no {@code Variable::type}
- * lookup — fallback per spec until the resolver is wired).
+ * Field values are formatted according to the declared VariableType from the
+ * tenant schema registry when available; raw string fallback for legacy fields.
  */
 final class ContactInfolistSchema
 {
@@ -127,12 +131,17 @@ final class ContactInfolistSchema
      */
     private static function rootAttributeFields(Contact $contact): array
     {
-        $entries = [];
+        $registry = self::registry();
+        $entries  = [];
 
         foreach (self::rootAttributeKeys($contact) as $key) {
+            $type      = $registry?->get('contact', null, $key);
             $entries[] = TextEntry::make("attributes.{$key}")
                 ->label($key)
-                ->state(static fn (Contact $record): string => self::stringify(($record->attributes[$key] ?? null)))
+                ->state(static fn (Contact $record): string => self::formatValue(
+                    $record->attributes[$key] ?? null,
+                    $type,
+                ))
                 ->placeholder(self::placeholder());
         }
 
@@ -185,16 +194,27 @@ final class ContactInfolistSchema
      */
     private static function groupFields(string $group, array $groupData): array
     {
-        $entries = [];
+        $registry = self::registry();
+        $entries  = [];
 
         foreach ($groupData as $key => $value) {
+            $type      = $registry?->get('contact', $group, (string)$key);
             $entries[] = TextEntry::make("attributes.{$group}.{$key}")
                 ->label((string) $key)
-                ->state(static fn () => self::stringify($value))
+                ->state(static fn () => self::formatValue($value, $type))
                 ->placeholder(self::placeholder());
         }
 
         return $entries;
+    }
+
+    private static function registry(): ?VariableSchemaRegistryInterface
+    {
+        try {
+            return app(VariableSchemaRegistryInterface::class);
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private static function groupHeading(string $group, int $count): string
@@ -212,7 +232,7 @@ final class ContactInfolistSchema
         $keys = [];
 
         foreach (self::attributesArray($contact) as $key => $value) {
-            if ( ! is_array($value)) {
+            if (!is_array($value)) {
                 $keys[] = (string) $key;
             }
         }
@@ -272,6 +292,52 @@ final class ContactInfolistSchema
         $value = self::metaArray($contact)[$key] ?? null;
 
         return null === $value ? null : self::stringify($value);
+    }
+
+    private static function formatValue(mixed $value, ?VariableType $type): string
+    {
+        if (null === $value || '' === $value) {
+            return '';
+        }
+
+        if (null === $type) {
+            return self::stringify($value);
+        }
+
+        return match ($type) {
+            VariableType::Number => is_numeric($value)
+                ? number_format((float)$value, str_contains((string)$value, '.') ? 2 : 0, '.', ',')
+                : self::stringify($value),
+
+            VariableType::Date => self::formatDate($value),
+
+            VariableType::Confirm => match (true) {
+                true === $value
+                || in_array(
+                    mb_strtolower((string)$value),
+                    ['true', '1', 'yes', 'y', 'on', 'да'],
+                    true
+                ) => __('contact.values.yes'),
+                false === $value
+                || in_array(
+                    mb_strtolower((string)$value),
+                    ['false', '0', 'no', 'n', 'off', 'нет'],
+                    true
+                )       => __('contact.values.no'),
+                default => self::stringify($value),
+            },
+
+            default => self::stringify($value),
+        };
+    }
+
+    private static function formatDate(mixed $value): string
+    {
+        try {
+            return Carbon::parse((string)$value)->translatedFormat('d M Y');
+        } catch (Throwable) {
+            return self::stringify($value);
+        }
     }
 
     private static function stringify(mixed $value): string

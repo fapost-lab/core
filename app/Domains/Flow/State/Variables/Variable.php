@@ -13,8 +13,8 @@ use InvalidArgumentException;
  * concrete state path through {@see VariableResolver}.
  *
  * Identity is the triple (storage, group, name). The optional {@see $type}
- * is metadata for the UI (text/number/phone/...) and does not affect path
- * resolution or runtime semantics.
+ * drives coercion in VariableResolver when reading values — unknown types
+ * fall back to raw string (backward-compatible).
  */
 final readonly class Variable
 {
@@ -47,7 +47,7 @@ final readonly class Variable
         public string $name,
         public VariableStorage $storage,
         public ?string $group = null,
-        public ?string $type = null,
+        public ?VariableType $type = null,
     ) {
         $this->assertValidIdentifier($name, 'name');
 
@@ -83,17 +83,17 @@ final readonly class Variable
         $name    = $raw['name'] ?? null;
         $storage = $raw['storage'] ?? null;
 
-        if ( ! is_string($name) || '' === $name) {
+        if (!is_string($name) || '' === $name) {
             return null;
         }
 
-        if ( ! is_string($storage) || '' === $storage) {
+        if (!is_string($storage) || '' === $storage) {
             return null;
         }
 
         $storageEnum = VariableStorage::tryFrom($storage);
 
-        if ( ! $storageEnum instanceof VariableStorage) {
+        if (!$storageEnum instanceof VariableStorage) {
             throw new InvalidArgumentException("Unknown variable storage: '{$storage}'.");
         }
 
@@ -103,14 +103,21 @@ final readonly class Variable
             throw new InvalidArgumentException('Variable group must be a string or null.');
         }
 
-        if (is_string($group) && '' === $group) {
+        if ('' === $group) {
             $group = null;
         }
 
-        $type = $raw['type'] ?? null;
+        $rawType = $raw['type'] ?? null;
+        $type    = null;
 
-        if (null !== $type && ! is_string($type)) {
-            throw new InvalidArgumentException('Variable type must be a string or null.');
+        if (null !== $rawType) {
+            if (!is_string($rawType)) {
+                throw new InvalidArgumentException('Variable type must be a string or null.');
+            }
+
+            // Unknown type strings (legacy / future) are silently ignored so that
+            // existing flows remain loadable after a type enum change.
+            $type = VariableType::tryFrom($rawType);
         }
 
         return new self(

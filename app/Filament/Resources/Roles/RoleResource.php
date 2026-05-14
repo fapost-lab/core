@@ -22,7 +22,7 @@ final class RoleResource extends Resource
 {
     protected static ?string $model = Role::class;
 
-    protected static ?string $recordTitleAttribute = 'name';
+    protected static ?string $recordTitleAttribute = 'title';
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 

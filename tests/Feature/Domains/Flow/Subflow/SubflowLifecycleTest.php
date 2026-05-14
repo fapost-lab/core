@@ -12,6 +12,7 @@ use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Models\FlowSessionHistoryEntry;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
@@ -19,6 +20,7 @@ use FAPost\Foundation\Contracts\NodeHandlerInterface;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
+use FAPost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
 
@@ -157,6 +159,119 @@ final class SubflowLifecycleTest extends FeatureTestCase
         $this->assertSame('failure-branch', $parent->state['flow']['marker'] ?? null);
     }
 
+    public function test_subflow_writes_started_and_returned_history_events_when_logging_enabled(): void
+    {
+        $childFlowId = (string)Str::uuid();
+        $this->createDefinition(
+            flowId: $childFlowId,
+            nodes: [
+                ['id' => 'c-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [],
+        );
+
+        $parentFlowId     = (string)Str::uuid();
+        $parentDefinition = $this->createDefinition(
+            flowId: $parentFlowId,
+            nodes: [
+                [
+                    'id'      => 'p-sub',
+                    'type'    => 'subflow',
+                    'version' => 1,
+                    'config'  => ['flow_id' => $childFlowId, 'timeout' => 'PT1H'],
+                ],
+                ['id' => 'p-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [
+                ['id' => 'p-e1', 'from' => 'p-sub', 'to' => 'p-end', 'handle' => 'success'],
+            ],
+            loggingEnabled: true,
+        );
+
+        $this->app->make(FlowEngineInterface::class)->start($parentDefinition, $this->contact);
+
+        /** @var FlowSession $parent */
+        $parent = FlowSession::query()
+            ->where('contact_id', $this->contact->getKey())
+            ->whereNull('parent_session_id')
+            ->latest('created_at')
+            ->first();
+
+        /** @var FlowSession $child */
+        $child = FlowSession::query()
+            ->where('parent_session_id', $parent->getKey())
+            ->latest('created_at')
+            ->first();
+
+        $started = FlowSessionHistoryEntry::query()
+            ->where('session_id', $parent->getKey())
+            ->where('event_type', HistoryEventType::SubflowStarted->value)
+            ->first();
+
+        $returned = FlowSessionHistoryEntry::query()
+            ->where('session_id', $parent->getKey())
+            ->where('event_type', HistoryEventType::SubflowReturned->value)
+            ->first();
+
+        $this->assertNotNull($started, 'SubflowStarted event must be recorded in parent history');
+        $this->assertSame('p-sub', $started->node_id);
+        $this->assertSame((string)$child->getKey(), $started->metadata['child_session_id'] ?? null);
+
+        $this->assertNotNull($returned, 'SubflowReturned event must be recorded in parent history');
+        $this->assertSame('p-sub', $returned->node_id);
+        $this->assertSame((string)$child->getKey(), $returned->metadata['child_session_id'] ?? null);
+        $this->assertSame(EndNodeHandler::END_STATUS_SUCCESS, $returned->metadata['end_status'] ?? null);
+    }
+
+    public function test_subflow_does_not_write_history_events_when_logging_disabled(): void
+    {
+        $childFlowId = (string)Str::uuid();
+        $this->createDefinition(
+            flowId: $childFlowId,
+            nodes: [
+                ['id' => 'c-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [],
+        );
+
+        $parentFlowId     = (string)Str::uuid();
+        $parentDefinition = $this->createDefinition(
+            flowId: $parentFlowId,
+            nodes: [
+                [
+                    'id'      => 'p-sub',
+                    'type'    => 'subflow',
+                    'version' => 1,
+                    'config'  => ['flow_id' => $childFlowId, 'timeout' => 'PT1H'],
+                ],
+                ['id' => 'p-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [
+                ['id' => 'p-e1', 'from' => 'p-sub', 'to' => 'p-end', 'handle' => 'success'],
+            ],
+            loggingEnabled: false,
+        );
+
+        $this->app->make(FlowEngineInterface::class)->start($parentDefinition, $this->contact);
+
+        /** @var FlowSession $parent */
+        $parent = FlowSession::query()
+            ->where('contact_id', $this->contact->getKey())
+            ->whereNull('parent_session_id')
+            ->latest('created_at')
+            ->first();
+
+        $count = FlowSessionHistoryEntry::query()
+            ->where('session_id', $parent->getKey())
+            ->whereIn('event_type', [
+                HistoryEventType::SubflowStarted->value,
+                HistoryEventType::SubflowReturned->value,
+            ])
+            ->count();
+
+        $this->assertSame(0, $count, 'No history events should be written when logging is disabled');
+    }
+
     public function test_subflow_with_inactive_callee_marks_parent_session_failed(): void
     {
         $parentFlowId   = (string) Str::uuid();
@@ -187,16 +302,21 @@ final class SubflowLifecycleTest extends FeatureTestCase
      * @param  array<int, array<string, mixed>>  $nodes
      * @param  array<int, array<string, mixed>>  $edges
      */
-    private function createDefinition(string $flowId, array $nodes, array $edges): FlowDefinition
-    {
+    private function createDefinition(
+        string $flowId,
+        array $nodes,
+        array $edges,
+        bool $loggingEnabled = false,
+    ): FlowDefinition {
         return FlowDefinition::query()->create([
-            'tenant_id' => $this->tenantId,
-            'flow_id'   => $flowId,
-            'version'   => 1,
-            'name'      => "Test {$flowId}",
-            'nodes'     => $nodes,
-            'edges'     => $edges,
-            'is_active' => true,
+            'tenant_id'       => $this->tenantId,
+            'flow_id'         => $flowId,
+            'version'         => 1,
+            'name'            => "Test {$flowId}",
+            'nodes'           => $nodes,
+            'edges'           => $edges,
+            'is_active'       => true,
+            'logging_enabled' => $loggingEnabled,
         ]);
     }
 }

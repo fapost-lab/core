@@ -7,6 +7,7 @@ namespace App\Domains\Staff\Models;
 use App\Domains\Staff\Enums\RoleEnum;
 use FAPost\Support\Concerns\HasUlidPrimaryKey;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Collection;
 use Spatie\Permission\Models\Role as SpatieRole;
 
@@ -81,6 +82,17 @@ final class Role extends SpatieRole
                 throw new AuthorizationException(__('System roles cannot be deleted.'));
             }
         });
+    }
+
+    /**
+     * Human-readable title: display_name when set, falls back to name.
+     * Used as $recordTitleAttribute in Filament resources.
+     */
+    protected function title(): Attribute
+    {
+        return Attribute::make(
+            get: fn (): string => $this->display_name ?? $this->name,
+        );
     }
 
     /**

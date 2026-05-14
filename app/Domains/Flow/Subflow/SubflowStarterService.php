@@ -10,10 +10,12 @@ use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowConcurrencyException;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
+use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\FlowGraphResolver;
 use DateInterval;
 use Exception;
+use FAPost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Database\ConnectionInterface;
 use RuntimeException;
 
@@ -36,6 +38,7 @@ final readonly class SubflowStarterService
         private FlowEngineInterface $engine,
         private FlowGraphResolver $graphResolver,
         private ConnectionInterface $connection,
+        private HistoryWriterFactory $historyWriterFactory,
     ) {
     }
 
@@ -113,6 +116,20 @@ final readonly class SubflowStarterService
                 'expires_at'            => $childExpiresAt,
             ]);
         });
+
+        // Write SubflowStarted to parent's history before driving the child —
+        // logging_enabled is determined by the parent's flow_definition.
+        $parentDefinition = $this->definitions->findById((string)$parent->flow_definition_id);
+        $this->historyWriterFactory->for($parentDefinition)->record(
+            eventType: HistoryEventType::SubflowStarted,
+            tenantId: (string)$parent->tenant_id,
+            sessionId: (string)$parent->getKey(),
+            nodeId: $subflowNodeId,
+            metadata: [
+                'child_session_id' => (string)$child->getKey(),
+                'child_flow_id'    => $childFlowId,
+            ],
+        );
 
         // Drive the child to its first wait point so a single inbound message
         // can carry parent → child → child-end → parent-resume in one cycle.

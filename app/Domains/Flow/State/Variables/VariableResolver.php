@@ -4,19 +4,42 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\State\Variables;
 
+use App\Domains\Flow\Contracts\VariableCoercerInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
+use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\State\FlowStateNamespace;
+use Closure;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use InvalidArgumentException;
 
 /**
  * Default implementation of {@see VariableResolverInterface}.
  *
- * Stateless and tenant-unaware: every method is a pure transformation of the
- * supplied arguments. Bound as a singleton in {@code FlowServiceProvider}.
+ * Reads raw values from the engine state and coerces them via the per-tenant
+ * schema registry + VariableCoercer. Falls back to raw value when the variable's
+ * type is unknown (legacy flow / no declaration). Bound as singleton in FlowServiceProvider.
+ *
+ * The schema registry is resolved lazily via a closure so the singleton does not
+ * capture a scoped instance — important for long-lived queue worker processes.
  */
 final class VariableResolver implements VariableResolverInterface
 {
+    private readonly VariableCoercerInterface $coercer;
+
+    /** @var (Closure(): VariableSchemaRegistryInterface)|null */
+    private readonly ?Closure $schemaRegistryResolver;
+
+    /**
+     * @param  (Closure(): VariableSchemaRegistryInterface)|null  $schemaRegistryResolver
+     */
+    public function __construct(
+        ?VariableCoercerInterface $coercer = null,
+        ?Closure $schemaRegistryResolver = null,
+    ) {
+        $this->coercer                = $coercer ?? new VariableCoercer();
+        $this->schemaRegistryResolver = $schemaRegistryResolver;
+    }
+
     public function resolveTargetPath(Variable $variable): string
     {
         return match ($variable->storage) {
@@ -33,7 +56,27 @@ final class VariableResolver implements VariableResolverInterface
             return null;
         }
 
-        return $reader->read($this->resolveTargetPath($variable));
+        $raw = $reader->read($this->resolveTargetPath($variable));
+
+        // Resolve the declared type: prefer the variable's own type annotation;
+        // fall back to the tenant schema registry for undeclared variables
+        // (e.g. when the variable is read from a different flow's saved data).
+        $type = $variable->type;
+
+        if (null === $type && null !== $this->schemaRegistryResolver) {
+            $registry = ($this->schemaRegistryResolver)();
+            $type     = $registry->get(
+                $variable->storage->value,
+                $variable->group,
+                $variable->name,
+            );
+        }
+
+        if (null === $type) {
+            return $raw;
+        }
+
+        return $this->coercer->coerce($raw, $type);
     }
 
     public function fromLegacyPath(string $path): Variable

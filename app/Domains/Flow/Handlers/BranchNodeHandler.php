@@ -111,7 +111,7 @@ final class BranchNodeHandler extends AbstractVersionedHandler
         $resolved = [];
 
         foreach ($rules as $rule) {
-            if ( ! is_array($rule)) {
+            if (!is_array($rule)) {
                 continue;
             }
 
@@ -155,7 +155,7 @@ final class BranchNodeHandler extends AbstractVersionedHandler
             $ref = $left['ref'] ?? null;
 
             if ('user_variable' === $ref) {
-                return $this->resolveUserVariableLeft($left, $state);
+                return $this->resolveUserVariableLeft($left, $state, $context);
             }
 
             if ('source' === $ref) {
@@ -184,11 +184,11 @@ final class BranchNodeHandler extends AbstractVersionedHandler
      *
      * @return array{0: string, 1: mixed}
      */
-    private function resolveUserVariableLeft(array $left, array $state): array
+    private function resolveUserVariableLeft(array $left, array $state, NodeExecutionContext $context): array
     {
         $variableConfig = $left['variable'] ?? null;
 
-        if ( ! is_array($variableConfig)) {
+        if (!is_array($variableConfig)) {
             // Compact form: name embedded directly on left for forward-compat.
             $variableConfig = [
                 'name'    => $left['name'] ?? null,
@@ -206,16 +206,20 @@ final class BranchNodeHandler extends AbstractVersionedHandler
             );
         }
 
-        if ( ! $variable instanceof Variable) {
+        if (!$variable instanceof Variable) {
             throw new InvalidNodeConfigException('branch: user_variable left missing required name/storage');
         }
 
         $path = $this->variableResolver->resolveTargetPath($variable);
 
-        // contact.* paths are read from contact-scoped state by handlers; we
-        // surface the same path as the rest of the engine and rely on
-        // data_get against `state` which is populated by the orchestrator.
-        return [$path, data_get($state, $path)];
+        // Read through VariableResolver so coercion (type from schema registry /
+        // variable declaration) is applied. Falls back to data_get when no reader
+        // is available (legacy test contexts without a stateReader).
+        $value = null !== $context->stateReader
+            ? $this->variableResolver->read($variable, $context)
+            : data_get($state, $path);
+
+        return [$path, $value];
     }
 
     /**

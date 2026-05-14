@@ -7,6 +7,7 @@ namespace Tests\Unit\Domains\Flow\State\Variables;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableResolver;
 use App\Domains\Flow\State\Variables\VariableStorage;
+use App\Domains\Flow\State\Variables\VariableType;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\Flow\Contracts\ScopedStateReaderInterface;
 use InvalidArgumentException;
@@ -185,7 +186,7 @@ final class VariableResolverTest extends TestCase
         $this->assertSame(VariableStorage::Contact, $variable->storage);
         $this->assertSame('street', $variable->name);
         $this->assertSame('address', $variable->group);
-        $this->assertSame('text', $variable->type);
+        $this->assertSame(VariableType::Text, $variable->type);
     }
 
     public function test_try_from_array_rejects_invalid_identifier(): void
