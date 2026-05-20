@@ -90,7 +90,7 @@ function resolveHandleLabel(handle: string): string {
         const idx = buttons.findIndex((b) => b.id === handle)
         if (idx !== -1) {
             const lbl = buttons[idx].label
-            const text = typeof lbl === 'object'
+            const text = lbl !== null && typeof lbl === 'object'
                 ? String(Object.values(lbl as Record<string, unknown>)[0] ?? '')
                 : String(lbl ?? '')
             return text.trim() !== '' ? text.trim() : `Button ${idx + 1}`

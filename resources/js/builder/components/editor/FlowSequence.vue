@@ -150,7 +150,7 @@ const moveTargets = computed<MoveTarget[]>(() => {
     const buttons = Array.isArray(config.buttons) ? (config.buttons as Array<Record<string, unknown>>) : []
     return buttons.map((btn, idx) => {
         const raw = btn.label
-        const text = typeof raw === 'object'
+        const text = raw !== null && typeof raw === 'object'
             ? String(Object.values(raw as Record<string, unknown>)[0] ?? '')
             : String(raw ?? '')
         return {
@@ -206,7 +206,7 @@ const breadcrumbs = computed(() => {
                 const idx = buttons.findIndex((b) => b.id === handle)
                 if (idx !== -1) {
                     const lbl = buttons[idx].label
-                    const text = typeof lbl === 'object'
+                    const text = lbl !== null && typeof lbl === 'object'
                         ? String(Object.values(lbl as Record<string, unknown>)[0] ?? '')
                         : String(lbl ?? '')
                     handleLabel = text.trim() !== '' ? text.trim() : `Button ${idx + 1}`
