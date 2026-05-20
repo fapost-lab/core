@@ -7,8 +7,8 @@ namespace Tests\Feature\Domains\Flow\Subflow;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
-use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Subflow\SubflowTimeoutSweeper;
@@ -85,11 +85,11 @@ final class SubflowTimeoutSweeperTest extends FeatureTestCase
 
         $child->refresh();
         $this->assertSame(FlowSessionStatus::Ended, $child->status);
-        $this->assertSame(EndNodeHandler::END_STATUS_FAILED, $child->end_status);
+        $this->assertSame(EndStatus::Failed->value, $child->end_status);
 
         $parent->refresh();
         $this->assertSame(FlowSessionStatus::Ended, $parent->status);
-        $this->assertSame(EndNodeHandler::END_STATUS_FAILED, $parent->end_status);
+        $this->assertSame(EndStatus::Failed->value, $parent->end_status);
     }
 
     public function test_expired_parent_without_live_child_is_marked_expired(): void

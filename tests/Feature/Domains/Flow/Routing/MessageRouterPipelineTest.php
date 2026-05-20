@@ -9,8 +9,8 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
-use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
@@ -78,7 +78,7 @@ final class MessageRouterPipelineTest extends FeatureTestCase
 
         $this->assertNotNull($session);
         $this->assertSame(FlowSessionStatus::Ended, $session->status);
-        $this->assertSame(EndNodeHandler::END_STATUS_SUCCESS, $session->end_status);
+        $this->assertSame(EndStatus::Success->value, $session->end_status);
         $this->assertNull($session->current_node_id);
         $this->assertSame('first', $session->state['flow']['marker'] ?? null);
     }

@@ -9,6 +9,7 @@ use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
+use App\Domains\Flow\Enums\InputExpectedType;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\Variable;
@@ -21,6 +22,10 @@ use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Contracts\ContactWriterInterface;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use FAPost\Support\Builder\Schema\Fields\SelectField;
+use FAPost\Support\Builder\Schema\Fields\StatePickerField;
+use FAPost\Support\Builder\Schema\Schema;
+use FAPost\Support\Builder\Schema\Section;
 use RuntimeException;
 use Throwable;
 
@@ -29,15 +34,6 @@ final class InputNodeHandler extends AbstractVersionedHandler
     final public const string TYPE = 'input';
 
     private const string RECEIVED_META = 'received';
-
-    private const string EXPECTED_TYPE_TEXT = 'text';
-
-    /**
-     * Expected types that route through the media ingest pipeline. The handler accepts
-     * any of these values; the value also constrains what attachments are accepted on
-     * an incoming message (file = anything, others narrow to a specific MediaKind).
-     */
-    private const array MEDIA_EXPECTED_TYPES = ['file', 'image', 'document', 'video', 'voice', 'audio'];
 
     public function __construct(
         private readonly MediaIngestorInterface $mediaIngestor,
@@ -58,28 +54,35 @@ final class InputNodeHandler extends AbstractVersionedHandler
      */
     public function configSchema(): array
     {
-        return [
-            'save_to' => [
-                'type'        => 'state-picker',
-                'label'       => 'Save to',
-                'required'    => false,
-                'placeholder' => 'flow.user_input',
-            ],
-            'expected_type' => [
-                'type'    => 'select',
-                'label'   => 'Expected input',
-                'options' => array_merge([self::EXPECTED_TYPE_TEXT], self::MEDIA_EXPECTED_TYPES),
-                'default' => self::EXPECTED_TYPE_TEXT,
-            ],
-        ];
+        return Schema::make()
+            ->section(
+                Section::make('storage', 'Storage')
+                    ->icon('archive-box')
+                    ->fields([
+                        StatePickerField::make('save_to')
+                            ->label('Save to')
+                            ->placeholder('flow.user_input'),
+                    ]),
+            )
+            ->section(
+                Section::make('validation', 'Validation')
+                    ->icon('check-circle')
+                    ->fields([
+                        SelectField::make('expected_type')
+                            ->label('Expected input')
+                            ->options(InputExpectedType::cases())
+                            ->default(InputExpectedType::Text),
+                    ]),
+            )
+            ->toArray();
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         $config       = is_array($nodeConfig['config'] ?? null) ? $nodeConfig['config'] : [];
-        $expectedType = is_string(
-            $config['expected_type'] ?? null
-        ) ? $config['expected_type'] : self::EXPECTED_TYPE_TEXT;
+        $rawExpected  = is_string($config['expected_type'] ?? null) ? $config['expected_type'] : null;
+        $expectedType = (null !== $rawExpected ? InputExpectedType::tryFrom($rawExpected) : null)
+                        ?? InputExpectedType::Text;
 
         $variable = $this->resolveVariable($config);
 
@@ -88,7 +91,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
             return $promptResult;
         }
 
-        if (in_array($expectedType, self::MEDIA_EXPECTED_TYPES, true)) {
+        if ($expectedType->isMedia()) {
             return $this->handleMediaInput($expectedType, $variable, $context);
         }
 
@@ -114,12 +117,12 @@ final class InputNodeHandler extends AbstractVersionedHandler
         NodeExecutionContext $context
     ): ?NodeExecutionResult {
         $promptRaw = $config['prompt'] ?? null;
-        if ( ! is_string($promptRaw) && ! is_array($promptRaw)) {
+        if (! is_string($promptRaw) && ! is_array($promptRaw)) {
             return null;
         }
 
         $resolved = $this->translator->resolveField($promptRaw, $context->resolvedLanguage);
-        if ( ! is_string($resolved) || '' === mb_trim($resolved)) {
+        if (! is_string($resolved) || '' === mb_trim($resolved)) {
             return null;
         }
 
@@ -158,7 +161,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
      * lists — single-file messages produce one-element lists for a uniform downstream shape.
      */
     private function handleMediaInput(
-        string $expectedType,
+        InputExpectedType $expectedType,
         ?Variable $variable,
         NodeExecutionContext $context
     ): NodeExecutionResult {
@@ -225,18 +228,18 @@ final class InputNodeHandler extends AbstractVersionedHandler
      *
      * @return array<int, IncomingMedia>
      */
-    private function filterAcceptedMedia(array $media, string $expectedType): array
+    private function filterAcceptedMedia(array $media, InputExpectedType $expectedType): array
     {
-        if ('file' === $expectedType) {
+        if (InputExpectedType::File === $expectedType) {
             return $media;
         }
 
         $allowedKind = match ($expectedType) {
-            'image'          => 'image',
-            'document'       => 'document',
-            'video'          => 'video',
-            'voice', 'audio' => 'audio',
-            default          => null,
+            InputExpectedType::Image                           => 'image',
+            InputExpectedType::Document                        => 'document',
+            InputExpectedType::Video                           => 'video',
+            InputExpectedType::Voice, InputExpectedType::Audio => 'audio',
+            default                                            => null,
         };
 
         if (null === $allowedKind) {
@@ -275,7 +278,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
             ->orderByDesc('channel_contacts.last_interaction_at')
             ->first();
 
-        if ( ! $channelContact instanceof ChannelContact || ! $channelContact->channel instanceof Channel) {
+        if (! $channelContact instanceof ChannelContact || ! $channelContact->channel instanceof Channel) {
             throw new RuntimeException("No active channel found for contact '{$context->contactId}'.");
         }
 
@@ -316,7 +319,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
 
         $saveTo = $config['save_to'] ?? null;
 
-        if ( ! is_string($saveTo) || '' === $saveTo) {
+        if (! is_string($saveTo) || '' === $saveTo) {
             return null;
         }
 

@@ -6,6 +6,7 @@ import {useKnownGroups} from '@builder/composables/useKnownGroups'
 import KeyboardListEditor from './KeyboardListEditor.vue'
 import VariablePicker from '../VariablePicker.vue'
 import AccordionSection from '../AccordionSection.vue'
+import StatePathPicker from '../StatePathPicker.vue'
 import MediaPicker from '@builder/components/media/MediaPicker.vue'
 import VariableStorageEditor from '@builder/components/editor/variables/VariableStorageEditor.vue'
 import {
@@ -14,6 +15,10 @@ import {
     variableTypeToLegacySaveToType,
 } from '@builder/utils/variableCompiler'
 import type {Variable} from '@builder/dto/types'
+
+const DYNAMIC_ITEM_TYPES = [
+    { value: 'text', label: 'Text' },
+]
 
 // Aligned with SendMessage button-answer taxonomy. Only three types make
 // sense for a tap-on-button scenario: free text, numeric label, or yes/no.
@@ -69,6 +74,8 @@ const isReplyKeyboard = computed(() => showsButtons.value && keyboardMode.value 
 
 const knownGroups = useKnownGroups()
 
+// ── Static keyboard ──────────────────────────────────────────────────────────
+
 // `null` = user has not configured a save target. We surface an empty
 // editor in that case so they can opt-in without any pre-filled name.
 const answerVariable = ref<Variable | null>(decodeSendMessageVariable(config.value))
@@ -84,8 +91,78 @@ watch(
     () => {
         answerVariable.value = decodeSendMessageVariable(config.value)
         saveAnswerEnabled.value = answerVariable.value !== null
+        syncDynamicRefs()
     },
 )
+
+// ── Dynamic keyboard ──────────────────────────────────────────────────────────
+
+const isDynamic = computed(() =>
+    showsButtons.value && !isReplyKeyboard.value && config.value.dynamic_buttons != null
+)
+
+// Switching to Dynamic is blocked when static buttons have wired descendants —
+// removing buttons would prune those edges and disconnect graph nodes.
+const dynamicSwitchBlocked = computed(() => {
+    if (isDynamic.value) return false
+    const nodeId   = props.node.id as string
+    const buttonIds = new Set(buttons.value.map((b) => b.id).filter(Boolean))
+    if (buttonIds.size === 0) return false
+    return builderStore.definition.edges.some(
+        (e) => e.from === nodeId && buttonIds.has(e.handle ?? ''),
+    )
+})
+
+const dynamicConfig = computed(
+    () => (config.value.dynamic_buttons as Record<string, unknown> | null) ?? {}
+)
+
+const dynamicSource = ref<string>(String(dynamicConfig.value.source ?? ''))
+
+const dynamicItemVariable = ref<Variable | null>(
+    (() => {
+        const raw = (dynamicConfig.value.save_item_to as Record<string, unknown> | null) ?? null
+        return raw ? (raw as Variable) : null
+    })()
+)
+
+function syncDynamicRefs() {
+    const dc = (config.value.dynamic_buttons as Record<string, unknown> | null) ?? {}
+    dynamicSource.value = String(dc.source ?? '')
+    const raw = (dc.save_item_to as Record<string, unknown> | null) ?? null
+    dynamicItemVariable.value = raw ? (raw as Variable) : null
+}
+
+function switchKeyboardType(type: 'static' | 'dynamic') {
+    if (type === 'dynamic') {
+        // Do NOT clear buttons — they carry the graph edges that connect downstream
+        // nodes. Clearing buttons would trigger edge pruning in the store and
+        // disconnect all wired branches. The backend ignores buttons when
+        // dynamic_buttons is present.
+        update({
+            dynamic_buttons: { source: '', max_per_row: 2, save_item_to: null },
+        })
+        dynamicSource.value = ''
+        dynamicItemVariable.value = null
+    } else {
+        update({ dynamic_buttons: null })
+    }
+}
+
+function updateDynamicSource(value: string) {
+    dynamicSource.value = value
+    update({ dynamic_buttons: { ...dynamicConfig.value, source: value } })
+}
+
+function updateDynamicMaxPerRow(value: string) {
+    const n = parseInt(value, 10)
+    update({ dynamic_buttons: { ...dynamicConfig.value, max_per_row: isNaN(n) ? 2 : Math.max(1, n) } })
+}
+
+function onDynamicItemVariableUpdate(next: Variable) {
+    dynamicItemVariable.value = next
+    update({ dynamic_buttons: { ...dynamicConfig.value, save_item_to: compileVariable(next) } })
+}
 
 // KeyboardListEditor still validates per-button values against the legacy
 // string|number|boolean taxonomy. Map our richer VariableType down so that
@@ -283,35 +360,107 @@ function updateKeyboardMode(value: string) {
         <AccordionSection
             v-if="showsButtons"
             title="Buttons"
-            :badge="buttons.length > 0 ? buttons.length : null"
+            :badge="isDynamic ? 'dynamic' : (buttons.length > 0 ? buttons.length : null)"
         >
-            <KeyboardListEditor
-                :buttons="buttons"
-                :is-reply-keyboard="isReplyKeyboard"
-                :save-to-type="saveToType"
-                @update="update({ buttons: $event })"
-            />
+            <!-- Static / Dynamic toggle (inline keyboards only) -->
+            <div v-if="!isReplyKeyboard" class="config-field">
+                <div class="field-label">Keyboard type</div>
+                <div class="kb-type-toggle">
+                    <button
+                        class="kb-type-btn"
+                        :class="{ 'kb-type-btn--active': !isDynamic }"
+                        type="button"
+                        @click="switchKeyboardType('static')"
+                    >Static</button>
+                    <button
+                        class="kb-type-btn"
+                        :class="{ 'kb-type-btn--active': isDynamic, 'kb-type-btn--disabled': dynamicSwitchBlocked }"
+                        :disabled="dynamicSwitchBlocked"
+                        :title="dynamicSwitchBlocked ? 'Remove all button connections in the graph before switching to Dynamic' : undefined"
+                        type="button"
+                        @click="switchKeyboardType('dynamic')"
+                    >Dynamic</button>
+                </div>
+                <p v-if="isDynamic" class="field-hint">
+                    ⚙️ <em>Advanced / Developer feature.</em> Buttons are generated at runtime from a state
+                    collection. Requires an upstream node (e.g. Call) that populates the source path with
+                    objects containing a <em>label</em> field.
+                </p>
+            </div>
 
-            <template v-if="!isReplyKeyboard && buttons.length > 0">
+            <!-- Static keyboard -->
+            <template v-if="!isDynamic">
+                <KeyboardListEditor
+                    :buttons="buttons"
+                    :is-reply-keyboard="isReplyKeyboard"
+                    :save-to-type="saveToType"
+                    @update="update({ buttons: $event })"
+                />
+
+                <template v-if="!isReplyKeyboard && buttons.length > 0">
+                    <div class="config-field">
+                        <label class="save-answer-toggle">
+                            <input
+                                type="checkbox"
+                                class="toggle-check"
+                                :checked="saveAnswerEnabled"
+                                @change="onSaveAnswerToggle(($event.target as HTMLInputElement).checked)"
+                            >
+                            <span class="save-answer-label">Save answer to variable</span>
+                        </label>
+                        <VariableStorageEditor
+                            v-if="saveAnswerEnabled"
+                            :model-value="answerVariable"
+                            :type-options="BUTTON_VALUE_TYPES"
+                            :known-groups="knownGroups"
+                            show-storage
+                            show-group
+                            @update:model-value="onAnswerVariableUpdate"
+                        />
+                    </div>
+                </template>
+            </template>
+
+            <!-- Dynamic keyboard -->
+            <template v-else>
                 <div class="config-field">
-                    <label class="save-answer-toggle">
-                        <input
-                            type="checkbox"
-                            class="toggle-check"
-                            :checked="saveAnswerEnabled"
-                            @change="onSaveAnswerToggle(($event.target as HTMLInputElement).checked)"
-                        >
-                        <span class="save-answer-label">Save answer to variable</span>
-                    </label>
+                    <div class="field-label">Source collection</div>
+                    <StatePathPicker
+                        :model-value="dynamicSource"
+                        :allow-manual="false"
+                        placeholder="flow.employees"
+                        @update:model-value="updateDynamicSource"
+                    />
+                    <p class="field-hint">
+                        Choose a variable registered by an upstream node (e.g. Call → Save response to).
+                    </p>
+                </div>
+
+                <div class="config-field">
+                    <div class="field-label">Buttons per row</div>
+                    <input
+                        class="field-input"
+                        type="number"
+                        min="1"
+                        max="8"
+                        :value="(dynamicConfig.max_per_row as number | undefined) ?? 2"
+                        @input="updateDynamicMaxPerRow(($event.target as HTMLInputElement).value)"
+                    >
+                </div>
+
+                <div class="config-field">
+                    <div class="field-label">Save selected item to</div>
                     <VariableStorageEditor
-                        v-if="saveAnswerEnabled"
-                        :model-value="answerVariable"
-                        :type-options="BUTTON_VALUE_TYPES"
+                        :model-value="dynamicItemVariable"
+                        :type-options="DYNAMIC_ITEM_TYPES"
                         :known-groups="knownGroups"
                         show-storage
                         show-group
-                        @update:model-value="onAnswerVariableUpdate"
+                        @update:model-value="onDynamicItemVariableUpdate"
                     />
+                    <p class="field-hint">
+                        Full item object is saved here when a button is pressed.
+                    </p>
                 </div>
             </template>
         </AccordionSection>
@@ -367,5 +516,34 @@ function updateKeyboardMode(value: string) {
 .save-answer-label {
     font-size: 12.5px;
     color: var(--text-2);
+}
+
+.kb-type-toggle {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.kb-type-btn {
+    flex: 1;
+    padding: 5px 0;
+    font-size: 12px;
+    background: transparent;
+    color: var(--text-2);
+    border: none;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.kb-type-btn:hover {
+    background: var(--bg-2);
+}
+.kb-type-btn--active {
+    background: var(--primary);
+    color: #fff;
+}
+.kb-type-btn--disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 </style>

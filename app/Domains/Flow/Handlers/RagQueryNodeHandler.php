@@ -13,7 +13,9 @@ use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\DTO\RagQueryContext;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
-use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Fields\JsonField;
+use FAPost\Support\Builder\Schema\Fields\TextareaField;
+use FAPost\Support\Builder\Schema\Fields\TextField;
 use FAPost\Support\Builder\Schema\Schema;
 use FAPost\Support\Builder\Schema\Section;
 use LogicException;
@@ -65,10 +67,10 @@ final class RagQueryNodeHandler extends AbstractVersionedHandler
                 Section::make('knowledge_base', 'Knowledge base')
                     ->icon('book-open')
                     ->fields([
-                        Field::string('knowledge_base_id')
+                        TextField::make('knowledge_base_id')
                             ->label('Knowledge base')
                             ->required(),
-                        Field::string('provider')
+                        TextField::make('provider')
                             ->label('Provider')
                             ->required()
                             ->help('Identifier of a registered RAG adapter (e.g. openai_assistants, pgvector).'),
@@ -78,7 +80,7 @@ final class RagQueryNodeHandler extends AbstractVersionedHandler
                 Section::make('query', 'Query')
                     ->icon('magnifying-glass')
                     ->fields([
-                        Field::text('query')
+                        TextareaField::make('query')
                             ->label('Query')
                             ->required()
                             ->placeholder('{{flow.last_user_message}}'),
@@ -89,7 +91,7 @@ final class RagQueryNodeHandler extends AbstractVersionedHandler
                     ->icon('adjustments-horizontal')
                     ->collapsed()
                     ->fields([
-                        Field::json('options')
+                        JsonField::make('options')
                             ->label('Options')
                             ->default([]),
                     ]),
@@ -115,7 +117,7 @@ final class RagQueryNodeHandler extends AbstractVersionedHandler
 
         $resolvedQuery = $this->templates->render($rawQuery, $context, $state);
 
-        if ( ! is_string($resolvedQuery) || '' === $resolvedQuery) {
+        if (! is_string($resolvedQuery) || '' === $resolvedQuery) {
             throw new InvalidNodeConfigException('rag_query: query resolved to empty string');
         }
 

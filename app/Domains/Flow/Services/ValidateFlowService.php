@@ -10,6 +10,7 @@ use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\DTOs\FlowValidationResultDto;
+use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Handlers\EndNodeHandler;
@@ -87,7 +88,7 @@ final readonly class ValidateFlowService
         $normalized = [];
 
         foreach ($nodes as $key => $node) {
-            if ( ! is_array($node)) {
+            if (! is_array($node)) {
                 $errors[] = new FlowValidationErrorDto(
                     path: "nodes.{$key}",
                     code: 'invalid_node',
@@ -97,7 +98,7 @@ final readonly class ValidateFlowService
             }
 
             $nodeId = $node['id'] ?? $key;
-            if ( ! is_string($nodeId) || '' === $nodeId) {
+            if (! is_string($nodeId) || '' === $nodeId) {
                 $errors[] = new FlowValidationErrorDto(
                     path: "nodes.{$key}.id",
                     code: 'invalid_node_id',
@@ -121,7 +122,7 @@ final readonly class ValidateFlowService
         $type    = $node['type'] ?? null;
         $version = $node['version'] ?? 1;
 
-        if ( ! is_string($type) || '' === $type || ! is_int($version)) {
+        if (! is_string($type) || '' === $type || ! is_int($version)) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.type",
                 code: 'invalid_handler_reference',
@@ -151,11 +152,11 @@ final readonly class ValidateFlowService
         $type    = $node['type'] ?? null;
         $version = $node['version'] ?? null;
         $config  = $node['config'] ?? null;
-        if ( ! is_string($type) || ! is_int($version)) {
+        if (! is_string($type) || ! is_int($version)) {
             return;
         }
 
-        if ( ! is_array($config)) {
+        if (! is_array($config)) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config",
                 code: 'invalid_config',
@@ -186,7 +187,7 @@ final readonly class ValidateFlowService
         }
 
         foreach ($requiredFields as $requiredField) {
-            if ( ! array_key_exists($requiredField, $config)) {
+            if (! array_key_exists($requiredField, $config)) {
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.config.{$requiredField}",
                     code: 'missing_config_field',
@@ -203,17 +204,17 @@ final readonly class ValidateFlowService
     private function validateOutputs(array $node, string $path, array $nodeMap, array &$errors): void
     {
         $outputs = $node['outputs'] ?? null;
-        if ( ! is_array($outputs)) {
+        if (! is_array($outputs)) {
             return;
         }
 
         foreach ($outputs as $handle => $output) {
-            if ( ! is_array($output)) {
+            if (! is_array($output)) {
                 continue;
             }
 
             $target = $output['next'] ?? $output['target'] ?? null;
-            if ( ! is_string($target) || '' === $target || ! isset($nodeMap[$target])) {
+            if (! is_string($target) || '' === $target || ! isset($nodeMap[$target])) {
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.outputs.{$handle}",
                     code: 'unknown_output_target',
@@ -234,7 +235,7 @@ final readonly class ValidateFlowService
         }
 
         $outputs = $node['outputs'] ?? null;
-        if ( ! is_array($outputs) || ! isset($outputs['true'], $outputs['false'])) {
+        if (! is_array($outputs) || ! isset($outputs['true'], $outputs['false'])) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.outputs",
                 code: 'branch_outputs_missing',
@@ -250,12 +251,12 @@ final readonly class ValidateFlowService
     private function validateUnknownModuleReferences(array $node, string $path, array &$errors): void
     {
         $config = $node['config'] ?? null;
-        if ( ! is_array($config)) {
+        if (! is_array($config)) {
             return;
         }
 
         array_walk_recursive($config, function (mixed $value) use (&$errors, $path): void {
-            if ( ! is_string($value) || ! str_starts_with($value, 'module.')) {
+            if (! is_string($value) || ! str_starts_with($value, 'module.')) {
                 return;
             }
 
@@ -271,7 +272,7 @@ final readonly class ValidateFlowService
             }
 
             $namespace = "{$segments[0]}.{$segments[1]}";
-            if ( ! $this->dataAccessors->has($namespace)) {
+            if (! $this->dataAccessors->has($namespace)) {
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.config",
                     code: 'unknown_module_accessor',
@@ -309,21 +310,21 @@ final readonly class ValidateFlowService
         $rawContentType = $config['content_type'] ?? null;
         $contentType    = is_string($rawContentType) ? SendMessageContentType::tryFrom($rawContentType) : null;
 
-        if ( ! $contentType instanceof SendMessageContentType || ! $contentType->requiresMediaUrl()) {
+        if (! $contentType instanceof SendMessageContentType || ! $contentType->requiresMediaUrl()) {
             return;
         }
 
         $mediaFileId = $config['media_file_id'] ?? null;
 
-        if ( ! is_string($mediaFileId) || '' === $mediaFileId) {
+        if (! is_string($mediaFileId) || '' === $mediaFileId) {
             return;
         }
 
-        if ( ! $this->tenantContext->isResolved()) {
+        if (! $this->tenantContext->isResolved()) {
             return;
         }
 
-        if ( ! MediaFile::query()->where('id', $mediaFileId)->exists()) {
+        if (! MediaFile::query()->where('id', $mediaFileId)->exists()) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.media_file_id",
                 code: 'media_file_not_found',
@@ -350,7 +351,7 @@ final readonly class ValidateFlowService
         $config    = is_array($node['config'] ?? null) ? $node['config'] : [];
         $eventType = $config['event_type'] ?? null;
 
-        if ( ! is_string($eventType) || '' === mb_trim($eventType)) {
+        if (! is_string($eventType) || '' === mb_trim($eventType)) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.event_type",
                 code: 'emit_event_missing_type',
@@ -400,11 +401,13 @@ final readonly class ValidateFlowService
             return; // handler applies default at runtime
         }
 
-        if ( ! is_string($status) || ! in_array($status, EndNodeHandler::ALLOWED_END_STATUSES, true)) {
+        $allowed = array_column(EndStatus::cases(), 'value');
+
+        if (! is_string($status) || null === EndStatus::tryFrom($status)) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.status",
                 code: 'end_invalid_status',
-                message: 'end.status must be one of: ' . implode(', ', EndNodeHandler::ALLOWED_END_STATUSES) . '.',
+                message: 'end.status must be one of: ' . implode(', ', $allowed) . '.',
             );
         }
     }
@@ -427,7 +430,7 @@ final readonly class ValidateFlowService
         $config = is_array($node['config'] ?? null) ? $node['config'] : [];
 
         $kb = $config['knowledge_base_id'] ?? null;
-        if ( ! is_string($kb) || '' === mb_trim($kb)) {
+        if (! is_string($kb) || '' === mb_trim($kb)) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.knowledge_base_id",
                 code: 'rag_missing_knowledge_base_id',
@@ -442,7 +445,7 @@ final readonly class ValidateFlowService
         }
 
         $provider = $config['provider'] ?? null;
-        if ( ! is_string($provider) || '' === mb_trim($provider)) {
+        if (! is_string($provider) || '' === mb_trim($provider)) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.provider",
                 code: 'rag_missing_provider',
@@ -451,7 +454,7 @@ final readonly class ValidateFlowService
         }
 
         $query = $config['query'] ?? null;
-        if ( ! is_string($query) || '' === mb_trim($query)) {
+        if (! is_string($query) || '' === mb_trim($query)) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.query",
                 code: 'rag_missing_query',
@@ -515,7 +518,7 @@ final readonly class ValidateFlowService
         $config = is_array($node['config'] ?? null) ? $node['config'] : [];
 
         $flowId = $config['flow_id'] ?? null;
-        if ( ! is_string($flowId) || '' === mb_trim($flowId)) {
+        if (! is_string($flowId) || '' === mb_trim($flowId)) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.config.flow_id",
                 code: 'subflow_missing_flow_id',
@@ -531,7 +534,7 @@ final readonly class ValidateFlowService
 
         $timeout = $config['timeout'] ?? null;
         if (null !== $timeout) {
-            if ( ! is_string($timeout) || '' === mb_trim($timeout)) {
+            if (! is_string($timeout) || '' === mb_trim($timeout)) {
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.config.timeout",
                     code: 'subflow_invalid_timeout',
@@ -602,7 +605,7 @@ final readonly class ValidateFlowService
     private function validateEndNodeOutgoingEdges(array $nodeMap, array $edges, array &$errors): void
     {
         foreach ($edges as $edge) {
-            if ( ! is_array($edge) || ! isset($edge['from']) || ! is_string($edge['from'])) {
+            if (! is_array($edge) || ! isset($edge['from']) || ! is_string($edge['from'])) {
                 continue;
             }
 
@@ -642,7 +645,7 @@ final readonly class ValidateFlowService
         // Ordered list of root node IDs (preserving the sequence order from the frontend).
         $rootOrder = [];
         foreach (array_keys($nodeMap) as $nodeId) {
-            if ( ! isset($nodesWithIncoming[$nodeId])) {
+            if (! isset($nodesWithIncoming[$nodeId])) {
                 $rootOrder[] = $nodeId;
             }
         }
@@ -660,7 +663,7 @@ final readonly class ValidateFlowService
 
             // Case 1: explicit default edge leads out of this node (any branch, any keyboard mode).
             foreach ($edges as $edge) {
-                if ( ! is_array($edge)) {
+                if (! is_array($edge)) {
                     continue;
                 }
 
@@ -676,7 +679,7 @@ final readonly class ValidateFlowService
 
             // Case 2: this node is a root and other root nodes appear after it in the sequence.
             // Those trailing roots are visually displayed after this node but are unreachable at runtime.
-            if ( ! isset($nodesWithIncoming[$nodeId])) {
+            if (! isset($nodesWithIncoming[$nodeId])) {
                 $position = array_search($nodeId, $rootOrder, true);
                 if (false !== $position && $position < count($rootOrder) - 1) {
                     $errors[] = new FlowValidationErrorDto(
@@ -701,14 +704,14 @@ final readonly class ValidateFlowService
     private function validateButtonEdgesMatchExistingButtons(array $nodeMap, array $edges, array &$errors): void
     {
         foreach ($edges as $edge) {
-            if ( ! is_array($edge)) {
+            if (! is_array($edge)) {
                 continue;
             }
 
             $fromId = $edge['from'] ?? null;
             $handle = $edge['handle'] ?? 'default';
 
-            if ( ! is_string($fromId) || 'default' === $handle) {
+            if (! is_string($fromId) || 'default' === $handle) {
                 continue;
             }
 
@@ -721,7 +724,7 @@ final readonly class ValidateFlowService
             $buttons = is_array($config['buttons'] ?? null) ? $config['buttons'] : [];
 
             $buttonIds = array_column($buttons, 'id');
-            if ( ! in_array($handle, $buttonIds, true)) {
+            if (! in_array($handle, $buttonIds, true)) {
                 $errors[] = new FlowValidationErrorDto(
                     path: "nodes.{$fromId}",
                     code: 'orphaned_button_edge',
@@ -756,7 +759,7 @@ final readonly class ValidateFlowService
             }
 
             $saveToType = $config['save_to_type'] ?? 'string';
-            if ( ! in_array($saveToType, ['string', 'number', 'boolean'], true) || 'string' === $saveToType) {
+            if (! in_array($saveToType, ['string', 'number', 'boolean'], true) || 'string' === $saveToType) {
                 continue;
             }
 
@@ -764,7 +767,7 @@ final readonly class ValidateFlowService
 
             foreach ($buttons as $idx => $button) {
                 $value = $button['value'] ?? '';
-                if ( ! is_string($value) || '' === $value) {
+                if (! is_string($value) || '' === $value) {
                     continue;
                 }
 
@@ -774,7 +777,7 @@ final readonly class ValidateFlowService
                     default   => true,
                 };
 
-                if ( ! $valid) {
+                if (! $valid) {
                     $errors[] = new FlowValidationErrorDto(
                         path: "nodes.{$nodeId}.config.buttons.{$idx}.value",
                         code: 'button_value_type_mismatch',
@@ -800,7 +803,7 @@ final readonly class ValidateFlowService
         }
 
         $type = $trigger['type'] ?? null;
-        if ( ! is_string($type) || '' === $type) {
+        if (! is_string($type) || '' === $type) {
             $errors[] = new FlowValidationErrorDto(
                 path: 'trigger.type',
                 code: 'invalid_trigger_type',
@@ -810,7 +813,7 @@ final readonly class ValidateFlowService
             return;
         }
 
-        if ( ! is_bool($trigger['is_active'] ?? null)) {
+        if (! is_bool($trigger['is_active'] ?? null)) {
             $errors[] = new FlowValidationErrorDto(
                 path: 'trigger.is_active',
                 code: 'invalid_trigger_active_flag',
@@ -819,7 +822,7 @@ final readonly class ValidateFlowService
         }
 
         $priority = $trigger['priority'] ?? null;
-        if ( ! is_int($priority) || $priority < 0) {
+        if (! is_int($priority) || $priority < 0) {
             $errors[] = new FlowValidationErrorDto(
                 path: 'trigger.priority',
                 code: 'invalid_trigger_priority',
@@ -828,7 +831,7 @@ final readonly class ValidateFlowService
         }
 
         $config = $trigger['config'] ?? null;
-        if ( ! is_array($config)) {
+        if (! is_array($config)) {
             $errors[] = new FlowValidationErrorDto(
                 path: 'trigger.config',
                 code: 'invalid_trigger_config',
@@ -931,14 +934,14 @@ final readonly class ValidateFlowService
         $keywords = $config['keywords'] ?? null;
         $phrases  = $config['phrases'] ?? null;
 
-        if ( ! is_array($keywords) || (null !== $phrases && ! is_array($phrases))) {
+        if (! is_array($keywords) || (null !== $phrases && ! is_array($phrases))) {
             return [];
         }
 
         $needles = [];
 
         foreach ([...$keywords, ...(is_array($phrases) ? $phrases : [])] as $value) {
-            if ( ! is_string($value) || '' === mb_trim($value)) {
+            if (! is_string($value) || '' === mb_trim($value)) {
                 continue;
             }
 
@@ -980,7 +983,7 @@ final readonly class ValidateFlowService
 
         $eventName = $config['event_name'] ?? null;
 
-        if ( ! is_string($eventName) || '' === mb_trim($eventName)) {
+        if (! is_string($eventName) || '' === mb_trim($eventName)) {
             $errors[] = new FlowValidationErrorDto(
                 path: 'trigger.config.event_name',
                 code: 'missing_event_trigger_selection',
@@ -992,7 +995,7 @@ final readonly class ValidateFlowService
 
         $availableEvents = $this->tenantEvents->getEventNamesByTenant($draft->tenant_id);
 
-        if ( ! in_array($eventName, $availableEvents, true)) {
+        if (! in_array($eventName, $availableEvents, true)) {
             $errors[] = new FlowValidationErrorDto(
                 path: 'trigger.config.event_name',
                 code: 'unknown_event_trigger_selection',

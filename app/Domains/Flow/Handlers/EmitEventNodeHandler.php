@@ -11,7 +11,8 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
-use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Fields\JsonField;
+use FAPost\Support\Builder\Schema\Fields\TextField;
 use FAPost\Support\Builder\Schema\Schema;
 use FAPost\Support\Builder\Schema\Section;
 
@@ -55,7 +56,7 @@ final class EmitEventNodeHandler extends AbstractVersionedHandler
                 Section::make('event', 'Event')
                     ->icon('bolt')
                     ->fields([
-                        Field::string('event_type')
+                        TextField::make('event_type')
                             ->label('Event type')
                             ->required()
                             ->placeholder('sales.order.created'),
@@ -65,7 +66,7 @@ final class EmitEventNodeHandler extends AbstractVersionedHandler
                 Section::make('payload', 'Payload')
                     ->icon('cube')
                     ->fields([
-                        Field::json('payload')
+                        JsonField::make('payload')
                             ->label('Payload')
                             ->default([]),
                     ]),

@@ -117,6 +117,36 @@ final class CoreSystemTranslations
                 ],
             ),
 
+            // ── send_message inline keyboard waiting hints ───────────────────
+            new SystemTranslationEntry(
+                key: 'errors.waiting_for_button',
+                group: 'errors',
+                description: [
+                    'en' => 'Sent when the user types text while the bot is waiting for an inline keyboard button press (no timeout configured).',
+                    'ru' => 'Отправляется, когда пользователь пишет текст, пока бот ждёт нажатия кнопки инлайн-клавиатуры (без таймаута).',
+                    'uk' => 'Надсилається, коли користувач пише текст, поки бот чекає натискання кнопки інлайн-клавіатури (без таймауту).',
+                ],
+                defaults: [
+                    'en' => '⚠️ Please press one of the buttons, or send /reset to cancel.',
+                    'ru' => '⚠️ Нажмите одну из кнопок или отправьте /reset для отмены.',
+                    'uk' => '⚠️ Натисніть одну з кнопок або надішліть /reset для скасування.',
+                ],
+            ),
+            new SystemTranslationEntry(
+                key: 'errors.waiting_for_button_timed',
+                group: 'errors',
+                description: [
+                    'en' => 'Sent when the user types text while waiting for a button press with a timeout active. Use :seconds as a placeholder for the remaining seconds.',
+                    'ru' => 'Отправляется, когда пользователь пишет текст, пока активен таймаут ожидания кнопки. Используйте :seconds как плейсхолдер оставшихся секунд.',
+                    'uk' => 'Надсилається, коли користувач пише текст під час активного таймауту очікування кнопки. Використовуйте :seconds як плейсхолдер залишених секунд.',
+                ],
+                defaults: [
+                    'en' => '⚠️ Please press one of the buttons. Auto-cancel in :seconds s. Send /reset to cancel now.',
+                    'ru' => '⚠️ Нажмите одну из кнопок. Автоотмена через :seconds с. Отправьте /reset для немедленной отмены.',
+                    'uk' => '⚠️ Натисніть одну з кнопок. Автоскасування через :seconds с. Надішліть /reset для негайного скасування.',
+                ],
+            ),
+
             // ── Default service buttons ──────────────────────────────────────
             new SystemTranslationEntry(
                 key: 'buttons.yes',

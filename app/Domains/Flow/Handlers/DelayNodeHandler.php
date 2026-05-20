@@ -9,7 +9,7 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
-use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Fields\NumberField;
 use FAPost\Support\Builder\Schema\Schema;
 
 final class DelayNodeHandler extends AbstractVersionedHandler
@@ -36,7 +36,7 @@ final class DelayNodeHandler extends AbstractVersionedHandler
     {
         return Schema::make()
             ->fields([
-                Field::number('seconds')
+                NumberField::make('seconds')
                     ->label('Delay (seconds)')
                     ->default(60),
             ])

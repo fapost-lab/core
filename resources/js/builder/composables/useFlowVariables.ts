@@ -201,6 +201,16 @@ export function useFlowVariables() {
                 continue
             }
 
+            // Call — save_response_to is a free-form state path ("flow.x"). The
+            // dynamic-keyboard Source picker treats these as registered collections.
+            if (node.type === 'call') {
+                const saveTo = cfg.save_response_to
+                if (typeof saveTo === 'string' && saveTo !== '') {
+                    push(fromLegacyPath(saveTo, nodeLabel))
+                }
+                continue
+            }
+
             // Assign — operations[*].variable (new) | target+key (legacy) | flat key
             if (node.type === 'assign') {
                 const ops = cfg.operations

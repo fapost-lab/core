@@ -8,8 +8,8 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
-use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
@@ -113,10 +113,10 @@ final class SubflowLifecycleTest extends FeatureTestCase
         $this->assertNotNull($child);
 
         $this->assertSame(FlowSessionStatus::Ended, $child->status);
-        $this->assertSame(EndNodeHandler::END_STATUS_SUCCESS, $child->end_status);
+        $this->assertSame(EndStatus::Success->value, $child->end_status);
 
         $this->assertSame(FlowSessionStatus::Ended, $parent->status, 'parent should finish via success handle after child end');
-        $this->assertSame(EndNodeHandler::END_STATUS_SUCCESS, $parent->end_status);
+        $this->assertSame(EndStatus::Success->value, $parent->end_status);
         $this->assertSame('parent-post', $parent->state['flow']['marker'] ?? null);
     }
 
@@ -155,7 +155,7 @@ final class SubflowLifecycleTest extends FeatureTestCase
             ->first();
 
         $this->assertSame(FlowSessionStatus::Ended, $parent->status);
-        $this->assertSame(EndNodeHandler::END_STATUS_FAILED, $parent->end_status);
+        $this->assertSame(EndStatus::Failed->value, $parent->end_status);
         $this->assertSame('failure-branch', $parent->state['flow']['marker'] ?? null);
     }
 
@@ -220,7 +220,7 @@ final class SubflowLifecycleTest extends FeatureTestCase
         $this->assertNotNull($returned, 'SubflowReturned event must be recorded in parent history');
         $this->assertSame('p-sub', $returned->node_id);
         $this->assertSame((string)$child->getKey(), $returned->metadata['child_session_id'] ?? null);
-        $this->assertSame(EndNodeHandler::END_STATUS_SUCCESS, $returned->metadata['end_status'] ?? null);
+        $this->assertSame(EndStatus::Success->value, $returned->metadata['end_status'] ?? null);
     }
 
     public function test_subflow_does_not_write_history_events_when_logging_disabled(): void

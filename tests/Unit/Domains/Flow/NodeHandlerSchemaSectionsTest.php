@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Flow;
 
+use App\Domains\Flow\Handlers\AssignNodeHandler;
+use App\Domains\Flow\Handlers\BranchNodeHandler;
 use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\EmitEventNodeHandler;
+use App\Domains\Flow\Handlers\InputNodeHandler;
 use App\Domains\Flow\Handlers\RagQueryNodeHandler;
+use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -26,9 +30,13 @@ final class NodeHandlerSchemaSectionsTest extends TestCase
     public static function handlerProvider(): array
     {
         return [
+            'assign'     => [AssignNodeHandler::class],
+            'branch'     => [BranchNodeHandler::class],
             'call'       => [CallNodeHandler::class],
             'rag_query'  => [RagQueryNodeHandler::class],
             'emit_event' => [EmitEventNodeHandler::class],
+            'input'      => [InputNodeHandler::class],
+            'send'       => [SendMessageNodeHandler::class],
             'subflow'    => [SubflowNodeHandler::class],
         ];
     }

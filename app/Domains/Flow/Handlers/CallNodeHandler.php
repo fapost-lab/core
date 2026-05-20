@@ -11,7 +11,11 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
-use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Fields\ArrayField;
+use FAPost\Support\Builder\Schema\Fields\KeyValueField;
+use FAPost\Support\Builder\Schema\Fields\NumberField;
+use FAPost\Support\Builder\Schema\Fields\StatePickerField;
+use FAPost\Support\Builder\Schema\Fields\TextField;
 use FAPost\Support\Builder\Schema\Schema;
 use FAPost\Support\Builder\Schema\Section;
 
@@ -50,11 +54,11 @@ final class CallNodeHandler extends AbstractVersionedHandler
                 Section::make('connection', 'Connection')
                     ->icon('globe-alt')
                     ->fields([
-                        Field::string('url')
+                        TextField::make('url')
                             ->label('URL')
                             ->required()
                             ->placeholder('https://example.com/webhook'),
-                        Field::number('timeout')
+                        NumberField::make('timeout')
                             ->label('Timeout (seconds)')
                             ->default(10)
                             ->min(1)
@@ -65,7 +69,7 @@ final class CallNodeHandler extends AbstractVersionedHandler
                 Section::make('response', 'Response handling')
                     ->icon('arrow-down-tray')
                     ->fields([
-                        Field::statePicker('save_response_to')
+                        StatePickerField::make('save_response_to')
                             ->label('Save response to')
                             ->placeholder('flow.webhook_response'),
                     ]),
@@ -75,7 +79,7 @@ final class CallNodeHandler extends AbstractVersionedHandler
                     ->icon('cog-6-tooth')
                     ->collapsed()
                     ->fields([
-                        Field::keyValue('headers')
+                        KeyValueField::make('headers')
                             ->label('Custom headers')
                             ->keyLabel('Header')
                             ->valueLabel('Value')
@@ -83,7 +87,7 @@ final class CallNodeHandler extends AbstractVersionedHandler
                             ->help(
                                 'Sent alongside the request. Reserved X-* headers set by the engine cannot be overridden.'
                             ),
-                        Field::array('include_state')
+                        ArrayField::make('include_state')
                             ->label('Include state')
                             ->help('State paths whose values are forwarded in the request payload.'),
                     ]),
@@ -96,7 +100,7 @@ final class CallNodeHandler extends AbstractVersionedHandler
         $config = is_array($nodeConfig['config'] ?? null) ? $nodeConfig['config'] : [];
         $url    = $config['url'] ?? null;
 
-        if ( ! is_string($url) || '' === $url) {
+        if (! is_string($url) || '' === $url) {
             throw new InvalidNodeConfigException('call: missing url');
         }
 
@@ -110,7 +114,7 @@ final class CallNodeHandler extends AbstractVersionedHandler
         $rawHeaders = $config['headers'] ?? null;
         if (is_array($rawHeaders)) {
             foreach ($rawHeaders as $headerKey => $headerValue) {
-                if ( ! is_string($headerKey) || '' === $headerKey) {
+                if (! is_string($headerKey) || '' === $headerKey) {
                     continue;
                 }
                 if (str_starts_with($headerKey, 'X-Idempotency-Key') || str_starts_with($headerKey, 'X-FAPost-')) {
@@ -172,7 +176,7 @@ final class CallNodeHandler extends AbstractVersionedHandler
 
         $includeState = is_array($config['include_state'] ?? null) ? $config['include_state'] : [];
         foreach ($includeState as $path) {
-            if ( ! is_string($path)) {
+            if (! is_string($path)) {
                 continue;
             }
 

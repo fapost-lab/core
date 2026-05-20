@@ -12,12 +12,15 @@ use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\LanguageResolverInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowConcurrencyException;
 use App\Domains\Flow\Exceptions\FlowExecutionLimitExceededException;
 use App\Domains\Flow\Exceptions\HandlerNotFoundException;
 use App\Domains\Flow\Exceptions\InvalidFlowGraphException;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
+use App\Domains\Flow\Handlers\EndNodeHandler;
+use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\Logging\FlowLogEntry;
 use App\Domains\Flow\Logging\FlowLogStatus;
 use App\Domains\Flow\Logging\FlowLogWriter;
@@ -287,13 +290,13 @@ final readonly class FlowEngine implements FlowEngineInterface
 
             $nodeId = $node['id'] ?? null;
 
-            if ( ! is_string($nodeId) || '' === $nodeId) {
+            if (! is_string($nodeId) || '' === $nodeId) {
                 throw InvalidFlowGraphException::missingNode($currentNodeId);
             }
 
             $type = $node['type'] ?? null;
 
-            if ( ! is_string($type) || '' === $type) {
+            if (! is_string($type) || '' === $type) {
                 throw InvalidFlowGraphException::nodeMissingType($nodeId);
             }
 
@@ -361,18 +364,14 @@ final readonly class FlowEngine implements FlowEngineInterface
                 $nextNodeId = $this->graphResolver->resolveNextNode($definition, $nodeId, $result->sourceHandle);
             }
 
-            $isEndNode = \App\Domains\Flow\Handlers\EndNodeHandler::TYPE === $type;
+            $isEndNode = EndNodeHandler::TYPE === $type;
             $endStatus = null;
 
             if ($isEndNode && NodeExecutionStatus::Finished === $result->status) {
-                $rawEndStatus = $result->metadata[\App\Domains\Flow\Handlers\EndNodeHandler::END_STATUS_META] ?? null;
-                $endStatus    = is_string($rawEndStatus) && in_array(
-                    $rawEndStatus,
-                    \App\Domains\Flow\Handlers\EndNodeHandler::ALLOWED_END_STATUSES,
-                    true,
-                )
-                    ? $rawEndStatus
-                    : \App\Domains\Flow\Handlers\EndNodeHandler::END_STATUS_SUCCESS;
+                $rawEndStatus = $result->metadata[EndNodeHandler::END_STATUS_META] ?? null;
+                $endStatus    = (is_string($rawEndStatus) ? EndStatus::tryFrom($rawEndStatus) : null)
+                                ?? EndStatus::Success;
+                $endStatus = $endStatus->value;
             }
 
             // Subflow special case: SubflowStarter pauses the parent (paused_subflow)
@@ -382,7 +381,7 @@ final readonly class FlowEngine implements FlowEngineInterface
             // the stale Waiting result here would either lose that progress or
             // raise an OptimisticLockConflict. Skip persistence in that scenario.
             $skipPersist = false;
-            if (\App\Domains\Flow\Handlers\SubflowNodeHandler::TYPE === $type
+            if (SubflowNodeHandler::TYPE === $type
                 && NodeExecutionStatus::Waiting === $result->status
             ) {
                 $latest = FlowSession::query()->find($session->getKey());
@@ -490,10 +489,10 @@ final readonly class FlowEngine implements FlowEngineInterface
         ?string $endStatus = null,
     ): ?AnalyticsEventType {
         if (null !== $endStatus) {
-            return match ($endStatus) {
-                \App\Domains\Flow\Handlers\EndNodeHandler::END_STATUS_FAILED    => AnalyticsEventType::FlowFailed,
-                \App\Domains\Flow\Handlers\EndNodeHandler::END_STATUS_CANCELLED => AnalyticsEventType::FlowCancelled,
-                default                                                         => AnalyticsEventType::FlowCompleted,
+            return match (EndStatus::tryFrom($endStatus)) {
+                EndStatus::Failed    => AnalyticsEventType::FlowFailed,
+                EndStatus::Cancelled => AnalyticsEventType::FlowCancelled,
+                default              => AnalyticsEventType::FlowCompleted,
             };
         }
 

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Subflow;
 
+use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
-use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Models\FlowSession;
 use Illuminate\Database\ConnectionInterface;
 use Psr\Log\LoggerInterface;
@@ -76,7 +76,7 @@ final readonly class SubflowTimeoutSweeper
 
             try {
                 $this->forceFailChild($liveChild);
-                $this->resumer->resumeIfChild($liveChild, EndNodeHandler::END_STATUS_FAILED);
+                $this->resumer->resumeIfChild($liveChild, EndStatus::Failed->value);
                 ++$forcedFailures;
             } catch (Throwable $exception) {
                 $this->logger->warning('flow.subflow.timeout.sweep_failed', [
@@ -99,7 +99,7 @@ final readonly class SubflowTimeoutSweeper
             try {
                 $child->saveWithOptimisticLock([
                     'status'          => FlowSessionStatus::Ended,
-                    'end_status'      => EndNodeHandler::END_STATUS_FAILED,
+                    'end_status'      => EndStatus::Failed->value,
                     'current_node_id' => null,
                 ]);
             } catch (OptimisticLockConflictException $exception) {

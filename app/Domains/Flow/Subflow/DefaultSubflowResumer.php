@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Subflow;
 
 use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
-use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\Models\FlowSession;
@@ -86,10 +86,10 @@ final readonly class DefaultSubflowResumer implements SubflowResumerInterface
 
     private function handleFor(string $endStatus): string
     {
-        return match ($endStatus) {
-            EndNodeHandler::END_STATUS_CANCELLED => SubflowNodeHandler::HANDLE_CANCELLED,
-            EndNodeHandler::END_STATUS_FAILED    => SubflowNodeHandler::HANDLE_FAILED,
-            default                              => SubflowNodeHandler::HANDLE_SUCCESS,
+        return match (EndStatus::tryFrom($endStatus)) {
+            EndStatus::Cancelled => SubflowNodeHandler::HANDLE_CANCELLED,
+            EndStatus::Failed    => SubflowNodeHandler::HANDLE_FAILED,
+            default              => SubflowNodeHandler::HANDLE_SUCCESS,
         };
     }
 }

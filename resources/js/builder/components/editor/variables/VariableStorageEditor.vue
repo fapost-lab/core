@@ -40,6 +40,8 @@ export type { TypeOption }
 import { computed, ref, watch } from 'vue'
 import StorageRadio from './StorageRadio.vue'
 import GroupSelect from './GroupSelect.vue'
+import NameSelect from './NameSelect.vue'
+import { useFlowVariables } from '@builder/composables/useFlowVariables'
 import type { Variable, VariableStorage, VariableType } from '@builder/dto/types'
 
 const props = withDefaults(defineProps<{
@@ -83,6 +85,29 @@ watch(() => props.knownGroups, (next) => {
     localKnownGroups.value = [...next]
 })
 
+const { userVars } = useFlowVariables()
+
+// Known variable names for the current storage type — deduped and sorted for NameSelect.
+const knownNames = computed<string[]>(() => {
+    const isSession = state.value.storage === 'session'
+    const prefix    = isSession ? 'flow.' : 'contact.'
+    const names = userVars.value
+        .filter((v) => v.path.startsWith(prefix))
+        .map((v) => v.path.slice(prefix.length).split('.').at(-1) ?? '')
+        .filter((n) => n !== '')
+    return [...new Set(names)].sort()
+})
+
+// Tracks the last name explicitly chosen from the NameSelect dropdown.
+// When the user picks from the list they know it exists — suppress the warning.
+const pickedName = ref<string | null>(null)
+
+const isExistingName = computed<boolean>(() => {
+    const name = state.value.name.trim()
+    if (name === '' || pickedName.value === name) return false
+    return knownNames.value.includes(name)
+})
+
 const nameError = computed<string | null>(() => {
     const name = state.value.name
     if (name === '') {
@@ -122,8 +147,16 @@ function emitUpdate() {
     emit('update:modelValue', snapshot)
 }
 
-function onNameInput(event: Event) {
-    state.value.name = (event.target as HTMLInputElement).value
+function onNamePick(value: string) {
+    pickedName.value = value
+}
+
+function onNameSelect(value: string) {
+    // Reset pick tracking when the user manually types a different name
+    if (pickedName.value !== null && pickedName.value !== value) {
+        pickedName.value = null
+    }
+    state.value.name = value
     emitUpdate()
 }
 
@@ -160,17 +193,18 @@ function onGroupCreate(name: string) {
             <div class="vse-row">
                 <label class="vse-label">Name:</label>
                 <div class="vse-control">
-                    <input
-                        type="text"
-                        class="vse-input"
-                        :class="{ 'vse-input--error': nameError }"
-                        :value="state.name"
+                    <NameSelect
+                        :model-value="state.name"
+                        :known-names="knownNames"
+                        :class="{ 'vse-name-error': nameError }"
                         placeholder="my_variable"
-                        autocomplete="off"
-                        spellcheck="false"
-                        @input="onNameInput"
-                    >
+                        @pick="onNamePick"
+                        @update:model-value="onNameSelect"
+                    />
                     <div v-if="nameError" class="vse-error">{{ nameError }}</div>
+                    <div v-else-if="isExistingName" class="vse-hint vse-hint--warn">
+                        Already used in this flow — will overwrite.
+                    </div>
                     <div v-else class="vse-hint">Latin letters, digits, underscore — snake_case</div>
                 </div>
             </div>
@@ -284,6 +318,10 @@ function onGroupCreate(name: string) {
 .vse-input--error {
     border-color: var(--rose);
 }
+.vse-name-error :deep(.ns-trigger),
+.vse-name-error :deep(.ns-input) {
+    border-color: var(--rose);
+}
 .vse-error {
     font-size: 11px;
     color: var(--rose);
@@ -293,5 +331,8 @@ function onGroupCreate(name: string) {
     font-size: 11px;
     color: var(--text-3);
     line-height: 1.3;
+}
+.vse-hint--warn {
+    color: var(--amber, #d97706);
 }
 </style>

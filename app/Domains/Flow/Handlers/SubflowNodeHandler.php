@@ -13,7 +13,7 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
-use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Fields\TextField;
 use FAPost\Support\Builder\Schema\Schema;
 use FAPost\Support\Builder\Schema\Section;
 use RuntimeException;
@@ -65,7 +65,7 @@ final class SubflowNodeHandler extends AbstractVersionedHandler
                 Section::make('target', 'Target flow')
                     ->icon('arrow-right-circle')
                     ->fields([
-                        Field::string('flow_id')
+                        TextField::make('flow_id')
                             ->label('Subflow flow_id')
                             ->required(),
                     ]),
@@ -74,7 +74,7 @@ final class SubflowNodeHandler extends AbstractVersionedHandler
                 Section::make('behavior', 'Behavior')
                     ->icon('clock')
                     ->fields([
-                        Field::string('timeout')
+                        TextField::make('timeout')
                             ->label('Timeout (ISO 8601 duration)')
                             ->required()
                             ->default(self::DEFAULT_TIMEOUT)
@@ -106,7 +106,7 @@ final class SubflowNodeHandler extends AbstractVersionedHandler
 
         $parent = FlowSession::query()->find($context->sessionId);
 
-        if ( ! $parent instanceof FlowSession) {
+        if (! $parent instanceof FlowSession) {
             return new NodeExecutionResult(
                 status: NodeExecutionStatus::Failed,
                 metadata: ['error' => 'parent session not found', 'error_type' => 'subflow_parent_missing'],

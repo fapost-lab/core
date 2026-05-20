@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
+use App\Domains\Flow\Enums\BranchOperator;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Exceptions\UnknownDataAccessorNamespacePrefixException;
 use App\Domains\Flow\State\FlowStateNamespace;
@@ -14,6 +15,13 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use FAPost\Support\Builder\Schema\Fields\ObjectArrayField;
+use FAPost\Support\Builder\Schema\Fields\SelectField;
+use FAPost\Support\Builder\Schema\Fields\StatePickerField;
+use FAPost\Support\Builder\Schema\Fields\TextareaField;
+use FAPost\Support\Builder\Schema\Fields\TextField;
+use FAPost\Support\Builder\Schema\Schema;
+use FAPost\Support\Builder\Schema\Section;
 use InvalidArgumentException;
 
 /**
@@ -53,19 +61,32 @@ final class BranchNodeHandler extends AbstractVersionedHandler
      */
     public function configSchema(): array
     {
-        return [
-            'check' => [
-                'type'        => 'state-picker',
-                'label'       => 'Check',
-                'required'    => false,
-                'placeholder' => 'flow.status',
-            ],
-            'rules' => [
-                'type'     => 'repeater',
-                'label'    => 'Rules',
-                'required' => true,
-            ],
-        ];
+        return Schema::make()
+            ->section(
+                Section::make('condition', 'Condition')
+                    ->icon('adjustments-horizontal')
+                    ->fields([
+                        StatePickerField::make('check')
+                            ->label('Check')
+                            ->placeholder('flow.status'),
+                        ObjectArrayField::make('rules')
+                            ->label('Rules')
+                            ->required()
+                            ->itemLabel('{handle}')
+                            ->itemFields([
+                                TextField::make('handle')
+                                    ->label('Handle')
+                                    ->default('yes'),
+                                SelectField::make('operator')
+                                    ->label('Operator')
+                                    ->options(BranchOperator::cases())
+                                    ->default(BranchOperator::Eq),
+                                TextareaField::make('value')
+                                    ->label('Value'),
+                            ]),
+                    ]),
+            )
+            ->toArray();
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
@@ -309,18 +330,24 @@ final class BranchNodeHandler extends AbstractVersionedHandler
      */
     private function matchesRule(mixed $value, array $rule): bool
     {
-        return match ($rule['operator'] ?? null) {
-            'eq'        => $value === ($rule['value'] ?? null),
-            'neq'       => $value !== ($rule['value'] ?? null),
-            'gt'        => $value > ($rule['value'] ?? null),
-            'gte'       => $value >= ($rule['value'] ?? null),
-            'lt'        => $value < ($rule['value'] ?? null),
-            'lte'       => $value <= ($rule['value'] ?? null),
-            'contains'  => str_contains((string)$value, (string)($rule['value'] ?? '')),
-            'in'        => in_array($value, is_array($rule['value'] ?? null) ? $rule['value'] : [], true),
-            'empty'     => empty($value),
-            'not_empty' => ! empty($value),
-            default     => false,
+        $rawOperator = is_string($rule['operator'] ?? null) ? $rule['operator'] : null;
+        $operator    = null !== $rawOperator ? BranchOperator::tryFrom($rawOperator) : null;
+
+        if (null === $operator) {
+            return false;
+        }
+
+        return match ($operator) {
+            BranchOperator::Eq       => $value === ($rule['value'] ?? null),
+            BranchOperator::Neq      => $value !== ($rule['value'] ?? null),
+            BranchOperator::Gt       => $value > ($rule['value'] ?? null),
+            BranchOperator::Gte      => $value >= ($rule['value'] ?? null),
+            BranchOperator::Lt       => $value < ($rule['value'] ?? null),
+            BranchOperator::Lte      => $value <= ($rule['value'] ?? null),
+            BranchOperator::Contains => str_contains((string)$value, (string)($rule['value'] ?? '')),
+            BranchOperator::In       => in_array($value, is_array($rule['value'] ?? null) ? $rule['value'] : [], true),
+            BranchOperator::Empty    => empty($value),
+            BranchOperator::NotEmpty => ! empty($value),
         };
     }
 }

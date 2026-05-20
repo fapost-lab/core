@@ -15,4 +15,5 @@ final class SystemStateKeys
     public const string LANGUAGE                     = FlowStateNamespace::SYSTEM . '.language';
     public const string SEND_MESSAGE_TIMEOUT_PREFIX  = FlowStateNamespace::SYSTEM . '.send_message.timeout';
     public const string SEND_MESSAGE_RESPONSE_PREFIX = FlowStateNamespace::SYSTEM . '.send_message.response';
+    public const string SEND_MESSAGE_DYNAMIC_BUTTONS = FlowStateNamespace::SYSTEM . '.send_message.dynamic_buttons';
 }

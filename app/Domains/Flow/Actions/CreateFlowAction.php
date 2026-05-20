@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Actions;
 
+use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -38,7 +39,7 @@ final readonly class CreateFlowAction
                     'id'      => Str::lower((string)Str::ulid()),
                     'type'    => EndNodeHandler::TYPE,
                     'version' => 1,
-                    'config'  => ['status' => EndNodeHandler::END_STATUS_SUCCESS],
+                    'config'  => ['status' => EndStatus::Success->value],
                 ],
             ],
             'edges' => [],

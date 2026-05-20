@@ -1040,6 +1040,225 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('Hi, Alice !', $resolved);
     }
 
+    public function test_send_message_returns_error_handle_when_sender_throws(): void
+    {
+        $sender = Mockery::mock(MessageSenderInterface::class);
+        $sender->shouldReceive('send')->once()->andThrow(new \RuntimeException('connection refused'));
+
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $translator->shouldReceive('resolveField')->andReturn('hello');
+
+        $handler = $this->makeHandler($sender, $translator);
+        $result  = $handler->execute([
+            'id'     => 'node-err',
+            'config' => ['content_type' => 'text', 'text' => ['en' => 'hello']],
+        ], [], $this->context(nodeId: 'node-err'));
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('error', $result->sourceHandle);
+        $this->assertSame('send_failure', $result->metadata['error_type']);
+        $this->assertArrayNotHasKey(SystemStateKeys::SENT_MESSAGES, $result->stateChanges);
+    }
+
+    public function test_send_message_hint_uses_catalog_key_when_user_types_during_button_wait(): void
+    {
+        $sessionUuid = '00000000-0000-4000-8000-000000000050';
+        $buttonUuid  = '11111111-1111-4111-8111-111111111150';
+
+        $hintText = '⚠ localized hint';
+
+        $sender = Mockery::mock(MessageSenderInterface::class);
+        $sender->shouldReceive('send')
+            ->once()
+            ->andReturnUsing(function (string $t, string $c, string $s, array $payload) use ($hintText): string {
+                $this->assertSame($hintText, $payload['text']);
+
+                return 'hint-sent';
+            });
+
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $translator->shouldReceive('resolveField')->andReturn('Choose');
+        $translator->shouldReceive('translate')
+            ->with('errors.waiting_for_button', 'en')
+            ->once()
+            ->andReturn($hintText);
+
+        $handler = $this->makeHandler($sender, $translator);
+        $node    = [
+            'id'     => 'node-hint',
+            'config' => [
+                'content_type'                => 'text_with_keyboard',
+                'keyboard_mode'               => 'inline',
+                'remove_keyboard_after_press' => false,
+                'text'                        => ['en' => 'Choose'],
+                'buttons'                     => [
+                    ['id' => $buttonUuid, 'label' => ['en' => 'Yes'], 'value' => 'yes', 'row' => 0, 'order' => 0],
+                ],
+            ],
+        ];
+
+        $result = $handler->execute(
+            $node,
+            ['system' => ['sent_messages' => ['node-hint' => 'ext-inline']]],
+            $this->context(
+                incoming: new IncomingMessage(
+                    updateId: 'txt-1',
+                    externalUserId: 'ext-user',
+                    externalChatId: 'ext-chat',
+                    text: 'random text from user',
+                    type: IncomingMessageType::Text,
+                    platform: 'telegram',
+                ),
+                nodeId: 'node-hint',
+                sessionId: $sessionUuid,
+            ),
+        );
+
+        $this->assertSame(NodeExecutionStatus::Waiting, $result->status);
+    }
+
+    public function test_send_message_dynamic_keyboard_generates_buttons_and_persists_them(): void
+    {
+        $sessionUuid = '00000000-0000-4000-8000-000000000060';
+        $nodeId      = 'node-dyn';
+
+        // Items must follow the DynamicKeyboardItem contract: required `label` field.
+        $employees = [
+            ['label' => 'Alice', 'id' => 'emp-1', 'dept' => 'Engineering'],
+            ['label' => 'Bob',   'id' => 'emp-2', 'dept' => 'Sales'],
+            ['label' => 'Carol', 'id' => 'emp-3', 'dept' => 'HR'],
+        ];
+
+        $capturedPayload = null;
+
+        $sender = Mockery::mock(MessageSenderInterface::class);
+        $sender->shouldReceive('send')
+            ->once()
+            ->andReturnUsing(function ($t, $c, $s, array $payload) use (&$capturedPayload): string {
+                $capturedPayload = $payload;
+
+                return 'ext-dynamic';
+            });
+
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $translator->shouldReceive('resolveField')
+            ->andReturnUsing(static function (array|string $content, string $lang): string {
+                return is_array($content) ? ($content[$lang] ?? $content['en'] ?? '') : $content;
+            });
+
+        $handler = $this->makeHandler($sender, $translator);
+
+        $node = [
+            'id'     => $nodeId,
+            'config' => [
+                'content_type'    => 'text_with_keyboard',
+                'keyboard_mode'   => 'inline',
+                'text'            => ['en' => 'Choose an employee'],
+                'dynamic_buttons' => [
+                    'source'       => 'flow.employees',
+                    'max_per_row'  => 2,
+                    'save_item_to' => ['name' => 'selected_employee', 'storage' => 'session', 'group' => null],
+                ],
+            ],
+        ];
+
+        $state  = [FlowStateNamespace::FLOW => ['employees' => $employees]];
+        $result = $handler->execute($node, $state, $this->context(nodeId: $nodeId, sessionId: $sessionUuid));
+
+        $this->assertSame(NodeExecutionStatus::Waiting, $result->status);
+        $this->assertIsArray($capturedPayload);
+        $this->assertCount(3, $capturedPayload['buttons']);
+        $this->assertSame('Alice', $capturedPayload['buttons'][0]['label']);
+        $this->assertArrayNotHasKey('value', $capturedPayload['buttons'][0]);
+
+        $persisted = $result->stateChanges[SystemStateKeys::SEND_MESSAGE_DYNAMIC_BUTTONS . ".{$nodeId}"] ?? null;
+        $this->assertIsArray($persisted);
+        $this->assertCount(3, $persisted);
+        // Full item is stored alongside the button for save_item_to on press.
+        $this->assertSame($employees[0], $persisted[0]['item']);
+    }
+
+    public function test_send_message_dynamic_keyboard_resume_routes_to_default_handle(): void
+    {
+        $sessionUuid = '00000000-0000-4000-8000-000000000061';
+        $nodeId      = 'node-dyn-resume';
+
+        $buttonId = \Ramsey\Uuid\Uuid::uuid5(\Ramsey\Uuid\Uuid::NAMESPACE_OID, "{$nodeId}:0")->toString();
+        $cbData   = CallbackDataCodec::encode($sessionUuid, $buttonId);
+
+        $sender     = Mockery::mock(MessageSenderInterface::class);
+        $sender->shouldNotReceive('send');
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+
+        $keyboardEditor = Mockery::mock(InlineKeyboardEditorInterface::class);
+        $keyboardEditor->shouldReceive('removeKeyboard')->zeroOrMoreTimes();
+
+        $handler = new SendMessageNodeHandler(
+            $sender,
+            $translator,
+            new TemplateRenderer(),
+            $keyboardEditor,
+            Mockery::mock(PersistentButtonRegistryInterface::class),
+            new VariableResolver(),
+        );
+
+        $persistedButtons = [
+            [
+                'id'    => $buttonId,
+                'label' => 'Alice',
+                'row'   => 0,
+                'item'  => ['label' => 'Alice', 'id' => 'emp-1', 'dept' => 'Engineering'],
+            ],
+        ];
+
+        $state = [
+            'system' => [
+                'sent_messages' => [$nodeId => 'ext-dyn'],
+                'send_message'  => [
+                    'dynamic_buttons' => [$nodeId => $persistedButtons],
+                ],
+            ],
+        ];
+
+        $node = [
+            'id'     => $nodeId,
+            'config' => [
+                'content_type'    => 'text_with_keyboard',
+                'keyboard_mode'   => 'inline',
+                'text'            => ['en' => 'Choose'],
+                'dynamic_buttons' => [
+                    'source'       => 'flow.employees',
+                    'save_item_to' => ['name' => 'selected_employee', 'storage' => 'session', 'group' => null],
+                ],
+            ],
+        ];
+
+        $result = $handler->execute(
+            $node,
+            $state,
+            $this->context(
+                incoming: new IncomingMessage(
+                    updateId: 'cb-dyn',
+                    externalUserId: 'u',
+                    externalChatId: 'c',
+                    text: $cbData,
+                    type: IncomingMessageType::CallbackQuery,
+                    platform: 'telegram',
+                ),
+                nodeId: $nodeId,
+                sessionId: $sessionUuid,
+            ),
+        );
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('default', $result->sourceHandle);
+        // Full item object must be saved to save_item_to path on press.
+        $this->assertSame(
+            ['label' => 'Alice', 'id' => 'emp-1', 'dept' => 'Engineering'],
+            $result->stateChanges['flow.selected_employee'] ?? null,
+        );
+    }
+
     private function makeHandler(
         MessageSenderInterface $sender,
         ContentTranslatorInterface $translator,

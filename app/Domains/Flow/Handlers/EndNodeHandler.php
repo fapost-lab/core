@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
+use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
-use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Fields\SelectField;
 use FAPost\Support\Builder\Schema\Schema;
 
 /**
@@ -27,17 +28,6 @@ use FAPost\Support\Builder\Schema\Schema;
 final class EndNodeHandler extends AbstractVersionedHandler
 {
     final public const string TYPE = 'end';
-
-    public const string END_STATUS_SUCCESS   = 'success';
-    public const string END_STATUS_CANCELLED = 'cancelled';
-    public const string END_STATUS_FAILED    = 'failed';
-
-    /** @var list<string> */
-    public const array ALLOWED_END_STATUSES = [
-        self::END_STATUS_SUCCESS,
-        self::END_STATUS_CANCELLED,
-        self::END_STATUS_FAILED,
-    ];
 
     public const string END_STATUS_META = 'end_status';
 
@@ -58,29 +48,32 @@ final class EndNodeHandler extends AbstractVersionedHandler
     {
         return Schema::make()
             ->fields([
-                Field::select('status')
+                SelectField::make('status')
                     ->label('End status')
                     ->required()
-                    ->options(self::ALLOWED_END_STATUSES)
-                    ->default(self::END_STATUS_SUCCESS),
+                    ->options(EndStatus::cases())
+                    ->default(EndStatus::Success),
             ])
             ->toArray();
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
-        $config = is_array($nodeConfig['config'] ?? null) ? $nodeConfig['config'] : [];
-        $status = is_string($config['status'] ?? null) ? $config['status'] : self::END_STATUS_SUCCESS;
+        $config    = is_array($nodeConfig['config'] ?? null) ? $nodeConfig['config'] : [];
+        $rawStatus = is_string($config['status'] ?? null) ? $config['status'] : EndStatus::Success->value;
+        $status    = EndStatus::tryFrom($rawStatus);
 
-        if ( ! in_array($status, self::ALLOWED_END_STATUSES, true)) {
+        if (null === $status) {
+            $allowed = implode(', ', array_column(EndStatus::cases(), 'value'));
+
             throw new InvalidNodeConfigException(
-                "end: invalid status '{$status}', expected one of: " . implode(', ', self::ALLOWED_END_STATUSES),
+                "end: invalid status '{$rawStatus}', expected one of: {$allowed}",
             );
         }
 
         return new NodeExecutionResult(
             status: NodeExecutionStatus::Finished,
-            metadata: [self::END_STATUS_META => $status],
+            metadata: [self::END_STATUS_META => $status->value],
         );
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Contracts\VariableResolverInterface;
+use App\Domains\Flow\Enums\AssignTarget;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\FlowStateNamespace;
@@ -14,6 +15,11 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use FAPost\Support\Builder\Schema\Fields\SelectField;
+use FAPost\Support\Builder\Schema\Fields\TextareaField;
+use FAPost\Support\Builder\Schema\Fields\TextField;
+use FAPost\Support\Builder\Schema\Schema;
+use FAPost\Support\Builder\Schema\Section;
 
 final class AssignNodeHandler extends AbstractVersionedHandler
 {
@@ -43,26 +49,26 @@ final class AssignNodeHandler extends AbstractVersionedHandler
      */
     public function configSchema(): array
     {
-        return [
-            'target' => [
-                'type'     => 'enum',
-                'label'    => 'Target',
-                'required' => true,
-                'options'  => ['flow', 'contact'],
-            ],
-            'key' => [
-                'type'        => 'string',
-                'label'       => 'Key',
-                'required'    => true,
-                'placeholder' => 'language',
-            ],
-            'value' => [
-                'type'        => 'text',
-                'label'       => 'Value',
-                'required'    => true,
-                'placeholder' => '{{flow.input}}',
-            ],
-        ];
+        return Schema::make()
+            ->section(
+                Section::make('legacy_assignment', 'Legacy assignment')
+                    ->icon('arrow-path')
+                    ->fields([
+                        SelectField::make('target')
+                            ->label('Target')
+                            ->required()
+                            ->options(AssignTarget::cases()),
+                        TextField::make('key')
+                            ->label('Key')
+                            ->required()
+                            ->placeholder('language'),
+                        TextareaField::make('value')
+                            ->label('Value')
+                            ->required()
+                            ->placeholder('{{flow.input}}'),
+                    ]),
+            )
+            ->toArray();
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
@@ -92,19 +98,19 @@ final class AssignNodeHandler extends AbstractVersionedHandler
         $appliedKeys  = [];
 
         foreach ($operations as $index => $operation) {
-            if ( ! is_array($operation)) {
+            if (! is_array($operation)) {
                 throw new InvalidNodeConfigException("assign: operation #{$index} must be an object.");
             }
 
             $variableConfig = $operation['variable'] ?? null;
 
-            if ( ! is_array($variableConfig)) {
+            if (! is_array($variableConfig)) {
                 throw new InvalidNodeConfigException("assign: operation #{$index} missing variable definition.");
             }
 
             $variable = Variable::tryFromArray($variableConfig);
 
-            if ( ! $variable instanceof Variable) {
+            if (! $variable instanceof Variable) {
                 throw new InvalidNodeConfigException("assign: operation #{$index} has an incomplete variable definition.");
             }
 
@@ -148,8 +154,9 @@ final class AssignNodeHandler extends AbstractVersionedHandler
      */
     private function executeLegacy(array $config, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
-        $target = is_string($config['target'] ?? null) ? $config['target'] : null;
-        $key    = is_string($config['key'] ?? null) ? $config['key'] : null;
+        $rawTarget = is_string($config['target'] ?? null) ? $config['target'] : null;
+        $key       = is_string($config['key'] ?? null) ? $config['key'] : null;
+        $target    = null !== $rawTarget ? AssignTarget::tryFrom($rawTarget) : null;
 
         if (null === $target || null === $key) {
             throw new InvalidNodeConfigException('assign: missing target or key');
@@ -157,12 +164,12 @@ final class AssignNodeHandler extends AbstractVersionedHandler
 
         $value = $this->templates->render($config['value'] ?? null, $context, $state);
 
-        if ('flow' === $target) {
+        if (AssignTarget::Flow === $target) {
             return new NodeExecutionResult(
                 status: NodeExecutionStatus::Executed,
                 sourceHandle: 'default',
                 stateChanges: [FlowStateNamespace::FLOW . ".{$key}" => $value],
-                metadata: [self::TARGET_META => 'flow', self::KEY_META => $key],
+                metadata: [self::TARGET_META => $target->value, self::KEY_META => $key],
             );
         }
 
@@ -189,7 +196,7 @@ final class AssignNodeHandler extends AbstractVersionedHandler
         return new NodeExecutionResult(
             status: NodeExecutionStatus::Executed,
             sourceHandle: 'default',
-            metadata: [self::TARGET_META => 'contact', self::KEY_META => $key],
+            metadata: [self::TARGET_META => AssignTarget::Contact->value, self::KEY_META => $key],
         );
     }
 }
