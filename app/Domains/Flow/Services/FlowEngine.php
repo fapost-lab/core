@@ -26,7 +26,6 @@ use App\Domains\Flow\Logging\FlowLogStatus;
 use App\Domains\Flow\Logging\FlowLogWriter;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
-use App\Domains\Flow\State\FlowStateNamespace;
 use App\Domains\Flow\State\SystemStateKeys;
 use DateTimeImmutable;
 use FAPost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
@@ -36,6 +35,7 @@ use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\NodeExecutionContext as FoundationNodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
+use FAPost\Foundation\Flow\Enums\StateNamespace;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
@@ -76,7 +76,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         $entry = $this->graphResolver->resolveEntryNode($definition);
 
         $baseState = array_replace_recursive([
-            FlowStateNamespace::SYSTEM => [
+            StateNamespace::System->value => [
                 SystemStateKeys::STARTED_AT_LEAF  => now()->toIso8601String(),
                 'flow_definition_id'              => (string)$definition->getKey(),
                 'contact_id'                      => (string)$contact->getKey(),
@@ -144,7 +144,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         $nextNodeId = $this->graphResolver->resolveNextNode($definition, $nodeId, $outputHandle);
 
         $baseState = array_replace_recursive([
-            FlowStateNamespace::SYSTEM => [
+            StateNamespace::System->value => [
                 SystemStateKeys::STARTED_AT_LEAF  => now()->toIso8601String(),
                 'flow_definition_id'              => (string)$definition->getKey(),
                 'contact_id'                      => (string)$contact->getKey(),

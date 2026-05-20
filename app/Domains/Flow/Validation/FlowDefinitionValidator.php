@@ -71,11 +71,11 @@ final readonly class FlowDefinitionValidator
             $targetNodeId = $this->stringField($edge, 'target_node_id', 'Edge must contain target_node_id.');
             $transition   = $this->stringField($edge, 'transition', 'Edge must contain transition.');
 
-            if ( ! isset($nodeMap[$sourceNodeId])) {
+            if (! isset($nodeMap[$sourceNodeId])) {
                 throw $this->validationException("Edge references unknown source node: {$sourceNodeId}");
             }
 
-            if ( ! isset($nodeMap[$targetNodeId])) {
+            if (! isset($nodeMap[$targetNodeId])) {
                 throw $this->validationException("Edge references unknown target node: {$targetNodeId}");
             }
 
@@ -93,7 +93,7 @@ final readonly class FlowDefinitionValidator
         $entryCandidates = [];
 
         foreach (array_keys($nodeMap) as $nodeId) {
-            if ( ! isset($reverseAdjacency[$nodeId])) {
+            if (! isset($reverseAdjacency[$nodeId])) {
                 $entryCandidates[] = $nodeId;
             }
         }
@@ -130,16 +130,16 @@ final readonly class FlowDefinitionValidator
         }
 
         foreach ($nodeMap as $nodeId => $node) {
-            if ( ! isset($node['required_transitions']) || ! is_array($node['required_transitions'])) {
+            if (! isset($node['required_transitions']) || ! is_array($node['required_transitions'])) {
                 continue;
             }
 
             foreach ($node['required_transitions'] as $transition) {
-                if ( ! is_string($transition) || '' === $transition) {
+                if (! is_string($transition) || '' === $transition) {
                     throw $this->validationException("Node {$nodeId} has invalid required transition value.");
                 }
 
-                if ( ! isset($adjacency[$nodeId][$transition])) {
+                if (! isset($adjacency[$nodeId][$transition])) {
                     throw $this->validationException(
                         "Node {$nodeId} requires transition {$transition}, but edge is missing."
                     );
@@ -169,8 +169,11 @@ final readonly class FlowDefinitionValidator
             // Inline keyboard with buttons: each button defines its own
             // continuation path via its button.id handle. A `default` edge
             // would race the button branches and is therefore disallowed.
-            $buttons = is_array($config['buttons'] ?? null) ? $config['buttons'] : [];
-            if (count($buttons) > 0 && isset($adjacency[$nodeId]['default'])) {
+            // Dynamic mode generates buttons at runtime — same constraint.
+            $buttons         = is_array($config['buttons'] ?? null) ? $config['buttons'] : [];
+            $hasDynamic      = null !== ($config['dynamic_buttons'] ?? null);
+            $hasButtonOutput = count($buttons) > 0 || $hasDynamic;
+            if ($hasButtonOutput && isset($adjacency[$nodeId]['default'])) {
                 throw $this->validationException(
                     "send_message node with inline buttons must be terminal at the top level — "
                     . "'default' output cannot be connected when buttons are defined"
@@ -223,12 +226,12 @@ final readonly class FlowDefinitionValidator
     {
         $rules = $config['rules'] ?? null;
 
-        if ( ! is_array($rules)) {
+        if (! is_array($rules)) {
             return;
         }
 
         foreach ($rules as $index => $rule) {
-            if ( ! is_array($rule)) {
+            if (! is_array($rule)) {
                 throw $this->validationException(
                     "Node {$nodeId} (branch) rule #{$index} must be an object."
                 );
@@ -236,7 +239,7 @@ final readonly class FlowDefinitionValidator
 
             $left = $rule['left'] ?? null;
 
-            if ( ! is_array($left)) {
+            if (! is_array($left)) {
                 continue; // legacy: rule without left, falls back to top-level `check`.
             }
 
@@ -251,7 +254,7 @@ final readonly class FlowDefinitionValidator
                         'group'   => $left['group'] ?? null,
                     ];
 
-                if ( ! is_string($variableConfig['name'] ?? null) || '' === $variableConfig['name']) {
+                if (! is_string($variableConfig['name'] ?? null) || '' === $variableConfig['name']) {
                     throw $this->validationException(
                         "Node {$nodeId} (branch) rule #{$index} user_variable left requires a name."
                     );
@@ -269,13 +272,13 @@ final readonly class FlowDefinitionValidator
                 $source = $left['source'] ?? null;
                 $field  = $left['field'] ?? null;
 
-                if ( ! is_string($source) || '' === $source) {
+                if (! is_string($source) || '' === $source) {
                     throw $this->validationException(
                         "Node {$nodeId} (branch) rule #{$index} source left requires a non-empty source."
                     );
                 }
 
-                if ( ! is_string($field) || '' === $field) {
+                if (! is_string($field) || '' === $field) {
                     throw $this->validationException(
                         "Node {$nodeId} (branch) rule #{$index} source left requires a non-empty field."
                     );
@@ -283,7 +286,7 @@ final readonly class FlowDefinitionValidator
 
                 $allowed = in_array($source, self::BRANCH_ALLOWED_SOURCES, true) || str_starts_with($source, 'module.');
 
-                if ( ! $allowed) {
+                if (! $allowed) {
                     throw $this->validationException(
                         "Node {$nodeId} (branch) rule #{$index} source '{$source}' is not allowed."
                     );
@@ -312,7 +315,7 @@ final readonly class FlowDefinitionValidator
             );
         }
 
-        if ( ! $hasNew && ! $hasLegacy) {
+        if (! $hasNew && ! $hasLegacy) {
             throw $this->validationException(
                 "Node {$nodeId} (input) requires a 'variable' save target.",
             );
@@ -356,14 +359,14 @@ final readonly class FlowDefinitionValidator
             );
         }
 
-        if ( ! $hasNew) {
+        if (! $hasNew) {
             return;
         }
 
         $seen = [];
 
         foreach ($config['operations'] as $index => $operation) {
-            if ( ! is_array($operation)) {
+            if (! is_array($operation)) {
                 throw $this->validationException(
                     "Node {$nodeId} (assign) operation #{$index} must be an object."
                 );
@@ -371,7 +374,7 @@ final readonly class FlowDefinitionValidator
 
             $variableConfig = $operation['variable'] ?? null;
 
-            if ( ! is_array($variableConfig)) {
+            if (! is_array($variableConfig)) {
                 throw $this->validationException(
                     "Node {$nodeId} (assign) operation #{$index} is missing variable definition."
                 );
@@ -396,7 +399,7 @@ final readonly class FlowDefinitionValidator
      */
     private function assertVariableShape(string $nodeId, mixed $raw, string $field): Variable
     {
-        if ( ! is_array($raw)) {
+        if (! is_array($raw)) {
             throw $this->validationException(
                 "Node {$nodeId} {$field} must be an object describing a variable."
             );
@@ -411,7 +414,7 @@ final readonly class FlowDefinitionValidator
             );
         }
 
-        if ( ! $variable instanceof Variable) {
+        if (! $variable instanceof Variable) {
             throw $this->validationException(
                 "Node {$nodeId} {$field} is missing required name/storage."
             );
@@ -438,7 +441,7 @@ final readonly class FlowDefinitionValidator
     {
         $value = $payload[$field] ?? null;
 
-        if ( ! is_string($value) || '' === $value) {
+        if (! is_string($value) || '' === $value) {
             throw $this->validationException($message);
         }
 
@@ -452,7 +455,7 @@ final readonly class FlowDefinitionValidator
     {
         $value = $payload[$field] ?? null;
 
-        if ( ! is_int($value)) {
+        if (! is_int($value)) {
             throw $this->validationException($message);
         }
 

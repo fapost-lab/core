@@ -25,6 +25,10 @@ export function nodeMustBeLast(node: TerminalCheckInput): boolean {
     const mode = (config.keyboard_mode ?? 'inline') as string
     if (mode === 'reply') return true
 
+    // Dynamic keyboard generates per-button handles at runtime — treat as
+    // populated regardless of the static `buttons` array.
+    if (config.dynamic_buttons !== null && config.dynamic_buttons !== undefined) return true
+
     const buttons = Array.isArray(config.buttons) ? (config.buttons as unknown[]) : []
     return buttons.length > 0
 }

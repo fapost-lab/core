@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\State;
 
+use FAPost\Foundation\Flow\Enums\StateNamespace;
+
 final class RagStateKeys
 {
-    public const string FOUND      = FlowStateNamespace::RAG . '.found';
-    public const string CONFIDENCE = FlowStateNamespace::RAG . '.confidence';
-    public const string ANSWER     = FlowStateNamespace::RAG . '.answer';
-    public const string INTENT     = FlowStateNamespace::RAG . '.intent';
+    public const string FOUND      = StateNamespace::Rag->value . '.found';
+    public const string CONFIDENCE = StateNamespace::Rag->value . '.confidence';
+    public const string ANSWER     = StateNamespace::Rag->value . '.answer';
+    public const string INTENT     = StateNamespace::Rag->value . '.intent';
 }

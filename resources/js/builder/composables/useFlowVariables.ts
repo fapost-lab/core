@@ -44,6 +44,8 @@ export interface PickerVariable {
     isCustom:     boolean
     /** Optional source-node label for tooltip ("from <node label>"). */
     sourceNode?:  string
+    /** ID of the node that registered this variable — lets editors skip self-references. */
+    sourceNodeId?: string
 }
 
 // ── Built-in platform fixtures ───────────────────────────────────────────────
@@ -82,7 +84,7 @@ function makeVar(
     path: string,
     label: string,
     source: PickerSource,
-    opts: { isCustom?: boolean; sourceNode?: string; group?: string | null } = {},
+    opts: { isCustom?: boolean; sourceNode?: string; sourceNodeId?: string; group?: string | null } = {},
 ): PickerVariable {
     const segments = path.split('.').filter((s) => s !== '')
     return {
@@ -94,11 +96,12 @@ function makeVar(
         group:        opts.group ?? null,
         isCustom:     opts.isCustom ?? false,
         ...(opts.sourceNode ? { sourceNode: opts.sourceNode } : {}),
+        ...(opts.sourceNodeId ? { sourceNodeId: opts.sourceNodeId } : {}),
     }
 }
 
 /** Build picker entry for a Variable descriptor (storage rework shape). */
-function fromVariable(v: Variable, sourceNode: string): PickerVariable | null {
+function fromVariable(v: Variable, sourceNode: string, sourceNodeId: string): PickerVariable | null {
     const name = (v.name ?? '').trim()
     if (name === '') {
         return null
@@ -110,6 +113,7 @@ function fromVariable(v: Variable, sourceNode: string): PickerVariable | null {
         return makeVar(path, label, { kind: 'contact-profile' }, {
             isCustom: true,
             sourceNode,
+            sourceNodeId,
             group,
         })
     }
@@ -117,6 +121,7 @@ function fromVariable(v: Variable, sourceNode: string): PickerVariable | null {
     return makeVar(`flow.${name}`, name, { kind: 'temporary' }, {
         isCustom: true,
         sourceNode,
+        sourceNodeId,
     })
 }
 
@@ -124,12 +129,12 @@ function fromVariable(v: Variable, sourceNode: string): PickerVariable | null {
  * Convert a legacy save_to-style string ("flow.x", "contact.g.x", "x") into a
  * PickerVariable. Routes contact.* → contact-profile, everything else → temp.
  */
-function fromLegacyPath(saveTo: string, sourceNode: string): PickerVariable | null {
+function fromLegacyPath(saveTo: string, sourceNode: string, sourceNodeId: string): PickerVariable | null {
     const decoded = decompileLegacySaveTo(saveTo)
     if (decoded.name === '') {
         return null
     }
-    return fromVariable(decoded, sourceNode)
+    return fromVariable(decoded, sourceNode, sourceNodeId)
 }
 
 // ── Composable ───────────────────────────────────────────────────────────────
@@ -168,12 +173,13 @@ export function useFlowVariables() {
                             group:   storage === 'contact' ? group : null,
                         },
                         nodeLabel,
+                        node.id,
                     ))
                     continue
                 }
                 // legacy
                 if (typeof cfg.save_to === 'string') {
-                    push(fromLegacyPath(cfg.save_to, nodeLabel))
+                    push(fromLegacyPath(cfg.save_to, nodeLabel, node.id))
                 }
                 continue
             }
@@ -192,21 +198,38 @@ export function useFlowVariables() {
                             group:   storage === 'contact' ? group : null,
                         },
                         nodeLabel,
+                        node.id,
                     ))
                     continue
                 }
                 if (typeof cfg.save_to === 'string') {
-                    push(fromLegacyPath(cfg.save_to, nodeLabel))
+                    push(fromLegacyPath(cfg.save_to, nodeLabel, node.id))
                 }
                 continue
             }
 
-            // Call — save_response_to is a free-form state path ("flow.x"). The
-            // dynamic-keyboard Source picker treats these as registered collections.
+            // Call — new save_to_variable shape (matches Input/SendMessage) wins
+            // over legacy save_response_to free-form path.
             if (node.type === 'call') {
+                const v = cfg.save_to_variable as Record<string, unknown> | undefined
+                if (v && typeof v === 'object' && typeof v.name === 'string') {
+                    const storage = v.storage === 'session' ? 'session' : 'contact'
+                    const group   = typeof v.group === 'string' && v.group !== '' ? v.group : null
+                    push(fromVariable(
+                        {
+                            name:    v.name,
+                            type:    (typeof v.type === 'string' ? v.type : 'text') as Variable['type'],
+                            storage,
+                            group:   storage === 'contact' ? group : null,
+                        },
+                        nodeLabel,
+                        node.id,
+                    ))
+                    continue
+                }
                 const saveTo = cfg.save_response_to
                 if (typeof saveTo === 'string' && saveTo !== '') {
-                    push(fromLegacyPath(saveTo, nodeLabel))
+                    push(fromLegacyPath(saveTo, nodeLabel, node.id))
                 }
                 continue
             }
@@ -229,6 +252,7 @@ export function useFlowVariables() {
                                     group:   storage === 'contact' ? group : null,
                                 },
                                 nodeLabel,
+                                node.id,
                             ))
                             continue
                         }
@@ -240,14 +264,14 @@ export function useFlowVariables() {
                             const path  = target === 'contact'
                                 ? (group ? `contact.${group}.${key}` : `contact.${key}`)
                                 : `flow.${key}`
-                            push(fromLegacyPath(path, nodeLabel))
+                            push(fromLegacyPath(path, nodeLabel, node.id))
                         }
                     }
                     continue
                 }
                 // very-legacy single-op
                 if (typeof cfg.key === 'string') {
-                    push(fromLegacyPath(`flow.${cfg.key}`, nodeLabel))
+                    push(fromLegacyPath(`flow.${cfg.key}`, nodeLabel, node.id))
                 }
                 continue
             }
@@ -290,5 +314,20 @@ export function useFlowVariables() {
         return [...seen.values()]
     })
 
-    return { allVars, userVars }
+    /**
+     * name → first registration (any storage). Used to enforce cross-namespace
+     * uniqueness: a variable name lives in exactly one storage across the flow.
+     */
+    const userVarsByName = computed<Map<string, PickerVariable>>(() => {
+        const out = new Map<string, PickerVariable>()
+        for (const v of userVars.value) {
+            const last = v.pathSegments.at(-1) ?? ''
+            if (last !== '' && !out.has(last)) {
+                out.set(last, v)
+            }
+        }
+        return out
+    })
+
+    return { allVars, userVars, userVarsByName }
 }

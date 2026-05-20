@@ -183,7 +183,10 @@ final class FlowServiceProvider extends ServiceProvider
         );
         $registry->register(new DelayNodeHandler());
         $registry->register(new AssignNodeHandler($templates, $variableResolver));
-        $registry->register(new CallNodeHandler($this->app->make(HttpClientInterface::class)));
+        $registry->register(new CallNodeHandler(
+            $this->app->make(HttpClientInterface::class),
+            $variableResolver,
+        ));
         $registry->register(
             new EmitEventNodeHandler(
                 $this->app->make(FlowTriggerEventPublisherInterface::class),

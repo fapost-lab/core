@@ -162,6 +162,22 @@ final class SchemaBuilderTest extends TestCase
         $this->assertSame(['type' => 'state-picker', 'placeholder' => 'flow.response'], $array);
     }
 
+    public function test_state_picker_field_carries_namespaces_and_searchable_flag(): void
+    {
+        $array = StatePickerField::make('source')
+            ->namespaces(['flow', 'contact'])
+            ->searchable()
+            ->placeholder('flow.items')
+            ->toArray();
+
+        $this->assertSame([
+            'type'        => 'state-picker',
+            'placeholder' => 'flow.items',
+            'namespaces'  => ['flow', 'contact'],
+            'searchable'  => true,
+        ], $array);
+    }
+
     public function test_key_value_field_emits_labels(): void
     {
         $array = KeyValueField::make('headers')

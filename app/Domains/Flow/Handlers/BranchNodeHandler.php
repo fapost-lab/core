@@ -9,11 +9,11 @@ use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Enums\BranchOperator;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Exceptions\UnknownDataAccessorNamespacePrefixException;
-use App\Domains\Flow\State\FlowStateNamespace;
 use App\Domains\Flow\State\Variables\Variable;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
+use FAPost\Foundation\Flow\Enums\StateNamespace;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use FAPost\Support\Builder\Schema\Fields\ObjectArrayField;
 use FAPost\Support\Builder\Schema\Fields\SelectField;
@@ -292,9 +292,9 @@ final class BranchNodeHandler extends AbstractVersionedHandler
         }
 
         if (
-            str_starts_with($path, FlowStateNamespace::FLOW . '.')
-            || str_starts_with($path, FlowStateNamespace::SYSTEM . '.')
-            || str_starts_with($path, FlowStateNamespace::RAG . '.')
+            str_starts_with($path, StateNamespace::Flow->value . '.')
+            || str_starts_with($path, StateNamespace::System->value . '.')
+            || str_starts_with($path, StateNamespace::Rag->value . '.')
             || str_starts_with($path, 'contact.')
             || str_starts_with($path, 'call.')
         ) {

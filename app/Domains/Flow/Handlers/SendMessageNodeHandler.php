@@ -13,7 +13,6 @@ use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
-use App\Domains\Flow\State\FlowStateNamespace;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableStorage;
@@ -24,6 +23,7 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\Flow\Contracts\ContactWriterInterface;
 use FAPost\Foundation\Flow\Enums\KeyboardMode;
+use FAPost\Foundation\Flow\Enums\StateNamespace;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use FAPost\Support\Builder\Schema\Fields\NumberField;
 use FAPost\Support\Builder\Schema\Fields\ObjectArrayField;
@@ -136,6 +136,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                                 StatePickerField::make('source')
                                     ->label('Source')
                                     ->required()
+                                    ->namespaces([StateNamespace::Flow, StateNamespace::Contact])
                                     ->placeholder('flow.items'),
                                 NumberField::make('max_per_row')
                                     ->label('Max per row')
@@ -600,7 +601,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                     'keyboard_mode'   => null,
                     'session_id'      => $context->sessionId,
                     'node_id'         => $context->nodeId . ':hint',
-                    'idempotency_key' => 'hint:' . ($context->incoming?->updateId ?? uniqid()),
+                    'idempotency_key' => 'hint:' . ($context->incoming?->updateId ?? uniqid('', true)),
                 ],
             );
         } catch (Throwable) {
@@ -764,7 +765,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
         NodeExecutionContext $context,
         string $externalMessageId,
     ): void {
-        $flowDefinitionId = data_get($state, FlowStateNamespace::SYSTEM . '.flow_definition_id');
+        $flowDefinitionId = data_get($state, StateNamespace::System->value . '.flow_definition_id');
 
         if (! is_string($flowDefinitionId) || '' === $flowDefinitionId) {
             return;

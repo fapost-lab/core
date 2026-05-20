@@ -7,9 +7,9 @@ namespace App\Domains\Flow\State\Variables;
 use App\Domains\Flow\Contracts\VariableCoercerInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
-use App\Domains\Flow\State\FlowStateNamespace;
 use Closure;
 use FAPost\Foundation\DTO\NodeExecutionContext;
+use FAPost\Foundation\Flow\Enums\StateNamespace;
 use InvalidArgumentException;
 
 /**
@@ -140,7 +140,7 @@ final class VariableResolver implements VariableResolverInterface
     private function sessionPath(Variable $variable): string
     {
         // Session variables never have a group — guarded by Variable's constructor.
-        return FlowStateNamespace::FLOW . ".{$variable->name}";
+        return StateNamespace::Flow->value . ".{$variable->name}";
     }
 
     private function contactPath(Variable $variable): string

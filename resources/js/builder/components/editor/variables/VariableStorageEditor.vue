@@ -50,11 +50,20 @@ const props = withDefaults(defineProps<{
     knownGroups?: string[]
     showGroup?:   boolean
     showStorage?: boolean
+    showType?:    boolean
+    /**
+     * ID of the node this editor belongs to. Used to exclude the node's own
+     * registrations from cross-namespace conflict detection — otherwise the
+     * editor would flag the variable it's currently writing as a duplicate.
+     */
+    ownerNodeId?: string
 }>(), {
     typeOptions: () => DEFAULT_TYPE_OPTIONS,
     knownGroups: () => [],
     showGroup:   true,
     showStorage: true,
+    showType:    true,
+    ownerNodeId: '',
 })
 
 const emit = defineEmits<{
@@ -87,16 +96,37 @@ watch(() => props.knownGroups, (next) => {
 
 const { userVars } = useFlowVariables()
 
-// Known variable names for the current storage type — deduped and sorted for NameSelect.
-const knownNames = computed<string[]>(() => {
-    const isSession = state.value.storage === 'session'
-    const prefix    = isSession ? 'flow.' : 'contact.'
-    const names = userVars.value
-        .filter((v) => v.path.startsWith(prefix))
-        .map((v) => v.path.slice(prefix.length).split('.').at(-1) ?? '')
-        .filter((n) => n !== '')
-    return [...new Set(names)].sort()
+// All known variable names — flat across storages, excluding the owning node.
+// Cross-namespace uniqueness means a name lives in at most one storage; the
+// suggestion list is global.
+const knownNames = computed<string[]>(() =>
+    [...existingByName.value.keys()].sort(),
+)
+
+// Name → existing registration: { storage, group }. Used to lock the storage
+// radio when the user picks an already-registered name. Skips entries owned
+// by the editor's own node so the in-progress edit doesn't conflict with
+// itself.
+interface ExistingHit { storage: VariableStorage; group: string | null }
+const existingByName = computed<Map<string, ExistingHit>>(() => {
+    const out = new Map<string, ExistingHit>()
+    for (const v of userVars.value) {
+        if (props.ownerNodeId !== '' && v.sourceNodeId === props.ownerNodeId) continue
+        const last = v.pathSegments.at(-1) ?? ''
+        if (last === '' || out.has(last)) continue
+        const storage: VariableStorage = v.source.kind === 'contact-profile' ? 'contact' : 'session'
+        out.set(last, { storage, group: v.group })
+    }
+    return out
 })
+
+const existingForCurrent = computed<ExistingHit | null>(() => {
+    const name = state.value.name.trim()
+    if (name === '') return null
+    return existingByName.value.get(name) ?? null
+})
+
+const storageLocked = computed<boolean>(() => existingForCurrent.value !== null)
 
 // Tracks the last name explicitly chosen from the NameSelect dropdown.
 // When the user picks from the list they know it exists — suppress the warning.
@@ -157,6 +187,16 @@ function onNameSelect(value: string) {
         pickedName.value = null
     }
     state.value.name = value
+
+    // Cross-namespace uniqueness: a name is owned by exactly one storage.
+    // If the user picks/types a name that's already registered elsewhere,
+    // snap the editor onto that storage + group so the binding stays valid.
+    const hit = existingByName.value.get(value.trim())
+    if (hit) {
+        state.value.storage = hit.storage
+        state.value.group   = hit.storage === 'contact' ? hit.group : null
+    }
+
     emitUpdate()
 }
 
@@ -209,7 +249,7 @@ function onGroupCreate(name: string) {
                 </div>
             </div>
 
-            <div class="vse-row">
+            <div v-if="props.showType" class="vse-row">
                 <label class="vse-label">Type:</label>
                 <div class="vse-control">
                     <select
@@ -233,8 +273,12 @@ function onGroupCreate(name: string) {
                 <div class="vse-control vse-control-inline">
                     <StorageRadio
                         :model-value="state.storage"
+                        :disabled="storageLocked"
                         @update:model-value="onStorageChange"
                     />
+                    <span v-if="storageLocked" class="vse-hint vse-hint--warn vse-hint--inline">
+                        Locked — name already registered in {{ existingForCurrent?.storage }}.
+                    </span>
                 </div>
             </div>
 
@@ -334,5 +378,8 @@ function onGroupCreate(name: string) {
 }
 .vse-hint--warn {
     color: var(--amber, #d97706);
+}
+.vse-hint--inline {
+    padding-left: 8px;
 }
 </style>

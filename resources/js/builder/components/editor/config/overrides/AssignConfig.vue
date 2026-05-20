@@ -166,6 +166,7 @@ function removeOperation(index: number) {
                         :model-value="op.variable"
                         :type-options="ASSIGN_TYPES"
                         :known-groups="knownGroups"
+                        :owner-node-id="String(props.node.id)"
                         show-storage
                         show-group
                         @update:model-value="(next: Variable) => onVariableUpdate(index, next)"

@@ -25,7 +25,6 @@ use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Rag\RagAdapterRegistry;
-use App\Domains\Flow\State\FlowStateNamespace;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\VariableResolver;
 use App\Domains\Flow\Support\CallbackDataCodec;
@@ -40,6 +39,7 @@ use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\DTO\RagConfidence;
 use FAPost\Foundation\DTO\RagQueryContext;
 use FAPost\Foundation\DTO\StructuredRagResult;
+use FAPost\Foundation\Flow\Enums\StateNamespace;
 use Mockery;
 use Tests\TestCase;
 
@@ -343,14 +343,14 @@ final class BuiltInNodeHandlersTest extends TestCase
             Mockery::mock(MessageSenderInterface::class),
             Mockery::mock(ContentTranslatorInterface::class),
         );
-        $node    = ['id' => 'input-1', 'config' => ['save_to' => FlowStateNamespace::FLOW . '.user_name']];
+        $node    = ['id' => 'input-1', 'config' => ['save_to' => StateNamespace::Flow->value . '.user_name']];
 
         $waiting  = $handler->execute($node, [], $this->context(incoming: null));
         $executed = $handler->execute($node, [], $this->context(incoming: $this->incoming('John')));
 
         $this->assertSame(NodeExecutionStatus::Waiting, $waiting->status);
         $this->assertSame(NodeExecutionStatus::Executed, $executed->status);
-        $this->assertSame('John', $executed->stateChanges[FlowStateNamespace::FLOW . '.user_name']);
+        $this->assertSame('John', $executed->stateChanges[StateNamespace::Flow->value . '.user_name']);
     }
 
     public function test_condition_uses_state_for_flow_path_and_accessor_for_module_path(): void
@@ -364,7 +364,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $flowNode = [
             'id'     => 'condition-flow',
             'config' => [
-                'check' => FlowStateNamespace::FLOW . '.segment',
+                'check' => StateNamespace::Flow->value . '.segment',
                 'rules' => [['operator' => 'eq', 'value' => 'vip', 'handle' => 'yes']],
             ],
         ];
@@ -378,14 +378,14 @@ final class BuiltInNodeHandlersTest extends TestCase
         $emptyNode = [
             'id'     => 'condition-empty',
             'config' => [
-                'check' => FlowStateNamespace::FLOW . '.optional',
+                'check' => StateNamespace::Flow->value . '.optional',
                 'rules' => [['operator' => 'empty', 'handle' => 'empty']],
             ],
         ];
 
-        $flow   = $handler->execute($flowNode, [FlowStateNamespace::FLOW => ['segment' => 'vip']], $this->context());
+        $flow   = $handler->execute($flowNode, [StateNamespace::Flow->value => ['segment' => 'vip']], $this->context());
         $module = $handler->execute($moduleNode, [], $this->context());
-        $empty  = $handler->execute($emptyNode, [FlowStateNamespace::FLOW => ['optional' => '']], $this->context());
+        $empty  = $handler->execute($emptyNode, [StateNamespace::Flow->value => ['optional' => '']], $this->context());
 
         $this->assertSame('yes', $flow->sourceHandle);
         $this->assertSame('route', $module->sourceHandle);
@@ -419,7 +419,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
         $session = $handler->execute(
             $sessionNode,
-            [FlowStateNamespace::FLOW => ['code' => '1234']],
+            [StateNamespace::Flow->value => ['code' => '1234']],
             $this->context(),
         );
 
@@ -473,7 +473,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
         $result = $handler->execute(
             $node,
-            [FlowStateNamespace::RAG => ['found' => true]],
+            [StateNamespace::Rag->value => ['found' => true]],
             $this->context(),
         );
 
@@ -489,7 +489,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $node = [
             'id'     => 'cond-legacy',
             'config' => [
-                'check' => FlowStateNamespace::FLOW . '.code',
+                'check' => StateNamespace::Flow->value . '.code',
                 'rules' => [
                     ['operator' => 'eq', 'value' => '1234', 'handle' => 'yes'],
                 ],
@@ -498,7 +498,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
         $result = $handler->execute(
             $node,
-            [FlowStateNamespace::FLOW => ['code' => '1234']],
+            [StateNamespace::Flow->value => ['code' => '1234']],
             $this->context(),
         );
 
@@ -512,7 +512,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
         $first  = $handler->execute($node, [], $this->context(nodeId: 'delay-1'));
         $second = $handler->execute($node, [
-            FlowStateNamespace::SYSTEM => ['delay' => ['delay-1' => ['scheduled_at' => '2026-01-01T00:00:00+00:00']]],
+            StateNamespace::System->value => ['delay' => ['delay-1' => ['scheduled_at' => '2026-01-01T00:00:00+00:00']]],
         ], $this->context(nodeId: 'delay-1'));
 
         $this->assertSame(NodeExecutionStatus::Waiting, $first->status);
@@ -533,14 +533,14 @@ final class BuiltInNodeHandlersTest extends TestCase
         $handler->execute([
             'id'     => 'set-contact',
             'config' => ['target' => 'contact', 'key' => 'first_name', 'value' => '{{flow.name}}'],
-        ], [FlowStateNamespace::FLOW => ['name' => 'Jane']], $contextWithWriter);
+        ], [StateNamespace::Flow->value => ['name' => 'Jane']], $contextWithWriter);
 
         $flow = $handler->execute([
             'id'     => 'set-flow',
             'config' => ['target' => 'flow', 'key' => 'nickname', 'value' => '{{flow.name}}'],
-        ], [FlowStateNamespace::FLOW => ['name' => 'Jane']], $this->context());
+        ], [StateNamespace::Flow->value => ['name' => 'Jane']], $this->context());
 
-        $this->assertSame('Jane', $flow->stateChanges[FlowStateNamespace::FLOW . '.nickname']);
+        $this->assertSame('Jane', $flow->stateChanges[StateNamespace::Flow->value . '.nickname']);
     }
 
     public function test_assign_contact_language_aliases_route_to_canonical_path(): void
@@ -676,7 +676,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
         $result = $handler->execute(
             $node,
-            [FlowStateNamespace::FLOW => ['name' => 'Jane']],
+            [StateNamespace::Flow->value => ['name' => 'Jane']],
             $context,
         );
 
@@ -802,7 +802,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $errorHttp = Mockery::mock(HttpClientInterface::class);
         $errorHttp->shouldReceive('post')->once()->andThrow(new HttpTransportException('timeout'));
 
-        $errorHandler = new CallNodeHandler($errorHttp);
+        $errorHandler = new CallNodeHandler($errorHttp, new VariableResolver());
         $failed       = $errorHandler->execute([
             'id'     => 'hook-1',
             'config' => ['url' => 'https://example.test/hook'],
@@ -811,7 +811,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $okHttp = Mockery::mock(HttpClientInterface::class);
         $okHttp->shouldReceive('post')->once()->andReturn(new HttpResponse(200, ['ok' => true]));
 
-        $okHandler = new CallNodeHandler($okHttp);
+        $okHandler = new CallNodeHandler($okHttp, new VariableResolver());
         $executed  = $okHandler->execute([
             'id'     => 'hook-2',
             'config' => ['url' => 'https://example.test/hook', 'save_response_to' => 'flow.webhook'],
@@ -837,7 +837,7 @@ final class BuiltInNodeHandlersTest extends TestCase
                 }
             );
 
-        $handler = new CallNodeHandler($http);
+        $handler = new CallNodeHandler($http, new VariableResolver());
         $handler->execute([
             'id'     => 'hook-1',
             'config' => [
@@ -888,7 +888,7 @@ final class BuiltInNodeHandlersTest extends TestCase
                 ],
             ],
         ], [
-            FlowStateNamespace::FLOW => ['order_id' => 'ORD-7', 'amount' => 199],
+            StateNamespace::Flow->value => ['order_id' => 'ORD-7', 'amount' => 199],
         ], $context);
 
         $this->assertSame(NodeExecutionStatus::Executed, $result->status);
@@ -961,13 +961,13 @@ final class BuiltInNodeHandlersTest extends TestCase
                 'provider'          => 'test-rag',
                 'query'             => 'When do you open, {{flow.contact_name}}?',
             ],
-        ], [FlowStateNamespace::FLOW => ['contact_name' => 'Alice']], $this->context(nodeId: 'rag-1'));
+        ], [StateNamespace::Flow->value => ['contact_name' => 'Alice']], $this->context(nodeId: 'rag-1'));
 
         $this->assertSame(NodeExecutionStatus::Executed, $result->status);
         $this->assertSame('success', $result->sourceHandle);
-        $this->assertSame('Office hours are 9-6.', $result->stateChanges[FlowStateNamespace::RAG . '.answer']);
-        $this->assertTrue($result->stateChanges[FlowStateNamespace::RAG . '.found']);
-        $this->assertSame('high', $result->stateChanges[FlowStateNamespace::RAG . '.confidence']);
+        $this->assertSame('Office hours are 9-6.', $result->stateChanges[StateNamespace::Rag->value . '.answer']);
+        $this->assertTrue($result->stateChanges[StateNamespace::Rag->value . '.found']);
+        $this->assertSame('high', $result->stateChanges[StateNamespace::Rag->value . '.confidence']);
     }
 
     public function test_rag_query_routes_not_found_when_adapter_signals_no_match(): void
@@ -986,7 +986,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         ], [], $this->context());
 
         $this->assertSame('not_found', $result->sourceHandle);
-        $this->assertFalse($result->stateChanges[FlowStateNamespace::RAG . '.found']);
+        $this->assertFalse($result->stateChanges[StateNamespace::Rag->value . '.found']);
     }
 
     public function test_rag_query_routes_error_on_adapter_throw(): void
@@ -1162,7 +1162,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             ],
         ];
 
-        $state  = [FlowStateNamespace::FLOW => ['employees' => $employees]];
+        $state  = [StateNamespace::Flow->value => ['employees' => $employees]];
         $result = $handler->execute($node, $state, $this->context(nodeId: $nodeId, sessionId: $sessionUuid));
 
         $this->assertSame(NodeExecutionStatus::Waiting, $result->status);

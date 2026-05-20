@@ -8,12 +8,12 @@ use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Enums\AssignTarget;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
-use App\Domains\Flow\State\FlowStateNamespace;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableStorage;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
+use FAPost\Foundation\Flow\Enums\StateNamespace;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use FAPost\Support\Builder\Schema\Fields\SelectField;
 use FAPost\Support\Builder\Schema\Fields\TextareaField;
@@ -168,7 +168,7 @@ final class AssignNodeHandler extends AbstractVersionedHandler
             return new NodeExecutionResult(
                 status: NodeExecutionStatus::Executed,
                 sourceHandle: 'default',
-                stateChanges: [FlowStateNamespace::FLOW . ".{$key}" => $value],
+                stateChanges: [StateNamespace::Flow->value . ".{$key}" => $value],
                 metadata: [self::TARGET_META => $target->value, self::KEY_META => $key],
             );
         }

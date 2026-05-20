@@ -51,6 +51,29 @@ const emit = defineEmits(['update:config'])
 const builderStore = useBuilderStore()
 
 const config = computed((): Record<string, unknown> => (props.node.config as Record<string, unknown>) ?? {})
+
+// Read the dynamic-buttons source field schema from the handler-supplied
+// definition. Handler authors declare allowed namespaces in PHP; the Vue
+// override just forwards them. Default (flow + contact) is applied when
+// the schema doesn't override.
+const dynamicSourceSchema = computed<Record<string, unknown>>(() => {
+    const root          = props.schema as Record<string, unknown>
+    const dynamicBlock  = root.dynamic_buttons as Record<string, unknown> | undefined
+    const fields        = dynamicBlock?.fields as Record<string, unknown> | undefined
+    const sourceField   = fields?.source as Record<string, unknown> | undefined
+    return sourceField ?? {}
+})
+const dynamicSourceNamespaces = computed<string[]>(() => {
+    const ns = (dynamicSourceSchema.value.namespaces as unknown)
+    return Array.isArray(ns) && ns.length > 0
+        ? (ns as string[])
+        : ['flow', 'contact']
+})
+const dynamicSourcePlaceholder = computed<string | undefined>(() =>
+    typeof dynamicSourceSchema.value.placeholder === 'string'
+        ? (dynamicSourceSchema.value.placeholder as string)
+        : undefined,
+)
 const buttons = computed((): KbButton[] => (config.value.buttons as KbButton[]) ?? [])
 const contentType = computed(() => String(config.value.content_type ?? 'text'))
 const keyboardMode = computed(() => String(config.value.keyboard_mode ?? 'inline'))
@@ -122,7 +145,7 @@ const dynamicSource = ref<string>(String(dynamicConfig.value.source ?? ''))
 const dynamicItemVariable = ref<Variable | null>(
     (() => {
         const raw = (dynamicConfig.value.save_item_to as Record<string, unknown> | null) ?? null
-        return raw ? (raw as Variable) : null
+        return raw ? (raw as unknown as Variable) : null
     })()
 )
 
@@ -130,7 +153,7 @@ function syncDynamicRefs() {
     const dc = (config.value.dynamic_buttons as Record<string, unknown> | null) ?? {}
     dynamicSource.value = String(dc.source ?? '')
     const raw = (dc.save_item_to as Record<string, unknown> | null) ?? null
-    dynamicItemVariable.value = raw ? (raw as Variable) : null
+    dynamicItemVariable.value = raw ? (raw as unknown as Variable) : null
 }
 
 function switchKeyboardType(type: 'static' | 'dynamic') {
@@ -413,6 +436,7 @@ function updateKeyboardMode(value: string) {
                             :model-value="answerVariable"
                             :type-options="BUTTON_VALUE_TYPES"
                             :known-groups="knownGroups"
+                            :owner-node-id="String(props.node.id)"
                             show-storage
                             show-group
                             @update:model-value="onAnswerVariableUpdate"
@@ -428,11 +452,12 @@ function updateKeyboardMode(value: string) {
                     <StatePathPicker
                         :model-value="dynamicSource"
                         :allow-manual="false"
-                        placeholder="flow.employees"
+                        :namespaces="dynamicSourceNamespaces"
+                        :placeholder="dynamicSourcePlaceholder ?? 'flow.employees'"
                         @update:model-value="updateDynamicSource"
                     />
                     <p class="field-hint">
-                        Choose a variable registered by an upstream node (e.g. Call → Save response to).
+                        Choose any user-registered variable (flow.* or contact.*) populated by an upstream node.
                     </p>
                 </div>
 
@@ -454,6 +479,7 @@ function updateKeyboardMode(value: string) {
                         :model-value="dynamicItemVariable"
                         :type-options="DYNAMIC_ITEM_TYPES"
                         :known-groups="knownGroups"
+                        :owner-node-id="String(props.node.id)"
                         show-storage
                         show-group
                         @update:model-value="onDynamicItemVariableUpdate"

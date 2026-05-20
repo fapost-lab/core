@@ -109,6 +109,7 @@ function onVariableUpdate(next: Variable) {
                 :model-value="variable"
                 :type-options="INPUT_TYPES"
                 :known-groups="knownGroups"
+                :owner-node-id="String(props.node.id)"
                 show-storage
                 show-group
                 @update:model-value="onVariableUpdate"

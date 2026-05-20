@@ -7,11 +7,11 @@ namespace App\Domains\Flow\Handlers;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Rag\RagAdapterRegistry;
-use App\Domains\Flow\State\FlowStateNamespace;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\DTO\RagQueryContext;
+use FAPost\Foundation\Flow\Enums\StateNamespace;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use FAPost\Support\Builder\Schema\Fields\JsonField;
 use FAPost\Support\Builder\Schema\Fields\TextareaField;
@@ -150,7 +150,7 @@ final class RagQueryNodeHandler extends AbstractVersionedHandler
 
         $stateChanges = [];
         foreach ($result->toStateArray() as $key => $value) {
-            $stateChanges[FlowStateNamespace::RAG . ".{$key}"] = $value;
+            $stateChanges[StateNamespace::Rag->value . ".{$key}"] = $value;
         }
 
         return new NodeExecutionResult(

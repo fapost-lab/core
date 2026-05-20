@@ -8,6 +8,7 @@ import FlowNodeCard from './FlowNodeCard.vue'
 import FlowInsertPoint from './FlowInsertPoint.vue'
 import FlowConditionCard from './FlowConditionCard.vue'
 import FlowSendMessageCard from './FlowSendMessageCard.vue'
+import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 
 interface TreeNode {
     node: { id: string; type: string; label?: string; config?: Record<string, unknown> }
@@ -19,13 +20,11 @@ const selectionStore = useSelectionStore()
 const { confirm } = useConfirm()
 const navigationStore = useNavigationStore()
 
+// Halts the linear walk on any node that cannot have a default-handle
+// successor — keyboard-bearing send_message (static OR dynamic buttons,
+// or reply mode) and `end`. Single source of truth in `nodeTerminal.ts`.
 function isTerminalSendMessage(node: TreeNode['node']): boolean {
-    if (node.type !== 'send_message') return false
-    const config = (node.config ?? {}) as Record<string, unknown>
-    if (config.content_type !== 'text_with_keyboard') return false
-    if ((config.keyboard_mode ?? 'inline') === 'reply') return true
-    const buttons = Array.isArray(config.buttons) ? (config.buttons as unknown[]) : []
-    return buttons.length > 0
+    return nodeMustBeLast(node)
 }
 
 // Walk the linear `default` chain at the current branch level. Stop as
@@ -274,13 +273,7 @@ function goToRoot() {
 const lastNodeIsTerminal = computed(() => {
     const last = activeNodes.value[activeNodes.value.length - 1]
     if (!last) return false
-    const { type, config } = last.node
-    // Real `end` node already terminates the chain — no decorative tail card.
-    if (type === 'end') return true
-    if (type !== 'send_message' || config?.content_type !== 'text_with_keyboard') return false
-    const mode = config?.keyboard_mode ?? 'inline'
-    if (mode === 'reply') return true
-    return ((config?.buttons as unknown[] | undefined)?.length ?? 0) > 0
+    return nodeMustBeLast(last.node)
 })
 
 /**

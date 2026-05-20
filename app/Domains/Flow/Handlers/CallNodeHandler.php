@@ -5,15 +5,21 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Contracts\HttpClientInterface;
+use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Exceptions\HttpTransportException;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
+use App\Domains\Flow\State\Variables\Variable;
+use App\Domains\Flow\State\Variables\VariableStorage;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
+use FAPost\Foundation\Flow\Contracts\ContactWriterInterface;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use FAPost\Support\Builder\Schema\Fields\ArrayField;
 use FAPost\Support\Builder\Schema\Fields\KeyValueField;
 use FAPost\Support\Builder\Schema\Fields\NumberField;
+use FAPost\Support\Builder\Schema\Fields\ObjectField;
+use FAPost\Support\Builder\Schema\Fields\SelectField;
 use FAPost\Support\Builder\Schema\Fields\StatePickerField;
 use FAPost\Support\Builder\Schema\Fields\TextField;
 use FAPost\Support\Builder\Schema\Schema;
@@ -31,6 +37,7 @@ final class CallNodeHandler extends AbstractVersionedHandler
 
     public function __construct(
         private readonly HttpClientInterface $http,
+        private readonly VariableResolverInterface $variableResolver,
     ) {
     }
 
@@ -69,8 +76,22 @@ final class CallNodeHandler extends AbstractVersionedHandler
                 Section::make('response', 'Response handling')
                     ->icon('arrow-down-tray')
                     ->fields([
-                        StatePickerField::make('save_response_to')
+                        ObjectField::make('save_to_variable')
                             ->label('Save response to')
+                            ->fields([
+                                TextField::make('name')->label('Name')->required(),
+                                SelectField::make('type')
+                                    ->label('Type')
+                                    ->options(['text', 'number', 'confirm'])
+                                    ->default('text'),
+                                SelectField::make('storage')
+                                    ->label('Storage')
+                                    ->options(['session', 'contact'])
+                                    ->default('session'),
+                                TextField::make('group')->label('Group'),
+                            ]),
+                        StatePickerField::make('save_response_to')
+                            ->label('Legacy save path')
                             ->placeholder('flow.webhook_response'),
                     ]),
             )
@@ -144,10 +165,29 @@ final class CallNodeHandler extends AbstractVersionedHandler
             );
         }
 
-        $stateChanges   = [];
-        $saveResponseTo = $config['save_response_to'] ?? null;
-        if (is_string($saveResponseTo) && '' !== $saveResponseTo) {
-            $stateChanges[$saveResponseTo] = $response->json();
+        $stateChanges = [];
+        $body         = $response->json();
+        $variable     = $this->resolveVariable($config);
+
+        if ($variable instanceof Variable) {
+            $path = $this->variableResolver->resolveTargetPath($variable);
+
+            if (VariableStorage::Contact === $variable->storage) {
+                $writer = $context->contactWriter;
+                if (! $writer instanceof ContactWriterInterface) {
+                    throw new InvalidNodeConfigException(
+                        'call: ContactWriter is unavailable for contact-scoped save_to_variable.',
+                    );
+                }
+                $writer->write($path, $body);
+            } else {
+                $stateChanges[$path] = $body;
+            }
+        } else {
+            $saveResponseTo = $config['save_response_to'] ?? null;
+            if (is_string($saveResponseTo) && '' !== $saveResponseTo) {
+                $stateChanges[$saveResponseTo] = $body;
+            }
         }
 
         return new NodeExecutionResult(
@@ -167,6 +207,22 @@ final class CallNodeHandler extends AbstractVersionedHandler
      *
      * @return array<string, mixed>
      */
+    /**
+     * Resolve the new {@code save_to_variable} shape. Returns null when only
+     * the legacy {@code save_response_to} path is configured (or nothing at
+     * all) — the caller falls back to the legacy write surface in that case.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function resolveVariable(array $config): ?Variable
+    {
+        if (! is_array($config['save_to_variable'] ?? null)) {
+            return null;
+        }
+
+        return Variable::tryFromArray($config['save_to_variable']);
+    }
+
     private function buildPayload(array $config, array $state, NodeExecutionContext $context): array
     {
         $payload = [

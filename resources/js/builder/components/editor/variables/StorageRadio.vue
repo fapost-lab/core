@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type {VariableStorage} from '@builder/dto/types'
 
-defineProps<{
+withDefaults(defineProps<{
     modelValue: VariableStorage
-}>()
+    disabled?:  boolean
+}>(), { disabled: false })
 
 defineEmits<{
     (e: 'update:modelValue', value: VariableStorage): void
@@ -11,13 +12,14 @@ defineEmits<{
 </script>
 
 <template>
-    <div class="storage-radio" role="radiogroup">
+    <div class="storage-radio" role="radiogroup" :class="{ 'storage-radio--disabled': disabled }">
         <button
             type="button"
             class="storage-option"
             :class="{ active: modelValue === 'contact' }"
             role="radio"
             :aria-checked="modelValue === 'contact'"
+            :disabled="disabled"
             title="Contact profile — persists on the contact"
             @click="$emit('update:modelValue', 'contact')"
         >
@@ -30,6 +32,7 @@ defineEmits<{
             :class="{ active: modelValue === 'session' }"
             role="radio"
             :aria-checked="modelValue === 'session'"
+            :disabled="disabled"
             title="Temporary — only for the current flow session"
             @click="$emit('update:modelValue', 'session')"
         >
@@ -76,5 +79,11 @@ defineEmits<{
 }
 .storage-option .label {
     user-select: none;
+}
+.storage-radio--disabled {
+    opacity: 0.55;
+}
+.storage-option:disabled {
+    cursor: not-allowed;
 }
 </style>
