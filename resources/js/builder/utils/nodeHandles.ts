@@ -64,12 +64,17 @@ function sendMessageHandles(node: FlowNodeLike): NodeHandle[] {
 function conditionHandles(node: FlowNodeLike): NodeHandle[] {
   const config = (node.config ?? {}) as Record<string, unknown>
   const rules = Array.isArray(config.rules) ? (config.rules as Array<Record<string, unknown>>) : []
-  const handles: NodeHandle[] = rules.map((rule, idx) => ({
-    handle: String(rule.handle ?? `rule_${idx}`),
-    label: typeof rule.label === 'string' && rule.label !== '' ? rule.label : `Rule ${idx + 1}`,
-  }))
-  handles.push({handle: 'default', label: 'Otherwise'})
-  return handles
+  if (rules.length === 0) {
+    return [{handle: 'true', label: 'true'}, {handle: 'false', label: 'false'}]
+  }
+  const named = rules.map((rule, idx) => {
+    const handle = String(rule.handle ?? `branch_${idx}`)
+    const label  = (rule.label && String(rule.label).trim() !== '')
+      ? String(rule.label)
+      : handle
+    return {handle, label}
+  })
+  return [...named, {handle: 'default', label: 'Otherwise'}]
 }
 
 function buttonLabel(button: Record<string, unknown>): string {

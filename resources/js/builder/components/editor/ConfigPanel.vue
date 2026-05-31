@@ -20,6 +20,7 @@ const OVERRIDES: Record<string, object> = {
     send_message: SendMessageConfig,
     input: InputConfig,
     condition: ConditionConfig,
+    branch: ConditionConfig,
     assign: AssignConfig,
     call: CallConfig,
     end: EndConfig,

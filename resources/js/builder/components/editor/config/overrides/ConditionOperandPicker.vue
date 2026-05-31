@@ -1,16 +1,17 @@
 <script setup lang="ts">
 /**
- * Operand picker for a single Branch rule. Renders in two modes:
- *  - user_variable (default): a flat dropdown of user-defined variables
- *    plus a "+ Other source..." entry that switches to source mode.
- *  - source: a source-kind dropdown (Contact / RAG / API / System / Module),
- *    plus a field dropdown scoped to the chosen source.
+ * Operand picker for a single Branch rule.
+ *
+ * Shows the selected variable path in a read-only display field with a
+ * VariablePicker trigger ({...}) on the right — same UX as other variable
+ * fields in the builder. Selecting a variable via the picker decompiles the
+ * path into the structured BranchOperandUiState that the backend handler reads.
  */
 import {computed} from 'vue'
+import VariablePicker from '@builder/components/editor/config/VariablePicker.vue'
 import {useFlowVariables} from '@builder/composables/useFlowVariables'
-import {useConditionSources} from '@builder/composables/useConditionSources'
 import type {BranchOperandUiState} from '@builder/utils/branchOperandCompiler'
-import type {Variable} from '@builder/dto/types'
+import {decompileLeft} from '@builder/utils/branchOperandCompiler'
 
 const props = defineProps<{
     modelValue: BranchOperandUiState
@@ -21,208 +22,95 @@ const emit = defineEmits<{
 }>()
 
 const { userVars } = useFlowVariables()
-const { sources, findSource } = useConditionSources()
 
-const SWITCH_TO_SOURCE = '__switch_to_source__'
-
-const userVariableValue = computed(() => {
-    if (props.modelValue.mode !== 'user_variable' || !props.modelValue.variable) {
-        return ''
+/** Human-readable path for the current state, shown in the display field. */
+const displayPath = computed((): string => {
+    const s = props.modelValue
+    if (s.rawPath) return s.rawPath
+    if (s.mode === 'user_variable' && s.variable) {
+        const v = s.variable
+        if (v.storage === 'contact') {
+            return v.group ? `contact.${v.group}.${v.name}` : `contact.${v.name}`
+        }
+        return `flow.${v.name}`
     }
-    const v = props.modelValue.variable
-    return variableKey(v)
+    if (s.mode === 'source' && s.source && s.field) {
+        return `${s.source}.${s.field}`
+    }
+    return ''
 })
 
-function variableKey(v: Variable): string {
-    return [v.storage, v.group ?? '', v.name].join('|')
+function onSelect(snippet: string) {
+    // VariablePicker emits {{flow.name}} — strip the braces to get the raw path.
+    const path = snippet.replace(/^\{\{\s*/, '').replace(/\s*\}\}$/, '').trim()
+    emit('update:modelValue', decompileLeft(path, userVars.value))
 }
 
-function variableLabelFor(v: { name: string; storage: string; group: string | null }): string {
-    if (v.storage === 'session') {
-        return `${v.name} (Temporary)`
-    }
-    if (v.group) {
-        return `${v.group}.${v.name} (Contact)`
-    }
-    return `${v.name} (Contact)`
+function clear() {
+    emit('update:modelValue', { mode: 'user_variable', variable: null, source: null, field: null, rawPath: null })
 }
-
-function onUserVariableChange(event: Event) {
-    const value = (event.target as HTMLSelectElement).value
-
-    if (value === SWITCH_TO_SOURCE) {
-        emit('update:modelValue', { mode: 'source', variable: null, source: null, field: null, rawPath: null })
-        return
-    }
-
-    const found = userVars.value.find((pv) => {
-        if (pv.source.kind === 'temporary') {
-            return variableKey({ name: pv.pathSegments.at(-1)!, type: 'text', storage: 'session', group: null }) === value
-        }
-        if (pv.source.kind === 'contact-profile') {
-            return variableKey({
-                name:    pv.pathSegments.at(-1)!,
-                type:    'text',
-                storage: 'contact',
-                group:   pv.group,
-            }) === value
-        }
-        return false
-    })
-
-    if (!found) {
-        emit('update:modelValue', { ...props.modelValue, variable: null })
-        return
-    }
-
-    const variable: Variable = found.source.kind === 'temporary'
-        ? { name: found.pathSegments.at(-1)!, type: 'text', storage: 'session', group: null }
-        : { name: found.pathSegments.at(-1)!, type: 'text', storage: 'contact', group: found.group }
-
-    emit('update:modelValue', {
-        mode:    'user_variable',
-        variable,
-        source:  null,
-        field:   null,
-        rawPath: null,
-    })
-}
-
-function onSourceChange(event: Event) {
-    const value = (event.target as HTMLSelectElement).value
-    emit('update:modelValue', {
-        mode:    'source',
-        variable: null,
-        source:  value === '' ? null : value,
-        field:   null,
-        rawPath: null,
-    })
-}
-
-function onFieldChange(event: Event) {
-    const value = (event.target as HTMLSelectElement).value
-    emit('update:modelValue', {
-        ...props.modelValue,
-        mode:  'source',
-        field: value === '' ? null : value,
-    })
-}
-
-function backToUserVariable() {
-    emit('update:modelValue', {
-        mode:     'user_variable',
-        variable: null,
-        source:   null,
-        field:    null,
-        rawPath:  null,
-    })
-}
-
-const currentSource = computed(() => findSource(props.modelValue.source))
 </script>
 
 <template>
-    <div class="operand-picker">
-        <!-- user_variable mode -->
-        <template v-if="modelValue.mode === 'user_variable'">
-            <select
-                class="field-input"
-                :value="userVariableValue"
-                @change="onUserVariableChange"
-            >
-                <option value="">— pick variable —</option>
-                <optgroup v-if="userVars.length > 0" label="User variables">
-                    <option
-                        v-for="pv in userVars"
-                        :key="pv.path"
-                        :value="variableKey(
-                            pv.source.kind === 'temporary'
-                                ? { name: pv.pathSegments.at(-1)!, type: 'text', storage: 'session', group: null }
-                                : { name: pv.pathSegments.at(-1)!, type: 'text', storage: 'contact', group: pv.group }
-                        )"
-                    >
-                        {{ variableLabelFor(
-                            pv.source.kind === 'temporary'
-                                ? { name: pv.pathSegments.at(-1)!, storage: 'session', group: null }
-                                : { name: pv.pathSegments.at(-1)!, storage: 'contact', group: pv.group }
-                        ) }}
-                    </option>
-                </optgroup>
-                <option :value="SWITCH_TO_SOURCE">+ Other source...</option>
-            </select>
-        </template>
-
-        <!-- source mode -->
-        <template v-else>
-            <div class="source-picker">
-                <select class="field-input" :value="modelValue.source ?? ''" @change="onSourceChange">
-                    <option value="">— pick source —</option>
-                    <option v-for="s in sources" :key="s.id" :value="s.id">
-                        {{ s.icon }} {{ s.label }}
-                    </option>
-                </select>
-
-                <select
-                    v-if="currentSource"
-                    class="field-input"
-                    :value="modelValue.field ?? ''"
-                    @change="onFieldChange"
-                >
-                    <option value="">— pick field —</option>
-                    <option v-for="f in currentSource.fields" :key="f.id" :value="f.id">
-                        {{ f.label }}
-                    </option>
-                </select>
-            </div>
-
-            <button
-                type="button"
-                class="back-btn"
-                @click="backToUserVariable"
-            >
-                ← Back to user variables
-            </button>
-
-            <div v-if="modelValue.rawPath" class="warn">
-                Unknown source: <code>{{ modelValue.rawPath }}</code>
-            </div>
-        </template>
+    <div class="operand-row">
+        <div class="operand-display" :class="{ empty: !displayPath }">
+            <span class="operand-path">{{ displayPath || '— pick variable —' }}</span>
+            <button v-if="displayPath" type="button" class="clear-btn" title="Clear" @click.stop="clear">×</button>
+        </div>
+        <VariablePicker @select="onSelect" />
     </div>
 </template>
 
 <style scoped>
-.operand-picker { display: flex; flex-direction: column; gap: 4px; }
-.source-picker { display: flex; gap: 4px; }
-.source-picker .field-input { flex: 1; }
-.field-input {
-    width: 100%;
-    padding: 6px 9px;
+.operand-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+}
+
+.operand-display {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 5px 8px;
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface-2);
+    min-height: 32px;
+    cursor: default;
+}
+
+.operand-display.empty {
+    border-style: dashed;
+}
+
+.operand-path {
+    font-family: 'Victor Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.operand-display.empty .operand-path {
+    color: var(--text-3);
     font-family: 'DM Sans', sans-serif;
     font-size: 12.5px;
-    color: var(--text);
-    outline: none;
-    transition: border-color .15s;
 }
-.field-input:focus { border-color: var(--primary); background: #fff; }
-.back-btn {
-    align-self: flex-start;
+
+.clear-btn {
     background: transparent;
     border: none;
     color: var(--text-3);
     cursor: pointer;
-    font-size: 11.5px;
-    padding: 2px 0;
+    font-size: 14px;
+    padding: 0 2px;
+    line-height: 1;
+    flex-shrink: 0;
 }
-.back-btn:hover { color: var(--primary); }
-.warn {
-    font-size: 11.5px;
-    color: var(--amber, #b8860b);
-    background: var(--amber-bg, #fff8e1);
-    padding: 4px 6px;
-    border-radius: 4px;
-}
-.warn code { font-family: 'Victor Mono', monospace; }
+
+.clear-btn:hover { color: var(--rose, #e05252); }
 </style>

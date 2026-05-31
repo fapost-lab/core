@@ -17,15 +17,24 @@ const props = defineProps({
 const selectionStore = useSelectionStore()
 const builderStore   = useBuilderStore()
 
-const handles      = computed(() => Object.keys(props.treeNode.childrenByHandle ?? {}))
-const activeHandle = ref(handles.value[0] ?? 'yes')
+// Branches come from config.rules (like send_message reads config.buttons),
+// so they appear even before they're wired.
+const rules = computed<Array<{handle: string; label?: string}>>(() => {
+    const raw = props.treeNode.node.config?.rules
+    return Array.isArray(raw) ? (raw as Array<{handle: string; label?: string}>) : []
+})
+
+const activeHandle = ref('')
 const colors       = computed(() => nodeColors('condition'))
 const isSelected   = computed(() => selectionStore.selectedNodeId === props.treeNode.node.id)
 const hasError     = computed(() => builderStore.nodesWithErrors.has(props.treeNode.node.id))
 
-watch(handles, (next) => {
-    if (!next.includes(activeHandle.value)) activeHandle.value = next[0] ?? 'yes'
-}, { immediate: true })
+// Reset only if the active branch was deleted — don't auto-select on init.
+watch(rules, (next) => {
+    if (activeHandle.value !== '' && !next.find(r => r.handle === activeHandle.value)) {
+        activeHandle.value = ''
+    }
+})
 
 function selectCard() {
     selectionStore.select(props.treeNode.node.id)
@@ -97,30 +106,30 @@ function openMoveDialog() {
         </div>
 
         <div class="node-card-body">
-            <div v-if="treeNode.node.config?.expression" class="node-summary-row">
-                <span class="node-summary-key">Expr</span>
-                <span
-                    class="node-summary-val"
-                    style="font-family:'Victor Mono',monospace;font-size:12px"
-                >{{ treeNode.node.config.expression }}</span>
-            </div>
-            <div
-                v-for="handle in handles"
-                :key="handle"
-                class="node-summary-row"
-            >
-                <span class="node-summary-key" style="text-transform:uppercase">{{ handle }}</span>
-                <span class="node-summary-val muted">{{ childCount(handle) }} nodes</span>
-            </div>
-
+            <div v-if="rules.length > 0" class="branch-hint">Click a branch to wire it →</div>
             <div class="condition-branches">
                 <button
-                    v-for="handle in handles"
-                    :key="handle"
-                    :class="[branchClass(handle), { 'active-branch': activeHandle === handle }]"
-                    @click.stop="selectBranch(handle)"
+                    v-for="rule in rules"
+                    :key="rule.handle"
+                    class="branch-btn branch-default"
+                    :class="{ 'active-branch': activeHandle === rule.handle }"
+                    :title="`Open ${rule.label || rule.handle} branch`"
+                    @click.stop="selectBranch(rule.handle)"
                 >
-                    ▶ {{ handle }}
+                    {{ rule.label || rule.handle }}
+                    <span v-if="childCount(rule.handle) > 0" class="branch-count">{{ childCount(rule.handle) }}</span>
+                    <span class="branch-chevron" aria-hidden="true">›</span>
+                </button>
+                <!-- Fallback branch — always last, cannot be deleted -->
+                <button
+                    class="branch-btn branch-fallback"
+                    :class="{ 'active-branch': activeHandle === 'default' }"
+                    title="Open Otherwise (fallback) branch"
+                    @click.stop="selectBranch('default')"
+                >
+                    Otherwise
+                    <span v-if="childCount('default') > 0" class="branch-count">{{ childCount('default') }}</span>
+                    <span class="branch-chevron" aria-hidden="true">›</span>
                 </button>
             </div>
         </div>

@@ -536,9 +536,10 @@ body {
   transition: all .15s;
   font-family: 'DM Sans', sans-serif;
 }
-.branch-yes { background: var(--sage-bg); color: var(--sage); }
-.branch-no  { background: var(--rose-bg); color: var(--rose); }
-.branch-default { background: var(--sky-bg); color: var(--sky); }
+.branch-yes      { background: var(--sage-bg); color: var(--sage); }
+.branch-no       { background: var(--rose-bg); color: var(--rose); }
+.branch-default  { background: var(--sky-bg); color: var(--sky); }
+.branch-fallback { background: var(--surface-2); color: var(--text-3); border: 1px dashed var(--border); }
 .branch-btn.active-branch { outline: 2px solid currentColor; outline-offset: 1px; }
 .branch-count {
   display: inline-flex; align-items: center; justify-content: center;

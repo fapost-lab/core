@@ -1,16 +1,11 @@
 <script setup lang="ts">
 /**
- * Branch (Condition) node config — rule builder with structured operand picker.
+ * Branch (Condition) node config — card-based branch builder.
  *
- * Each rule has:
- *   - structured `left` block ({ ref: 'user_variable' | 'source', ... })
- *   - operator (eq / neq / gt / contains / empty / ...)
- *   - right-side value (skipped for unary operators)
- *   - handle (yes / no / default / custom)
- *
- * Compiles UI state into `node.config.rules[i]` JSON via `branchOperandCompiler`.
- * Decompiles legacy `left: "flow.code"` strings and the older node-level
- * `check` path into the equivalent UI state on load.
+ * Each branch is a card (handle name + condition) rendered like keyboard
+ * buttons in send_message. Two default branches (true / false) are seeded
+ * when the node has no rules yet. The node is terminal — no "Otherwise"
+ * fallback handle is shown; all paths must be explicitly connected.
  */
 import {computed} from 'vue'
 import AccordionSection from '../AccordionSection.vue'
@@ -23,7 +18,8 @@ interface RuleConfig {
     left?:     CompiledLeft | string | null
     operator?: string
     value?:    unknown
-    handle?:   string
+    handle?:   string   // stable UUID used as edge identifier — never shown to user
+    label?:    string   // user-visible branch name
 }
 
 const props = defineProps<{
@@ -63,13 +59,11 @@ const legacyCheck = computed(() => {
 })
 
 function operandStateFor(rule: RuleConfig): BranchOperandUiState {
-    // If rule has its own left, use it. Otherwise fall back to top-level legacy `check`.
     const left = rule.left ?? legacyCheck.value
     return decompileLeft(left, userVars.value)
 }
 
 function emitRules(next: RuleConfig[]) {
-    // Always drop top-level legacy `check` once we start writing structured left.
     const patch: Record<string, unknown> = { rules: next }
     if (legacyCheck.value !== null) {
         patch.check = null
@@ -83,14 +77,15 @@ function updateRule(index: number, patch: Partial<RuleConfig>) {
 }
 
 function updateRuleLeft(index: number, state: BranchOperandUiState) {
-    const compiled = compileLeft(state)
-    updateRule(index, { left: compiled })
+    updateRule(index, { left: compileLeft(state) })
 }
 
 function addRule() {
     emitRules([
         ...rules.value,
-        { left: null, operator: 'eq', value: '', handle: 'yes' },
+        // handle = stable UUID (edge identifier, never changes on rename)
+        // label  = user-visible name (editable)
+        { handle: crypto.randomUUID(), label: '', left: null, operator: 'eq', value: '' },
     ])
 }
 
@@ -99,63 +94,81 @@ function removeRule(index: number) {
 }
 
 function ruleValueAsString(rule: RuleConfig): string {
-    if (rule.value === undefined || rule.value === null) {
-        return ''
-    }
+    if (rule.value === undefined || rule.value === null) return ''
     return typeof rule.value === 'string' ? rule.value : String(rule.value)
 }
+
 </script>
 
 <template>
     <div class="accordion">
-        <AccordionSection title="Rules" default-open>
-            <div v-for="(rule, i) in rules" :key="i" class="rule-block">
-                <div class="rule-row rule-operand">
-                    <span class="rule-prefix">IF</span>
-                    <ConditionOperandPicker
-                        :model-value="operandStateFor(rule)"
-                        @update:model-value="(state: BranchOperandUiState) => updateRuleLeft(i, state)"
-                    />
-                </div>
-
-                <div class="rule-row">
-                    <select
-                        class="field-input op-sel"
-                        :value="rule.operator ?? 'eq'"
-                        @change="updateRule(i, { operator: ($event.target as HTMLSelectElement).value })"
-                    >
-                        <option v-for="op in OPERATORS" :key="op.value" :value="op.value">
-                            {{ op.label }}
-                        </option>
-                    </select>
-
+        <AccordionSection title="Branches" default-open>
+            <div
+                v-for="(rule, i) in rules"
+                :key="i"
+                class="branch-card"
+            >
+                <!-- Card header: handle name + delete -->
+                <div class="branch-header">
+                    <span class="branch-arrow">→</span>
                     <input
-                        v-if="!UNARY_OPS.has(rule.operator ?? 'eq')"
-                        type="text"
-                        class="field-input"
-                        placeholder="value"
-                        :value="ruleValueAsString(rule)"
-                        @input="updateRule(i, { value: ($event.target as HTMLInputElement).value })"
+                        class="handle-input"
+                        :value="rule.label ?? ''"
+                        placeholder="Branch name…"
+                        spellcheck="false"
+                        @input="updateRule(i, { label: ($event.target as HTMLInputElement).value })"
                     />
+                    <button type="button" class="del-btn" title="Remove branch" @click="removeRule(i)">×</button>
                 </div>
 
-                <div class="rule-row">
-                    <span class="rule-prefix">THEN</span>
-                    <select
-                        class="field-input handle-sel"
-                        :value="rule.handle ?? 'yes'"
-                        @change="updateRule(i, { handle: ($event.target as HTMLSelectElement).value })"
-                    >
-                        <option value="yes">→ yes</option>
-                        <option value="no">→ no</option>
-                        <option value="default">→ default</option>
-                    </select>
+                <!-- Condition body -->
+                <div class="branch-body">
+                    <div class="cond-row">
+                        <span class="cond-label">IF</span>
+                        <ConditionOperandPicker
+                            class="cond-operand"
+                            :model-value="operandStateFor(rule)"
+                            @update:model-value="(state: BranchOperandUiState) => updateRuleLeft(i, state)"
+                        />
+                    </div>
 
-                    <button type="button" class="del-btn" @click="removeRule(i)" title="Remove rule">×</button>
+                    <div class="cond-row">
+                        <span class="cond-label"></span>
+                        <select
+                            class="field-input op-sel"
+                            :value="rule.operator ?? 'eq'"
+                            @change="updateRule(i, { operator: ($event.target as HTMLSelectElement).value })"
+                        >
+                            <option v-for="op in OPERATORS" :key="op.value" :value="op.value">
+                                {{ op.label }}
+                            </option>
+                        </select>
+
+                        <input
+                            v-if="!UNARY_OPS.has(rule.operator ?? 'eq')"
+                            type="text"
+                            class="field-input val-input"
+                            placeholder="value"
+                            :value="ruleValueAsString(rule)"
+                            @input="updateRule(i, { value: ($event.target as HTMLInputElement).value })"
+                        />
+                    </div>
                 </div>
             </div>
 
-            <button type="button" class="add-btn" @click="addRule">+ Add rule</button>
+            <button type="button" class="add-btn" @click="addRule">+ Add branch</button>
+
+            <!-- Fallback: always present, cannot be deleted -->
+            <div class="branch-card branch-card--fallback">
+                <div class="branch-header">
+                    <span class="branch-arrow" style="color:var(--text-3)">→</span>
+                    <span class="fallback-label">Otherwise</span>
+                    <span class="fallback-badge">fallback</span>
+                </div>
+                <p class="fallback-hint">
+                    Taken when no branch condition matches.
+                </p>
+            </div>
         </AccordionSection>
 
         <AccordionSection title="Meta">
@@ -173,27 +186,85 @@ function ruleValueAsString(rule: RuleConfig): string {
 </template>
 
 <style scoped>
-.rule-block {
-    padding: 8px;
+.branch-card {
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: 8px;
     margin-bottom: 8px;
     background: var(--surface);
-    display: flex; flex-direction: column; gap: 6px;
+    overflow: hidden;
 }
-.rule-row { display: flex; gap: 6px; align-items: center; }
-.rule-row .field-input { flex: 1; }
-.rule-operand { align-items: flex-start; }
-.rule-operand > :last-child { flex: 1; }
-.rule-prefix {
-    font-size: 11px; font-weight: 700;
-    color: var(--text-3); width: 38px;
-    padding-top: 4px;
+
+.branch-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
 }
-.op-sel { flex: 0 0 140px; }
-.handle-sel { flex: 0 0 110px; }
+
+.branch-arrow {
+    font-size: 13px;
+    color: var(--primary, #5b7fa6);
+    flex-shrink: 0;
+}
+
+.handle-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-family: 'Victor Mono', monospace;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+    outline: none;
+    padding: 0;
+}
+
+.handle-input::placeholder {
+    color: var(--text-3);
+    font-weight: 400;
+}
+
+.del-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-3);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0 2px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.del-btn:hover { color: var(--rose, #e05252); }
+
+.branch-body {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cond-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cond-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-3);
+    width: 22px;
+    flex-shrink: 0;
+    text-align: right;
+}
+
+.cond-operand { flex: 1; }
+
 .field-input {
-    padding: 6px 9px;
+    padding: 5px 8px;
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface-2);
@@ -202,21 +273,61 @@ function ruleValueAsString(rule: RuleConfig): string {
     color: var(--text);
     outline: none;
 }
+
 .field-input:focus { border-color: var(--primary); background: #fff; }
-.del-btn {
-    background: transparent; border: none; color: var(--text-3);
-    cursor: pointer; font-size: 16px; padding: 0 4px;
-}
-.del-btn:hover { color: var(--rose); }
+
+.op-sel  { flex: 0 0 150px; }
+.val-input { flex: 1; }
+
 .add-btn {
-    width: 100%; padding: 5px;
+    width: 100%;
+    padding: 6px;
     border: 1px dashed var(--border-2);
-    border-radius: 6px; background: transparent;
+    border-radius: 6px;
+    background: transparent;
     font-family: 'DM Sans', sans-serif;
-    font-size: 12px; color: var(--text-3);
+    font-size: 12px;
+    color: var(--text-3);
     cursor: pointer;
+    margin-top: 2px;
 }
-.add-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-bg); }
+
+.add-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-bg, #f0f4f8);
+}
+
+.branch-card--fallback {
+    opacity: 0.75;
+    border-style: dashed;
+}
+
+.fallback-label {
+    flex: 1;
+    font-family: 'Victor Mono', monospace;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text-2);
+}
+
+.fallback-badge {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--surface-3, #e8e8e8);
+    color: var(--text-3);
+    letter-spacing: 0.03em;
+}
+
+.fallback-hint {
+    padding: 6px 10px 8px;
+    font-size: 11.5px;
+    color: var(--text-3);
+    margin: 0;
+}
+
 .config-field { margin-bottom: 10px; }
 .field-label { font-size: 12px; color: var(--text-2); margin-bottom: 4px; }
 </style>

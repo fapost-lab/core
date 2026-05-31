@@ -17,6 +17,14 @@ export interface TerminalCheckInput {
 
 export function nodeMustBeLast(node: TerminalCheckInput): boolean {
     if (node.type === 'end') return true
+
+    // Branch/condition node is terminal when it has at least one rule —
+    // continuation is only via named branch handles, not the default chain.
+    if (node.type === 'branch' || node.type === 'condition') {
+        const rules = Array.isArray(node.config?.rules) ? node.config!.rules as unknown[] : []
+        return rules.length > 0
+    }
+
     if (node.type !== 'send_message') return false
 
     const config = (node.config ?? {}) as Record<string, unknown>

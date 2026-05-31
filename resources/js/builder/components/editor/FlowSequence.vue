@@ -374,7 +374,7 @@ const trailingInsertContext = computed(() => {
                     </div>
 
                     <FlowConditionCard
-                        v-if="item.node.type === 'condition'"
+                        v-if="item.node.type === 'condition' || item.node.type === 'branch'"
                         :index="index + 1"
                         :parent-branch="selectionStore.activeBranch"
                         :tree-node="item"
