@@ -12,6 +12,7 @@ import SendMessageConfig from './config/overrides/SendMessageConfig.vue'
 import InputConfig from './config/overrides/InputConfig.vue'
 import ConditionConfig from './config/overrides/ConditionConfig.vue'
 import AssignConfig from './config/overrides/AssignConfig.vue'
+import SubflowConfig from './config/overrides/SubflowConfig.vue'
 import CallConfig from './config/overrides/CallConfig.vue'
 import EndConfig from './config/overrides/EndConfig.vue'
 import TriggerConfig from './config/overrides/TriggerConfig.vue'
@@ -21,7 +22,8 @@ const OVERRIDES: Record<string, object> = {
     input: InputConfig,
     condition: ConditionConfig,
     branch: ConditionConfig,
-    assign: AssignConfig,
+    assign:   AssignConfig,
+    subflow:  SubflowConfig,
     call: CallConfig,
     end: EndConfig,
 }

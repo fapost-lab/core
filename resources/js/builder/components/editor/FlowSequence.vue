@@ -8,6 +8,7 @@ import FlowNodeCard from './FlowNodeCard.vue'
 import FlowInsertPoint from './FlowInsertPoint.vue'
 import FlowConditionCard from './FlowConditionCard.vue'
 import FlowSendMessageCard from './FlowSendMessageCard.vue'
+import FlowSubflowCard from './FlowSubflowCard.vue'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 
 interface TreeNode {
@@ -386,6 +387,12 @@ const trailingInsertContext = computed(() => {
                                 && (item.node.config?.keyboard_mode ?? 'inline') !== 'reply'
                                 && ((item.node.config?.buttons as unknown[] | undefined)?.length ?? 0) > 0
                         "
+                        :index="index + 1"
+                        :parent-branch="selectionStore.activeBranch"
+                        :tree-node="item"
+                    />
+                    <FlowSubflowCard
+                        v-else-if="item.node.type === 'subflow'"
                         :index="index + 1"
                         :parent-branch="selectionStore.activeBranch"
                         :tree-node="item"

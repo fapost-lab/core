@@ -36,6 +36,7 @@ final class BuilderFlowController extends Controller
                 'publishedAt'         => $dto->publishedAt?->toIso8601String(),
                 'contentBaseLanguage' => $dto->contentBaseLanguage,
                 'availableLanguages'  => $dto->availableLanguages,
+                'availableFlows'      => $dto->availableFlows,
             ],
             'backUrl' => route('filament.assistant.resources.flows.index', ['tenant' => $dto->assistantId]),
         ]);

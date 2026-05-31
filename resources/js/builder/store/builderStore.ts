@@ -98,6 +98,8 @@ export const useBuilderStore = defineStore('builder', () => {
   const tenantEvents = ref<string[]>([])
     const contentBaseLanguage = ref('en')
     const availableLanguages = ref<string[]>([])
+    const availableFlows     = ref<Array<{id: string; name: string}>>([])
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tree = computed(() => buildTree(definition.value.nodes ?? [], definition.value.edges ?? []) as any)
 
@@ -155,6 +157,7 @@ export const useBuilderStore = defineStore('builder', () => {
       tenantEvents.value = Array.isArray(flow.availableEvents) ? flow.availableEvents : []
         contentBaseLanguage.value = flow.contentBaseLanguage ?? 'en'
         availableLanguages.value = Array.isArray(flow.availableLanguages) ? flow.availableLanguages : []
+        availableFlows.value     = Array.isArray(flow.availableFlows) ? flow.availableFlows : []
         isDirty.value = false
         hydrated      = true
     }
@@ -700,6 +703,7 @@ export const useBuilderStore = defineStore('builder', () => {
         availableEvents,
         contentBaseLanguage,
         availableLanguages,
+        availableFlows,
         tree,
         saveStatus,
         isDirty,

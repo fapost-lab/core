@@ -28,12 +28,20 @@ final class BuilderFlowDto extends Data
         public readonly string $contentBaseLanguage,
         /** @var list<string> */
         public readonly array $availableLanguages,
+        /**
+         * Flows available for subflow selection — same assistant, ordered by name.
+         * Each entry: `{id: string, name: string}`.
+         *
+         * @var list<array{id: string, name: string}>
+         */
+        public readonly array $availableFlows,
     ) {
     }
 
     /**
-     * @param  list<string>  $availableEvents
-     * @param  list<string>  $availableLanguages
+     * @param  list<string>                       $availableEvents
+     * @param  list<string>                       $availableLanguages
+     * @param  list<array{id: string, name: string}>  $availableFlows
      */
     public static function fromDraftAndDefinition(
         FlowDraft $draft,
@@ -42,6 +50,7 @@ final class BuilderFlowDto extends Data
         array $availableEvents,
         string $contentBaseLanguage,
         array $availableLanguages,
+        array $availableFlows = [],
     ): self {
         return new self(
             flowId: $draft->flow_id,
@@ -65,6 +74,7 @@ final class BuilderFlowDto extends Data
             publishedAt: $published?->published_at,
             contentBaseLanguage: $contentBaseLanguage,
             availableLanguages: $availableLanguages,
+            availableFlows: $availableFlows,
         );
     }
 }

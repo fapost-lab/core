@@ -47,6 +47,7 @@ export interface BuilderFlowPayload {
     availableLanguages?: string[]
     contentBaseLanguage?: string
     publishedAt?: string | null
+    availableFlows?: Array<{id: string; name: string}>
 }
 
 export interface NodeTypePayload {

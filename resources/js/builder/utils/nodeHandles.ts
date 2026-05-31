@@ -31,9 +31,14 @@ export function nodeHandles(node: FlowNodeLike): NodeHandle[] {
   }
 
   if (node.type === 'input') {
+    return inputHandles(node)
+  }
+
+  if (node.type === 'subflow') {
     return [
-      {handle: 'default', label: 'Next'},
-      {handle: 'invalid', label: 'Invalid (retries exhausted)'},
+      {handle: 'success',   label: 'Success'},
+      {handle: 'cancelled', label: 'Cancelled'},
+      {handle: 'failed',    label: 'Failed'},
     ]
   }
 
