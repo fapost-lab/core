@@ -18,4 +18,11 @@ final class SystemStateKeys
     public const string SEND_MESSAGE_TIMEOUT_PREFIX  = StateNamespace::System->value . '.send_message.timeout';
     public const string SEND_MESSAGE_RESPONSE_PREFIX = StateNamespace::System->value . '.send_message.response';
     public const string SEND_MESSAGE_DYNAMIC_BUTTONS = StateNamespace::System->value . '.send_message.dynamic_buttons';
+
+    /**
+     * Prefix for per-input-node retry counters. Full path:
+     * `system.input.{nodeId}.retry_count`. Incremented whenever validation
+     * fails; cleared when the node finally emits success or `invalid`.
+     */
+    public const string INPUT_RETRY_PREFIX = StateNamespace::System->value . '.input';
 }

@@ -14,6 +14,8 @@ use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableStorage;
+use App\Domains\Flow\Validation\InputValidatorInterface;
+use App\Domains\Flow\Validation\ValidationResult;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
 use App\Domains\Media\Contracts\MediaServiceInterface;
 use FAPost\Foundation\DTO\IncomingMedia;
@@ -24,6 +26,8 @@ use FAPost\Foundation\Flow\Contracts\ContactWriterInterface;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use FAPost\Support\Builder\Schema\Fields\SelectField;
 use FAPost\Support\Builder\Schema\Fields\StatePickerField;
+use FAPost\Support\Builder\Schema\Fields\TextareaField;
+use FAPost\Support\Builder\Schema\Fields\TextField;
 use FAPost\Support\Builder\Schema\Schema;
 use FAPost\Support\Builder\Schema\Section;
 use RuntimeException;
@@ -33,7 +37,9 @@ final class InputNodeHandler extends AbstractVersionedHandler
 {
     final public const string TYPE = 'input';
 
-    private const string RECEIVED_META = 'received';
+    private const string RECEIVED_META       = 'received';
+    private const string INVALID_HANDLE      = 'invalid';
+    private const string DEFAULT_RETRY_LIMIT = '3';
 
     public function __construct(
         private readonly MediaIngestorInterface $mediaIngestor,
@@ -41,6 +47,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
         private readonly VariableResolverInterface $variableResolver,
         private readonly MessageSenderInterface $sender,
         private readonly ContentTranslatorInterface $translator,
+        private readonly InputValidatorInterface $validator,
     ) {
     }
 
@@ -72,6 +79,11 @@ final class InputNodeHandler extends AbstractVersionedHandler
                             ->label('Expected input')
                             ->options(InputExpectedType::cases())
                             ->default(InputExpectedType::Text),
+                        TextField::make('retry_limit')
+                            ->label('Retry limit')
+                            ->default(self::DEFAULT_RETRY_LIMIT),
+                        TextareaField::make('on_invalid_message')
+                            ->label('On invalid message'),
                     ]),
             )
             ->toArray();
@@ -80,33 +92,65 @@ final class InputNodeHandler extends AbstractVersionedHandler
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         $config       = is_array($nodeConfig['config'] ?? null) ? $nodeConfig['config'] : [];
-        $rawExpected  = is_string($config['expected_type'] ?? null) ? $config['expected_type'] : null;
-        $expectedType = (null !== $rawExpected ? InputExpectedType::tryFrom($rawExpected) : null)
-                        ?? InputExpectedType::Text;
+        $expectedType = $this->resolveExpectedType($config);
+        $variable     = $this->resolveVariable($config);
 
-        $variable = $this->resolveVariable($config);
+        // Media path stays in its own ingest pipeline — the validator
+        // only handles textual / select / platform-native input.
+        if ($expectedType->isMedia()) {
+            $promptResult = $this->sendPromptIfNeeded($config, $state, $context, withKeyboard: false);
+            if (null !== $promptResult) {
+                return $promptResult;
+            }
 
-        $promptResult = $this->sendPromptIfNeeded($config, $state, $context);
+            return $this->handleMediaInput($expectedType, $variable, $context);
+        }
+
+        // Platform-native types send a ReplyKeyboard with a special native button.
+        $withNativeButton = $expectedType->isPlatformNative();
+
+        $promptResult = $withNativeButton
+            ? $this->sendNativeButtonPromptIfNeeded($config, $state, $context, $expectedType)
+            : $this->sendPromptIfNeeded($config, $state, $context, withKeyboard: $expectedType->isSelect());
+
         if (null !== $promptResult) {
             return $promptResult;
         }
 
-        if ($expectedType->isMedia()) {
-            return $this->handleMediaInput($expectedType, $variable, $context);
+        if (null === $context->incoming) {
+            return NodeExecutionResult::waiting();
         }
 
-        return $this->handleTextInput($variable, $context);
+        $rules  = is_array($config['validation'] ?? null) ? $config['validation'] : [];
+        $result = $this->validator->validate($expectedType, $context->incoming, $rules, $nodeConfig);
+
+        if ($result->valid) {
+            return $this->emitSuccess($variable, $result->value, $state, $context);
+        }
+
+        return $this->handleInvalid($result, $config, $state, $context);
     }
 
     /**
-     * Optionally send the configured prompt before parking the session
-     * in `Waiting`. Idempotent through {@see SystemStateKeys::SENT_MESSAGES}:
-     * once the prompt for this node id has gone out, subsequent passes
-     * skip the send entirely. Returns:
+     * @param  array<string, mixed>  $config
+     */
+    private function resolveExpectedType(array $config): InputExpectedType
+    {
+        $raw = is_string($config['expected_type'] ?? null) ? $config['expected_type'] : null;
+
+        return (null !== $raw ? InputExpectedType::tryFrom($raw) : null) ?? InputExpectedType::Text;
+    }
+
+    /**
+     * Send the configured prompt before parking the session. Idempotent via
+     * {@see SystemStateKeys::SENT_MESSAGES}: once dispatched, repeat passes
+     * skip the send. For select/confirm types the prompt is delivered with
+     * an inline keyboard built from `config.buttons` — the same payload
+     * shape send_message uses, so {@see \App\Domains\Flow\Services\FlowMessageSender}
+     * routes it through the existing keyboard pipeline.
      *
-     *   - the result the engine should propagate (prompt was just sent
-     *     → waiting), or
-     *   - `null` to mean "carry on with normal input handling".
+     * Returns the result the engine should propagate (Waiting after a send)
+     * or `null` to mean "carry on with input handling".
      *
      * @param  array<string, mixed>  $config
      * @param  array<string, mixed>  $state
@@ -114,33 +158,44 @@ final class InputNodeHandler extends AbstractVersionedHandler
     private function sendPromptIfNeeded(
         array $config,
         array $state,
-        NodeExecutionContext $context
+        NodeExecutionContext $context,
+        bool $withKeyboard,
     ): ?NodeExecutionResult {
         $promptRaw = $config['prompt'] ?? null;
-        if (! is_string($promptRaw) && ! is_array($promptRaw)) {
-            return null;
-        }
-
-        $resolved = $this->translator->resolveField($promptRaw, $context->resolvedLanguage);
-        if (! is_string($resolved) || '' === mb_trim($resolved)) {
-            return null;
-        }
+        $resolved  = (is_string($promptRaw) || is_array($promptRaw))
+            ? $this->translator->resolveField($promptRaw, $context->resolvedLanguage)
+            : '';
+        $text = mb_trim($resolved);
 
         $sentIds = data_get($state, SystemStateKeys::SENT_MESSAGES, []);
         if (is_array($sentIds) && array_key_exists($context->nodeId, $sentIds)) {
-            // Prompt already sent on a previous pass; let the input
-            // handling continue (or wait, if no incoming yet).
             return null;
         }
+
+        // Select prompts must always go out (the user has no way to respond without the keyboard).
+        // Plain prompts may be skipped when empty.
+        if (! $withKeyboard && '' === $text) {
+            return null;
+        }
+
+        $payload = $withKeyboard
+            ? [
+                'content_type'  => 'text_with_keyboard',
+                'text'          => $text,
+                'buttons'       => $this->resolveButtons($config, $context->resolvedLanguage),
+                'keyboard_mode' => 'inline',
+                'session_id'    => $context->sessionId,
+            ]
+            : [
+                'content_type' => 'text',
+                'text'         => $text,
+            ];
 
         $externalMessageId = $this->sender->send(
             tenantId: $context->tenantId,
             contactId: $context->contactId,
             sessionId: $context->sessionId,
-            payload: [
-                'content_type' => 'text',
-                'text'         => $resolved,
-            ],
+            payload: $payload,
         );
 
         $nextSent                   = is_array($sentIds) ? $sentIds : [];
@@ -152,6 +207,209 @@ final class InputNodeHandler extends AbstractVersionedHandler
                 SystemStateKeys::SENT_MESSAGES => $nextSent,
             ],
         );
+    }
+
+    /**
+     * Send a prompt with a Telegram-native sharing button (request_contact /
+     * request_location) via a one-time ReplyKeyboard. The button label is taken
+     * from `config.request_button_label` (localizable). Idempotent: skipped on
+     * subsequent passes once the message has been recorded in SENT_MESSAGES.
+     *
+     * A non-empty prompt text from `config.prompt` IS required — the native
+     * button itself carries no instruction, so the prompt is the only context
+     * the user sees before pressing.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $state
+     */
+    private function sendNativeButtonPromptIfNeeded(
+        array $config,
+        array $state,
+        NodeExecutionContext $context,
+        InputExpectedType $expectedType,
+    ): ?NodeExecutionResult {
+        $sentIds = data_get($state, SystemStateKeys::SENT_MESSAGES, []);
+        if (is_array($sentIds) && array_key_exists($context->nodeId, $sentIds)) {
+            return null;
+        }
+
+        $promptRaw = $config['prompt'] ?? null;
+        $text      = (is_string($promptRaw) || is_array($promptRaw))
+            ? mb_trim($this->translator->resolveField($promptRaw, $context->resolvedLanguage))
+            : '';
+
+        $buttonLabelRaw = $config['request_button_label'] ?? null;
+        $buttonLabel    = (is_string($buttonLabelRaw) || is_array($buttonLabelRaw))
+            ? mb_trim($this->translator->resolveField($buttonLabelRaw, $context->resolvedLanguage))
+            : '';
+
+        // Fall back to type-based defaults when label is blank.
+        if ('' === $buttonLabel) {
+            $buttonLabel = match ($expectedType) {
+                InputExpectedType::Contact  => '📱 Share contact',
+                InputExpectedType::Location => '📍 Share location',
+                default                     => 'Share',
+            };
+        }
+
+        $specialField = match ($expectedType) {
+            InputExpectedType::Contact  => 'request_contact',
+            InputExpectedType::Location => 'request_location',
+            default                     => null,
+        };
+
+        $externalMessageId = $this->sender->send(
+            tenantId: $context->tenantId,
+            contactId: $context->contactId,
+            sessionId: $context->sessionId,
+            payload: [
+                'content_type' => 'text_with_keyboard',
+                'text'         => '' !== $text ? $text : $buttonLabel,
+                'buttons'      => [
+                    [
+                        'id'      => 'native-button',
+                        'type'    => 'reply',
+                        'label'   => $buttonLabel,
+                        'special' => $specialField,
+                        'row'     => 0,
+                        'order'   => 0,
+                    ],
+                ],
+                'keyboard_mode' => 'reply',
+                'session_id'    => $context->sessionId,
+            ],
+        );
+
+        $nextSent                   = is_array($sentIds) ? $sentIds : [];
+        $nextSent[$context->nodeId] = $externalMessageId;
+
+        return new NodeExecutionResult(
+            status: NodeExecutionStatus::Waiting,
+            stateChanges: [SystemStateKeys::SENT_MESSAGES => $nextSent],
+        );
+    }
+
+    /**
+     * Resolve each button's localized label so the sender receives a
+     * language-flattened keyboard.
+     *
+     * @param  array<string, mixed>  $config
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function resolveButtons(array $config, string $language): array
+    {
+        $buttons = is_array($config['buttons'] ?? null) ? array_values($config['buttons']) : [];
+
+        return array_map(
+            function (mixed $button) use ($language): array {
+                $btn          = is_array($button) ? $button : [];
+                $labelRaw     = $btn['label'] ?? null;
+                $btn['label'] = (is_string($labelRaw) || is_array($labelRaw))
+                    ? $this->translator->resolveField($labelRaw, $language)
+                    : '';
+                $btn['type'] = is_string($btn['type'] ?? null) ? $btn['type'] : 'callback';
+
+                return $btn;
+            },
+            $buttons,
+        );
+    }
+
+    /**
+     * Successful validation: write the (parsed) value to the configured
+     * variable and clear the per-node retry counter if any attempts were made.
+     *
+     * @param  array<string, mixed>  $state
+     */
+    private function emitSuccess(?Variable $variable, mixed $value, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        $stateChanges = $this->buildStateChanges($variable, $value, $context);
+
+        // Only emit the retry-counter reset when there was actually something to
+        // reset — keeps the happy-path stateChanges minimal and avoids polluting
+        // session state with null entries for nodes that never failed.
+        if ((int)data_get($state, $this->retryPath($context), 0) > 0) {
+            $stateChanges[$this->retryPath($context)] = null;
+        }
+
+        return new NodeExecutionResult(
+            status: NodeExecutionStatus::Executed,
+            sourceHandle: 'default',
+            stateChanges: $stateChanges,
+            metadata: [self::RECEIVED_META => $value],
+        );
+    }
+
+    /**
+     * Validation failed. Increment the retry counter; if we have budget left,
+     * re-send the on_invalid_message hint (if configured) and park. Once the
+     * counter reaches the configured retry_limit, drop the session through
+     * the `invalid` handle so the flow author can branch into recovery.
+     *
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $state
+     */
+    private function handleInvalid(
+        ValidationResult $result,
+        array $config,
+        array $state,
+        NodeExecutionContext $context,
+    ): NodeExecutionResult {
+        $retryLimit   = max(0, (int)($config['retry_limit'] ?? self::DEFAULT_RETRY_LIMIT));
+        $retryPath    = $this->retryPath($context);
+        $currentCount = (int)data_get($state, $retryPath, 0);
+        $nextCount    = $currentCount + 1;
+
+        if ($nextCount > $retryLimit) {
+            return new NodeExecutionResult(
+                status: NodeExecutionStatus::Executed,
+                sourceHandle: self::INVALID_HANDLE,
+                stateChanges: [$retryPath => null],
+                metadata: ['error_key' => $result->errorKey, 'retry_count' => $currentCount],
+            );
+        }
+
+        $this->sendInvalidHintIfConfigured($config, $context);
+
+        return new NodeExecutionResult(
+            status: NodeExecutionStatus::Waiting,
+            stateChanges: [$retryPath => $nextCount],
+            metadata: ['error_key' => $result->errorKey, 'retry_count' => $nextCount],
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function sendInvalidHintIfConfigured(array $config, NodeExecutionContext $context): void
+    {
+        $hintRaw = $config['on_invalid_message'] ?? null;
+
+        if (! is_string($hintRaw) && ! is_array($hintRaw)) {
+            return;
+        }
+
+        $resolved = $this->translator->resolveField($hintRaw, $context->resolvedLanguage);
+
+        if ('' === mb_trim($resolved)) {
+            return;
+        }
+
+        $this->sender->send(
+            tenantId: $context->tenantId,
+            contactId: $context->contactId,
+            sessionId: $context->sessionId,
+            payload: [
+                'content_type' => 'text',
+                'text'         => $resolved,
+            ],
+        );
+    }
+
+    private function retryPath(NodeExecutionContext $context): string
+    {
+        return SystemStateKeys::INPUT_RETRY_PREFIX . ".{$context->nodeId}.retry_count";
     }
 
     /**
@@ -283,24 +541,6 @@ final class InputNodeHandler extends AbstractVersionedHandler
         }
 
         return $channelContact->channel;
-    }
-
-    private function handleTextInput(?Variable $variable, NodeExecutionContext $context): NodeExecutionResult
-    {
-        $incomingText = $context->incoming?->text;
-
-        if (null === $incomingText) {
-            return new NodeExecutionResult(status: NodeExecutionStatus::Waiting);
-        }
-
-        $stateChanges = $this->buildStateChanges($variable, $incomingText, $context);
-
-        return new NodeExecutionResult(
-            status: NodeExecutionStatus::Executed,
-            sourceHandle: 'default',
-            stateChanges: $stateChanges,
-            metadata: [self::RECEIVED_META => $incomingText],
-        );
     }
 
     /**

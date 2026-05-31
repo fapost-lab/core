@@ -30,6 +30,13 @@ export function nodeHandles(node: FlowNodeLike): NodeHandle[] {
     return []
   }
 
+  if (node.type === 'input') {
+    return [
+      {handle: 'default', label: 'Next'},
+      {handle: 'invalid', label: 'Invalid (retries exhausted)'},
+    ]
+  }
+
   return [{handle: 'default', label: 'Next'}]
 }
 

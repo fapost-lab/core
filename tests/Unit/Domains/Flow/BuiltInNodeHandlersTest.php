@@ -342,6 +342,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             new VariableResolver(),
             Mockery::mock(MessageSenderInterface::class),
             Mockery::mock(ContentTranslatorInterface::class),
+            new \App\Domains\Flow\Validation\InputValidator(),
         );
         $node    = ['id' => 'input-1', 'config' => ['save_to' => StateNamespace::Flow->value . '.user_name']];
 
@@ -574,6 +575,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             new VariableResolver(),
             Mockery::mock(MessageSenderInterface::class),
             Mockery::mock(ContentTranslatorInterface::class),
+            new \App\Domains\Flow\Validation\InputValidator(),
         );
 
         $node = ['id' => 'input-legacy', 'config' => ['save_to' => 'user_name']];
@@ -591,6 +593,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             new VariableResolver(),
             Mockery::mock(MessageSenderInterface::class),
             Mockery::mock(ContentTranslatorInterface::class),
+            new \App\Domains\Flow\Validation\InputValidator(),
         );
 
         $node = [
@@ -616,6 +619,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             new VariableResolver(),
             Mockery::mock(MessageSenderInterface::class),
             Mockery::mock(ContentTranslatorInterface::class),
+            new \App\Domains\Flow\Validation\InputValidator(),
         );
 
         $node = [
@@ -639,6 +643,157 @@ final class BuiltInNodeHandlersTest extends TestCase
         $result = $handler->execute($node, [], $context);
 
         $this->assertSame([], $result->stateChanges);
+    }
+
+    public function test_input_number_validation_stores_parsed_float(): void
+    {
+        $handler = $this->makeInputHandler();
+
+        $node = [
+            'id'     => 'input-num',
+            'config' => [
+                'expected_type' => 'number',
+                'variable'      => ['name' => 'age', 'storage' => 'session'],
+                'validation'    => ['min' => 0, 'max' => 150],
+            ],
+        ];
+
+        $result = $handler->execute($node, [], $this->context(incoming: $this->incoming('42')));
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('default', $result->sourceHandle);
+        $this->assertSame(42.0, $result->stateChanges['flow.age']);
+    }
+
+    public function test_input_invalid_increments_retry_and_re_parks(): void
+    {
+        $sender = Mockery::mock(MessageSenderInterface::class);
+        // The on_invalid_message hint goes out on each failed attempt.
+        $sender->shouldReceive('send')->once()->andReturn('ext-msg-1');
+
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $translator->shouldReceive('resolveField')->andReturnUsing(
+            static fn (mixed $field): string => is_array($field) ? (string)reset($field) : (string)$field,
+        );
+
+        $handler = new InputNodeHandler(
+            Mockery::mock(MediaIngestorInterface::class),
+            Mockery::mock(MediaServiceInterface::class),
+            new VariableResolver(),
+            $sender,
+            $translator,
+            new \App\Domains\Flow\Validation\InputValidator(),
+        );
+
+        $node = [
+            'id'     => 'input-retry',
+            'config' => [
+                'expected_type'      => 'email',
+                'variable'           => ['name' => 'email', 'storage' => 'session'],
+                'retry_limit'        => 2,
+                'on_invalid_message' => 'try again',
+            ],
+        ];
+
+        $result = $handler->execute(
+            $node,
+            [],
+            $this->context(incoming: $this->incoming('not-an-email'), nodeId: 'input-retry'),
+        );
+
+        $this->assertSame(NodeExecutionStatus::Waiting, $result->status);
+        $this->assertSame(1, $result->stateChanges['system.input.input-retry.retry_count']);
+        $this->assertSame('invalid_email', $result->metadata['error_key']);
+    }
+
+    public function test_input_routes_to_invalid_handle_after_retry_limit(): void
+    {
+        $handler = $this->makeInputHandler();
+
+        $node = [
+            'id'     => 'input-exhausted',
+            'config' => [
+                'expected_type' => 'number',
+                'variable'      => ['name' => 'n', 'storage' => 'session'],
+                'retry_limit'   => 2,
+            ],
+        ];
+
+        $state = ['system' => ['input' => ['input-exhausted' => ['retry_count' => 2]]]];
+
+        $result = $handler->execute(
+            $node,
+            $state,
+            $this->context(incoming: $this->incoming('still not a number'), nodeId: 'input-exhausted'),
+        );
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('invalid', $result->sourceHandle);
+        $this->assertNull($result->stateChanges['system.input.input-exhausted.retry_count']);
+    }
+
+    public function test_input_select_resolves_pressed_button_value(): void
+    {
+        // CallbackDataCodec only round-trips real UUIDs — the encoding strips
+        // dashes and unpacks two 32-char hex halves on decode.
+        $sessionId = '550e8400-e29b-41d4-a716-446655440000';
+        $buttonId  = '11111111-1111-4111-8111-111111111111';
+        $payload   = \App\Domains\Flow\Support\CallbackDataCodec::encode($sessionId, $buttonId);
+
+        $handler = $this->makeInputHandler();
+
+        $node = [
+            'id'     => 'input-select',
+            'config' => [
+                'expected_type' => 'select',
+                'variable'      => ['name' => 'choice', 'storage' => 'session'],
+                'buttons'       => [
+                    ['id' => $buttonId, 'value' => 'option_a', 'label' => 'A'],
+                    ['id' => '22222222-2222-4222-8222-222222222222', 'value' => 'option_b', 'label' => 'B'],
+                ],
+            ],
+        ];
+
+        $incoming = new IncomingMessage('upd-2', 'ext-user', 'ext-chat', $payload, IncomingMessageType::CallbackQuery, 'telegram');
+
+        // Prompt was already sent on the previous pass — simulate by pre-populating SENT_MESSAGES.
+        $state = ['system' => ['sent_messages' => ['input-select' => 'ext-msg-prompt']]];
+
+        $context = new NodeExecutionContext(
+            tenantId: 'tenant-1',
+            contactId: 'contact-1',
+            sessionId: $sessionId,
+            nodeId: 'input-select',
+            idempotencyKey: 'idem-1',
+            platform: 'telegram',
+            incoming: $incoming,
+        );
+
+        $result = $handler->execute($node, $state, $context);
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('default', $result->sourceHandle);
+        $this->assertSame('option_a', $result->stateChanges['flow.choice']);
+    }
+
+    private function makeInputHandler(): InputNodeHandler
+    {
+        $sender = Mockery::mock(MessageSenderInterface::class);
+        $sender->shouldReceive('send')->zeroOrMoreTimes()->andReturn('ext-msg');
+
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $translator->shouldReceive('resolveField')->andReturnUsing(
+            static fn (mixed $field): string => is_array($field) ? (string)reset($field) : (string)$field,
+        );
+
+        return new InputNodeHandler(
+            Mockery::mock(MediaIngestorInterface::class),
+            Mockery::mock(MediaServiceInterface::class),
+            new VariableResolver(),
+            $sender,
+            $translator,
+            new \App\Domains\Flow\Validation\InputValidator(),
+        );
     }
 
     public function test_assign_with_operations_writes_session_and_contact_in_one_node(): void

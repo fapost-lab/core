@@ -35,7 +35,7 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             ->select(['id', 'assistant_id'])
             ->find($sessionId);
 
-        if ( ! $session instanceof FlowSession) {
+        if (! $session instanceof FlowSession) {
             throw new RuntimeException("Flow session '{$sessionId}' was not found.");
         }
 
@@ -88,7 +88,7 @@ final readonly class FlowMessageSender implements MessageSenderInterface
 
         $result = $this->sender->send($message);
 
-        if ( ! $result->sent) {
+        if (! $result->sent) {
             throw new RuntimeException($result->error ?? 'Failed to send outbound flow message.');
         }
 
@@ -121,7 +121,7 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             ->whereKey($mediaFileId)
             ->first();
 
-        if ( ! $media instanceof MediaFile) {
+        if (! $media instanceof MediaFile) {
             throw MediaNotFoundException::forId($mediaFileId);
         }
 
@@ -209,9 +209,14 @@ final readonly class FlowMessageSender implements MessageSenderInterface
                     'text'          => (string)($button['label'] ?? ''),
                     'callback_data' => $this->encodeCallbackData($sessionId, (string)($button['id'] ?? '')),
                 ],
-                KeyboardMode::Reply => [
-                    'text' => (string)($button['label'] ?? ''),
-                ],
+                // Special platform-native button types (request_contact, request_location)
+                // are sent via ReplyKeyboard. The 'special' field is passed through directly
+                // to the Telegram API so the platform sends the native share button.
+                KeyboardMode::Reply => array_filter([
+                    'text'             => (string)($button['label'] ?? ''),
+                    'request_contact'  => ($button['special'] ?? null) === 'request_contact' ? true : null,
+                    'request_location' => ($button['special'] ?? null) === 'request_location' ? true : null,
+                ], static fn (mixed $v): bool => null !== $v),
             };
         }
 

@@ -173,6 +173,7 @@ final class FlowServiceProvider extends ServiceProvider
                 $variableResolver,
                 $this->app->make(MessageSenderInterface::class),
                 $this->app->make(ContentTranslatorInterface::class),
+                $this->app->make(\App\Domains\Flow\Validation\InputValidatorInterface::class),
             )
         );
         $registry->register(
@@ -265,6 +266,10 @@ final class FlowServiceProvider extends ServiceProvider
         );
         $this->app->singleton(FlowDefinitionValidator::class);
         $this->app->singleton(VariableCoercerInterface::class, VariableCoercer::class);
+        $this->app->singleton(
+            \App\Domains\Flow\Validation\InputValidatorInterface::class,
+            \App\Domains\Flow\Validation\InputValidator::class,
+        );
         $this->app->bind(
             VariableSchemaRegistryInterface::class,
             fn ($app): CacheBackedVariableSchemaRegistry => new CacheBackedVariableSchemaRegistry(
