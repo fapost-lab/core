@@ -29,7 +29,6 @@ use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
-use App\Domains\Flow\Contracts\HttpClientInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\LanguageResolverInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
@@ -116,7 +115,6 @@ use App\Domains\Flow\Subflow\DefaultSubflowResumer;
 use App\Domains\Flow\Subflow\SubflowResumerInterface;
 use App\Domains\Flow\Subflow\SubflowStarterService;
 use App\Domains\Flow\Subflow\SubflowTimeoutSweeper;
-use App\Domains\Flow\Support\LaravelHttpClient;
 use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
 use App\Domains\Flow\Translations\CoreSystemTranslations;
 use App\Domains\Flow\Translations\InMemorySystemTranslationCatalog;
@@ -185,7 +183,8 @@ final class FlowServiceProvider extends ServiceProvider
         $registry->register(new DelayNodeHandler());
         $registry->register(new AssignNodeHandler($templates, $variableResolver));
         $registry->register(new CallNodeHandler(
-            $this->app->make(HttpClientInterface::class),
+            $this->app->make(CallTransportRegistry::class),
+            $templates,
             $variableResolver,
         ));
         $registry->register(
@@ -294,7 +293,6 @@ final class FlowServiceProvider extends ServiceProvider
             MutableDataAccessorRegistryInterface::class,
             fn ($app): ModuleDataAccessorRegistry => $app->make(ModuleDataAccessorRegistry::class)
         );
-        $this->app->singleton(HttpClientInterface::class, LaravelHttpClient::class);
         $this->app->singleton(
             MessageSenderInterface::class,
             fn ($app): FlowMessageSender => new FlowMessageSender(

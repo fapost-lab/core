@@ -111,6 +111,8 @@ return [
                 'default_language'           => 'Язык по умолчанию',
                 'default_language_locked'    => 'Нельзя изменить, если есть сценарии',
                 'available_languages'        => 'Доступные языки',
+                'available_countries'        => 'Страны обслуживания',
+                'available_countries_help'   => 'Страны, для которых работает ассистент — определяют форматы телефонов и валидацию в input-нодах.',
                 'default_flow_id'            => 'Сценарий по умолчанию',
                 'default_flow_create'        => 'Создать новый сценарий',
                 'default_flow_create_modal'  => 'Создание нового сценария',

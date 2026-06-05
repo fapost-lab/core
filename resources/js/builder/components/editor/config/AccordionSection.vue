@@ -13,7 +13,7 @@ const open = ref(props.defaultOpen)
 </script>
 
 <template>
-    <div class="acc-section">
+    <div class="acc-section" :class="{ 'acc-section--open': open }">
         <button type="button" class="acc-header" @click="open = !open">
             <svg
                 v-if="icon"

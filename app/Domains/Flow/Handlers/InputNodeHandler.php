@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
@@ -121,7 +122,14 @@ final class InputNodeHandler extends AbstractVersionedHandler
             return NodeExecutionResult::waiting();
         }
 
-        $rules  = is_array($config['validation'] ?? null) ? $config['validation'] : [];
+        $rules = is_array($config['validation'] ?? null) ? $config['validation'] : [];
+
+        // Phone validation candidates come from the assistant's served countries
+        // (the node's own `country` field, when set, narrows to one of them).
+        if (InputExpectedType::Phone === $expectedType) {
+            $rules['countries'] = $this->resolveAssistantCountries($context);
+        }
+
         $result = $this->validator->validate($expectedType, $context->incoming, $rules, $nodeConfig);
 
         if ($result->valid) {
@@ -510,6 +518,31 @@ final class InputNodeHandler extends AbstractVersionedHandler
                 static fn (IncomingMedia $entry): bool => $entry->kind->value === $allowedKind,
             )
         );
+    }
+
+    /**
+     * Load the assistant's served countries (ISO codes) for the running session
+     * — the candidate regions for phone validation. Empty when none configured.
+     *
+     * @return list<string>
+     */
+    private function resolveAssistantCountries(NodeExecutionContext $context): array
+    {
+        $session = FlowSession::query()
+            ->select(['id', 'assistant_id'])
+            ->find($context->sessionId);
+
+        if (null === $session) {
+            return [];
+        }
+
+        $assistant = Assistant::query()
+            ->select(['id', 'available_countries'])
+            ->find($session->assistant_id);
+
+        $countries = $assistant?->available_countries;
+
+        return is_array($countries) ? array_values(array_filter($countries, 'is_string')) : [];
     }
 
     /**

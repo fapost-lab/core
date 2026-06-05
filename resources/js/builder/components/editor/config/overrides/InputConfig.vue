@@ -47,20 +47,13 @@ const INPUT_TYPES = [
     { value: 'audio',    label: 'Audio' },
 ]
 
-// Aligned with InputValidator::PHONE_PATTERNS — keep in sync when adding countries.
-const PHONE_COUNTRIES = [
-    { value: '',   label: 'Any (generic E.164)' },
-    { value: 'UA', label: 'Ukraine (+380)' },
-    { value: 'RU', label: 'Russia (+7)' },
-    { value: 'KZ', label: 'Kazakhstan (+7)' },
-    { value: 'BY', label: 'Belarus (+375)' },
-    { value: 'US', label: 'United States (+1)' },
-    { value: 'CA', label: 'Canada (+1)' },
-    { value: 'GB', label: 'United Kingdom (+44)' },
-    { value: 'DE', label: 'Germany (+49)' },
-    { value: 'FR', label: 'France (+33)' },
-    { value: 'PL', label: 'Poland (+48)' },
-]
+// Phone formats come from the assistant's served countries (configured in
+// assistant settings). The author may narrow to one or accept any of them.
+const assistantCountries = computed(() => builderStore.availableCountries)
+const phoneCountryOptions = computed(() => [
+    { value: '', label: 'Any served country' },
+    ...assistantCountries.value,
+])
 
 const knownGroups = useKnownGroups()
 
@@ -310,16 +303,23 @@ function onTypeChange(newType: string) {
             <template v-if="expectedType === 'phone'">
                 <div class="config-field">
                     <div class="field-label">Country</div>
-                    <select
-                        class="field-input"
-                        :value="validation.country ?? ''"
-                        @change="updateValidation({ country: ($event.target as HTMLSelectElement).value || null })"
-                    >
-                        <option v-for="c in PHONE_COUNTRIES" :key="c.value" :value="c.value">{{ c.label }}</option>
-                    </select>
-                    <p class="field-help">
-                        Narrows phone format to the selected country. Generic mode accepts any E.164 number
-                        (+ followed by 7–15 digits).
+                    <template v-if="assistantCountries.length > 0">
+                        <select
+                            class="field-input"
+                            :value="validation.country ?? ''"
+                            @change="updateValidation({ country: ($event.target as HTMLSelectElement).value || null })"
+                        >
+                            <option v-for="c in phoneCountryOptions" :key="c.value" :value="c.value">{{ c.label }}</option>
+                        </select>
+                        <p class="field-help">
+                            Formats come from the assistant's served countries. Leave “Any served country”
+                            to accept a number from any of them, or narrow to one. National format is
+                            normalized to E.164.
+                        </p>
+                    </template>
+                    <p v-else class="field-help" style="color: var(--amber, #9a6a00)">
+                        No countries configured for this assistant. Add them in
+                        <strong>Assistant settings → Served countries</strong> to validate phone formats.
                     </p>
                 </div>
             </template>

@@ -1,0 +1,328 @@
+/*
+ * FAPost — кастомная тема Filament «Warm Minimal».
+ *
+ * Дизайн-направление: современный, лёгкий, воздушный минимализм.
+ *  - Один тёплый нейтральный спектр (Stone) + один приглушённый акцент (шалфей).
+ *  - Воздух создаётся фоном, ритмом секций и типографикой; данные остаются плотными.
+ *  - Иерархия — тоном и типографикой, границы сведены к hairline.
+ *  - Глубина — мягкими, едва заметными тенями.
+ *
+ * Палитра задаётся в PanelProvider: primary = #5a6e58, gray = Stone.
+ * Подключение: ->viteTheme('resources/css/filament/theme.css') + ->font('DM Sans').
+ * Применяется к обеим панелям (admin + assistant).
+ */
+
+@import '../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../app/Filament';
+@source '../../../resources/views/filament';
+
+/* ───────────────────────────── Дизайн-токены ──────────────────────────── */
+
+:root {
+    --fapost-bg:             #f7f6f4; /* тёплый off-white фон приложения */
+    --fapost-surface:        #ffffff; /* карточки/таблицы/поля */
+    --fapost-surface-muted:  #faf9f7; /* зебра/наведение/служебные зоны */
+    --fapost-border:         #eceae5; /* hairline-граница */
+    --fapost-border-strong:  #e4e0d9; /* акцентная граница (фокус полей и т.п.) */
+    --fapost-text:           #1c1917;
+    --fapost-text-2:         #6b6560;
+    --fapost-text-3:         #a09b94;
+
+    --fapost-accent:         #5a6e58; /* шалфей */
+    --fapost-accent-soft:    #eef2ec; /* мягкая шалфейная заливка (active/hover) */
+    --fapost-ring:           rgba(90, 110, 88, 0.30);
+
+    --fapost-radius:         10px;    /* карточки/секции */
+    --fapost-radius-sm:      8px;     /* контролы */
+
+    --fapost-shadow-sm:      0 1px 2px rgba(28, 25, 23, 0.04);
+    --fapost-shadow:         0 1px 3px rgba(28, 25, 23, 0.05), 0 1px 2px rgba(28, 25, 23, 0.03);
+}
+
+/* ───────────────────────────── База / типографика ──────────────────────────── */
+
+.fi-body {
+    font-size: 0.8125rem;          /* 13px — компактная база */
+    letter-spacing: -0.005em;      /* лёгкая оптическая собранность */
+    -webkit-font-smoothing: antialiased;
+}
+
+/* Тёплый воздушный фон только в светлой теме; тёмную не трогаем. */
+.fi-body:not(.dark) {
+    background-color: var(--fapost-bg);
+}
+
+/* ───────────────────────────── Topbar ──────────────────────────── */
+
+.fi-topbar nav {
+    min-height: 3.25rem;
+    padding-block: 0.5rem;
+    border-bottom: 1px solid var(--fapost-border);
+    box-shadow: none;
+    backdrop-filter: saturate(1.1);
+}
+
+.fi-body:not(.dark) .fi-topbar nav {
+    background-color: color-mix(in srgb, var(--fapost-surface) 85%, transparent);
+}
+
+/* ───────────────────────────── Sidebar ──────────────────────────── */
+
+.fi-sidebar {
+    border-right: 1px solid var(--fapost-border);
+}
+
+.fi-body:not(.dark) .fi-sidebar {
+    background-color: var(--fapost-surface);
+}
+
+.fi-sidebar-nav {
+    padding: 0.625rem 0.625rem 1rem;
+}
+
+/* Между группами — воздух; внутри группы пункты вплотную. */
+.fi-sidebar-nav-groups {
+    gap: 0.875rem;
+}
+
+.fi-sidebar-group-items {
+    gap: 0.0625rem;
+}
+
+/* Заголовки групп: тихий, разрежённый caps-лейбл. */
+.fi-sidebar-group-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--fapost-text-3);
+}
+
+.fi-sidebar-item-btn,
+.fi-sidebar-group-btn {
+    padding-block: 0.4375rem;
+    border-radius: var(--fapost-radius-sm);
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.fi-sidebar-item-label {
+    font-size: 0.8125rem;
+}
+
+/* Наведение — едва тёплая подсветка. */
+.fi-body:not(.dark) .fi-sidebar-item-btn:hover {
+    background-color: var(--fapost-surface-muted);
+}
+
+/* Активный пункт — мягкая шалфейная заливка вместо жирного фона. */
+.fi-body:not(.dark) .fi-sidebar-item-active .fi-sidebar-item-btn {
+    background-color: var(--fapost-accent-soft);
+    color: var(--fapost-accent);
+}
+
+.fi-body:not(.dark) .fi-sidebar-item-active .fi-sidebar-item-icon {
+    color: var(--fapost-accent);
+}
+
+/* ───────────────────────────── Контент страницы ──────────────────────────── */
+
+/* Воздух вокруг контента — главный источник «лёгкости». */
+.fi-main {
+    padding-block: 1.5rem;
+    gap: 1.5rem;
+}
+
+.fi-page {
+    gap: 1.25rem;
+}
+
+/* Заголовок страницы — крупный, но лёгкий по начертанию. */
+.fi-header {
+    gap: 0.5rem;
+}
+
+.fi-header-heading {
+    font-size: 1.375rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+}
+
+.fi-header-subheading {
+    color: var(--fapost-text-2);
+}
+
+/* ───────────────────────────── Секции / карточки ──────────────────────────── */
+
+.fi-section,
+.fi-ta,
+.fi-fo-component-ctn > .fi-section {
+    border-radius: var(--fapost-radius);
+}
+
+.fi-body:not(.dark) .fi-section {
+    border: 1px solid var(--fapost-border);
+    background-color: var(--fapost-surface);
+    box-shadow: var(--fapost-shadow-sm);
+}
+
+.fi-section-content {
+    padding: 1.25rem;
+}
+
+.fi-section-header {
+    padding: 1rem 1.25rem;
+}
+
+.fi-section-header-heading {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+/* ───────────────────────────── Таблицы ──────────────────────────── */
+
+/* Таблица как самостоятельная карточка. */
+.fi-body:not(.dark) .fi-ta {
+    border: 1px solid var(--fapost-border);
+    background-color: var(--fapost-surface);
+    box-shadow: var(--fapost-shadow-sm);
+    border-radius: var(--fapost-radius);
+    overflow: hidden;
+}
+
+/* Тулбар таблицы (поиск/группировка/фильтры) — спокойный, с hairline снизу. */
+.fi-ta-header-ctn,
+.fi-ta-header {
+    padding: 0.75rem 1rem;
+}
+
+/* Заголовки колонок — тихий caps-лейбл. */
+.fi-ta-header-cell {
+    padding-block: 0.5rem;
+}
+
+.fi-ta-header-cell-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--fapost-text-3);
+}
+
+/*
+ * Высота строки задаёт padding-block обёрток колонок (text/icon/color/image/
+ * checkbox), у Filament он = 1rem. Сбалансированно-компактное значение.
+ */
+.fi-ta-text:not(.fi-inline),
+.fi-ta-icon:not(.fi-inline),
+.fi-ta-color:not(.fi-inline),
+.fi-ta-image:not(.fi-inline),
+.fi-ta-checkbox:not(.fi-inline),
+.fi-ta-cell:has(.fi-ta-actions),
+.fi-ta-cell:has(.fi-ta-record-checkbox),
+.fi-ta-cell.fi-ta-selection-cell,
+.fi-ta-cell.fi-ta-summary-row-heading-cell {
+    padding-block: 0.4375rem;
+}
+
+.fi-ta-cell-content {
+    min-height: 0;
+}
+
+/* Разделители строк — hairline; наведение — едва тёплое. */
+.fi-body:not(.dark) .fi-ta-row:hover {
+    background-color: var(--fapost-surface-muted);
+}
+
+/* ───────────────────────────── Формы / поля ──────────────────────────── */
+
+/* Ритм между полями — чуть больше воздуха. */
+.fi-sc-form,
+.fi-sc-flex {
+    gap: 0.875rem;
+}
+
+/* Зазор лейбл ↔ инпут и инпут ↔ подсказка — собранный. */
+.fi-fo-field {
+    gap: 0.3125rem;
+}
+
+.fi-fo-field-content-col {
+    gap: 0.25rem;
+}
+
+.fi-fo-field-label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--fapost-text-2);
+}
+
+/* Контролы: тёплый радиус, тихая граница, шалфейный фокус-ринг. */
+.fi-input,
+.fi-select-input {
+    padding-block: 0.0625rem;
+}
+
+/* Убираем минимальную высоту обёртки контрола, чтобы поля были по-настоящему низкими. */
+.fi-input-wrp {
+    min-height: 0;
+}
+
+.fi-body:not(.dark) .fi-input-wrp {
+    border-radius: var(--fapost-radius-sm);
+    border: 1px solid var(--fapost-border-strong);
+    background-color: var(--fapost-surface);
+    box-shadow: var(--fapost-shadow-sm);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.fi-body:not(.dark) .fi-input-wrp:focus-within {
+    border-color: var(--fapost-accent);
+    box-shadow: 0 0 0 3px var(--fapost-ring);
+}
+
+/* ───────────────────────────── Кнопки / бэйджи ──────────────────────────── */
+
+.fi-btn {
+    padding-block: 0.4375rem;
+    border-radius: var(--fapost-radius-sm);
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    transition: transform 0.05s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.fi-btn:active {
+    transform: translateY(0.5px);
+}
+
+.fi-badge {
+    border-radius: 999px;
+    font-weight: 500;
+}
+
+/* ───────────────────────────── Модалки ──────────────────────────── */
+
+.fi-modal-window {
+    border-radius: var(--fapost-radius);
+}
+
+.fi-modal-content {
+    gap: 0.875rem;
+}
+
+/* ───────────────────────────── Скроллбары ──────────────────────────── */
+
+.fi-body:not(.dark) ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.fi-body:not(.dark) ::-webkit-scrollbar-thumb {
+    background-color: var(--fapost-border-strong);
+    border: 3px solid var(--fapost-bg);
+    border-radius: 999px;
+}
+
+.fi-body:not(.dark) ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--fapost-text-3);
+}

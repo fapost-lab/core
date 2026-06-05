@@ -246,4 +246,28 @@ final class SaveDraftServiceTest extends TestCase
             'type'    => 'event',
         ]);
     }
+
+    public function test_it_registers_emitted_events_tenant_wide_on_draft_save(): void
+    {
+        $draft = FlowDraft::factory()->create([
+            'draft_version' => 1,
+            'nodes'         => [],
+        ]);
+
+        app(SaveDraftService::class)->execute(
+            $draft->flow_id,
+            [
+                'emit_1' => ['id' => 'emit_1', 'type' => 'emit_event', 'config' => ['event_type' => 'order.created']],
+            ],
+            [],
+            null,
+            expectedDraftVersion: 1,
+        );
+
+        // Visible tenant-wide even though the draft is not published yet.
+        $this->assertDatabaseHas('tenant_events', [
+            'tenant_id'  => $draft->tenant_id,
+            'event_name' => 'order.created',
+        ]);
+    }
 }

@@ -9,6 +9,7 @@ import FlowInsertPoint from './FlowInsertPoint.vue'
 import FlowConditionCard from './FlowConditionCard.vue'
 import FlowSendMessageCard from './FlowSendMessageCard.vue'
 import FlowSubflowCard from './FlowSubflowCard.vue'
+import FlowCallCard from './FlowCallCard.vue'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 
 interface TreeNode {
@@ -187,9 +188,18 @@ async function removeUnreachable() {
     builderStore.removeNodes(unreachableNodes.value.map((tn) => tn.node.id))
 }
 
-/** Breadcrumb segments based on activeBranch + node labels */
+/**
+ * Breadcrumb segments based on activeBranch + node labels. Each segment
+ * carries the `branch` array to apply when clicked:
+ *   - 'Main flow' → [] (root)
+ *   - a node crumb → the prefix *before* its (node, handle) pair, i.e. the
+ *     level where that node's card is visible
+ *   - a handle crumb → the prefix *including* its pair, i.e. inside that branch
+ */
 const breadcrumbs = computed(() => {
-    const segments = [{ label: 'Main flow', key: 'root' }]
+    const segments: Array<{ label: string; key: string; branch: string[] }> = [
+        { label: 'Main flow', key: 'root', branch: [] },
+    ]
     const branch = selectionStore.activeBranch
     for (let i = 0; i < branch.length; i += 2) {
         const nodeId = branch[i]
@@ -199,7 +209,7 @@ const breadcrumbs = computed(() => {
         const nodeLabel = node?.label
             ?? node?.type?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
             ?? nodeId
-        segments.push({ label: nodeLabel, key: `${nodeId}` })
+        segments.push({ label: nodeLabel, key: `${nodeId}`, branch: branch.slice(0, i) })
         if (handle) {
             let handleLabel = handle
             if (node?.type === 'send_message' && Array.isArray(node?.config?.buttons)) {
@@ -215,11 +225,19 @@ const breadcrumbs = computed(() => {
                     handleLabel = 'Button'
                 }
             }
-            segments.push({ label: handleLabel, key: `${nodeId}-${handle}` })
+            segments.push({ label: handleLabel, key: `${nodeId}-${handle}`, branch: branch.slice(0, i + 2) })
         }
     }
     return segments
 })
+
+function goToBreadcrumb(branch: string[]) {
+    if (branch.length === 0) {
+        selectionStore.clearBranch()
+    } else {
+        selectionStore.setActiveBranch([...branch])
+    }
+}
 
 const isAtRoot = computed(() => selectionStore.activeBranch.length === 0)
 
@@ -259,10 +277,6 @@ const triggerLabel = computed(() => {
 })
 
 const hoveredSlot = ref<string | null>(null)
-
-function goToRoot() {
-    selectionStore.clearBranch()
-}
 
 /**
  * True when the last visible node is terminal — no further nodes may be added.
@@ -332,7 +346,8 @@ const trailingInsertContext = computed(() => {
                     <span v-if="i > 0" class="breadcrumb-sep">/</span>
                     <a
                         v-if="i < breadcrumbs.length - 1"
-                        @click="i === 0 ? goToRoot() : null"
+                        class="breadcrumb-link"
+                        @click="goToBreadcrumb(seg.branch)"
                     >{{ seg.label }}</a>
                     <span v-else class="breadcrumb-current">{{ seg.label }}</span>
                 </template>
@@ -393,6 +408,12 @@ const trailingInsertContext = computed(() => {
                     />
                     <FlowSubflowCard
                         v-else-if="item.node.type === 'subflow'"
+                        :index="index + 1"
+                        :parent-branch="selectionStore.activeBranch"
+                        :tree-node="item"
+                    />
+                    <FlowCallCard
+                        v-else-if="item.node.type === 'call'"
                         :index="index + 1"
                         :parent-branch="selectionStore.activeBranch"
                         :tree-node="item"

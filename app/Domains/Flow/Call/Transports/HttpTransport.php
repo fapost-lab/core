@@ -65,7 +65,19 @@ final readonly class HttpTransport implements CallTransportInterface
         $timeout     = (int) ($request->options['timeout'] ?? 10);
         $successWhen = (string) ($request->options['success_when'] ?? '2xx');
 
+        // Raw body wins over bucketed body.* params: when present, the author
+        // supplies a pre-built (templated) JSON string for nested/array shapes
+        // the flat body.* convention can't express.
+        $rawBody = is_string($request->options['body_raw'] ?? null) && '' !== mb_trim($request->options['body_raw'])
+            ? $request->options['body_raw']
+            : null;
+
         $client = $this->configureClient($this->http->withHeaders($headers)->timeout($timeout), $bearer, $basic);
+
+        if (null !== $rawBody) {
+            $client = $client->withBody($rawBody, 'application/json');
+            $body   = [];
+        }
 
         try {
             $response = match ($method) {
@@ -89,10 +101,10 @@ final readonly class HttpTransport implements CallTransportInterface
 
         $statusCode = $response->status();
         $payload    = $this->parseBody($response->header('Content-Type'), $response->body());
-        $metadata   = ['status_code' => $statusCode];
+        $metadata   = ['status_code' => $statusCode, 'headers' => $this->flattenHeaders($response->headers())];
         $isSuccess  = $this->matchesSuccessPolicy($statusCode, $successWhen);
 
-        if ( ! $isSuccess) {
+        if (! $isSuccess) {
             $code = $statusCode >= 500 ? 'http_5xx' : ($statusCode >= 400 ? 'http_4xx' : 'http_other');
 
             return CallResult::error($code, $payload, $metadata);
@@ -108,14 +120,14 @@ final readonly class HttpTransport implements CallTransportInterface
     {
         $parts = preg_split('/\s+/', mb_trim($target), 2);
 
-        if ( ! is_array($parts) || 2 !== count($parts)) {
+        if (! is_array($parts) || 2 !== count($parts)) {
             return [null, ''];
         }
 
         $method = mb_strtoupper($parts[0]);
         $url    = $parts[1];
 
-        if ( ! in_array($method, ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], true)) {
+        if (! in_array($method, ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'], true)) {
             return [null, $url];
         }
 
@@ -200,6 +212,26 @@ final readonly class HttpTransport implements CallTransportInterface
         }
 
         return $body;
+    }
+
+    /**
+     * Collapse Laravel's `array<string, list<string>>` header bag into a flat
+     * `array<string, string>` so `result_mapping` / `{{call.last.headers.X}}`
+     * can address a header by name without an index.
+     *
+     * @param  array<string, list<string>>  $headers
+     *
+     * @return array<string, string>
+     */
+    private function flattenHeaders(array $headers): array
+    {
+        $flat = [];
+
+        foreach ($headers as $name => $values) {
+            $flat[$name] = is_array($values) ? implode(', ', $values) : (string) $values;
+        }
+
+        return $flat;
     }
 
     private function matchesSuccessPolicy(int $statusCode, string $policy): bool

@@ -1,7 +1,37 @@
 <script setup lang="ts">
+import {computed} from 'vue'
+import {usePage} from '@inertiajs/vue3'
 import {useTranslations} from '../composables/useTranslations.js'
 
 const { t } = useTranslations()
+
+/**
+ * Interface language switcher. The selected locale is persisted server-side
+ * (session + long-lived cookie) by the SetLocale middleware via ?lang=, so the
+ * first choice is automatic and every later visit reads it back from storage.
+ */
+const LOCALES = [
+    { code: 'en', label: 'EN' },
+    { code: 'ru', label: 'RU' },
+    { code: 'uk', label: 'UK' },
+] as const
+
+const page = usePage()
+const currentLocale = computed<string>(() => {
+    const code = (page.props as Record<string, unknown>)['locale']
+    return typeof code === 'string' ? code : 'en'
+})
+
+function switchLocale(event: Event): void {
+    const code = (event.target as HTMLSelectElement).value
+    if (code === currentLocale.value) {
+        return
+    }
+    const url = new URL(window.location.href)
+    url.searchParams.set('lang', code)
+    // Full reload so middleware persists the choice and fresh translations load.
+    window.location.assign(url.toString())
+}
 
 defineProps({
     flowName:         { type: String,  required: true },
@@ -82,6 +112,14 @@ const SAVE_COLORS: Record<string, string> = {
 
         <!-- Right -->
         <div class="topbar-right">
+            <select
+                class="lang-select"
+                :value="currentLocale"
+                :title="t('topbar.language')"
+                @change="switchLocale"
+            >
+                <option v-for="l in LOCALES" :key="l.code" :value="l.code">{{ l.label }}</option>
+            </select>
             <button class="btn btn-ghost" :disabled="!canUndo" @click="emit('undo')">↩ Undo</button>
             <button class="btn btn-ghost" :disabled="!canRedo" @click="emit('redo')">↪ Redo</button>
             <button class="btn btn-outline" :disabled="validating" @click="emit('validate')">
@@ -125,6 +163,27 @@ const SAVE_COLORS: Record<string, string> = {
     line-height: 1;
     color: var(--amber, #d69e2e);
     transform: translateY(-1px);
+}
+.lang-select {
+    height: 28px;
+    padding: 0 22px 0 8px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-2);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='none' stroke='%23a09b94' stroke-width='1.5' d='M1 1l4 4 4-4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 7px center;
+    transition: all .15s;
+}
+.lang-select:hover {
+    border-color: var(--border-2);
+    color: var(--text);
 }
 .btn-back {
     display: flex;

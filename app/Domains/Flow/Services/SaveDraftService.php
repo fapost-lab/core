@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Exceptions\DraftVersionConflictException;
 use App\Domains\Flow\Models\FlowDraft;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,8 @@ final class SaveDraftService
 {
     public function __construct(
         private readonly SyncFlowTriggerService $syncTrigger,
+        private readonly EmittedEventCollector $emittedEvents,
+        private readonly TenantEventRepositoryInterface $tenantEvents,
     ) {
     }
 
@@ -40,6 +43,14 @@ final class SaveDraftService
             ])->save();
 
             $this->syncTrigger->execute($draft, $trigger);
+
+            // Register emitted events tenant-wide already on draft save, so other
+            // flows/assistants can pick them while everything is still being
+            // prepared (an unpublished emitter simply never fires — that's fine).
+            $this->tenantEvents->registerEventNames(
+                (string) $draft->tenant_id,
+                $this->emittedEvents->collect($nodes),
+            );
 
             return $draft->draft_version;
         });

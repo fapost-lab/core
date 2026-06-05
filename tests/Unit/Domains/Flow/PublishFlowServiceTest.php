@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Flow;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Flow\Models\FlowDefinition;
@@ -437,5 +438,69 @@ final class PublishFlowServiceTest extends TestCase
             $this->assertNotEmpty($exception->errors);
             $this->assertContainsOnlyInstancesOf(FlowValidationErrorDto::class, $exception->errors);
         }
+    }
+
+    public function test_publish_registers_emit_event_names_into_tenant_wide_registry(): void
+    {
+        $this->createTenantEventsTable();
+
+        $flowId = '99999999-9999-9999-9999-999999999999';
+
+        $draft = FlowDraft::factory()->create([
+            'flow_id' => $flowId,
+            'nodes'   => [
+                ['id' => 'emit-1', 'type' => 'emit_event', 'version' => 1, 'config' => ['event_type' => 'order.created']],
+                ['id' => 'end-1',  'type' => 'end',        'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            'edges' => [
+                ['id' => 'e1', 'from' => 'emit-1', 'to' => 'end-1', 'handle' => 'default'],
+            ],
+        ]);
+
+        app(PublishFlowService::class)->execute($flowId);
+
+        $events = app(TenantEventRepositoryInterface::class)
+            ->getEventNamesByTenant((string) $draft->tenant_id);
+
+        $this->assertContains('order.created', $events);
+    }
+
+    public function test_event_registry_is_visible_across_assistants_of_the_same_tenant(): void
+    {
+        $this->createTenantEventsTable();
+
+        $tenantId = '77777777-0000-0000-0000-000000000000';
+
+        // Flow owned by assistant A emits the event.
+        $emitterFlowId = '77777777-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+        FlowDraft::factory()->create([
+            'flow_id'      => $emitterFlowId,
+            'tenant_id'    => $tenantId,
+            'assistant_id' => 'aaaaaaaa-0000-0000-0000-000000000000',
+            'nodes'        => [
+                ['id' => 'emit-1', 'type' => 'emit_event', 'version' => 1, 'config' => ['event_type' => 'lead.qualified']],
+                ['id' => 'end-1',  'type' => 'end',        'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            'edges' => [['id' => 'e1', 'from' => 'emit-1', 'to' => 'end-1', 'handle' => 'default']],
+        ]);
+
+        app(PublishFlowService::class)->execute($emitterFlowId);
+
+        // The event is visible tenant-wide (the registry is not scoped to an assistant).
+        $events = app(TenantEventRepositoryInterface::class)->getEventNamesByTenant($tenantId);
+
+        $this->assertContains('lead.qualified', $events);
+    }
+
+    private function createTenantEventsTable(): void
+    {
+        Schema::dropIfExists('tenant_events');
+        Schema::create('tenant_events', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->uuid('tenant_id');
+            $table->string('event_name', 120);
+            $table->timestamps();
+            $table->unique(['tenant_id', 'event_name']);
+        });
     }
 }

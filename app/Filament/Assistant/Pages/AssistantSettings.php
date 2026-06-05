@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Assistant\Pages;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Assistant\Support\CountryCatalog;
 use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Domains\Flow\Commands\CommandActionType;
 use App\Domains\Flow\Models\FlowDraft;
@@ -75,12 +76,17 @@ final class AssistantSettings extends Page
     {
         $assistantData = $this->currentAssistant->get()->only([
             'default_language',
+            'available_countries',
             'default_flow_id',
             'fallback_message',
             'busy_message',
             'commands',
             'settings',
         ]);
+
+        $assistantData['available_countries'] = is_array($assistantData['available_countries'] ?? null)
+            ? $assistantData['available_countries']
+            : [];
 
         // Filament Repeater expects a list-shaped array; an unset / null commands
         // column reads back as null which would crash the input cast.
@@ -133,6 +139,13 @@ final class AssistantSettings extends Page
                                     ->hintIconTooltip(
                                         $hasFlows ? __('assistant.pages.settings.fields.default_language_locked') : null
                                     ),
+                                Select::make('available_countries')
+                                    ->label(__('assistant.pages.settings.fields.available_countries'))
+                                    ->helperText(__('assistant.pages.settings.fields.available_countries_help'))
+                                    ->options(app(CountryCatalog::class)->options())
+                                    ->multiple()
+                                    ->searchable()
+                                    ->nullable(),
                                 Select::make('default_flow_id')
                                     ->label(__('assistant.pages.settings.fields.default_flow_id'))
                                     ->options($flowOptions)

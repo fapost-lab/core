@@ -123,6 +123,44 @@ final class InputValidatorTest extends TestCase
         $this->assertSame('+14155550123', $generic->value);
     }
 
+    public function test_phone_uses_assistant_countries_and_national_format(): void
+    {
+        // National (no +) number resolved against the assistant's countries.
+        $national = $this->validator->validate(
+            InputExpectedType::Phone,
+            $this->text('0631234567'),
+            ['countries' => ['PL', 'UA']],
+            [],
+        );
+        // E.164 number whose region is among the assistant countries.
+        $e164 = $this->validator->validate(
+            InputExpectedType::Phone,
+            $this->text('+380631234567'),
+            ['countries' => ['UA']],
+            [],
+        );
+        // E.164 number from a country the assistant does not serve.
+        $foreign = $this->validator->validate(
+            InputExpectedType::Phone,
+            $this->text('+380631234567'),
+            ['countries' => ['PL']],
+            [],
+        );
+        // Per-node country narrows past the assistant list.
+        $narrowed = $this->validator->validate(
+            InputExpectedType::Phone,
+            $this->text('+380631234567'),
+            ['country' => 'PL', 'countries' => ['UA', 'PL']],
+            [],
+        );
+
+        $this->assertTrue($national->valid);
+        $this->assertSame('+380631234567', $national->value);
+        $this->assertTrue($e164->valid);
+        $this->assertSame('invalid_phone', $foreign->errorKey);
+        $this->assertSame('invalid_phone', $narrowed->errorKey);
+    }
+
     public function test_date_round_trips_through_format(): void
     {
         $good = $this->validator->validate(InputExpectedType::Date, $this->text('2026-05-31'), [], []);

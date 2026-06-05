@@ -49,6 +49,29 @@ function matchesSearch(v: PickerVariable, q: string): boolean {
         || v.snippet.toLowerCase().includes(needle)
 }
 
+// A json variable stays visible when the query matches the parent OR any of
+// its nested fields, so searching a field name surfaces it under its parent.
+function matchesDeep(v: PickerVariable, q: string): boolean {
+    if (matchesSearch(v, q)) return true
+    return !!v.children?.some((c) => matchesSearch(c, q))
+}
+
+// Which json variables are expanded. A search auto-expands everything.
+const expandedVars = ref<Set<string>>(new Set())
+function toggleVar(path: string) {
+    const next = new Set(expandedVars.value)
+    next.has(path) ? next.delete(path) : next.add(path)
+    expandedVars.value = next
+}
+function isVarExpanded(path: string): boolean {
+    return searchQuery.value.trim() !== '' || expandedVars.value.has(path)
+}
+function visibleChildren(v: PickerVariable): PickerVariable[] {
+    if (!v.children) return []
+    const q = searchQuery.value.trim()
+    return q === '' ? v.children : v.children.filter((c) => matchesSearch(c, q))
+}
+
 const sections = computed<Section[]>(() => {
     const q        = searchQuery.value.trim()
     const bySource = groupVariablesBySource(allVars.value)
@@ -63,16 +86,16 @@ const sections = computed<Section[]>(() => {
 
         if (kind === 'contact-profile') {
             const split = splitContactByGroup(vars)
-            const flatVars = split.rootVars.filter((v) => matchesSearch(v, q))
+            const flatVars = split.rootVars.filter((v) => matchesDeep(v, q))
             const groups = Object.entries(split.groupedVars)
                 .sort(([a], [b]) => a.localeCompare(b))
-                .map(([name, list]) => ({ name, vars: list.filter((v) => matchesSearch(v, q)) }))
+                .map(([name, list]) => ({ name, vars: list.filter((v) => matchesDeep(v, q)) }))
                 .filter((g) => g.vars.length > 0)
             const total = flatVars.length + groups.reduce((sum, g) => sum + g.vars.length, 0)
             if (total === 0) continue
             out.push({ kind, icon: meta.icon, title: meta.title, flatVars, groups, total })
         } else {
-            const flatVars = vars.filter((v) => matchesSearch(v, q))
+            const flatVars = vars.filter((v) => matchesDeep(v, q))
             if (flatVars.length === 0) continue
             out.push({ kind, icon: meta.icon, title: meta.title, flatVars, groups: [], total: flatVars.length })
         }
@@ -242,20 +265,44 @@ function onDragStart(v: PickerVariable, e: DragEvent) {
                         </button>
 
                         <template v-if="isExpanded(section.kind)">
-                            <div
-                                v-for="v in section.flatVars"
-                                :key="v.path"
-                                class="vp-item"
-                                draggable="true"
-                                :title="v.sourceNode ? `from ${v.sourceNode}` : 'Click to insert/copy · drag to drop'"
-                                @click="selectVar(v)"
-                                @dragstart="onDragStart(v, $event)"
-                            >
-                                <span class="vp-key">{{ v.snippet }}</span>
-                                <span class="vp-badge" :class="{ 'vp-badge--ok': copied === v.path }">
-                                    {{ copied === v.path ? '✓' : 'use' }}
-                                </span>
-                            </div>
+                            <template v-for="v in section.flatVars" :key="v.path">
+                                <div
+                                    class="vp-item"
+                                    :class="{ 'vp-item--parent': v.children?.length }"
+                                    draggable="true"
+                                    :title="v.sourceNode ? `from ${v.sourceNode}` : 'Click to insert/copy · drag to drop'"
+                                    @click="selectVar(v)"
+                                    @dragstart="onDragStart(v, $event)"
+                                >
+                                    <span
+                                        v-if="v.children?.length"
+                                        class="vp-expand"
+                                        :title="isVarExpanded(v.path) ? 'Collapse' : 'Show fields'"
+                                        @click.stop="toggleVar(v.path)"
+                                    >{{ isVarExpanded(v.path) ? '▾' : '▸' }}</span>
+                                    <span class="vp-key">{{ v.snippet }}</span>
+                                    <span v-if="v.children?.length" class="vp-children-count">{{ v.children.length }}</span>
+                                    <span class="vp-badge" :class="{ 'vp-badge--ok': copied === v.path }">
+                                        {{ copied === v.path ? '✓' : 'use' }}
+                                    </span>
+                                </div>
+                                <template v-if="v.children?.length && isVarExpanded(v.path)">
+                                    <div
+                                        v-for="c in visibleChildren(v)"
+                                        :key="c.path"
+                                        class="vp-item vp-item--json-child"
+                                        draggable="true"
+                                        :title="`Insert ${c.snippet}`"
+                                        @click="selectVar(c)"
+                                        @dragstart="onDragStart(c, $event)"
+                                    >
+                                        <span class="vp-key vp-key--rel">{{ c.label }}</span>
+                                        <span class="vp-badge" :class="{ 'vp-badge--ok': copied === c.path }">
+                                            {{ copied === c.path ? '✓' : 'use' }}
+                                        </span>
+                                    </div>
+                                </template>
+                            </template>
 
                             <template v-for="group in section.groups" :key="`${section.kind}:${group.name}`">
                                 <div class="vp-subgroup-label">─── {{ group.name }} ───</div>
@@ -415,6 +462,31 @@ function onDragStart(v: PickerVariable, e: DragEvent) {
 }
 .vp-item--nested { padding-left: 18px; }
 .vp-item:hover { background: var(--surface-2, #f4f5f6); }
+
+.vp-expand {
+    flex-shrink: 0;
+    width: 12px;
+    margin-right: 2px;
+    color: var(--text-3);
+    font-size: 9px;
+    cursor: pointer;
+    user-select: none;
+}
+.vp-expand:hover { color: var(--primary); }
+.vp-children-count {
+    flex-shrink: 0;
+    font-size: 9.5px;
+    color: var(--text-3);
+    background: var(--surface-2, #eef1f4);
+    border-radius: 8px;
+    padding: 0 5px;
+    margin-left: 6px;
+}
+.vp-item--json-child {
+    padding-left: 26px;
+    background: color-mix(in srgb, var(--primary, #5b7fa6) 4%, transparent);
+}
+.vp-key--rel { color: var(--text-2); font-size: 11px; }
 
 .vp-key {
     font-family: 'Victor Mono', monospace;

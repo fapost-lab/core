@@ -4,15 +4,13 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Flow;
 
+use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
-use App\Domains\Flow\Contracts\HttpClientInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
-use App\Domains\Flow\DTOs\HttpResponse;
-use App\Domains\Flow\Exceptions\HttpTransportException;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\AssignNodeHandler;
 use App\Domains\Flow\Handlers\BranchNodeHandler;
@@ -39,6 +37,10 @@ use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\DTO\RagConfidence;
 use FAPost\Foundation\DTO\RagQueryContext;
 use FAPost\Foundation\DTO\StructuredRagResult;
+use FAPost\Foundation\Flow\Call\CallContext;
+use FAPost\Foundation\Flow\Call\CallRequest;
+use FAPost\Foundation\Flow\Call\CallResult;
+use FAPost\Foundation\Flow\Call\CallTransportInterface;
 use FAPost\Foundation\Flow\Enums\StateNamespace;
 use Mockery;
 use Tests\TestCase;
@@ -952,64 +954,103 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('yes', $result->stateChanges['flow.pick']);
     }
 
-    public function test_webhook_returns_failed_on_transport_error_and_success_on_http_2xx(): void
+    public function test_call_renders_templates_saves_response_and_maps_fields(): void
     {
-        $errorHttp = Mockery::mock(HttpClientInterface::class);
-        $errorHttp->shouldReceive('post')->once()->andThrow(new HttpTransportException('timeout'));
+        $transport = new FakeCallTransport(
+            'http',
+            CallResult::ok(['data' => ['id' => 42]], ['status_code' => 201, 'headers' => ['X-Trace' => 'abc']]),
+        );
+        $handler = $this->makeCallHandler($transport);
 
-        $errorHandler = new CallNodeHandler($errorHttp, new VariableResolver());
-        $failed       = $errorHandler->execute([
-            'id'     => 'hook-1',
-            'config' => ['url' => 'https://example.test/hook'],
-        ], [], $this->context(nodeId: 'hook-1'));
-
-        $okHttp = Mockery::mock(HttpClientInterface::class);
-        $okHttp->shouldReceive('post')->once()->andReturn(new HttpResponse(200, ['ok' => true]));
-
-        $okHandler = new CallNodeHandler($okHttp, new VariableResolver());
-        $executed  = $okHandler->execute([
-            'id'     => 'hook-2',
-            'config' => ['url' => 'https://example.test/hook', 'save_response_to' => 'flow.webhook'],
-        ], [], $this->context(nodeId: 'hook-2'));
-
-        $this->assertSame(NodeExecutionStatus::Failed, $failed->status);
-        $this->assertSame('transport', $failed->metadata['error_type']);
-        $this->assertSame(NodeExecutionStatus::Executed, $executed->status);
-        $this->assertSame('success', $executed->sourceHandle);
-    }
-
-    public function test_webhook_forwards_custom_headers_and_protects_reserved_ones(): void
-    {
-        $capturedHeaders = [];
-        $http            = Mockery::mock(HttpClientInterface::class);
-        $http->shouldReceive('post')
-            ->once()
-            ->andReturnUsing(
-                function (string $url, array $payload, array $headers, int $timeout) use (&$capturedHeaders) {
-                    $capturedHeaders = $headers;
-
-                    return new HttpResponse(200, ['ok' => true]);
-                }
-            );
-
-        $handler = new CallNodeHandler($http, new VariableResolver());
-        $handler->execute([
-            'id'     => 'hook-1',
+        $node = [
+            'id'     => 'call-1',
             'config' => [
-                'url'     => 'https://example.test/hook',
-                'headers' => [
-                    'Authorization'     => 'Bearer abc',
-                    'Accept-Language'   => 'fr-FR',
-                    'X-Idempotency-Key' => 'attacker-controlled',
+                'transport'         => 'http',
+                'target'            => 'POST https://api.example.com/users/{{flow.uid}}',
+                'parameters'        => ['body.name' => '{{flow.name}}'],
+                'transport_options' => ['timeout' => 15, 'success_when' => '2xx'],
+                'save_to_variable'  => ['name' => 'response', 'storage' => 'session'],
+                'result_mapping'    => [
+                    ['from' => 'body.data.id',     'to' => ['name' => 'user_id', 'storage' => 'session']],
+                    ['from' => 'status',           'to' => ['name' => 'http_status', 'storage' => 'session']],
+                    ['from' => 'body.missing.path', 'to' => ['name' => 'ghost', 'storage' => 'session']],
                 ],
             ],
-        ], [], $this->context(nodeId: 'hook-1'));
+        ];
+        $state = ['flow' => ['uid' => 'u7', 'name' => 'Bob']];
 
-        $this->assertSame('Bearer abc', $capturedHeaders['Authorization']);
-        $this->assertSame('fr-FR', $capturedHeaders['Accept-Language']);
-        // Engine-set headers always win, even when the author tried to override them.
-        $this->assertSame('session-1:hook-1', $capturedHeaders['X-Idempotency-Key']);
-        $this->assertSame('session-1', $capturedHeaders['X-FAPost-Session']);
+        $result = $handler->execute($node, $state, $this->context(nodeId: 'call-1'));
+
+        // Templates rendered into the outgoing request.
+        $this->assertSame('POST https://api.example.com/users/u7', $transport->lastRequest?->target);
+        $this->assertSame('Bob', $transport->lastRequest?->parameters['body.name']);
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('success', $result->sourceHandle);
+
+        // Whole-response object saved as {status, body, headers}.
+        $this->assertSame(
+            ['status' => 201, 'body' => ['data' => ['id' => 42]], 'headers' => ['X-Trace' => 'abc']],
+            $result->stateChanges['flow.response'],
+        );
+
+        // Field mapping extracts individual paths; missing path resolves to null.
+        $this->assertSame(42, $result->stateChanges['flow.user_id']);
+        $this->assertSame(201, $result->stateChanges['flow.http_status']);
+        $this->assertArrayHasKey('flow.ghost', $result->stateChanges);
+        $this->assertNull($result->stateChanges['flow.ghost']);
+    }
+
+    public function test_call_routes_transport_failure_to_error_handle(): void
+    {
+        $transport = new FakeCallTransport('http', CallResult::error('transport_failure', null, ['exception' => 'timeout']));
+        $handler   = $this->makeCallHandler($transport);
+
+        $result = $handler->execute([
+            'id'     => 'call-x',
+            'config' => ['transport' => 'http', 'target' => 'GET https://x.test'],
+        ], [], $this->context(nodeId: 'call-x'));
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('error', $result->sourceHandle);
+        $this->assertSame('transport_failure', $result->metadata['error_code']);
+    }
+
+    public function test_call_unknown_transport_routes_to_error(): void
+    {
+        $handler = new CallNodeHandler(new CallTransportRegistry(), new TemplateRenderer(), new VariableResolver());
+
+        $result = $handler->execute([
+            'id'     => 'call-u',
+            'config' => ['transport' => 'nope', 'target' => 'GET https://x'],
+        ], [], $this->context(nodeId: 'call-u'));
+
+        $this->assertSame('error', $result->sourceHandle);
+        $this->assertSame('unknown_transport', $result->metadata['error_type']);
+    }
+
+    public function test_call_legacy_config_posts_url_and_saves_body(): void
+    {
+        $transport = new FakeCallTransport('http', CallResult::ok(['ok' => true], ['status_code' => 200]));
+        $handler   = $this->makeCallHandler($transport);
+
+        $result = $handler->execute([
+            'id'     => 'hook-legacy',
+            'config' => ['url' => 'https://example.test/hook', 'save_response_to' => 'flow.webhook'],
+        ], [], $this->context(nodeId: 'hook-legacy'));
+
+        $this->assertSame('success', $result->sourceHandle);
+        $this->assertSame(['ok' => true], $result->stateChanges['flow.webhook']);
+        // Legacy routes through the http transport with a synthesized target.
+        $this->assertSame('POST https://example.test/hook', $transport->lastRequest?->target);
+    }
+
+    private function makeCallHandler(CallTransportInterface $transport): CallNodeHandler
+    {
+        $registry = new CallTransportRegistry();
+        $registry->register($transport);
+
+        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver());
     }
 
     public function test_emit_event_publishes_resolved_payload_and_returns_success_handle(): void
@@ -1502,5 +1543,28 @@ final class ThrowingRagAdapter implements RagAdapterInterface
     public function query(string $prompt, RagQueryContext $context): StructuredRagResult
     {
         throw new \RuntimeException($this->message);
+    }
+}
+
+final class FakeCallTransport implements CallTransportInterface
+{
+    public ?CallRequest $lastRequest = null;
+
+    public function __construct(
+        private readonly string $id,
+        private readonly CallResult $result,
+    ) {
+    }
+
+    public function id(): string
+    {
+        return $this->id;
+    }
+
+    public function execute(CallRequest $request, CallContext $context): CallResult
+    {
+        $this->lastRequest = $request;
+
+        return $this->result;
     }
 }

@@ -37,6 +37,8 @@ final class BuilderFlowController extends Controller
                 'contentBaseLanguage' => $dto->contentBaseLanguage,
                 'availableLanguages'  => $dto->availableLanguages,
                 'availableFlows'      => $dto->availableFlows,
+                'availableActions'    => $dto->availableActions,
+                'availableCountries'  => $dto->availableCountries,
             ],
             'backUrl' => route('filament.assistant.resources.flows.index', ['tenant' => $dto->assistantId]),
         ]);

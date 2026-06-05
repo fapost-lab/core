@@ -1,9 +1,9 @@
-import { defineConfig } from 'vite';
+import {defineConfig} from 'vite';
 import laravel from 'laravel-vite-plugin';
 import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {fileURLToPath} from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -13,6 +13,7 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/css/builder.css',
+                'resources/css/filament/theme.css',
                 'resources/js/app.js',
                 'resources/js/builder/app.ts',
                 'resources/js/tma/app.ts',

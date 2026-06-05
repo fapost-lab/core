@@ -19,6 +19,7 @@ const DEFAULT_TYPE_OPTIONS: TypeOption[] = [
     { value: 'photo',    label: 'Photo' },
     { value: 'location', label: 'Location' },
     { value: 'date',     label: 'Date' },
+    { value: 'json',     label: 'JSON / object' },
 ]
 
 // Reserved attribute names that collide with canonical contact columns or
@@ -79,13 +80,27 @@ function defaultVariable(): Variable {
     }
 }
 
-const state = ref<Variable>(props.modelValue ?? defaultVariable())
+// Coerce any external (possibly partial / null-bearing) variable shape into a
+// well-formed Variable so downstream computeds can rely on `name` being a
+// string and `group` being string|null. The prop is typed `Variable | null`,
+// but callers may hand us loaded config with missing/null fields.
+function normalize(input: Variable | null): Variable {
+    const base = input ?? defaultVariable()
+    return {
+        name:    typeof base.name === 'string' ? base.name : '',
+        type:    (base.type ?? props.typeOptions[0]?.value ?? 'text') as VariableType,
+        storage: base.storage === 'session' ? 'session' : 'contact',
+        group:   typeof base.group === 'string' && base.group !== '' ? base.group : null,
+    }
+}
+
+const state = ref<Variable>(normalize(props.modelValue))
 
 // Local mirror — keep external updates in sync with the editor's local
 // state without dropping in-flight edits.
 watch(() => props.modelValue, (next) => {
     if (next && next !== state.value) {
-        state.value = { ...next }
+        state.value = normalize(next)
     }
 }, { deep: true })
 

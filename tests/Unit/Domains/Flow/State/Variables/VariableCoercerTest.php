@@ -172,6 +172,18 @@ final class VariableCoercerTest extends TestCase
         $this->assertSame('file-id-abc', $this->coercer->coerce('file-id-abc', VariableType::File));
     }
 
+    public function test_json_passes_through_nested_structure(): void
+    {
+        $payload = ['status' => 200, 'body' => ['data' => ['id' => 7]], 'headers' => ['X' => 'y']];
+
+        $this->assertSame($payload, $this->coercer->coerce($payload, VariableType::Json));
+    }
+
+    public function test_json_null_for_empty_string(): void
+    {
+        $this->assertNull($this->coercer->coerce('', VariableType::Json));
+    }
+
     protected function setUp(): void
     {
         parent::setUp();

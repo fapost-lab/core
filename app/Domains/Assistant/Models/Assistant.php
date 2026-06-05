@@ -42,6 +42,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @property string                          $default_language
+ * @property list<string>|null               $available_countries
  * @property-read bool|null                  $channels_exists
  * @property-read bool|null                  $users_exists
  * @method static AssistantBuilder<static>|Assistant whereCreatedAt($value)
@@ -73,6 +74,7 @@ final class Assistant extends BaseModel implements HasName
         'name',
         'is_active',
         'default_language',
+        'available_countries',
         'default_flow_id',
         'fallback_message',
         'settings',
@@ -127,7 +129,10 @@ final class Assistant extends BaseModel implements HasName
             'settings'         => 'array',
             'is_active'        => 'boolean',
             'default_language' => 'string',
-            'commands'         => 'array',
+            // List of ISO 3166-1 alpha-2 codes the assistant serves — drives
+            // phone-input format options & validation candidates.
+            'available_countries' => 'array',
+            'commands'            => 'array',
             // Both message fields are jsonb locale maps `{lang: text}`. The
             // {@see \App\Domains\Flow\Contracts\ContentTranslatorInterface}
             // resolves them via {@see ContentTranslatorInterface::resolveField}.

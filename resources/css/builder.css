@@ -64,8 +64,8 @@ body {
   flex-shrink: 0;
     padding: 10px 8px 10px;
     background: var(--bg);
-    --flow-panel-accent: #7d8a70;
-    --flow-panel-accent-strong: #6b7861;
+    --flow-panel-accent: #94a187;
+    --flow-panel-accent-strong: #7d8a70;
     --flow-panel-accent-soft: #eef2ea;
 }
 
@@ -74,7 +74,7 @@ body {
     min-height: 0;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(180deg, rgba(107, 120, 97, .86) 0%, rgba(125, 138, 112, .68) 18%, rgba(125, 138, 112, .18) 36%, rgba(125, 138, 112, 0) 50%),
+    background: linear-gradient(180deg, rgba(112, 125, 101, .9) 0%, rgba(150, 163, 136, .34) 13%, rgba(150, 163, 136, .08) 28%, rgba(150, 163, 136, 0) 44%),
     var(--flow-panel-accent-soft);
     border: 1px solid color-mix(in srgb, var(--flow-panel-accent) 34%, var(--border));
     border-radius: 8px;
@@ -207,9 +207,9 @@ body {
     padding: 6px 7px 7px;
   gap: 0;
   min-height: 100%;
-    background: linear-gradient(180deg, rgba(107, 120, 97, .86) 0%, rgba(125, 138, 112, .68) 16%, rgba(125, 138, 112, .18) 32%, rgba(125, 138, 112, 0) 48%),
+    background: linear-gradient(180deg, rgba(112, 125, 101, .9) 0%, rgba(150, 163, 136, .34) 12%, rgba(150, 163, 136, .08) 26%, rgba(150, 163, 136, 0) 42%),
     var(--config-card-accent-soft, #eef2ea);
-    border: 1px solid color-mix(in srgb, var(--config-card-accent, #7d8a70) 34%, var(--border));
+    border: 1px solid color-mix(in srgb, var(--config-card-accent, #94a187) 34%, var(--border));
     border-radius: 8px;
     box-shadow: var(--shadow);
 }
@@ -249,7 +249,7 @@ body {
     padding: 16px 16px 40px;
     background: linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(255, 255, 255, .9)),
     var(--config-card-accent-soft, #eef2ea);
-    border: 1px dashed color-mix(in srgb, var(--config-card-accent, #7d8a70) 44%, #fff);
+    border: 1px dashed color-mix(in srgb, var(--config-card-accent, #94a187) 44%, #fff);
     border-radius: 7px;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
     display: flex;
@@ -699,11 +699,11 @@ body {
   padding-bottom: 260px;
 }
 .config-card {
-    --config-card-accent: #7d8a70;
-    --config-card-accent-strong: #6b7861;
-    --config-card-accent-light: #98a48b;
+    --config-card-accent: #94a187;
+    --config-card-accent-strong: #7d8a70;
+    --config-card-accent-light: #abb79f;
     --config-card-accent-soft: #eef2ea;
-    background: linear-gradient(180deg, rgba(107, 120, 97, .9) 0%, rgba(125, 138, 112, .76) 24%, rgba(125, 138, 112, .2) 48%, rgba(125, 138, 112, 0) 68%),
+    background: linear-gradient(180deg, rgba(112, 125, 101, .9) 0%, rgba(150, 163, 136, .36) 16%, rgba(150, 163, 136, .1) 34%, rgba(150, 163, 136, 0) 52%),
     var(--config-card-accent-soft);
     border: 1px solid color-mix(in srgb, var(--config-card-accent) 42%, var(--border));
     border-radius: 8px;
@@ -769,35 +769,50 @@ body {
     position: relative;
     z-index: 1;
 }
-/* Accordion sections inside the config card render as inner cards: own
-   border + light tinted background separates them from the outer body
-   so the card's white frame stays visible even when every group is
-   collapsed. */
+/* Accordion sections inside the config card render as solid white cards that
+   lift off the tinted panel with a soft shadow. Collapsed sections stay clean
+   white bars (not translucent) so they never wash into the green background;
+   the open section gets a light accent header + left rail as an "active" cue. */
 .config-card-body .accordion {
-  gap: 8px;
+  gap: 10px;
 }
 .config-card-body .acc-section {
-    border: 1px solid color-mix(in srgb, var(--config-card-accent) 16%, var(--border));
-    border-radius: 7px;
-    background: rgba(255, 255, 255, .92);
-  overflow: hidden;
+    border: 1px solid color-mix(in srgb, var(--config-card-accent) 10%, var(--border));
+    border-radius: 9px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(40, 54, 38, .05), 0 1px 1px rgba(40, 54, 38, .03);
+    overflow: hidden;
+    transition: box-shadow .14s, border-color .14s;
 }
 .config-card-body .acc-section:hover {
-    border-color: color-mix(in srgb, var(--config-card-accent) 34%, var(--border-2));
+    border-color: color-mix(in srgb, var(--config-card-accent) 28%, var(--border-2));
+    box-shadow: 0 3px 8px rgba(40, 54, 38, .08);
 }
 .config-card-body .acc-header {
-    padding: 9px 11px;
-    background: rgba(255, 255, 255, .86);
-  transition: background .12s;
+    padding: 10px 12px;
+    background: #fff;
+    transition: background .12s, color .12s;
 }
 .config-card-body .acc-header:hover {
     background: var(--config-card-accent-soft);
     color: var(--config-card-accent-strong);
 }
 .config-card-body .acc-body {
-    padding: 10px 11px 12px;
-    background: rgba(255, 255, 255, .94);
-    border-top: 1px solid color-mix(in srgb, var(--config-card-accent) 14%, var(--border));
+    padding: 11px 12px 13px;
+    background: #fff;
+    border-top: 1px solid color-mix(in srgb, var(--config-card-accent) 10%, var(--border));
+}
+
+/* Open section — subtle accent header tint + left rail, accented title. */
+.config-card-body .acc-section--open {
+    border-color: color-mix(in srgb, var(--config-card-accent) 30%, var(--border));
+    box-shadow:
+        inset 3px 0 0 var(--config-card-accent),
+        0 2px 6px rgba(40, 54, 38, .07);
+}
+.config-card-body .acc-section--open .acc-header {
+    background: var(--config-card-accent-soft);
+    color: var(--config-card-accent-strong);
 }
 
 /* Accordion sections — used across all node configs as cards on the panel bg. */

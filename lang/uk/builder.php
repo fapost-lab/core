@@ -5,6 +5,7 @@ declare(strict_types=1);
 return [
     'topbar' => [
         'back'            => 'Назад',
+        'language'        => 'Мова інтерфейсу',
         'tab_builder'     => 'Конструктор',
         'tab_content'     => 'Контент',
         'rollback'        => 'Відкотити',

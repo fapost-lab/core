@@ -33,6 +33,26 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
 final class AdminPanelProvider extends PanelProvider
 {
     /**
+     * Шкала «шалфей» (Warm Minimal), привязанная к конструктору: shade 600 = #5a6e58.
+     * OKLCH сохраняет единый оттенок (H≈142.5) и приглушённую насыщенность по всей шкале.
+     *
+     * @var array<int, string>
+     */
+    private const SAGE_PALETTE = [
+        50  => 'oklch(0.965 0.019 142.5)',
+        100 => 'oklch(0.930 0.019 142.5)',
+        200 => 'oklch(0.875 0.029 142.5)',
+        300 => 'oklch(0.800 0.042 142.5)',
+        400 => 'oklch(0.660 0.042 142.5)',
+        500 => 'oklch(0.550 0.042 142.5)',
+        600 => 'oklch(0.515 0.042 142.5)',
+        700 => 'oklch(0.405 0.042 142.5)',
+        800 => 'oklch(0.340 0.042 142.5)',
+        900 => 'oklch(0.285 0.025 142.5)',
+        950 => 'oklch(0.210 0.025 142.5)',
+    ];
+
+    /**
      * Build and configure the admin panel (id/path/resources/pages/widgets/middleware).
      */
     public function panel(Panel $panel): Panel
@@ -46,12 +66,17 @@ final class AdminPanelProvider extends PanelProvider
             ->plugins([
                 FilamentLanguageSwitcherPlugin::make()
                     ->locales(['en', 'ru', 'uk'])
+                    // Persist the choice (same cookie as SetLocale) so it never reverts on its own.
+                    ->rememberLocale(365)
                     // Default USER_MENU_BEFORE is easy to miss in the topbar; this hook is inside the topbar actions area.
                     ->renderHook(PanelsRenderHook::GLOBAL_SEARCH_AFTER),
             ])
-            ->font('Play')
+            ->font('DM Sans')
+            ->viteTheme('resources/css/filament/theme.css')
             ->colors([
-                'primary' => Color::Amber,
+                // Warm Minimal: глубокий шалфей (600 = #5a6e58 из конструктора) + тёплая нейтраль.
+                'primary' => self::SAGE_PALETTE,
+                'gray'    => Color::Stone,
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')

@@ -35,13 +35,30 @@ final class BuilderFlowDto extends Data
          * @var list<array{id: string, name: string}>
          */
         public readonly array $availableFlows,
+        /**
+         * Action handler ids registered by active Solutions/Plugins — populate
+         * the `call` node's handler-transport action picker. Empty until a
+         * Solution provides one.
+         *
+         * @var list<string>
+         */
+        public readonly array $availableActions,
+        /**
+         * Countries the assistant serves — drive the phone input's format picker.
+         * Each entry: `{value: ISO, label: "Name (+dial)"}`.
+         *
+         * @var list<array{value: string, label: string}>
+         */
+        public readonly array $availableCountries,
     ) {
     }
 
     /**
-     * @param  list<string>                       $availableEvents
-     * @param  list<string>                       $availableLanguages
-     * @param  list<array{id: string, name: string}>  $availableFlows
+     * @param  list<string>                                $availableEvents
+     * @param  list<string>                                $availableLanguages
+     * @param  list<array{id: string, name: string}>       $availableFlows
+     * @param  list<string>                                $availableActions
+     * @param  list<array{value: string, label: string}>  $availableCountries
      */
     public static function fromDraftAndDefinition(
         FlowDraft $draft,
@@ -51,6 +68,8 @@ final class BuilderFlowDto extends Data
         string $contentBaseLanguage,
         array $availableLanguages,
         array $availableFlows = [],
+        array $availableActions = [],
+        array $availableCountries = [],
     ): self {
         return new self(
             flowId: $draft->flow_id,
@@ -75,6 +94,8 @@ final class BuilderFlowDto extends Data
             contentBaseLanguage: $contentBaseLanguage,
             availableLanguages: $availableLanguages,
             availableFlows: $availableFlows,
+            availableActions: $availableActions,
+            availableCountries: $availableCountries,
         );
     }
 }

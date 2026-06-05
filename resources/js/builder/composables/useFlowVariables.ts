@@ -46,6 +46,12 @@ export interface PickerVariable {
     sourceNode?:  string
     /** ID of the node that registered this variable — lets editors skip self-references. */
     sourceNodeId?: string
+    /**
+     * Nested fields for a `json` variable (e.g. a call node's whole response
+     * whose structure was captured via Test request). Each child is a fully
+     * insertable variable; the picker renders them as an expandable subtree.
+     */
+    children?: PickerVariable[]
 }
 
 // ── Built-in platform fixtures ───────────────────────────────────────────────
@@ -208,14 +214,16 @@ export function useFlowVariables() {
                 continue
             }
 
-            // Call — new save_to_variable shape (matches Input/SendMessage) wins
-            // over legacy save_response_to free-form path.
+            // Call — whole-response `save_to_variable` AND each `result_mapping[].to`
+            // contribute downstream variables; legacy `save_response_to` path is a
+            // fallback only when no structured variable is present.
             if (node.type === 'call') {
-                const v = cfg.save_to_variable as Record<string, unknown> | undefined
-                if (v && typeof v === 'object' && typeof v.name === 'string') {
+                const pushVarObject = (raw: unknown, children?: PickerVariable[]): boolean => {
+                    const v = raw as Record<string, unknown> | undefined
+                    if (!v || typeof v !== 'object' || typeof v.name !== 'string') return false
                     const storage = v.storage === 'session' ? 'session' : 'contact'
                     const group   = typeof v.group === 'string' && v.group !== '' ? v.group : null
-                    push(fromVariable(
+                    const pv = fromVariable(
                         {
                             name:    v.name,
                             type:    (typeof v.type === 'string' ? v.type : 'text') as Variable['type'],
@@ -224,12 +232,47 @@ export function useFlowVariables() {
                         },
                         nodeLabel,
                         node.id,
-                    ))
-                    continue
+                    )
+                    if (pv && children && children.length > 0) pv.children = children
+                    push(pv)
+                    return true
                 }
-                const saveTo = cfg.save_response_to
-                if (typeof saveTo === 'string' && saveTo !== '') {
-                    push(fromLegacyPath(saveTo, nodeLabel, node.id))
+
+                // Build nested children for the json whole-response variable from
+                // the structure captured via Test request (config.response_paths).
+                let saveChildren: PickerVariable[] | undefined
+                const saveVar = cfg.save_to_variable as Record<string, unknown> | undefined
+                const responsePaths = cfg.response_paths
+                if (saveVar && typeof saveVar.name === 'string' && Array.isArray(responsePaths) && responsePaths.length > 0) {
+                    const storage = saveVar.storage === 'session' ? 'session' : 'contact'
+                    const group   = typeof saveVar.group === 'string' && saveVar.group !== '' ? saveVar.group : null
+                    const basePath = storage === 'contact'
+                        ? (group ? `contact.${group}.${saveVar.name}` : `contact.${saveVar.name}`)
+                        : `flow.${saveVar.name}`
+                    const src = storage === 'contact'
+                        ? { kind: 'contact-profile' as const }
+                        : { kind: 'temporary' as const }
+                    saveChildren = (responsePaths as unknown[])
+                        .filter((p): p is string => typeof p === 'string' && p !== '')
+                        .map(rel => makeVar(`${basePath}.${rel}`, rel, src, {
+                            isCustom: true, sourceNode: nodeLabel, sourceNodeId: node.id,
+                        }))
+                }
+
+                let pushedAny = pushVarObject(cfg.save_to_variable, saveChildren)
+
+                const mappings = cfg.result_mapping
+                if (Array.isArray(mappings)) {
+                    for (const m of mappings) {
+                        if (pushVarObject((m as Record<string, unknown>)?.to)) pushedAny = true
+                    }
+                }
+
+                if (!pushedAny) {
+                    const saveTo = cfg.save_response_to
+                    if (typeof saveTo === 'string' && saveTo !== '') {
+                        push(fromLegacyPath(saveTo, nodeLabel, node.id))
+                    }
                 }
                 continue
             }

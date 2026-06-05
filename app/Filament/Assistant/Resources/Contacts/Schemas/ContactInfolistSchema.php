@@ -311,6 +311,10 @@ final class ContactInfolistSchema
 
             VariableType::Date => self::formatDate($value),
 
+            VariableType::Json => is_scalar($value) || null === $value
+                ? self::stringify($value)
+                : (string) json_encode($value, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+
             VariableType::Confirm => match (true) {
                 true === $value
                 || in_array(

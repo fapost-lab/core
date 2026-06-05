@@ -9,6 +9,9 @@ use App\Domains\Flow\Support\CallbackDataCodec;
 use DateTimeImmutable;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\IncomingMessageType;
+use libphonenumber\NumberParseException;
+use libphonenumber\PhoneNumberFormat;
+use libphonenumber\PhoneNumberUtil;
 use Throwable;
 
 /**
@@ -21,26 +24,6 @@ use Throwable;
  */
 final class InputValidator implements InputValidatorInterface
 {
-    /**
-     * Lightweight per-country phone number patterns. Country code is the canonical
-     * ISO-3166 alpha-2 in upper case. The pattern matches the full E.164 form
-     * (incl. the leading "+") after normalization (whitespace/dashes/parens stripped).
-     *
-     * @var array<string, string>
-     */
-    private const array PHONE_PATTERNS = [
-        'UA' => '/^\+380\d{9}$/',
-        'RU' => '/^\+7\d{10}$/',
-        'KZ' => '/^\+7\d{10}$/',
-        'BY' => '/^\+375\d{9}$/',
-        'US' => '/^\+1\d{10}$/',
-        'CA' => '/^\+1\d{10}$/',
-        'GB' => '/^\+44\d{9,10}$/',
-        'DE' => '/^\+49\d{6,13}$/',
-        'FR' => '/^\+33\d{9}$/',
-        'PL' => '/^\+48\d{9}$/',
-    ];
-
     public function validate(
         InputExpectedType $type,
         IncomingMessage $incoming,
@@ -139,10 +122,16 @@ final class InputValidator implements InputValidatorInterface
     }
 
     /**
-     * Phone validation strategy: normalize by stripping spaces/dashes/parens,
-     * then match against a per-country pattern from {@see self::PHONE_PATTERNS}.
-     * Unknown / unspecified country falls back to a permissive E.164 shape
-     * (+ then 7–15 digits, per ITU-T E.164).
+     * Phone validation via libphonenumber. Candidate regions come from the input
+     * node's `country` (single, optional narrow) or — falling back — the
+     * assistant's `countries` list injected by the handler.
+     *
+     *  - international input ("+…") is parsed region-agnostically; if candidates
+     *    are configured the detected region must be one of them;
+     *  - national input (no "+") is parsed against each candidate region until
+     *    one yields a valid number — impossible to infer without candidates.
+     *
+     * The stored value is always normalized to E.164.
      *
      * @param  array<string, mixed>  $rules
      */
@@ -152,22 +141,73 @@ final class InputValidator implements InputValidatorInterface
             return ValidationResult::fail('text_required');
         }
 
-        $normalized = preg_replace('/[\s\-()]+/', '', mb_trim($incoming->text)) ?? '';
-
-        if ('' === $normalized) {
+        $raw = mb_trim($incoming->text);
+        if ('' === $raw) {
             return ValidationResult::fail('invalid_phone');
         }
 
-        $country = is_string($rules['country'] ?? null) ? mb_strtoupper((string)$rules['country']) : null;
-        $pattern = (null !== $country && isset(self::PHONE_PATTERNS[$country]))
-            ? self::PHONE_PATTERNS[$country]
-            : '/^\+\d{7,15}$/';
+        $candidates = $this->phoneCandidates($rules);
+        $util       = PhoneNumberUtil::getInstance();
 
-        if (1 !== preg_match($pattern, $normalized)) {
-            return ValidationResult::fail('invalid_phone');
+        if (str_starts_with($raw, '+')) {
+            try {
+                $proto = $util->parse($raw, null);
+            } catch (NumberParseException) {
+                return ValidationResult::fail('invalid_phone');
+            }
+
+            if (! $util->isValidNumber($proto)) {
+                return ValidationResult::fail('invalid_phone');
+            }
+
+            $region = $util->getRegionCodeForNumber($proto);
+            if ([] !== $candidates && (null === $region || ! in_array($region, $candidates, true))) {
+                return ValidationResult::fail('invalid_phone');
+            }
+
+            return ValidationResult::ok($util->format($proto, PhoneNumberFormat::E164));
         }
 
-        return ValidationResult::ok($normalized);
+        // National format needs a region to disambiguate.
+        foreach ($candidates as $region) {
+            try {
+                $proto = $util->parse($raw, $region);
+            } catch (NumberParseException) {
+                continue;
+            }
+
+            if ($util->isValidNumber($proto)) {
+                return ValidationResult::ok($util->format($proto, PhoneNumberFormat::E164));
+            }
+        }
+
+        return ValidationResult::fail('invalid_phone');
+    }
+
+    /**
+     * Resolve the ordered list of candidate ISO regions: a per-node `country`
+     * wins (narrow to one), otherwise the assistant's `countries` list.
+     *
+     * @param  array<string, mixed>  $rules
+     *
+     * @return list<string>
+     */
+    private function phoneCandidates(array $rules): array
+    {
+        $perNode = is_string($rules['country'] ?? null) && '' !== mb_trim((string) $rules['country'])
+            ? mb_strtoupper(mb_trim((string) $rules['country']))
+            : null;
+
+        if (null !== $perNode) {
+            return [$perNode];
+        }
+
+        $assistant = is_array($rules['countries'] ?? null) ? $rules['countries'] : [];
+
+        return array_values(array_filter(array_map(
+            static fn (mixed $c): ?string => is_string($c) && '' !== mb_trim($c) ? mb_strtoupper(mb_trim($c)) : null,
+            $assistant,
+        )));
     }
 
     /**

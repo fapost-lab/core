@@ -700,6 +700,10 @@ final class NullTenantEventRepository implements TenantEventRepositoryInterface
     {
         return [];
     }
+
+    public function registerEventNames(string $tenantId, array $eventNames): void
+    {
+    }
 }
 
 final class NullTenantContext implements TenantContextInterface

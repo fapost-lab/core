@@ -56,3 +56,19 @@ export const validateFlow = (
 
 export const publishFlow = (flowId: string): Promise<{ version: number }> =>
     request('POST', `/flows/${flowId}/publish`)
+
+export interface CallTestResult {
+    success:     boolean
+    status_code: number | null
+    headers:     Record<string, unknown>
+    body:        unknown
+    error_code:  string | null
+    duration_ms: number
+}
+
+/** Execute a call-node config live and return the response for shape inspection. */
+export const testCall = (
+    config: Record<string, unknown>,
+    sample: Record<string, string>,
+): Promise<CallTestResult> =>
+    request<{ data: CallTestResult }>('POST', '/call/test', { config, sample }).then((r) => r.data)

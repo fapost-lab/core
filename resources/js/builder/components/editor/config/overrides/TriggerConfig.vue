@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed} from 'vue'
+import {computed, ref} from 'vue'
 import AccordionSection from '../AccordionSection.vue'
 
 const props = defineProps({
@@ -23,11 +23,34 @@ const currentTrigger = computed(() =>
         : props.trigger
 )
 
-const hasAvailableEvents = computed(() => props.availableEvents.length > 0)
-
 const triggerCfg = computed((): Record<string, unknown> =>
     (currentTrigger.value.config as Record<string, unknown>) ?? {}
 )
+
+/**
+ * Event picker: searchable combobox over tenant-wide events (all assistants),
+ * with free-text entry — an event name can be referenced before it is published.
+ */
+const eventDropdownOpen = ref(false)
+
+const currentEventName = computed<string>(() => (triggerCfg.value.event_name as string) ?? '')
+
+const filteredEvents = computed<string[]>(() => {
+    const query = currentEventName.value.trim().toLowerCase()
+    if (query === '') {
+        return props.availableEvents
+    }
+    return props.availableEvents.filter((name) => name.toLowerCase().includes(query))
+})
+
+function setEventName(name: string): void {
+    update({ config: { event_name: name } })
+}
+
+function selectEvent(name: string): void {
+    setEventName(name)
+    eventDropdownOpen.value = false
+}
 
 function update(patch: Record<string, unknown>) {
     emit('update:trigger', {
@@ -264,21 +287,37 @@ function defaultConfig(type: string): Record<string, unknown> {
         <AccordionSection v-else-if="currentTrigger.type === 'event'" title="Event" default-open>
             <div class="config-field">
                 <div class="field-label">Event name</div>
-                <select
-                    class="field-input"
-                    :value="(triggerCfg.event_name as string) ?? ''"
-                    :disabled="!hasAvailableEvents"
-                    @change="update({ config: { event_name: ($event.target as HTMLSelectElement).value } })"
-                >
-                    <option value="" disabled>{{ hasAvailableEvents ? 'Select existing event' : 'No events available yet' }}</option>
-                    <option
-                        v-for="eventName in availableEvents"
-                        :key="eventName"
-                        :value="eventName"
-                    >{{ eventName }}</option>
-                </select>
+                <div class="event-combo">
+                    <input
+                        type="text"
+                        class="field-input"
+                        :value="currentEventName"
+                        placeholder="Search or type an event name…"
+                        autocomplete="off"
+                        @focus="eventDropdownOpen = true"
+                        @input="setEventName(($event.target as HTMLInputElement).value)"
+                        @keydown.escape="eventDropdownOpen = false"
+                        @blur="eventDropdownOpen = false"
+                    >
+                    <div v-if="eventDropdownOpen && filteredEvents.length" class="event-dropdown">
+                        <button
+                            v-for="eventName in filteredEvents"
+                            :key="eventName"
+                            type="button"
+                            class="event-option"
+                            :class="{ active: eventName === currentEventName }"
+                            @mousedown.prevent="selectEvent(eventName)"
+                        >{{ eventName }}</button>
+                    </div>
+                    <div
+                        v-else-if="eventDropdownOpen && currentEventName.trim()"
+                        class="event-empty"
+                    >
+                        No matching event — it will be saved as a new event name.
+                    </div>
+                </div>
                 <div class="field-hint">
-                    Events are created in the Event node. Trigger can only use events that already exist.
+                    Lists events from all assistants in this tenant. Pick one or type a new name.
                 </div>
             </div>
         </AccordionSection>
@@ -290,6 +329,57 @@ function defaultConfig(type: string): Record<string, unknown> {
 </template>
 
 <style scoped>
+.event-combo {
+    position: relative;
+}
+.event-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 20;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    padding: 4px;
+}
+.event-option {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 6px 8px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-family: 'Victor Mono', monospace;
+    font-size: 12px;
+    color: var(--text);
+    cursor: pointer;
+}
+.event-option:hover {
+    background: var(--surface-2);
+}
+.event-option.active {
+    background: var(--primary-bg);
+    color: var(--primary);
+}
+.event-empty {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 20;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    padding: 8px;
+    font-size: 11px;
+    color: var(--text-3);
+}
 .toggle-row {
     display: flex;
     align-items: center;

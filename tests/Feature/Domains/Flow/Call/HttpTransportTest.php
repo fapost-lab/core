@@ -75,6 +75,45 @@ final class HttpTransportTest extends TestCase
         $this->assertSame(404, $result->metadata['status_code']);
     }
 
+    public function test_raw_body_is_sent_verbatim_and_wins_over_body_params(): void
+    {
+        Http::fake([
+            '*' => Http::response(['ok' => true], 200, ['Content-Type' => 'application/json']),
+        ]);
+
+        $transport = new HttpTransport(app(HttpFactory::class));
+
+        $raw    = '{"nested":{"id":7},"tags":["a","b"]}';
+        $result = $transport->execute(
+            new CallRequest(
+                target: 'POST https://api.example.com/raw',
+                parameters: ['body.ignored' => 'x'],
+                options: ['body_raw' => $raw],
+            ),
+            $this->context(),
+        );
+
+        $this->assertTrue($result->success);
+        Http::assertSent(static fn ($request): bool => $request->body() === $raw);
+    }
+
+    public function test_response_headers_are_exposed_in_metadata(): void
+    {
+        Http::fake([
+            '*' => Http::response(['ok' => true], 200, ['Content-Type' => 'application/json', 'X-Trace' => 'abc-123']),
+        ]);
+
+        $transport = new HttpTransport(app(HttpFactory::class));
+
+        $result = $transport->execute(
+            new CallRequest(target: 'GET https://api.example.com/thing'),
+            $this->context(),
+        );
+
+        $this->assertArrayHasKey('headers', $result->metadata);
+        $this->assertSame('abc-123', $result->metadata['headers']['X-Trace']);
+    }
+
     public function test_idempotency_key_header_set_from_context(): void
     {
         Http::fake();

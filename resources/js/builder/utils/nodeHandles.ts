@@ -42,6 +42,13 @@ export function nodeHandles(node: FlowNodeLike): NodeHandle[] {
     ]
   }
 
+  if (node.type === 'call') {
+    return [
+      {handle: 'success', label: 'Success'},
+      {handle: 'error',   label: 'Error'},
+    ]
+  }
+
   return [{handle: 'default', label: 'Next'}]
 }
 
@@ -64,6 +71,39 @@ function sendMessageHandles(node: FlowNodeLike): NodeHandle[] {
   }
 
   return [{handle: 'default', label: 'Next'}]
+}
+
+function inputHandles(node: FlowNodeLike): NodeHandle[] {
+  const config = (node.config ?? {}) as Record<string, unknown>
+  const expectedType = config.expected_type as string | undefined
+  const buttons = Array.isArray(config.buttons) ? (config.buttons as Array<Record<string, unknown>>) : []
+
+  if (expectedType === 'confirm') {
+    // Fixed yes/no handles — handle = button value ('yes' / 'no').
+    const handles: NodeHandle[] = buttons.length > 0
+      ? buttons.map((btn) => ({
+          handle: String(btn.value ?? ''),
+          label: buttonLabel(btn) || String(btn.value ?? ''),
+        })).filter((h) => h.handle !== '')
+      : [{handle: 'yes', label: 'Yes'}, {handle: 'no', label: 'No'}]
+    handles.push({handle: 'invalid', label: 'Invalid'})
+    return handles
+  }
+
+  if (expectedType === 'select' && buttons.length > 0) {
+    // Per-button handles — handle = button UUID (stable across renames).
+    const handles = buttons.map((btn, idx) => ({
+      handle: String(btn.id ?? ''),
+      label: buttonLabel(btn) || `Option ${idx + 1}`,
+    })).filter((h) => h.handle !== '')
+    handles.push({handle: 'invalid', label: 'Invalid'})
+    return handles
+  }
+
+  return [
+    {handle: 'default', label: 'Next'},
+    {handle: 'invalid', label: 'Invalid'},
+  ]
 }
 
 function conditionHandles(node: FlowNodeLike): NodeHandle[] {

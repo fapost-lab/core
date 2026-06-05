@@ -1,9 +1,9 @@
 # Builder · `configSchema()` reference
 
 Single source of truth for the schema returned by every `NodeHandlerInterface::configSchema()`. The Vue builder's
-generic renderer (`SchemaConfigRenderer.vue` → `SchemaFields.vue`) reads this shape directly — when a handler skips an
-inline-styled override (SendMessage / Input / Condition / Trigger), the entire right-pane config form is built from this
-array.
+generic renderer (`SchemaConfigRenderer.vue` → `SchemaFields.vue`) reads this shape directly — when a node type has no
+inline-styled override (current overrides: SendMessage / Input / Condition / Branch / Assign / Call / Subflow / End —
+see `OVERRIDES` in `ConfigPanel.vue`), the entire right-pane config form is built from this array.
 
 Keep this file in sync with `resources/js/builder/components/editor/config/SchemaFields.vue#FIELD_COMPONENTS`. If you
 add a new field type to the renderer, extend the matching section here in the same PR.
@@ -18,7 +18,9 @@ renderer reads the same wire shape in both cases.
 **Fluent (preferred):**
 
 ```php
-use FAPost\Support\Builder\Schema\Field;
+use FAPost\Support\Builder\Schema\Fields\KeyValueField;
+use FAPost\Support\Builder\Schema\Fields\NumberField;
+use FAPost\Support\Builder\Schema\Fields\TextField;
 use FAPost\Support\Builder\Schema\Schema;
 use FAPost\Support\Builder\Schema\Section;
 
@@ -29,8 +31,8 @@ public function configSchema(): array
             Section::make('connection', 'Connection')
                 ->icon('globe-alt')
                 ->fields([
-                    Field::string('url')->label('URL')->required(),
-                    Field::number('timeout')->label('Timeout')->default(10)->min(1)->max(300),
+                    TextField::make('url')->label('URL')->required(),
+                    NumberField::make('timeout')->label('Timeout')->default(10)->min(1)->max(300),
                 ]),
         )
         ->section(
@@ -38,12 +40,16 @@ public function configSchema(): array
                 ->icon('cog-6-tooth')
                 ->collapsed()
                 ->fields([
-                    Field::keyValue('headers')->label('Custom headers'),
+                    KeyValueField::make('headers')->label('Custom headers'),
                 ]),
         )
         ->toArray();
 }
 ```
+
+Each field is its own class with a static `make(string $name)` factory (`TextField::make()`,
+`NumberField::make()`, …) — there is no `Field::string()` style facade. Concrete field classes live under the
+`Fields\` sub-namespace; `Schema` and `Section` live directly under `…\Builder\Schema`.
 
 **Raw array (still supported):**
 
@@ -122,12 +128,12 @@ Single-line text input. Renders `TextField.vue` with `VariablePicker` for `{{pat
 |-----------------|------------|-------------------------------------------------|
 | `type`          | `'string'` | required                                        |
 | `placeholder`   | `string`   | input placeholder                               |
-| `regex`         | `string`   | inline-validated regex (Phase 2, see §6)        |
+| `regex`         | `string`   | inline-validated regex (see §6)                 |
 | `regex_message` | `string`   | error text shown under input when `regex` fails |
 
 ```php
 // Fluent
-Field::string('event_type')
+TextField::make('event_type')
     ->label('Event type')
     ->placeholder('sales.order.created')
     ->required()
@@ -151,7 +157,7 @@ Multi-line textarea. Renders `TextareaField.vue` with `VariablePicker`.
 Same prop set as `string` plus a default of 4 rows of height. No regex validator at the moment.
 
 ```php
-Field::text('message')->label('Message text')->placeholder('Welcome, {{contact.name}}');
+TextareaField::make('message')->label('Message text')->placeholder('Welcome, {{contact.name}}');
 
 // Raw
 'message' => ['type' => 'text', 'label' => 'Message text', 'placeholder' => 'Welcome, {{contact.name}}'],
@@ -168,7 +174,7 @@ numeric fields).
 | `max` | `number` | inline-validated upper bound (inclusive) |
 
 ```php
-Field::number('timeout')->label('Timeout (s)')->default(10)->min(1)->max(300);
+NumberField::make('timeout')->label('Timeout (s)')->default(10)->min(1)->max(300);
 
 // Raw
 'timeout' => ['type' => 'number', 'label' => 'Timeout (s)', 'default' => 10, 'min' => 1, 'max' => 300],
@@ -179,7 +185,7 @@ Field::number('timeout')->label('Timeout (s)')->default(10)->min(1)->max(300);
 Checkbox toggle. Renders `ToggleField.vue`.
 
 ```php
-Field::toggle('remove_keyboard_after_press')->label('Remove keyboard after press')->default(true);
+ToggleField::make('remove_keyboard_after_press')->label('Remove keyboard after press')->default(true);
 
 // Raw
 'remove_keyboard_after_press' => ['type' => 'boolean', 'label' => 'Remove keyboard after press', 'default' => true],
@@ -194,7 +200,7 @@ Dropdown select. Renders `SelectField.vue`.
 | `options` | `array<string>` or `array<string, string>` | List of values, or value→label map. `values` is also accepted. |
 
 ```php
-Field::select('method')->label('HTTP method')->options(['GET' => 'GET', 'POST' => 'POST'])->default('POST');
+SelectField::make('method')->label('HTTP method')->options(['GET' => 'GET', 'POST' => 'POST'])->default('POST');
 
 // Raw
 'method' => [
@@ -208,7 +214,7 @@ Field::select('method')->label('HTTP method')->options(['GET' => 'GET', 'POST' =
 List of strings. Renders `ArrayField.vue` — one input per item, `+ Add item` button, per-row delete.
 
 ```php
-Field::array('include_state')->label('Include state')->help('State paths whose values are forwarded in the payload.');
+ArrayField::make('include_state')->label('Include state')->help('State paths whose values are forwarded in the payload.');
 
 // Raw
 'include_state' => ['type' => 'array', 'label' => 'Include state', 'help' => '…'],
@@ -220,7 +226,7 @@ Raw JSON textarea. Renders `JsonField.vue` with `Victor Mono` font and inline pa
 object/array, not the raw string.
 
 ```php
-Field::json('metadata')->label('Metadata')->default([]);
+JsonField::make('metadata')->label('Metadata')->default([]);
 
 // Raw
 'metadata' => ['type' => 'json', 'label' => 'Metadata', 'default' => []],
@@ -231,7 +237,7 @@ Field::json('metadata')->label('Metadata')->default([]);
 Flow-state path input. Renders `StatePickerField.vue` — monospace input with `VariablePicker`.
 
 ```php
-Field::statePicker('save_response_to')->label('Save response to')->placeholder('flow.webhook_response');
+StatePickerField::make('save_response_to')->label('Save response to')->placeholder('flow.webhook_response');
 
 // Raw
 'save_response_to' => ['type' => 'state-picker', 'label' => 'Save response to', 'placeholder' => 'flow.webhook_response'],
@@ -249,7 +255,7 @@ inline (last-write-wins on commit). Empty keys are dropped on commit.
 | `placeholder` | `array{string: string}` | one entry used as placeholder for empty rows |
 
 ```php
-Field::keyValue('headers')
+KeyValueField::make('headers')
     ->label('Custom headers')
     ->keyLabel('Header')
     ->valueLabel('Value')
@@ -275,11 +281,11 @@ merge in the store.
 | `required` | `array<string>`              | required sub-field keys                    |
 
 ```php
-Field::object('transport_options')
+ObjectField::make('transport_options')
     ->label('Transport options')
     ->fields([
-        Field::number('retries')->label('Retries')->default(0),
-        Field::toggle('verify_ssl')->label('Verify SSL')->default(true),
+        NumberField::make('retries')->label('Retries')->default(0),
+        ToggleField::make('verify_ssl')->label('Verify SSL')->default(true),
     ]);
 
 // Raw
@@ -309,14 +315,14 @@ Repeater of structured objects. Renders `ObjectArrayField.vue` — each item is 
 The `item_label` template substitutes `{key}` for top-level item values — handy for the collapsed-row preview.
 
 ```php
-Field::objectArray('result_mapping')
+ObjectArrayField::make('result_mapping')
     ->label('Result mapping')
     ->minItems(0)
     ->maxItems(50)
     ->itemLabel('{from_path} → {to_state}')
     ->itemFields([
-        Field::statePicker('from_path')->label('From response'),
-        Field::statePicker('to_state')->label('To state'),
+        StatePickerField::make('from_path')->label('From response'),
+        StatePickerField::make('to_state')->label('To state'),
     ]);
 
 // Raw
@@ -426,23 +432,28 @@ references declared field keys.
 The wire format from §2–§3 is generated by the `FAPost\Support\Builder\Schema` namespace. It's a thin layer over the
 same shape — `toArray()` is the only contract — giving authors autocomplete, type-safe field-specific methods (only
 `min()`/`max()` on `NumberField`, only `regex()` on `TextField`, etc.) and refactor-safety on a vocabulary that's
-growing. Handlers may mix fluent and raw arrays during migration; the renderer can't tell the difference.
+growing. Every Core handler is fluent today, but the renderer reads the wire shape, so a raw array (e.g. from a Plugin
+that doesn't depend on `fapost/support`) renders identically.
 
-| Class / factory               | Returns            | Field-specific methods                                    |
-|-------------------------------|--------------------|-----------------------------------------------------------|
-| `Schema::make()`              | `Schema`           | `section()`, `fields()`, `required()`, `toArray()`        |
-| `Section::make($key, $label)` | `Section`          | `icon()`, `collapsed()`, `fields()`                       |
-| `Field::string($name)`        | `TextField`        | `regex(pattern, message?)`                                |
-| `Field::text($name)`          | `TextareaField`    | —                                                         |
-| `Field::number($name)`        | `NumberField`      | `min()`, `max()`                                          |
-| `Field::select($name)`        | `SelectField`      | `options(array)`                                          |
-| `Field::toggle($name)`        | `ToggleField`      | —                                                         |
-| `Field::array($name)`         | `ArrayField`       | —                                                         |
-| `Field::json($name)`          | `JsonField`        | —                                                         |
-| `Field::statePicker($name)`   | `StatePickerField` | —                                                         |
-| `Field::keyValue($name)`      | `KeyValueField`    | `keyLabel()`, `valueLabel()`                              |
-| `Field::object($name)`        | `ObjectField`      | `fields(array)`                                           |
-| `Field::objectArray($name)`   | `ObjectArrayField` | `itemFields()`, `itemLabel()`, `minItems()`, `maxItems()` |
+Each field is a concrete class under `FAPost\Support\Builder\Schema\Fields\*` with a static `make(string $name)`
+factory inherited from the abstract `Field`. `Schema` and `Section` live directly under
+`FAPost\Support\Builder\Schema`.
+
+| Class / factory                 | type         | Field-specific methods                                    |
+|---------------------------------|--------------|-----------------------------------------------------------|
+| `Schema::make()`                | —            | `section(Section)`, `fields(array)`, `required(array)`, `defaultConfig(array)`, `toArray()` |
+| `Section::make($key, $label)`   | —            | `icon()`, `collapsed(bool = true)`, `fields(array)`       |
+| `TextField::make($name)`        | `string`     | `regex(pattern, message?)`                                |
+| `TextareaField::make($name)`    | `text`       | —                                                         |
+| `NumberField::make($name)`      | `number`     | `min()`, `max()`                                          |
+| `SelectField::make($name)`      | `enum`       | `options(array)`                                          |
+| `ToggleField::make($name)`      | `boolean`    | —                                                         |
+| `ArrayField::make($name)`       | `array`      | —                                                         |
+| `JsonField::make($name)`        | `json`       | —                                                         |
+| `StatePickerField::make($name)` | `state-picker` | `namespaces(array)`, `searchable(bool = true)`          |
+| `KeyValueField::make($name)`    | `key-value`  | `keyLabel()`, `valueLabel()`                              |
+| `ObjectField::make($name)`      | `object`     | `fields(array)`                                           |
+| `ObjectArrayField::make($name)` | `object-array` | `itemFields()`, `itemLabel()`, `minItems()`, `maxItems()` |
 
 Common methods on every field: `label()`, `help()`, `default()`, `placeholder()`, `required(bool = true)`,
 `visibleWhen(array)`.

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\Exceptions\FlowValidationException;
@@ -25,6 +26,8 @@ final readonly class PublishFlowService
         private CallGraphRepository $callGraph,
         private VariableSchemaCollector $schemaCollector,
         private VariableSchemaRegistryInterface $schemaRegistry,
+        private TenantEventRepositoryInterface $tenantEvents,
+        private EmittedEventCollector $emittedEvents,
     ) {
     }
 
@@ -104,6 +107,14 @@ final readonly class PublishFlowService
                 tenantId: (string)$draft->tenant_id,
                 flowId: (string)$definition->getKey(),
                 nodes: $nodes,
+            );
+
+            // Register events emitted by this flow into the tenant-wide registry so
+            // event triggers on ANY flow/assistant can subscribe to them — even
+            // before the event ever fires at runtime.
+            $this->tenantEvents->registerEventNames(
+                tenantId: (string)$draft->tenant_id,
+                eventNames: $this->emittedEvents->collect($nodes),
             );
 
             return $definition;

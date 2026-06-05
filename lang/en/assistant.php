@@ -111,6 +111,8 @@ return [
                 'default_language'           => 'Default language',
                 'default_language_locked'    => 'Cannot be changed once flows exist',
                 'available_languages'        => 'Available languages',
+                'available_countries'        => 'Served countries',
+                'available_countries_help'   => 'Countries this assistant serves — drives phone-number formats and validation in input nodes.',
                 'default_flow_id'            => 'Default flow',
                 'default_flow_create'        => 'Create new flow',
                 'default_flow_create_modal'  => 'Create a new flow',

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Assistant\Support\CountryCatalog;
+use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
@@ -20,6 +23,8 @@ final readonly class LoadBuilderFlowService
         private FlowTriggerRepositoryInterface $triggers,
         private TenantEventRepositoryInterface $tenantEvents,
         private TenantSettings $tenantSettings,
+        private ActionHandlerRegistry $actionHandlers,
+        private CountryCatalog $countries,
     ) {
     }
 
@@ -37,6 +42,9 @@ final readonly class LoadBuilderFlowService
             ->values()
             ->all();
 
+        $assistant          = Assistant::query()->select(['id', 'available_countries'])->find($draft->assistant_id);
+        $assistantCountries = is_array($assistant?->available_countries) ? $assistant->available_countries : [];
+
         return BuilderFlowDto::fromDraftAndDefinition(
             draft: $draft,
             published: $published,
@@ -45,6 +53,8 @@ final readonly class LoadBuilderFlowService
             contentBaseLanguage: $this->tenantSettings->content_base_language,
             availableLanguages: $this->tenantSettings->available_languages,
             availableFlows: $availableFlows,
+            availableActions: $this->actionHandlers->ids(),
+            availableCountries: $this->countries->toOptions($assistantCountries),
         );
     }
 }

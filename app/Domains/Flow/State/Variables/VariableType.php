@@ -24,4 +24,7 @@ enum VariableType: string
     case Photo    = 'photo';
     case Location = 'location';
     case Select   = 'select';
+
+    /** Structured object/array payload (e.g. a `call` node's whole response). */
+    case Json = 'json';
 }

@@ -149,6 +149,8 @@ final class MediaValidationNullTriggerValidator implements FlowTriggerConfigVali
 final class MediaValidationNullTenantEvents implements TenantEventRepositoryInterface
 {
     public function getEventNamesByTenant(string $tenantId): array { return []; }
+
+    public function registerEventNames(string $tenantId, array $eventNames): void {}
 }
 
 final class MediaValidationResolvedTenantContext implements TenantContextInterface

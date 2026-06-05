@@ -111,6 +111,8 @@ return [
                 'default_language'           => 'Мова за замовчуванням',
                 'default_language_locked'    => 'Неможливо змінити, якщо є сценарії',
                 'available_languages'        => 'Доступні мови',
+                'available_countries'        => 'Країни обслуговування',
+                'available_countries_help'   => 'Країни, для яких працює асистент — визначають формати телефонів і валідацію в input-нодах.',
                 'default_flow_id'            => 'Сценарій за замовчуванням',
                 'default_flow_create'        => 'Створити новий сценарій',
                 'default_flow_create_modal'  => 'Створення нового сценарію',

@@ -48,6 +48,8 @@ export interface BuilderFlowPayload {
     contentBaseLanguage?: string
     publishedAt?: string | null
     availableFlows?: Array<{id: string; name: string}>
+    availableActions?: string[]
+    availableCountries?: Array<{value: string; label: string}>
 }
 
 export interface NodeTypePayload {
@@ -70,7 +72,7 @@ export type SaveStatus = 'idle' | 'saving' | 'saved' | 'conflict' | 'error'
  */
 export type VariableType =
     | 'text' | 'number' | 'phone' | 'email' | 'contact'
-    | 'select' | 'confirm' | 'file' | 'photo' | 'location' | 'date'
+    | 'select' | 'confirm' | 'file' | 'photo' | 'location' | 'date' | 'json'
 
 export type VariableStorage = 'contact' | 'session'
 

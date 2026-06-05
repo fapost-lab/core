@@ -99,6 +99,8 @@ export const useBuilderStore = defineStore('builder', () => {
     const contentBaseLanguage = ref('en')
     const availableLanguages = ref<string[]>([])
     const availableFlows     = ref<Array<{id: string; name: string}>>([])
+    const availableActions   = ref<string[]>([])
+    const availableCountries = ref<Array<{value: string; label: string}>>([])
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tree = computed(() => buildTree(definition.value.nodes ?? [], definition.value.edges ?? []) as any)
@@ -158,6 +160,8 @@ export const useBuilderStore = defineStore('builder', () => {
         contentBaseLanguage.value = flow.contentBaseLanguage ?? 'en'
         availableLanguages.value = Array.isArray(flow.availableLanguages) ? flow.availableLanguages : []
         availableFlows.value     = Array.isArray(flow.availableFlows) ? flow.availableFlows : []
+        availableActions.value   = Array.isArray(flow.availableActions) ? flow.availableActions : []
+        availableCountries.value = Array.isArray(flow.availableCountries) ? flow.availableCountries : []
         isDirty.value = false
         hydrated      = true
     }
@@ -704,6 +708,8 @@ export const useBuilderStore = defineStore('builder', () => {
         contentBaseLanguage,
         availableLanguages,
         availableFlows,
+        availableActions,
+        availableCountries,
         tree,
         saveStatus,
         isDirty,

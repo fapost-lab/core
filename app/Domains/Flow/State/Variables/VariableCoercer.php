@@ -40,6 +40,7 @@ final class VariableCoercer implements VariableCoercerInterface
             VariableType::Contact,
             VariableType::File,
             VariableType::Photo,
+            VariableType::Json,
             VariableType::Location => '' === $value ? null : $value,
             // String-semantic types.
             default => $this->coerceString($value),
