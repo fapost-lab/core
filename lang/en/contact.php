@@ -18,6 +18,10 @@ return [
         'created_at'  => 'Created',
         'updated_at'  => 'Updated',
     ],
+    'tags' => [
+        'label'  => 'Tags',
+        'manage' => 'Manage tags',
+    ],
     'sections' => [
         'header'        => 'Identity',
         'profile'       => 'Profile',

@@ -13,7 +13,8 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
-use FAPost\Support\Builder\Schema\Fields\TextField;
+use FAPost\Support\Builder\Schema\Fields\FlowPickerField;
+use FAPost\Support\Builder\Schema\Fields\SelectField;
 use FAPost\Support\Builder\Schema\Schema;
 use FAPost\Support\Builder\Schema\Section;
 use RuntimeException;
@@ -65,20 +66,33 @@ final class SubflowNodeHandler extends AbstractVersionedHandler
                 Section::make('target', 'Target flow')
                     ->icon('arrow-right-circle')
                     ->fields([
-                        TextField::make('flow_id')
-                            ->label('Subflow flow_id')
-                            ->required(),
+                        FlowPickerField::make('flow_id')
+                            ->label('Flow')
+                            ->required()
+                            ->help(
+                                'Runs as a child session; the parent pauses until it ends. '
+                                . 'Resumes here via success / cancelled / failed once the child '
+                                . 'reaches an end node (failed also covers timeout and inactive target).',
+                            ),
                     ]),
             )
             ->section(
                 Section::make('behavior', 'Behavior')
                     ->icon('clock')
                     ->fields([
-                        TextField::make('timeout')
-                            ->label('Timeout (ISO 8601 duration)')
+                        SelectField::make('timeout')
+                            ->label('Max wait time')
                             ->required()
                             ->default(self::DEFAULT_TIMEOUT)
-                            ->placeholder('PT24H'),
+                            ->options([
+                                'PT1H'  => '1 hour',
+                                'PT6H'  => '6 hours',
+                                'PT12H' => '12 hours',
+                                'PT24H' => '24 hours',
+                                'PT48H' => '48 hours',
+                                'P7D'   => '7 days',
+                            ])
+                            ->help("If the child flow doesn't complete within this time, the parent routes to failed."),
                     ]),
             )
             ->toArray();

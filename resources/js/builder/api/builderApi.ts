@@ -39,6 +39,23 @@ async function request<T>(method: string, url: string, body: unknown = null): Pr
 export const fetchNodeTypes = (): Promise<NodeTypePayload[]> =>
     request<{ data: NodeTypePayload[] }>('GET', '/node-types').then((r) => r.data)
 
+/** Distinct contact tags already used in this tenant — powers set_tag autocomplete. */
+export const fetchKnownTags = (): Promise<string[]> =>
+    request<{ data: string[] }>('GET', '/tags').then((r) => r.data)
+
+export interface SelectOption {
+    value: string
+    label: string
+}
+
+/** Active staff users for the notify node (staff mode) recipient picker. */
+export const fetchStaffOptions = (): Promise<SelectOption[]> =>
+    request<{ data: SelectOption[] }>('GET', '/staff').then((r) => r.data)
+
+/** Tenant assistants for the notify node (contacts mode) target picker. */
+export const fetchAssistantOptions = (): Promise<SelectOption[]> =>
+    request<{ data: SelectOption[] }>('GET', '/assistants').then((r) => r.data)
+
 export const saveDraft = (
     flowId: string,
     definition: FlowDefinition,

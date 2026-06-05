@@ -7,6 +7,10 @@ return [
         'group' => 'Персонал',
     ],
 
+    'notifications' => [
+        'escalation_subject' => 'Уведомление от :app',
+    ],
+
     'tenant_settings' => [
         'title'      => 'Настройки',
         'navigation' => 'Настройки',

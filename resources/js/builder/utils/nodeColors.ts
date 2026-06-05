@@ -25,6 +25,7 @@ export const NODE_TYPE_COLORS: Record<string, NodeColorScheme> = {
     // Input / data capture / mutation
     input:         { bg: 'var(--sage-bg)',   color: 'var(--sage)',   icon: '❓' },
     assign:        { bg: 'var(--sage-bg)',   color: 'var(--sage)',   icon: '📝' },
+    set_tag:       { bg: 'var(--sage-bg)',   color: 'var(--sage)',   icon: '🏷️' },
 
     // Control flow / branching
     condition:     { bg: 'var(--amber-bg)',  color: 'var(--amber)',  icon: '🔀' },
@@ -42,6 +43,12 @@ export const NODE_TYPE_COLORS: Record<string, NodeColorScheme> = {
 
     // Composition
     subflow:       { bg: '#eef2ff',          color: '#4f46e5',       icon: '🪆' },
+
+    // Access control / branching on auth result
+    auth_request:  { bg: 'var(--amber-bg)',  color: 'var(--amber)',  icon: '🔐' },
+
+    // Notify (staff / contacts)
+    notify:        { bg: '#eef4ff',          color: '#3538cd',       icon: '🔔' },
 
     // Terminal
     end:           { bg: 'var(--rose-bg)',   color: 'var(--rose)',   icon: '🛑' },

@@ -2,8 +2,9 @@
 
 Single source of truth for the schema returned by every `NodeHandlerInterface::configSchema()`. The Vue builder's
 generic renderer (`SchemaConfigRenderer.vue` → `SchemaFields.vue`) reads this shape directly — when a node type has no
-inline-styled override (current overrides: SendMessage / Input / Condition / Branch / Assign / Call / Subflow / End —
-see `OVERRIDES` in `ConfigPanel.vue`), the entire right-pane config form is built from this array.
+inline-styled override (current overrides: SendMessage / Input / Condition / Branch / Assign / Call — see `OVERRIDES`
+in `ConfigPanel.vue`), the entire right-pane config form is built from this array. (`subflow` and `end` are now fully
+schema-driven via the `flow-picker` and `enum-cards` field types.)
 
 Keep this file in sync with `resources/js/builder/components/editor/config/SchemaFields.vue#FIELD_COMPONENTS`. If you
 add a new field type to the renderer, extend the matching section here in the same PR.
@@ -339,6 +340,59 @@ ObjectArrayField::make('result_mapping')
 ],
 ```
 
+### 3.12 `flow-picker`
+
+Searchable dropdown over the assistant's flows. Renders `FlowPickerField.vue` (on top of `SearchableSelect.vue`).
+Stores the selected `flow.id` (UUID, language-agnostic), never the name. The option list is read from the builder
+runtime store (`builderStore.availableFlows`), **not** from the schema — so no `options` key is declared.
+
+| Key               | Type        | Description                                                          |
+|-------------------|-------------|---------------------------------------------------------------------|
+| `type`            | `'flow-picker'` | required                                                        |
+| `placeholder`     | `string`    | trigger placeholder, default `— select a flow —`                    |
+| `exclude_current` | `boolean`   | hide the current flow from the list, default `true` (omitted unless set to `false`) |
+
+```php
+// Fluent
+FlowPickerField::make('flow_id')
+    ->label('Flow')
+    ->required()
+    ->help('Runs as a child session; the parent pauses until it ends.');
+
+// Raw
+'flow_id' => ['type' => 'flow-picker', 'label' => 'Flow', 'required' => true],
+```
+
+Used by `subflow.flow_id`. `exclude_current` prevents a flow from referencing itself.
+
+### 3.13 `enum-cards`
+
+Radio-card enum — a richer alternative to `enum` (§3.5) where each option is a full-width clickable card with an
+optional icon, hint line and colour accent. Renders `EnumCardsField.vue`. Stores the selected option's `value`.
+
+| Key       | Type      | Description                                                             |
+|-----------|-----------|-------------------------------------------------------------------------|
+| `type`    | `'enum-cards'` | required                                                           |
+| `options` | `array`   | list of `{ value, label, icon?, hint?, accent? }` descriptors           |
+
+`accent` tints the selected card. Known accents: `sage` (green), `amber`, `rose`; unknown / omitted falls back to the
+neutral primary accent.
+
+```php
+// Fluent
+EnumCardsField::make('status')
+    ->label('End status')
+    ->required()
+    ->default(EndStatus::Success)
+    ->options([
+        ['value' => 'success',   'label' => 'Success',   'icon' => '✓', 'hint' => 'Flow finished as expected',        'accent' => 'sage'],
+        ['value' => 'cancelled', 'label' => 'Cancelled', 'icon' => '⊘', 'hint' => 'User cancelled or session timed out', 'accent' => 'amber'],
+        ['value' => 'failed',    'label' => 'Failed',    'icon' => '✕', 'hint' => 'Flow ended due to error',           'accent' => 'rose'],
+    ]);
+```
+
+Used by `end.status`.
+
 ---
 
 ## 4. Common field props
@@ -454,6 +508,8 @@ factory inherited from the abstract `Field`. `Schema` and `Section` live directl
 | `KeyValueField::make($name)`    | `key-value`  | `keyLabel()`, `valueLabel()`                              |
 | `ObjectField::make($name)`      | `object`     | `fields(array)`                                           |
 | `ObjectArrayField::make($name)` | `object-array` | `itemFields()`, `itemLabel()`, `minItems()`, `maxItems()` |
+| `FlowPickerField::make($name)`  | `flow-picker` | `excludeCurrent(bool = true)`                            |
+| `EnumCardsField::make($name)`   | `enum-cards` | `options(array)`                                          |
 
 Common methods on every field: `label()`, `help()`, `default()`, `placeholder()`, `required(bool = true)`,
 `visibleWhen(array)`.

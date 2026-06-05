@@ -21,4 +21,26 @@ enum BranchOperator: string
     case In       = 'in';
     case Empty    = 'empty';
     case NotEmpty = 'not_empty';
+
+    /**
+     * Builder dropdown options: value → localized label (admin-UI locale).
+     *
+     * @return array<string, string>
+     */
+    public static function options(): array
+    {
+        $options = [];
+
+        foreach (self::cases() as $case) {
+            $options[$case->value] = (string) __("builder.operators.{$case->value}");
+        }
+
+        return $options;
+    }
+
+    /** Operators that take no right-hand value (unary). */
+    public function isUnary(): bool
+    {
+        return self::Empty === $this || self::NotEmpty === $this;
+    }
 }

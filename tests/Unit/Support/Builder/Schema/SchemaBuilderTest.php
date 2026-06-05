@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Support\Builder\Schema;
 
 use FAPost\Support\Builder\Schema\Fields\ArrayField;
+use FAPost\Support\Builder\Schema\Fields\EnumCardsField;
+use FAPost\Support\Builder\Schema\Fields\FlowPickerField;
 use FAPost\Support\Builder\Schema\Fields\JsonField;
 use FAPost\Support\Builder\Schema\Fields\KeyValueField;
 use FAPost\Support\Builder\Schema\Fields\NumberField;
@@ -175,6 +177,51 @@ final class SchemaBuilderTest extends TestCase
             'placeholder' => 'flow.items',
             'namespaces'  => ['flow', 'contact'],
             'searchable'  => true,
+        ], $array);
+    }
+
+    public function test_flow_picker_field_omits_exclude_current_by_default(): void
+    {
+        $array = FlowPickerField::make('flow_id')->label('Flow')->required()->toArray();
+
+        // exclude_current defaults to true on the component, so the minimal
+        // wire shape leaves it out entirely.
+        $this->assertSame([
+            'type'     => 'flow-picker',
+            'label'    => 'Flow',
+            'required' => true,
+        ], $array);
+    }
+
+    public function test_flow_picker_field_emits_exclude_current_when_disabled(): void
+    {
+        $array = FlowPickerField::make('flow_id')->excludeCurrent(false)->toArray();
+
+        $this->assertSame([
+            'type'            => 'flow-picker',
+            'exclude_current' => false,
+        ], $array);
+    }
+
+    public function test_enum_cards_field_emits_option_descriptors(): void
+    {
+        $array = EnumCardsField::make('status')
+            ->label('End status')
+            ->default('success')
+            ->options([
+                ['value' => 'success', 'label' => 'Success', 'icon' => '✓', 'accent' => 'sage'],
+                ['value' => 'failed', 'label' => 'Failed', 'icon' => '✕', 'accent' => 'rose'],
+            ])
+            ->toArray();
+
+        $this->assertSame([
+            'type'    => 'enum-cards',
+            'label'   => 'End status',
+            'default' => 'success',
+            'options' => [
+                ['value' => 'success', 'label' => 'Success', 'icon' => '✓', 'accent' => 'sage'],
+                ['value' => 'failed', 'label' => 'Failed', 'icon' => '✕', 'accent' => 'rose'],
+            ],
         ], $array);
     }
 

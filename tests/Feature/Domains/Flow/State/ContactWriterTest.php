@@ -28,6 +28,17 @@ final class ContactWriterTest extends FeatureTestCase
         $this->assertSame('es', $contact->language);
     }
 
+    public function test_writes_canonical_column_is_authenticated(): void
+    {
+        $contact = $this->makeContact();
+        $this->assertFalse($contact->fresh()->is_authenticated);
+
+        $this->writer($contact)->write('contact.is_authenticated', true);
+
+        $contact->refresh();
+        $this->assertTrue($contact->is_authenticated);
+    }
+
     public function test_writes_top_level_attribute(): void
     {
         $contact = $this->makeContact();

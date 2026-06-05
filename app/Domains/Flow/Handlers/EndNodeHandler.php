@@ -10,7 +10,7 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
-use FAPost\Support\Builder\Schema\Fields\SelectField;
+use FAPost\Support\Builder\Schema\Fields\EnumCardsField;
 use FAPost\Support\Builder\Schema\Schema;
 
 /**
@@ -48,11 +48,33 @@ final class EndNodeHandler extends AbstractVersionedHandler
     {
         return Schema::make()
             ->fields([
-                SelectField::make('status')
+                EnumCardsField::make('status')
                     ->label('End status')
                     ->required()
-                    ->options(EndStatus::cases())
-                    ->default(EndStatus::Success),
+                    ->default(EndStatus::Success)
+                    ->options([
+                        [
+                            'value'  => EndStatus::Success->value,
+                            'label'  => 'Success',
+                            'icon'   => '✓',
+                            'hint'   => 'Flow finished as expected',
+                            'accent' => 'sage',
+                        ],
+                        [
+                            'value'  => EndStatus::Cancelled->value,
+                            'label'  => 'Cancelled',
+                            'icon'   => '⊘',
+                            'hint'   => 'User cancelled or session timed out',
+                            'accent' => 'amber',
+                        ],
+                        [
+                            'value'  => EndStatus::Failed->value,
+                            'label'  => 'Failed',
+                            'icon'   => '✕',
+                            'hint'   => 'Flow ended due to error',
+                            'accent' => 'rose',
+                        ],
+                    ]),
             ])
             ->toArray();
     }

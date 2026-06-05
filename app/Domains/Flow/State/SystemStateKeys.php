@@ -20,6 +20,20 @@ final class SystemStateKeys
     public const string SEND_MESSAGE_DYNAMIC_BUTTONS = StateNamespace::System->value . '.send_message.dynamic_buttons';
 
     /**
+     * Prefix for the per-node `notify_staff` dispatch marker. Full path:
+     * `system.staff_notified.{nodeId}`. Set once the delivery job is queued so a
+     * re-execution of the node never dispatches a duplicate notification.
+     */
+    public const string STAFF_NOTIFIED_PREFIX = StateNamespace::System->value . '.staff_notified';
+
+    /**
+     * Prefix for the per-node `notify` contacts-mode dispatch marker. Full path:
+     * `system.contacts_notified.{nodeId}`. Set once the fan-out job is queued so a
+     * re-execution of the node never enqueues a duplicate broadcast.
+     */
+    public const string CONTACTS_NOTIFIED_PREFIX = StateNamespace::System->value . '.contacts_notified';
+
+    /**
      * Prefix for per-input-node retry counters. Full path:
      * `system.input.{nodeId}.retry_count`. Incremented whenever validation
      * fails; cleared when the node finally emits success or `invalid`.

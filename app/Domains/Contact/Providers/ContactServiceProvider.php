@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Contact\Providers;
 
 use App\Domains\Contact\Contracts\ContactServiceInterface;
+use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Policies\ContactPolicy;
+use App\Domains\Contact\Repositories\ContactTagRepository;
 use App\Domains\Contact\Services\ContactService;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -24,6 +26,7 @@ final class ContactServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(ContactServiceInterface::class, ContactService::class);
+        $this->app->bind(ContactTagRepositoryInterface::class, ContactTagRepository::class);
     }
 
     /**

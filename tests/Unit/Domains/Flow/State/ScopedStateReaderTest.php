@@ -48,6 +48,21 @@ final class ScopedStateReaderTest extends TestCase
         $this->assertSame('t-99', $reader->read('contact.tenant_id'));
     }
 
+    public function test_reads_contact_is_authenticated_canonical_column(): void
+    {
+        $contact                   = $this->contact();
+        $contact->is_authenticated = true;
+
+        $reader = new ScopedStateReader(
+            sessionState: [],
+            contact: $contact,
+            accessors: $this->emptyRegistry(),
+        );
+
+        // Must come from the canonical column, not the attributes JSONB.
+        $this->assertTrue($reader->read('contact.is_authenticated'));
+    }
+
     public function test_reads_contact_attributes_leaf_and_nested(): void
     {
         $contact             = $this->contact();

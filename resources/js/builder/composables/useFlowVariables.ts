@@ -57,12 +57,13 @@ export interface PickerVariable {
 // ── Built-in platform fixtures ───────────────────────────────────────────────
 
 const BUILTIN_CONTACT: Array<{ name: string; label: string }> = [
-    { name: 'id',       label: 'ID' },
-    { name: 'language', label: 'Language' },
-    { name: 'name',     label: 'Name' },
-    { name: 'username', label: 'Username' },
-    { name: 'phone',    label: 'Phone' },
-    { name: 'channel',  label: 'Channel' },
+    { name: 'id',               label: 'ID' },
+    { name: 'language',         label: 'Language' },
+    { name: 'name',             label: 'Name' },
+    { name: 'username',         label: 'Username' },
+    { name: 'phone',            label: 'Phone' },
+    { name: 'channel',          label: 'Channel' },
+    { name: 'is_authenticated', label: 'Authenticated' },
 ]
 
 const BUILTIN_RAG: Array<{ name: string; label: string }> = [

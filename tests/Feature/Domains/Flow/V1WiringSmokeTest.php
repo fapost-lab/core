@@ -42,6 +42,9 @@ final class V1WiringSmokeTest extends FeatureTestCase
             ['end', 1],
             ['rag_query', 1],
             ['subflow', 1],
+            ['set_tag', 1],
+            ['notify', 1],
+            ['auth_request', 1],
         ];
 
         foreach ($expected as [$type, $version]) {

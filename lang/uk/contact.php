@@ -18,6 +18,10 @@ return [
         'created_at'  => 'Створено',
         'updated_at'  => 'Оновлено',
     ],
+    'tags' => [
+        'label'  => 'Теги',
+        'manage' => 'Керування тегами',
+    ],
     'sections' => [
         'header'        => 'Ідентичність',
         'profile'       => 'Профіль',

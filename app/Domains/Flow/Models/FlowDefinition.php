@@ -56,6 +56,7 @@ final class FlowDefinition extends BaseModel
         'nodes',
         'edges',
         'is_active',
+        'is_public',
         'expression_engine',
         'logging_enabled',
         'published_at',
@@ -70,6 +71,7 @@ final class FlowDefinition extends BaseModel
             'nodes'           => 'array',
             'edges'           => 'array',
             'is_active'       => 'boolean',
+            'is_public'       => 'boolean',
             'logging_enabled' => 'boolean',
             'published_at'    => 'datetime',
         ];

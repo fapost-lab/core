@@ -506,7 +506,9 @@ username), `attributes` (JSON: данные собранные платформ�
 - `contact_tags`: `contact_id`, `tag`, `tagged_by` (`flow_session_id` | `staff_user_id`), `tagged_at`.
 - `contact_segments`: `rules` (JSON условий), `cached_count`.
 
-**`set_tag` нода (Core, P1):** `action` (add|remove|toggle), `tags` (массив).
+**`set_tag` нода (Core, P1):** `action` (add|remove|toggle), `tags` (массив, language-agnostic). Пишет в
+`contact_tags` с `tagged_by = flow_session_id`. Override `SetTagConfig.vue` (автокомплит из существующих тегов
+`/builder/tags` + вставка переменных). Категория **Data**. Спека: `drafts/nodes/set_tag.md`.
 
 **`ContactSegmentResolver`** вычисляет выборку по rules. Используется Broadcasting при создании списка получателей.
 
@@ -646,20 +648,28 @@ renderer → расширил reference. Это контракт, не комм�
 | `delay` | Core | P1 |
 | `assign` | Core | P1 |
 | `call` | Core | P1 |
-| `notify_staff` | Core | P1 |
+| `notify` | Core | P1 |
 | `set_tag` | Core | P1 |
 | `handler` | Core + Solution/Plugin | P1 |
 | `go_to_flow` | Core | P2 |
 | `emit_event` | Core | P2 |
 | `subflow` | Core | P2 |
 | `rag_query` | Feature: RAG | P2 |
-| `auth_request` | Feature: AccessControl | P3 |
+| `auth_request` | Core | P1 |
 | `comment` | Core (конструктор) | P3 |
 
 **Удалено из taxonomy (май 2026):**
 - `switch` — функционал перекрывается `condition`/`branch` через множественные правила в одной ноде. Иконка и color-scheme удалены из builder.
 - `set_attribute`, `set_variable` — оба покрываются `assign` (multi-operations). Один writer, один UI.
 - `webhook` — переименован в `call` (matches `CallNodeHandler`). Не путать с triggers: `webhook` остаётся как **trigger type** (входящий HTTP запрос для старта flow).
+
+**Superseded — отдельная нода не реализуется (июнь 2026):**
+- `handler` — покрывается нодой `call` с `transport: 'handler'` (вызов зарегистрированного `handler_id` через
+  `CallTransportRegistry` → `HandlerTransport`). Реестр handler'ов (`auth.*`, `hr.*`, …) остаётся актуальным — их
+  вызывает `call`, отдельный node-type не нужен.
+- `go_to_flow` — отдельная нода не нужна. Два сценария разведены: call-and-return → `subflow`; «jump без возврата» →
+  `emit_event` нода + `event`-триггер целевого flow (подписка на событие, опц. задержка). Передача управления между
+  flow моделируется через события, не через прямой jump-узел.
 
 **`send_message` content_type:** `text`, `text_with_keyboard`, `image`, `document`, `video`, `voice`.
 
@@ -676,7 +686,6 @@ renderer → расширил reference. Это контракт, не комм�
 - `true` / `false` — condition.
 - `no_response` — input timeout.
 - `error` / `success` — webhook, handler.
-- `authenticated` / `failed` — auth_request.
 - `no_agents` — assign.
 - `[значение]` + `default` — switch.
 
@@ -692,6 +701,21 @@ renderer → расширил reference. Это контракт, не комм�
 **`handler` нода:** тип ноды живёт в Core, реализации регистрируют Solution/Plugin при boot через `CoreRegistrar`.
 `handler_id` определяет реализацию (`hr.sync_employee`, `crm.create_deal`). `TenantActivationRuntime` фильтрует
 доступные `handler_id` по активированным Solution/Plugin.
+
+**`notify` нода (Core, P1):** уведомление с двумя режимами (`NotifyConfig.vue` override). **Staff** — эскалация
+staff-пользователям (Users в tenant-схеме, `user_assistants`): target `assistant` | `role` | `users`, каналы in-app
+(Filament DB) / email / all, текст — **admin UI language**, доставка через `messaging.system`. **Contacts** — рассылка
+контактам через выбранный ассистент по тегу/«все контакты», content-язык, доставка через `messaging.broadcast`
+(`SendContactNotificationJob`). Один выход `default`. Спека: `drafts/nodes/notify_staff.md` (исторический файл).
+
+**`auth_request` нода (Core, P1):** **флаг-сеттер**, не ветвитель. Тип `basic`: сравнивает переменную с ожидаемым
+значением (операторы `BranchOperator`); при совпадении поднимает каноничный `contact.is_authenticated`. Всегда идёт
+одним выходом `default` — auth проверяется gate'ом при старте flow (`FlowAccessPolicy`, поле `flow_definitions.is_public`)
+и нодой `branch`. Override `AuthRequestConfig.vue` (operand picker + локализованные операторы). Будущие методы
+(phone/SMS) добавляются как case'ы `AuthMethod`. Спека: `drafts/nodes/auth_request.md`.
+
+**`comment` нода (Core, конструктор, P3):** builder-only аннотация на канвасе. **Без NodeHandler и runtime-поведения** —
+движок её не исполняет; живёт только в Vue-конструкторе. В Flow Engine не реализуется.
 
 ### Handler Registry — namespace taxonomy
 
@@ -994,23 +1018,26 @@ vendor/fapost/solution-{name}/
     SyncEmployeePreview.vue    ← node card preview override (опционально)
 ```
 
-Builder должен подхватывать через Vite glob (⚠️ **спроектировано, но ещё НЕ реализовано** — сейчас `ConfigPanel.vue`
-использует хардкод-карту `OVERRIDES`, vendor-glob не подключён; задача: `drafts/builder-renderer/05-vendor-glob.md`):
+Builder подхватывает через Vite glob (✅ реализовано — `resources/js/builder/utils/vendorComponents.ts` строит карты
+`vendorConfigs` / `vendorPreviews`; `ConfigPanel.vue` резолвит `OVERRIDES[type] ?? vendorConfigs[type] ??
+SchemaConfigRenderer` (Core приоритетнее vendor), `FlowNodeCard.vue` — `vendorPreviews[type]` поверх дефолтного
+summary):
 
 ```js
 const vendorConfigs = import.meta.glob(
-  '../../vendor/fapost/*/resources/js/builder/*Config.vue',
+  '../../../../vendor/fapost/*/resources/js/builder/*Config.vue',
   { eager: true }
 )
 const vendorPreviews = import.meta.glob(
-  '../../vendor/fapost/*/resources/js/builder/*Preview.vue',
+  '../../../../vendor/fapost/*/resources/js/builder/*Preview.vue',
   { eager: true }
 )
 ```
 
 **Соглашение по именованию — обязательно:**
 `{PascalCaseType}Config.vue` → тип ноды `snake_case`.
-`SyncEmployeeConfig.vue` → `sync_employee`.
+`SyncEmployeeConfig.vue` → `sync_employee`. Маппинг имени — `vendorComponentType()` в
+`resources/js/builder/utils/vendorComponentName.ts` (unit-тест: `vendorComponentName.test.ts`).
 
 ### Что НЕ делать
 

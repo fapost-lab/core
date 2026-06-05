@@ -73,6 +73,12 @@ final class ContactInfolistSchema
                     ->label(__('contact.fields.username'))
                     ->state(static fn (Contact $record): ?string => self::metaString($record, 'username'))
                     ->placeholder(self::placeholder()),
+                TextEntry::make('contact_tags')
+                    ->label(__('contact.tags.label'))
+                    ->badge()
+                    ->columnSpanFull()
+                    ->state(static fn (Contact $record): array => $record->tags()->orderBy('tag')->pluck('tag')->all())
+                    ->placeholder(self::placeholder()),
             ]);
     }
 

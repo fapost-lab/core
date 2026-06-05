@@ -7,6 +7,10 @@ return [
         'group' => 'Staff',
     ],
 
+    'notifications' => [
+        'escalation_subject' => 'Notification from :app',
+    ],
+
     'tenant_settings' => [
         'title'      => 'Settings',
         'navigation' => 'Settings',

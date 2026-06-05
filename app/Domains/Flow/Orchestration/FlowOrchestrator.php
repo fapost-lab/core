@@ -8,6 +8,7 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
+use App\Domains\Flow\Contracts\FlowAccessPolicyInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
@@ -37,6 +38,7 @@ final class FlowOrchestrator implements FlowOrchestratorInterface
         private readonly PersistentButtonRegistryInterface $persistentButtonRegistry,
         private readonly ContentTranslatorInterface $translator,
         private readonly TenantSettings $tenantSettings,
+        private readonly FlowAccessPolicyInterface $accessPolicy,
     ) {
     }
 
@@ -79,7 +81,10 @@ final class FlowOrchestrator implements FlowOrchestratorInterface
                     if (null !== $flowId) {
                         $definition = $this->definitions->findLatestActiveByFlowId($flowId);
 
-                        if (null !== $definition) {
+                        // A private flow is unavailable to an unauthenticated contact —
+                        // treat it like "no flow available" and fall through to fallback,
+                        // never starting a session for it.
+                        if (null !== $definition && $this->accessPolicy->canStart($definition, $contact)) {
                             $this->engine->start($definition, $contact, []);
 
                             return;
@@ -171,7 +176,7 @@ final class FlowOrchestrator implements FlowOrchestratorInterface
 
     private function resolveDefaultFlowId(): ?string
     {
-        if ( ! $this->currentAssistant->isResolved()) {
+        if (! $this->currentAssistant->isResolved()) {
             return null;
         }
 
@@ -182,13 +187,13 @@ final class FlowOrchestrator implements FlowOrchestratorInterface
 
     private function sendFallbackIfConfigured(Contact $contact, string $assistantId): void
     {
-        if ( ! $this->currentAssistant->isResolved()) {
+        if (! $this->currentAssistant->isResolved()) {
             return;
         }
 
         $field = $this->currentAssistant->get()->fallback_message;
 
-        if ( ! is_array($field) && ! is_string($field)) {
+        if (! is_array($field) && ! is_string($field)) {
             return;
         }
 

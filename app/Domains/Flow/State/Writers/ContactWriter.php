@@ -28,7 +28,7 @@ use InvalidArgumentException;
 final readonly class ContactWriter implements ContactWriterInterface
 {
     /** Canonical contact columns that flow nodes are allowed to write. */
-    private const array WRITABLE_COLUMNS = ['language'];
+    private const array WRITABLE_COLUMNS = ['language', 'is_authenticated'];
 
     /** Identity columns / namespaces that flow nodes must never write. */
     private const array RESERVED_COLUMNS = ['id', 'tenant_id', 'external_id', 'platform'];
@@ -46,7 +46,7 @@ final readonly class ContactWriter implements ContactWriterInterface
 
     public function write(string $path, mixed $value): void
     {
-        if ( ! str_starts_with($path, 'contact.')) {
+        if (! str_starts_with($path, 'contact.')) {
             throw new InvalidArgumentException("ContactWriter only handles 'contact.*' paths; got '{$path}'.");
         }
 

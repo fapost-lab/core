@@ -6,6 +6,10 @@ namespace App\Providers;
 
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Notifications\Notifiers\EmailStaffNotifier;
+use App\Domains\Staff\Notifications\Notifiers\InAppStaffNotifier;
+use App\Domains\Staff\Notifications\StaffNotifierRegistry;
+use App\Domains\Staff\Notifications\StaffRecipientResolver;
 use App\Domains\Staff\Policies\RolePolicy;
 use App\Domains\Staff\Policies\UserPolicy;
 use App\Domains\Staff\Services\AclBootstrapService;
@@ -29,6 +33,18 @@ final class StaffServiceProvider extends ServiceProvider
         $this->app->singleton(RoleWriterService::class);
         $this->app->singleton(RoleFormDataMapper::class);
         $this->app->singleton(UserService::class);
+        $this->app->singleton(StaffRecipientResolver::class);
+
+        // Staff notification transports — registered into a single in-memory
+        // registry. Adding a new channel (e.g. a messenger bot) is a one-line
+        // register() call here; the notify_staff node picks it up automatically.
+        $this->app->singleton(StaffNotifierRegistry::class, function (): StaffNotifierRegistry {
+            $registry = new StaffNotifierRegistry();
+            $registry->register(new InAppStaffNotifier());
+            $registry->register(new EmailStaffNotifier());
+
+            return $registry;
+        });
     }
 
     /**

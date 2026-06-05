@@ -18,6 +18,8 @@ import StatePickerField from './fields/StatePickerField.vue'
 import KeyValueField from './fields/KeyValueField.vue'
 import ObjectField from './fields/ObjectField.vue'
 import ObjectArrayField from './fields/ObjectArrayField.vue'
+import FlowPickerField from './fields/FlowPickerField.vue'
+import EnumCardsField from './fields/EnumCardsField.vue'
 import {resolveVisibility} from '@builder/composables/useFieldVisibility'
 
 /**
@@ -54,6 +56,8 @@ const FIELD_COMPONENTS: Record<string, object> = {
     'key-value': KeyValueField,
     object: ObjectField,
     'object-array': ObjectArrayField,
+    'flow-picker': FlowPickerField,
+    'enum-cards': EnumCardsField,
 }
 
 const visibleFields = computed(() =>

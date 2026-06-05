@@ -89,6 +89,24 @@ const SHAPES: Record<string, string> = {
         <rect x="10" y="10" width="4" height="4" rx="0.6" fill="currentColor" stroke="none" />
     `,
 
+    // ── set_tag — price tag with hole ──
+    set_tag: `
+        <path d="M4 12.5l8-8H19v6.5L11 19z" />
+        <circle cx="15" cy="9" r="1.3" fill="currentColor" stroke="none" />
+    `,
+
+    // ── notify — bell ──
+    notify: `
+        <path d="M12 4a5 5 0 0 0-5 5c0 5-2 6-2 6h14s-2-1-2-6a5 5 0 0 0-5-5z" />
+        <path d="M10 19a2 2 0 0 0 4 0" />
+    `,
+
+    // ── auth_request — shield with check ──
+    auth_request: `
+        <path d="M12 3.5l7 2.5v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9v-5z" />
+        <path d="M9 12l2 2 4-4" />
+    `,
+
     // ── end — filled stop circle ──
     end: `
         <circle cx="12" cy="12" r="8" />

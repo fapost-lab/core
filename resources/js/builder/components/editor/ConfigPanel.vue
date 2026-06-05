@@ -12,20 +12,25 @@ import SendMessageConfig from './config/overrides/SendMessageConfig.vue'
 import InputConfig from './config/overrides/InputConfig.vue'
 import ConditionConfig from './config/overrides/ConditionConfig.vue'
 import AssignConfig from './config/overrides/AssignConfig.vue'
-import SubflowConfig from './config/overrides/SubflowConfig.vue'
+import AuthRequestConfig from './config/overrides/AuthRequestConfig.vue'
 import CallConfig from './config/overrides/CallConfig.vue'
-import EndConfig from './config/overrides/EndConfig.vue'
+import NotifyConfig from './config/overrides/NotifyConfig.vue'
+import SetTagConfig from './config/overrides/SetTagConfig.vue'
 import TriggerConfig from './config/overrides/TriggerConfig.vue'
+import {vendorConfigs} from '@builder/utils/vendorComponents'
 
+// Core bespoke config panels. Resolution order is Core → vendor (Solution)
+// → generic schema renderer, so Core always wins on a type collision.
 const OVERRIDES: Record<string, object> = {
     send_message: SendMessageConfig,
     input: InputConfig,
     condition: ConditionConfig,
     branch: ConditionConfig,
     assign:   AssignConfig,
-    subflow:  SubflowConfig,
     call: CallConfig,
-    end: EndConfig,
+    set_tag: SetTagConfig,
+    notify: NotifyConfig,
+    auth_request: AuthRequestConfig,
 }
 
 const selectionStore = useSelectionStore()
@@ -45,9 +50,11 @@ const handlerMeta = computed(() =>
         : null
 )
 
-const configComponent = computed(() =>
-    selectedNode.value ? (OVERRIDES[selectedNode.value.type] ?? SchemaConfigRenderer) : null
-)
+const configComponent = computed(() => {
+    if (!selectedNode.value) return null
+    const type = selectedNode.value.type
+    return OVERRIDES[type] ?? vendorConfigs[type] ?? SchemaConfigRenderer
+})
 
 const colors = computed(() =>
     selectedNode.value ? nodeColors(selectedNode.value.type) : null

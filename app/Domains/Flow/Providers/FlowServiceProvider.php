@@ -46,14 +46,17 @@ use App\Domains\Flow\Events\QueuedFlowTriggerEventPublisher;
 use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
 use App\Domains\Flow\Handlers\AssignNodeHandler;
+use App\Domains\Flow\Handlers\AuthRequestNodeHandler;
 use App\Domains\Flow\Handlers\BranchNodeHandler;
 use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\DelayNodeHandler;
 use App\Domains\Flow\Handlers\EmitEventNodeHandler;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\InputNodeHandler;
+use App\Domains\Flow\Handlers\NotifyNodeHandler;
 use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
+use App\Domains\Flow\Handlers\SetTagNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Handlers\Support\TemplateResolver;
@@ -206,6 +209,29 @@ final class FlowServiceProvider extends ServiceProvider
                 $this->app->make(FlowSessionRepositoryInterface::class),
             )
         );
+        $registry->register(
+            new SetTagNodeHandler(
+                $this->app->make(\App\Domains\Contact\Contracts\ContactTagRepositoryInterface::class),
+                $templates,
+            )
+        );
+        $registry->register(
+            new NotifyNodeHandler(
+                $this->app->make(\Illuminate\Contracts\Bus\Dispatcher::class),
+                $templates,
+                $this->app->make(\App\Domains\Staff\Notifications\StaffNotifierRegistry::class),
+            )
+        );
+        $registry->register(
+            new AuthRequestNodeHandler(
+                new \App\Domains\Flow\Handlers\Support\OperandResolver(
+                    $this->app->make(DataAccessorRegistryInterface::class),
+                    $variableResolver,
+                ),
+                new \App\Domains\Flow\Handlers\Support\OperatorComparator(),
+                $templates,
+            )
+        );
 
         $expressions = $this->app->make(ExpressionEngineRegistry::class);
         $expressions->register(new TemplateEngine());
@@ -301,6 +327,10 @@ final class FlowServiceProvider extends ServiceProvider
             )
         );
         $this->app->bind(LanguageResolverInterface::class, LanguageResolver::class);
+        $this->app->singleton(
+            \App\Domains\Flow\Contracts\FlowAccessPolicyInterface::class,
+            \App\Domains\Flow\Services\FlowAccessPolicy::class,
+        );
         $this->app->bind(ContentTranslatorInterface::class, CachedContentTranslator::class);
         $this->app->bind(TenantTranslationRepositoryInterface::class, TenantTranslationRepository::class);
         $this->app->bind(AssistantTranslationRepositoryInterface::class, AssistantTranslationRepository::class);

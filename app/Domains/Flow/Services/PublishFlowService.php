@@ -82,6 +82,7 @@ final readonly class PublishFlowService
                 'nodes'           => $nodes,
                 'edges'           => $edges,
                 'is_active'       => true,
+                'is_public'       => (bool) $draft->is_public,
                 'logging_enabled' => (bool) $draft->logging_enabled,
                 'published_at'    => now(),
             ]);

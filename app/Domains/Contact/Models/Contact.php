@@ -59,6 +59,7 @@ final class Contact extends BaseModel
         'platform',
         'external_id',
         'language',
+        'is_authenticated',
         'meta',
         'attributes',
     ];
@@ -73,6 +74,16 @@ final class Contact extends BaseModel
         return $this->hasMany(ChannelContact::class);
     }
 
+    /**
+     * Dynamic tags applied to this contact (by flow nodes or staff).
+     *
+     * @return HasMany<ContactTag, $this>
+     */
+    public function tags(): HasMany
+    {
+        return $this->hasMany(ContactTag::class);
+    }
+
     protected static function newFactory(): ContactFactory
     {
         return ContactFactory::new();
@@ -84,10 +95,11 @@ final class Contact extends BaseModel
     protected function casts(): array
     {
         return [
-            'platform'   => PlatformEnum::class,
-            'language'   => 'string',
-            'meta'       => 'array',
-            'attributes' => 'array',
+            'platform'         => PlatformEnum::class,
+            'language'         => 'string',
+            'is_authenticated' => 'boolean',
+            'meta'             => 'array',
+            'attributes'       => 'array',
         ];
     }
 }

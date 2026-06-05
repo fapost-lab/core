@@ -7,6 +7,7 @@ import {nodeColors} from '@builder/utils/nodeColors'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 import {useMoveNode} from '@builder/composables/useMoveNode'
 import NodeIcon from '@builder/components/NodeIcon.vue'
+import {vendorPreviews} from '@builder/utils/vendorComponents'
 
 const props = defineProps({
     treeNode: { type: Object, required: true },
@@ -26,6 +27,13 @@ const typeLabel = computed(() => {
     if (handlerMeta.value?.label) return handlerMeta.value.label
     return props.treeNode.node.type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
 })
+
+/**
+ * Vendor (Solution) card-preview override for this node type, if one is
+ * published (ADR-06). When present it replaces the default summary body;
+ * the card head (icon + label) is always Core-rendered.
+ */
+const vendorPreview = computed<object | null>(() => vendorPreviews[props.treeNode.node.type] ?? null)
 
 /**
  * For `end` nodes, surface the configured completion status as a colour accent
@@ -173,7 +181,11 @@ function openMoveDialog() {
             <button class="node-delete-btn" title="Delete node" @click.stop="deleteNode">×</button>
         </div>
 
-        <div v-if="summaryRows.length > 0" class="node-card-body">
+        <div v-if="vendorPreview" class="node-card-body">
+            <component :is="vendorPreview" :node="treeNode.node" />
+        </div>
+
+        <div v-else-if="summaryRows.length > 0" class="node-card-body">
             <div
                 v-for="row in summaryRows"
                 :key="row.key"

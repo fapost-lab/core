@@ -63,7 +63,10 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
         $tail     = $segments[1] ?? null;
 
         // Canonical column lookup
-        if (in_array($head, ['id', 'tenant_id', 'external_id', 'platform', 'language'], true) && null === $tail) {
+        if (
+            in_array($head, ['id', 'tenant_id', 'external_id', 'platform', 'language', 'is_authenticated'], true)
+            && null === $tail
+        ) {
             return $this->contact->getAttribute($head);
         }
 
@@ -75,7 +78,7 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
 
         $group = $attributes[$head] ?? null;
 
-        if ( ! is_array($group)) {
+        if (! is_array($group)) {
             return null;
         }
 
@@ -107,7 +110,7 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
     {
         $payload = $this->sessionState[$namespace] ?? null;
 
-        if ( ! is_array($payload)) {
+        if (! is_array($payload)) {
             return null;
         }
 

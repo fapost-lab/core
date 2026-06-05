@@ -48,6 +48,7 @@ final class PublishFlowServiceTest extends TestCase
             $table->json('nodes')->nullable();
             $table->json('edges')->nullable();
             $table->boolean('is_active')->default(true);
+            $table->boolean('is_public')->default(true);
             $table->boolean('logging_enabled')->default(false);
             $table->timestamps();
         });
@@ -85,6 +86,7 @@ final class PublishFlowServiceTest extends TestCase
             $table->json('nodes');
             $table->json('edges')->nullable();
             $table->boolean('is_active')->default(false);
+            $table->boolean('is_public')->default(true);
             $table->boolean('logging_enabled')->default(false);
             $table->timestamp('published_at')->nullable();
             $table->timestamps();
@@ -161,6 +163,35 @@ final class PublishFlowServiceTest extends TestCase
         $definition = app(PublishFlowService::class)->execute($flowId);
 
         $this->assertFalse((bool) $definition->logging_enabled);
+    }
+
+    public function test_publishes_is_public_flag_from_draft_onto_new_definition(): void
+    {
+        $flowId = '00000000-0000-0000-0000-000000000999';
+
+        FlowDraft::factory()->create([
+            'flow_id'   => $flowId,
+            'is_public' => false,
+            'nodes'     => [
+                [
+                    'id'      => 'start',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => [
+                            'name'    => 'answer',
+                            'type'    => 'text',
+                            'storage' => 'session',
+                            'group'   => null,
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        $definition = app(PublishFlowService::class)->execute($flowId);
+
+        $this->assertFalse((bool) $definition->is_public);
     }
 
     public function test_assigns_unique_versions_for_repeated_publish_calls(): void

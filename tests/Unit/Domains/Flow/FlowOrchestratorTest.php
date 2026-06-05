@@ -52,6 +52,51 @@ final class FlowOrchestratorTest extends TestCase
         );
     }
 
+    public function test_it_does_not_start_private_flow_for_unauthenticated_contact(): void
+    {
+        $contact     = Contact::factory()->make(['tenant_id' => 'tenant-1', 'is_authenticated' => false]);
+        $message     = $this->message();
+        $definition  = FlowDefinition::make(['is_public' => false]);
+        $guard       = $this->guardThatRunsCallback();
+        $sessions    = $this->mock(FlowSessionRepositoryInterface::class);
+        $definitions = $this->mock(FlowDefinitionRepositoryInterface::class);
+        $engine      = $this->mock(FlowEngineInterface::class);
+
+        $sessions->shouldReceive('findActiveForContact')->once()->with($contact, 'assistant-1')->andReturn(null);
+        $definitions->shouldReceive('findLatestActiveByFlowId')->once()->with('flow-1')->andReturn($definition);
+        $engine->shouldNotReceive('start');
+        $engine->shouldNotReceive('resume');
+
+        $this->orchestrator($guard, $engine, $sessions, $definitions)->handle(
+            $contact,
+            $message,
+            'assistant-1',
+            new ResolvedTrigger(triggerId: 'trigger-1', flowId: 'flow-1', type: 'message'),
+        );
+    }
+
+    public function test_it_starts_private_flow_for_authenticated_contact(): void
+    {
+        $contact     = Contact::factory()->make(['tenant_id' => 'tenant-1', 'is_authenticated' => true]);
+        $message     = $this->message();
+        $definition  = FlowDefinition::make(['is_public' => false]);
+        $guard       = $this->guardThatRunsCallback();
+        $sessions    = $this->mock(FlowSessionRepositoryInterface::class);
+        $definitions = $this->mock(FlowDefinitionRepositoryInterface::class);
+        $engine      = $this->mock(FlowEngineInterface::class);
+
+        $sessions->shouldReceive('findActiveForContact')->once()->with($contact, 'assistant-1')->andReturn(null);
+        $definitions->shouldReceive('findLatestActiveByFlowId')->once()->with('flow-1')->andReturn($definition);
+        $engine->shouldReceive('start')->once()->with($definition, $contact, [])->andReturn(FlowSession::make());
+
+        $this->orchestrator($guard, $engine, $sessions, $definitions)->handle(
+            $contact,
+            $message,
+            'assistant-1',
+            new ResolvedTrigger(triggerId: 'trigger-1', flowId: 'flow-1', type: 'message'),
+        );
+    }
+
     public function test_it_resumes_existing_session(): void
     {
         $contact     = Contact::factory()->make(['tenant_id' => 'tenant-1']);
@@ -415,6 +460,7 @@ final class FlowOrchestratorTest extends TestCase
             $registry,
             $translator,
             $settings,
+            new \App\Domains\Flow\Services\FlowAccessPolicy(),
         );
     }
 }
