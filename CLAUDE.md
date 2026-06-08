@@ -1086,6 +1086,96 @@ const vendorPreviews = import.meta.glob(
 
 Детали фаз, спринтов, задач и статусов — в `fapost-plan.docx`.
 
+---
+
+## Состояние реализации (июнь 2026)
+
+V1 ядро + V1.x закрыты, **651+ тестов проходят**. Ниже — фактический срез того, что построено;
+не дублировать сюда детальные планы (они в `fapost-plan.docx` и `drafts/`), только устойчивые ориентиры
+по существующим классам и компонентам.
+
+### Filament admin
+
+- **Tenant-level resources:** Users / Roles / Assistants / Media.
+- **Tenant-level pages:** TenantSettings (табы Languages / Runtime / Broadcasts), Translations (catalog overrides под Content).
+- **Assistant-level resources:** Channels / Flows / FlowGroups / FlowSessions / FlowLogs / Contacts (read-only).
+- **Assistant-level pages:** Dashboard, AssistantSettings (табы General / Commands / Advanced; inline create-flow на
+  `default_flow_id`; commands UI), Translations (assistant override layer + tenant inheritance badge).
+- `ContactResource` — group-based infolist секции (collapsible по threshold, plural-aware заголовки), action «Manage tags»
+  (`TagsInput`, `syncForContact`).
+
+### Backend / translations
+
+- System translation catalog (`SystemTranslationCatalogInterface`, `InMemorySystemTranslationCatalog`,
+  `CoreSystemTranslations` seed) — все ключи системных текстов в коде.
+- `CachedContentTranslator` — 3-layer chain: `assistant override → tenant override → catalog → key`.
+- `CommandMatcher` / `BuiltinCommandsRegistry` через catalog (`response_key`); `DropPolicy::applyBusy` через `errors.busy`;
+  `FlowOrchestrator::sendFallbackIfConfigured` через locale-aware `resolveField`.
+- Locale-aware assistant fields (`fallback_message`, `busy_message`, `commands.text`, `commands.response`) — JSONB columns,
+  табы по локалям в UI.
+
+### Vue builder — schema renderer
+
+- Schema renderer (Phase 1+2): field-типы `json`, `state-picker`, `object`, `key-value`, `object-array`, `flow-picker`,
+  `enum-cards`; `help` text, `required: [...]`, schema defaults, `visible_when` (`useFieldVisibility`,
+  операторы equals/in/truthy), inline-валидаторы (`regex`/`min`/`max`), секции с иконками (`sectionIcons.ts`,
+  `AccordionSection`).
+- Fluent API `FAPost\Support\Builder\Schema` (`XxxField::make()` + `Schema`/`Section`) — все 10 Core-handler'ов мигрированы.
+  Reference: `docs/builder-config-schema-reference.md` (контракт PHP↔Vue).
+- **Core overrides** (`ConfigPanel.vue` OVERRIDES): `send_message`, `input`, `condition`/`branch`, `assign`, `call`,
+  `set_tag`, `notify`, `auth_request`. `subflow` и `end` — **без bespoke-override**, полностью schema-driven
+  (`subflow` → `flow-picker`; `end` → `enum-cards`). `SubflowConfig.vue`/`EndConfig.vue` удалены.
+- Vendor glob (ADR-06): `utils/vendorComponents.ts` (`vendorConfigs`/`vendorPreviews`) + `utils/vendorComponentName.ts`
+  (vitest unit-тест). Резолвинг: `ConfigPanel` → Core OVERRIDES → vendor → `SchemaConfigRenderer`;
+  `FlowNodeCard` → vendorPreviews поверх дефолтного summary. Добавлен vitest (`npm test`).
+- Unified `VariablePicker` (copy + drag + emit `select`) в `TextField`/`TextareaField`/`StatePickerField` +
+  `SendMessageConfig` через `useInsertAtCursor`. Dirty indicator (● в AppTopBar) + `beforeunload` guard в FlowEditor.
+
+### Variable storage (drafts/storage 01–11 — закрыто)
+
+- Frontend: `VariableStorageEditor.vue` (StorageRadio pill + GroupSelect с inline-create + `useKnownGroups`),
+  `utils/variableCompiler.ts` (compile/decompile + legacy support); Input / SendMessage (`save_to_variable`) /
+  Assign (`AssignConfig.vue`, multi-operations) мигрированы. Variable Picker rework — search + accordion-секции,
+  auto-flip popover, source icons.
+- Branch source picker — `ConditionOperandPicker.vue` (режимы user_variable / source) + structured `left` JSON.
+- Backend: `Variable` VO, `VariableResolver`, `VariableStorage` enum, `VariableType` enum, `VariableCoercer`,
+  `CacheBackedVariableSchemaRegistry` (per-tenant `tenant_variable_schema`, schema upsert при publish, cross-flow
+  type conflict detection). `BranchNodeHandler` читает через coercer; легаси-формат поддержан.
+- Flow `logging_enabled` flag end-to-end (propagation draft→definition в `PublishFlowService`, Filament toggle,
+  History tab в FlowSession Inspector). Subflow navigation events (`SubflowStarted`/`SubflowReturned`) пишутся
+  `SubflowStarterService` / `DefaultSubflowResumer` через `HistoryWriterFactory`, уважают `logging_enabled`.
+- End node — color-coding на canvas по `status` (success/cancelled/failed → зелёный/амбер/красный); config через `enum-cards`.
+- **Save draft без валидации:** `BuilderFlowController::saveDraft` не вызывает `ValidateFlowService`. Validation только
+  при явном `/validate` и атомарно при Publish (`PublishFlowService`). `SyncFlowTriggerService` снят с проверки
+  tenant-event-registry.
+
+### Auth unification (drafts/auth — закрыто)
+
+- Granular permissions (Permission enum + `label()`/`description()`/`isSensitive()`/`group()`), RoleEnum, i18n.
+- Policy classes: FlowDraft, FlowGroup, FlowSession, FlowLog, Contact, Assistant (+ migrate inline checks + `canAccess()`).
+- Roles UI — descriptions, sensitive marker (⚠ badge), 2-column layout.
+
+### Ноды set_tag / notify / auth_request (drafts/nodes — закрыто)
+
+- **set_tag** — `SetTagNodeHandler` + `contact_tags` (модель/миграция/`ContactTagRepository`), `SetTagConfig.vue`
+  (автокомплит тегов из `/builder/tags` + вставка переменных). add/remove/toggle идемпотентны, `tagged_by = session`.
+  Категория **Data**.
+- **notify** — единый `NotifyNodeHandler` (бывш. `NotifyStaffNodeHandler`), два режима (`NotifyConfig.vue`):
+  **Staff** (in-app/email через `StaffNotifierRegistry`, `SendStaffNotificationJob` → `messaging.system`,
+  Admin-UI язык) и **Contacts** (рассылка по тегу/«все» через ассистент, `SendContactNotificationJob` →
+  `BroadcastSendJob` на `messaging.broadcast`, content-язык per-recipient). Дропдауны с поиском (`SearchSelect.vue`).
+- **auth_request** — Core флаг-сеттер: `basic`-сравнение (`BranchOperator`, локализованы) поднимает каноничный
+  `contact.is_authenticated`, один выход `default`. Gate доступа — `FlowAccessPolicy` + `flow_definitions.is_public`,
+  enforce в `FlowOrchestrator` на старте. `AuthRequestConfig.vue`; `is_authenticated` в `ScopedStateReader` whitelist.
+
+### Отложено (с триггером)
+
+- **phpat-правила** — enforcement архитектурных законов (Migration Isolation, Handler Version Contract, Dependency
+  direction) — отложено, нет user impact. См. `drafts/flow-engine-v1/11-implementation-plan.md`.
+- **Knowledge bases table + RAG validation** — отложено, нет RAG юзкейсов.
+- **Broadcast backpressure** по длине transactional-очереди в `BroadcastSendJob` (стаб не проверяет; полагаемся на
+  rate-limit `MessageSender`) — триггер: Broadcasting feature.
+
 ===
 
 <laravel-boost-guidelines>
