@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Handlers;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
 use App\Domains\Flow\Enums\TagAction;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
+use App\Domains\Flow\State\SystemStateKeys;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
@@ -20,8 +21,10 @@ use FAPost\Support\Builder\Schema\Section;
  *
  * Tags are language-agnostic segmentation labels written to {@code contact_tags}
  * with {@code tagged_by} = the current flow session id. The node never branches:
- * its single `default` output continues the flow. All three actions are idempotent
- * so the handler is safe to retry under the session lock (see CLAUDE.md § Concurrency).
+ * its single `default` output continues the flow. Retry safety is guaranteed by a
+ * per-node state marker (`system.set_tag.{nodeId}`): `add`/`remove` are naturally
+ * idempotent, but `toggle` flips on every run, so a re-execution under the session
+ * lock must skip the mutations entirely (see CLAUDE.md § Concurrency).
  */
 final class SetTagNodeHandler extends AbstractVersionedHandler
 {
@@ -74,6 +77,14 @@ final class SetTagNodeHandler extends AbstractVersionedHandler
         $action = TagAction::tryFrom(is_string($config['action'] ?? null) ? $config['action'] : '')
             ?? TagAction::Add;
 
+        $markerKey = SystemStateKeys::SET_TAG_PREFIX . ".{$context->nodeId}";
+
+        if (true === data_get($state, $markerKey)) {
+            return NodeExecutionResult::executed(
+                metadata: ['action' => $action->value, 'replayed' => true],
+            );
+        }
+
         $tags = $this->resolveTags($config['tags'] ?? [], $state, $context);
 
         foreach ($tags as $tag) {
@@ -85,6 +96,7 @@ final class SetTagNodeHandler extends AbstractVersionedHandler
         }
 
         return NodeExecutionResult::executed(
+            stateChanges: [$markerKey => true],
             metadata: ['action' => $action->value, 'tags' => $tags],
         );
     }

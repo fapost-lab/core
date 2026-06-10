@@ -6,11 +6,19 @@ namespace App\Domains\Webhook\Services;
 
 use InvalidArgumentException;
 
-final class WebhookUrlGenerator
+final readonly class WebhookUrlGenerator
 {
+    /**
+     * @param  string|null  $baseUrl  Public ingress base URL (config `webhook.base_url`), bound in WebhookServiceProvider.
+     */
+    public function __construct(
+        private ?string $baseUrl = null,
+    ) {
+    }
+
     public function forChannel(string $channel, string $hash): string
     {
-        $baseUrl = (string)config('webhook.base_url');
+        $baseUrl = (string)$this->baseUrl;
 
         if ('' === $baseUrl) {
             throw new InvalidArgumentException('Webhook base URL is not configured.');

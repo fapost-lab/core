@@ -33,7 +33,7 @@ final class TelegramWebhookRegistrarTest extends TestCase
         $identityStore = $this->mock(TelegramBotIdentityStoreInterface::class, function (MockInterface $mock): void {
             $mock->shouldReceive('saveUsername')->with('channel-1', 'sample_bot')->once();
         });
-        $registrar = new TelegramWebhookRegistrar(new TelegramBotApiClientFactory(), new WebhookUrlGenerator(), $identityStore);
+        $registrar = new TelegramWebhookRegistrar(new TelegramBotApiClientFactory(), new WebhookUrlGenerator('https://hooks.example.com'), $identityStore);
 
         $registrar->register(new WebhookRegistrationPayload(
             channelId: 'channel-1',
@@ -70,7 +70,7 @@ final class TelegramWebhookRegistrarTest extends TestCase
         $identityStore = $this->mock(TelegramBotIdentityStoreInterface::class, function (MockInterface $mock): void {
             $mock->shouldReceive('saveUsername')->with('channel-1', 'sample_bot')->once();
         });
-        $registrar = new TelegramWebhookRegistrar(new TelegramBotApiClientFactory(), new WebhookUrlGenerator(), $identityStore);
+        $registrar = new TelegramWebhookRegistrar(new TelegramBotApiClientFactory(), new WebhookUrlGenerator('https://hooks.example.com'), $identityStore);
 
         $registrar->register(new WebhookRegistrationPayload(
             channelId: 'channel-1',
@@ -92,7 +92,7 @@ final class TelegramWebhookRegistrarTest extends TestCase
 
         $registrar = new TelegramWebhookRegistrar(
             new TelegramBotApiClientFactory(),
-            new WebhookUrlGenerator(),
+            new WebhookUrlGenerator('https://hooks.example.com'),
             $this->mock(TelegramBotIdentityStoreInterface::class, function (MockInterface $mock): void {
                 $mock->shouldNotReceive('saveUsername');
             }),

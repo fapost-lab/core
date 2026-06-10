@@ -22,8 +22,12 @@ final readonly class MediaService implements MediaServiceInterface
 {
     private const string INBOX_FOLDER_NAME = 'Inbox';
 
+    /**
+     * @param  int  $downloadUrlTtlSeconds  Signed-URL lifetime (config `media.download_url_ttl_seconds`), bound in MediaServiceProvider.
+     */
     public function __construct(
         private TenantContextInterface $tenantContext,
+        private int $downloadUrlTtlSeconds = 300,
     ) {
     }
 
@@ -47,7 +51,7 @@ final readonly class MediaService implements MediaServiceInterface
         return URL::signedRoute(
             'media.files.raw',
             ['file' => $file->id],
-            now()->addSeconds((int)config('media.download_url_ttl_seconds', 300)),
+            now()->addSeconds($this->downloadUrlTtlSeconds),
         );
     }
 

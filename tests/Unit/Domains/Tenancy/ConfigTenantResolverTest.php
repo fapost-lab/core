@@ -22,15 +22,13 @@ final class ConfigTenantResolverTest extends TestCase
     }
     public function test_resolves_tenant_by_slug_from_config(): void
     {
-        config(['tenancy.default_tenant_slug' => 'acme']);
-
         $tenant = Mockery::mock(TenantInterface::class);
         $tenant->shouldReceive('isActive')->once()->andReturn(true);
 
         $repository = Mockery::mock(TenantRepositoryInterface::class);
         $repository->shouldReceive('findBySlug')->once()->with('acme')->andReturn($tenant);
 
-        $resolver = new ConfigTenantResolver($repository);
+        $resolver = new ConfigTenantResolver($repository, 'acme');
         $result   = $resolver->resolve(Request::create('/'));
 
         $this->assertSame($tenant, $result);
@@ -38,10 +36,8 @@ final class ConfigTenantResolverTest extends TestCase
 
     public function test_throws_when_slug_not_configured(): void
     {
-        config(['tenancy.default_tenant_slug' => null]);
-
         $repository = Mockery::mock(TenantRepositoryInterface::class);
-        $resolver   = new ConfigTenantResolver($repository);
+        $resolver   = new ConfigTenantResolver($repository, null);
 
         $this->expectException(TenantNotFoundException::class);
 
@@ -50,12 +46,10 @@ final class ConfigTenantResolverTest extends TestCase
 
     public function test_throws_when_tenant_not_found(): void
     {
-        config(['tenancy.default_tenant_slug' => 'unknown']);
-
         $repository = Mockery::mock(TenantRepositoryInterface::class);
         $repository->shouldReceive('findBySlug')->once()->with('unknown')->andReturn(null);
 
-        $resolver = new ConfigTenantResolver($repository);
+        $resolver = new ConfigTenantResolver($repository, 'unknown');
 
         $this->expectException(TenantNotFoundException::class);
 
@@ -64,15 +58,13 @@ final class ConfigTenantResolverTest extends TestCase
 
     public function test_throws_when_tenant_not_active(): void
     {
-        config(['tenancy.default_tenant_slug' => 'inactive']);
-
         $tenant = Mockery::mock(TenantInterface::class);
         $tenant->shouldReceive('isActive')->once()->andReturn(false);
 
         $repository = Mockery::mock(TenantRepositoryInterface::class);
         $repository->shouldReceive('findBySlug')->once()->with('inactive')->andReturn($tenant);
 
-        $resolver = new ConfigTenantResolver($repository);
+        $resolver = new ConfigTenantResolver($repository, 'inactive');
 
         $this->expectException(TenantNotActiveException::class);
 

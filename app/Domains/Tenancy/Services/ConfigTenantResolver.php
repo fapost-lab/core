@@ -13,14 +13,18 @@ use Illuminate\Http\Request;
 
 final readonly class ConfigTenantResolver implements TenantResolverInterface
 {
+    /**
+     * @param  string|null  $defaultTenantSlug  Config `tenancy.default_tenant_slug`, bound in DomainServiceProvider.
+     */
     public function __construct(
         private TenantRepositoryInterface $tenantRepository,
+        private ?string $defaultTenantSlug = null,
     ) {
     }
 
     public function resolve(Request $request): TenantInterface
     {
-        $slug = config('tenancy.default_tenant_slug');
+        $slug = $this->defaultTenantSlug;
 
         if (empty($slug)) {
             throw new TenantNotFoundException(
@@ -34,7 +38,7 @@ final readonly class ConfigTenantResolver implements TenantResolverInterface
             throw TenantNotFoundException::forSlug($slug);
         }
 
-        if ( ! $tenant->isActive()) {
+        if (! $tenant->isActive()) {
             throw new TenantNotActiveException(
                 "Tenant [{$slug}] is not active."
             );

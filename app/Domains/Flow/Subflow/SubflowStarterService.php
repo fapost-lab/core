@@ -13,6 +13,7 @@ use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
 use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\FlowGraphResolver;
+use Closure;
 use DateInterval;
 use Exception;
 use FAPost\Foundation\Flow\History\HistoryEventType;
@@ -32,10 +33,16 @@ use RuntimeException;
  */
 final readonly class SubflowStarterService
 {
+    /**
+     * @param  Closure(): FlowEngineInterface  $engineResolver  Lazy engine accessor: the engine itself
+     *                                                           depends on the node-handler registry whose factory
+     *                                                           constructs this service, so resolving it eagerly
+     *                                                           would recurse (same pattern as DefaultSubflowResumer).
+     */
     public function __construct(
         private FlowDefinitionRepositoryInterface $definitions,
         private FlowSessionRepositoryInterface $sessions,
-        private FlowEngineInterface $engine,
+        private Closure $engineResolver,
         private FlowGraphResolver $graphResolver,
         private ConnectionInterface $connection,
         private HistoryWriterFactory $historyWriterFactory,
@@ -133,7 +140,7 @@ final readonly class SubflowStarterService
 
         // Drive the child to its first wait point so a single inbound message
         // can carry parent → child → child-end → parent-resume in one cycle.
-        $this->engine->runSession($child);
+        ($this->engineResolver)()->runSession($child);
 
         return $child;
     }

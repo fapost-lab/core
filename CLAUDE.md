@@ -656,6 +656,7 @@ renderer → расширил reference. Это контракт, не комм�
 | `subflow` | Core | P2 |
 | `rag_query` | Feature: RAG | P2 |
 | `auth_request` | Core | P1 |
+| `loop` + `loop_end` | Core | P2 |
 | `comment` | Core (конструктор) | P3 |
 
 **Удалено из taxonomy (май 2026):**
@@ -713,6 +714,14 @@ staff-пользователям (Users в tenant-схеме, `user_assistants`)
 одним выходом `default` — auth проверяется gate'ом при старте flow (`FlowAccessPolicy`, поле `flow_definitions.is_public`)
 и нодой `branch`. Override `AuthRequestConfig.vue` (operand picker + локализованные операторы). Будущие методы
 (phone/SMS) добавляются как case'ы `AuthMethod`. Спека: `drafts/nodes/auth_request.md`.
+
+**`loop` + `loop_end` ноды (Core, P2, не реализованы):** циклы counted/while. Итератор `flow.{iterator_name}`
+(1-based), cleanup null-присвоением при exit; `loop_end` без edges — возврат к `loop_node_id` это **engine-level
+навигация** (special-case по type, прецедент `end`/`subflow`), handler остаётся graph-unaware. Тянут за собой:
+`VariableType::Array` + append/circular-buffer в `ContactWriter`, колонку `properties` в `tenant_variable_schema`,
+решение по iteration budget (`flow.execution.max_iterations`). Спека (v2.0, приведена к текущим
+контрактам): `drafts/flow-engine-v1/nodes/11-loop.md`; node usage statistics вынесена в
+`drafts/node-usage-statistics.md` (draft для доработки).
 
 **`comment` нода (Core, конструктор, P3):** builder-only аннотация на канвасе. **Без NodeHandler и runtime-поведения** —
 движок её не исполняет; живёт только в Vue-конструкторе. В Flow Engine не реализуется.

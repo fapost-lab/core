@@ -6,8 +6,7 @@ namespace App\Domains\Channels\Models;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
-use App\Domains\Channels\Observers\ChannelObserver as RegistryChannelObserver;
-use App\Domains\Messaging\Observers\ChannelObserver as MessagingChannelObserver;
+use App\Domains\Channels\Observers\ChannelObserver;
 use Database\Factories\ChannelFactory;
 use FAPost\Foundation\Channel\ChannelInterface;
 use FAPost\Support\Concerns\HasUlidPrimaryKey;
@@ -57,7 +56,7 @@ use Illuminate\Support\Str;
  * @method static Builder<static>|Channel whereWebhookPublicHash($value)
  * @mixin \Eloquent
  */
-#[ObservedBy([RegistryChannelObserver::class, MessagingChannelObserver::class])]
+#[ObservedBy([ChannelObserver::class])]
 final class Channel extends Model implements ChannelInterface
 {
     /** @use HasFactory<ChannelFactory> */

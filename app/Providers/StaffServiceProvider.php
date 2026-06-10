@@ -31,6 +31,9 @@ final class StaffServiceProvider extends ServiceProvider
     {
         $this->app->singleton(AclBootstrapService::class);
         $this->app->singleton(RoleWriterService::class);
+        $this->app->when(RoleWriterService::class)
+            ->needs('$guard')
+            ->giveConfig('auth.defaults.guard', 'web');
         $this->app->singleton(RoleFormDataMapper::class);
         $this->app->singleton(UserService::class);
         $this->app->singleton(StaffRecipientResolver::class);

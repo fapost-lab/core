@@ -2,18 +2,20 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Domains\Messaging;
+namespace Tests\Unit\Domains\Channels;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
-use App\Domains\Messaging\Observers\ChannelObserver;
+use App\Domains\Channels\Observers\ChannelObserver;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
 use FAPost\Foundation\Channel\WebhookRegistrarInterface;
 use Illuminate\Support\Facades\Bus;
 use Mockery\MockInterface;
+use RuntimeException;
 use Tests\TestCase;
 
 final class ChannelObserverTest extends TestCase
@@ -24,6 +26,87 @@ final class ChannelObserverTest extends TestCase
 
         Bus::fake();
     }
+
+    // -- Redis routing registry sync (created / updated / deleted) ----------
+
+    public function test_created_writes_registry_entry_for_active_channel(): void
+    {
+        $observer = $this->observer(hasRegistrar: false, configureRegistry: function (MockInterface $registry): void {
+            $registry->shouldReceive('set')->once();
+        });
+
+        $observer->created($this->channel(isActive: true));
+    }
+
+    public function test_created_skips_registry_for_inactive_channel(): void
+    {
+        $observer = $this->observer(hasRegistrar: false, configureRegistry: function (MockInterface $registry): void {
+            $registry->shouldNotReceive('set');
+            $registry->shouldNotReceive('remove');
+        });
+
+        $observer->created($this->channel(isActive: false));
+    }
+
+    public function test_updated_skips_registry_when_webhook_hash_rotated(): void
+    {
+        $observer = $this->observer(hasRegistrar: false, configureRegistry: function (MockInterface $registry): void {
+            $registry->shouldNotReceive('set');
+            $registry->shouldNotReceive('remove');
+        });
+
+        $observer->updated($this->channelWithChanges(changed: ['webhook_public_hash'], isActive: true));
+    }
+
+    public function test_updated_removes_registry_entry_for_deactivated_channel(): void
+    {
+        $observer = $this->observer(hasRegistrar: false, configureRegistry: function (MockInterface $registry): void {
+            $registry->shouldReceive('remove')->once()->with('hash-1');
+        });
+
+        $observer->updated($this->channelWithChanges(changed: ['is_active'], isActive: false));
+    }
+
+    public function test_updated_writes_registry_entry_for_active_channel(): void
+    {
+        $observer = $this->observer(hasRegistrar: false, configureRegistry: function (MockInterface $registry): void {
+            $registry->shouldReceive('set')->once();
+        });
+
+        $observer->updated($this->channelWithChanges(changed: ['token'], isActive: true));
+    }
+
+    public function test_deleted_removes_registry_entry_before_provider_sync(): void
+    {
+        // Registry removal failing must abort the provider dispatch: proves the
+        // registry write runs strictly before the provider sync job.
+        $observer = $this->observer(hasRegistrar: true, configureRegistry: function (MockInterface $registry): void {
+            $registry->shouldReceive('remove')->once()->with('hash-1')
+                ->andThrow(new RuntimeException('redis down'));
+        });
+
+        try {
+            $observer->deleted($this->channel(isActive: true));
+            $this->fail('Expected the registry failure to propagate.');
+        } catch (RuntimeException) {
+            // expected
+        }
+
+        Bus::assertNothingDispatched();
+    }
+
+    public function test_deleted_removes_registry_entry_and_dispatches_deregister(): void
+    {
+        $observer = $this->observer(hasRegistrar: true, configureRegistry: function (MockInterface $registry): void {
+            $registry->shouldReceive('remove')->once()->with('hash-1');
+        });
+
+        $observer->deleted($this->channel(isActive: true));
+
+        Bus::assertDispatchedSync(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => false === $job->register);
+    }
+
+    // -- Provider webhook sync (saved / deleted) -----------------------------
 
     public function test_saved_dispatches_register_job_sync_for_new_active_supported_channel(): void
     {
@@ -48,14 +131,6 @@ final class ChannelObserverTest extends TestCase
         $observer->saved($channel);
 
         Bus::assertNothingDispatched();
-    }
-
-    public function test_deleted_dispatches_deregister_job_sync_for_supported_channel(): void
-    {
-        $observer = $this->observer(hasRegistrar: true);
-        $observer->deleted($this->channel(isActive: true));
-
-        Bus::assertDispatchedSync(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => false === $job->register);
     }
 
     public function test_saved_dispatches_register_job_sync_when_token_changes(): void
@@ -125,13 +200,25 @@ final class ChannelObserverTest extends TestCase
         Bus::assertNothingDispatched();
     }
 
-    private function observer(bool $hasRegistrar): ChannelObserver
+    /**
+     * @param  (callable(MockInterface): void)|null  $configureRegistry
+     */
+    private function observer(bool $hasRegistrar, ?callable $configureRegistry = null): ChannelObserver
     {
+        $webhookRegistry = $this->mock(
+            ChannelWebhookRegistryInterface::class,
+            function (MockInterface $mock) use ($configureRegistry): void {
+                if (null !== $configureRegistry) {
+                    $configureRegistry($mock);
+                }
+            },
+        );
+
         $registrar = $hasRegistrar
             ? $this->mock(WebhookRegistrarInterface::class)
             : null;
 
-        $registry = $this->mock(ChannelRegistryInterface::class, function (MockInterface $mock) use ($registrar): void {
+        $channelRegistry = $this->mock(ChannelRegistryInterface::class, function (MockInterface $mock) use ($registrar): void {
             $mock->shouldReceive('webhookRegistrar')->andReturn($registrar);
         });
 
@@ -144,7 +231,7 @@ final class ChannelObserverTest extends TestCase
             $mock->shouldReceive('get')->andReturn($tenant);
         });
 
-        return new ChannelObserver($registry, $tenantContext);
+        return new ChannelObserver($webhookRegistry, $channelRegistry, $tenantContext);
     }
 
     private function channel(bool $isActive = true): Channel

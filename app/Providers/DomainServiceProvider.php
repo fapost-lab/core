@@ -47,6 +47,9 @@ final class DomainServiceProvider extends ServiceProvider
         );
 
         $this->app->bind(TenantResolverInterface::class, ConfigTenantResolver::class);
+        $this->app->when(ConfigTenantResolver::class)
+            ->needs('$defaultTenantSlug')
+            ->giveConfig('tenancy.default_tenant_slug');
 
         $this->app->scoped(CoreBootstrap::class);
         $this->app->scoped(CoreBootstrapInterface::class, fn ($app): CoreBootstrap => $app->make(CoreBootstrap::class));
@@ -54,5 +57,14 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->scoped(TenantSwitcher::class);
         $this->app->singleton(WebhookRegistryWriterInterface::class, WebhookRegistryWriter::class);
         $this->app->singleton(WebhookRegistryReaderInterface::class, EloquentWebhookRegistryReader::class);
+
+        // CoreBootstrap memoizes the booted tenant id; once TenantSwitcher restores
+        // the previous context that memo is stale and must be dropped, otherwise a
+        // subsequent boot() within the same scope would be skipped for the wrong tenant.
+        $this->app->afterResolving(TenantSwitcher::class, function (TenantSwitcher $switcher, $app): void {
+            $switcher->registerRestoreHook(function () use ($app): void {
+                $app->make(CoreBootstrapInterface::class)->reset();
+            });
+        });
     }
 }

@@ -34,6 +34,14 @@ final class SystemStateKeys
     public const string CONTACTS_NOTIFIED_PREFIX = StateNamespace::System->value . '.contacts_notified';
 
     /**
+     * Prefix for the per-node `set_tag` execution marker. Full path:
+     * `system.set_tag.{nodeId}`. Set after the tag mutations are applied so a
+     * re-execution of the node (queue retry under the session lock) never
+     * re-applies non-idempotent actions such as `toggle`.
+     */
+    public const string SET_TAG_PREFIX = StateNamespace::System->value . '.set_tag';
+
+    /**
      * Prefix for per-input-node retry counters. Full path:
      * `system.input.{nodeId}.retry_count`. Incremented whenever validation
      * fails; cleared when the node finally emits success or `invalid`.

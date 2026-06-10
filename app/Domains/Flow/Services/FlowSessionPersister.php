@@ -7,16 +7,26 @@ namespace App\Domains\Flow\Services;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowConcurrencyException;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
+use App\Domains\Flow\Exceptions\StateNamespaceViolationException;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\State\SystemStateNamespacePolicy;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 
 /**
  * Persists session state and column updates. Navigation position is authoritative on
  * {@see FlowSession::$current_node_id} only; state JSON is not used for runtime routing.
+ *
+ * State changes returned by handlers are validated against the namespace contract
+ * ({@see SystemStateNamespacePolicy}) before they are merged into the session JSON.
  */
 final class FlowSessionPersister
 {
+    public function __construct(
+        private readonly SystemStateNamespacePolicy $namespacePolicy,
+    ) {
+    }
+
     /**
      * Persist a session terminated by an explicit {@code end} node. Differs from
      * the regular {@see persist()} path: status is forced to {@code ended}
@@ -28,8 +38,9 @@ final class FlowSessionPersister
         FlowSession $session,
         NodeExecutionResult $result,
         string $endStatus,
+        string $nodeType,
     ): void {
-        $state = $this->applyStateChanges($session->state ?? [], $result->stateChanges);
+        $state = $this->applyStateChanges($session->state ?? [], $result->stateChanges, $nodeType);
 
         try {
             $session->saveWithOptimisticLock([
@@ -47,8 +58,9 @@ final class FlowSessionPersister
         FlowSession $session,
         NodeExecutionResult $result,
         ?string $nextNodeId,
+        string $nodeType,
     ): void {
-        $state = $this->applyStateChanges($session->state ?? [], $result->stateChanges);
+        $state = $this->applyStateChanges($session->state ?? [], $result->stateChanges, $nodeType);
 
         $columnPatch = $this->resolveColumnPatch($result, $nextNodeId);
 
@@ -71,13 +83,17 @@ final class FlowSessionPersister
      * @param  array<string, mixed>  $changes
      *
      * @return array<string, mixed>
+     *
+     * @throws StateNamespaceViolationException
      */
-    private function applyStateChanges(array $state, array $changes): array
+    private function applyStateChanges(array $state, array $changes, string $nodeType): array
     {
         foreach ($changes as $flatKey => $value) {
-            if ( ! is_string($flatKey) || ! str_contains($flatKey, '.')) {
+            if (! is_string($flatKey) || ! str_contains($flatKey, '.')) {
                 continue;
             }
+
+            $this->namespacePolicy->assertWriteAllowed($nodeType, $flatKey);
 
             [$namespace, $path] = explode('.', $flatKey, 2);
             $state              = $this->setNamespacedPath($state, $namespace, $path, $value);
@@ -93,7 +109,7 @@ final class FlowSessionPersister
      */
     private function setNamespacedPath(array $state, string $namespace, string $path, mixed $value): array
     {
-        if ( ! isset($state[$namespace]) || ! is_array($state[$namespace])) {
+        if (! isset($state[$namespace]) || ! is_array($state[$namespace])) {
             $state[$namespace] = [];
         }
 
@@ -103,7 +119,7 @@ final class FlowSessionPersister
         $inner = array_slice($keys, 0, -1);
 
         foreach ($inner as $segment) {
-            if ( ! isset($ref[$segment]) || ! is_array($ref[$segment])) {
+            if (! isset($ref[$segment]) || ! is_array($ref[$segment])) {
                 $ref[$segment] = [];
             }
 

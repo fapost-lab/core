@@ -83,6 +83,31 @@ final class SetTagNodeHandlerTest extends FeatureTestCase
         $this->assertFalse(ContactTag::query()->where('contact_id', $contact->id)->where('tag', 'vip')->exists());
     }
 
+    public function test_first_execution_emits_idempotency_marker_state_change(): void
+    {
+        $contact = Contact::factory()->create();
+
+        $result = $this->handler->execute($this->node('toggle', ['vip']), [], $this->context($contact->id));
+
+        $this->assertSame(['system.set_tag.node-tag' => true], $result->stateChanges);
+    }
+
+    public function test_replay_with_marker_skips_all_mutations(): void
+    {
+        $contact = Contact::factory()->create();
+        $state   = ['system' => ['set_tag' => ['node-tag' => true]]];
+
+        // A retry under the session lock re-executes the node with the marker
+        // already persisted: toggle must not flip the tag again.
+        $result = $this->handler->execute($this->node('toggle', ['vip']), $state, $this->context($contact->id));
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('default', $result->sourceHandle);
+        $this->assertTrue($result->metadata['replayed']);
+        $this->assertSame([], $result->stateChanges);
+        $this->assertSame(0, ContactTag::query()->where('contact_id', $contact->id)->count());
+    }
+
     public function test_distinct_tags_returns_sorted_unique_vocabulary(): void
     {
         $a = Contact::factory()->create();

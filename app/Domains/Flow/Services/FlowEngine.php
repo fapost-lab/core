@@ -40,6 +40,7 @@ use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\DB;
 use LogicException;
+use Psr\Log\LoggerInterface;
 use Throwable;
 
 final readonly class FlowEngine implements FlowEngineInterface
@@ -62,6 +63,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         private \App\Domains\Flow\History\HistoryWriterFactory $historyWriterFactory,
         private \App\Domains\Flow\Subflow\SubflowResumerInterface $subflowResumer,
         private \App\Domains\Messaging\Typing\TypingHeartbeatRegistry $typingHeartbeat,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -356,7 +358,13 @@ final readonly class FlowEngine implements FlowEngineInterface
             // bypass the routing pipeline).
             $this->typingHeartbeat->current()?->refresh();
 
-            $result = $handler->execute($node, $session->state ?? [], $handlerContext);
+            try {
+                $result = $handler->execute($node, $session->state ?? [], $handlerContext);
+            } catch (Throwable $handlerException) {
+                $this->markSessionFailed($session, $nodeId, $type, $version, $handlerException);
+
+                throw $handlerException;
+            }
 
             $nextNodeId = null;
 
@@ -391,13 +399,13 @@ final readonly class FlowEngine implements FlowEngineInterface
                 }
             }
 
-            $this->connection->transaction(function () use ($session, $node, $result, $nextNodeId, $endStatus, $skipPersist): void {
+            $this->connection->transaction(function () use ($session, $node, $result, $nextNodeId, $endStatus, $skipPersist, $type): void {
                 if ($skipPersist) {
                     // No-op: state already reflects the most recent write.
                 } elseif (null !== $endStatus) {
-                    $this->persister->persistEnd($session, $result, $endStatus);
+                    $this->persister->persistEnd($session, $result, $endStatus, $type);
                 } else {
-                    $this->persister->persist($session, $result, $nextNodeId);
+                    $this->persister->persist($session, $result, $nextNodeId, $type);
                 }
 
                 $this->logWriter->write($this->buildLogEntry($session, $node, $result, $nextNodeId));
@@ -435,6 +443,61 @@ final readonly class FlowEngine implements FlowEngineInterface
             if (null === $nextNodeId) {
                 break;
             }
+        }
+    }
+
+    /**
+     * Best-effort failure persistence when a handler throws an unhandled exception.
+     *
+     * Marks the session as failed, writes a failed flow-log entry and records a
+     * FlowFailed analytics event so the crash is observable. Runs in its own
+     * transaction; any persistence error (including an optimistic-lock conflict
+     * from a concurrent worker) is logged and swallowed so the original handler
+     * exception always reaches the queue retry policy unmasked.
+     */
+    private function markSessionFailed(
+        FlowSession $session,
+        string $nodeId,
+        string $nodeType,
+        int $nodeVersion,
+        Throwable $handlerException,
+    ): void {
+        try {
+            $this->connection->transaction(function () use ($session, $nodeId, $nodeType, $nodeVersion, $handlerException): void {
+                $session->saveWithOptimisticLock([
+                    'status' => FlowSessionStatus::Failed,
+                ]);
+
+                $this->logWriter->write(new FlowLogEntry(
+                    sessionId: (string)$session->getKey(),
+                    nodeId: $nodeId,
+                    nodeType: $nodeType,
+                    nodeVersion: $nodeVersion,
+                    status: FlowLogStatus::Failed,
+                    sourceHandle: null,
+                    stateChanges: null,
+                    resolved: null,
+                    error: ['message' => $handlerException->getMessage()],
+                ));
+
+                $this->afterCommit(function () use ($session): void {
+                    $this->analyticsWriter->record(
+                        new AnalyticsEvent(
+                            tenantId: (string)$session->tenant_id,
+                            eventType: AnalyticsEventType::FlowFailed,
+                            payload: ['session_id' => (string)$session->getKey()],
+                            occurredAt: new DateTimeImmutable(),
+                        )
+                    );
+                });
+            });
+        } catch (Throwable $persistException) {
+            $this->logger->warning('Failed to persist flow session failure state after handler exception.', [
+                'session_id' => (string)$session->getKey(),
+                'node_id'    => $nodeId,
+                'node_type'  => $nodeType,
+                'error'      => $persistException->getMessage(),
+            ]);
         }
     }
 

@@ -84,6 +84,9 @@ final class MediaServiceProvider extends ServiceProvider
         $this->app->scoped(MediaDispatcherInterface::class, MediaDispatcher::class);
         $this->app->scoped(MediaIngestorInterface::class, MediaIngestor::class);
         $this->app->scoped(MediaServiceInterface::class, MediaService::class);
+        $this->app->when(MediaService::class)
+            ->needs('$downloadUrlTtlSeconds')
+            ->giveConfig('media.download_url_ttl_seconds', 300);
 
         $this->app->singleton(
             ChannelLimitInspector::class,

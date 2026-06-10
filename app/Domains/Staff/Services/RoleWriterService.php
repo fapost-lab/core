@@ -17,13 +17,21 @@ use Illuminate\Validation\ValidationException;
 final class RoleWriterService
 {
     /**
+     * @param  string  $guard  Auth guard roles are scoped to (config `auth.defaults.guard`), bound in StaffServiceProvider.
+     */
+    public function __construct(
+        private readonly string $guard = 'web',
+    ) {
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     public function create(User $actor, array $data): Role
     {
         $this->assertCanManageRoles($actor);
 
-        $guard       = (string)config('auth.defaults.guard', 'web');
+        $guard       = $this->guard;
         $permissions = $this->flattenPermissionGroups($data['permission_groups'] ?? []);
 
         $this->assertUniqueRoleName($data['name'], $guard, null);
@@ -52,7 +60,7 @@ final class RoleWriterService
 
         $out = [];
         foreach ($groups as $selected) {
-            if ( ! is_array($selected)) {
+            if (! is_array($selected)) {
                 continue;
             }
             foreach ($selected as $name) {
@@ -72,7 +80,7 @@ final class RoleWriterService
     {
         $this->assertCanManageRoles($actor);
 
-        $guard       = (string)config('auth.defaults.guard', 'web');
+        $guard       = $this->guard;
         $permissions = $this->flattenPermissionGroups($data['permission_groups'] ?? []);
 
         $nextName = $role->is_system ? $role->name : $data['name'];
