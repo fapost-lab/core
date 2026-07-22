@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Media\Contracts;
 
 use App\Domains\Channels\Models\Channel;
+use App\Domains\Media\Enums\MediaSource;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFolder;
 
@@ -25,5 +26,6 @@ interface MediaIngestorInterface
         string $providerFileId,
         ?MediaFolder $folder = null,
         ?string $uploadedBy = null,
+        MediaSource $source = MediaSource::InputNode,
     ): MediaFile;
 }

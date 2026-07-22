@@ -9,11 +9,14 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Enums\PlatformEnum;
+use App\Domains\Conversation\Capture\ConversationCaptureFactory;
+use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Flow\Routing\MessageRouter;
 use App\Domains\Flow\Routing\RoutingOutcome;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Domains\Webhook\Services\ChannelAdapterResolver;
+use Carbon\CarbonImmutable;
 use FAPost\Foundation\DTO\InboundWebhookPayload;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -49,6 +52,8 @@ final class IncomingMessageJob implements ShouldQueue
         AssistantRepositoryInterface $assistants,
         ContactServiceInterface $contactService,
         MessageRouter $router,
+        ConversationLoggerInterface $conversationLogger,
+        ConversationCaptureFactory $captureFactory,
     ): void {
         $tenant = new RuntimeTenant(
             id: $this->payload->tenantId,
@@ -63,6 +68,8 @@ final class IncomingMessageJob implements ShouldQueue
                 $assistants,
                 $contactService,
                 $router,
+                $conversationLogger,
+                $captureFactory,
             ): void {
                 $platform       = PlatformEnum::from($this->payload->platform);
                 $adapter        = $adapterResolver->resolve($platform);
@@ -85,6 +92,25 @@ final class IncomingMessageJob implements ShouldQueue
                 );
 
                 $channel = Channel::query()->findOrFail($this->payload->channelId);
+
+                // Capture the inbound message BEFORE routing: messages the
+                // drop-policy discards under concurrency are still real user
+                // messages and must land in the transcript regardless of whether
+                // a flow ran (spec §7.1).
+                $conversationLogger->log(
+                    $captureFactory->forInbound(
+                        tenantId: $this->payload->tenantId,
+                        assistantId: (string) $assistant->getKey(),
+                        contactId: (string) $contact->getKey(),
+                        channelId: $this->payload->channelId,
+                        message: $inboundMessage,
+                        idempotencyKey: $this->payload->idempotencyKey,
+                        // Stable across retries (ingress receive time) so a retried
+                        // delivery dedups on the transcript unique index instead of
+                        // inserting a duplicate row.
+                        occurredAt: CarbonImmutable::createFromTimestamp($this->payload->receivedAt, 'UTC'),
+                    ),
+                );
 
                 $outcome = $router->route(
                     contact: $contact,

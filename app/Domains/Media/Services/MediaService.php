@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Media\Services;
 
 use App\Domains\Media\Contracts\MediaServiceInterface;
+use App\Domains\Media\Enums\MediaSource;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFolder;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -161,6 +162,9 @@ final readonly class MediaService implements MediaServiceInterface
         return MediaFile::query()
             ->where('tenant_id', $tenant->getId())
             ->where('folder_id', $folder?->id)
+            // Conversation-transcript attachments are ingested through the same
+            // pipeline but must not flood the admin media library (spec §6.1/§14).
+            ->where('source', '!=', MediaSource::Conversation->value)
             ->orderBy('name')
             ->get();
     }

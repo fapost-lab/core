@@ -15,6 +15,7 @@ use App\Domains\Flow\Commands\GlobalCommandExecutorInterface;
 use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Routing\DropPolicyInterface;
 use App\Domains\Flow\Routing\MessageRouter;
@@ -91,7 +92,7 @@ final class MessageRouterTest extends TestCase
         $lock  = $this->lockMock(true);
         $cache->shouldReceive('lock')->once()->andReturn($lock);
 
-        $session = $this->makeSession(FlowSessionStatus::WaitingInput);
+        $session  = $this->makeSession(FlowSessionStatus::WaitingInput);
         $sessions = Mockery::mock(FlowSessionRepositoryInterface::class);
         $sessions->shouldReceive('findActiveForContact')->once()->andReturn($session);
 
@@ -126,7 +127,7 @@ final class MessageRouterTest extends TestCase
         $lock  = $this->lockMock(true);
         $cache->shouldReceive('lock')->once()->andReturn($lock);
 
-        $session = $this->makeSession(FlowSessionStatus::Paused);
+        $session  = $this->makeSession(FlowSessionStatus::Paused);
         $sessions = Mockery::mock(FlowSessionRepositoryInterface::class);
         $sessions->shouldReceive('findActiveForContact')->once()->andReturn($session);
 
@@ -184,6 +185,40 @@ final class MessageRouterTest extends TestCase
         );
 
         $this->assertSame('executed', $outcome->kind);
+    }
+
+    public function test_engine_lock_timeout_from_orchestrator_drops_with_engine_lock_timeout_reason(): void
+    {
+        $cache = Mockery::mock(CacheRepository::class);
+        $lock  = $this->lockMock(true);
+        $cache->shouldReceive('lock')->once()->andReturn($lock);
+
+        $session  = $this->makeSession(FlowSessionStatus::WaitingInput);
+        $sessions = Mockery::mock(FlowSessionRepositoryInterface::class);
+        $sessions->shouldReceive('findActiveForContact')->once()->andReturn($session);
+
+        // The engine's own guard fails to acquire its lock — the router must
+        // convert that into an engine_lock_timeout drop rather than surface it.
+        $orchestrator = Mockery::mock(FlowOrchestratorInterface::class);
+        $orchestrator->shouldReceive('handle')
+            ->once()
+            ->andThrow(new SessionLockTimeoutException('session_lock:tenant-1:contact-1:assistant-1'));
+
+        $router = $this->router(
+            cache: $cache,
+            sessions: $sessions,
+            orchestrator: $orchestrator,
+        );
+
+        $outcome = $router->route(
+            contact: $this->contact(),
+            message: $this->message('hello'),
+            assistant: $this->assistant(),
+            channel: $this->channel(),
+        );
+
+        $this->assertTrue($outcome->wasDropped());
+        $this->assertSame('engine_lock_timeout', $outcome->reason);
     }
 
     private function router(
@@ -244,12 +279,12 @@ final class MessageRouterTest extends TestCase
     private function assistant(): Assistant
     {
         $assistant = Assistant::make([
-            'name'              => 'Test',
-            'is_active'         => true,
-            'default_language'  => 'en',
-            'fallback_message'  => null,
+            'name'             => 'Test',
+            'is_active'        => true,
+            'default_language' => 'en',
+            'fallback_message' => null,
         ]);
-        $assistant->id = 'assistant-1';
+        $assistant->id     = 'assistant-1';
         $assistant->exists = true;
 
         return $assistant;
@@ -262,7 +297,7 @@ final class MessageRouterTest extends TestCase
             'token'     => 'token-1',
             'is_active' => true,
         ]);
-        $channel->id = 'channel-1';
+        $channel->id     = 'channel-1';
         $channel->exists = true;
 
         return $channel;

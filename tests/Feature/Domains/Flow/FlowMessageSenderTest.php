@@ -9,6 +9,10 @@ use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Conversation\Capture\ConversationCaptureFactory;
+use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
+use App\Domains\Conversation\DTO\MessageLogEntry;
+use App\Domains\Conversation\Enums\DeliveryStatus;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\FlowMessageSender;
@@ -87,6 +91,8 @@ final class FlowMessageSenderTest extends FeatureTestCase
         $flowSender = new FlowMessageSender(
             $sender,
             Mockery::mock(MediaDispatcherInterface::class),
+            $this->recordingLogger(),
+            new ConversationCaptureFactory(),
         );
 
         $providerMessageId = $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
@@ -166,6 +172,8 @@ final class FlowMessageSenderTest extends FeatureTestCase
         $flowSender = new FlowMessageSender(
             $sender,
             Mockery::mock(MediaDispatcherInterface::class),
+            $this->recordingLogger(),
+            new ConversationCaptureFactory(),
         );
 
         $providerMessageId = $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
@@ -262,7 +270,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
             new DispatchResult(providerFileId: 'cached-file-id', alreadyDelivered: false),
         );
 
-        $flowSender        = new FlowMessageSender($sender, $dispatcher);
+        $flowSender        = new FlowMessageSender($sender, $dispatcher, $this->recordingLogger(), new ConversationCaptureFactory());
         $providerMessageId = $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
             'node_id'         => 'node-img',
             'idempotency_key' => 'idem-img',
@@ -351,7 +359,8 @@ final class FlowMessageSenderTest extends FeatureTestCase
             ),
         );
 
-        $flowSender = new FlowMessageSender($sender, $dispatcher);
+        $logger     = $this->recordingLogger();
+        $flowSender = new FlowMessageSender($sender, $dispatcher, $logger, new ConversationCaptureFactory());
 
         $providerMessageId = $flowSender->send($tenantId, (string)$contact->getKey(), (string)$session->getKey(), [
             'node_id'         => 'node-uas',
@@ -363,5 +372,30 @@ final class FlowMessageSenderTest extends FeatureTestCase
         ]);
 
         $this->assertSame('999', $providerMessageId);
+
+        // The upload-as-send path bypasses MessageSender, so FlowMessageSender must
+        // capture the outbound transcript itself.
+        $this->assertCount(1, $logger->entries);
+        $entry = $logger->entries[0];
+        $this->assertSame('999', $entry->providerMessageId);
+        $this->assertSame((string)$contact->getKey(), $entry->contactId);
+        $this->assertSame((string)$assistant->getKey(), $entry->assistantId);
+    }
+
+    private function recordingLogger(): ConversationLoggerInterface
+    {
+        return new class () implements ConversationLoggerInterface {
+            /** @var list<MessageLogEntry> */
+            public array $entries = [];
+
+            public function log(MessageLogEntry $entry): void
+            {
+                $this->entries[] = $entry;
+            }
+
+            public function updateDeliveryStatus(string $providerMessageId, DeliveryStatus $status): void
+            {
+            }
+        };
     }
 }

@@ -159,6 +159,54 @@ final class SubflowLifecycleTest extends FeatureTestCase
         $this->assertSame('failure-branch', $parent->state['flow']['marker'] ?? null);
     }
 
+    public function test_subflow_cancelled_routes_parent_through_cancelled_handle(): void
+    {
+        $childFlowId = (string) Str::uuid();
+        $this->createDefinition(
+            flowId: $childFlowId,
+            nodes: [
+                ['id' => 'c-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'cancelled']],
+            ],
+            edges: [],
+        );
+
+        $parentFlowId     = (string) Str::uuid();
+        $parentDefinition = $this->createDefinition(
+            flowId: $parentFlowId,
+            nodes: [
+                ['id' => 'p-sub',    'type' => 'subflow',     'version' => 1, 'config' => ['flow_id' => $childFlowId, 'timeout' => 'PT1H']],
+                ['id' => 'p-cancel', 'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'cancel-branch']],
+                ['id' => 'p-end',    'type' => 'end',         'version' => 1, 'config' => ['status' => 'cancelled']],
+            ],
+            edges: [
+                ['id' => 'p-e1', 'from' => 'p-sub',    'to' => 'p-cancel', 'handle' => 'cancelled'],
+                ['id' => 'p-e2', 'from' => 'p-cancel', 'to' => 'p-end',    'handle' => 'default'],
+            ],
+        );
+
+        $this->app->make(FlowEngineInterface::class)->start($parentDefinition, $this->contact);
+
+        /** @var FlowSession $parent */
+        $parent = FlowSession::query()
+            ->where('contact_id', $this->contact->getKey())
+            ->whereNull('parent_session_id')
+            ->latest('created_at')
+            ->first();
+
+        /** @var FlowSession $child */
+        $child = FlowSession::query()
+            ->where('parent_session_id', $parent->getKey())
+            ->latest('created_at')
+            ->first();
+
+        $this->assertSame(FlowSessionStatus::Ended, $child->status);
+        $this->assertSame(EndStatus::Cancelled->value, $child->end_status);
+
+        $this->assertSame(FlowSessionStatus::Ended, $parent->status);
+        $this->assertSame(EndStatus::Cancelled->value, $parent->end_status);
+        $this->assertSame('cancel-branch', $parent->state['flow']['marker'] ?? null, 'parent should route through the cancelled handle');
+    }
+
     public function test_subflow_writes_started_and_returned_history_events_when_logging_enabled(): void
     {
         $childFlowId = (string)Str::uuid();

@@ -7,6 +7,7 @@ namespace App\Domains\Contact\Jobs;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
 use App\Domains\Contact\Models\ChannelContact;
+use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Enums\ContactNotifyTarget;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
@@ -129,6 +130,14 @@ final class SendContactNotificationJob implements ShouldQueue
                     metadata: [
                         'flow_session_id' => $this->sessionId,
                         'source'          => 'notify',
+                        // Transcript-capture context for MessageSender (spec §7.4).
+                        'contact_id'   => (string) $contact->getKey(),
+                        'assistant_id' => $this->assistantId,
+                        'origin'       => MessageOrigin::Notify->value,
+                        'origin_ref'   => [
+                            'flow_session_id' => $this->sessionId,
+                            'node_id'         => $this->nodeId,
+                        ],
                     ],
                 )));
             }

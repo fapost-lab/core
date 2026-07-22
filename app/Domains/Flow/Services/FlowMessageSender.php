@@ -6,6 +6,9 @@ namespace App\Domains\Flow\Services;
 
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
+use App\Domains\Conversation\Capture\ConversationCaptureFactory;
+use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
+use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Models\FlowSession;
@@ -16,6 +19,7 @@ use App\Domains\Media\Exceptions\MediaNotFoundException;
 use App\Domains\Media\Models\MediaFile;
 use FAPost\Foundation\Flow\Enums\KeyboardMode;
 use FAPost\Foundation\Media\DTO\UploadContext;
+use FAPost\Foundation\Messaging\DeliveryResult;
 use FAPost\Foundation\Messaging\MessagePayload;
 use FAPost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use FAPost\Foundation\Messaging\OutboundMessage;
@@ -26,6 +30,8 @@ final readonly class FlowMessageSender implements MessageSenderInterface
     public function __construct(
         private OutboundMessageSenderInterface $sender,
         private MediaDispatcherInterface $mediaDispatcher,
+        private ConversationLoggerInterface $conversationLogger,
+        private ConversationCaptureFactory $captureFactory,
     ) {
     }
 
@@ -63,16 +69,51 @@ final readonly class FlowMessageSender implements MessageSenderInterface
         $contentType = SendMessageContentType::from((string)$payload['content_type']);
 
         if ($contentType->requiresMediaUrl()) {
-            $dispatch = $this->resolveMediaDispatch($payload, $channel, $chatId, $tenantId);
+            $dispatch                    = $this->resolveMediaDispatch($payload, $channel, $chatId, $tenantId);
+            $payload['provider_file_id'] = $dispatch->providerFileId;
 
             if ($dispatch->alreadyDelivered) {
+                // Upload-as-send (Telegram cache miss): the media dispatcher already
+                // delivered the bytes and this path never reaches MessageSender, so
+                // capture the transcript here rather than lose the outbound message.
+                $message = $this->buildOutboundMessage($tenantId, $contactId, $sessionId, (string)$session->assistant_id, $channel, $chatId, $payload, $contentType);
+                $this->captureOutbound($message, $dispatch->deliveredMessageId);
+
                 return $dispatch->deliveredMessageId ?? 'default';
             }
-
-            $payload['provider_file_id'] = $dispatch->providerFileId;
         }
 
-        $message = new OutboundMessage(
+        $message = $this->buildOutboundMessage($tenantId, $contactId, $sessionId, (string)$session->assistant_id, $channel, $chatId, $payload, $contentType);
+
+        // Delivered through MessageSender, which owns the outbound transcript capture.
+        $result = $this->sender->send($message);
+
+        if (! $result->sent) {
+            throw new RuntimeException($result->error ?? 'Failed to send outbound flow message.');
+        }
+
+        return $result->providerMessageId ?? 'default';
+    }
+
+    /**
+     * Assemble the outbound envelope, embedding the transcript-capture context
+     * (contact/assistant identity, origin) in metadata — OutboundMessage carries
+     * no identity of its own, so the builder passes it down for MessageSender /
+     * the already-delivered capture below (spec §7.2).
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function buildOutboundMessage(
+        string $tenantId,
+        string $contactId,
+        string $sessionId,
+        string $assistantId,
+        Channel $channel,
+        string $chatId,
+        array $payload,
+        SendMessageContentType $contentType,
+    ): OutboundMessage {
+        return new OutboundMessage(
             idempotencyKey: "{$sessionId}:{$payload['node_id']}:{$payload['idempotency_key']}",
             tenantId: $tenantId,
             channelId: (string)$channel->getKey(),
@@ -83,16 +124,33 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             metadata: [
                 'flow_session_id' => $sessionId,
                 'parse_mode'      => 'HTML',
+                'contact_id'      => $contactId,
+                'assistant_id'    => $assistantId,
+                'origin'          => MessageOrigin::Flow->value,
+                'origin_ref'      => [
+                    'flow_session_id' => $sessionId,
+                    'node_id'         => $payload['node_id'] ?? null,
+                ],
             ],
         );
+    }
 
-        $result = $this->sender->send($message);
+    /**
+     * Record an upload-as-send outbound message in the transcript. Used only for
+     * the media path that bypasses MessageSender (which owns capture for every
+     * other outbound). The binding is scoped so the tenant-aware logger stays
+     * Octane-safe.
+     */
+    private function captureOutbound(OutboundMessage $message, ?string $deliveredMessageId): void
+    {
+        $entry = $this->captureFactory->forOutbound(
+            $message,
+            new DeliveryResult(sent: true, providerMessageId: $deliveredMessageId),
+        );
 
-        if (! $result->sent) {
-            throw new RuntimeException($result->error ?? 'Failed to send outbound flow message.');
+        if (null !== $entry) {
+            $this->conversationLogger->log($entry);
         }
-
-        return $result->providerMessageId ?? 'default';
     }
 
     /**

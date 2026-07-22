@@ -41,7 +41,7 @@ final class ResumeTimedOutSendMessageNodeJob implements ShouldQueue
         $switcher->runForTenant($tenant, function () use ($engine): void {
             $session = FlowSession::query()->find($this->sessionId);
 
-            if ( ! $session instanceof FlowSession || $session->current_node_id !== $this->nodeId) {
+            if (! $session instanceof FlowSession || $session->current_node_id !== $this->nodeId) {
                 return;
             }
 

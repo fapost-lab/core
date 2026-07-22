@@ -12,7 +12,8 @@ namespace App\Domains\Media\Enums;
  */
 enum MediaSource: string
 {
-    case Upload    = 'upload';
-    case InputNode = 'input_node';
-    case Api       = 'api';
+    case Upload       = 'upload';
+    case InputNode    = 'input_node';
+    case Api          = 'api';
+    case Conversation = 'conversation';
 }

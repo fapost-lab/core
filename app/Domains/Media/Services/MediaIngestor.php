@@ -37,6 +37,7 @@ final readonly class MediaIngestor implements MediaIngestorInterface
         string $providerFileId,
         ?MediaFolder $folder = null,
         ?string $uploadedBy = null,
+        MediaSource $source = MediaSource::InputNode,
     ): MediaFile {
         $downloader = $this->downloaderRegistry->forChannelType($channel->type->value);
 
@@ -51,7 +52,7 @@ final readonly class MediaIngestor implements MediaIngestorInterface
             mimeType: $download->mimeType,
             originalFilename: $download->originalFilename,
             folder: $folder,
-            source: MediaSource::InputNode,
+            source: $source,
             uploadedBy: $uploadedBy,
         );
 

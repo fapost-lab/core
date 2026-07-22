@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Domains\Messaging;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Conversation\Capture\ConversationCaptureFactory;
+use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Messaging\Exceptions\RateLimitExceededException;
 use App\Domains\Messaging\Exceptions\UnsupportedChannelException;
 use FAPost\Foundation\Messaging\DeliveryResult;
@@ -28,6 +30,8 @@ final readonly class MessageSender implements MessageSenderInterface
         private ChannelRegistryInterface $channelRegistry,
         private RedisFactory $redis,
         private int $rateLimitPerMinute,
+        private ConversationLoggerInterface $conversationLogger,
+        private ConversationCaptureFactory $captureFactory,
     ) {
     }
 
@@ -36,7 +40,7 @@ final readonly class MessageSender implements MessageSenderInterface
      */
     public function send(OutboundMessage $message): DeliveryResult
     {
-        if ( ! $this->reserveIdempotency($message->idempotencyKey)) {
+        if (! $this->reserveIdempotency($message->idempotencyKey)) {
             return new DeliveryResult(sent: false, duplicate: true);
         }
 
@@ -61,11 +65,28 @@ final readonly class MessageSender implements MessageSenderInterface
 
         if ($result->sent) {
             $this->markSent($message->idempotencyKey);
+            $this->captureTranscript($message, $result);
         } else {
             $this->releaseIdempotency($message->idempotencyKey);
         }
 
         return $result;
+    }
+
+    /**
+     * Record the delivered message in the conversation transcript. This is the
+     * single outbound capture site — every flow / notify / broadcast delivery
+     * funnels through here (spec §7.2). Only messages whose builder supplied the
+     * capture context (contact/assistant identity in metadata) are logged; the
+     * logger itself never throws back into delivery.
+     */
+    private function captureTranscript(OutboundMessage $message, DeliveryResult $result): void
+    {
+        $entry = $this->captureFactory->forOutbound($message, $result);
+
+        if (null !== $entry) {
+            $this->conversationLogger->log($entry);
+        }
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domains\Channels\Providers\ChannelsServiceProvider;
 use App\Domains\Contact\Providers\ContactServiceProvider;
+use App\Domains\Conversation\Providers\ConversationServiceProvider;
 use App\Domains\Flow\Providers\FlowServiceProvider;
 use App\Domains\Media\Providers\MediaServiceProvider;
 use App\Domains\Messaging\Providers\MessageSenderServiceProvider;
@@ -23,6 +24,7 @@ return [
     AssistantServiceProvider::class,
     ChannelsServiceProvider::class,
     ContactServiceProvider::class,
+    ConversationServiceProvider::class,
     FlowServiceProvider::class,
     MediaServiceProvider::class,
     MessageSenderServiceProvider::class,

@@ -18,11 +18,10 @@ use Illuminate\Support\Facades\Log;
  * subscribed flow asynchronously. Runs on the `scheduled.triggers` queue so
  * that high-priority transactional traffic is never blocked by event fanout.
  *
- * Design note: the actual flow-start mechanics for tenant-scoped events
- * (without an originating contact) is owned by the trigger pipeline (Phase D).
- * This job currently performs trigger resolution + event-name registration
- * and emits a structured log entry per resolved trigger. Wiring of the per-
- * trigger start job is added when the trigger pipeline lands.
+ * Fans out one {@see StartFlowFromEventJob} per resolved trigger for isolation
+ * and independent retry. The started flow runs for the emitting contact
+ * (`source.contact_id`); events without a contact are skipped (a flow start
+ * requires a contact).
  */
 final class DispatchFlowTriggerEventJob implements ShouldQueue
 {
@@ -55,16 +54,36 @@ final class DispatchFlowTriggerEventJob implements ShouldQueue
         $switcher->runForTenant($tenant, function () use ($resolver): void {
             $this->registerEventName();
 
-            $resolved = $resolver->execute($this->tenantId, $this->eventName);
+            $contactId = is_string($this->source['contact_id'] ?? null) ? $this->source['contact_id'] : '';
 
-            foreach ($resolved as $trigger) {
-                Log::channel('stack')->info('flow.event.trigger_resolved', [
+            if ('' === $contactId) {
+                // No originating contact — nothing to start a contact-scoped flow for.
+                Log::channel('stack')->info('flow.event.dispatch_skipped_no_contact', [
                     'tenant_id'  => $this->tenantId,
                     'event_name' => $this->eventName,
-                    'trigger_id' => $trigger->triggerId,
-                    'flow_id'    => $trigger->flowId,
                     'source'     => $this->source,
                 ]);
+
+                return;
+            }
+
+            foreach ($resolver->execute($this->tenantId, $this->eventName) as $trigger) {
+                $assistantId = is_string($trigger->metadata['assistant_id'] ?? null)
+                    ? $trigger->metadata['assistant_id']
+                    : '';
+
+                if ('' === $assistantId) {
+                    continue;
+                }
+
+                StartFlowFromEventJob::dispatch(
+                    $this->tenantId,
+                    $trigger->flowId,
+                    $assistantId,
+                    $contactId,
+                    $this->payload,
+                    $this->eventName,
+                );
             }
         });
     }

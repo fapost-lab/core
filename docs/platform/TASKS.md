@@ -43,7 +43,7 @@
 ### Net-new nodes (Phase C)
 - [x] **C-2** `EndNodeHandler` (color-coded: success/cancelled/failed) — [[specs/flow-engine/nodes/10-end]]
 - [x] **C-4** `SubflowNodeHandler` + CallGraphValidator + lifecycle — [[specs/flow-engine/nodes/08-subflow]]
-- [-] **C-1** `EmitEventNodeHandler` (handler + validation + registry есть; event-chain flow start ещё не завершён) — [[specs/flow-engine/nodes/07-emit-event]]
+- [x] **C-1** `EmitEventNodeHandler` (handler + validation + registry + event-chain flow start — `StartFlowFromEventJob` фанится на подписанные event-триггеры) — [[specs/flow-engine/nodes/07-emit-event]]
 - [-] **C-3** `RagQueryNodeHandler` (handler + registry + validation есть; RAG Feature/storage/providers ещё не готовы) — [[specs/flow-engine/nodes/09-rag-query]]
 
 ### Routing pipeline (Phase D)
@@ -86,7 +86,7 @@
   - [x] `.length` резолвер для array-переменных в условиях (`OperandResolver` — `contact.photos.length` → count)
   - [x] Budget: `flow.execution.max_iterations` + publish-error на literal count > 100
   - Остаток (V1.x, warning-only): 8.5 (while condition не меняется), 8.7 (static number check), UI редактирования `max_size`, `{{…length}}` в TemplateEngine
-- [-] `emit_event` — handler готов; полный event-chain start ещё предстоит — [[specs/flow-engine/nodes/07-emit-event]]
+- [x] `emit_event` — event-chain start завершён: `DispatchFlowTriggerEventJob` теперь фанит `StartFlowFromEventJob` на каждый подписанный event-триггер (было — только лог); flow стартует для emitting-контакта, payload доступен как `flow.event.*`; выровнен формат имени события (trigger `event_name` теперь принимает dotted/mixed-case как emit `event_type`) — [[specs/flow-engine/nodes/07-emit-event]]
 - [-] `rag_query` — handler/registry/validation готовы; Feature: RAG ещё предстоит — [[specs/flow-engine/nodes/09-rag-query]]
 
 ### P3
@@ -173,16 +173,23 @@
 ### Conversation Logging (новый домен)
 Спека: [[specs/messaging/conversation-logging]]
 
-- [ ] `Conversation` агрегат + `conversation_messages` (monthly partitions)
-- [ ] Port-интерфейсы: `ConversationLoggerInterface`, `ConversationStoreInterface`, `ConversationReaderInterface`
-- [ ] `MessageLogEntry` DTO
-- [ ] `PersistConversationMessageJob` (очередь `messaging.logging`)
-- [ ] Capture-site в `IncomingMessageJob` (inbound)
-- [ ] Capture-site в `MessageSender::send()` (outbound)
-- [ ] Postgres driver (`EloquentConversationStore`)
-- [ ] GDPR cascade delete (contacts → conversations → messages)
-- [ ] Тесты: unit per driver, integration capture pipeline
-- [ ] `MediaSource::Conversation` (open question §14)
+- [x] `Conversation` агрегат + `conversation_messages` (monthly partitions, pgsql; sqlite fallback для тестов)
+- [x] Port-интерфейсы: `ConversationLoggerInterface`, `ConversationStoreInterface` (`ConversationReaderInterface` — с Filament-фазой)
+- [x] `MessageLogEntry` DTO + `ConversationRef`, enums (direction/sender/origin/status/content-type)
+- [x] `PersistConversationMessageJob` + `UpdateConversationDeliveryStatusJob` (очередь `messaging.logging`, добавлена в Horizon low-group)
+- [x] Capture-site в `IncomingMessageJob` (inbound, до router, идемпотентно по `update_id`) + `ConversationCaptureFactory`
+- [x] Postgres driver (`PostgresConversationStore` + `ConversationPartitionManager`), провайдер по config
+- [x] GDPR cascade delete (contacts/assistants/channels → conversations `cascadeOnDelete`)
+- [x] Тесты: store (идемпотентность/агрегат/status), logger (dispatch/enabled), capture factory (11 unit)
+- [x] **Фаза 5 — outbound capture** в едином funnel `MessageSender::send()` (только delivered); metadata обогащается в `FlowMessageSender` (origin=flow) и `SendContactNotificationJob` (origin=notify); `forOutbound()` в capture-factory; binding `MessageSender` → `scoped` (Octane-safe)
+- [x] **Фаза 7 — Filament chat viewer** (assistant-панель, read-only): `ConversationResource` + `ConversationsTable` (inbox-лента) + `ViewConversation` (custom Page, blade-пузыри inbound/outbound, media/keyboard/delivery-status); lang en/ru/uk; scope по `assistant_id`
+- [x] **Фаза 4a — inbound media**: `FetchConversationMediaJob` (queue `messaging.logging`) поверх `MediaIngestor::ingestFromChannel(..., source: Conversation)`; сообщение пишется сразу с media-дескриптором `status:pending`, джоба досоздаёт `media_file_id` (`status:ready`) либо `status:failed` с сохранением `provider_file_id`; `MediaSource::Conversation` + фильтр в `MediaService::listFolderContents` (не засоряет медиа-библиотеку); `appendMessage` возвращает id, `updateMessageMedia()` в store
+- [x] Outbound media через upload-as-send (`FlowMessageSender` `alreadyDelivered`) теперь логируется — `buildOutboundMessage()` + `captureOutbound()` в самом `FlowMessageSender` (единственный путь мимо `MessageSender`)
+- [ ] `ConversationReaderInterface` (Фаза 8, при переходе на ClickHouse; сейчас Filament читает Postgres-Eloquent — документированный trade-off §10)
+
+> **Вне скоупа (отдельная фаза после запуска продукта):** delivery-status (read-receipts). Provider-agnostic плумбинг
+> `updateDeliveryStatus` → `UpdateConversationDeliveryStatusJob` → `store.updateStatus` уже есть и покрыт тестами, но
+> «спит»: Telegram не даёт статусов доставки, а WhatsApp-канал вынесен в отдельную пост-запусковую фазу целиком.
 
 ---
 
@@ -222,8 +229,8 @@
 
 - [x] phpat enforcement (`composer run test:arch`; rules exist under `tests/Architecture` and run via PHPStan)
 - [ ] `flow_active_node_stats` — статистика активных нод для safe handler removal — [[specs/flow-engine/node-usage-statistics]]
-- [ ] End-to-end integration тесты: subflow lifecycle (success/cancelled/failed/timeout)
-- [ ] Concurrency hardening тесты: distributed lock, heartbeat, optimistic lock retry
+- [x] End-to-end integration тесты: subflow lifecycle — success/failed (были) + **cancelled** (добавлен, `SubflowLifecycleTest`); timeout покрыт `SubflowTimeoutSweeperTest` (нет отдельного `timeout`-статуса — таймаут = child `failed` + parent `failed`/`expired`)
+- [-] Concurrency hardening тесты: **optimistic-lock retry** (`FlowOrchestratorRetryTest` — retry-succeeds / exhaust-rethrow) + **engine_lock_timeout** drop-outcome (`MessageRouterTest`) добавлены; distributed lock покрыт unit-тестами (`FlowExecutionGuardTest`, `SessionLockManagerTest`, `LockAcquisitionPolicyTest`). Не покрыто: real-Redis integration (моки), **heartbeat** (`LockHeartbeat` dead-wired — нет каллеров/шедулера; live keep-alive — это typing-heartbeat, не lock)
 - [x] `/reset` migration под `BuiltinCommandsRegistry` с force unlock (D-3)
 - [x] Routing pipeline 6 шагов end-to-end с typing indicator (D-1+D-2)
 

@@ -246,11 +246,16 @@ final class FlowServiceProvider extends ServiceProvider
             MutableDataAccessorRegistryInterface::class,
             fn ($app): ModuleDataAccessorRegistry => $app->make(ModuleDataAccessorRegistry::class)
         );
-        $this->app->singleton(
+        // Scoped (not singleton): it depends on the scoped, tenant-aware
+        // conversation logger, so it must rebuild per scope to stay Octane-safe —
+        // consistent with the Foundation MessageSender binding.
+        $this->app->scoped(
             MessageSenderInterface::class,
             fn ($app): FlowMessageSender => new FlowMessageSender(
                 $app->make(OutboundMessageSenderInterface::class),
                 $app->make(MediaDispatcherInterface::class),
+                $app->make(\App\Domains\Conversation\Contracts\ConversationLoggerInterface::class),
+                $app->make(\App\Domains\Conversation\Capture\ConversationCaptureFactory::class),
             )
         );
         $this->app->bind(LanguageResolverInterface::class, LanguageResolver::class);

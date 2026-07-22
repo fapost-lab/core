@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Domains\Messaging\Providers;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Conversation\Capture\ConversationCaptureFactory;
+use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Messaging\MessageSender;
 use FAPost\Foundation\Messaging\MessageSenderInterface;
 use Illuminate\Support\ServiceProvider;
@@ -19,12 +21,16 @@ final class MessageSenderServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(
+        // Scoped (not singleton): the sender now depends on the scoped, tenant-aware
+        // conversation logger, so it must be rebuilt per scope to stay Octane-safe.
+        $this->app->scoped(
             MessageSenderInterface::class,
             fn ($app): MessageSender => new MessageSender(
                 channelRegistry: $app->make(ChannelRegistryInterface::class),
                 redis: $app->make('redis'),
                 rateLimitPerMinute: (int)config('messaging.rate_limit_per_minute', 30),
+                conversationLogger: $app->make(ConversationLoggerInterface::class),
+                captureFactory: $app->make(ConversationCaptureFactory::class),
             )
         );
     }

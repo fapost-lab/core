@@ -227,7 +227,7 @@ return [
         ],
         'low' => [
             'connection'          => 'redis',
-            'queue'               => ['messaging.broadcast', 'messaging.system'],
+            'queue'               => ['messaging.broadcast', 'messaging.system', 'messaging.logging'],
             'balance'             => 'auto',
             'autoScalingStrategy' => 'time',
             'minProcesses'        => 1,

@@ -31,7 +31,7 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
         $keywords = $config['keywords'] ?? null;
         $phrases  = $config['phrases'] ?? null;
 
-        if ( ! is_array($keywords) || (null !== $phrases && ! is_array($phrases))
+        if (! is_array($keywords) || (null !== $phrases && ! is_array($phrases))
             || [] === $this->filterStringList($keywords, is_array($phrases) ? $phrases : [])) {
             throw new InvalidArgumentException('Invalid message trigger config.');
         }
@@ -48,7 +48,7 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
         $values = [];
 
         foreach ([...$keywords, ...$phrases] as $value) {
-            if ( ! is_string($value) || '' === mb_trim($value)) {
+            if (! is_string($value) || '' === mb_trim($value)) {
                 continue;
             }
 
@@ -65,7 +65,7 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
     {
         $target = $config['timezone'] ?? $config['target'] ?? null;
 
-        if ( ! is_string($config['cron'] ?? null) || '' === mb_trim($config['cron'])
+        if (! is_string($config['cron'] ?? null) || '' === mb_trim($config['cron'])
              || ! is_string($target)
              || '' === mb_trim($target)) {
             throw new InvalidArgumentException('Invalid schedule trigger config.');
@@ -81,13 +81,13 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
         $path   = $config['path'] ?? null;
         $secret = $config['secret'] ?? null;
 
-        if ( ! is_string($method) || ! in_array($method, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], true)
+        if (! is_string($method) || ! in_array($method, ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'], true)
              || ! is_string($secret)
              || '' === mb_trim($secret)) {
             throw new InvalidArgumentException('Invalid webhook trigger config.');
         }
 
-        if (null !== $path && ( ! is_string($path) || '' === mb_trim($path))) {
+        if (null !== $path && (! is_string($path) || '' === mb_trim($path))) {
             throw new InvalidArgumentException('Invalid webhook trigger config.');
         }
     }
@@ -99,7 +99,7 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
     {
         $routeKey = $config['route_key'] ?? null;
 
-        if ((null !== $routeKey && ( ! is_string($routeKey) || '' === mb_trim($routeKey)))
+        if ((null !== $routeKey && (! is_string($routeKey) || '' === mb_trim($routeKey)))
             || ! is_array($config['allowed_sources'] ?? null)) {
             throw new InvalidArgumentException('Invalid api trigger config.');
         }
@@ -112,7 +112,10 @@ final class FlowTriggerConfigValidator implements FlowTriggerConfigValidatorInte
     {
         $eventName = $config['event_name'] ?? null;
 
-        if ( ! is_string($eventName) || 1 !== preg_match('/^[a-z0-9]+(?:_[a-z0-9]+)*$/', $eventName)) {
+        // Must accept the SAME shape emit_event produces (dotted, mixed-case
+        // segments — see ValidateFlowService::validateEmitEventConfig), otherwise
+        // a dotted emitted name like `order.created` could never match a trigger.
+        if (! is_string($eventName) || 1 !== preg_match('/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$/', $eventName)) {
             throw new InvalidArgumentException('Invalid event trigger config.');
         }
     }
