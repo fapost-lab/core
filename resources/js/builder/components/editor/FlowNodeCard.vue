@@ -76,9 +76,31 @@ const summaryRows = computed(() => {
 
     if (type === 'input') {
         const rows = []
-        if (config.save_to) rows.push({ key: 'Var', val: config.save_to, mono: true })
+        const v = config.variable as Record<string, unknown> | undefined
+        if (v && typeof v === 'object' && v.name) {
+            const isArray = v.type === 'array'
+            const suffix  = isArray ? '[]' : ''
+            const icon    = v.storage === 'contact' ? ' 💾' : ''
+            rows.push({ key: 'Var', val: `${String(v.name)}${suffix}${icon}`, mono: true })
+        } else if (config.save_to) {
+            rows.push({ key: 'Var', val: config.save_to, mono: true })
+        }
         if (config.expected_type) rows.push({ key: 'Type', val: config.expected_type, muted: true })
         return rows
+    }
+
+    if (type === 'loop') {
+        const mode = config.mode === 'while' ? 'while' : 'counted'
+        if (mode === 'counted') {
+            const cs = config.count_source as Record<string, unknown> | undefined
+            const n  = cs && cs.type === 'literal' ? String(cs.value ?? '?') : 'variable'
+            return [{ key: 'Repeat', val: `× ${n}`, muted: false }]
+        }
+        return [{ key: 'Mode', val: 'while condition', muted: true }]
+    }
+
+    if (type === 'loop_end') {
+        return [{ key: '↻', val: 'back to loop', muted: true }]
     }
 
     if (type === 'condition') {
@@ -96,12 +118,16 @@ const summaryRows = computed(() => {
 })
 
 function select() {
-    selectionStore.select(props.treeNode.node.id)
+    selectionStore.toggle(props.treeNode.node.id)
 }
 
 function deleteNode() {
     builderStore.deleteNode(props.treeNode.node.id)
 }
+
+// loop_end is auto-managed: it lives and dies with its parent loop, so the
+// per-card delete button is hidden (the store rejects the delete anyway).
+const canDelete = computed(() => props.treeNode.node.type !== 'loop_end')
 
 // A node can move up only if it has both an incoming edge AND its
 // predecessor has its own incoming edge — i.e. it's not adjacent to the
@@ -178,7 +204,7 @@ function openMoveDialog() {
             <span v-if="endStatusLabel" class="end-status-badge">{{ endStatusLabel }}</span>
             <div v-if="hasError" class="node-warn" title="Validation error">!</div>
             <span v-if="index != null" class="node-num">#{{ index }}</span>
-            <button class="node-delete-btn" title="Delete node" @click.stop="deleteNode">×</button>
+            <button v-if="canDelete" class="node-delete-btn" title="Delete node" @click.stop="deleteNode">×</button>
         </div>
 
         <div v-if="vendorPreview" class="node-card-body">
@@ -201,7 +227,7 @@ function openMoveDialog() {
         </div>
     </div>
 
-    <div class="node-side-actions" @click.stop>
+    <div v-if="treeNode.node.type !== 'loop_end'" class="node-side-actions" @click.stop>
         <button
             class="node-side-btn"
             title="Move up"

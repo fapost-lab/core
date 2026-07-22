@@ -37,7 +37,7 @@ watch(rules, (next) => {
 })
 
 function selectCard() {
-    selectionStore.select(props.treeNode.node.id)
+    selectionStore.toggle(props.treeNode.node.id)
 }
 
 function selectBranch(handle: string) {

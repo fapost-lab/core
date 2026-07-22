@@ -1,15 +1,34 @@
 <script setup lang="ts">
+import {nextTick} from 'vue';
 import {useBuilderStore} from '@builder/store/builderStore';
 import {useRegistryStore} from '@builder/store/registryStore';
 import {useSelectionStore} from '@builder/store/selectionStore';
 import {useValidation} from '@builder/composables/useValidation';
+import type {TreeNode} from '@builder/utils/buildTree';
 
 const store = useBuilderStore();
 const registryStore = useRegistryStore();
 const selectionStore = useSelectionStore();
 const { validate } = useValidation();
 
-function jumpToNode(error: { path?: string; message?: string }) {
+/**
+ * Find the branch path (sequence of node+handle pairs, default chains omitted)
+ * needed to make `targetId` visible on the canvas. Linear `default` continuations
+ * are flattened by the sequence view, so only meaningful branch points matter.
+ */
+function findBranchPath(nodes: TreeNode[], targetId: string, acc: string[]): string[] | null {
+    for (const tn of nodes) {
+        if (tn.node.id === targetId) return acc
+        for (const [handle, children] of Object.entries(tn.childrenByHandle ?? {})) {
+            const nextAcc = handle === 'default' ? acc : [...acc, tn.node.id, handle]
+            const found = findBranchPath(children, targetId, nextAcc)
+            if (found) return found
+        }
+    }
+    return null
+}
+
+async function jumpToNode(error: { path?: string; message?: string }) {
     if (error?.path?.startsWith('trigger.')) {
         selectionStore.selectTrigger()
         return
@@ -17,7 +36,18 @@ function jumpToNode(error: { path?: string; message?: string }) {
 
     const nodeId = error?.path?.split('.')?.[1];
     if (!nodeId) return;
+
+    // Switch to the branch that contains the node so it renders on the canvas,
+    // then select + scroll once the DOM has updated.
+    const path = findBranchPath(store.tree as TreeNode[], nodeId, []);
+    if (path && path.length > 0) {
+        selectionStore.setActiveBranch(path);
+    } else {
+        selectionStore.clearBranch();
+    }
     selectionStore.select(nodeId);
+
+    await nextTick();
     const target = document.getElementById(`node-card-${nodeId}`);
     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
@@ -92,9 +122,10 @@ function humanPath(path: string | undefined): string {
 
 <style scoped>
 .val-panel {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    z-index: 40;
+    /* Normal flow: last child of the editor-root flex column, so it takes its
+       own height and shrinks editor-main by exactly that — no fixed overlay,
+       no manual scroll-padding reserve, no gap below the panels. */
+    flex-shrink: 0;
     background: var(--surface);
     border-top: 1px solid var(--border);
     box-shadow: var(--shadow-md);

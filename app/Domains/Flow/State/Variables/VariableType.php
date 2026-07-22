@@ -15,6 +15,7 @@ enum VariableType: string
 {
     case Text     = 'text';
     case Number   = 'number';
+    case Boolean  = 'boolean';
     case Phone    = 'phone';
     case Email    = 'email';
     case Confirm  = 'confirm';
@@ -27,4 +28,7 @@ enum VariableType: string
 
     /** Structured object/array payload (e.g. a `call` node's whole response). */
     case Json = 'json';
+
+    /** Ordered collection; writes are append-only; max_size enforced by ContactWriter. */
+    case Array = 'array';
 }

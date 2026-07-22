@@ -1,5 +1,5 @@
-import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import {defineStore} from 'pinia'
+import {ref} from 'vue'
 
 export const useSelectionStore = defineStore('selection', () => {
     const selectedNodeId = ref<string | null>(null)
@@ -9,12 +9,17 @@ export const useSelectionStore = defineStore('selection', () => {
         selectedNodeId.value = nodeId
     }
 
+    /** Select the node, or deselect it when it is already the active one. */
+    function toggle(nodeId: string) {
+        selectedNodeId.value = selectedNodeId.value === nodeId ? null : nodeId
+    }
+
     function clear() {
         selectedNodeId.value = null
     }
 
     function selectTrigger() {
-        selectedNodeId.value = '__trigger__'
+        selectedNodeId.value = selectedNodeId.value === '__trigger__' ? null : '__trigger__'
     }
 
     function setActiveBranch(path: string[]) {
@@ -29,6 +34,7 @@ export const useSelectionStore = defineStore('selection', () => {
         selectedNodeId,
         activeBranch,
         select,
+        toggle,
         selectTrigger,
         clear,
         setActiveBranch,

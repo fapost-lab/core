@@ -53,6 +53,8 @@ use App\Domains\Flow\Handlers\DelayNodeHandler;
 use App\Domains\Flow\Handlers\EmitEventNodeHandler;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\InputNodeHandler;
+use App\Domains\Flow\Handlers\LoopEndNodeHandler;
+use App\Domains\Flow\Handlers\LoopNodeHandler;
 use App\Domains\Flow\Handlers\NotifyNodeHandler;
 use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
@@ -470,5 +472,12 @@ final class FlowServiceProvider extends ServiceProvider
                 $templates,
             )
         );
+        $registry->register(
+            new LoopNodeHandler(
+                $app->make(DataAccessorRegistryInterface::class),
+                $variableResolver,
+            )
+        );
+        $registry->register(new LoopEndNodeHandler());
     }
 }

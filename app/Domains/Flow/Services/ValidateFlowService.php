@@ -14,6 +14,8 @@ use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Handlers\EndNodeHandler;
+use App\Domains\Flow\Handlers\LoopEndNodeHandler;
+use App\Domains\Flow\Handlers\LoopNodeHandler;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Subflow\CallGraphValidator;
@@ -62,10 +64,14 @@ final readonly class ValidateFlowService
             $this->validateRagQueryConfig($node, $path, $errors);
             $this->validateSubflowConfig($node, $path, $errors);
             $this->validateInputSaveTarget($node, $path, $errors);
+            $this->validateLoopConfig($node, $path, $errors);
+            $this->validateLoopEndConfig($node, $path, $nodeMap, $errors);
         }
 
         $this->validateEndNodeOutgoingEdges($nodeMap, $edges, $errors);
         $this->validateSubflowCallGraph($flowId, $nodeMap, $errors);
+        $this->validateNoNestedLoops($nodeMap, $edges, $errors);
+        $this->validateLoopReachesLoopEnd($nodeMap, $edges, $errors);
 
         $this->validateInlineKeyboardIsTerminal($nodeMap, $edges, $errors);
         $this->validateButtonEdgesMatchExistingButtons($nodeMap, $edges, $errors);
@@ -230,16 +236,21 @@ final readonly class ValidateFlowService
      */
     private function validateBranchNodeConnections(array $node, string $path, array &$errors): void
     {
-        if (($node['type'] ?? null) !== 'branch') {
+        if (! in_array($node['type'] ?? null, ['branch', 'condition'], true)) {
             return;
         }
 
-        $outputs = $node['outputs'] ?? null;
-        if (! is_array($outputs) || ! isset($outputs['true'], $outputs['false'])) {
+        // Current model: a branch routes through one or more rules (each with its
+        // own handle) plus an implicit `default` (Otherwise) exit. The legacy
+        // true/false output pair no longer applies.
+        $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+        $rules  = is_array($config['rules'] ?? null) ? $config['rules'] : [];
+
+        if ([] === $rules) {
             $errors[] = new FlowValidationErrorDto(
-                path: "{$path}.outputs",
-                code: 'branch_outputs_missing',
-                message: 'Branch nodes must have both true/false outputs.',
+                path: "{$path}.config.rules",
+                code: 'branch_rules_missing',
+                message: 'Branch nodes must define at least one condition.',
             );
         }
     }
@@ -1001,6 +1012,289 @@ final readonly class ValidateFlowService
                 code: 'unknown_event_trigger_selection',
                 message: 'Selected event must already exist in the tenant event registry.',
             );
+        }
+    }
+
+    /**
+     * Validate a loop node's own config (rule 8.3: iterator_name format).
+     *
+     * @param  array<string, mixed>          $node
+     * @param  list<FlowValidationErrorDto>  $errors
+     */
+    private function validateLoopConfig(array $node, string $path, array &$errors): void
+    {
+        if (($node['type'] ?? null) !== LoopNodeHandler::TYPE) {
+            return;
+        }
+
+        $config       = is_array($node['config'] ?? null) ? $node['config'] : [];
+        $iteratorName = $config['iterator_name'] ?? null;
+
+        if (null !== $iteratorName) {
+            if (! is_string($iteratorName) || 1 !== preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $iteratorName)) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "{$path}.config.iterator_name",
+                    code: 'loop_invalid_iterator_name',
+                    message: "iterator_name '{$iteratorName}' must match identifier pattern (alphanumeric + underscore, not starting with digit).",
+                );
+            } elseif (in_array($iteratorName, ['id', 'language', 'meta', 'tenant_id', 'external_id'], true)) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "{$path}.config.iterator_name",
+                    code: 'loop_reserved_iterator_name',
+                    message: "iterator_name '{$iteratorName}' is reserved and cannot be used.",
+                );
+            }
+        }
+
+        // Rule 8.8: for literal counted mode, warn if count exceeds budget.
+        $mode        = is_string($config['mode'] ?? null) ? $config['mode'] : 'counted';
+        $countSource = is_array($config['count_source'] ?? null) ? $config['count_source'] : null;
+
+        if ('counted' === $mode && is_array($countSource) && 'literal' === ($countSource['type'] ?? null)) {
+            $literal = $countSource['value'] ?? null;
+
+            if (is_numeric($literal) && (int) $literal > 100) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "{$path}.config.count_source",
+                    code: 'loop_count_exceeds_budget',
+                    message: "Static loop count {$literal} exceeds the recommended maximum of 100 iterations per session.",
+                );
+            }
+        }
+    }
+
+    /**
+     * Validate a loop_end node: loop_node_id must reference an existing loop node (rule 8.2).
+     *
+     * @param  array<string, mixed>                  $node
+     * @param  array<string, array<string, mixed>>   $nodeMap
+     * @param  list<FlowValidationErrorDto>          $errors
+     */
+    private function validateLoopEndConfig(
+        array $node,
+        string $path,
+        array $nodeMap,
+        array &$errors,
+    ): void {
+        if (($node['type'] ?? null) !== LoopEndNodeHandler::TYPE) {
+            return;
+        }
+
+        $config     = is_array($node['config'] ?? null) ? $node['config'] : [];
+        $loopNodeId = is_string($config['loop_node_id'] ?? null) ? $config['loop_node_id'] : null;
+
+        if (null === $loopNodeId || '' === $loopNodeId) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.loop_node_id",
+                code: 'loop_end_missing_loop_node_id',
+                message: 'loop_end requires loop_node_id pointing to the parent loop node.',
+            );
+
+            return;
+        }
+
+        $target = $nodeMap[$loopNodeId] ?? null;
+
+        if (null === $target || ($target['type'] ?? null) !== LoopNodeHandler::TYPE) {
+            $errors[] = new FlowValidationErrorDto(
+                path: "{$path}.config.loop_node_id",
+                code: 'loop_end_invalid_loop_node_id',
+                message: "loop_node_id '{$loopNodeId}' does not reference an existing loop node.",
+            );
+        }
+    }
+
+    /**
+     * Detect nested loops (rule 8.4): a loop body must not reach another loop node
+     * before hitting a loop_end. Uses BFS from the 'loop' handle of each loop node.
+     *
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     * @param  array<int, array<string, mixed>>     $edges
+     * @param  list<FlowValidationErrorDto>         $errors
+     */
+    private function validateNoNestedLoops(array $nodeMap, array $edges, array &$errors): void
+    {
+        // Build adjacency list: source node id → list of target node ids.
+        /** @var array<string, list<string>> $adjacency */
+        $adjacency = [];
+
+        foreach ($edges as $edge) {
+            if (! is_array($edge)) {
+                continue;
+            }
+
+            $source = is_string($edge['from'] ?? null) ? $edge['from'] : null;
+            $target = is_string($edge['to'] ?? null) ? $edge['to'] : null;
+
+            if (null !== $source && null !== $target) {
+                $adjacency[$source][] = $target;
+            }
+        }
+
+        foreach ($nodeMap as $nodeId => $node) {
+            if (($node['type'] ?? null) !== LoopNodeHandler::TYPE) {
+                continue;
+            }
+
+            // BFS from each outgoing edge of this loop node's 'loop' handle.
+            $loopEdgeTargets = [];
+
+            foreach ($edges as $edge) {
+                if (! is_array($edge)) {
+                    continue;
+                }
+
+                if (($edge['from'] ?? null) !== $nodeId) {
+                    continue;
+                }
+
+                if (($edge['handle'] ?? null) !== 'loop') {
+                    continue;
+                }
+
+                $target = is_string($edge['to'] ?? null) ? $edge['to'] : null;
+
+                if (null !== $target) {
+                    $loopEdgeTargets[] = $target;
+                }
+            }
+
+            $visited = [$nodeId => true];
+            $queue   = $loopEdgeTargets;
+
+            while ([] !== $queue) {
+                $current = array_shift($queue);
+
+                if (isset($visited[$current])) {
+                    continue;
+                }
+
+                $visited[$current] = true;
+                $currentType       = $nodeMap[$current]['type'] ?? null;
+
+                if (LoopNodeHandler::TYPE === $currentType) {
+                    $errors[] = new FlowValidationErrorDto(
+                        path: "nodes.{$nodeId}",
+                        code: 'loop_nested_not_allowed',
+                        message: "Loop body of node '{$nodeId}' contains a nested loop node '{$current}'. Nested loops are not supported.",
+                    );
+                    break;
+                }
+
+                // Stop BFS at loop_end (it's the boundary of this loop's body).
+                if (LoopEndNodeHandler::TYPE === $currentType) {
+                    $loopEndConfig = is_array($nodeMap[$current]['config'] ?? null)
+                        ? $nodeMap[$current]['config']
+                        : [];
+
+                    if (($loopEndConfig['loop_node_id'] ?? null) === $nodeId) {
+                        continue;
+                    }
+                }
+
+                foreach ($adjacency[$current] ?? [] as $next) {
+                    if (! isset($visited[$next])) {
+                        $queue[] = $next;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Reachability (rule 8.1): every loop node's `loop` handle must reach its
+     * paired loop_end. The builder guarantees this via auto-managed constructs,
+     * but flows arriving through the API / import path are unprotected — an
+     * orphaned loop would iterate forever without a loop_end to advance it.
+     *
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     * @param  array<int, array<string, mixed>>     $edges
+     * @param  list<FlowValidationErrorDto>         $errors
+     */
+    private function validateLoopReachesLoopEnd(array $nodeMap, array $edges, array &$errors): void
+    {
+        // Build adjacency list: source node id → list of target node ids.
+        /** @var array<string, list<string>> $adjacency */
+        $adjacency = [];
+
+        foreach ($edges as $edge) {
+            if (! is_array($edge)) {
+                continue;
+            }
+
+            $source = is_string($edge['from'] ?? null) ? $edge['from'] : null;
+            $target = is_string($edge['to'] ?? null) ? $edge['to'] : null;
+
+            if (null !== $source && null !== $target) {
+                $adjacency[$source][] = $target;
+            }
+        }
+
+        foreach ($nodeMap as $nodeId => $node) {
+            if (($node['type'] ?? null) !== LoopNodeHandler::TYPE) {
+                continue;
+            }
+
+            // Seed BFS from the targets of this loop's 'loop' handle only.
+            $queue = [];
+
+            foreach ($edges as $edge) {
+                if (! is_array($edge) || ($edge['from'] ?? null) !== $nodeId) {
+                    continue;
+                }
+
+                if (($edge['handle'] ?? null) !== 'loop') {
+                    continue;
+                }
+
+                $target = is_string($edge['to'] ?? null) ? $edge['to'] : null;
+
+                if (null !== $target) {
+                    $queue[] = $target;
+                }
+            }
+
+            $reached = false;
+            $visited = [$nodeId => true];
+
+            while ([] !== $queue) {
+                $current = array_shift($queue);
+
+                if (isset($visited[$current])) {
+                    continue;
+                }
+
+                $visited[$current] = true;
+
+                if (($nodeMap[$current]['type'] ?? null) === LoopEndNodeHandler::TYPE) {
+                    $config = is_array($nodeMap[$current]['config'] ?? null)
+                        ? $nodeMap[$current]['config']
+                        : [];
+
+                    if (($config['loop_node_id'] ?? null) === $nodeId) {
+                        $reached = true;
+                        break;
+                    }
+
+                    // A loop_end for a *different* loop is a boundary — don't
+                    // traverse past it into another loop's body.
+                    continue;
+                }
+
+                foreach ($adjacency[$current] ?? [] as $next) {
+                    if (! isset($visited[$next])) {
+                        $queue[] = $next;
+                    }
+                }
+            }
+
+            if (! $reached) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "nodes.{$nodeId}",
+                    code: 'loop_missing_loop_end',
+                    message: "Loop node '{$nodeId}' has no reachable loop_end — the iteration would never complete.",
+                );
+            }
         }
     }
 }

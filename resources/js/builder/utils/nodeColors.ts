@@ -34,6 +34,10 @@ export const NODE_TYPE_COLORS: Record<string, NodeColorScheme> = {
     // Timing
     delay:         { bg: '#f0edf8',          color: '#7060a8',       icon: '⏱️' },
 
+    // Looping (control flow — iteration)
+    loop:          { bg: 'var(--amber-bg)',  color: 'var(--amber)',  icon: '🔁' },
+    loop_end:      { bg: 'var(--amber-bg)',  color: 'var(--amber)',  icon: '🔚' },
+
     // External / network
     call:          { bg: 'var(--sky-bg)',    color: 'var(--sky)',    icon: '🌐' },
     emit_event:    { bg: 'var(--sky-bg)',    color: 'var(--sky)',    icon: '📡' },

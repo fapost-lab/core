@@ -33,7 +33,9 @@ final class VariableCoercer implements VariableCoercerInterface
     public function coerce(mixed $value, VariableType $type): mixed
     {
         return match ($type) {
-            VariableType::Number  => $this->coerceNumber($value),
+            VariableType::Number => $this->coerceNumber($value),
+            // Boolean shares the confirm parsing (truthy/falsy literals → bool).
+            VariableType::Boolean,
             VariableType::Confirm => $this->coerceConfirm($value),
             VariableType::Date    => $this->coerceDate($value),
             // Structured payloads written by platform handlers — pass through as-is.
@@ -41,7 +43,9 @@ final class VariableCoercer implements VariableCoercerInterface
             VariableType::File,
             VariableType::Photo,
             VariableType::Json,
-            VariableType::Location => '' === $value ? null : $value,
+            VariableType::Location,
+            // Array values are managed by ContactWriter / handlers; coercer is a no-op.
+            VariableType::Array => '' === $value ? null : $value,
             // String-semantic types.
             default => $this->coerceString($value),
         };

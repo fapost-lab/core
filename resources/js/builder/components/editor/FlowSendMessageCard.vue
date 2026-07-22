@@ -25,7 +25,7 @@ const isSelected = computed(() => selectionStore.selectedNodeId === node.value.i
 const hasError   = computed(() => builderStore.nodesWithErrors.has(node.value.id))
 
 function selectCard() {
-    selectionStore.select(node.value.id)
+    selectionStore.toggle(node.value.id)
 }
 
 interface KbButton {

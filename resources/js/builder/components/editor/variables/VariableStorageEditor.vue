@@ -52,6 +52,13 @@ const props = withDefaults(defineProps<{
     showGroup?:   boolean
     showStorage?: boolean
     showType?:    boolean
+    /** Show the "Store as list" toggle — turns the variable into an append-only array. */
+    showList?:    boolean
+    /**
+     * Read-only type caption shown when the Type dropdown is hidden
+     * (showType=false) — e.g. Input derives the type from "Expected input".
+     */
+    typeDisplay?: string | null
     /**
      * ID of the node this editor belongs to. Used to exclude the node's own
      * registrations from cross-namespace conflict detection — otherwise the
@@ -64,6 +71,8 @@ const props = withDefaults(defineProps<{
     showGroup:   true,
     showStorage: true,
     showType:    true,
+    showList:    false,
+    typeDisplay: null,
     ownerNodeId: '',
 })
 
@@ -77,6 +86,7 @@ function defaultVariable(): Variable {
         type:    (props.typeOptions[0]?.value ?? 'text') as VariableType,
         storage: 'contact',
         group:   null,
+        isList:  false,
     }
 }
 
@@ -91,6 +101,7 @@ function normalize(input: Variable | null): Variable {
         type:    (base.type ?? props.typeOptions[0]?.value ?? 'text') as VariableType,
         storage: base.storage === 'session' ? 'session' : 'contact',
         group:   typeof base.group === 'string' && base.group !== '' ? base.group : null,
+        isList:  base.isList === true,
     }
 }
 
@@ -188,6 +199,7 @@ function emitUpdate() {
         type:    state.value.type,
         storage: state.value.storage,
         group:   state.value.storage === 'contact' ? state.value.group : null,
+        isList:  state.value.isList === true,
     }
     emit('update:modelValue', snapshot)
 }
@@ -217,6 +229,11 @@ function onNameSelect(value: string) {
 
 function onTypeChange(event: Event) {
     state.value.type = (event.target as HTMLSelectElement).value as VariableType
+    emitUpdate()
+}
+
+function onListChange(event: Event) {
+    state.value.isList = (event.target as HTMLInputElement).checked
     emitUpdate()
 }
 
@@ -280,6 +297,27 @@ function onGroupCreate(name: string) {
                             {{ opt.label }}
                         </option>
                     </select>
+                </div>
+            </div>
+
+            <div v-if="!props.showType && props.typeDisplay" class="vse-row vse-row-inline">
+                <label class="vse-label">Type:</label>
+                <div class="vse-control vse-control-inline">
+                    <span class="vse-type-display">{{ props.typeDisplay }}</span>
+                </div>
+            </div>
+
+            <div v-if="props.showList" class="vse-row vse-row-inline">
+                <label class="vse-label">List:</label>
+                <div class="vse-control vse-control-inline">
+                    <label class="vse-toggle">
+                        <input
+                            type="checkbox"
+                            :checked="state.isList === true"
+                            @change="onListChange"
+                        >
+                        <span>Store as list (append each value)</span>
+                    </label>
                 </div>
             </div>
 
@@ -396,5 +434,24 @@ function onGroupCreate(name: string) {
 }
 .vse-hint--inline {
     padding-left: 8px;
+}
+.vse-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--text-2);
+    cursor: pointer;
+}
+.vse-toggle input {
+    cursor: pointer;
+}
+.vse-type-display {
+    font-size: 12.5px;
+    color: var(--text);
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
 }
 </style>

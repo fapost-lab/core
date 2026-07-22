@@ -21,6 +21,7 @@ use FAPost\Support\Models\BaseModel;
  * @property string|null                $group
  * @property string                     $name
  * @property VariableType               $type
+ * @property array<string, mixed>       $properties           Type-specific metadata; for Array: {max_size, item_type}
  * @property string|null                $declared_in_flow_id
  * @property string|null                $declared_by_node_id
  * @property \Illuminate\Support\Carbon $updated_at
@@ -40,6 +41,7 @@ final class VariableSchemaEntry extends BaseModel
         'group',
         'name',
         'type',
+        'properties',
         'declared_in_flow_id',
         'declared_by_node_id',
         'updated_at',
@@ -57,6 +59,7 @@ final class VariableSchemaEntry extends BaseModel
     {
         return [
             'type'       => VariableType::class,
+            'properties' => 'array',
             'updated_at' => 'datetime',
         ];
     }

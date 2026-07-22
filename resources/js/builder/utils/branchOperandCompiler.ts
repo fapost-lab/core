@@ -42,11 +42,18 @@ export interface CompiledLeft {
     field?:    string
 }
 
-/** Build the JSON snapshot stored under `rule.left`. */
-export function compileLeft(state: BranchOperandUiState): CompiledLeft | null {
+/**
+ * Build the JSON snapshot stored under `rule.left`.
+ *
+ * Returns the structured shape for known variables/sources. A free-typed path
+ * that didn't map to either (rawPath) is emitted as a plain string — the
+ * backend OperandResolver accepts string `left` as a legacy path (`data_get`),
+ * so deep dot-paths like `call.last.body.items` resolve at runtime.
+ */
+export function compileLeft(state: BranchOperandUiState): CompiledLeft | string | null {
     if (state.mode === 'user_variable') {
         if (!state.variable || state.variable.name.trim() === '') {
-            return null
+            return state.rawPath && state.rawPath.trim() !== '' ? state.rawPath.trim() : null
         }
         return {
             ref: 'user_variable',
@@ -58,7 +65,7 @@ export function compileLeft(state: BranchOperandUiState): CompiledLeft | null {
         }
     }
     if (!state.source || !state.field) {
-        return null
+        return state.rawPath && state.rawPath.trim() !== '' ? state.rawPath.trim() : null
     }
     return {
         ref:    'source',

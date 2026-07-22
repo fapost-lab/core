@@ -97,6 +97,19 @@ function resolveHandleLabel(handle: string): string {
         }
         return `Button`
     }
+    if (props.treeNode.node.type === 'loop' && handle === 'loop') {
+        return 'Loop body'
+    }
+    // Branch/condition rule handles are generated ids — show the rule's label.
+    if (props.treeNode.node.type === 'branch' || props.treeNode.node.type === 'condition') {
+        if (handle === 'default') return 'Otherwise'
+        const rules = Array.isArray(props.treeNode.node.config?.rules)
+            ? (props.treeNode.node.config!.rules as Array<Record<string, unknown>>)
+            : []
+        const rule = rules.find((r) => r.handle === handle)
+        const label = typeof rule?.label === 'string' ? rule.label.trim() : ''
+        return label !== '' ? label : handle
+    }
     return handle
 }
 </script>
@@ -149,8 +162,12 @@ function resolveHandleLabel(handle: string): string {
             </template>
         </div>
 
-        <!-- Default handle — render children flat at same level (linear continuation) -->
-        <template v-if="expanded">
+        <!-- Default handle — render children flat at same level (linear continuation).
+             For a loop, `default` is the main-flow continuation AFTER the loop
+             (not a sub-branch), so it must stay visible even when the loop's
+             body branch is collapsed — collapsing only hides the `loop body`.
+             Pure branchers (condition) keep their `default`/Otherwise gated. -->
+        <template v-if="expanded || treeNode.node.type === 'loop'">
             <FlowStructureNode
                 v-for="child in defaultChildren"
                 :key="child.node.id"

@@ -21,16 +21,58 @@ export interface CompiledVariable {
     type:    VariableType
     storage: VariableStorage
     group:   string | null
+    /** Present only for list variables: { item_type } describing the element type. */
+    properties?: { item_type: VariableType }
 }
 
-/** Build the JSON snapshot stored under `node.config.variable`. */
+/**
+ * Build the JSON snapshot stored under `node.config.variable`.
+ *
+ * A list variable ({@link Variable.isList}) compiles to backend `type: 'array'`
+ * with the chosen element type carried in `properties.item_type`.
+ */
 export function compileVariable(variable: Variable): CompiledVariable {
-    return {
+    const base: CompiledVariable = {
         name:    variable.name,
         type:    variable.type,
         storage: variable.storage,
         group:   variable.storage === 'contact' ? variable.group : null,
     }
+
+    if (variable.isList) {
+        return {
+            ...base,
+            type:       'array',
+            properties: { item_type: variable.type === 'array' ? 'text' : variable.type },
+        }
+    }
+
+    return base
+}
+
+/**
+ * Decode a stored variable block (any node) into the UI {@link Variable},
+ * unwrapping the array shape back into element-type + isList flag.
+ */
+export function decodeStoredVariable(
+    obj: Record<string, unknown>,
+    fallbackType: VariableType = 'text',
+): Variable {
+    const name    = typeof obj.name === 'string' ? obj.name : ''
+    const storage = obj.storage === 'session' ? 'session' : 'contact'
+    const group   = typeof obj.group === 'string' && obj.group !== '' ? obj.group : null
+    const rawType = typeof obj.type === 'string' ? (obj.type as VariableType) : fallbackType
+
+    if (rawType === 'array') {
+        const props    = obj.properties as Record<string, unknown> | undefined
+        const itemType = props && typeof props.item_type === 'string'
+            ? (props.item_type as VariableType)
+            : 'text'
+
+        return { name, type: itemType, storage, group: storage === 'contact' ? group : null, isList: true }
+    }
+
+    return { name, type: rawType, storage, group: storage === 'contact' ? group : null, isList: false }
 }
 
 
@@ -101,19 +143,9 @@ export function decodeInputVariable(config: Record<string, unknown> | null | und
 
     if (raw && typeof raw === 'object') {
         const obj = raw as Record<string, unknown>
-        const name    = typeof obj.name === 'string' ? obj.name : ''
-        const storage = obj.storage === 'session' ? 'session' : 'contact'
-        const group   = typeof obj.group === 'string' && obj.group !== '' ? obj.group : null
-        const type    = typeof obj.type === 'string'
-            ? (obj.type as VariableType)
-            : (typeof cfg.expected_type === 'string' ? (cfg.expected_type as VariableType) : 'text')
+        const fallback = typeof cfg.expected_type === 'string' ? (cfg.expected_type as VariableType) : 'text'
 
-        return {
-            name,
-            type,
-            storage,
-            group: storage === 'contact' ? group : null,
-        }
+        return decodeStoredVariable(obj, fallback)
     }
 
     const saveTo = typeof cfg.save_to === 'string' ? cfg.save_to : ''
@@ -160,18 +192,8 @@ export function decodeAssignOperations(
                 continue
             }
 
-            const name    = typeof varRaw.name === 'string' ? varRaw.name : ''
-            const storage = varRaw.storage === 'session' ? 'session' : 'contact'
-            const group   = typeof varRaw.group === 'string' && varRaw.group !== '' ? varRaw.group : null
-            const type    = typeof varRaw.type === 'string' ? (varRaw.type as VariableType) : 'text'
-
             out.push({
-                variable: {
-                    name,
-                    type,
-                    storage,
-                    group: storage === 'contact' ? group : null,
-                },
+                variable: decodeStoredVariable(varRaw),
                 value,
             })
         }
@@ -226,18 +248,7 @@ export function decodeSendMessageVariable(
     const raw = cfg.save_to_variable
 
     if (raw && typeof raw === 'object') {
-        const obj = raw as Record<string, unknown>
-        const name    = typeof obj.name === 'string' ? obj.name : ''
-        const storage = obj.storage === 'session' ? 'session' : 'contact'
-        const group   = typeof obj.group === 'string' && obj.group !== '' ? obj.group : null
-        const type    = typeof obj.type === 'string' ? (obj.type as VariableType) : 'text'
-
-        return {
-            name,
-            type,
-            storage,
-            group: storage === 'contact' ? group : null,
-        }
+        return decodeStoredVariable(raw as Record<string, unknown>)
     }
 
     const saveTo = typeof cfg.save_to === 'string' ? cfg.save_to.trim() : ''

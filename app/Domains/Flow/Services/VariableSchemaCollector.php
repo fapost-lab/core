@@ -99,6 +99,7 @@ final class VariableSchemaCollector
                 storage: $variable->storage,
                 group: $variable->group,
                 type: VariableType::Text,
+                properties: $variable->properties,
             );
         }
 

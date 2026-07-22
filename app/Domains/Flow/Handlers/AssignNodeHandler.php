@@ -10,6 +10,7 @@ use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableStorage;
+use App\Domains\Flow\State\Variables\VariableType;
 use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
@@ -126,6 +127,17 @@ final class AssignNodeHandler extends AbstractVersionedHandler
 
                 $writer->write($path, $value);
                 $appliedKeys[] = $path;
+
+                continue;
+            }
+
+            // Session array variables append rather than replace (spec §5.5).
+            if (VariableType::Array === $variable->type) {
+                $current             = data_get($state, $path);
+                $list                = is_array($current) ? array_values($current) : [];
+                $list[]              = $value;
+                $stateChanges[$path] = $list;
+                $appliedKeys[]       = $path;
 
                 continue;
             }

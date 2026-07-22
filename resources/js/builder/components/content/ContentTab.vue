@@ -237,7 +237,6 @@ function onSave() {
             :languages="languages"
             @update="onUpdate"
             @save="onSave"
-            @delete="() => {}"
         />
     </div>
 </template>

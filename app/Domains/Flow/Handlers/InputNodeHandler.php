@@ -15,6 +15,7 @@ use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableStorage;
+use App\Domains\Flow\State\Variables\VariableType;
 use App\Domains\Flow\Validation\InputValidatorInterface;
 use App\Domains\Flow\Validation\ValidationResult;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
@@ -104,7 +105,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
                 return $promptResult;
             }
 
-            return $this->handleMediaInput($expectedType, $variable, $context);
+            return $this->handleMediaInput($expectedType, $variable, $state, $context);
         }
 
         // Platform-native types send a ReplyKeyboard with a special native button.
@@ -332,7 +333,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
      */
     private function emitSuccess(?Variable $variable, mixed $value, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
-        $stateChanges = $this->buildStateChanges($variable, $value, $context);
+        $stateChanges = $this->persistValue($variable, $value, $state, $context);
 
         // Only emit the retry-counter reset when there was actually something to
         // reset — keeps the happy-path stateChanges minimal and avoids polluting
@@ -429,6 +430,7 @@ final class InputNodeHandler extends AbstractVersionedHandler
     private function handleMediaInput(
         InputExpectedType $expectedType,
         ?Variable $variable,
+        array $state,
         NodeExecutionContext $context
     ): NodeExecutionResult {
         $incoming = $context->incoming;
@@ -479,7 +481,14 @@ final class InputNodeHandler extends AbstractVersionedHandler
             ];
         }
 
-        $stateChanges = $this->buildStateChanges($variable, $stored, $context);
+        // Array variable → append each ingested descriptor as its own element
+        // (a 5-photo message yields 5 appended items). Otherwise the whole list
+        // is stored as the variable value (legacy single-write behavior).
+        if (null !== $variable && VariableType::Array === $variable->type) {
+            $stateChanges = $this->persistElements($variable, $stored, $state, $context);
+        } else {
+            $stateChanges = $this->persistValue($variable, $stored, $state, $context);
+        }
 
         return new NodeExecutionResult(
             status: NodeExecutionStatus::Executed,
@@ -605,9 +614,15 @@ final class InputNodeHandler extends AbstractVersionedHandler
      * {@see ContactWriterInterface}; session-scoped variables flow through
      * the engine's {@code stateChanges} batch.
      *
+     * Array-typed variables use append semantics: contact arrays append +
+     * circular-buffer inside {@see ContactWriterInterface}; session arrays append
+     * into the in-state collection here (the session has no immediate writer).
+     *
+     * @param  array<string, mixed>  $state
+     *
      * @return array<string, mixed>
      */
-    private function buildStateChanges(?Variable $variable, mixed $value, NodeExecutionContext $context): array
+    private function persistValue(?Variable $variable, mixed $value, array $state, NodeExecutionContext $context): array
     {
         if (null === $variable) {
             return [];
@@ -625,6 +640,51 @@ final class InputNodeHandler extends AbstractVersionedHandler
             return [];
         }
 
+        // Session storage: array variables append into the existing collection.
+        if (VariableType::Array === $variable->type) {
+            $current = data_get($state, $path);
+            $list    = is_array($current) ? array_values($current) : [];
+            $list[]  = $value;
+
+            return [$path => $list];
+        }
+
         return [$path => $value];
+    }
+
+    /**
+     * Append several elements one-by-one into an array variable. Contact arrays
+     * append through {@see ContactWriterInterface} per element (circular buffer
+     * applied each time); session arrays accumulate into a single batched list.
+     *
+     * @param  list<mixed>           $elements
+     * @param  array<string, mixed>  $state
+     *
+     * @return array<string, mixed>
+     */
+    private function persistElements(Variable $variable, array $elements, array $state, NodeExecutionContext $context): array
+    {
+        $path = $this->variableResolver->resolveTargetPath($variable);
+
+        if (VariableStorage::Contact === $variable->storage) {
+            $writer = $context->contactWriter;
+
+            if ($writer instanceof ContactWriterInterface) {
+                foreach ($elements as $element) {
+                    $writer->write($path, $element);
+                }
+            }
+
+            return [];
+        }
+
+        $current = data_get($state, $path);
+        $list    = is_array($current) ? array_values($current) : [];
+
+        foreach ($elements as $element) {
+            $list[] = $element;
+        }
+
+        return [$path => $list];
     }
 }

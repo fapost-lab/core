@@ -4,16 +4,16 @@ import AccordionSection from '../AccordionSection.vue'
 import TextareaField from '../fields/TextareaField.vue'
 import VariableStorageEditor from '@builder/components/editor/variables/VariableStorageEditor.vue'
 import {useKnownGroups} from '@builder/composables/useKnownGroups'
-import {type AssignOperation, decodeAssignOperations,} from '@builder/utils/variableCompiler'
+import {type AssignOperation, compileVariable, decodeAssignOperations,} from '@builder/utils/variableCompiler'
 import type {Variable, VariableType} from '@builder/dto/types'
 
-// Assign-supported value types — narrower than the global default; an Assign
-// node writes structured data into state, so file/photo/location/contact are
-// out of scope (those are Input concerns).
+// Assign-supported value types — plain scalars. An Assign node writes typed
+// data into state; file/photo/location/contact are Input concerns. The "store
+// as list" toggle wraps the chosen scalar into an append-only array.
 const ASSIGN_TYPES = [
     { value: 'text',    label: 'Text' },
     { value: 'number',  label: 'Number' },
-    { value: 'confirm', label: 'Yes/No' },
+    { value: 'boolean', label: 'Boolean' },
     { value: 'date',    label: 'Date' },
 ]
 
@@ -82,13 +82,10 @@ function persist() {
     // name rows here — Publish + the Validate button surface them as
     // proper errors so the author can see what to fix.
     const compiled = operations.value.map((op) => ({
-        variable: {
-            name:    op.variable.name,
-            type:    op.variable.type,
-            storage: op.variable.storage,
-            group:   op.variable.storage === 'contact' ? op.variable.group : null,
-        },
-        value: op.value,
+        // compileVariable maps the "store as list" flag onto backend
+        // { type: 'array', properties: { item_type } }.
+        variable: compileVariable(op.variable),
+        value:    op.value,
     }))
 
     // Drop legacy single-op keys — backend validator rejects coexistence.
@@ -169,6 +166,7 @@ function removeOperation(index: number) {
                         :owner-node-id="String(props.node.id)"
                         show-storage
                         show-group
+                        show-list
                         @update:model-value="(next: Variable) => onVariableUpdate(index, next)"
                     />
 

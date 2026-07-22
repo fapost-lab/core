@@ -95,10 +95,35 @@ final class OperandResolver
             || str_starts_with($path, 'contact.')
             || str_starts_with($path, 'call.')
         ) {
-            return data_get($state, $path);
+            return $this->resolveWithLength($state, $path);
         }
 
         throw new InvalidNodeConfigException("operand: unsupported namespace in path '{$path}'");
+    }
+
+    /**
+     * Resolve a state path, honouring the `.length` pseudo-accessor for array
+     * variables (spec §5.6 / §14.3). `contact.photos.length` yields the element
+     * count so conditions can compare array size (e.g. "photos.length >= 5").
+     *
+     * A real state key literally named `length` still wins when it exists; the
+     * pseudo-accessor only kicks in when `data_get` finds nothing and the parent
+     * value is a countable array.
+     *
+     * @param  array<string, mixed>  $state
+     */
+    private function resolveWithLength(array $state, string $path): mixed
+    {
+        $value = data_get($state, $path);
+
+        if (null !== $value || ! str_ends_with($path, '.length')) {
+            return $value;
+        }
+
+        $parent      = mb_substr($path, 0, -mb_strlen('.length'));
+        $parentValue = data_get($state, $parent);
+
+        return is_array($parentValue) ? count($parentValue) : $value;
     }
 
     /**
@@ -148,7 +173,9 @@ final class OperandResolver
     private function resolveSourceLeft(array $left, array $state, NodeExecutionContext $context): array
     {
         $source = is_string($left['source'] ?? null) ? $left['source'] : null;
-        $field  = is_string($left['field'] ?? null) ? $left['field'] : null;
+        // Support both `field` and `path` as aliases for the attribute name within the source.
+        $field = is_string($left['field'] ?? null) ? $left['field']
+                : (is_string($left['path'] ?? null) ? $left['path'] : null);
 
         if (null === $source || '' === $source) {
             throw new InvalidNodeConfigException('operand: source left requires non-empty source');

@@ -16,6 +16,8 @@ import AuthRequestConfig from './config/overrides/AuthRequestConfig.vue'
 import CallConfig from './config/overrides/CallConfig.vue'
 import NotifyConfig from './config/overrides/NotifyConfig.vue'
 import SetTagConfig from './config/overrides/SetTagConfig.vue'
+import LoopConfig from './config/overrides/LoopConfig.vue'
+import LoopEndConfig from './config/overrides/LoopEndConfig.vue'
 import TriggerConfig from './config/overrides/TriggerConfig.vue'
 import {vendorConfigs} from '@builder/utils/vendorComponents'
 
@@ -31,18 +33,28 @@ const OVERRIDES: Record<string, object> = {
     set_tag: SetTagConfig,
     notify: NotifyConfig,
     auth_request: AuthRequestConfig,
+    loop: LoopConfig,
+    loop_end: LoopEndConfig,
 }
 
 const selectionStore = useSelectionStore()
 const builderStore   = useBuilderStore()
 const registryStore  = useRegistryStore()
-const { width, isCollapsed, handleRef, toggle } = useConfigResize()
+const { width, handleRef } = useConfigResize()
 
 const selectedNode = computed(() =>
     builderStore.definition.nodes.find((n) => n.id === selectionStore.selectedNodeId) ?? null
 )
 
 const isTriggerSelected = computed(() => selectionStore.selectedNodeId === '__trigger__')
+
+// The panel is a right-side drawer: it slides in only while a node (or the
+// trigger) is selected, leaving the canvas full-width the rest of the time.
+const isOpen = computed(() => null !== selectedNode.value || isTriggerSelected.value)
+
+function close() {
+    selectionStore.clear()
+}
 
 const handlerMeta = computed(() =>
     selectedNode.value
@@ -82,26 +94,21 @@ function deleteTrigger() {
 
 <template>
     <div
-        class="panel-config"
-        :class="{ 'panel-config--val-open': builderStore.validationOpen }"
-        :style="{ width: isCollapsed ? '0' : `${width}px` }"
+        class="panel-config panel-config--drawer"
+        :class="{
+            'panel-config--val-open': builderStore.validationOpen,
+            'panel-config--open': isOpen,
+        }"
+        :style="{ width: `${width}px` }"
     >
         <!-- resize handle -->
         <div ref="handleRef" class="config-resize-handle" />
 
-        <!-- collapse toggle -->
-        <button class="config-width-toggle" :title="isCollapsed ? 'Expand' : 'Collapse'" @click="toggle">
-            {{ isCollapsed ? '▶' : '◀' }}
-        </button>
+        <!-- close drawer -->
+        <button class="config-width-toggle" title="Close" @click="close">▶</button>
 
-        <template v-if="!isCollapsed">
-            <!-- empty state -->
-            <div v-if="!selectedNode && !isTriggerSelected" class="config-empty">
-                <div class="config-empty-icon">☰</div>
-                <div class="config-empty-text">Select a node to<br>configure it</div>
-            </div>
-
-            <template v-else-if="isTriggerSelected">
+        <template v-if="isOpen">
+            <template v-if="isTriggerSelected">
                 <div class="config-card-wrap">
                     <div class="config-card">
                         <div class="config-card-header">
@@ -121,6 +128,7 @@ function deleteTrigger() {
                                 <div class="config-node-title">Trigger</div>
                                 <span class="config-node-type">Flow entry configuration</span>
                             </div>
+                            <button class="config-close-btn" title="Close" @click="close">×</button>
                         </div>
                         <div class="config-card-body">
                             <TriggerConfig
@@ -154,6 +162,7 @@ function deleteTrigger() {
                                         }}</span>
                                 </div>
                             </div>
+                            <button class="config-close-btn" title="Close" @click="close">×</button>
                         </div>
                         <div class="config-card-body">
                             <component
@@ -188,6 +197,21 @@ function deleteTrigger() {
     opacity: 0;
     transition: opacity .15s, color .15s;
 }
-.panel-config:hover .config-width-toggle { opacity: 1; }
+.panel-config--open:hover .config-width-toggle { opacity: 1; }
 .config-width-toggle:hover { color: var(--primary); }
+
+/* × in the card header — primary affordance to dismiss the drawer. */
+.config-close-btn {
+    flex-shrink: 0;
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    border: none;
+    background: transparent;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 17px; line-height: 1;
+    color: rgba(255, 255, 255, .8);
+    transition: background .12s, color .12s;
+}
+.config-close-btn:hover { background: rgba(255, 255, 255, .18); color: #fff; }
 </style>

@@ -10,6 +10,7 @@ import FlowConditionCard from './FlowConditionCard.vue'
 import FlowSendMessageCard from './FlowSendMessageCard.vue'
 import FlowSubflowCard from './FlowSubflowCard.vue'
 import FlowCallCard from './FlowCallCard.vue'
+import FlowLoopCard from './FlowLoopCard.vue'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 
 interface TreeNode {
@@ -21,6 +22,20 @@ const builderStore = useBuilderStore()
 const selectionStore = useSelectionStore()
 const { confirm } = useConfirm()
 const navigationStore = useNavigationStore()
+
+/**
+ * Clicking the canvas background (anywhere not on a node/trigger card)
+ * deselects the active node, sliding the config drawer shut. Cards keep
+ * their own toggle/stop handlers, so this only fires for genuine background
+ * clicks — including the full-width empty strips beside centered cards
+ * (`.node-card-wrap` spans 100% width), which a `.self` check would miss.
+ */
+function onCanvasClick(event: MouseEvent) {
+    const target = event.target as HTMLElement | null
+    if (target && !target.closest('.node-card, .trigger-card')) {
+        selectionStore.clear()
+    }
+}
 
 // Halts the linear walk on any node that cannot have a default-handle
 // successor — keyboard-bearing send_message (static OR dynamic buttons,
@@ -111,9 +126,13 @@ const unreachableNodes = computed<TreeNode[]>(() => {
     const result: TreeNode[] = []
     const seen = new Set<string>()
 
-    // 1. Default-tail past a terminal send_message in the main path.
+    // 1. Default-tail past a terminal node in the main path. Skipped for
+    //    branch/condition: their `default` handle is the "Otherwise" branch
+    //    (reachable via the branch UI), not an orphaned tail.
     const last = activeNodes.value[activeNodes.value.length - 1]
-    if (last && isTerminalSendMessage(last.node)) {
+    const lastType = last?.node.type
+    const lastIsBranch = lastType === 'branch' || lastType === 'condition'
+    if (last && isTerminalSendMessage(last.node) && !lastIsBranch) {
         for (const tn of collectDefaultTail(last)) {
             if (!seen.has(tn.node.id)) {
                 seen.add(tn.node.id)
@@ -212,6 +231,21 @@ const breadcrumbs = computed(() => {
         segments.push({ label: nodeLabel, key: `${nodeId}`, branch: branch.slice(0, i) })
         if (handle) {
             let handleLabel = handle
+            if (node?.type === 'loop' && handle === 'loop') {
+                handleLabel = 'Loop body'
+            }
+            if (node?.type === 'branch' || node?.type === 'condition') {
+                if (handle === 'default') {
+                    handleLabel = 'Otherwise'
+                } else {
+                    const rules = Array.isArray(node?.config?.rules)
+                        ? (node.config!.rules as Array<Record<string, unknown>>)
+                        : []
+                    const rule = rules.find((r) => r.handle === handle)
+                    const lbl = typeof rule?.label === 'string' ? rule.label.trim() : ''
+                    handleLabel = lbl !== '' ? lbl : handle
+                }
+            }
             if (node?.type === 'send_message' && Array.isArray(node?.config?.buttons)) {
                 const buttons = node.config.buttons as Array<Record<string, unknown>>
                 const idx = buttons.findIndex((b) => b.id === handle)
@@ -338,7 +372,7 @@ const trailingInsertContext = computed(() => {
 </script>
 
 <template>
-    <div class="panel-sequence">
+    <div class="panel-sequence" @click="onCanvasClick">
         <div class="sequence-wrap">
             <!-- Breadcrumb -->
             <div class="breadcrumb">
@@ -414,6 +448,12 @@ const trailingInsertContext = computed(() => {
                     />
                     <FlowCallCard
                         v-else-if="item.node.type === 'call'"
+                        :index="index + 1"
+                        :parent-branch="selectionStore.activeBranch"
+                        :tree-node="item"
+                    />
+                    <FlowLoopCard
+                        v-else-if="item.node.type === 'loop'"
                         :index="index + 1"
                         :parent-branch="selectionStore.activeBranch"
                         :tree-node="item"

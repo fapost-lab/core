@@ -11,6 +11,15 @@ use Illuminate\Http\JsonResponse;
 
 final class NodeTypesController extends Controller
 {
+    /**
+     * Node types that exist in the registry but must NOT appear in the builder
+     * palette — they are created and managed automatically by the builder
+     * (e.g. `loop_end` is auto-appended to a loop branch, never added by hand).
+     *
+     * @var list<string>
+     */
+    private const array AUTO_MANAGED_TYPES = ['loop_end'];
+
     public function index(NodeHandlerRegistryInterface $registry): JsonResponse
     {
         $types = collect($registry->all())
@@ -20,6 +29,9 @@ final class NodeTypesController extends Controller
                 'label'         => $handler->label(),
                 'category'      => $handler->category(),
                 'config_schema' => $handler->configSchema(),
+                // false → builder keeps the type for rendering/config lookup but
+                // hides it from the insertable palette.
+                'palette' => ! in_array($handler->type(), self::AUTO_MANAGED_TYPES, true),
             ])
             ->values();
 

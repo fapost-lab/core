@@ -319,6 +319,25 @@ export function useFlowVariables() {
                 }
                 continue
             }
+
+            // Loop — exposes the iterator (1-based) and, for counted mode, the
+            // total. Both live in the session (`flow.*`) namespace and are
+            // available inside the loop body via templating.
+            if (node.type === 'loop') {
+                const rawName = typeof cfg.iterator_name === 'string' && cfg.iterator_name.trim() !== ''
+                    ? cfg.iterator_name.trim()
+                    : 'iterator'
+                push(makeVar(`flow.${rawName}`, `${rawName} (loop index)`, { kind: 'temporary' }, {
+                    isCustom: true, sourceNode: nodeLabel, sourceNodeId: node.id,
+                }))
+                if (cfg.mode !== 'while') {
+                    // Total is per-loop, derived from the iterator name (matches LoopNodeHandler).
+                    push(makeVar(`flow.${rawName}_total`, `${rawName}_total (loop total)`, { kind: 'temporary' }, {
+                        isCustom: true, sourceNode: nodeLabel, sourceNodeId: node.id,
+                    }))
+                }
+                continue
+            }
         }
 
         return [...seen.values()]

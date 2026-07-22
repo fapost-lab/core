@@ -591,6 +591,124 @@ final class ValidateFlowServiceTest extends TestCase
         $this->assertTrue($result->valid, implode(', ', array_map(static fn ($e) => $e->code, $result->errors)));
     }
 
+    public function test_loop_without_reachable_loop_end_fails_validation(): void
+    {
+        $service = $this->makeServiceWithLoop();
+
+        $result = $service->execute(
+            nodes: [
+                'loop_1' => [
+                    'id'      => 'loop_1',
+                    'type'    => 'loop',
+                    'version' => 1,
+                    'config'  => ['mode' => 'while'],
+                ],
+                'body_1' => [
+                    'id'      => 'body_1',
+                    'type'    => 'send_message',
+                    'version' => 1,
+                    'config'  => ['content_type' => 'text'],
+                ],
+            ],
+            edges: [
+                ['id' => 'e1', 'from' => 'loop_1', 'to' => 'body_1', 'handle' => 'loop'],
+            ],
+        );
+
+        $this->assertFalse($result->valid);
+        $codes = array_map(static fn ($e) => $e->code, $result->errors);
+        $this->assertContains('loop_missing_loop_end', $codes);
+    }
+
+    public function test_loop_with_reachable_loop_end_passes_reachability(): void
+    {
+        $service = $this->makeServiceWithLoop();
+
+        $result = $service->execute(
+            nodes: [
+                'loop_1' => [
+                    'id'      => 'loop_1',
+                    'type'    => 'loop',
+                    'version' => 1,
+                    'config'  => ['mode' => 'while'],
+                ],
+                'body_1' => [
+                    'id'      => 'body_1',
+                    'type'    => 'send_message',
+                    'version' => 1,
+                    'config'  => ['content_type' => 'text'],
+                ],
+                'end_1' => [
+                    'id'      => 'end_1',
+                    'type'    => 'loop_end',
+                    'version' => 1,
+                    'config'  => ['loop_node_id' => 'loop_1'],
+                ],
+            ],
+            edges: [
+                ['id' => 'e1', 'from' => 'loop_1', 'to' => 'body_1', 'handle' => 'loop'],
+                ['id' => 'e2', 'from' => 'body_1', 'to' => 'end_1', 'handle' => 'default'],
+            ],
+        );
+
+        $codes = array_map(static fn ($e) => $e->code, $result->errors);
+        $this->assertNotContains('loop_missing_loop_end', $codes);
+    }
+
+    public function test_loop_end_paired_with_another_loop_does_not_satisfy_reachability(): void
+    {
+        $service = $this->makeServiceWithLoop();
+
+        // loop_1's body reaches a loop_end, but that loop_end is paired with a
+        // different loop — it must not count as loop_1's terminator.
+        $result = $service->execute(
+            nodes: [
+                'loop_1' => [
+                    'id'      => 'loop_1',
+                    'type'    => 'loop',
+                    'version' => 1,
+                    'config'  => ['mode' => 'while'],
+                ],
+                'body_1' => [
+                    'id'      => 'body_1',
+                    'type'    => 'send_message',
+                    'version' => 1,
+                    'config'  => ['content_type' => 'text'],
+                ],
+                'end_other' => [
+                    'id'      => 'end_other',
+                    'type'    => 'loop_end',
+                    'version' => 1,
+                    'config'  => ['loop_node_id' => 'loop_other'],
+                ],
+            ],
+            edges: [
+                ['id' => 'e1', 'from' => 'loop_1', 'to' => 'body_1', 'handle' => 'loop'],
+                ['id' => 'e2', 'from' => 'body_1', 'to' => 'end_other', 'handle' => 'default'],
+            ],
+        );
+
+        $this->assertFalse($result->valid);
+        $codes = array_map(static fn ($e) => $e->code, $result->errors);
+        $this->assertContains('loop_missing_loop_end', $codes);
+    }
+
+    private function makeServiceWithLoop(): ValidateFlowService
+    {
+        $registry = new NodeHandlerRegistry();
+        $registry->register(new LoopStubHandler());
+        $registry->register(new LoopEndStubHandler());
+        $registry->register(new SendMessageStubHandler());
+
+        return new ValidateFlowService(
+            registry: $registry,
+            dataAccessors: new NullDataAccessorRegistry(),
+            triggerValidator: new NullTriggerConfigValidator(),
+            tenantEvents: new NullTenantEventRepository(),
+            tenantContext: new NullTenantContext(),
+        );
+    }
+
     private function makeServiceWithSubflow(): ValidateFlowService
     {
         $registry = new NodeHandlerRegistry();
@@ -819,6 +937,82 @@ final class EndStubHandler implements NodeHandlerInterface
     public function label(): string
     {
         return 'End';
+    }
+
+    public function category(): string
+    {
+        return 'Logic';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return NodeExecutionResult::executed();
+    }
+}
+
+final class LoopStubHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'loop';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Loop';
+    }
+
+    public function category(): string
+    {
+        return 'Logic';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return NodeExecutionResult::executed();
+    }
+}
+
+final class LoopEndStubHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'loop_end';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Loop End';
     }
 
     public function category(): string

@@ -6,6 +6,7 @@ import VariableStorageEditor from '@builder/components/editor/variables/Variable
 import {useKnownGroups} from '@builder/composables/useKnownGroups'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {compileVariable, decodeInputVariable} from '@builder/utils/variableCompiler'
+import {storedTypeForInput} from '@builder/utils/inputVariableType'
 import type {Variable} from '@builder/dto/types'
 
 interface KbButton {
@@ -84,12 +85,33 @@ function emitLocalizedField(key: string, value: string) {
     emit('update:config', {[key]: {[baseLanguage.value]: value}})
 }
 
-const variable = ref<Variable>(decodeInputVariable(props.node.config as Record<string, unknown>))
+// Inside a loop body, freshly-added inputs default to "store as list" so each
+// iteration accumulates instead of overwriting. Only seeds brand-new variables.
+const inLoop = computed(() => builderStore.isNodeInLoopBody(String(props.node.id)))
+
+// Read-only type caption for the variable card. Shows what is actually STORED
+// (via storedTypeForInput) — a "photo" input stores a media reference, not a
+// photo. Wrapped in "List of …" when accumulating.
+const variableTypeDisplay = computed(() => {
+    const { label } = storedTypeForInput(expectedType.value)
+    return variable.value.isList ? `List of: ${label}` : label
+})
+
+function decodeVariableWithLoopDefault(): Variable {
+    const cfg = (props.node.config ?? {}) as Record<string, unknown>
+    const decoded = decodeInputVariable(cfg)
+    if (!cfg.variable && inLoop.value && !decoded.isList) {
+        decoded.isList = true
+    }
+    return decoded
+}
+
+const variable = ref<Variable>(decodeVariableWithLoopDefault())
 
 watch(
     () => props.node.id,
     () => {
-        variable.value = decodeInputVariable(props.node.config as Record<string, unknown>)
+        variable.value = decodeVariableWithLoopDefault()
     },
 )
 
@@ -141,8 +163,10 @@ function onTypeChange(newType: string) {
         seedConfirmButtons()
     }
 
-    // Keep variable.type in sync so the variable schema registry stores the right type.
-    const updatedVariable = { ...variable.value, type: newType as Variable['type'] }
+    // Keep variable.type in sync so the variable schema registry stores the
+    // right type — the STORED type, not the raw expected_type (a photo input
+    // stores a media-reference object, not a "photo").
+    const updatedVariable = { ...variable.value, type: storedTypeForInput(newType).type }
     variable.value = updatedVariable
 
     const patch: Record<string, unknown> = {
@@ -384,8 +408,10 @@ function onTypeChange(newType: string) {
                 :known-groups="knownGroups"
                 :owner-node-id="String(props.node.id)"
                 :show-type="false"
+                :type-display="variableTypeDisplay"
                 show-storage
                 show-group
+                show-list
                 @update:model-value="onVariableUpdate"
             />
         </AccordionSection>

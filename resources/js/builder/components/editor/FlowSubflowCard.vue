@@ -40,7 +40,7 @@ const activeHandle = ref('')
 watch(() => props.treeNode.childrenByHandle, () => {}, { immediate: true })
 
 function selectCard() {
-    selectionStore.select(node.value.id)
+    selectionStore.toggle(node.value.id)
 }
 
 function selectBranch(handle: string) {

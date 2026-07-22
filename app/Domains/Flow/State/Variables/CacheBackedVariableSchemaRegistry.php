@@ -16,11 +16,17 @@ use Illuminate\Contracts\Cache\Repository as CacheRepository;
  * No TTL — write-through on publish via {@see invalidate()}.
  * Bound as scoped (per-request) so the loaded map stays hot within a request
  * without surviving across requests in long-lived workers.
+ *
+ * Cache format (per key): JSON `{"type":"text","properties":{}}`. The older format
+ * (plain type string) is silently skipped on hydration, causing a one-time DB reload.
  */
 final class CacheBackedVariableSchemaRegistry implements VariableSchemaRegistryInterface
 {
-    /** @var array<string, VariableType>|null Lazily loaded map for the current request. */
-    private ?array $map = null;
+    /** @var array<string, VariableType>|null Lazily loaded type map for the current request. */
+    private ?array $typeMap = null;
+
+    /** @var array<string, array<string, mixed>>|null Lazily loaded properties map. */
+    private ?array $propertiesMap = null;
 
     public function __construct(
         private readonly TenantContextInterface $tenantContext,
@@ -32,25 +38,35 @@ final class CacheBackedVariableSchemaRegistry implements VariableSchemaRegistryI
     {
         $key = $this->buildKey($storage, $group, $name);
 
-        return $this->loadMap()[$key] ?? null;
+        return $this->loadTypesMap()[$key] ?? null;
+    }
+
+    /** @return array<string, mixed> */
+    public function getProperties(string $storage, ?string $group, string $name): array
+    {
+        $key = $this->buildKey($storage, $group, $name);
+
+        return $this->loadPropertiesMap()[$key] ?? [];
     }
 
     /** @return array<string, VariableType> */
     public function getAllForTenant(): array
     {
-        return $this->loadMap();
+        return $this->loadTypesMap();
     }
 
     public function invalidate(): void
     {
         if (!$this->tenantContext->isResolved()) {
-            $this->map = null;
+            $this->typeMap       = null;
+            $this->propertiesMap = null;
 
             return;
         }
 
         $this->cache->forget($this->cacheKey());
-        $this->map = null;
+        $this->typeMap       = null;
+        $this->propertiesMap = null;
     }
 
     private function buildKey(string $storage, ?string $group, string $name): string
@@ -59,39 +75,62 @@ final class CacheBackedVariableSchemaRegistry implements VariableSchemaRegistryI
     }
 
     /** @return array<string, VariableType> */
-    private function loadMap(): array
+    private function loadTypesMap(): array
     {
-        if (null !== $this->map) {
-            return $this->map;
+        if (null !== $this->typeMap) {
+            return $this->typeMap;
         }
 
+        $this->loadAndHydrate();
+
+        return $this->typeMap ?? [];
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private function loadPropertiesMap(): array
+    {
+        if (null !== $this->propertiesMap) {
+            return $this->propertiesMap;
+        }
+
+        $this->loadAndHydrate();
+
+        return $this->propertiesMap ?? [];
+    }
+
+    /**
+     * Load from Redis cache (or DB on miss), then populate both in-memory maps.
+     */
+    private function loadAndHydrate(): void
+    {
         /** @var array<string, string>|null $cached */
         $cached = $this->cache->get($this->cacheKey());
 
         if (null !== $cached) {
-            $this->map = $this->hydrateMap($cached);
+            [$this->typeMap, $this->propertiesMap] = $this->hydrateEntries($cached);
 
-            return $this->map;
+            return;
         }
 
         $raw = VariableSchemaEntry::query()
             ->where('tenant_id', $this->tenantContext->get()->getId())
-            ->get(['storage', 'group', 'name', 'type']);
+            ->get(['storage', 'group', 'name', 'type', 'properties']);
 
         $serialized = [];
 
         foreach ($raw as $entry) {
             /** @var VariableSchemaEntry $entry */
             $key              = $this->buildKey($entry->storage, $entry->group, $entry->name);
-            $serialized[$key] = $entry->type->value;
+            $serialized[$key] = json_encode([
+                'type'       => $entry->type->value,
+                'properties' => is_array($entry->properties) ? $entry->properties : [],
+            ]);
         }
 
         // No TTL — write-through on publish.
         $this->cache->forever($this->cacheKey(), $serialized);
 
-        $this->map = $this->hydrateMap($serialized);
-
-        return $this->map;
+        [$this->typeMap, $this->propertiesMap] = $this->hydrateEntries($serialized);
     }
 
     private function cacheKey(): string
@@ -100,22 +139,36 @@ final class CacheBackedVariableSchemaRegistry implements VariableSchemaRegistryI
     }
 
     /**
+     * Hydrate both type and properties maps from the serialized cache payload.
+     * Entries that do not decode as `{type, properties}` JSON objects are silently
+     * skipped — this handles the old plain-type-string format gracefully.
+     *
      * @param  array<string, string>  $raw
      *
-     * @return array<string, VariableType>
+     * @return array{0: array<string, VariableType>, 1: array<string, array<string, mixed>>}
      */
-    private function hydrateMap(array $raw): array
+    private function hydrateEntries(array $raw): array
     {
-        $map = [];
+        $types      = [];
+        $properties = [];
 
-        foreach ($raw as $key => $typeValue) {
-            $type = VariableType::tryFrom($typeValue);
+        foreach ($raw as $key => $payload) {
+            /** @var mixed $decoded */
+            $decoded = is_string($payload) ? json_decode($payload, true) : null;
+
+            if (!is_array($decoded)) {
+                // Legacy format: plain type string — upgrade on next publish.
+                continue;
+            }
+
+            $type = VariableType::tryFrom((string)($decoded['type'] ?? ''));
 
             if (null !== $type) {
-                $map[$key] = $type;
+                $types[$key]      = $type;
+                $properties[$key] = is_array($decoded['properties'] ?? null) ? $decoded['properties'] : [];
             }
         }
 
-        return $map;
+        return [$types, $properties];
     }
 }

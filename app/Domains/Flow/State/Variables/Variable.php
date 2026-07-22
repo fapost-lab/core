@@ -43,11 +43,15 @@ final readonly class Variable
     /** Variable / group identifier pattern (alphanumeric + underscore, must not start with digit). */
     private const string IDENTIFIER_REGEX = '/^[A-Za-z_][A-Za-z0-9_]*$/';
 
+    /**
+     * @param  array<string, mixed>  $properties  Extra schema metadata (e.g. max_size, item_type for arrays).
+     */
     public function __construct(
         public string $name,
         public VariableStorage $storage,
         public ?string $group = null,
         public ?VariableType $type = null,
+        public array $properties = [],
     ) {
         $this->assertValidIdentifier($name, 'name');
 
@@ -120,11 +124,15 @@ final readonly class Variable
             $type = VariableType::tryFrom($rawType);
         }
 
+        $rawProperties = $raw['properties'] ?? null;
+        $properties    = is_array($rawProperties) ? $rawProperties : [];
+
         return new self(
             name: $name,
             storage: $storageEnum,
             group: $group,
             type: $type,
+            properties: $properties,
         );
     }
 

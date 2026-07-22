@@ -13,8 +13,8 @@ use FAPost\Foundation\DTO\NodeExecutionContext;
 use FAPost\Foundation\DTO\NodeExecutionResult;
 use FAPost\Foundation\DTO\NodeExecutionStatus;
 use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use FAPost\Support\Builder\Schema\Fields\DurationField;
 use FAPost\Support\Builder\Schema\Fields\FlowPickerField;
-use FAPost\Support\Builder\Schema\Fields\SelectField;
 use FAPost\Support\Builder\Schema\Schema;
 use FAPost\Support\Builder\Schema\Section;
 use RuntimeException;
@@ -80,18 +80,11 @@ final class SubflowNodeHandler extends AbstractVersionedHandler
                 Section::make('behavior', 'Behavior')
                     ->icon('clock')
                     ->fields([
-                        SelectField::make('timeout')
+                        DurationField::make('timeout')
                             ->label('Max wait time')
                             ->required()
                             ->default(self::DEFAULT_TIMEOUT)
-                            ->options([
-                                'PT1H'  => '1 hour',
-                                'PT6H'  => '6 hours',
-                                'PT12H' => '12 hours',
-                                'PT24H' => '24 hours',
-                                'PT48H' => '48 hours',
-                                'P7D'   => '7 days',
-                            ])
+                            ->units(['minutes', 'hours', 'days', 'weeks'])
                             ->help("If the child flow doesn't complete within this time, the parent routes to failed."),
                     ]),
             )

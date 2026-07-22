@@ -18,6 +18,10 @@ export interface TerminalCheckInput {
 export function nodeMustBeLast(node: TerminalCheckInput): boolean {
     if (node.type === 'end') return true
 
+    // Loop end is the terminal of a loop body — the engine navigates back to the
+    // parent loop from here, so nothing may follow it in the branch.
+    if (node.type === 'loop_end') return true
+
     // Subflow is always terminal — continuation is only via success/cancelled/failed.
     if (node.type === 'subflow') return true
 

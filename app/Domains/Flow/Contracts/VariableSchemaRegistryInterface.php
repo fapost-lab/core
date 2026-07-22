@@ -31,6 +31,16 @@ interface VariableSchemaRegistryInterface
     public function getAllForTenant(): array;
 
     /**
+     * Return type-specific properties for the given variable, or an empty array
+     * when the variable is unknown or has no declared properties.
+     *
+     * For array variables the payload is `{max_size: int, item_type: string|null}`.
+     *
+     * @return array<string, mixed>
+     */
+    public function getProperties(string $storage, ?string $group, string $name): array;
+
+    /**
      * Invalidate the cached schema. Called by PublishFlowService after upsert.
      */
     public function invalidate(): void;

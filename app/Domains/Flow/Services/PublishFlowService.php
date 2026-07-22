@@ -9,15 +9,19 @@ use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Flow\Exceptions\VariableTypeConflictException;
+use App\Domains\Flow\Handlers\LoopEndNodeHandler;
+use App\Domains\Flow\Handlers\LoopNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\VariableSchemaEntry;
 use App\Domains\Flow\State\Variables\Variable;
+use App\Domains\Flow\State\Variables\VariableType;
 use App\Domains\Flow\Subflow\CallGraphRepository;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use stdClass;
 
 final readonly class PublishFlowService
 {
@@ -42,6 +46,10 @@ final readonly class PublishFlowService
 
             $nodes = is_array($draft->nodes) ? $draft->nodes : [];
             $edges = is_array($draft->edges) ? $draft->edges : [];
+
+            // Denormalize iterator_name from each Loop node into its paired
+            // LoopEnd nodes so handlers stay graph-unaware at runtime.
+            $nodes = $this->denormalizeLoopEndIteratorNames($nodes);
 
             // Pass flowId so the validator can run subflow call-graph checks
             // (cycle / depth) against the existing edges table.
@@ -165,13 +173,29 @@ final readonly class PublishFlowService
                 continue;
             }
 
-            if ($existing->type === $variable->type) {
-                continue;
-            }
-
             $path = $variable->group
                 ? "{$variable->storage->value}.{$variable->group}.{$variable->name}"
                 : "{$variable->storage->value}.{$variable->name}";
+
+            if ($existing->type === $variable->type) {
+                // Same base type — for arrays the element type must also match.
+                // A variable holding `photo` elements in one flow cannot be
+                // reused as an array of `file` in another (spec §7.2).
+                if (VariableType::Array === $variable->type) {
+                    $existingItem = $this->arrayItemType($existing->properties ?? []);
+                    $newItem      = $this->arrayItemType($variable->properties);
+
+                    if (null !== $existingItem && null !== $newItem && $existingItem !== $newItem) {
+                        $errors[] = new FlowValidationErrorDto(
+                            path: "variable.{$path}",
+                            code: 'variable_properties_conflict',
+                            message: "Variable \"{$path}\" is already registered as an array of \"{$existingItem}\" elements; flow \"{$flowName}\" tries to use it as an array of \"{$newItem}\". Match the existing element type or use a different variable name.",
+                        );
+                    }
+                }
+
+                continue;
+            }
 
             $errors[] = new FlowValidationErrorDto(
                 path: "variable.{$path}",
@@ -188,6 +212,22 @@ final readonly class PublishFlowService
         if ([] !== $errors) {
             throw new FlowValidationException($errors);
         }
+    }
+
+    /**
+     * Extract the array element type from a variable's schema properties.
+     *
+     * `max_size` is intentionally ignored: it is not carried in node config
+     * (it lives only in the registry, spec §7.3), so it cannot be compared for
+     * cross-flow conflicts. Only the element type (`item_type`) is authoritative.
+     *
+     * @param  array<string, mixed>  $properties
+     */
+    private function arrayItemType(array $properties): ?string
+    {
+        $itemType = $properties['item_type'] ?? null;
+
+        return is_string($itemType) && '' !== $itemType ? $itemType : null;
     }
 
     /**
@@ -212,12 +252,13 @@ final readonly class PublishFlowService
                     'group'               => $variable->group,
                     'name'                => $variable->name,
                     'type'                => $variable->type?->value ?? 'text',
+                    'properties'          => json_encode($variable->properties ?: new stdClass()),
                     'declared_in_flow_id' => $flowId,
                     'declared_by_node_id' => $nodeId,
                     'updated_at'          => $now,
                 ],
                 uniqueBy: ['storage', 'group', 'name'],
-                update: ['type', 'declared_in_flow_id', 'declared_by_node_id', 'updated_at'],
+                update: ['type', 'properties', 'declared_in_flow_id', 'declared_by_node_id', 'updated_at'],
             );
         }
     }
@@ -262,6 +303,60 @@ final readonly class PublishFlowService
         }
 
         return $errors;
+    }
+
+    /**
+     * Copy `iterator_name` from each Loop node into its paired LoopEnd nodes so
+     * {@see LoopEndNodeHandler} is definition-unaware at runtime (spec §4.3).
+     *
+     * `loop_node_id` is already present on LoopEnd nodes (set by the builder);
+     * this step only denormalizes the human-readable iterator name.
+     *
+     * @param  array<int, mixed>  $nodes
+     * @return array<int, mixed>
+     */
+    private function denormalizeLoopEndIteratorNames(array $nodes): array
+    {
+        // Build a lookup table: loop_node_id → iterator_name.
+        $iteratorNames = [];
+
+        foreach ($nodes as $node) {
+            if (!is_array($node) || LoopNodeHandler::TYPE !== ($node['type'] ?? null)) {
+                continue;
+            }
+
+            $id     = is_string($node['id'] ?? null) ? $node['id'] : null;
+            $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+            $name   = is_string($config['iterator_name'] ?? null) && '' !== $config['iterator_name']
+                ? $config['iterator_name']
+                : LoopNodeHandler::DEFAULT_ITERATOR_NAME;
+
+            if (null !== $id) {
+                $iteratorNames[$id] = $name;
+            }
+        }
+
+        if ([] === $iteratorNames) {
+            return $nodes;
+        }
+
+        foreach ($nodes as &$node) {
+            if (!is_array($node) || LoopEndNodeHandler::TYPE !== ($node['type'] ?? null)) {
+                continue;
+            }
+
+            $config     = is_array($node['config'] ?? null) ? $node['config'] : [];
+            $loopNodeId = is_string($config['loop_node_id'] ?? null) ? $config['loop_node_id'] : null;
+
+            if (null !== $loopNodeId && isset($iteratorNames[$loopNodeId])) {
+                $config['iterator_name'] = $iteratorNames[$loopNodeId];
+                $node['config']          = $config;
+            }
+        }
+
+        unset($node);
+
+        return $nodes;
     }
 
     /**

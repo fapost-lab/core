@@ -40,7 +40,7 @@ const transportLabel = computed(() => (config.value.transport as string | undefi
 const activeHandle = ref('')
 
 function selectCard() {
-    selectionStore.select(node.value.id)
+    selectionStore.toggle(node.value.id)
 }
 
 function selectBranch(handle: string) {

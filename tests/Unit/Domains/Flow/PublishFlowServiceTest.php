@@ -61,6 +61,7 @@ final class PublishFlowServiceTest extends TestCase
             $table->string('group', 64)->nullable();
             $table->string('name', 64);
             $table->string('type', 16);
+            $table->json('properties')->default('{}');
             $table->uuid('declared_in_flow_id')->nullable();
             $table->string('declared_by_node_id', 128)->nullable();
             $table->timestampTz('updated_at');
@@ -439,6 +440,99 @@ final class PublishFlowServiceTest extends TestCase
         $this->expectException(FlowValidationException::class);
 
         app(PublishFlowService::class)->execute($flowIdB);
+    }
+
+    public function test_publish_rejects_cross_flow_array_item_type_conflict(): void
+    {
+        $flowIdA  = '00000000-0000-0000-0000-000000000912';
+        $flowIdB  = '00000000-0000-0000-0000-000000000913';
+        $tenantId = '00000000-0000-0000-0000-000000000001';
+
+        // Flow A declares `photos` as an array of `photo`.
+        FlowDraft::factory()->create([
+            'flow_id'   => $flowIdA,
+            'tenant_id' => $tenantId,
+            'nodes'     => [
+                [
+                    'id'      => 'inp-a',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => [
+                            'name'       => 'photos',
+                            'storage'    => 'session',
+                            'type'       => 'array',
+                            'properties' => ['item_type' => 'photo'],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+        app(PublishFlowService::class)->execute($flowIdA);
+
+        // Flow B reuses `photos` as an array of `file` — element type conflict.
+        FlowDraft::factory()->create([
+            'flow_id'   => $flowIdB,
+            'tenant_id' => $tenantId,
+            'nodes'     => [
+                [
+                    'id'      => 'inp-b',
+                    'type'    => 'input',
+                    'version' => 1,
+                    'config'  => [
+                        'variable' => [
+                            'name'       => 'photos',
+                            'storage'    => 'session',
+                            'type'       => 'array',
+                            'properties' => ['item_type' => 'file'],
+                        ],
+                    ],
+                ],
+            ],
+        ]);
+
+        try {
+            app(PublishFlowService::class)->execute($flowIdB);
+            $this->fail('Expected FlowValidationException was not thrown.');
+        } catch (FlowValidationException $exception) {
+            $codes = array_map(static fn (FlowValidationErrorDto $e): string => $e->code, $exception->errors);
+            $this->assertContains('variable_properties_conflict', $codes);
+        }
+    }
+
+    public function test_publish_allows_matching_array_item_type_across_flows(): void
+    {
+        $flowIdA  = '00000000-0000-0000-0000-000000000922';
+        $flowIdB  = '00000000-0000-0000-0000-000000000923';
+        $tenantId = '00000000-0000-0000-0000-000000000001';
+
+        $variable = [
+            'name'       => 'photos',
+            'storage'    => 'session',
+            'type'       => 'array',
+            'properties' => ['item_type' => 'photo'],
+        ];
+
+        FlowDraft::factory()->create([
+            'flow_id'   => $flowIdA,
+            'tenant_id' => $tenantId,
+            'nodes'     => [
+                ['id' => 'inp-a', 'type' => 'input', 'version' => 1, 'config' => ['variable' => $variable]],
+            ],
+        ]);
+        app(PublishFlowService::class)->execute($flowIdA);
+
+        FlowDraft::factory()->create([
+            'flow_id'   => $flowIdB,
+            'tenant_id' => $tenantId,
+            'nodes'     => [
+                ['id' => 'inp-b', 'type' => 'input', 'version' => 1, 'config' => ['variable' => $variable]],
+            ],
+        ]);
+
+        $definition = app(PublishFlowService::class)->execute($flowIdB);
+
+        $this->assertTrue($definition->is_active);
     }
 
     public function test_throws_flow_validation_exception_when_draft_is_invalid(): void

@@ -89,9 +89,6 @@ body {
   overflow-y: auto;
     padding: 10px;
 }
-.editor-main--val-open .panel-sequence {
-  padding-bottom: 260px;
-}
 .panel-config {
   width: 280px;
   min-width: 240px;
@@ -104,6 +101,32 @@ body {
   overflow: hidden;
     padding: 10px 10px 10px;
     background: var(--bg);
+}
+
+/* Drawer mode: the panel overlays the right edge of the canvas and slides in
+   only while a node is selected, so the flow stays full-width otherwise. */
+.panel-config--drawer {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    flex-shrink: 0;
+    transform: translateX(100%);
+    transition: transform .22s cubic-bezier(.4, 0, .2, 1);
+    z-index: 20;
+    will-change: transform;
+}
+.panel-config--drawer.panel-config--open {
+    transform: translateX(0);
+    box-shadow: -8px 0 24px -12px rgba(0, 0, 0, .25);
+}
+/* Closed: fully off-canvas — kill the protruding handle/toggle and clicks. */
+.panel-config--drawer:not(.panel-config--open) {
+    pointer-events: none;
+}
+.panel-config--drawer:not(.panel-config--open) .config-resize-handle,
+.panel-config--drawer:not(.panel-config--open) .config-width-toggle {
+    display: none;
 }
 .panel-header {
   padding: 10px 14px 9px;
@@ -265,7 +288,7 @@ body {
 /* trigger node */
 .trigger-card {
   width: 100%;
-  max-width: 480px;
+  max-width: 720px;
   background: var(--surface);
   border: 1.5px dashed var(--border-2);
   border-radius: var(--radius-lg);
@@ -302,14 +325,14 @@ body {
 /* slot wrapper — hover this to reveal the insert point */
 .seq-slot {
   display: flex; flex-direction: column; align-items: center;
-  width: 100%; max-width: 480px;
+  width: 100%; max-width: 720px;
   cursor: default;
 }
 
 /* insert point */
 .insert-point {
   position: relative;
-  width: 100%; max-width: 480px;
+  width: 100%; max-width: 720px;
   display: flex; align-items: center; gap: 8px;
   opacity: 1; transition: opacity .15s;
   cursor: pointer;
@@ -353,7 +376,7 @@ body {
 
 /* node card */
 .node-card {
-  width: 100%; max-width: 480px;
+  width: 100%; max-width: 720px;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -481,7 +504,9 @@ body {
 .node-side-actions {
   position: absolute;
   top: 50%;
-  left: calc(50% + 240px + 8px);
+  /* 360px = half of .node-card max-width (720px); keep the column just
+     outside the card's right edge. */
+  left: calc(50% + 360px + 8px);
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
@@ -690,13 +715,6 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-}
-/* Validation panel is `position: fixed; bottom: 0` and overlays anything
-   underneath. Pad the scrollable wrap when it's open so the last fields
-   in long node configs (Input retries, On-invalid message…) can scroll
-   above the validation footer. */
-.panel-config--val-open .config-card-wrap {
-  padding-bottom: 260px;
 }
 .config-card {
     --config-card-accent: #94a187;

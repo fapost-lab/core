@@ -20,6 +20,7 @@ import ObjectField from './fields/ObjectField.vue'
 import ObjectArrayField from './fields/ObjectArrayField.vue'
 import FlowPickerField from './fields/FlowPickerField.vue'
 import EnumCardsField from './fields/EnumCardsField.vue'
+import DurationField from './fields/DurationField.vue'
 import {resolveVisibility} from '@builder/composables/useFieldVisibility'
 
 /**
@@ -58,6 +59,7 @@ const FIELD_COMPONENTS: Record<string, object> = {
     'object-array': ObjectArrayField,
     'flow-picker': FlowPickerField,
     'enum-cards': EnumCardsField,
+    duration: DurationField,
 }
 
 const visibleFields = computed(() =>

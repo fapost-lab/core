@@ -1,4 +1,10 @@
 <script setup lang="ts">
+/**
+ * Variable-name combobox. A single text input drives everything: as the user
+ * types, matching known names are suggested below. Picking a suggestion reuses
+ * that variable (emits `pick`); typing a name with no match simply becomes a
+ * new variable (the typed value is the model). No separate "create" mode.
+ */
 import {computed, nextTick, onUnmounted, ref, watch} from 'vue'
 
 const props = defineProps<{
@@ -12,37 +18,54 @@ const emit = defineEmits<{
     (e: 'pick', value: string): void
 }>()
 
-const open        = ref(false)
-const isCreating  = ref(false)
-const draftName   = ref('')
-const rootRef     = ref<HTMLElement | null>(null)
-const triggerRef  = ref<HTMLButtonElement | null>(null)
-const menuRef     = ref<HTMLElement | null>(null)
-const createInput = ref<HTMLInputElement | null>(null)
+const open      = ref(false)
+const activeIdx = ref(-1)
+const rootRef   = ref<HTMLElement | null>(null)
+const inputRef  = ref<HTMLInputElement | null>(null)
+const menuRef   = ref<HTMLElement | null>(null)
 
 interface MenuPos { top: number; left: number; width: number }
 const menuPos = ref<MenuPos>({ top: 0, left: 0, width: 0 })
 
-const hasKnown = computed(() => props.knownNames.length > 0)
+// Filter known names by the current query (case-insensitive substring).
+const matches = computed<string[]>(() => {
+    const q = props.modelValue.trim().toLowerCase()
+    if (q === '') return props.knownNames
+    return props.knownNames.filter((n) => n.toLowerCase().includes(q))
+})
+
+// A typed name that doesn't exactly match an existing one creates a new var.
+const exactMatch = computed<boolean>(() =>
+    props.knownNames.some((n) => n === props.modelValue.trim()),
+)
+const showCreateRow = computed<boolean>(() =>
+    props.modelValue.trim() !== '' && !exactMatch.value,
+)
 
 function reposition() {
-    const el = triggerRef.value
+    const el = inputRef.value
     if (!el) return
     const rect = el.getBoundingClientRect()
     menuPos.value = { top: rect.bottom + 4, left: rect.left, width: rect.width }
 }
 
-function toggle() {
-    if (isCreating.value) return
-    if (!hasKnown.value) {
-        void startCreate()
-        return
-    }
-    if (!open.value) reposition()
-    open.value = !open.value
+function openMenu() {
+    reposition()
+    open.value = true
+    activeIdx.value = -1
 }
 
-function close() { open.value = false }
+function close() {
+    open.value = false
+    activeIdx.value = -1
+}
+
+function onInput(event: Event) {
+    emit('update:modelValue', (event.target as HTMLInputElement).value)
+    if (!open.value) openMenu()
+    else reposition()
+    activeIdx.value = -1
+}
 
 function pick(name: string) {
     emit('pick', name)
@@ -50,32 +73,27 @@ function pick(name: string) {
     close()
 }
 
-async function startCreate() {
-    open.value    = false
-    isCreating.value = true
-    draftName.value  = props.modelValue
-    await nextTick()
-    createInput.value?.focus()
-    createInput.value?.select()
-}
-
-function commitCreate() {
-    emit('update:modelValue', draftName.value)
-    isCreating.value = false
-}
-
-function cancelCreate() {
-    isCreating.value = false
-}
-
-function onCreateKeydown(event: KeyboardEvent) {
-    if (event.key === 'Enter')  { event.preventDefault(); commitCreate() }
-    if (event.key === 'Escape') { event.preventDefault(); cancelCreate() }
-}
-
-function onCreateInput(event: Event) {
-    draftName.value = (event.target as HTMLInputElement).value
-    emit('update:modelValue', draftName.value)
+function onKeydown(event: KeyboardEvent) {
+    if (!open.value && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+        openMenu()
+        return
+    }
+    if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        activeIdx.value = Math.min(activeIdx.value + 1, matches.value.length - 1)
+    } else if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        activeIdx.value = Math.max(activeIdx.value - 1, 0)
+    } else if (event.key === 'Enter') {
+        if (activeIdx.value >= 0 && activeIdx.value < matches.value.length) {
+            event.preventDefault()
+            pick(matches.value[activeIdx.value]!)
+        } else {
+            close()
+        }
+    } else if (event.key === 'Escape') {
+        close()
+    }
 }
 
 function onDocClick(e: MouseEvent) {
@@ -99,6 +117,8 @@ watch(open, (val) => {
     }
 })
 
+watch(() => props.modelValue, () => { if (open.value) void nextTick(reposition) })
+
 onUnmounted(() => {
     document.removeEventListener('mousedown', onDocClick, { capture: true })
     window.removeEventListener('scroll', onReposition, true)
@@ -108,71 +128,52 @@ onUnmounted(() => {
 
 <template>
     <div ref="rootRef" class="name-select">
-        <!-- Inline text input when typing a new name -->
         <input
-            v-if="isCreating"
-            ref="createInput"
+            ref="inputRef"
             type="text"
             class="ns-input"
-            :value="draftName"
+            :class="{ 'ns-input--open': open }"
+            :value="modelValue"
             :placeholder="placeholder ?? 'my_variable'"
             autocomplete="off"
             spellcheck="false"
-            @input="onCreateInput"
-            @keydown="onCreateKeydown"
-            @blur="commitCreate"
+            @input="onInput"
+            @focus="openMenu"
+            @keydown="onKeydown"
         >
 
-        <!-- Trigger button + dropdown -->
-        <template v-else>
-            <button
-                ref="triggerRef"
-                type="button"
-                class="ns-trigger"
-                :class="{ 'ns-trigger--placeholder': modelValue === '', 'ns-trigger--open': open }"
-                :aria-expanded="open"
-                @click="toggle"
+        <Teleport to="body">
+            <div
+                v-if="open && (matches.length > 0 || showCreateRow)"
+                ref="menuRef"
+                :style="{ top: `${menuPos.top}px`, left: `${menuPos.left}px`, width: `${menuPos.width}px` }"
+                class="ns-menu"
+                role="listbox"
             >
-                <span class="ns-trigger-label">{{ modelValue || (placeholder ?? 'my_variable') }}</span>
-                <span class="ns-trigger-caret" :class="{ 'ns-trigger-caret--open': open }">▾</span>
-            </button>
-
-            <Teleport to="body">
-                <div
-                    v-if="open"
-                    ref="menuRef"
-                    :style="{ top: `${menuPos.top}px`, left: `${menuPos.left}px`, width: `${menuPos.width}px` }"
-                    class="ns-menu"
-                    role="listbox"
+                <button
+                    v-for="(name, idx) in matches"
+                    :key="name"
+                    :aria-selected="modelValue === name"
+                    :class="{ 'ns-option--active': idx === activeIdx, 'ns-option--current': modelValue === name }"
+                    class="ns-option"
+                    role="option"
+                    type="button"
+                    @mouseenter="activeIdx = idx"
+                    @click="pick(name)"
                 >
-                    <template v-if="hasKnown">
-                        <button
-                            v-for="name in knownNames"
-                            :key="name"
-                            :aria-selected="modelValue === name"
-                            :class="{ 'ns-option--active': modelValue === name }"
-                            class="ns-option"
-                            role="option"
-                            type="button"
-                            @click="pick(name)"
-                        >
-                            <span class="ns-option-mark">{{ modelValue === name ? '✓' : '' }}</span>
-                            <span class="ns-option-label">{{ name }}</span>
-                        </button>
-                        <div class="ns-divider" />
-                    </template>
+                    <span class="ns-option-mark">{{ modelValue === name ? '✓' : '' }}</span>
+                    <span class="ns-option-label">{{ name }}</span>
+                    <span class="ns-option-tag">existing</span>
+                </button>
 
-                    <button
-                        class="ns-option ns-option--create"
-                        type="button"
-                        @click="startCreate"
-                    >
-                        <span class="ns-option-mark">✎</span>
-                        <span class="ns-option-label">Type new name…</span>
-                    </button>
+                <div v-if="matches.length > 0 && showCreateRow" class="ns-divider" />
+
+                <div v-if="showCreateRow" class="ns-create-hint">
+                    <span class="ns-option-mark">✎</span>
+                    <span class="ns-option-label">New variable: <strong>{{ modelValue.trim() }}</strong></span>
                 </div>
-            </Teleport>
-        </template>
+            </div>
+        </Teleport>
     </div>
 </template>
 
@@ -182,7 +183,6 @@ onUnmounted(() => {
     width: 100%;
 }
 
-.ns-trigger,
 .ns-input {
     width: 100%;
     padding: 6px 10px;
@@ -195,37 +195,9 @@ onUnmounted(() => {
     box-sizing: border-box;
 }
 .ns-input:focus,
-.ns-trigger:focus,
-.ns-trigger--open {
+.ns-input--open {
     outline: none;
     border-color: var(--primary);
-}
-
-.ns-trigger {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    cursor: pointer;
-    text-align: left;
-}
-.ns-trigger--placeholder .ns-trigger-label {
-    color: var(--text-3);
-}
-.ns-trigger-label {
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-.ns-trigger-caret {
-    color: var(--text-3);
-    font-size: 11px;
-    transition: transform 120ms;
-    flex-shrink: 0;
-}
-.ns-trigger-caret--open {
-    transform: rotate(180deg);
 }
 
 .ns-menu {
@@ -256,11 +228,11 @@ onUnmounted(() => {
     cursor: pointer;
     transition: background 100ms;
 }
-.ns-option:hover {
+.ns-option--active {
     background: var(--surface-2, #f4f5f6);
 }
-.ns-option--active {
-    background: var(--primary-bg, rgba(0, 0, 0, 0.04));
+.ns-option--current {
+    color: var(--primary);
 }
 .ns-option-mark {
     flex: 0 0 14px;
@@ -275,20 +247,33 @@ onUnmounted(() => {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-.ns-option--create {
-    color: var(--primary);
-}
-.ns-option--create:hover {
-    background: var(--primary-bg, rgba(0, 0, 0, 0.04));
-}
-.ns-option--create .ns-option-mark {
-    color: var(--primary);
-    font-weight: 600;
+.ns-option-tag {
+    flex-shrink: 0;
+    font-size: 10px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: .04em;
 }
 
 .ns-divider {
     height: 1px;
     margin: 4px 0;
     background: var(--border);
+}
+
+.ns-create-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    font-size: 12.5px;
+    color: var(--text-3);
+}
+.ns-create-hint .ns-option-mark {
+    color: var(--text-3);
+}
+.ns-create-hint strong {
+    color: var(--text);
+    font-weight: 600;
 }
 </style>

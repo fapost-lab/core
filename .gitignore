@@ -45,3 +45,10 @@ boost.json
 /packages
 /drafts
 CLAUDE.local.md
+
+# Obsidian vault state for repository docs.
+/docs/.obsidian/workspace.json
+/docs/.obsidian/workspace-mobile.json
+/docs/.obsidian/plugins
+/docs/.obsidian/snippets
+/docs/.obsidian/cache

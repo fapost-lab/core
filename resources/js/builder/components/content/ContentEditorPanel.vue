@@ -9,7 +9,7 @@ const props = defineProps({
     languages:    { type: Array as () => Language[], default: () => [] },
 })
 
-const emit = defineEmits(['update', 'save', 'delete'])
+const emit = defineEmits(['update', 'save'])
 
 const FLAG_MAP: Record<string, string> = {
     uk: '🇺🇦', en: '🇬🇧', ru: '🇷🇺', pl: '🇵🇱',
@@ -47,12 +47,6 @@ const translatedCount = computed(() =>
                             <span class="content-editor-meta">· {{ translatedCount }}/{{ languages.length }} translations</span>
                         </div>
                     </div>
-                    <button
-                        class="card-header-btn"
-                        type="button"
-                        @click="emit('delete', contentKey)"
-                    >Delete
-                    </button>
                     <button
                         class="card-header-btn card-header-btn--primary"
                         type="button"

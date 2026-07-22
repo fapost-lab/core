@@ -149,5 +149,7 @@ useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
     display: flex;
     overflow: hidden;
     min-height: 0;
+    /* Anchor for the absolutely-positioned config drawer (ConfigPanel). */
+    position: relative;
 }
 </style>

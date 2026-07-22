@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>API Reference | FAPost Developer Portal</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">FAPost Developer Portal</div>
+        <div class="subtitle">Generated API docs</div>
+        <a class="nav-link" href="./index.html">Overview</a>
+        <a class="nav-link" href="./extension-model.html">Extension Model</a>
+        <a class="nav-link" href="./flow-nodes.html">Flow Nodes</a>
+        <a class="nav-link" href="./builder-extensions.html">Builder Extensions</a>
+      </aside>
+      <main class="content">
+        <div class="eyebrow">Reference</div>
+        <h1>Generated Core API</h1>
+        <p class="lead">
+          Doctum generates browsable API documentation for Core domain classes and public package contracts.
+        </p>
+
+        <h2>Build</h2>
+        <pre><code>composer run docs:build</code></pre>
+
+        <h2>Output</h2>
+        <p>
+          The generated site is written to <code>public/core</code>. That directory is ignored by git and can be served
+          locally or published by deployment tooling.
+        </p>
+
+        <h2>Included Sources</h2>
+        <ul>
+          <li><code>app/Domains</code></li>
+          <li><code>packages/fapost-foundation/src</code></li>
+          <li><code>packages/fapost-support/src</code></li>
+        </ul>
+      </main>
+    </div>
+  </body>
+</html>

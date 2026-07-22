@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Domains\Flow\State\Writers;
 
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\History\HistoryWriterInterface;
 use App\Domains\Flow\State\Exceptions\ReservedContactPathException;
 use App\Domains\Flow\State\Exceptions\StructuralPathConflictException;
+use App\Domains\Flow\State\Variables\VariableType;
+use Closure;
 use FAPost\Foundation\Flow\Contracts\ContactWriterInterface;
 use FAPost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Database\ConnectionInterface;
@@ -35,12 +38,18 @@ final readonly class ContactWriter implements ContactWriterInterface
 
     private const array RESERVED_GROUPS = ['meta'];
 
+    /**
+     * @param  (Closure(): VariableSchemaRegistryInterface)|null  $schemaRegistryResolver
+     *         Injected by FlowEngine so array variables use append + circular-buffer semantics.
+     *         When null the writer falls back to replace for all paths (safe for legacy callers).
+     */
     public function __construct(
         private Contact $contact,
         private string $sessionId,
         private string $nodeId,
         private ConnectionInterface $connection,
         private HistoryWriterInterface $historyWriter,
+        private ?Closure $schemaRegistryResolver = null,
     ) {
     }
 
@@ -116,6 +125,13 @@ final readonly class ContactWriter implements ContactWriterInterface
             return;
         }
 
+        // For array-type variables, append rather than replace (spec §5.2).
+        if ($this->isArrayVariable(null === $tail ? null : $head, null === $tail ? $head : $tail)) {
+            $this->applyArrayAppend($head, $tail, $value);
+
+            return;
+        }
+
         $attributes = is_array($this->contact->attributes) ? $this->contact->attributes : [];
 
         if (null === $tail) {
@@ -144,6 +160,77 @@ final readonly class ContactWriter implements ContactWriterInterface
         $attributes[$head] = $group;
         $this->contact->setAttribute('attributes', $attributes);
         $this->contact->save();
+    }
+
+    /**
+     * Append $value to the array at contact.<head> or contact.<head>.<tail>.
+     * Applies circular-buffer logic when the array reaches max_size.
+     */
+    private function applyArrayAppend(string $head, ?string $tail, mixed $value): void
+    {
+        $group   = null === $tail ? null : $head;
+        $name    = null === $tail ? $head : $tail;
+        $maxSize = $this->resolveMaxSize($group, $name);
+
+        $attributes = is_array($this->contact->attributes) ? $this->contact->attributes : [];
+
+        if (null === $tail) {
+            $current           = is_array($attributes[$head] ?? null) ? $attributes[$head] : [];
+            $attributes[$head] = $this->appendWithCircularBuffer($current, $value, $maxSize);
+        } else {
+            $groupData         = is_array($attributes[$head] ?? null) ? $attributes[$head] : [];
+            $current           = is_array($groupData[$tail] ?? null) ? $groupData[$tail] : [];
+            $groupData[$tail]  = $this->appendWithCircularBuffer($current, $value, $maxSize);
+            $attributes[$head] = $groupData;
+        }
+
+        $this->contact->setAttribute('attributes', $attributes);
+        $this->contact->save();
+    }
+
+    /**
+     * Append an element; shift out the oldest when the buffer is full.
+     *
+     * @param  list<mixed>  $array
+     *
+     * @return list<mixed>
+     */
+    private function appendWithCircularBuffer(array $array, mixed $value, int $maxSize): array
+    {
+        $array[] = $value;
+
+        if ($maxSize > 0 && count($array) > $maxSize) {
+            $array = array_values(array_slice($array, count($array) - $maxSize));
+        }
+
+        return $array;
+    }
+
+    /** Resolve max_size from the schema registry; default 100 when unknown. */
+    private function resolveMaxSize(?string $group, string $name): int
+    {
+        if (null === $this->schemaRegistryResolver) {
+            return 100;
+        }
+
+        $properties = ($this->schemaRegistryResolver)()->getProperties('contact', $group, $name);
+
+        return isset($properties['max_size']) && is_int($properties['max_size'])
+            ? $properties['max_size']
+            : 100;
+    }
+
+    /**
+     * Check whether the contact attribute at (group, name) is declared as an array type.
+     * Canonical columns (language, is_authenticated) are never arrays.
+     */
+    private function isArrayVariable(?string $group, string $name): bool
+    {
+        if (null === $this->schemaRegistryResolver) {
+            return false;
+        }
+
+        return VariableType::Array === ($this->schemaRegistryResolver)()->get('contact', $group, $name);
     }
 
     private function emitHistory(string $path, mixed $oldValue, mixed $newValue): void

@@ -12,6 +12,7 @@ use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\LanguageResolverInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowConcurrencyException;
@@ -20,6 +21,7 @@ use App\Domains\Flow\Exceptions\HandlerNotFoundException;
 use App\Domains\Flow\Exceptions\InvalidFlowGraphException;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
 use App\Domains\Flow\Handlers\EndNodeHandler;
+use App\Domains\Flow\Handlers\LoopEndNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\Logging\FlowLogEntry;
 use App\Domains\Flow\Logging\FlowLogStatus;
@@ -64,6 +66,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         private \App\Domains\Flow\Subflow\SubflowResumerInterface $subflowResumer,
         private \App\Domains\Messaging\Typing\TypingHeartbeatRegistry $typingHeartbeat,
         private LoggerInterface $logger,
+        private VariableSchemaRegistryInterface $schemaRegistry,
     ) {
     }
 
@@ -330,12 +333,14 @@ final readonly class FlowEngine implements FlowEngineInterface
                 accessors: $this->dataAccessors,
             );
 
-            $contactWriter = new \App\Domains\Flow\State\Writers\ContactWriter(
+            $schemaRegistry = $this->schemaRegistry;
+            $contactWriter  = new \App\Domains\Flow\State\Writers\ContactWriter(
                 contact: $contact,
                 sessionId: (string)$session->getKey(),
                 nodeId: $nodeId,
                 connection: $this->connection,
                 historyWriter: $this->historyWriterFactory->for($definition),
+                schemaRegistryResolver: static fn () => $schemaRegistry,
             );
 
             $handlerContext = new FoundationNodeExecutionContext(
@@ -370,6 +375,16 @@ final readonly class FlowEngine implements FlowEngineInterface
 
             if (NodeExecutionStatus::Executed === $result->status && null !== $result->sourceHandle) {
                 $nextNodeId = $this->graphResolver->resolveNextNode($definition, $nodeId, $result->sourceHandle);
+            }
+
+            // LoopEnd: navigate back to the parent Loop node without a graph edge (spec §4.3).
+            if (LoopEndNodeHandler::TYPE === $type && NodeExecutionStatus::Executed === $result->status) {
+                $rawConfig  = is_array($node['config'] ?? null) ? $node['config'] : [];
+                $loopNodeId = is_string($rawConfig['loop_node_id'] ?? null) ? $rawConfig['loop_node_id'] : null;
+
+                if (null !== $loopNodeId) {
+                    $nextNodeId = $loopNodeId;
+                }
             }
 
             $isEndNode = EndNodeHandler::TYPE === $type;

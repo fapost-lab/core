@@ -28,10 +28,14 @@ const paletteStyle   = ref<CSSProperties>({
     transform: 'translateX(-50%)',
 })
 
+// Auto-managed types (palette === false) are registered for rendering/config
+// lookup but never inserted by hand — exclude them from the palette.
+const insertableNodeTypes = computed(() => registryStore.nodeTypes.filter((n) => n.palette !== false))
+
 const filteredNodeTypes = computed(() => {
     const query = searchQuery.value.trim().toLowerCase()
-    if (!query) return registryStore.nodeTypes
-    return registryStore.nodeTypes.filter((n) => (n.label ?? '').toLowerCase().includes(query))
+    if (!query) return insertableNodeTypes.value
+    return insertableNodeTypes.value.filter((n) => (n.label ?? '').toLowerCase().includes(query))
 })
 
 const grouped = computed((): Record<string, typeof filteredNodeTypes.value> =>

@@ -1,0 +1,42 @@
+﻿Title,Depends on,Domain,Phase,Sprint,Status,Task №
+"Роли, права, иерархия и деактивация пользователей",04,Staff,1 — Core Platform,3,Готово,5
+Tenancy middleware & boot,03,Tenancy,0 — Фундамент,2,Готово,4
+Tenant infrastructure,02,Tenancy,0 — Фундамент,1,Готово,3
+Project scaffolding,—,Tenancy,0 — Фундамент,1,Готово,1
+Tenancy Domain,01,Tenancy,0 — Фундамент,1,Готово,2
+Octane integration,08,Tenancy,1 — Core Platform,3,Готово,8.1
+Staff Domain,04,Staff,1 — Core Platform,3,Готово,5
+Logging & retention,11,Flow,2 — Flow Engine,6,Готово,18
+Flow triggers,"13, 14",Flow,2 — Flow Engine,5,Готово,15
+Concurrency protection,11,Flow,2 — Flow Engine,5,Готово,12
+DataAccessor layer,13,Flow,2 — Flow Engine,5,Готово,14
+Filament admin UI,"09, 16",Staff,3 — Messaging Pipeline,7,К реализации,21
+RAG adapter,13,RAG,3 — Messaging Pipeline,7,К реализации,20
+Broadcast engine,16,Messaging,3 — Messaging Pipeline,7,К реализации,19
+platform:update command,22,Ops,5 — Self-hosted & SaaS,10,К реализации,26
+SaaS shell,04,Tenancy,5 — Self-hosted & SaaS,10,К реализации,27
+HR assessments,24,Module,4 — Module System & HR,9,К реализации,25
+Module isolation,"22, 11",Module,4 — Module System & HR,8,К реализации,23
+HR Domain,"23, 14",Module,4 — Module System & HR,9,К реализации,24
+Module framework,"04, 14",Module,4 — Module System & HR,8,К реализации,22
+Flow constructor UI,"09, 21",Flow,2 — Flow Engine,6,В работе,17
+Assistant & Channel Domain,"04, supersedes 06",Assistant,1 — Core Platform,3,Готово,6.1
+Assistant Panel (Filament),06b,Assistant,1 — Core Platform,3,Готово,6.2
+ID Strategy Refactoring — ULID as PK,06b,Assistant,1 — Core Platform,3,Готово,6.4
+Contact Domain,"04, 06b",Contact,1 — Core Platform,3,Готово,7
+Model Extension Infrastructure (BaseModel + ModelAttributeRegistry),01,Tenancy,0 — Фундамент,1,Готово,4.1
+Task 08 — Webhook Message Pipeline,"06, 07",Assistant,1 — Core Platform,3,Готово,8
+Task 09 — Flow Handler Versioning Contract,04,Flow,2 — Flow Engine,4,Готово,9
+Task 10 — Flow Session & State,09,Flow,2 — Flow Engine,4,Готово,10
+Introduce fapost/foundation — публичный контрактный пакет для extension boundary,04,Module,0 — Фундамент,1,Готово,4.2
+Flow Execution Engine,10,Flow,2 — Flow Engine,5,Готово,11
+Built-in node handlers,"11, 12",Flow,2 — Flow Engine,5,Готово,13
+Multilingual support (i18n),"07 (Contact), 10 (Flow Session), 20 (Filament UI), 27 (Flow constructor)",Flow,5 — Self-hosted & SaaS,11,Готово,28
+Message queues & sender,,Messaging,3 — Messaging Pipeline,,Готово,16
+Channel connectors — Telegram MVP,,Messaging,3 — Messaging Pipeline,,Готово,16
+Task 29.1 — Media Domain backend core,13,Flow,2 — Flow Engine,6,Готово,29.1
+Task 29.4b — Vue media picker (builder integration),"29.3, 17",Flow,2 — Flow Engine,6,Готово,29.42
+Task 29 — Media Domain (parent),"13, 16, 17",Flow,2 — Flow Engine,6,Готово,29
+Task 29.4a — Filament MediaResource,29.3,Flow,2 — Flow Engine,6,Готово,29.41
+Task 29.2 — Telegram media adapter + send_message rework,"29.1, 16",Messaging,2 — Flow Engine,6,Готово,29.2
+Task 29.3 — Media REST API,29.1,Flow,2 — Flow Engine,6,Готово,29.3

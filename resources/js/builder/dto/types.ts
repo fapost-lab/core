@@ -61,6 +61,8 @@ export interface NodeTypePayload {
         default_config?: Record<string, unknown>
         [key: string]: unknown
     }
+    /** false → type is registered but hidden from the insertable palette (auto-managed). */
+    palette?: boolean
 }
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'conflict' | 'error'
@@ -71,16 +73,22 @@ export type SaveStatus = 'idle' | 'saving' | 'saved' | 'conflict' | 'error'
  * this shape; nodes compile it into their own JSON snapshot.
  */
 export type VariableType =
-    | 'text' | 'number' | 'phone' | 'email' | 'contact'
-    | 'select' | 'confirm' | 'file' | 'photo' | 'location' | 'date' | 'json'
+    | 'text' | 'number' | 'boolean' | 'phone' | 'email' | 'contact'
+    | 'select' | 'confirm' | 'file' | 'photo' | 'location' | 'date' | 'json' | 'array'
 
 export type VariableStorage = 'contact' | 'session'
 
 export interface Variable {
     name: string
+    /** Element / scalar type. When {@link isList} is true this is the array's item type. */
     type: VariableType
     storage: VariableStorage
     group: string | null
+    /**
+     * UI flag: when true the variable accumulates a list (append semantics).
+     * Compiles to backend `type: 'array'` + `properties.item_type = type`.
+     */
+    isList?: boolean
 }
 
 export type ActiveTab = 'builder' | 'content'

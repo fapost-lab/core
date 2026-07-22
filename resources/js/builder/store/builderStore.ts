@@ -149,12 +149,54 @@ export const useBuilderStore = defineStore('builder', () => {
         )
     })
 
+    /**
+     * Self-heal loop constructs: every loop node must have a paired loop_end
+     * terminating its `loop` branch. Drafts authored before the auto-managed
+     * loop_end existed (or mangled externally) get the missing node recreated
+     * here. Returns true when anything was repaired.
+     */
+    function healLoopConstructs(def: FlowDefinition): boolean {
+        let healed = false
+
+        for (const loop of def.nodes.filter((n) => n.type === 'loop')) {
+            const hasLoopEnd = def.nodes.some(
+                (n) => n.type === 'loop_end' && (n.config?.loop_node_id as string | undefined) === loop.id,
+            )
+            if (hasLoopEnd) continue
+
+            const loopEndId = nanoid(10)
+            def.nodes.push({
+                id:      loopEndId,
+                type:    'loop_end',
+                version: 1,
+                config:  { loop_node_id: loop.id },
+            })
+
+            // Attach at the end of the existing body chain (follow default
+            // edges from the `loop` handle); empty body → wire loop directly.
+            let tailId = loop.id
+            let tailHandle = 'loop'
+            let next = def.edges.find((e) => e.from === tailId && (e.handle ?? 'default') === tailHandle)
+            while (next) {
+                tailId = next.to
+                tailHandle = 'default'
+                next = def.edges.find((e) => e.from === tailId && (e.handle ?? 'default') === 'default')
+            }
+            def.edges.push({ id: nanoid(10), from: tailId, to: loopEndId, handle: tailHandle })
+
+            healed = true
+        }
+
+        return healed
+    }
+
     function init(flow: BuilderFlowPayload) {
         flowId.value = flow.flowId
         flowName.value = flow.name
         draftVersion.value = flow.draftVersion
         publishedVersion.value = flow.publishedVersion ?? null
         definition.value = normalizeDefinition(flow.definition)
+        const healedLoops = healLoopConstructs(definition.value)
         trigger.value = normalizeTrigger(flow.trigger)
       tenantEvents.value = Array.isArray(flow.availableEvents) ? flow.availableEvents : []
         contentBaseLanguage.value = flow.contentBaseLanguage ?? 'en'
@@ -162,7 +204,9 @@ export const useBuilderStore = defineStore('builder', () => {
         availableFlows.value     = Array.isArray(flow.availableFlows) ? flow.availableFlows : []
         availableActions.value   = Array.isArray(flow.availableActions) ? flow.availableActions : []
         availableCountries.value = Array.isArray(flow.availableCountries) ? flow.availableCountries : []
-        isDirty.value = false
+        // A healed definition differs from the persisted draft — flag dirty so
+        // the repaired loop_end nodes reach the backend on the next save.
+        isDirty.value = healedLoops
         hydrated      = true
     }
 
@@ -290,7 +334,83 @@ export const useBuilderStore = defineStore('builder', () => {
             definition.value.edges.push({ id: nanoid(10), from: afterNodeId, to: newNodeId, handle })
         }
 
+        // A loop node is never alone: auto-create its paired loop_end as the
+        // terminator of the `loop` branch. New body nodes insert before it
+        // (standard insert-after-handle wiring), and it is removed with the loop.
+        if (type === 'loop') {
+            const loopEndId = nanoid(10)
+            definition.value.nodes.push({
+                id:      loopEndId,
+                type:    'loop_end',
+                version: 1,
+                config:  { loop_node_id: newNodeId },
+            })
+            definition.value.edges.push({ id: nanoid(10), from: newNodeId, to: loopEndId, handle: 'loop' })
+        }
+
         return newNodeId
+    }
+
+    /**
+     * Collect every node id inside a loop body — reachable from the loop's
+     * `loop` handle, stopping at the paired loop_end (and never re-entering
+     * the loop node itself).
+     */
+    function collectLoopBodyIds(loopId: string, loopEndId: string | null): string[] {
+        const out = new Set<string>()
+        const queue = definition.value.edges
+            .filter((edge) => edge.from === loopId && (edge.handle ?? 'default') === 'loop')
+            .map((edge) => edge.to)
+
+        while (queue.length > 0) {
+            const id = queue.shift()!
+            if (id === loopId || id === loopEndId || out.has(id)) continue
+            out.add(id)
+            for (const edge of definition.value.edges.filter((e) => e.from === id)) {
+                if (edge.to !== loopId && edge.to !== loopEndId) queue.push(edge.to)
+            }
+        }
+
+        return [...out]
+    }
+
+    /**
+     * Remove a loop construct wholesale: the loop node, its auto-managed
+     * loop_end, and the entire loop body. The flow is bridged from the loop's
+     * incoming edge to its `default` (exit) continuation.
+     */
+    function deleteLoop(loopId: string): boolean {
+        const selectionStore = useSelectionStore()
+
+        snapshot()
+
+        const loopEndId = definition.value.nodes
+            .find((n) => n.type === 'loop_end' && (n.config?.loop_node_id as string | undefined) === loopId)?.id ?? null
+
+        const bodyIds     = collectLoopBodyIds(loopId, loopEndId)
+        const incoming    = definition.value.edges.find((e) => e.to === loopId) ?? null
+        const defaultExit = definition.value.edges
+            .find((e) => e.from === loopId && (e.handle ?? 'default') === 'default') ?? null
+
+        const toRemove = new Set<string>([loopId, ...bodyIds, ...(loopEndId ? [loopEndId] : [])])
+
+        definition.value.nodes = definition.value.nodes.filter((n) => !toRemove.has(n.id))
+        definition.value.edges = definition.value.edges.filter((e) => !toRemove.has(e.from) && !toRemove.has(e.to))
+
+        if (incoming && defaultExit) {
+            definition.value.edges.push({
+                id:     nanoid(10),
+                from:   incoming.from,
+                to:     defaultExit.to,
+                handle: incoming.handle ?? 'default',
+            })
+        }
+
+        if (selectionStore.selectedNodeId && toRemove.has(selectionStore.selectedNodeId)) {
+            selectionStore.clear()
+        }
+
+        return true
     }
 
     function deleteNode(nodeId: string): boolean {
@@ -298,6 +418,18 @@ export const useBuilderStore = defineStore('builder', () => {
 
         if (!nodeId) {
             return false
+        }
+
+        const target = definition.value.nodes.find((n) => n.id === nodeId) ?? null
+
+        // loop_end is auto-managed — it can only be removed by deleting its loop.
+        if (target?.type === 'loop_end') {
+            return false
+        }
+
+        // Deleting a loop tears down the whole construct (loop + body + loop_end).
+        if (target?.type === 'loop') {
+            return deleteLoop(nodeId)
         }
 
         const incomingEdges = definition.value.edges.filter((edge) => edge.to === nodeId)
@@ -685,6 +817,23 @@ export const useBuilderStore = defineStore('builder', () => {
         }
     }
 
+    /**
+     * True when the node sits inside any loop body (reachable from a loop's
+     * `loop` handle, before its loop_end). Used by Input/Assign configs to
+     * default the "store as list" toggle on for accumulation inside loops.
+     */
+    function isNodeInLoopBody(nodeId: string): boolean {
+        const loops = definition.value.nodes.filter((n) => n.type === 'loop')
+        for (const loop of loops) {
+            const loopEndId = definition.value.nodes
+                .find((n) => n.type === 'loop_end' && (n.config?.loop_node_id as string | undefined) === loop.id)?.id ?? null
+            if (collectLoopBodyIds(loop.id, loopEndId).includes(nodeId)) {
+                return true
+            }
+        }
+        return false
+    }
+
     // Mark the flow dirty on any post-hydration mutation of definition or
     // trigger. Cleared again by `setSaveStatus('saved')` and by `init()`.
     watch(
@@ -735,6 +884,7 @@ export const useBuilderStore = defineStore('builder', () => {
         insertNode,
         deleteNode,
         removeNodes,
+        isNodeInLoopBody,
       moveNode,
         moveChain,
         moveNodeUp,
