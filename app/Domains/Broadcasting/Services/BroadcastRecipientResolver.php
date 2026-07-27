@@ -8,6 +8,8 @@ use App\Domains\Broadcasting\Enums\BroadcastTarget;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
 use App\Domains\Contact\Models\ChannelContact;
+use App\Domains\Contact\Models\ContactSegment;
+use App\Domains\Contact\Services\ContactSegmentResolver;
 use Illuminate\Support\Collection;
 
 /**
@@ -21,6 +23,7 @@ final readonly class BroadcastRecipientResolver
 {
     public function __construct(
         private ContactTagRepositoryInterface $tags,
+        private ContactSegmentResolver $segments,
     ) {
     }
 
@@ -58,10 +61,18 @@ final readonly class BroadcastRecipientResolver
      */
     private function targetContactIds(Broadcast $broadcast): ?array
     {
-        if (BroadcastTarget::Tags !== $broadcast->target_type) {
-            return null;
-        }
+        return match ($broadcast->target_type) {
+            BroadcastTarget::All     => null,
+            BroadcastTarget::Tags    => $this->tagContactIds($broadcast),
+            BroadcastTarget::Segment => $this->segmentContactIds($broadcast),
+        };
+    }
 
+    /**
+     * @return list<string>
+     */
+    private function tagContactIds(Broadcast $broadcast): array
+    {
         $ids = [];
 
         foreach ($broadcast->target_tags ?? [] as $tag) {
@@ -71,5 +82,19 @@ final readonly class BroadcastRecipientResolver
         }
 
         return array_values(array_unique($ids));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function segmentContactIds(Broadcast $broadcast): array
+    {
+        if (null === $broadcast->target_segment_id) {
+            return [];
+        }
+
+        $segment = ContactSegment::query()->find($broadcast->target_segment_id);
+
+        return null !== $segment ? $this->segments->resolveContactIds($segment) : [];
     }
 }

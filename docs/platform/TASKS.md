@@ -224,8 +224,11 @@
 - [x] `contact_tags` + `ContactTagRepository` (set_tag нода)
 - [x] `contact_groups` + `contact_group_members`
 - [x] `ContactResource` Filament (group sections, «Manage tags» action)
-- [ ] `contact_segments` (rules JSON, `cached_count`)
-- [ ] `ContactSegmentResolver` (для Broadcasting)
+- [x] `contact_segments` (rules JSON `{match, conditions[]}`, `cached_count`/`cached_count_at`) — модель + миграция
+- [x] `ContactSegmentResolver` — компилирует rules в tenant-scoped Contact-запрос (условия: tag has/not_has, language/platform in/eq; all/any); `resolveContactIds` / `count` / `refreshCount`
+- [x] Интеграция в Broadcasting: `BroadcastTarget::Segment` + `broadcasts.target_segment_id`; `BroadcastRecipientResolver` резолвит сегмент → пересечение с deliverable-контактами ассистента
+- [x] Filament: `ContactSegmentResource` (assistant-панель, tenant-scoped) — rules-builder (match + Repeater условий), «Recount» action; segment-опция в composer'е рассылки; lang en/ru/uk
+- [ ] Условия по группам / attributes-json (ждут `contact_groups` / расширения)
 
 ---
 

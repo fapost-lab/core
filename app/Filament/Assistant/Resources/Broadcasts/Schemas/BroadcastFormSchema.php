@@ -6,6 +6,7 @@ namespace App\Filament\Assistant\Resources\Broadcasts\Schemas;
 
 use App\Domains\Broadcasting\Enums\BroadcastTarget;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
+use App\Domains\Contact\Models\ContactSegment;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -40,8 +41,9 @@ final class BroadcastFormSchema
                 ->live()
                 ->default(BroadcastTarget::All->value)
                 ->options([
-                    BroadcastTarget::All->value  => __('broadcast.targets.all'),
-                    BroadcastTarget::Tags->value => __('broadcast.targets.tags'),
+                    BroadcastTarget::All->value     => __('broadcast.targets.all'),
+                    BroadcastTarget::Tags->value    => __('broadcast.targets.tags'),
+                    BroadcastTarget::Segment->value => __('broadcast.targets.segment'),
                 ]),
 
             Select::make('target_tags')
@@ -51,6 +53,16 @@ final class BroadcastFormSchema
                 ->required(fn (Get $get): bool => BroadcastTarget::Tags->value === $get('target_type'))
                 ->visible(fn (Get $get): bool => BroadcastTarget::Tags->value === $get('target_type'))
                 ->options(static fn (): array => self::tagOptions()),
+
+            Select::make('target_segment_id')
+                ->label(__('broadcast.fields.segment'))
+                ->searchable()
+                ->required(fn (Get $get): bool => BroadcastTarget::Segment->value === $get('target_type'))
+                ->visible(fn (Get $get): bool => BroadcastTarget::Segment->value === $get('target_type'))
+                ->options(static fn (): array => ContactSegment::query()
+                    ->orderBy('name')
+                    ->pluck('name', 'id')
+                    ->all()),
         ]);
     }
 

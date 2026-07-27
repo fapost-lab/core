@@ -12,6 +12,7 @@ return [
         'message_help' => 'Sent as-is to every recipient. Basic HTML is supported.',
         'target'       => 'Audience',
         'tags'         => 'Tags',
+        'segment'      => 'Segment',
         'status'       => 'Status',
         'progress'     => 'Sent',
         'failed'       => 'Failed',
@@ -19,8 +20,9 @@ return [
     ],
 
     'targets' => [
-        'all'  => 'All contacts',
-        'tags' => 'By tags',
+        'all'     => 'All contacts',
+        'tags'    => 'By tags',
+        'segment' => 'By segment',
     ],
 
     'statuses' => [

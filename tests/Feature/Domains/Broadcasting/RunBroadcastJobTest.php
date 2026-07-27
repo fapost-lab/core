@@ -13,6 +13,8 @@ use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Contact\Models\ContactSegment;
+use App\Domains\Contact\Models\ContactTag;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Tests\Feature\FeatureTestCase;
@@ -54,6 +56,40 @@ final class RunBroadcastJobTest extends FeatureTestCase
         $this->assertSame(0, $broadcast->total_recipients);
         $this->assertNotNull($broadcast->completed_at);
         Bus::assertNotDispatched(SendBroadcastRecipientJob::class);
+    }
+
+    public function test_segment_target_only_reaches_matching_contacts(): void
+    {
+        Bus::fake();
+
+        $channel = $this->channel();
+
+        $vip = $this->contact();
+        ContactTag::query()->create(['contact_id' => $vip->getKey(), 'tag' => 'vip', 'tagged_by' => null, 'tagged_at' => now()]);
+        $this->bind($vip, $channel);
+
+        $this->bind($this->contact(), $channel); // untagged → excluded by the segment
+
+        $segment = ContactSegment::query()->create([
+            'tenant_id' => self::TENANT_ID,
+            'name'      => 'VIP',
+            'rules'     => ['match' => 'all', 'conditions' => [['type' => 'tag', 'operator' => 'has', 'value' => 'vip']]],
+        ]);
+
+        $broadcast = Broadcast::query()->create([
+            'tenant_id'         => self::TENANT_ID,
+            'assistant_id'      => (string) $channel->assistant_id,
+            'name'              => 'Promo',
+            'message'           => 'Hello!',
+            'target_type'       => 'segment',
+            'target_segment_id' => $segment->getKey(),
+            'status'            => BroadcastStatus::Running->value,
+        ]);
+
+        $this->runJob($broadcast);
+
+        $this->assertSame(1, $broadcast->fresh()->total_recipients);
+        Bus::assertDispatchedTimes(SendBroadcastRecipientJob::class, 1);
     }
 
     private function runJob(Broadcast $broadcast): void

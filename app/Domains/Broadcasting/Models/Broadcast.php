@@ -51,6 +51,7 @@ final class Broadcast extends BaseModel
         'message',
         'target_type',
         'target_tags',
+        'target_segment_id',
         'status',
         'total_recipients',
         'sent_count',
