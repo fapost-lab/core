@@ -535,6 +535,29 @@ final class PublishFlowServiceTest extends TestCase
         $this->assertTrue($definition->is_active);
     }
 
+    public function test_publish_strips_comment_annotation_nodes_and_their_edges(): void
+    {
+        $flowId = '00000000-0000-0000-0000-000000000933';
+
+        FlowDraft::factory()->create([
+            'flow_id' => $flowId,
+            'nodes'   => [
+                ['id' => 'note', 'type' => 'comment', 'version' => 1, 'config' => ['text' => 'note']],
+                ['id' => 'sm', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+            ],
+            'edges'   => [
+                ['id' => 'e1', 'from' => 'note', 'to' => 'sm', 'handle' => 'default'],
+            ],
+        ]);
+
+        $definition = app(PublishFlowService::class)->execute($flowId);
+
+        $types = array_map(static fn (array $node): string => $node['type'], $definition->nodes);
+        $this->assertNotContains('comment', $types, 'Comment nodes must be stripped from the published definition.');
+        $this->assertContains('send_message', $types);
+        $this->assertSame([], $definition->edges, 'Edges touching a comment node must be stripped.');
+    }
+
     public function test_throws_flow_validation_exception_when_draft_is_invalid(): void
     {
         $flowId = '00000000-0000-0000-0000-000000000654';

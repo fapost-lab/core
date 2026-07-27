@@ -42,7 +42,7 @@ final class ContactSegmentFormSchema
                 ->label(__('segment.fields.conditions'))
                 ->addActionLabel(__('segment.actions.add_condition'))
                 ->default([])
-                ->columns(3)
+                ->columns(4)
                 ->schema([
                     Select::make('type')
                         ->label(__('segment.condition.type'))
@@ -50,19 +50,28 @@ final class ContactSegmentFormSchema
                         ->live()
                         ->default(SegmentConditionType::Tag->value)
                         ->options([
-                            SegmentConditionType::Tag->value      => __('segment.condition.types.tag'),
-                            SegmentConditionType::Language->value => __('segment.condition.types.language'),
-                            SegmentConditionType::Platform->value => __('segment.condition.types.platform'),
+                            SegmentConditionType::Tag->value       => __('segment.condition.types.tag'),
+                            SegmentConditionType::Language->value  => __('segment.condition.types.language'),
+                            SegmentConditionType::Platform->value  => __('segment.condition.types.platform'),
+                            SegmentConditionType::Attribute->value => __('segment.condition.types.attribute'),
                         ]),
+
+                    TextInput::make('key')
+                        ->label(__('segment.condition.key'))
+                        ->placeholder('profile.city')
+                        ->required(fn (Get $get): bool => SegmentConditionType::Attribute->value === $get('type'))
+                        ->visible(fn (Get $get): bool => SegmentConditionType::Attribute->value === $get('type')),
 
                     Select::make('operator')
                         ->label(__('segment.condition.operator'))
                         ->required()
+                        ->live()
                         ->options(static fn (Get $get): array => self::operatorOptions((string) $get('type'))),
 
                     TagsInput::make('value')
                         ->label(__('segment.condition.value'))
-                        ->required()
+                        ->required(fn (Get $get): bool => 'exists' !== $get('operator'))
+                        ->visible(fn (Get $get): bool => 'exists' !== $get('operator'))
                         ->helperText(__('segment.condition.value_help')),
                 ]),
         ]);
@@ -73,16 +82,20 @@ final class ContactSegmentFormSchema
      */
     private static function operatorOptions(string $type): array
     {
-        if (SegmentConditionType::Tag->value === $type) {
-            return [
+        return match (SegmentConditionType::tryFrom($type)) {
+            SegmentConditionType::Tag => [
                 'has'     => __('segment.operators.has'),
                 'not_has' => __('segment.operators.not_has'),
-            ];
-        }
-
-        return [
-            'in' => __('segment.operators.in'),
-            'eq' => __('segment.operators.eq'),
-        ];
+            ],
+            SegmentConditionType::Attribute => [
+                'eq'     => __('segment.operators.eq'),
+                'ne'     => __('segment.operators.ne'),
+                'exists' => __('segment.operators.exists'),
+            ],
+            default => [
+                'in' => __('segment.operators.in'),
+                'eq' => __('segment.operators.eq'),
+            ],
+        };
     }
 }

@@ -90,7 +90,7 @@
 - [-] `rag_query` — handler/registry/validation готовы; Feature: RAG ещё предстоит — [[specs/flow-engine/nodes/09-rag-query]]
 
 ### P3
-- [ ] `comment` (builder-only аннотация, без NodeHandler)
+- [-] `comment` (builder-only аннотация): backend готов — палитра (`NodeTypesController`), skip в валидации, strip-at-publish (`AnnotationNodeTypes`); остаётся Vue-рендеринг ноды на канвасе
 
 ---
 
@@ -130,7 +130,7 @@
 - [x] `useInsertAtCursor` в TextField / Textarea / StatePickerField
 - [x] End node color-coding (success → зелёный, cancelled → амбер, failed → красный)
 - [x] Flow Content Manager (многоязычный редактор контента, отдельная вкладка)
-- [ ] `comment` нода на канвасе (P3)
+- [-] `comment` нода на канвасе (P3) — backend-энейблмент готов (палитра/валидация/strip); Vue-карточка на канвасе ещё предстоит
 
 ---
 
@@ -228,7 +228,8 @@
 - [x] `ContactSegmentResolver` — компилирует rules в tenant-scoped Contact-запрос (условия: tag has/not_has, language/platform in/eq; all/any); `resolveContactIds` / `count` / `refreshCount`
 - [x] Интеграция в Broadcasting: `BroadcastTarget::Segment` + `broadcasts.target_segment_id`; `BroadcastRecipientResolver` резолвит сегмент → пересечение с deliverable-контактами ассистента
 - [x] Filament: `ContactSegmentResource` (assistant-панель, tenant-scoped) — rules-builder (match + Repeater условий), «Recount» action; segment-опция в composer'е рассылки; lang en/ru/uk
-- [ ] Условия по группам / attributes-json (ждут `contact_groups` / расширения)
+- [x] Условия по attributes-json (dot-path key, eq/ne/exists) — реализованы в `ContactSegmentResolver` + Filament
+- [ ] Условия по группам (ждут `contact_groups` — в коде отсутствуют)
 
 ---
 

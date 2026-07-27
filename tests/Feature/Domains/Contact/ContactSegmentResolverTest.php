@@ -67,6 +67,30 @@ final class ContactSegmentResolverTest extends FeatureTestCase
         $this->assertSame([(string) $clean->getKey()], $this->resolver->resolveContactIds($segment));
     }
 
+    public function test_attribute_equality_condition(): void
+    {
+        $gold = $this->contactWithAttributes(['tier' => 'gold']);
+        $this->contactWithAttributes(['tier' => 'silver']);
+
+        $segment = $this->segment('all', [
+            ['type' => 'attribute', 'key' => 'tier', 'operator' => 'eq', 'value' => 'gold'],
+        ]);
+
+        $this->assertSame([(string) $gold->getKey()], $this->resolver->resolveContactIds($segment));
+    }
+
+    public function test_attribute_exists_condition_on_nested_path(): void
+    {
+        $withCity = $this->contactWithAttributes(['profile' => ['city' => 'Kyiv']]);
+        $this->contactWithAttributes(['profile' => ['name' => 'A']]); // no city
+
+        $segment = $this->segment('all', [
+            ['type' => 'attribute', 'key' => 'profile.city', 'operator' => 'exists'],
+        ]);
+
+        $this->assertSame([(string) $withCity->getKey()], $this->resolver->resolveContactIds($segment));
+    }
+
     public function test_empty_rules_match_all_tenant_contacts(): void
     {
         $this->contact('en', []);
@@ -110,6 +134,14 @@ final class ContactSegmentResolverTest extends FeatureTestCase
         }
 
         return $contact;
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function contactWithAttributes(array $attributes): Contact
+    {
+        return Contact::factory()->forTenant(self::TENANT_ID)->create(['attributes' => $attributes]);
     }
 
     /**

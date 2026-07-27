@@ -21,13 +21,15 @@ return [
 
     'condition' => [
         'type'       => 'Attribute',
+        'key'        => 'Key',
         'operator'   => 'Operator',
         'value'      => 'Value',
-        'value_help' => 'One tag, or one or more languages / platforms.',
+        'value_help' => 'One tag, or one or more languages / platforms / values.',
         'types'      => [
-            'tag'      => 'Tag',
-            'language' => 'Language',
-            'platform' => 'Platform',
+            'tag'       => 'Tag',
+            'language'  => 'Language',
+            'platform'  => 'Platform',
+            'attribute' => 'Attribute',
         ],
     ],
 
@@ -36,6 +38,8 @@ return [
         'not_has' => 'does not have tag',
         'in'      => 'is any of',
         'eq'      => 'equals',
+        'ne'      => 'not equals',
+        'exists'  => 'is set',
     ],
 
     'actions' => [

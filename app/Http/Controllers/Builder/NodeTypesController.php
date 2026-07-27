@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Builder;
 
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Http\Controllers\Controller;
 use FAPost\Foundation\Contracts\NodeHandlerInterface;
 use Illuminate\Http\JsonResponse;
@@ -33,7 +34,18 @@ final class NodeTypesController extends Controller
                 // hides it from the insertable palette.
                 'palette' => ! in_array($handler->type(), self::AUTO_MANAGED_TYPES, true),
             ])
-            ->values();
+            ->values()
+            // Annotation nodes (e.g. comment) have no handler — surface them in
+            // the palette manually so the builder can drop them on the canvas.
+            ->push([
+                'type'          => AnnotationNodeTypes::COMMENT,
+                'version'       => 1,
+                'label'         => 'Comment',
+                'category'      => 'Annotation',
+                'config_schema' => (object) [],
+                'annotation'    => true,
+                'palette'       => true,
+            ]);
 
         return response()->json(['data' => $types]);
     }

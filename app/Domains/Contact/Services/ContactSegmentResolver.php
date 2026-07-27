@@ -91,11 +91,48 @@ final class ContactSegmentResolver
         $value    = $condition['value'] ?? null;
 
         match ($type) {
-            SegmentConditionType::Tag      => $this->applyTag($query, $operator, $value, $or),
-            SegmentConditionType::Language => $this->applyColumn($query, 'language', $operator, $value, $or),
-            SegmentConditionType::Platform => $this->applyColumn($query, 'platform', $operator, $value, $or),
-            null                           => null,
+            SegmentConditionType::Tag       => $this->applyTag($query, $operator, $value, $or),
+            SegmentConditionType::Language  => $this->applyColumn($query, 'language', $operator, $value, $or),
+            SegmentConditionType::Platform  => $this->applyColumn($query, 'platform', $operator, $value, $or),
+            SegmentConditionType::Attribute => $this->applyAttribute($query, $condition, $operator, $value, $or),
+            null                            => null,
         };
+    }
+
+    /**
+     * Filter on a flow-collected value in the `attributes` json. The key is a
+     * dot-path (e.g. `age` or `profile.city`) translated to Laravel's JSON
+     * selector. Operators: eq / ne (value comparison), exists (key present).
+     *
+     * @param  Builder<\App\Domains\Contact\Models\Contact>  $query
+     * @param  array<string, mixed>                          $condition
+     */
+    private function applyAttribute(Builder $query, array $condition, string $operator, mixed $value, bool $or): void
+    {
+        $key = (string) ($condition['key'] ?? '');
+
+        // Only allow safe dot-path identifiers into the JSON selector.
+        if (1 !== preg_match('/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$/', $key)) {
+            return;
+        }
+
+        $column = 'attributes->' . str_replace('.', '->', $key);
+
+        if ('exists' === $operator) {
+            $or ? $query->orWhereNotNull($column) : $query->whereNotNull($column);
+
+            return;
+        }
+
+        $scalar = is_array($value) ? ($value[0] ?? null) : $value;
+
+        if (! is_string($scalar) || '' === $scalar) {
+            return;
+        }
+
+        $sqlOperator = 'ne' === $operator ? '!=' : '=';
+
+        $or ? $query->orWhere($column, $sqlOperator, $scalar) : $query->where($column, $sqlOperator, $scalar);
     }
 
     /**

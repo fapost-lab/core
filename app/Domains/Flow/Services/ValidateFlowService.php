@@ -18,6 +18,7 @@ use App\Domains\Flow\Handlers\LoopEndNodeHandler;
 use App\Domains\Flow\Handlers\LoopNodeHandler;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Domains\Flow\Subflow\CallGraphValidator;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -52,6 +53,12 @@ final readonly class ValidateFlowService
         $nodeMap = $this->normalizeNodeMap($nodes, $errors);
 
         foreach ($nodeMap as $nodeId => $node) {
+            // Annotation nodes (comment) are builder-only — no handler, no runtime
+            // behaviour — so they are exempt from node-level validation.
+            if (AnnotationNodeTypes::isAnnotation($node['type'] ?? null)) {
+                continue;
+            }
+
             $path = "nodes.{$nodeId}";
             $this->validateRegisteredNodeType($node, $path, $errors);
             $this->validateRequiredConfig($node, $path, $errors);

@@ -693,6 +693,31 @@ final class ValidateFlowServiceTest extends TestCase
         $this->assertContains('loop_missing_loop_end', $codes);
     }
 
+    public function test_comment_annotation_node_is_exempt_from_validation(): void
+    {
+        $service = $this->makeServiceWithSendMessage();
+
+        // A comment node has no handler; it must not be flagged as an unknown type.
+        $result = $service->execute(
+            nodes: [
+                'note_1' => [
+                    'id'      => 'note_1',
+                    'type'    => 'comment',
+                    'version' => 1,
+                    'config'  => ['text' => 'Remember to localize this branch'],
+                ],
+                'sm_1' => [
+                    'id'      => 'sm_1',
+                    'type'    => 'send_message',
+                    'version' => 1,
+                    'config'  => ['content_type' => 'text'],
+                ],
+            ],
+        );
+
+        $this->assertTrue($result->valid, 'Comment nodes must not produce validation errors.');
+    }
+
     private function makeServiceWithLoop(): ValidateFlowService
     {
         $registry = new NodeHandlerRegistry();

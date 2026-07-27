@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace App\Domains\Contact\Enums;
 
 /**
- * Contact attribute a segment condition filters on. Scoped to indexed,
- * first-class contact data in V1 — tag membership, content language, and
- * platform. Group / attribute-json conditions arrive with those features.
+ * Contact attribute a segment condition filters on: tag membership, content
+ * language, platform, or a flow-collected value in the `attributes` json
+ * (dot-path key). Group conditions arrive with the contact-groups feature.
  */
 enum SegmentConditionType: string
 {
-    case Tag      = 'tag';
-    case Language = 'language';
-    case Platform = 'platform';
+    case Tag       = 'tag';
+    case Language  = 'language';
+    case Platform  = 'platform';
+    case Attribute = 'attribute';
 }

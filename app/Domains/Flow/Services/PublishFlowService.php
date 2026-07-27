@@ -15,6 +15,7 @@ use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\VariableSchemaEntry;
+use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableType;
 use App\Domains\Flow\Subflow\CallGraphRepository;
@@ -46,6 +47,10 @@ final readonly class PublishFlowService
 
             $nodes = is_array($draft->nodes) ? $draft->nodes : [];
             $edges = is_array($draft->edges) ? $draft->edges : [];
+
+            // Strip builder-only annotation nodes (comment) and any edges touching
+            // them — they never reach the published definition or the engine.
+            [$nodes, $edges] = $this->stripAnnotationNodes($nodes, $edges);
 
             // Denormalize iterator_name from each Loop node into its paired
             // LoopEnd nodes so handlers stay graph-unaware at runtime.
@@ -357,6 +362,45 @@ final readonly class PublishFlowService
         unset($node);
 
         return $nodes;
+    }
+
+    /**
+     * Remove annotation nodes (comment) and every edge that references one, so
+     * the published definition contains only executable graph.
+     *
+     * @param  array<int, mixed>  $nodes
+     * @param  array<int, mixed>  $edges
+     * @return array{0: array<int, mixed>, 1: array<int, mixed>}
+     */
+    private function stripAnnotationNodes(array $nodes, array $edges): array
+    {
+        $annotationIds = [];
+
+        foreach ($nodes as $node) {
+            if (is_array($node) && AnnotationNodeTypes::isAnnotation($node['type'] ?? null)) {
+                $id = is_string($node['id'] ?? null) ? $node['id'] : null;
+                if (null !== $id) {
+                    $annotationIds[$id] = true;
+                }
+            }
+        }
+
+        if ([] === $annotationIds) {
+            return [$nodes, $edges];
+        }
+
+        $nodes = array_values(array_filter(
+            $nodes,
+            static fn ($node): bool => ! (is_array($node) && AnnotationNodeTypes::isAnnotation($node['type'] ?? null)),
+        ));
+
+        $edges = array_values(array_filter(
+            $edges,
+            static fn ($edge): bool => ! (is_array($edge)
+                && (isset($annotationIds[$edge['from'] ?? null]) || isset($annotationIds[$edge['to'] ?? null]))),
+        ));
+
+        return [$nodes, $edges];
     }
 
     /**
