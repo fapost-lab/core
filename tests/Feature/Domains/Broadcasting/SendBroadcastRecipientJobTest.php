@@ -1,0 +1,135 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Domains\Broadcasting;
+
+use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Broadcasting\Enums\BroadcastStatus;
+use App\Domains\Broadcasting\Enums\RecipientStatus;
+use App\Domains\Broadcasting\Jobs\SendBroadcastRecipientJob;
+use App\Domains\Broadcasting\Models\Broadcast;
+use App\Domains\Broadcasting\Models\BroadcastRecipient;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Models\Channel;
+use App\Domains\Contact\Models\Contact;
+use FAPost\Foundation\Messaging\DeliveryResult;
+use FAPost\Foundation\Messaging\MessageSenderInterface;
+use FAPost\Foundation\Messaging\OutboundMessage;
+use Tests\Feature\FeatureTestCase;
+
+final class SendBroadcastRecipientJobTest extends FeatureTestCase
+{
+    private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
+    public function test_delivers_records_outcome_and_completes_the_broadcast(): void
+    {
+        $this->fakeSender(new DeliveryResult(sent: true, providerMessageId: 'pmid-1'));
+
+        [$broadcast, $recipient] = $this->scenario();
+
+        $this->send($recipient);
+
+        $recipient->refresh();
+        $broadcast->refresh();
+        $this->assertSame(RecipientStatus::Sent, $recipient->status);
+        $this->assertSame('pmid-1', $recipient->provider_message_id);
+        $this->assertSame(1, $broadcast->sent_count);
+        $this->assertSame(BroadcastStatus::Completed, $broadcast->status, 'Last recipient must complete the broadcast.');
+    }
+
+    public function test_is_idempotent_when_recipient_already_processed(): void
+    {
+        $this->fakeSender(new DeliveryResult(sent: true, providerMessageId: 'pmid-1'));
+
+        [$broadcast, $recipient] = $this->scenario();
+
+        $this->send($recipient);
+        $this->send($recipient); // retry
+
+        $this->assertSame(1, $broadcast->fresh()->sent_count, 'A processed recipient must not be re-sent or re-counted.');
+    }
+
+    public function test_failed_delivery_is_recorded_as_failed(): void
+    {
+        $this->fakeSender(new DeliveryResult(sent: false, error: 'boom'));
+
+        [$broadcast, $recipient] = $this->scenario();
+
+        $this->send($recipient);
+
+        $recipient->refresh();
+        $this->assertSame(RecipientStatus::Failed, $recipient->status);
+        $this->assertSame('boom', $recipient->error);
+        $this->assertSame(1, $broadcast->fresh()->failed_count);
+    }
+
+    public function test_skips_recipient_when_broadcast_is_cancelled(): void
+    {
+        $this->fakeSender(new DeliveryResult(sent: true, providerMessageId: 'pmid-1'));
+
+        [$broadcast, $recipient] = $this->scenario();
+        $broadcast->update(['status' => BroadcastStatus::Cancelled->value]);
+
+        $this->send($recipient);
+
+        $this->assertSame(RecipientStatus::Skipped, $recipient->fresh()->status);
+        $this->assertSame(1, $broadcast->fresh()->skipped_count);
+    }
+
+    private function send(BroadcastRecipient $recipient): void
+    {
+        $job = new SendBroadcastRecipientJob(self::TENANT_ID, (string) $recipient->getKey());
+        app()->call([$job, 'handle']);
+    }
+
+    private function fakeSender(DeliveryResult $result): void
+    {
+        $this->app->bind(MessageSenderInterface::class, static fn (): MessageSenderInterface => new class ($result) implements MessageSenderInterface {
+            public function __construct(private readonly DeliveryResult $result)
+            {
+            }
+
+            public function send(OutboundMessage $message): DeliveryResult
+            {
+                return $this->result;
+            }
+        });
+    }
+
+    /**
+     * @return array{0: Broadcast, 1: BroadcastRecipient}
+     */
+    private function scenario(): array
+    {
+        $assistant = Assistant::factory()->create(['tenant_id' => self::TENANT_ID, 'default_language' => 'en']);
+        $channel   = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $assistant->getKey(),
+            'tenant_id'    => self::TENANT_ID,
+            'type'         => ChannelTypeEnum::Telegram,
+            'token'        => 'bot-token',
+            'is_active'    => true,
+        ]));
+        $contact = Contact::factory()->forTenant(self::TENANT_ID)->create(['external_id' => 'chat-1']);
+
+        $broadcast = Broadcast::query()->create([
+            'tenant_id'        => self::TENANT_ID,
+            'assistant_id'     => $assistant->getKey(),
+            'name'             => 'Promo',
+            'message'          => 'Hello!',
+            'target_type'      => 'all',
+            'status'           => BroadcastStatus::Running->value,
+            'total_recipients' => 1,
+        ]);
+
+        $recipient = BroadcastRecipient::query()->create([
+            'tenant_id'    => self::TENANT_ID,
+            'broadcast_id' => $broadcast->getKey(),
+            'contact_id'   => $contact->getKey(),
+            'channel_id'   => $channel->getKey(),
+            'status'       => RecipientStatus::Pending->value,
+        ]);
+
+        return [$broadcast, $recipient];
+    }
+}

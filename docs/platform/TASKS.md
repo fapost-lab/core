@@ -195,11 +195,15 @@
 
 ## 📢 Broadcasting (Feature)
 
-- [ ] `broadcasts` / `broadcast_recipients` модели + статусы (draft → running → completed)
-- [x] Filament UI: TenantSettings таб Broadcasts
-- [-] `BroadcastSendJob` → `messaging.broadcast` очередь (низкоуровневый fan-out job есть; per-recipient bookkeeping нет)
-- [ ] Backpressure: проверка длины `transactional` очереди перед отправкой
-- [ ] Rate limiting per `(bot_id, chat_id)` превентивно
+- [x] `broadcasts` / `broadcast_recipients` модели + статусы (draft → running → completed/failed/cancelled) — новый домен `Broadcasting`
+- [x] `RunBroadcastJob` (fan-out: резолв аудитории → materialize recipients → per-recipient send) + `SendBroadcastRecipientJob` (доставка + bookkeeping + counters + completion) на `messaging.broadcast`; `BroadcastDispatcher` (атомарный Draft→Running); `BroadcastRecipientResolver` (реюз notify-таргетинга All/Tags)
+- [x] Per-recipient bookkeeping: `broadcast_recipients` (pending→sent/failed/skipped, provider_message_id), денормализованные счётчики на `broadcasts`; идемпотентно по статусу получателя; outbound логируется в транскрипт (origin=broadcast)
+- [x] Backpressure: `RunBroadcastJob` откладывает запуск при переполнении `messaging.broadcast` (настройка `broadcast_backpressure`); rate-shaping fan-out по `broadcast_chunk_size` в секунду
+- [x] Rate limiting per `(channel, chat)` — переиспользуется превентивный лимит `MessageSender`
+- [x] Filament UI: полноценный **дашборд рассылок** (assistant-панель) — composer (name/message/audience All|Tags), lifecycle-таблица со статус-бейджами и прогрессом, confirmable **Send** + **Cancel**, edit/delete только в Draft; lang en/ru/uk
+- [x] Filament UI: TenantSettings таб Broadcasts (настройки chunk_size / backpressure — теперь реально читаются)
+- [ ] Мультиязычный контент рассылки (сейчас plain text; per-locale — follow-up)
+- [ ] Таргетинг по группам/сегментам (ждёт `contact_segments`)
 
 ---
 

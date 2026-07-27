@@ -42,7 +42,7 @@ FAPost Core - ядро платформы для диалоговых ассис
 
 ```text
 app/
-  Domains/          Technical bounded contexts: Tenancy, Flow, Messaging, Contact, Assistant, Channels, Media, Conversation, Staff.
+  Domains/          Technical bounded contexts: Tenancy, Flow, Messaging, Contact, Assistant, Channels, Media, Conversation, Broadcasting, Staff.
   Filament/         Admin UI.
   Http/             Controllers, middleware, builder endpoints.
   Jobs/             Cross-domain orchestration jobs.
