@@ -189,7 +189,41 @@
 
 > **Вне скоупа (отдельная фаза после запуска продукта):** delivery-status (read-receipts). Provider-agnostic плумбинг
 > `updateDeliveryStatus` → `UpdateConversationDeliveryStatusJob` → `store.updateStatus` уже есть и покрыт тестами, но
-> «спит»: Telegram не даёт статусов доставки, а WhatsApp-канал вынесен в отдельную пост-запусковую фазу целиком.
+> «спит»: Telegram не даёт статусов доставки, а других каналов в планах сейчас нет (M9 удалён).
+
+---
+
+## 💬 Inbox / Live Chat (M8, релизный трек)
+
+Детальная разбивка с точками врезки — [[ROADMAP]] § Milestone 8. Заложено в M3 и ждёт использования:
+case'ы `MessageSenderType::Staff` / `MessageOrigin::Staff`, колонки `conversations.owner_type`,
+`conversations.owner_staff_user_id`, `conversation_messages.sender_staff_user_id` (объявлены, нигде не используются).
+
+### Безопасность (закрыть до выкладки)
+- [ ] 🔒 Права на диалоги в `Permission` enum — сейчас их нет вовсе, а `ConversationResource` пускает любого
+  аутентифицированного пользователя (`shouldRegisterNavigation()` проверяет только `instanceof User`)
+- [ ] `ConversationPolicy` + точечная регистрация в сервис-провайдере
+- [ ] Раздача новых прав в `RoleEnum::permissions()`; не забыть `Permission::group()` — `match` без `default`
+
+### Takeover
+- [ ] Владелец треда через `owner_type` (`bot`/`staff`) + `owner_staff_user_id`, без нового case в `ConversationStatus`
+- [ ] Врезка в `MessageRouter` шаг 4 (строки 130-145) — сейчас решение принимается только по `FlowSession`
+- [ ] Возврат треда боту + действия «Взять / Вернуть» в UI
+
+### Ответ оператора
+- [ ] Reply input в `ViewConversation` → `MessageSender::send()`
+- [ ] Проброс `senderType`/`senderStaffUserId` — `ConversationCaptureFactory::forOutbound():95` хардкодит `Assistant`
+
+### Unread и назначение
+- [ ] `markRead` — метода нет ни в `ConversationStoreInterface`, ни где-либо ещё; `unread_count` только растёт
+- [ ] Badge непрочитанных
+- [ ] Решить scope оператора: `User::getTenants()` игнорирует пивот `user_assistants`
+
+### Качество треда
+- [ ] Пагинация в `ViewConversation::messages()` — сейчас весь тред одним запросом
+- [ ] Медиа в транскрипте через `MediaService::signedUrl()` (механизм готов, к blade не подключён)
+- [ ] `FallbackMessageService` не пишет в транскрипт — нет `contact_id`/`assistant_id` в metadata
+- [ ] Polling в inbox-ленте (прецеденты: `FlowLogsTable` 60s, `FlowSessionsTable` 30s). Real-time стек — вне релиза
 
 ---
 
@@ -202,13 +236,20 @@
 - [x] Rate limiting per `(channel, chat)` — переиспользуется превентивный лимит `MessageSender`
 - [x] Filament UI: полноценный **дашборд рассылок** (assistant-панель) — composer (name/message/audience All|Tags), lifecycle-таблица со статус-бейджами и прогрессом, confirmable **Send** + **Cancel**, edit/delete только в Draft; lang en/ru/uk
 - [x] Filament UI: TenantSettings таб Broadcasts (настройки chunk_size / backpressure — теперь реально читаются)
-- [ ] Мультиязычный контент рассылки (сейчас plain text; per-locale — follow-up)
-- [ ] Таргетинг по группам/сегментам (ждёт `contact_segments`)
+- [ ] **Мультиязычный контент рассылки** (релизный трек M4). Доставка уже готова — `SendBroadcastRecipientJob:87`
+  зовёт `resolveField()`. Осталось: миграция `broadcasts.message` text → jsonb (прецедент
+  `2026_05_08_000002_localize_assistant_messages.php`), cast `'message' => 'array'`, замена `Textarea` на
+  `LocalizedTextarea::tabs()` в `BroadcastFormSchema:37-42`, нормализация по образцу `AssistantSettings::cleanLocalized()`,
+  валидация непустого текста на базовом языке, lang-ключи вкладок
+- [ ] Таргетинг по группам контактов — ждёт `contact_groups` (см. Contact Domain). Может быть вынесен за релиз
 
 ---
 
-## 🤖 RAG (Feature)
+## 🧊 RAG (Feature) — бэклог, после M12
 
+Перенесён в бэклог: runtime-часть в коде, но нода нерабочая до выбора провайдера. См. [[ROADMAP]] § Бэклог.
+
+- [ ] Решение по провайдеру эмбеддингов / хранилищу векторов (блокер)
 - [ ] `knowledge_bases` table + миграция
 - [x] `RagAdapterRegistry`
 - [x] `RagQueryNodeHandler` — [[specs/flow-engine/nodes/09-rag-query]]
@@ -222,7 +263,8 @@
 
 - [x] `Contact` модель: `id`, `channel`, `language` (canonical), `meta`, `attributes`
 - [x] `contact_tags` + `ContactTagRepository` (set_tag нода)
-- [x] `contact_groups` + `contact_group_members`
+- [ ] `contact_groups` + `contact_group_members` — **в коде отсутствуют** (ни миграции, ни модели). Ранее строка
+  стояла как выполненная — ложный статус, исправлен по факту. Из-за этого заблокированы условия сегмента по группам.
 - [x] `ContactResource` Filament (group sections, «Manage tags» action)
 - [x] `contact_segments` (rules JSON `{match, conditions[]}`, `cached_count`/`cached_count_at`) — модель + миграция
 - [x] `ContactSegmentResolver` — компилирует rules в tenant-scoped Contact-запрос (условия: tag has/not_has, language/platform in/eq; all/any); `resolveContactIds` / `count` / `refreshCount`
@@ -233,12 +275,63 @@
 
 ---
 
+## 🔌 MCP Server (M12)
+
+Дорожная карта и архитектурные решения: [[ROADMAP]] § Milestone 12.
+
+Ничего из блока пока не реализовано — в коде нет ни домена `Mcp`, ни token-инфраструктуры (Sanctum не установлен).
+
+### Фаза 1 — Фундамент
+- [ ] ADR: MCP surface (transport, домен, auth-модель, scopes, аудит)
+- [ ] Решение по зависимости `laravel/mcp` (требует согласования — правило «не добавлять зависимости»)
+- [ ] Домен `Domains/Mcp` + service provider + route-группа `/mcp` (Streamable HTTP)
+- [ ] `mcp_tokens`: миграция + модель + issue/revoke + hashing
+- [ ] Middleware `mcp.auth` + `mcp.tenant` (резолв tenant по токену, fail fast без context)
+- [ ] `McpToolInterface` (foundation) + `McpToolRegistry` (Core)
+- [ ] `mcp_audit_log` + rate limit per token
+- [ ] Тестовый харнес для tool'ов + phpat-правило (tool не ходит в landlord / Filament)
+
+### Фаза 2 — Read-инструменты
+- [ ] `assistants.list` / `assistants.get`
+- [ ] `flows.list` / `flows.get` / `flows.validate` (через `ValidateFlowService`)
+- [ ] `contacts.search` / `contacts.get`
+- [ ] `segments.list` / `segments.preview` (через `ContactSegmentResolver`)
+- [ ] `conversations.search` / `conversations.transcript`
+- [ ] `broadcasts.list` / `broadcasts.stats`
+- [ ] `flow_sessions.inspect` / `flow_logs.tail`
+
+### Фаза 3 — Write-инструменты (за scope'ами)
+- [ ] `contacts.set_tag` / `contacts.update_attributes`
+- [ ] `segments.create` / `segments.update` + recount
+- [ ] `broadcasts.create_draft`; отправка — только со scope `broadcast:send`
+- [ ] `flows.publish` через `PublishFlowService` (scope `flow:publish`)
+- [ ] `messages.send` в существующий диалог (`origin=mcp`, пишется в транскрипт)
+- [ ] Идемпотентность + audit на каждом write
+
+### Фаза 4 — Resources и Prompts
+- [ ] Resources: `flow://{id}/definition`, `conversation://{id}/transcript`, `schema://variables`, `docs://node/{type}`
+- [ ] Resource templates + пагинация
+- [ ] Prompts: разбор застрявшей сессии, сегмент по описанию, черновик flow
+- [ ] Медиа в ответах: blob vs signed URL
+
+### Фаза 5 — Расширяемость и UI
+- [ ] Регистрация tool'ов из Solutions/Plugins (E2E: Solution ставится → tool доступен)
+- [ ] Filament: MCP Tokens resource + просмотр audit log
+- [ ] Генерация client-конфига для подключения агента
+- [ ] `developers/` HTML: как написать MCP tool в Solution
+
+> **Вне скоупа:** MCP *client* (вызов внешних MCP-серверов из flow — нода `mcp_call` / транспорт для `call`).
+> Отдельное направление, зависит от AI-слоя и RAG.
+
+---
+
 ## 🔧 Infrastructure / Tech Debt
 
 - [x] phpat enforcement (`composer run test:arch`; rules exist under `tests/Architecture` and run via PHPStan)
 - [ ] `flow_active_node_stats` — статистика активных нод для safe handler removal — [[specs/flow-engine/node-usage-statistics]]
 - [x] End-to-end integration тесты: subflow lifecycle — success/failed (были) + **cancelled** (добавлен, `SubflowLifecycleTest`); timeout покрыт `SubflowTimeoutSweeperTest` (нет отдельного `timeout`-статуса — таймаут = child `failed` + parent `failed`/`expired`)
-- [-] Concurrency hardening тесты: **optimistic-lock retry** (`FlowOrchestratorRetryTest` — retry-succeeds / exhaust-rethrow) + **engine_lock_timeout** drop-outcome (`MessageRouterTest`) добавлены; distributed lock покрыт unit-тестами (`FlowExecutionGuardTest`, `SessionLockManagerTest`, `LockAcquisitionPolicyTest`). Не покрыто: real-Redis integration (моки), **heartbeat** (`LockHeartbeat` dead-wired — нет каллеров/шедулера; live keep-alive — это typing-heartbeat, не lock)
+- [-] Concurrency hardening тесты: **optimistic-lock retry** (`FlowOrchestratorRetryTest`) + **engine_lock_timeout** drop-outcome (`MessageRouterTest`) добавлены; distributed lock покрыт unit-тестами (`FlowExecutionGuardTest`, `SessionLockManagerTest`, `LockAcquisitionPolicyTest`). Не покрыто: real-Redis integration (везде моки; инфраструктуры под такой suite в `phpunit.xml` нет), **heartbeat** (теста нет вовсе)
+- [ ] **Консолидация блокировок (релизный трек M2).** В коде две несвязанные реализации: пакет `Domains/Flow/Concurrency/` (`SessionLockManager`/`LockHeartbeat`/`LockAcquisitionPolicy`/`LockScope`/`LockHandle`) — умеет `extend()`, но **не используется в production-коде вообще**; реальные локи держат `MessageRouter` (`Cache::lock`, ключ с `platform:externalUserId`) и `FlowExecutionGuard` (`LockProvider`, ключ с `contactId`) — оба без продления TTL. Детальный список подзадач — [[ROADMAP]] § Milestone 2
 - [x] `/reset` migration под `BuiltinCommandsRegistry` с force unlock (D-3)
 - [x] Routing pipeline 6 шагов end-to-end с typing indicator (D-1+D-2)
 

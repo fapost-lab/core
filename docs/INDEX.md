@@ -34,6 +34,8 @@ HTML docs for future implementation work on top of the platform:
 - [developers/features.html](./developers/features.html) — built-in platform features.
 - [developers/solutions.html](./developers/solutions.html) — composer-based Solutions.
 - [developers/plugins.html](./developers/plugins.html) — runtime Plugins.
+- [developers/package-development.html](./developers/package-development.html) — developing shared packages locally and
+  adding a new Solution/Plugin package.
 - [developers/flow-nodes.html](./developers/flow-nodes.html) — adding or extending Flow nodes.
 - [developers/builder-extensions.html](./developers/builder-extensions.html) — Builder UI and frontend extension boundary.
 - [developers/testing.html](./developers/testing.html) — required checks for extension work.

@@ -7,7 +7,18 @@
 
 ## О проекте
 
-**FAPost** (Flow Automation Post) — платформа для создания диалоговых ассистентов в Telegram и WhatsApp. Целевая аудитория: средний и крупный бизнес, которому нужна автоматизация коммуникаций без найма разработчиков.
+**FAPost** (Flow Automation Post) — платформа для создания диалоговых ассистентов в мессенджерах: Telegram, Viber,
+WhatsApp, Facebook Messenger, Slack, Microsoft Teams и далее по спросу. Целевая аудитория: средний и крупный бизнес,
+которому нужна автоматизация коммуникаций без найма разработчиков.
+
+Канал — сменная деталь, а не встроенное допущение: flow, контакты, транскрипты и рассылки не знают про конкретный
+мессенджер. Адаптер реализует `ChannelAdapterInterface` (нормализация webhook + отправка), отправитель —
+`ChannelInterface` в foundation; `IncomingMessage::$platform` и `OutboundMessage::$channelType` заложены в DTO.
+Новый мессенджер — это новый адаптер, а не переработка ядра.
+
+> **Что реализовано сегодня:** только Telegram Bot API. `WhatsAppAdapter` существует как заглушка — все методы
+> бросают `LogicException`, `PlatformEnum` содержит `whatsapp` и `email`. Остальные каналы — заявленное направление
+> продукта, не обещание к сроку: отдельного milestone под них в [[ROADMAP]] нет, адаптеры делаются под спрос.
 
 **Два режима поставки:**
 - **SaaS** — облако, подписка, многоарендная модель, биллинг, план-управление
@@ -30,7 +41,7 @@
 | Webhook ingress | Laravel Octane 2 (только `/webhooks/*`) |
 | База данных | PostgreSQL (schema per tenant) |
 | Кэш / очереди / locks | Redis |
-| Мессенджеры | Telegram Bot API, WhatsApp HTTP |
+| Мессенджеры | Telegram Bot API (реализован); Viber / WhatsApp / Messenger / Slack / Teams — через `ChannelInterface` |
 
 ---
 
@@ -200,16 +211,18 @@ active / waiting_input → error (uncaught exception)
 | # | Milestone | Статус | Когда |
 |---|-----------|--------|-------|
 | M1 | Platform Core | ✅ | Закрыт (июнь 2026) |
-| M2 | Runtime Hardening | 🔄 | Текущий |
-| M3 | Conversation Logging | ⏳ | После M2 |
-| M4 | Broadcasting & Segments | 📋 | Параллельно M3 |
-| M5 | RAG Feature | 📋 | После M2 |
-| M6 | emit_event + Event Chains | 📋 | После M2 |
-| M7 | Solutions Framework | 📋 | После M6 |
-| M8 | Inbox / Live Chat | 📋 | После M3 |
-| M9 | Multi-channel (WhatsApp) | 📋 | По приоритету |
+| M2 | Runtime Hardening | 🔄 | Текущий; открыт только heartbeat |
+| M3 | Conversation Logging | ✅ | Закрыт; reader-порт отложен до ClickHouse |
+| M4 | Broadcasting & Segments | 🔄 | Ядро закрыто; i18n рассылок и группы — открыты |
+| M5 | RAG Feature | 🧊 | Бэклог, после M12 |
+| M6 | emit_event + Event Chains | ✅ | Закрыт |
+| M7 | Solutions Framework | 📋 | После M8 |
+| M8 | Inbox / Live Chat | 🔄 | Read-only viewer есть; оператор — предстоит |
 | M10 | SaaS Shell | 🔮 | Отдельный репо |
 | M11 | Plugin Marketplace | 🔮 | После M7 |
+| M12 | MCP Server | 📋 | После релизного трека M2 → M4 → M8 |
+
+> Релизный трек до передачи в тестирование: **M2 → M4 → M8**. M9 (Multi-channel / WhatsApp) удалён из планов.
 
 **Фазы из исходного Notion-плана:**
 

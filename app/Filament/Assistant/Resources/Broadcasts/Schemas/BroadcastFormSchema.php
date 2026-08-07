@@ -4,14 +4,20 @@ declare(strict_types=1);
 
 namespace App\Filament\Assistant\Resources\Broadcasts\Schemas;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Broadcasting\Enums\BroadcastTarget;
+use App\Domains\Broadcasting\Models\Broadcast;
+use App\Domains\Broadcasting\Services\BroadcastRecipientResolver;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
 use App\Domains\Contact\Models\ContactSegment;
+use Filament\Facades\Filament;
+use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
+use Throwable;
 
 /**
  * Broadcast composer form: a name, the message body, and the audience selector.
@@ -50,6 +56,7 @@ final class BroadcastFormSchema
                 ->label(__('broadcast.fields.tags'))
                 ->multiple()
                 ->searchable()
+                ->live()
                 ->required(fn (Get $get): bool => BroadcastTarget::Tags->value === $get('target_type'))
                 ->visible(fn (Get $get): bool => BroadcastTarget::Tags->value === $get('target_type'))
                 ->options(static fn (): array => self::tagOptions()),
@@ -57,13 +64,47 @@ final class BroadcastFormSchema
             Select::make('target_segment_id')
                 ->label(__('broadcast.fields.segment'))
                 ->searchable()
+                ->live()
                 ->required(fn (Get $get): bool => BroadcastTarget::Segment->value === $get('target_type'))
                 ->visible(fn (Get $get): bool => BroadcastTarget::Segment->value === $get('target_type'))
                 ->options(static fn (): array => ContactSegment::query()
                     ->orderBy('name')
                     ->pluck('name', 'id')
                     ->all()),
+
+            // Actual reach = the chosen audience intersected with THIS assistant's
+            // deliverable contacts — not the segment's tenant-wide size. Segments
+            // are tenant-level; a broadcast only reaches its own bot's audience.
+            Placeholder::make('reach')
+                ->label(__('broadcast.fields.reach'))
+                ->content(static fn (Get $get): string => self::reachLabel($get)),
         ]);
+    }
+
+    private static function reachLabel(Get $get): string
+    {
+        $tenant = Filament::getTenant();
+
+        if (! $tenant instanceof Assistant) {
+            return '—';
+        }
+
+        $broadcast = new Broadcast();
+        $broadcast->forceFill([
+            'tenant_id'         => (string) $tenant->tenant_id,
+            'assistant_id'      => (string) $tenant->getKey(),
+            'target_type'       => $get('target_type') ?? BroadcastTarget::All->value,
+            'target_tags'       => $get('target_tags'),
+            'target_segment_id' => $get('target_segment_id'),
+        ]);
+
+        try {
+            $count = app(BroadcastRecipientResolver::class)->resolve($broadcast)->count();
+        } catch (Throwable) {
+            return '—';
+        }
+
+        return trans_choice('broadcast.reach_count', $count, ['count' => $count]);
     }
 
     /**

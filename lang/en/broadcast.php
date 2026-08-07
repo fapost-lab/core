@@ -13,6 +13,7 @@ return [
         'target'       => 'Audience',
         'tags'         => 'Tags',
         'segment'      => 'Segment',
+        'reach'        => 'Reach',
         'status'       => 'Status',
         'progress'     => 'Sent',
         'failed'       => 'Failed',
@@ -39,6 +40,8 @@ return [
         'send_confirm_body'  => 'The message will be delivered to every reachable recipient in the selected audience. This cannot be undone.',
         'cancel'             => 'Cancel',
     ],
+
+    'reach_count' => '{0} No reachable contacts|{1} :count contact will receive|[2,*] :count contacts will receive',
 
     'notifications' => [
         'started'         => 'Broadcast started.',

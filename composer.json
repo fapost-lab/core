@@ -20,8 +20,8 @@
     "ext-pdo": "*",
     "ext-pdo_pgsql": "*",
     "craft-forge/filament-language-switcher": "^1.2",
-    "fapost/foundation": "*",
-    "fapost/support": "*",
+    "fapost/foundation": "^0.1",
+    "fapost/support": "^0.1",
     "filament/filament": "^5.0",
     "giggsey/libphonenumber-for-php": "^9.0",
     "inertiajs/inertia-laravel": "*",
@@ -67,16 +67,17 @@
   },
   "repositories": [
     {
-      "type": "path",
-      "url": "packages/fapost-foundation"
+      "type": "vcs",
+      "url": "git@github.com:fapost-lab/foundation.git"
     },
     {
-      "type": "path",
-      "url": "packages/fapost-support"
+      "type": "vcs",
+      "url": "git@github.com:fapost-lab/support.git"
     }
   ],
   "scripts": {
     "hooks:install": "@php tools/git-hooks/install.php",
+    "dev:link": "@php tools/dev-link-packages.php",
     "ngrok": "tools/ngrok-http",
     "setup": [
       "composer install",
@@ -103,10 +104,12 @@
       "@php artisan filament:upgrade"
     ],
     "post-install-cmd": [
-      "@hooks:install"
+      "@hooks:install",
+      "@dev:link"
     ],
     "post-update-cmd": [
       "@hooks:install",
+      "@dev:link",
       "@php artisan vendor:publish --tag=laravel-assets --ansi --force",
       "@php artisan boost:update --ansi",
       "@php artisan ide-helper:generate --ansi",
