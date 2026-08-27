@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Architecture;
 
-use FAPost\Foundation\Contracts\NodeHandlerInterface;
+use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use PHPat\Selector\Selector;
 use PHPat\Test\Builder\Rule;
 use PHPat\Test\PHPat;

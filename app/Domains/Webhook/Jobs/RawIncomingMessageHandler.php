@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Webhook\Jobs;
 
-use FAPost\Foundation\DTO\InboundWebhookPayload;
+use Fapost\Foundation\DTO\InboundWebhookPayload;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Queue\Job;
 use ValueError;

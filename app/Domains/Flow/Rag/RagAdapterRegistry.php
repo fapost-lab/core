@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Rag;
 
-use FAPost\Foundation\Contracts\RagAdapterInterface;
+use Fapost\Foundation\Contracts\RagAdapterInterface;
 use LogicException;
 
 /**
@@ -50,7 +50,7 @@ final class RagAdapterRegistry
 
     public function get(string $provider): RagAdapterInterface
     {
-        if ( ! isset($this->adapters[$provider])) {
+        if (! isset($this->adapters[$provider])) {
             throw new LogicException("RAG adapter '{$provider}' is not registered.");
         }
 

@@ -6,8 +6,8 @@ namespace App\Domains\Contact\Models;
 
 use App\Domains\Contact\Enums\PlatformEnum;
 use Database\Factories\ContactFactory;
-use FAPost\Support\Concerns\HasUlidPrimaryKey;
-use FAPost\Support\Models\BaseModel;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
+use Fapost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;

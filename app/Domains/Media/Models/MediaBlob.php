@@ -6,9 +6,9 @@ namespace App\Domains\Media\Models;
 
 use App\Domains\Media\Storage\TenantMediaDisk;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
-use FAPost\Foundation\Media\MediaBlobReadInterface;
-use FAPost\Support\Concerns\HasUlidPrimaryKey;
-use FAPost\Support\Models\BaseModel;
+use Fapost\Foundation\Media\MediaBlobReadInterface;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
+use Fapost\Support\Models\BaseModel;
 use GuzzleHttp\Psr7\Utils;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Psr\Http\Message\StreamInterface;

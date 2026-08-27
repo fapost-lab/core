@@ -16,7 +16,7 @@ namespace App\Domains\Messaging\Typing;
  * Bound as {@code scoped} in the container — one instance per request /
  * queue job, never leaks across worker invocations.
  *
- * Octane note: the registry holds plain object refs; lifecycle is bounded
+ * Worker safety: the registry holds plain object refs; lifecycle is bounded
  * by the request scope and {@see clear()} is idempotent. The router calls
  * {@code clear()} in a finally block, the engine never mutates the slot.
  */

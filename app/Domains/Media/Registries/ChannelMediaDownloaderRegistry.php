@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Media\Registries;
 
 use App\Domains\Media\Exceptions\ChannelMediaUploaderNotRegisteredException;
-use FAPost\Foundation\Media\ChannelMediaDownloaderInterface;
+use Fapost\Foundation\Media\ChannelMediaDownloaderInterface;
 
 /**
  * Resolves channel-specific media downloaders by channel type.
@@ -35,7 +35,7 @@ final class ChannelMediaDownloaderRegistry
 
     public function forChannelType(string $channelType): ChannelMediaDownloaderInterface
     {
-        if ( ! isset($this->downloaders[$channelType])) {
+        if (! isset($this->downloaders[$channelType])) {
             throw ChannelMediaUploaderNotRegisteredException::downloaderForType($channelType);
         }
 

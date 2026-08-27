@@ -13,7 +13,7 @@ use App\Domains\Media\Models\MediaChannelRef;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Registries\ChannelMediaUploaderRegistry;
 use Carbon\CarbonImmutable;
-use FAPost\Foundation\Media\DTO\UploadContext;
+use Fapost\Foundation\Media\DTO\UploadContext;
 
 /**
  * Resolves provider-side file ids for sending media through a channel.

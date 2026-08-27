@@ -3,7 +3,50 @@ title: "Choosing an extension type"
 description: "A decision guide for where your code belongs."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+Work through these in order. The first one that matches is your answer.
+
+<Steps>
+  <Step title="Does the capability belong to the platform itself?">
+    If every installation should have it, and it should be released and versioned
+    with Core, it is a **Feature** — it lives in the Core repository.
+
+    If it exists to serve one industry, one customer, or one workflow, it does not
+    belong in Core. Continue.
+  </Step>
+
+  <Step title="Does it bring its own domain — tables, models, screens?">
+    A package with its own persistent data and its own admin surface is a
+    **Solution**. HR is the canonical example: employees, departments, and the
+    screens that manage them.
+
+    If it has no domain of its own and only reacts to what Core already does,
+    continue.
+  </Step>
+
+  <Step title="Does it register runtime behaviour?">
+    Node handlers, message transports, artisan commands, routes, schedules — these
+    are a **Plugin**. A Plugin extends what Core can do without adding a product
+    module of its own.
+  </Step>
+</Steps>
+
+## When two answers seem right
+
+A Solution may contain Plugin-shaped code: an HR Solution will almost certainly
+register node handlers and a data accessor. That is expected. The question is not
+"which kind of code is this" but "what is the unit I ship". If you ship a product
+module, it is a Solution, and its handlers travel with it.
+
+## Where contracts go
+
+Once you know what you are building, the placement rule for shared code follows:
+
+| The code is… | It belongs in |
+|---|---|
+| A contract external packages build against | `fapost/foundation` |
+| A reusable primitive with no Core dependency | `fapost/support` |
+| Used by one domain and carrying its meaning | Core, inside that domain |
+
+Neither `foundation` nor `support` may reference `App\…`. If a contract you need
+does not exist in `foundation` yet, that is a Core change — propose it rather than
+reaching into internals.

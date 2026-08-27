@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Conversation\Enums;
 
-use FAPost\Foundation\DTO\IncomingMessageType;
+use Fapost\Foundation\DTO\IncomingMessageType;
 
 /**
  * Canonical content-type vocabulary for the transcript, normalizing the various

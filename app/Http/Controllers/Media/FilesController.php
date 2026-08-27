@@ -16,7 +16,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Media\UpdateFileRequest;
 use App\Http\Requests\Media\UploadFileRequest;
 use App\Http\Resources\Media\MediaFileResource;
-use FAPost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Media\Enums\MediaKind;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;

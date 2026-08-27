@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Media;
 
-use FAPost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Media\Enums\MediaKind;
 use PHPUnit\Framework\TestCase;
 
 final class MediaKindTest extends TestCase

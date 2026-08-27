@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Channels\Telegram;
 
 use App\Domains\Channels\Telegram\TelegramInboundNormalizer;
-use FAPost\Foundation\DTO\IncomingMessageType;
-use FAPost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\DTO\IncomingMessageType;
+use Fapost\Foundation\Media\Enums\MediaKind;
 use Tests\TestCase;
 
 final class TelegramInboundNormalizerMediaTest extends TestCase

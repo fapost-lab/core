@@ -1,13 +1,13 @@
 # Architecture Vision
 
-## Role of FAPost Core
+## Role of FaPost Core
 
-FAPost Core is the runtime and domain platform for conversational automation. Core must not contain SaaS logic, billing,
+FaPost Core is the runtime and domain platform for conversational automation. Core must not contain SaaS logic, billing,
 onboarding, or other control plane concerns.
 
 Expected ecosystem:
 
-- `FAPost Core` as the shared execution kernel
+- `FaPost Core` as the shared execution kernel
 - separate solution repositories (`HR`, `Niche`, and others)
 - a separate SaaS repository on top of core
 

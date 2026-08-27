@@ -7,8 +7,8 @@ namespace App\Domains\Channels\Telegram;
 use App\Domains\Channels\Telegram\Contracts\TelegramBotIdentityStoreInterface;
 use App\Domains\Channels\Telegram\Dto\SetWebhookDto;
 use App\Domains\Webhook\Services\WebhookUrlGenerator;
-use FAPost\Foundation\Channel\WebhookRegistrarInterface;
-use FAPost\Foundation\Channel\WebhookRegistrationPayload;
+use Fapost\Foundation\Channel\WebhookRegistrarInterface;
+use Fapost\Foundation\Channel\WebhookRegistrationPayload;
 
 /**
  * Registers Telegram provider-side webhooks for configured assistant channels.

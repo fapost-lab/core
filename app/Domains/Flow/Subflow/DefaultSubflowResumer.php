@@ -11,7 +11,7 @@ use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\Models\FlowSession;
 use Closure;
-use FAPost\Foundation\Flow\History\HistoryEventType;
+use Fapost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Support\Facades\Log;
 
 /**

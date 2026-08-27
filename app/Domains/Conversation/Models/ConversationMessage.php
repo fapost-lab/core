@@ -9,8 +9,8 @@ use App\Domains\Conversation\Enums\MessageContentType;
 use App\Domains\Conversation\Enums\MessageDirection;
 use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Conversation\Enums\MessageSenderType;
-use FAPost\Support\Concerns\HasUlidPrimaryKey;
-use FAPost\Support\Models\BaseModel;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
+use Fapost\Support\Models\BaseModel;
 use Illuminate\Support\Carbon;
 
 /**

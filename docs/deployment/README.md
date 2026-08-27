@@ -1,6 +1,6 @@
 # Deployment
 
-How to run FAPost Core on your own infrastructure.
+How to run FaPost Core on your own infrastructure.
 
 These documents are the source of truth for deployment. Every step is written so
 it can be followed by hand; the scripts under `deploy/` automate exactly what is

@@ -2,7 +2,7 @@
 
 **Версия документа:** v1.3 (после brownfield reconciliation, Май 2026)
 **Статус реализации:** см. [`../../../platform/TASKS.md`](../../../platform/TASKS.md)
-**Контекст:** FAPost Phase 2 — Flow Engine
+**Контекст:** FaPost Phase 2 — Flow Engine
 **Источник snapshot:** `./_snapshot-v1.0.md` (v1.0)
 
 > Документ разбит на отдельные файлы по логическим единицам реализации. Все 4 ADR приняты. Brownfield audit + synthesis закрыли расхождения между ADR и фактической кодовой базой. Плановые документы живут в `../../../platform/plans/flow-engine/`.

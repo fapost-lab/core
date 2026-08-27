@@ -1,5 +1,5 @@
 #!/bin/bash
-# Database initialisation for FAPost Core.
+# Database initialisation for FaPost Core.
 #
 # A shell script rather than plain SQL because the database and user names come
 # from the environment, and psql does not receive them as variables on its own.

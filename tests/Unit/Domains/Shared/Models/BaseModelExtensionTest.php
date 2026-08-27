@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Shared\Models;
 
 use App\Domains\Shared\Infrastructure\ModelAttributeRegistry;
-use FAPost\Support\Models\BaseModel;
+use Fapost\Support\Models\BaseModel;
 use Tests\TestCase;
 
 final class BaseModelExtensionTest extends TestCase

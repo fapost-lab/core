@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Media\Storage;
 
 use DateTimeInterface;
-use FAPost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Media\Enums\MediaKind;
 use Illuminate\Support\Str;
 
 /**

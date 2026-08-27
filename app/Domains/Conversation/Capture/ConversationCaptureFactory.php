@@ -12,10 +12,10 @@ use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Conversation\Enums\MessageSenderType;
 use Carbon\CarbonImmutable;
 use DateTimeImmutable;
-use FAPost\Foundation\DTO\IncomingMedia;
-use FAPost\Foundation\DTO\IncomingMessage;
-use FAPost\Foundation\Messaging\DeliveryResult;
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\DTO\IncomingMedia;
+use Fapost\Foundation\DTO\IncomingMessage;
+use Fapost\Foundation\Messaging\DeliveryResult;
+use Fapost\Foundation\Messaging\OutboundMessage;
 
 /**
  * Builds normalized {@see MessageLogEntry} envelopes from raw pipeline inputs so

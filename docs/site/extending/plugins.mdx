@@ -3,7 +3,87 @@ title: "Building a Plugin"
 description: "Extensions installed and enabled at runtime."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+A Plugin adds **platform capability** — a new channel adapter, a new RAG provider.
+That is what separates it from a [Solution](/extending/solutions), which adds
+domain logic such as HR or recruitment.
+
+## The service provider
+
+A Plugin is a Composer package whose service provider extends
+`Fapost\Foundation\Lifecycle\AbstractPluginServiceProvider`:
+
+```php
+final class ViberPluginServiceProvider extends AbstractPluginServiceProvider
+{
+    public function getId(): string
+    {
+        return 'viber';
+    }
+
+    public function getVersion(): string
+    {
+        return '1.0.0';
+    }
+
+    public function getManifest(): SolutionManifest
+    {
+        return SolutionManifest::make(
+            id: $this->getId(),
+            version: $this->getVersion(),
+            requiresPlatform: '>=1.0.0 <2.0.0',
+            requiresCapabilities: ['messaging.channel_adapter'],
+        );
+    }
+
+    protected function registerExtensions(CoreRegistrarInterface $registrar): void
+    {
+        $registrar->registerNodeHandler(ViberNodeHandler::class);
+    }
+}
+```
+
+`onActivate()` and `onDeactivate()` are available to hook enabling and disabling;
+both are no-ops unless you override them.
+
+## The manifest
+
+`SolutionManifest` is what makes a Plugin checkable at boot rather than at the
+moment it breaks. `requiresPlatform` is a version constraint on Core;
+`requiresCapabilities` names the platform capabilities the Plugin needs to be
+present. Core validates the manifest during boot and through the platform update
+lifecycle.
+
+## What you may register
+
+Everything goes through `CoreRegistrarInterface`. This is the single registration
+entry point.
+
+| Method | Registers |
+|---|---|
+| `registerNodeHandler(string $handlerClass)` | A node handler for the flow engine |
+| `registerDataAccessor(string $namespace, string $accessorClass)` | A read accessor for condition nodes, under `module.<namespace>.*` |
+| `registerRagAdapter(string $provider, string $adapterClass)` | A retrieval provider, for example `pgvector` |
+| `registerManifest(SolutionManifest $manifest)` | The manifest, for boot-time validation |
+| `registerRoutes(Closure $routes)` | Routes, for the platform to mount |
+| `registerSchedule(Closure $schedule)` | Scheduled callbacks |
+| `registerMigrations(string $path)` | A migrations directory |
+
+<Warning>
+  An extension declares intent through the registrar. It must not call `Route`,
+  `Schedule`, or the migrator directly — the platform decides when and how those
+  are mounted.
+</Warning>
+
+## Rules
+
+**Depend on public contracts, not Core internals.** Everything a Plugin needs is
+in `fapost/foundation`. A `use App\…` statement in a Plugin will break on a Core
+refactor, and nothing in the stability promise covers it.
+
+**Do not inject Vue components into the running builder.** The builder front end
+is compiled before your Plugin is enabled. Make a node configurable by describing
+it with a configuration schema — see [Builder UI extensions](/extending/builder-ui).
+
+**Follow migration isolation.** A Plugin migration is a DDL operation like any
+other: no `app()`, no `config()`, no tenant-aware services, no reads of another
+module's tables. See [Migration isolation](/contributing/migration-isolation).

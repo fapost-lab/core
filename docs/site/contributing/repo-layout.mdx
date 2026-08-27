@@ -3,7 +3,76 @@ title: "Repository layout"
 description: "Where code lives and which boundaries it must respect."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+```text
+app/
+  Domains/          Technical bounded contexts
+  Filament/         Admin UI
+  Http/             Controllers, middleware, builder endpoints
+  Jobs/             Cross-domain orchestration jobs
+  Providers/        Service providers
+
+database/migrations/
+  landlord/         Platform schema
+  tenant/           Tenant schema
+
+packages/
+  fapost-foundation Public contracts and DTOs for Core, Solutions, and Plugins
+  fapost-support    Shared primitives
+
+resources/js/builder/
+                    The Vue flow builder
+```
+
+## Domains
+
+Each domain is a bounded context, not a layer:
+
+`Assistant` · `Broadcasting` · `Channels` · `Contact` · `Conversation` · `Flow` ·
+`Media` · `Messaging` · `Presale` · `Shared` · `Staff` · `Tenancy` · `Webhook`
+
+Inside one:
+
+```text
+Domains/{Domain}/
+  Models/        Eloquent models, when the domain needs persistence
+  Contracts/     Domain interfaces and stable integration points
+  Services/      Business logic
+  Jobs/          Asynchronous orchestration within the domain
+  Http/          Controllers and requests, without business logic
+  Exceptions/
+```
+
+<Warning>
+  Do not create new base folders — `app/Features`, `app/Solutions`,
+  `app/Plugins` — unless an architecture decision explicitly introduces them.
+  Solutions and Plugins are external packages by design; see the
+  [extension model](/extending/extension-model).
+</Warning>
+
+## Boundaries that are enforced
+
+**Domains do not reach into the landlord database.** A domain that needs
+platform-level data takes a contract from `Tenancy/Contracts`. Direct
+`DB::connection('landlord')` stays inside Tenancy infrastructure. The reasoning is
+in [Tenant-aware execution](/contributing/tenant-aware-execution).
+
+**`foundation` and `support` do not depend on Core.** No `use App\…`, no
+references to concrete Core classes. See
+[Dependency direction](/contributing/dependency-direction).
+
+**Migrations do not depend on runtime state.** See
+[Migration isolation](/contributing/migration-isolation).
+
+All three are checked by PHPat rules rather than by reviewers remembering them.
+
+## Where a piece of code belongs
+
+| It is… | It goes in |
+|---|---|
+| A contract external packages build against | `packages/fapost-foundation` |
+| A reusable primitive with no Core dependency | `packages/fapost-support` |
+| Used by one domain and carrying its meaning | That domain in Core |
+| Orchestration across several domains | `app/Jobs` |
+
+Business logic lives in services and domain classes. Controllers and jobs
+orchestrate; they do not decide.

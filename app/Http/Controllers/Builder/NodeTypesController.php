@@ -7,7 +7,7 @@ namespace App\Http\Controllers\Builder;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Http\Controllers\Controller;
-use FAPost\Foundation\Contracts\NodeHandlerInterface;
+use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Illuminate\Http\JsonResponse;
 
 final class NodeTypesController extends Controller

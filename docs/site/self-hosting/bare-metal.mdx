@@ -3,7 +3,219 @@ title: "Bare metal"
 description: "Installing directly onto a host without containers."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+Running FaPost Core directly on a host, without containers.
+
+> **Status: partly automated.**
+>
+> `deploy/install.sh` checks the host, installs dependencies and hands over to
+> the installer; both it and `php artisan install` have been exercised. What has
+> *not* been verified is the distribution-specific part — the package names and
+> repository setup in step 1 vary by distribution and were not confirmed on each.
+> Treat that step as a guide, and the rest as tested.
+
+## The short version
+
+```bash
+git clone https://github.com/fapost-lab/core.git /var/www/fapost
+cd /var/www/fapost
+./deploy/install.sh
+```
+
+The script verifies the runtime, installs Composer and npm dependencies, creates
+`.env`, and hands over to `php artisan install`, which asks for connection
+details and verifies each one before writing it.
+
+To see whether a host is ready without changing anything:
+
+```bash
+./deploy/install.sh --check-only
+```
+
+The rest of this document is what the script does, step by step, for when you
+would rather do it yourself or something needs fixing in the middle.
+
+## When to choose this
+
+You already run PHP applications and have package management, process
+supervision and TLS handled; or containers are not an option in your
+environment.
+
+If neither applies, the container path is less work and has fewer ways to go
+subtly wrong.
+
+## The hard part: PHP 8.4
+
+`composer.json` requires `^8.4`, and no mainstream distribution ships it yet —
+Debian 12 has 8.2, Ubuntu 24.04 has 8.3. You will be adding a third-party
+repository:
+
+- Debian / Ubuntu — [deb.sury.org](https://deb.sury.org/)
+- RHEL / Rocky / Alma — [Remi](https://rpms.remirepo.net/)
+
+This is a real decision, not a formality: it changes where your system gets PHP
+packages from, for the lifetime of the host. If that is unacceptable in your
+environment, use containers.
+
+## 1. Install the runtime
+
+Beyond PHP itself you need the extensions listed in
+[Requirements](/self-hosting/requirements). Two are easy to miss and fail silently:
+
+- **`pcntl` and `posix`** — Horizon cannot supervise workers without them. The
+  site keeps serving while no queued job ever runs, so nothing appears broken
+  until someone notices messages go unanswered.
+
+Verify before going further:
+
+```bash
+php -v    # must be 8.4+
+for ext in pdo_pgsql redis intl bcmath gd zip pcntl posix; do
+    php -m | grep -qx "$ext" && echo "ok   $ext" || echo "MISSING $ext"
+done
+```
+
+Also install PostgreSQL 15+, Redis 6+, Composer 2, Node.js 20+ (build only) and a
+web server.
+
+## 2. Prepare the database
+
+The application creates a PostgreSQL schema per tenant **at runtime**, so its
+user needs `CREATE` on the database — a grant managed-database defaults usually
+omit:
+
+```sql
+CREATE DATABASE fapost;
+CREATE USER fapost WITH PASSWORD '...';
+GRANT ALL PRIVILEGES ON DATABASE fapost TO fapost;
+GRANT CREATE ON DATABASE fapost TO fapost;
+```
+
+Without it the installation succeeds and then fails when the first tenant is
+provisioned, with a permission error that points nowhere useful.
+
+## 3. Deploy the code
+
+```bash
+sudo mkdir -p /var/www/fapost && cd /var/www/fapost
+git clone https://github.com/fapost-lab/core.git .
+
+composer install --no-dev --optimize-autoloader
+npm ci && npm run build
+
+cp .env.example .env
+php artisan key:generate
+```
+
+`npm run build` compiles the Vue flow builder. It needs `vendor/` to already
+exist — the Filament theme imports CSS from there — so keep this order.
+
+Ownership: the web server user needs write access to `storage/` and
+`bootstrap/cache/`, and nothing else.
+
+```bash
+sudo chown -R www-data:www-data storage bootstrap/cache
+sudo find . -path ./storage -prune -o -exec chown root:root {} +
+```
+
+## 4. Configure
+
+Edit `.env`:
+
+```dotenv
+APP_ENV=production
+APP_DEBUG=false
+APP_URL=https://fapost.example.com
+
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_DATABASE=fapost
+DB_USERNAME=fapost
+DB_PASSWORD=...
+
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=...
+REDIS_PREFIX=fapost:
+
+QUEUE_CONNECTION=redis
+```
+
+## 5. Install the application
+
+```bash
+php artisan migrate --database=landlord --path=database/migrations/landlord --force
+php artisan platform:install
+```
+
+`platform:install` asks for the first tenant slug, administrator email and
+password, then provisions the tenant schema and its ACL.
+
+## 6. Start the services
+
+This is the step that distinguishes a working installation from one that merely
+loads. See [Services](/self-hosting/services) for the unit files and the reasoning:
+
+```bash
+sudo systemctl enable --now fapost-horizon
+sudo systemctl enable --now fapost-scheduler.timer
+```
+
+Without Horizon nothing is processed. Without the scheduler nothing scheduled
+ever fires.
+
+## 7. Web server
+
+Point the document root at `public/` and pass `.php` to PHP-FPM. The nginx server
+block in [`docker/nginx/default.conf`](https://github.com/fapost-lab/core/blob/main/docker/nginx/default.conf) is a
+working reference — adjust `fastcgi_pass` to your socket.
+
+Terminate TLS here or in front. Whatever does it **must forward request bodies
+unmodified**: webhook signatures are computed over the exact bytes the provider
+sent.
+
+## 8. Verify
+
+```bash
+php artisan about
+php artisan horizon:status
+systemctl status fapost-scheduler.timer
+curl -I https://fapost.example.com/
+```
+
+## Upgrading
+
+```bash
+cd /var/www/fapost
+git pull
+composer install --no-dev --optimize-autoloader
+npm ci && npm run build
+
+php artisan migrate --database=landlord --path=database/migrations/landlord --force
+php artisan ops:tenants-migrate
+
+php artisan horizon:terminate      # workers pick up the new code on restart
+sudo systemctl reload php8.4-fpm
+```
+
+See [Upgrading and rollback](/self-hosting/upgrading) for the ordering constraints and rollback.
+
+## What the script does and does not do
+
+`deploy/install.sh` deliberately stops at the project boundary. It does **not**
+install system packages, add repositories, configure a web server or write
+anything under `/etc` — those decisions belong to whoever owns the host, so the
+script reports what is missing and how to get it, then exits.
+
+Everything past dependency installation is `php artisan install`, where answers
+can be validated, connections probed and the whole thing covered by tests. The
+same wizard runs inside a container, so both deployment methods configure the
+application identically.
+
+Still planned: release tarballs with `vendor/` and compiled assets included,
+which would remove Composer and Node from the host entirely.
+
+## Related
+
+- [Deployment overview](/self-hosting/overview)
+- [Requirements](/self-hosting/requirements)
+- [Long-running services](/self-hosting/services)
+- [Docker Compose](/self-hosting/docker-compose) — less work if containers are an option

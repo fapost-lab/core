@@ -10,8 +10,8 @@ use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
 use App\Domains\Flow\Exceptions\StateNamespaceViolationException;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\State\SystemStateNamespacePolicy;
-use FAPost\Foundation\DTO\NodeExecutionResult;
-use FAPost\Foundation\DTO\NodeExecutionStatus;
+use Fapost\Foundation\DTO\NodeExecutionResult;
+use Fapost\Foundation\DTO\NodeExecutionStatus;
 
 /**
  * Persists session state and column updates. Navigation position is authoritative on

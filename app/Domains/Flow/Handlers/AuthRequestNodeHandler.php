@@ -10,14 +10,14 @@ use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\OperandResolver;
 use App\Domains\Flow\Handlers\Support\OperatorComparator;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
-use FAPost\Foundation\DTO\NodeExecutionContext;
-use FAPost\Foundation\DTO\NodeExecutionResult;
-use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
-use FAPost\Support\Builder\Schema\Fields\SelectField;
-use FAPost\Support\Builder\Schema\Fields\StatePickerField;
-use FAPost\Support\Builder\Schema\Fields\TextField;
-use FAPost\Support\Builder\Schema\Schema;
-use FAPost\Support\Builder\Schema\Section;
+use Fapost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\DTO\NodeExecutionResult;
+use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use Fapost\Support\Builder\Schema\Fields\SelectField;
+use Fapost\Support\Builder\Schema\Fields\StatePickerField;
+use Fapost\Support\Builder\Schema\Fields\TextField;
+use Fapost\Support\Builder\Schema\Schema;
+use Fapost\Support\Builder\Schema\Section;
 
 /**
  * `auth_request` node — marks the contact authenticated inside a flow.

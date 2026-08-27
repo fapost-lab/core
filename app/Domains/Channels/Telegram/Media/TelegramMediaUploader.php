@@ -6,12 +6,12 @@ namespace App\Domains\Channels\Telegram\Media;
 
 use App\Domains\Channels\Telegram\TelegramBotApiClientFactory;
 use App\Domains\Media\Exceptions\MediaUploadFailedException;
-use FAPost\Foundation\Channel\ChannelInterface;
-use FAPost\Foundation\Media\ChannelMediaUploaderInterface;
-use FAPost\Foundation\Media\DTO\UploadContext;
-use FAPost\Foundation\Media\DTO\UploadResult;
-use FAPost\Foundation\Media\Enums\MediaKind;
-use FAPost\Foundation\Media\MediaBlobReadInterface;
+use Fapost\Foundation\Channel\ChannelInterface;
+use Fapost\Foundation\Media\ChannelMediaUploaderInterface;
+use Fapost\Foundation\Media\DTO\UploadContext;
+use Fapost\Foundation\Media\DTO\UploadResult;
+use Fapost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Media\MediaBlobReadInterface;
 
 /**
  * Telegram-side media uploader using the upload-as-send pattern.

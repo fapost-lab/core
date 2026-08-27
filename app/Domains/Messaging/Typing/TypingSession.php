@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Messaging\Typing;
 
-use FAPost\Foundation\Messaging\ProcessingIndicatorHandle;
-use FAPost\Foundation\Messaging\TypingCapableProviderInterface;
+use Fapost\Foundation\Messaging\ProcessingIndicatorHandle;
+use Fapost\Foundation\Messaging\TypingCapableProviderInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Throwable;

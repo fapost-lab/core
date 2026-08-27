@@ -3,7 +3,66 @@ title: "Data accessors"
 description: "Exposing your data to flows through the module namespace."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+A data accessor lets a flow read your module's data without ever copying it into
+session state. The flow asks for `module.hr.department`; the engine resolves it
+through the accessor registered under the namespace `hr`.
+
+## The contract
+
+```php
+interface DataAccessorInterface
+{
+    /** Namespace of this accessor, e.g. "hr". Maps to module.{namespace}.* */
+    public function namespace(): string;
+
+    /** @return mixed scalar or null; must not return objects */
+    public function get(string $key, string $contactId, string $tenantId): mixed;
+
+    /** @return string[] Supported keys, used to validate a flow on save */
+    public function supportedKeys(): array;
+}
+```
+
+Register it from your service provider:
+
+```php
+protected function registerExtensions(CoreRegistrarInterface $registrar): void
+{
+    $registrar->registerDataAccessor('hr', HrDataAccessor::class);
+}
+```
+
+## Why this exists
+
+<Warning>
+  A condition node must never read module tables directly.
+</Warning>
+
+If HR data were read straight from its tables by the flow engine, the engine would
+have to know the module's schema — and every schema change would become a flow
+engine change. If it were copied into session state instead, every running session
+would carry a snapshot that was correct when the session started and wrong an hour
+later.
+
+Resolving through an accessor avoids both. The module stays the single source of
+truth, the engine stays ignorant of its tables, and the flow always sees current
+data.
+
+## Implementation notes
+
+**Return scalars or null.** The accessor sits on a boundary that has to serialise;
+returning an object pushes your internal shape into the engine.
+
+**`supportedKeys()` is validation, not documentation.** It is used when a flow is
+saved, so a flow referencing a key you do not support fails at authoring time
+rather than mid-conversation. Keep it accurate.
+
+**`get()` is called during execution.** It is on the hot path for any flow that
+branches on your data. Keep it cheap, and remember it receives the contact and
+tenant it is being asked about — it must not read anything outside that tenant.
+
+**The accessor belongs to the module, not to Core.** Core provides the registry;
+you provide the answer.
+
+See also [State namespaces](/extending/flow-nodes/state-namespaces) for how
+`module.*` differs from the namespaces a handler may write.

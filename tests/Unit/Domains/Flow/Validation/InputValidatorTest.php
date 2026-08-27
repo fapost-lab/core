@@ -7,8 +7,8 @@ namespace Tests\Unit\Domains\Flow\Validation;
 use App\Domains\Flow\Enums\InputExpectedType;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use App\Domains\Flow\Validation\InputValidator;
-use FAPost\Foundation\DTO\IncomingMessage;
-use FAPost\Foundation\DTO\IncomingMessageType;
+use Fapost\Foundation\DTO\IncomingMessage;
+use Fapost\Foundation\DTO\IncomingMessageType;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 

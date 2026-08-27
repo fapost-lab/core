@@ -8,8 +8,8 @@ use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Handlers\Support\OperandResolver;
 use App\Domains\Flow\State\Variables\Variable;
-use FAPost\Foundation\Contracts\DataAccessorInterface;
-use FAPost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\Contracts\DataAccessorInterface;
+use Fapost\Foundation\DTO\NodeExecutionContext;
 use LogicException;
 use Tests\TestCase;
 

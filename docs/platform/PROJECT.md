@@ -1,4 +1,4 @@
-# FAPost Core — Проект
+# FaPost Core — Проект
 
 > Единый живой документ: продукт · архитектура · слои · дорожная карта.
 > Детальные спеки и диаграммы — по ссылкам. Навигация — [[INDEX]].
@@ -7,7 +7,7 @@
 
 ## О проекте
 
-**FAPost** (Flow Automation Post) — платформа для создания диалоговых ассистентов в мессенджерах: Telegram, Viber,
+**FaPost** (Flow Automation Post) — платформа для создания диалоговых ассистентов в мессенджерах: Telegram, Viber,
 WhatsApp, Facebook Messenger, Slack, Microsoft Teams и далее по спросу. Целевая аудитория: средний и крупный бизнес,
 которому нужна автоматизация коммуникаций без найма разработчиков.
 
@@ -24,9 +24,9 @@ WhatsApp, Facebook Messenger, Slack, Microsoft Teams и далее по спро
 - **SaaS** — облако, подписка, многоарендная модель, биллинг, план-управление
 - **Self-hosted** — on-premise, один tenant, клиент управляет сам
 
-**Первый нишевый модуль:** FAPost HR — онбординг, 360° оценки, опросы.
+**Первый нишевый модуль:** FaPost HR — онбординг, 360° оценки, опросы.
 
-**Архитектура репозиториев:** FAPost Core (этот репо) · FAPost HR / FAPost {Niche} (отдельные репо, Solutions) · FAPost SaaS (отдельный репо, оболочка).
+**Архитектура репозиториев:** FaPost Core (этот репо) · FaPost HR / FaPost {Niche} (отдельные репо, Solutions) · FaPost SaaS (отдельный репо, оболочка).
 
 ---
 
@@ -51,12 +51,12 @@ WhatsApp, Facebook Messenger, Slack, Microsoft Teams и далее по спро
 ┌─────────────────────────────────────────┐
 │           SaaS Shell (отдельный репо)    │  tenants, billing, plans, flags
 ├─────────────────────────────────────────┤
-│         FAPost Core (этот репо)          │  assistants, flow engine, messaging
+│         FaPost Core (этот репо)          │  assistants, flow engine, messaging
 │  ┌────────────┐  ┌──────────────────┐   │
 │  │  Domains   │  │    Features      │   │  RAG, AccessControl, Broadcasting
 │  └────────────┘  └──────────────────┘   │
 ├─────────────────────────────────────────┤
-│         Solutions / Plugins              │  FAPost HR, внешние расширения
+│         Solutions / Plugins              │  FaPost HR, внешние расширения
 │  ┌────────────────────────────────────┐ │
 │  │  fapost/foundation (contracts SDK) │ │
 │  │  fapost/support (shared primitives)│ │

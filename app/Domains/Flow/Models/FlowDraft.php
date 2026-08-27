@@ -6,8 +6,8 @@ namespace App\Domains\Flow\Models;
 
 use App\Domains\Assistant\Models\Assistant;
 use Database\Factories\FlowDraftFactory;
-use FAPost\Support\Concerns\HasUlidPrimaryKey;
-use FAPost\Support\Models\BaseModel;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
+use Fapost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasOne;

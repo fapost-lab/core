@@ -3,7 +3,55 @@ title: "Idempotency and retries"
 description: "Making a handler safe to run more than once."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+Node execution happens on queues. Queues retry. A handler will therefore be run
+again for work it has already done — after a timeout, a worker restart, or a
+transient provider failure — and it must be written so that the second run is
+harmless.
+
+<Warning>
+  Every handler must be safe to retry. This is not a quality goal; it is part of
+  the contract.
+</Warning>
+
+## State changes are usually fine
+
+Writing `flow.answer` twice with the same value costs nothing. Pure state
+transitions are naturally idempotent, and most handlers need no further thought.
+
+## External side effects are not
+
+The moment a handler sends a message, calls an API, charges something, or creates
+a record in another system, a retry becomes visible to someone. Those effects need
+an idempotency marker, or an equivalent guard, so that the second attempt
+recognises the first.
+
+The usual shapes:
+
+**A deterministic key.** Derive an identifier from facts that do not change
+between attempts — the session, the node, and the thing being acted on — and let
+the receiving system reject the duplicate. The webhook gateway does exactly this
+with keys such as `tg:{channel}:{body.update_id}`.
+
+**A recorded marker.** Write "this was done" as part of the same transaction as
+the effect, and check it on entry. This works when the effect is local.
+
+**A provider-supplied idempotency key.** Most payment and messaging APIs accept
+one. Use it rather than inventing a guard around a call that already supports it.
+
+## What not to rely on
+
+Do not rely on "this rarely happens". Retries are routine, not exceptional.
+
+Do not rely on checking whether the effect appears to have happened by reading
+back from the external system — between the read and the write, the first attempt
+may still be in flight.
+
+Do not use a timestamp or a random value in the key. A retry generates a new one,
+which is precisely the case the key exists to catch.
+
+## Waiting is not failing
+
+A handler that needs to pause returns `NodeExecutionResult::waiting()` or
+`::delayed()`. That is a normal outcome, not an error, and it does not re-run the
+work the handler already did. Reach for it instead of throwing when the flow
+simply is not ready to continue.

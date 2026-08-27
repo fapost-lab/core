@@ -6,8 +6,8 @@ namespace App\Domains\Webhook\Services;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
-use FAPost\Foundation\Channel\Ingress\IngressSpec;
-use FAPost\Foundation\Channel\Ingress\ProvidesIngressSpecInterface;
+use Fapost\Foundation\Channel\Ingress\IngressSpec;
+use Fapost\Foundation\Channel\Ingress\ProvidesIngressSpecInterface;
 
 /**
  * Single source of truth for which platforms can be verified declaratively.

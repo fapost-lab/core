@@ -6,7 +6,7 @@ namespace App\Domains\Conversation\Contracts;
 
 use App\Domains\Conversation\Exceptions\ConversationReplyUndeliverableException;
 use App\Domains\Conversation\Models\Conversation;
-use FAPost\Foundation\Messaging\DeliveryResult;
+use Fapost\Foundation\Messaging\DeliveryResult;
 
 /**
  * Sends a plain-text operator reply into an existing thread through the generic

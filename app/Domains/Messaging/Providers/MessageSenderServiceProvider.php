@@ -8,7 +8,7 @@ use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Conversation\Capture\ConversationCaptureFactory;
 use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Messaging\MessageSender;
-use FAPost\Foundation\Messaging\MessageSenderInterface;
+use Fapost\Foundation\Messaging\MessageSenderInterface;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -22,7 +22,8 @@ final class MessageSenderServiceProvider extends ServiceProvider
     public function register(): void
     {
         // Scoped (not singleton): the sender now depends on the scoped, tenant-aware
-        // conversation logger, so it must be rebuilt per scope to stay Octane-safe.
+        // conversation logger, so it must be rebuilt per scope rather than shared
+        // across jobs on a long-lived worker.
         $this->app->scoped(
             MessageSenderInterface::class,
             fn ($app): MessageSender => new MessageSender(

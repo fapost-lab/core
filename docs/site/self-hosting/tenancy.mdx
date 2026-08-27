@@ -3,7 +3,91 @@ title: "Tenancy operations"
 description: "Creating tenants and running landlord and tenant migrations."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+FaPost separates two database scopes, and almost every tenancy operation reduces to
+knowing which one you are acting on.
+
+| Scope | Holds | Migrations in |
+|---|---|---|
+| **Landlord** | Platform-level records, including the tenant list | `database/migrations/landlord` |
+| **Tenant** | Everything belonging to one tenant | `database/migrations/tenant` |
+
+Tenant migrations are not run once. They run **per tenant**, which is why adding a
+tenant and deploying a release both end in the same place.
+
+## Seeing what is pending
+
+```bash
+php artisan migrate:smart
+```
+
+Reports pending landlord migrations and pending migrations for the default local
+tenant, without running anything. Use it before a release to see what a deployment
+would apply.
+
+## Applying migrations
+
+Landlord migrations run through Laravel's own migrator. Tenant migrations run for
+every active tenant:
+
+```bash
+php artisan ops:tenants-migrate
+```
+
+<Warning>
+  A release that adds a tenant migration is not deployed until this has run. The
+  application will start, the landlord schema will be current, and the first
+  request into a tenant whose schema is behind will fail on a missing column.
+</Warning>
+
+Order matters: landlord first, then tenants. See
+[Upgrading and rollback](/self-hosting/upgrading) for how this fits into a release.
+
+## Permissions and roles
+
+```bash
+php artisan ops:tenants-seed-acl
+```
+
+Runs `TenantAclSeeder` — domain permissions and default roles — for selected active
+tenants. A new tenant needs this before anyone can be given meaningful access; an
+existing tenant needs it again when a release introduces new permissions.
+
+## Webhook routing per tenant
+
+Webhook routing resolves through Redis rather than the landlord database, so that
+inbound traffic never waits on platform storage. That makes the registry a cache
+with a source of truth behind it, and caches drift.
+
+```bash
+php artisan ops:webhook-registry-health
+```
+
+Checks Redis against the database, and can repair what it finds.
+
+```bash
+php artisan ops:webhook-warmup
+```
+
+Write-through warmup: pushes all active channels into the Redis registry, per
+tenant. This is what you run after a Redis flush, a restore, or a migration to new
+Redis infrastructure — without it, channels exist in the database and no inbound
+message resolves.
+
+## Moving ingress hosts
+
+`WEBHOOK_INGRESS_DRIVER` applies to newly registered channels only; the Laravel
+route stays live regardless. Channels registered before a change keep pointing
+where they did.
+
+```bash
+php artisan ops:ingress-migrate
+```
+
+Reports — or migrates — channels whose webhook still points at a previous ingress
+host. See [Webhook gateway](/self-hosting/gateway).
+
+## Scheduled tenant work
+
+Some maintenance is per-tenant and runs on the scheduler rather than by hand, such
+as creating next month's `flow_logs` partition. If the scheduler is not running,
+that work silently does not happen — see [Services](/self-hosting/services).

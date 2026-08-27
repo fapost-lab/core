@@ -6,8 +6,8 @@ namespace Tests\Feature\Domains\Flow\Logging;
 
 use App\Domains\Flow\Logging\DatabaseAnalyticsWriter;
 use DateTimeImmutable;
-use FAPost\Foundation\Analytics\DTO\AnalyticsEvent;
-use FAPost\Foundation\Analytics\Enums\AnalyticsEventType;
+use Fapost\Foundation\Analytics\DTO\AnalyticsEvent;
+use Fapost\Foundation\Analytics\Enums\AnalyticsEventType;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;

@@ -3,7 +3,53 @@ title: "Tenant-aware execution"
 description: "Why tenant context is required and how it is carried."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+Tenant is a base coordinate of the runtime. Core code that needs tenant context and
+does not have it must **fail fast** rather than continue.
+
+## Not allowed
+
+- SaaS-specific branching inside Core runtime
+- `if (isSaas())` and anything shaped like it
+- Falling back to a "default tenant" instead of an explicit context
+- Direct landlord lookups from domains outside `Tenancy`
+
+## Why no default tenant
+
+A fallback turns a missing-context bug into a data-leak bug. Without it, code that
+forgets to establish context throws immediately, in development, on the first run.
+With it, the same code silently reads and writes another tenant's rows, and the
+failure surfaces much later as data appearing where it should not.
+
+Failing fast is the cheaper failure.
+
+## Why no mode branching
+
+`if (isSaas())` means two runtimes sharing one codebase, where only one of them is
+exercised by any given test run. The branch that is not taken locally is the branch
+that breaks in production. Core has one runtime model: multi-tenant, context
+always present.
+
+## Reaching landlord data
+
+A domain that needs platform-level data takes a contract from
+`Tenancy/Contracts`. Direct `DB::connection('landlord')` stays inside Tenancy
+infrastructure.
+
+This keeps the number of places that know about the landlord connection small
+enough to audit, and it means a domain can be tested against a fake rather than a
+second live database.
+
+## Switching tenants
+
+Switch through `TenantSwitcher::runForTenant()`, and restore in a `finally`:
+
+```php
+$switcher->runForTenant($tenantId, function () {
+    // work in that tenant's context
+});
+```
+
+The restore is not optional bookkeeping — a Horizon worker survives the job, so a
+context left set becomes the next job's starting state. See
+[Long-lived worker safety](/contributing/worker-safety) for the rest of the
+constraints that follow from a long-lived process.

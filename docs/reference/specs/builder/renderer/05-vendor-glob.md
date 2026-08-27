@@ -2,13 +2,13 @@
 
 > **Статус: РЕАЛИЗОВАНО (2026-06-05).** Все четыре части закрыты.
 > - **A — `flow-picker`:** `FlowPickerField.vue` (поверх `SearchableSelect`, читает `builderStore.availableFlows`,
->   хранит `flow.id`, `exclude_current` default true) + `FAPost\Support\Builder\Schema\Fields\FlowPickerField`
+>   хранит `flow.id`, `exclude_current` default true) + `Fapost\Support\Builder\Schema\Fields\FlowPickerField`
 >   (`excludeCurrent(bool)`). Зарегистрирован в `SchemaFields.vue` `FIELD_COMPONENTS`. Документирован в reference §3.12 + §9.
 > - **B — `subflow` без override:** `SubflowNodeHandler::configSchema()` теперь `FlowPickerField` (flow_id) +
 >   `SelectField` с 6 ISO-пресетами (timeout, default `PT24H`), Outputs-инфо в `->help()`. `subflow` удалён из
 >   `OVERRIDES`, `SubflowConfig.vue` удалён. Сохранённые ноды читаются как есть (формат `flow_id`/`timeout` не менялся).
 > - **C — `end` без override (путь C2):** введён field-тип `enum-cards` — `EnumCardsField.vue` +
->   `FAPost\Support\Builder\Schema\Fields\EnumCardsField` (`options([{value,label,icon?,hint?,accent?}])`).
+>   `Fapost\Support\Builder\Schema\Fields\EnumCardsField` (`options([{value,label,icon?,hint?,accent?}])`).
 >   `EndNodeHandler` использует его (3 статуса, accent sage/amber/rose, default success). `end` снят с `OVERRIDES`,
 >   `EndConfig.vue` удалён. Цвет-кодинг canvas-карты (`FlowNodeCard`) не тронут. Reference §3.13 + §9.
 > - **D — vendor glob (ADR-06):** `utils/vendorComponents.ts` (eager `import.meta.glob`,

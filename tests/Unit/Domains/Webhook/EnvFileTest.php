@@ -38,7 +38,7 @@ final class EnvFileTest extends TestCase
     {
         $original = <<<'ENV'
             # Application
-            APP_NAME="FAPost Core"
+            APP_NAME="FaPost Core"
             APP_KEY=base64:secret
 
             # Database — do not touch
@@ -118,11 +118,11 @@ final class EnvFileTest extends TestCase
 
     public function test_it_reads_values_ignoring_quotes(): void
     {
-        $this->write("QUOTED=\"FAPost Core\"\nBARE=plain\nEMPTY=");
+        $this->write("QUOTED=\"FaPost Core\"\nBARE=plain\nEMPTY=");
 
         $file = $this->file();
 
-        $this->assertSame('FAPost Core', $file->get('QUOTED'));
+        $this->assertSame('FaPost Core', $file->get('QUOTED'));
         $this->assertSame('plain', $file->get('BARE'));
         $this->assertNull($file->get('EMPTY'));
         $this->assertNull($file->get('ABSENT'));

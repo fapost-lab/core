@@ -22,9 +22,9 @@ use App\Domains\Flow\Models\PersistentInlineButton;
 use App\Domains\Flow\Orchestration\FlowOrchestrator;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use App\Domains\Tenancy\Settings\TenantSettings;
-use FAPost\Foundation\DTO\IncomingMessage;
-use FAPost\Foundation\DTO\IncomingMessageType;
-use FAPost\Foundation\Flow\DTO\ResolvedTrigger;
+use Fapost\Foundation\DTO\IncomingMessage;
+use Fapost\Foundation\DTO\IncomingMessageType;
+use Fapost\Foundation\Flow\DTO\ResolvedTrigger;
 use Tests\TestCase;
 
 final class FlowOrchestratorTest extends TestCase

@@ -5,12 +5,12 @@ declare(strict_types=1);
 return [
 
     'meta' => [
-        'title'       => 'FAPOST — AI-Powered Communication Automation Platform',
+        'title'       => 'FaPost — AI-Powered Communication Automation Platform',
         'description' => 'Build intelligent bots, automate multichannel communication, and engage any audience — no code required.',
     ],
 
     'nav' => [
-        'logo'         => 'FAPOST',
+        'logo'         => 'FaPost',
         'cta'          => 'Get Early Access',
         'features'     => 'Platform',
         'cases'        => 'Solutions',
@@ -97,7 +97,7 @@ return [
 
     'cases' => [
         'title'    => 'Solutions for Every Industry',
-        'subtitle' => 'FAPOST adapts to your business. See how teams across industries automate communication.',
+        'subtitle' => 'FaPost adapts to your business. See how teams across industries automate communication.',
         'items'    => [
             [
                 'title'       => 'HR & People Ops',
@@ -198,7 +198,7 @@ return [
 
     'footer' => [
         'tagline'   => 'AI-powered communication automation for modern teams.',
-        'copyright' => '© :year FAPOST. All rights reserved.',
+        'copyright' => '© :year FaPost. All rights reserved.',
         'product'   => 'Product',
         'company'   => 'Company',
         'links'     => [

@@ -52,7 +52,7 @@ final readonly class GatewayArtifacts
 
         return <<<UNIT
             [Unit]
-            Description=FAPost webhook ingress gateway
+            Description=FaPost webhook ingress gateway
             Documentation=https://github.com/fapost/fapost-core
             After=network-online.target redis.service
             Wants=network-online.target

@@ -1,6 +1,6 @@
 # Deployment: Bare Metal
 
-Running FAPost Core directly on a host, without containers.
+Running FaPost Core directly on a host, without containers.
 
 > **Status: partly automated.**
 >

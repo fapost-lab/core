@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Call;
 
-use FAPost\Foundation\Flow\Call\CallTransportInterface;
+use Fapost\Foundation\Flow\Call\CallTransportInterface;
 use LogicException;
 
 /**

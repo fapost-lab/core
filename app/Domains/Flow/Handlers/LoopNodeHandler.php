@@ -9,10 +9,10 @@ use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\OperandResolver;
 use App\Domains\Flow\Handlers\Support\OperatorComparator;
-use FAPost\Foundation\DTO\NodeExecutionContext;
-use FAPost\Foundation\DTO\NodeExecutionResult;
-use FAPost\Foundation\DTO\NodeExecutionStatus;
-use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use Fapost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\DTO\NodeExecutionResult;
+use Fapost\Foundation\DTO\NodeExecutionStatus;
+use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use RuntimeException;
 
 /**

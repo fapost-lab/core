@@ -21,11 +21,11 @@ final class WebhookUrlGeneratorTest extends TestCase
 
     public function test_it_preserves_base_path_from_configured_base_url(): void
     {
-        config()->set('webhook.base_url', 'https://hooks.example.com/octane/');
+        config()->set('webhook.base_url', 'https://hooks.example.com/ingress/');
 
         $url = app(WebhookUrlGenerator::class)->forChannel('telegram', 'hash-123');
 
-        $this->assertSame('https://hooks.example.com/octane/webhook/telegram/hash-123', $url);
+        $this->assertSame('https://hooks.example.com/ingress/webhook/telegram/hash-123', $url);
     }
 
     public function test_it_requires_configured_webhook_base_url(): void

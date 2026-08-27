@@ -16,7 +16,7 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Filament\Resources\Media\MediaResource;
 use Database\Seeders\TenantAclSeeder;
-use FAPost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Media\Enums\MediaKind;
 use Filament\Facades\Filament;
 use Illuminate\Http\UploadedFile;
 use Tests\Feature\FeatureTestCase;

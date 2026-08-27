@@ -3,7 +3,56 @@ title: "Architecture decisions"
 description: "The decisions that constrain how Core is built."
 ---
 
+An ADR records a decision and the reasoning behind it, so that the constraint can
+be re-examined later on its merits rather than rediscovered as folklore.
+
+## Decisions with their own page
+
+These constrain code outside Core as much as inside it, so they are written out in
+full where the people they affect will look:
+
+<CardGroup cols={2}>
+  <Card title="ID strategy" href="/contributing/id-strategy">
+    ADR-03 — ULID primary keys stored as `uuid`.
+  </Card>
+  <Card title="Foundation contract package" href="/contributing/dependency-direction">
+    ADR-05 — the one-way dependency arrow.
+  </Card>
+  <Card title="Frontend extension boundary" href="/extending/builder-ui">
+    ADR-06 — Plugin versus Solution on the front end.
+  </Card>
+</CardGroup>
+
+## The full register
+
+| ADR | Decision |
+|---|---|
+| 01 | Octane: ingress-only — **superseded**, Octane removed from Core |
+| 02 | Assistant Panel as a separate operational console |
+| 03 | ID strategy: ULID as primary key, UUID for external integrations |
+| 05 | `fapost/foundation` as the public contract package for the extension boundary |
+| 06 | Frontend extension boundary: Plugin versus Solution |
+| 07 | Media domain and channel asset cache |
+| 08 | Expression language pluggability |
+| 09 | Message routing and concurrency control |
+| 10 | State writer semantics |
+| 11 | Subflow composition |
+| 15 | Multilingual |
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  The register is not contiguous — numbers absent from it belong to decisions that
+  were superseded and archived rather than published. An ADR that was replaced is
+  kept in the repository with its successor named, because the reasoning that was
+  overturned is part of why the current decision holds.
 </Note>
+
+## Writing one
+
+An ADR is worth writing when a choice will constrain future work and the reasoning
+would otherwise be lost — not for every technical decision. If the next person
+would reasonably ask "why is it done this way, and may I change it", the answer
+belongs in an ADR.
+
+Record what was decided, what it rules out, and what would have to change for the
+decision to be revisited. A decision without its alternatives is an instruction,
+not a record.

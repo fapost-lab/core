@@ -6,9 +6,9 @@ namespace App\Domains\Channels\WhatsApp;
 
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
-use FAPost\Foundation\DTO\IncomingMessage;
-use FAPost\Foundation\DTO\OutgoingMessage;
-use FAPost\Foundation\DTO\SendResult;
+use Fapost\Foundation\DTO\IncomingMessage;
+use Fapost\Foundation\DTO\OutgoingMessage;
+use Fapost\Foundation\DTO\SendResult;
 use Illuminate\Http\Request;
 use LogicException;
 

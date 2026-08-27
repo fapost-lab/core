@@ -3,7 +3,65 @@ title: "Artisan commands"
 description: "Commands Core adds, and what they do."
 ---
 
+Commands FaPost Core registers, beyond Laravel's own.
+
+## Installation
+
+| Command | Does |
+|---|---|
+| `install` | Configure and install FaPost Core step by step |
+| `platform:install` | Install the FaPost Core platform |
+| `gateway:install` | Configure the webhook ingress gateway and generate its deployment files |
+
+## Migrations and tenants
+
+| Command | Does |
+|---|---|
+| `migrate:smart` | Show pending landlord and default local tenant migrations **without running them** |
+| `ops:tenants-migrate` | Run `database/migrations/tenant` for all active tenants |
+| `ops:tenants-seed-acl` | Run `TenantAclSeeder` — domain permissions and default roles — for selected active tenants |
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  `migrate:smart` reports; it does not migrate. It exists so you can see what a
+  release would apply before applying it. See
+  [Upgrading and rollback](/self-hosting/upgrading).
 </Note>
+
+## Webhook routing
+
+| Command | Does |
+|---|---|
+| `ops:webhook-warmup` | Write-through warmup: push all active channels to the Redis webhook registry per tenant |
+| `ops:webhook-registry-health` | Check, and optionally repair, Redis-to-database consistency of the webhook routing registry |
+| `ops:ingress-specs-publish` | Publish declarative channel ingress specs to Redis for the external gateway |
+| `ops:ingress-migrate` | Report or migrate channels whose webhook still points at a previous ingress host |
+| `gateway:doctor` | Verify that the gateway and the application share the same Redis, specs, and routing |
+
+Webhook routing resolves through Redis rather than the landlord database, so the
+registry is a cache with a source of truth behind it. `ops:webhook-registry-health`
+is what tells you the two have diverged; `ops:webhook-warmup` is what rebuilds the
+cache after a flush.
+
+`gateway:doctor` is the first thing to run when the Go gateway is installed and
+webhooks are not arriving — see [Webhook gateway](/self-hosting/gateway).
+
+## Flow maintenance
+
+| Command | Does |
+|---|---|
+| `flow:sweep-subflow-timeouts` | Force-fail subflow children whose parent has expired, and resume the parent through its failed handle |
+
+## Log partitions
+
+| Command | Does |
+|---|---|
+| `logs:create-partition` | Create next month's `flow_logs` partition when missing |
+| `logs:prune-flow` | Drop `flow_logs` monthly partitions older than 30 days |
+
+`logs:prune-flow` accepts `--dry-run` to preview which partitions would be dropped.
+
+<Warning>
+  `logs:create-partition` is scheduled work. If the scheduler is not running,
+  the partition for next month is never created — see
+  [Services](/self-hosting/services).
+</Warning>

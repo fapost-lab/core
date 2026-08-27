@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Flow\Expression;
 
 use App\Domains\Flow\Expression\Engines\TemplateEngine;
-use FAPost\Foundation\Flow\Contracts\ExpressionSyntaxException;
-use FAPost\Foundation\Flow\Contracts\ScopedStateReaderInterface;
-use FAPost\Foundation\Flow\DTO\ExpressionContext;
+use Fapost\Foundation\Flow\Contracts\ExpressionSyntaxException;
+use Fapost\Foundation\Flow\Contracts\ScopedStateReaderInterface;
+use Fapost\Foundation\Flow\DTO\ExpressionContext;
 use Tests\TestCase;
 
 final class TemplateEngineTest extends TestCase

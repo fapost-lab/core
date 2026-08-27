@@ -1,4 +1,4 @@
-# FAPost Core — Documentation Index
+# FaPost Core — Documentation Index
 
 Documentation is organized by audience so platform development, extension developer docs, low-level reference, and
 historical material do not compete for the same entry point.
@@ -6,8 +6,8 @@ historical material do not compete for the same entry point.
 ## Start Here
 
 - [README.md](./README.md) — short documentation entry point.
-- [deployment/README.md](./deployment/README.md) — running FAPost Core on your own infrastructure.
-- [platform/README.md](./platform/README.md) — documentation for developing FAPost Core itself.
+- [deployment/README.md](./deployment/README.md) — running FaPost Core on your own infrastructure.
+- [platform/README.md](./platform/README.md) — documentation for developing FaPost Core itself.
 - [developers/index.html](./developers/index.html) — HTML developer portal for Features, Solutions, Plugins, nodes, and
   builder extensions.
 - [reference/README.md](./reference/README.md) — low-level specs, schemas, diagrams, and generated API docs.
@@ -16,7 +16,7 @@ historical material do not compete for the same entry point.
 
 ## Deployment
 
-Documents for people running FAPost Core rather than developing it. These are the
+Documents for people running FaPost Core rather than developing it. These are the
 source of truth for deployment: every step can be followed by hand, and the files
 under `docker/` and `deploy/` automate exactly what they describe.
 

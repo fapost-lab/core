@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services\Resolvers;
 
-use FAPost\Foundation\Flow\Contracts\TriggerTypeResolverInterface;
-use FAPost\Foundation\Flow\DTO\ResolvedTrigger;
-use FAPost\Foundation\Flow\DTO\TriggerContext;
+use Fapost\Foundation\Flow\Contracts\TriggerTypeResolverInterface;
+use Fapost\Foundation\Flow\DTO\ResolvedTrigger;
+use Fapost\Foundation\Flow\DTO\TriggerContext;
 
 final class WebhookTriggerResolver implements TriggerTypeResolverInterface
 {

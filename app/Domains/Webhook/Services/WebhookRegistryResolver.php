@@ -37,7 +37,7 @@ final class WebhookRegistryResolver implements WebhookRegistryResolverInterface
         }
 
         // 2. Thundering herd: acquire a short-lived leader lock.
-        //    Both leader and non-leader do their own DB lookup immediately — no sleep in the Octane hot path.
+        //    Both leader and non-leader do their own DB lookup immediately — no sleep in the ingress hot path.
         //    Only the leader deletes the lock; non-leaders leave it for the leader to clean up.
         $lockKey  = "warming:{$hash}";
         $isLeader = (bool)Redis::set($lockKey, '1', 'EX', self::LOCK_TTL_SECONDS, 'NX');
@@ -55,7 +55,7 @@ final class WebhookRegistryResolver implements WebhookRegistryResolverInterface
     {
         $raw = Redis::get("webhook:{$hash}");
 
-        if ( ! is_string($raw) || '' === $raw) {
+        if (! is_string($raw) || '' === $raw) {
             return null;
         }
 

@@ -9,7 +9,7 @@ use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Domains\Webhook\Services\WebhookUrlGenerator;
-use FAPost\Foundation\Channel\WebhookRegistrationPayload;
+use Fapost\Foundation\Channel\WebhookRegistrationPayload;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 

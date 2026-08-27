@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Webhook;
 
 use App\Domains\Webhook\Jobs\IncomingMessageJob;
-use FAPost\Foundation\DTO\InboundWebhookPayload;
+use Fapost\Foundation\DTO\InboundWebhookPayload;
 use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 

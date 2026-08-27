@@ -8,9 +8,9 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Models\FlowSession;
-use FAPost\Foundation\Messaging\MessagePayload;
-use FAPost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Messaging\MessagePayload;
+use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
+use Fapost\Foundation\Messaging\OutboundMessage;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -34,7 +34,7 @@ final readonly class FlowInlineKeyboardEditor implements InlineKeyboardEditorInt
         try {
             $session = FlowSession::query()->select(['id', 'assistant_id'])->find($sessionId);
 
-            if ( ! $session instanceof FlowSession) {
+            if (! $session instanceof FlowSession) {
                 return;
             }
 

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Expression;
 
-use FAPost\Foundation\Flow\Contracts\ExpressionEngineInterface;
-use FAPost\Foundation\Flow\Contracts\ExpressionEngineNotFoundException;
+use Fapost\Foundation\Flow\Contracts\ExpressionEngineInterface;
+use Fapost\Foundation\Flow\Contracts\ExpressionEngineNotFoundException;
 use LogicException;
 
 /**

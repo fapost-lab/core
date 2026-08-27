@@ -8,8 +8,8 @@ use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Handlers\LoopEndNodeHandler;
 use App\Domains\Flow\Handlers\LoopNodeHandler;
-use FAPost\Foundation\DTO\NodeExecutionContext;
-use FAPost\Foundation\DTO\NodeExecutionStatus;
+use Fapost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 

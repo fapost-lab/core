@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# FAPost Core — bare-metal bootstrap.
+# FaPost Core — bare-metal bootstrap.
 #
 # Does only what a shell script must do: verify the runtime, install the
 # project's own dependencies, prepare .env, and hand over to `php artisan
@@ -219,7 +219,7 @@ prepare_env() {
 
 # --- main -------------------------------------------------------------------
 
-printf 'FAPost Core — bare-metal bootstrap\n'
+printf 'FaPost Core — bare-metal bootstrap\n'
 printf '%sChecks the host, installs dependencies, then hands over to the installer.%s\n' "$C_DIM" "$C_OFF"
 
 run_checks

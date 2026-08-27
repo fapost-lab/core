@@ -6,7 +6,7 @@ namespace Tests\Unit\Domains\Messaging\Telegram;
 
 use App\Domains\Channels\Telegram\Exceptions\UnsupportedUpdateTypeException;
 use App\Domains\Channels\Telegram\TelegramInboundNormalizer;
-use FAPost\Foundation\DTO\IncomingMessageType;
+use Fapost\Foundation\DTO\IncomingMessageType;
 use Tests\TestCase;
 
 final class TelegramInboundNormalizerTest extends TestCase

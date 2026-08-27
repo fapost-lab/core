@@ -4,7 +4,7 @@
 
 **Date:** Апрель 2026
 
-**Контекст:** FAPost Phase 2 — Flow Engine
+**Контекст:** FaPost Phase 2 — Flow Engine
 
 **Связанные документы:** Flow Engine Nodes V1, Platform Architecture v2.2
 
@@ -130,7 +130,7 @@ Branch.cases используют OperandRef + Operator enum:
 Living in `fapost/foundation`:
 
 ```php
-namespace FAPost\Foundation\Contracts\Flow\Expression;
+namespace Fapost\Foundation\Contracts\Flow\Expression;
 
 interface ExpressionEngineInterface
 {
@@ -179,7 +179,7 @@ interface ExpressionEngineInterface
 ## ExpressionContext
 
 ```php
-namespace FAPost\Foundation\Contracts\Flow\Expression;
+namespace Fapost\Foundation\Contracts\Flow\Expression;
 
 final class ExpressionContext
 {
@@ -209,7 +209,7 @@ final class ExpressionContext
 Living в core:
 
 ```php
-namespace FAPost\Core\Flow\Expression;
+namespace Fapost\Core\Flow\Expression;
 
 final class ExpressionEngineRegistry
 {
@@ -255,7 +255,7 @@ Conflicts cause boot failure (consistent с другими registries).
 V1 implementation:
 
 ```php
-namespace FAPost\Core\Flow\Expression\Engines;
+namespace Fapost\Core\Flow\Expression\Engines;
 
 final class TemplateEngine implements ExpressionEngineInterface
 {

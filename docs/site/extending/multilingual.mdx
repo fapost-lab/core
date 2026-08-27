@@ -3,7 +3,52 @@ title: "Multilingual extensions"
 description: "Translating what your extension shows to end users."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+FaPost has two language layers, and they are resolved differently. Getting them
+mixed up is the most common multilingual bug in an extension.
+
+| Layer | What it covers | Resolved by |
+|---|---|---|
+| **Admin UI language** | Staff-facing screens, validation messages, admin labels | Laravel lang files |
+| **Content language** | What the assistant says to the end user | `LanguageResolverInterface` and the content translator chain |
+
+## Admin UI strings
+
+Anything a staff member reads — a field label in the builder, a validation error,
+a column heading — is an ordinary Laravel translation. Use lang files as you would
+in any Laravel application.
+
+## Content strings
+
+Anything the end user reads is content language, resolved at runtime for that
+contact.
+
+<Warning>
+  Never put a user-facing literal directly into a handler or a sender.
+</Warning>
+
+A bot-facing string must be either a system translation key or flow content
+authored by the person who built the flow. A literal in a handler cannot be
+translated, cannot be overridden per tenant, and will be sent in the developer's
+language to every contact regardless of theirs.
+
+## Values are not translated
+
+```
+label:  "Yes, continue"     ← translated
+value:  "confirm"           ← never translated
+```
+
+Button and select **values** are language-agnostic identifiers. They are compared
+against, stored in state, and branched on. Only the label or content is
+translated.
+
+Translating a value breaks every condition that tests it, and it breaks silently:
+the flow keeps running and simply takes the wrong branch for contacts in one
+language.
+
+## Practical consequence for extensions
+
+If your node offers choices, define the value once as a stable identifier and let
+the label carry the language. If your handler needs to tell the user something,
+expose it as flow content the author can edit, or as a translation key — not as a
+string in your PHP.

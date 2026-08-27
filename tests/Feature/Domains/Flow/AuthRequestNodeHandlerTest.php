@@ -10,9 +10,9 @@ use App\Domains\Flow\Handlers\AuthRequestNodeHandler;
 use App\Domains\Flow\Handlers\Support\OperandResolver;
 use App\Domains\Flow\Handlers\Support\OperatorComparator;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
-use FAPost\Foundation\DTO\NodeExecutionContext;
-use FAPost\Foundation\DTO\NodeExecutionStatus;
-use FAPost\Foundation\Flow\Contracts\ContactWriterInterface;
+use Fapost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\DTO\NodeExecutionStatus;
+use Fapost\Foundation\Flow\Contracts\ContactWriterInterface;
 use Mockery;
 use Tests\TestCase;
 

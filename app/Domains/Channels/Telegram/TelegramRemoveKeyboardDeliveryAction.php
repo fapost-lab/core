@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Channels\Telegram;
 
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Messaging\OutboundMessage;
 
 /**
  * Removes the inline keyboard from a previously sent message via editMessageReplyMarkup.

@@ -3,7 +3,49 @@ title: "ID strategy"
 description: "ULID primary keys and how they are stored."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+Tenant-schema primary keys are **ULIDs stored in a PostgreSQL `uuid` column**.
+
+## In models
+
+```php
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
+```
+
+Apply it to any model that follows this strategy. The trait ships in
+`fapost/support`, so extension packages get it on the same terms Core does.
+
+## In migrations
+
+```php
+$table->uuid('id')->primary();
+```
+
+No database default. The application generates the identifier.
+
+Foreign keys:
+
+```php
+$table->foreignUuid('contact_id')->constrained()->cascadeOnDelete();
+```
+
+Or the local equivalent, matching the style of the migrations around you.
+
+## Why ULID in a uuid column
+
+A ULID is lexicographically sortable by creation time, which an ordinary UUIDv4 is
+not. That matters for index locality: sequential inserts land near each other in
+the B-tree instead of scattering across it, so the index stays compact.
+
+Storing it as `uuid` rather than `char(26)` keeps PostgreSQL's native 16-byte
+representation, its comparison operators, and its index behaviour. The application
+sees a ULID; the database sees a uuid; neither pays for the other's convenience.
+
+Generating in the application rather than the database means an object has its
+identity before it is persisted — so related records can be built in one pass
+without a round trip to find out what the id turned out to be.
+
+<Warning>
+  Do not change special public identifiers, such as a webhook public hash, on the
+  strength of this rule. Those are separate decisions with their own constraints —
+  a webhook hash is in URLs held by external providers.
+</Warning>

@@ -15,10 +15,10 @@ use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Registries\ChannelMediaUploaderRegistry;
 use App\Domains\Media\Services\MediaDispatcher;
 use Carbon\CarbonImmutable;
-use FAPost\Foundation\Channel\ChannelInterface;
-use FAPost\Foundation\Media\ChannelMediaUploaderInterface;
-use FAPost\Foundation\Media\DTO\UploadResult;
-use FAPost\Foundation\Media\MediaBlobReadInterface;
+use Fapost\Foundation\Channel\ChannelInterface;
+use Fapost\Foundation\Media\ChannelMediaUploaderInterface;
+use Fapost\Foundation\Media\DTO\UploadResult;
+use Fapost\Foundation\Media\MediaBlobReadInterface;
 use Mockery;
 use Tests\TestCase;
 

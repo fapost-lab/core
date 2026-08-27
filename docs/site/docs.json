@@ -1,18 +1,32 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "FAPost Core",
+  "name": "FaPost",
   "description": "Conversational assistants and flow automation platform.",
   "colors": {
     "primary": "#5a6e58",
     "light": "#94a187",
     "dark": "#3f4f3d"
   },
+  "background": {
+    "color": {
+      "light": "#f5f4f1",
+      "dark": "#131211"
+    }
+  },
+  "fonts": {
+    "family": "DM Sans"
+  },
+  "styling": {
+    "codeblocks": {
+      "theme": "one-dark-pro"
+    }
+  },
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
-        "tab": "Using FAPost",
+        "tab": "Using FaPost",
         "groups": [
           {
             "group": "Get started",
@@ -156,7 +170,7 @@
               "contributing/runtime",
               "contributing/tenant-aware-execution",
               "contributing/migration-isolation",
-              "contributing/octane-scope",
+              "contributing/worker-safety",
               "contributing/id-strategy",
               "contributing/dependency-direction"
             ]

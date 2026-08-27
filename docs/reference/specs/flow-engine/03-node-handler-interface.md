@@ -7,7 +7,7 @@
 ## 3.1 NodeHandlerInterface (foundation)
 
 ```php
-namespace FAPost\Foundation\Contracts;
+namespace Fapost\Foundation\Contracts;
 
 interface NodeHandlerInterface
 {

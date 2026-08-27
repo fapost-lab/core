@@ -10,7 +10,7 @@ use App\Domains\Media\Models\MediaBlob;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
-use FAPost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Media\Enums\MediaKind;
 use Illuminate\Http\UploadedFile;
 use Tests\Feature\FeatureTestCase;
 

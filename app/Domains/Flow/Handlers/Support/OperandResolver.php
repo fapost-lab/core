@@ -9,8 +9,8 @@ use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Exceptions\UnknownDataAccessorNamespacePrefixException;
 use App\Domains\Flow\State\Variables\Variable;
-use FAPost\Foundation\DTO\NodeExecutionContext;
-use FAPost\Foundation\Flow\Enums\StateNamespace;
+use Fapost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\Flow\Enums\StateNamespace;
 use InvalidArgumentException;
 
 /**

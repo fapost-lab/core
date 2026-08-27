@@ -12,7 +12,7 @@ use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Models\ContactTag;
 use App\Jobs\Messaging\BroadcastSendJob;
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Messaging\OutboundMessage;
 use Illuminate\Support\Facades\Bus;
 use Tests\Feature\FeatureTestCase;
 

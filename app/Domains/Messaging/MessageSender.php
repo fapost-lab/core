@@ -9,9 +9,9 @@ use App\Domains\Conversation\Capture\ConversationCaptureFactory;
 use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Messaging\Exceptions\RateLimitExceededException;
 use App\Domains\Messaging\Exceptions\UnsupportedChannelException;
-use FAPost\Foundation\Messaging\DeliveryResult;
-use FAPost\Foundation\Messaging\MessageSenderInterface;
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Messaging\DeliveryResult;
+use Fapost\Foundation\Messaging\MessageSenderInterface;
+use Fapost\Foundation\Messaging\OutboundMessage;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use Throwable;
 

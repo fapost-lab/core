@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Channels\Telegram;
 
 use App\Domains\Channels\Telegram\Exceptions\UnsupportedUpdateTypeException;
-use FAPost\Foundation\DTO\IncomingMedia;
-use FAPost\Foundation\DTO\IncomingMessage;
-use FAPost\Foundation\DTO\IncomingMessageType;
-use FAPost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\DTO\IncomingMedia;
+use Fapost\Foundation\DTO\IncomingMessage;
+use Fapost\Foundation\DTO\IncomingMessageType;
+use Fapost\Foundation\Media\Enums\MediaKind;
 
 final class TelegramInboundNormalizer
 {

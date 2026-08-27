@@ -8,7 +8,7 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Services\Resolvers\MessageTriggerResolver;
-use FAPost\Foundation\Flow\DTO\TriggerContext;
+use Fapost\Foundation\Flow\DTO\TriggerContext;
 use InvalidArgumentException;
 use Tests\Feature\FeatureTestCase;
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Media\Registries;
 
 use App\Domains\Media\Exceptions\ChannelMediaUploaderNotRegisteredException;
-use FAPost\Foundation\Media\ChannelMediaUploaderInterface;
+use Fapost\Foundation\Media\ChannelMediaUploaderInterface;
 
 /**
  * Resolves channel-specific media uploaders by channel type.
@@ -36,7 +36,7 @@ final class ChannelMediaUploaderRegistry
 
     public function forChannelType(string $channelType): ChannelMediaUploaderInterface
     {
-        if ( ! isset($this->uploaders[$channelType])) {
+        if (! isset($this->uploaders[$channelType])) {
             throw ChannelMediaUploaderNotRegisteredException::forType($channelType);
         }
 

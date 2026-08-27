@@ -7,9 +7,9 @@ namespace App\Domains\Flow\Services\Resolvers;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Models\FlowTrigger;
-use FAPost\Foundation\Flow\Contracts\TriggerTypeResolverInterface;
-use FAPost\Foundation\Flow\DTO\ResolvedTrigger;
-use FAPost\Foundation\Flow\DTO\TriggerContext;
+use Fapost\Foundation\Flow\Contracts\TriggerTypeResolverInterface;
+use Fapost\Foundation\Flow\DTO\ResolvedTrigger;
+use Fapost\Foundation\Flow\DTO\TriggerContext;
 
 final readonly class MessageTriggerResolver implements TriggerTypeResolverInterface
 {
@@ -22,7 +22,7 @@ final readonly class MessageTriggerResolver implements TriggerTypeResolverInterf
     {
         $messageText = $context->payload['text'] ?? null;
 
-        if ( ! is_string($messageText) || '' === mb_trim($messageText)) {
+        if (! is_string($messageText) || '' === mb_trim($messageText)) {
             return null;
         }
 
@@ -85,7 +85,7 @@ final readonly class MessageTriggerResolver implements TriggerTypeResolverInterf
         $keywords = $trigger->config['keywords'] ?? null;
         $phrases  = $trigger->config['phrases'] ?? null;
 
-        if ( ! is_array($keywords) || (null !== $phrases && ! is_array($phrases))) {
+        if (! is_array($keywords) || (null !== $phrases && ! is_array($phrases))) {
             return null;
         }
 
@@ -117,7 +117,7 @@ final readonly class MessageTriggerResolver implements TriggerTypeResolverInterf
         $needles = [];
 
         foreach ([...$phrases, ...$keywords] as $value) {
-            if ( ! is_string($value) || '' === mb_trim($value)) {
+            if (! is_string($value) || '' === mb_trim($value)) {
                 continue;
             }
 

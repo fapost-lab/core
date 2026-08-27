@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Call\Transports;
 
-use FAPost\Foundation\Flow\Call\CallContext;
-use FAPost\Foundation\Flow\Call\CallRequest;
-use FAPost\Foundation\Flow\Call\CallResult;
-use FAPost\Foundation\Flow\Call\CallTransportInterface;
+use Fapost\Foundation\Flow\Call\CallContext;
+use Fapost\Foundation\Flow\Call\CallRequest;
+use Fapost\Foundation\Flow\Call\CallResult;
+use Fapost\Foundation\Flow\Call\CallTransportInterface;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\PendingRequest;

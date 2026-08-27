@@ -6,7 +6,7 @@ namespace App\Domains\Messaging\Typing;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
-use FAPost\Foundation\Messaging\TypingCapableProviderInterface;
+use Fapost\Foundation\Messaging\TypingCapableProviderInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Throwable;
@@ -42,7 +42,7 @@ final readonly class TypingIndicatorService
     ): ?TypingSession {
         $sender = $this->channelRegistry->sender($channelType);
 
-        if ( ! $sender instanceof TypingCapableProviderInterface) {
+        if (! $sender instanceof TypingCapableProviderInterface) {
             return null;
         }
 

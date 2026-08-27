@@ -21,7 +21,7 @@ namespace App\Domains\Flow\Concurrency;
  * Bound as {@code scoped} in the container — one instance per request / queue
  * job, never shared across worker invocations.
  *
- * Octane note: holds plain value objects, lifecycle bounded by request scope,
+ * Worker safety: holds plain value objects, lifecycle bounded by request scope,
  * {@see clear()} is idempotent and always called from a finally block.
  *
  * See ADR Message Routing & Concurrency Control § "Distributed Lock Strategy":

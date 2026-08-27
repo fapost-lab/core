@@ -17,7 +17,7 @@ final class InstallPlatformCommand extends Command
         {--admin-email= : Email for the first admin}
         {--admin-password= : Password for the first admin}';
 
-    protected $description = 'Install FAPOST Core platform';
+    protected $description = 'Install FaPost Core platform';
 
     public function __construct(
         private readonly TenantRepositoryInterface $tenantRepository,
@@ -28,7 +28,7 @@ final class InstallPlatformCommand extends Command
 
     public function handle(): int
     {
-        $this->info('FAPOST Core - Platform Installation');
+        $this->info('FaPost Core - Platform Installation');
         $this->newLine();
 
         $this->components->task('Checking database connection', function (): void {

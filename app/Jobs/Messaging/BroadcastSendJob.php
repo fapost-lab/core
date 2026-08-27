@@ -6,8 +6,8 @@ namespace App\Jobs\Messaging;
 
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
-use FAPost\Foundation\Messaging\MessageSenderInterface;
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Messaging\MessageSenderInterface;
+use Fapost\Foundation\Messaging\OutboundMessage;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use RuntimeException;

@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Call\Transports;
 
 use App\Domains\Flow\Action\ActionHandlerRegistry;
-use FAPost\Foundation\Flow\Call\CallContext;
-use FAPost\Foundation\Flow\Call\CallRequest;
-use FAPost\Foundation\Flow\Call\CallResult;
-use FAPost\Foundation\Flow\Call\CallTransportInterface;
+use Fapost\Foundation\Flow\Call\CallContext;
+use Fapost\Foundation\Flow\Call\CallRequest;
+use Fapost\Foundation\Flow\Call\CallResult;
+use Fapost\Foundation\Flow\Call\CallTransportInterface;
 use LogicException;
 use Throwable;
 
 /**
  * Built-in {@code handler} transport — dispatches the call to an in-process
- * {@see \FAPost\Foundation\Action\ActionHandlerInterface} resolved from the
+ * {@see \Fapost\Foundation\Action\ActionHandlerInterface} resolved from the
  * {@see ActionHandlerRegistry} by id.
  *
  * Target shape: action id (e.g. "crm.sync_contact"). Parameters are passed

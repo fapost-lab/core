@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Flow\Call;
 
 use App\Domains\Flow\Call\Transports\HttpTransport;
-use FAPost\Foundation\Flow\Call\CallContext;
-use FAPost\Foundation\Flow\Call\CallRequest;
+use Fapost\Foundation\Flow\Call\CallContext;
+use Fapost\Foundation\Flow\Call\CallRequest;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;

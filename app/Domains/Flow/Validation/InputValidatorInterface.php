@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Validation;
 
 use App\Domains\Flow\Enums\InputExpectedType;
-use FAPost\Foundation\DTO\IncomingMessage;
+use Fapost\Foundation\DTO\IncomingMessage;
 
 /**
  * Validates the user-provided payload of an `input` node against the

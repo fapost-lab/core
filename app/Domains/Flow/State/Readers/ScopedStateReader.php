@@ -6,7 +6,7 @@ namespace App\Domains\Flow\State\Readers;
 
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
-use FAPost\Foundation\Flow\Contracts\ScopedStateReaderInterface;
+use Fapost\Foundation\Flow\Contracts\ScopedStateReaderInterface;
 
 /**
  * Unified read surface across all state namespaces for a single node execution.

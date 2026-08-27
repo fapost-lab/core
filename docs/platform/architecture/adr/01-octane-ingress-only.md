@@ -1,7 +1,15 @@
 # ADR-01 — Octane: ingress-only
 
-> Зафиксировано: март 2026. Статус: **принято**.
-> 
+> Зафиксировано: март 2026. Статус: **отменено** (август 2026).
+>
+> Octane удалён из проекта: пакет `laravel/octane`, `config/octane.php` и переменная
+> `OCTANE_SERVER` больше не входят в состав Core. Роль быстрого ingress перед PHP
+> выполняет Go-гейтвей в `gateway/`.
+>
+> Текст ниже сохранён как запись решения и его причин. Ограничения на singleton-состояние,
+> `scoped` bindings и восстановление tenant context в `finally` остаются в силе —
+> они относятся к долгоживущим Horizon-воркерам, а не к Octane. См. `CLAUDE.md`
+> § Long-Lived Worker Safety.
 
 ---
 

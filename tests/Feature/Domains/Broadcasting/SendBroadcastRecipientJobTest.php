@@ -13,9 +13,9 @@ use App\Domains\Broadcasting\Models\BroadcastRecipient;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\Contact;
-use FAPost\Foundation\Messaging\DeliveryResult;
-use FAPost\Foundation\Messaging\MessageSenderInterface;
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Messaging\DeliveryResult;
+use Fapost\Foundation\Messaging\MessageSenderInterface;
+use Fapost\Foundation\Messaging\OutboundMessage;
 use Tests\Feature\FeatureTestCase;
 
 final class SendBroadcastRecipientJobTest extends FeatureTestCase

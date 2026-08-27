@@ -3,7 +3,89 @@ title: "Foundation contracts"
 description: "The interfaces and DTOs extensions are built against."
 ---
 
+`fapost/foundation` is the public surface. Everything here is what an extension may
+depend on; nothing under `App\…` is. See
+[Stability policy](/extending/stability-policy).
+
+## Extension registration
+
+| Contract | Role |
+|---|---|
+| `Contracts\CoreRegistrarInterface` | The single registration entry point for handlers, accessors, adapters, routes, schedules, and migrations |
+| `Contracts\ActivatableInterface` | `onActivate()` / `onDeactivate()` hooks |
+| `Lifecycle\AbstractPluginServiceProvider` | Base provider for a Plugin |
+| `Lifecycle\AbstractSolutionServiceProvider` | Base provider for a Solution |
+| `Manifest\SolutionManifest` | Declares id, version, platform constraint, and required capabilities |
+
+## Flow engine
+
+| Contract | Role |
+|---|---|
+| `Contracts\NodeHandlerInterface` | A node's runtime behaviour |
+| `Flow\Handlers\AbstractVersionedHandler` | Base class deriving type and label from a `TYPE` constant |
+| `Contracts\DataAccessorInterface` | Reading module data under `module.*` |
+| `Flow\Enums\StateNamespace` | The canonical state namespaces |
+| `Flow\Contracts\ContactWriterInterface` | Mutating the contact from a handler |
+| `Flow\Contracts\ScopedStateReaderInterface` | Reading state within a scope |
+| `Flow\Contracts\ExpressionEngineInterface` | Evaluating expressions |
+| `Flow\Contracts\TriggerResolverInterface`, `TriggerTypeResolverInterface` | Resolving what starts a flow |
+| `Flow\Call\CallTransportInterface` | The transport behind the `call` node |
+
+DTOs: `NodeExecutionContext`, `NodeExecutionResult`, `NodeExecutionStatus`,
+`ExpressionContext`, `ResolvedTrigger`, `TriggerContext`, `CallContext`,
+`CallRequest`, `CallResult`. Enums: `KeyboardMode`, `HistoryEventType`.
+
+## Channels and ingress
+
+| Contract | Role |
+|---|---|
+| `Channel\ChannelInterface` | Minimal channel identity across the extension boundary |
+| `Channel\Ingress\ProvidesIngressSpecInterface` | Declaring a provider's webhook contract |
+| `Channel\Ingress\IngressSpec`, `SignatureScheme`, `SignedRequest`, `IngressSpecExecutor` | Verifying and deduplicating inbound requests |
+| `Channel\WebhookRegistrarInterface`, `WebhookRegistrationPayload` | Registering the webhook with the provider |
+
+DTOs: `InboundWebhookPayload`, `IncomingMessage`, `IncomingMessageType`,
+`IncomingMedia`.
+
+## Messaging
+
+| Contract | Role |
+|---|---|
+| `Messaging\MessageSenderInterface` | Sending a message |
+| `Messaging\ProviderSenderInterface` | Delivering through one concrete provider |
+| `Messaging\TypingCapableProviderInterface` | Optional typing indicator, via `ProcessingIndicatorHandle` |
+
+DTOs: `OutboundMessage`, `MessagePayload`, `DeliveryResult`, `OutgoingMessage`,
+`OutgoingMessageType`, `SendResult`.
+
+## Media
+
+| Contract | Role |
+|---|---|
+| `Media\ChannelMediaUploaderInterface` | Uploading media to a provider |
+| `Media\ChannelMediaDownloaderInterface` | Fetching media from a provider |
+| `Media\MediaBlobReadInterface` | Reading a stored blob |
+
+DTOs: `UploadContext`, `UploadResult`, `DownloadResult`. Enum: `MediaKind`.
+
+## Retrieval
+
+`Contracts\RagAdapterInterface` with `RagQueryContext`, `StructuredRagResult`, and
+`RagConfidence`.
+
+## Analytics
+
+`Analytics\Contracts\AnalyticsWriterInterface`, with `AnalyticsEvent` and
+`AnalyticsEventType`.
+
+## Other
+
+`Contracts\ModelAttributeResolverInterface`, `Contracts\ModelUtilityInterface`,
+`Action\ActionHandlerInterface`, `Support\Version`.
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  Generated PHP API documentation is produced separately with
+  `composer run docs:build`, which writes Doctum output to `public/core`. That
+  covers every class in the repository; this page covers the ones you are allowed
+  to depend on.
 </Note>

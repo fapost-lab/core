@@ -66,7 +66,7 @@ on a mail-capable cron daemon:
 ```ini
 # /etc/systemd/system/fapost-scheduler.service
 [Unit]
-Description=FAPost scheduler tick
+Description=FaPost scheduler tick
 
 [Service]
 Type=oneshot
@@ -78,7 +78,7 @@ ExecStart=/usr/bin/php artisan schedule:run
 ```ini
 # /etc/systemd/system/fapost-scheduler.timer
 [Unit]
-Description=Run the FAPost scheduler every minute
+Description=Run the FaPost scheduler every minute
 
 [Timer]
 OnCalendar=*:0/1
@@ -101,7 +101,7 @@ means every scheduled trigger fires twice.
 ```ini
 # /etc/systemd/system/fapost-horizon.service
 [Unit]
-Description=FAPost queue workers (Horizon)
+Description=FaPost queue workers (Horizon)
 After=network-online.target postgresql.service redis.service
 Wants=network-online.target
 

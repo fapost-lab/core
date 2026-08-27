@@ -3,7 +3,127 @@ title: "Upgrading and rollback"
 description: "Release order, migrations, and how to go back."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+What changes between releases and in what order to apply it.
+
+## The shape of an upgrade
+
+Four things happen, and the order is not interchangeable:
+
+1. New code arrives (new image, or new checkout plus `composer install`)
+2. **Landlord** migrations run — platform-wide tables
+3. **Tenant** migrations run — once per tenant schema
+4. Queue workers restart, so they stop running the previous release from memory
+
+Step 4 is the one most often forgotten. Horizon workers are long-lived PHP
+processes: until they are restarted they keep executing the old code against the
+new database schema, which is the worst combination of the two.
+
+## Docker Compose
+
+```bash
+C="docker compose -f docker/compose.yaml --env-file .env"
+
+$C pull
+$C up -d
+
+$C exec app php artisan migrate --database=landlord --path=database/migrations/landlord --force
+$C exec app php artisan ops:tenants-migrate
+
+$C exec app php artisan horizon:terminate
+```
+
+`horizon:terminate` lets in-flight jobs finish and then exits; Compose restarts
+the container with the new image. Killing workers outright drops whatever they
+were processing — and for an inbound webhook that means a message the provider
+already considers delivered.
+
+Pin a version rather than tracking `latest` if you want upgrades to be a decision
+rather than an event:
+
+```dotenv
+APP_VERSION=v1.4.2
+```
+
+## Two schemas, two migration commands
+
+Tenant isolation is schema-per-tenant, so a migration touching tenant tables must
+run once per tenant. `ops:tenants-migrate` iterates active tenants; plain
+`artisan migrate` does not and will leave every tenant schema untouched.
+
+A release can contain either kind or both. Running both commands unconditionally
+is safe — an already-applied migration is skipped.
+
+## Before upgrading
+
+**Back up the database.** Migrations are not reversible in practice: `down()`
+methods exist but are exercised far less than `up()`, and a partial rollback on a
+schema-per-tenant layout is worse than a restore.
+
+```bash
+docker compose -f docker/compose.yaml --env-file .env exec postgres \
+  pg_dump -U fapost fapost | gzip > backup-$(date +%F).sql.gz
+```
+
+**Read the release notes for breaking changes**, particularly any that touch
+Flow node contracts. A node handler's contract is versioned: existing flow
+definitions keep running against the old version, but a release may add a new one
+that new flows use.
+
+## Downtime
+
+The application tolerates a short window where old and new run side by side —
+webhook ingress answers, and work queues up rather than being lost. What it does
+not tolerate is old workers against a migrated schema, which is why they restart
+last.
+
+For a zero-downtime upgrade the ordering is: start new web containers, migrate,
+then restart workers. Anything more elaborate is untested territory here.
+
+## The gateway
+
+The gateway upgrades independently of the application — it shares only Redis and
+the queue format, both versioned.
+
+```bash
+docker compose -f docker/compose.yaml --env-file .env --profile gateway pull
+docker compose -f docker/compose.yaml --env-file .env --profile gateway up -d
+php artisan ops:ingress-specs-publish   # if adapters changed
+php artisan gateway:doctor
+```
+
+If a release changes the queue payload version, the gateway and the application
+must be upgraded together: the worker rejects a payload version it does not
+recognise, sending the job to `failed_jobs` rather than processing it with half
+its context. Release notes call this out when it applies.
+
+## Rolling back
+
+```dotenv
+APP_VERSION=v1.4.1
+```
+
+```bash
+docker compose -f docker/compose.yaml --env-file .env up -d
+```
+
+Code rolls back cleanly. **The database does not.** If the release you are leaving
+contained migrations, restore the backup instead — or confirm from the release
+notes that its migrations are additive, in which case older code simply ignores
+the new columns.
+
+## Verifying
+
+```bash
+C="docker compose -f docker/compose.yaml --env-file .env"
+
+$C ps                                     # all services up
+$C exec app php artisan about              # version, environment, cache state
+$C exec app php artisan horizon:status     # workers running the new code
+$C logs --tail 50 horizon
+```
+
+## Related
+
+- [Docker Compose](/self-hosting/docker-compose)
+- [Long-running services](/self-hosting/services)
+- [Webhook gateway](/self-hosting/gateway)

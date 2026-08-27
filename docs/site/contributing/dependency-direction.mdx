@@ -3,7 +3,56 @@ title: "Dependency direction"
 description: "What foundation and support may depend on."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+`packages/fapost-foundation` and `packages/fapost-support` **do not depend on
+Core**. The arrow points one way, always.
+
+## Not allowed
+
+- `use App\…` inside `foundation` or `support`
+- References from either package to concrete Core domain classes
+- Moving Core business logic into `support`
+
+## Why it matters
+
+Extensions are built against `foundation`. If `foundation` referenced `App\…`,
+then installing an extension would pull Core's internals into its dependency
+graph, and every Core refactor would become a breaking change for every extension.
+
+The one-way arrow is what buys Core the freedom to reorganise its own domains
+without coordinating with anyone. That freedom is the whole reason the package
+exists.
+
+`support` is stricter still: it holds primitives with no domain semantics at all.
+The moment Core logic moves there "to share it", it stops being a primitive and
+starts being Core in a package that Core cannot see.
+
+## Deciding where something goes
+
+| The code is… | It belongs in |
+|---|---|
+| A contract needed by external Solutions or Plugins | `foundation` |
+| A pure reusable primitive with no Core dependency | `support` |
+| Used within one domain and carrying its meaning | Core, in that domain |
+
+The middle row is the one most often got wrong. "Several domains use it" is not
+sufficient — the question is whether it carries domain meaning. A date helper is a
+primitive. A "resolve the assistant for this contact" helper is Core logic no
+matter how many domains call it.
+
+## How it is checked
+
+PHPat rules, run through PHPStan:
+
+```bash
+composer run test:arch
+```
+
+The rules live in `tests/Architecture`. The default PHPUnit run covers them
+through `tests/Unit/Architecture/MigrationTest.php`.
+
+## If the contract you need is missing
+
+Adding to `foundation` is a deliberate act — it is a public promise, and it is
+much harder to withdraw than to make. That is the right conversation to have, and
+it is still cheaper than an extension that reaches into `App\…` and breaks
+silently later. See [Stability policy](/extending/stability-policy).

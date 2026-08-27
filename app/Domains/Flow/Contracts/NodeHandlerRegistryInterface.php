@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Contracts;
 
-use FAPost\Foundation\Contracts\NodeHandlerInterface;
+use Fapost\Foundation\Contracts\NodeHandlerInterface;
 
 interface NodeHandlerRegistryInterface
 {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Models;
 
-use FAPost\Support\Models\BaseModel;
+use Fapost\Support\Models\BaseModel;
 
 /**
  * Reverse-index row of a `subflow.flow_id` reference that exists inside a

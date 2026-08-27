@@ -1,6 +1,6 @@
 # Deployment Requirements
 
-What a host must provide to run FAPost Core. Every deployment method in this
+What a host must provide to run FaPost Core. Every deployment method in this
 section satisfies these requirements differently, but none of them removes one.
 
 Verified against `composer.json`, `config/`, and the packages actually installed —

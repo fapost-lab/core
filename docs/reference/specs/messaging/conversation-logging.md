@@ -2,7 +2,7 @@
 
 **Статус:** Draft (дизайн, не реализовано)
 **Дата:** Июнь 2026
-**Контекст:** FAPost Core — продуктовый транскрипт переписки контакта с ассистентом.
+**Контекст:** FaPost Core — продуктовый транскрипт переписки контакта с ассистентом.
 **Связанные документы:** `docs/platform/architecture/adr/09-message-routing-concurrency.md`,
 `docs/platform/runtime/flow/04-data-model-reference.md`,
 `docs/platform/architecture/platform/10-message-pipeline.md`.

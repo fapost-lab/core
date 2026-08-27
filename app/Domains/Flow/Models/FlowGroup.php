@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Models;
 
 use App\Domains\Assistant\Models\Assistant;
-use FAPost\Support\Concerns\HasUlidPrimaryKey;
-use FAPost\Support\Models\BaseModel;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
+use Fapost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 

@@ -4,15 +4,15 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers\Support;
 
-use FAPost\Foundation\DTO\NodeExecutionContext;
-use FAPost\Foundation\Flow\DTO\ExpressionContext;
+use Fapost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\Flow\DTO\ExpressionContext;
 
 /**
  * Per-node template substitution facade for handlers.
  *
- * Prefers the runtime-resolved {@see \FAPost\Foundation\Flow\Contracts\ExpressionEngineInterface}
+ * Prefers the runtime-resolved {@see \Fapost\Foundation\Flow\Contracts\ExpressionEngineInterface}
  * carried on {@see NodeExecutionContext} — that engine reads through
- * {@see \FAPost\Foundation\Flow\Contracts\ScopedStateReaderInterface} and
+ * {@see \Fapost\Foundation\Flow\Contracts\ScopedStateReaderInterface} and
  * therefore resolves {@code contact.*} / {@code module.*} placeholders, not
  * just the session-state namespaces ({@code flow.*}, {@code system.*},
  * {@code rag.*}, {@code call.*}).
@@ -43,7 +43,7 @@ final class TemplateRenderer
             return $out;
         }
 
-        if ( ! is_string($value) || ! str_contains($value, '{{')) {
+        if (! is_string($value) || ! str_contains($value, '{{')) {
             return $value;
         }
 

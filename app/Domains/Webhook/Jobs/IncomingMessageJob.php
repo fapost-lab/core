@@ -17,7 +17,7 @@ use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Domains\Webhook\Services\ChannelAdapterResolver;
 use Carbon\CarbonImmutable;
-use FAPost\Foundation\DTO\InboundWebhookPayload;
+use Fapost\Foundation\DTO\InboundWebhookPayload;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 

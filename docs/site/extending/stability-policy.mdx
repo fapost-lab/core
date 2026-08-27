@@ -3,7 +3,54 @@ title: "Stability policy"
 description: "What Core promises not to break, and what it does not."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+An extension is written against a moving platform. This page says which parts of
+that platform hold still.
+
+## What is covered
+
+**`fapost/foundation`.** The contracts and DTOs in this package are the public
+surface. They are what an extension is built against, and they are what Core
+undertakes not to break within a major version.
+
+**`fapost/support`.** Dependency-free primitives, on the same terms.
+
+**Node contracts, by version.** A node's contract is versioned explicitly. A
+published flow keeps reaching the handler version it was built against — see
+[Versioning and compatibility](/extending/flow-nodes/versioning).
+
+**State namespaces.** The meaning of `system.*`, `flow.*`, `rag.*`, and `module.*`
+is fixed, along with who may write each.
+
+## What is not covered
+
+**Everything under `App\…`.** Core's domains, models, services, and jobs are
+internal. They are refactored freely, and a `use App\…` in an extension is
+expected to break.
+
+<Warning>
+  If a contract you need is not in `fapost/foundation`, reaching into `App\…` is
+  not the workaround — it is a broken extension with a delayed failure. Propose
+  the contract instead.
+</Warning>
+
+**The database schema.** Core's tables are an implementation detail of Core's
+domains. Read module data through a
+[data accessor](/extending/data-accessors), not through a query.
+
+**The compiled front end.** The builder's internal component structure is not a
+contract. Configure nodes through schema — see
+[Builder UI extensions](/extending/builder-ui).
+
+## Where the line is enforced
+
+This is not an honour system. The dependency direction is checked by PHPat rules
+that run in `composer run test:arch`: `foundation` and `support` may not reference
+`App\…`, and the boundaries are verified on every run rather than at review time.
+
+## While the platform is pre-1.0
+
+The Solution and Plugin lifecycles are not product-complete. Packages are on `0.x`
+versions, where `^0.1` accepts `0.1.*` only and adopting a new minor is a
+deliberate constraint bump. Expect the surface to gain contracts rather than lose
+them, and read [Development setup](/extending/development-setup) for how version
+constraints behave in that range.

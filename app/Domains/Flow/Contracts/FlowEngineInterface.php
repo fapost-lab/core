@@ -7,7 +7,7 @@ namespace App\Domains\Flow\Contracts;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
-use FAPost\Foundation\DTO\IncomingMessage;
+use Fapost\Foundation\DTO\IncomingMessage;
 
 interface FlowEngineInterface
 {

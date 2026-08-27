@@ -6,8 +6,8 @@ namespace App\Domains\Broadcasting\Models;
 
 use App\Domains\Broadcasting\Enums\RecipientStatus;
 use App\Domains\Contact\Models\Contact;
-use FAPost\Support\Concerns\HasUlidPrimaryKey;
-use FAPost\Support\Models\BaseModel;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
+use Fapost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 

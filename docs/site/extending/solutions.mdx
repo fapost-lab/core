@@ -3,7 +3,52 @@ title: "Building a Solution"
 description: "Composer-distributed extensions that ship with the application."
 ---
 
+A Solution is a vertical product module — HR, recruitment, anything with its own
+domain behaviour — distributed as a Composer package under your own vendor.
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  The external Solution lifecycle is planned, not product-complete in Core. The
+  boundaries below are enforced today; the installation and release tooling around
+  them is still being built. Treat this page as the contract you will be held to,
+  not as a finished walkthrough.
 </Note>
+
+## Boundaries
+
+A Solution must not live under `app/Solutions` inside Core. It is an external
+package, resolved through Composer like any other dependency — see
+[Development setup](/extending/development-setup) for the two-lane workflow.
+
+Its public contracts belong in `fapost/foundation`. Dependency-free primitives
+belong in `fapost/support`. Neither package may reference `App\…`, and neither may
+absorb business logic that belongs to Core.
+
+Front-end components are possible, but only through the agreed build and publish
+contract. A Solution cannot drop Vue files into a running application — the
+builder front end is compiled ahead of time.
+
+## What a Solution typically contains
+
+Most Solutions are a combination of pieces documented elsewhere in this section:
+
+<CardGroup cols={2}>
+  <Card title="Node handlers" href="/extending/flow-nodes/handler-contract">
+    So flows can act on your domain.
+  </Card>
+  <Card title="A data accessor" href="/extending/data-accessors">
+    So conditions can read your data without duplicating it.
+  </Card>
+  <Card title="Builder configuration" href="/extending/builder-ui">
+    So your nodes can be configured on the canvas.
+  </Card>
+  <Card title="Migrations" href="/extending/plugins">
+    Subject to the same migration isolation rules as Core.
+  </Card>
+</CardGroup>
+
+## Before you start
+
+Read [Choosing an extension type](/extending/choosing-an-extension-type) first. The
+most common mistake is building a Solution for something that has no domain of its
+own and should have been a Plugin — or, more expensively, building one for
+something that belongs in Core.

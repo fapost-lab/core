@@ -8,7 +8,7 @@ use App\Domains\Channels\Services\IngressMigrator;
 use App\Domains\Webhook\Enums\IngressDriver;
 use App\Domains\Webhook\Services\IngressSpecResolver;
 use App\Domains\Webhook\Services\WebhookUrlGenerator;
-use FAPost\Foundation\Channel\Ingress\IngressSpec;
+use Fapost\Foundation\Channel\Ingress\IngressSpec;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Facades\Http;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Contact\Models;
 
 use App\Domains\Channels\Models\Channel;
-use FAPost\Support\Concerns\HasUlidPrimaryKey;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

@@ -1,6 +1,6 @@
 # Platform Development
 
-This section is for developers changing FAPost Core itself.
+This section is for developers changing FaPost Core itself.
 
 ## Read First
 

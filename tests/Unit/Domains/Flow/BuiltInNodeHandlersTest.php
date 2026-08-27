@@ -28,20 +28,20 @@ use App\Domains\Flow\State\Variables\VariableResolver;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
 use App\Domains\Media\Contracts\MediaServiceInterface;
-use FAPost\Foundation\Contracts\DataAccessorInterface;
-use FAPost\Foundation\Contracts\RagAdapterInterface;
-use FAPost\Foundation\DTO\IncomingMessage;
-use FAPost\Foundation\DTO\IncomingMessageType;
-use FAPost\Foundation\DTO\NodeExecutionContext;
-use FAPost\Foundation\DTO\NodeExecutionStatus;
-use FAPost\Foundation\DTO\RagConfidence;
-use FAPost\Foundation\DTO\RagQueryContext;
-use FAPost\Foundation\DTO\StructuredRagResult;
-use FAPost\Foundation\Flow\Call\CallContext;
-use FAPost\Foundation\Flow\Call\CallRequest;
-use FAPost\Foundation\Flow\Call\CallResult;
-use FAPost\Foundation\Flow\Call\CallTransportInterface;
-use FAPost\Foundation\Flow\Enums\StateNamespace;
+use Fapost\Foundation\Contracts\DataAccessorInterface;
+use Fapost\Foundation\Contracts\RagAdapterInterface;
+use Fapost\Foundation\DTO\IncomingMessage;
+use Fapost\Foundation\DTO\IncomingMessageType;
+use Fapost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\DTO\NodeExecutionStatus;
+use Fapost\Foundation\DTO\RagConfidence;
+use Fapost\Foundation\DTO\RagQueryContext;
+use Fapost\Foundation\DTO\StructuredRagResult;
+use Fapost\Foundation\Flow\Call\CallContext;
+use Fapost\Foundation\Flow\Call\CallRequest;
+use Fapost\Foundation\Flow\Call\CallResult;
+use Fapost\Foundation\Flow\Call\CallTransportInterface;
+use Fapost\Foundation\Flow\Enums\StateNamespace;
 use Mockery;
 use Tests\TestCase;
 
@@ -528,7 +528,7 @@ final class BuiltInNodeHandlersTest extends TestCase
     {
         $handler = new AssignNodeHandler(new TemplateRenderer(), new VariableResolver());
 
-        $writer = Mockery::mock(\FAPost\Foundation\Flow\Contracts\ContactWriterInterface::class);
+        $writer = Mockery::mock(\Fapost\Foundation\Flow\Contracts\ContactWriterInterface::class);
         $writer->shouldReceive('write')->once()->with('contact.first_name', 'Jane');
 
         $contextWithWriter = $this->contextWithContactWriter($writer);
@@ -550,7 +550,7 @@ final class BuiltInNodeHandlersTest extends TestCase
     {
         $handler = new AssignNodeHandler(new TemplateRenderer(), new VariableResolver());
 
-        $writer = Mockery::mock(\FAPost\Foundation\Flow\Contracts\ContactWriterInterface::class);
+        $writer = Mockery::mock(\Fapost\Foundation\Flow\Contracts\ContactWriterInterface::class);
         $writer->shouldReceive('write')->once()->with('contact.language', 'es');
         $writer->shouldReceive('write')->once()->with('contact.language', 'de');
 
@@ -612,7 +612,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
     public function test_input_with_new_variable_contact_storage_writes_through_writer(): void
     {
-        $writer = Mockery::mock(\FAPost\Foundation\Flow\Contracts\ContactWriterInterface::class);
+        $writer = Mockery::mock(\Fapost\Foundation\Flow\Contracts\ContactWriterInterface::class);
         $writer->shouldReceive('write')->once()->with('contact.profile.first_name', 'Jane');
 
         $handler = new InputNodeHandler(
@@ -800,7 +800,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
     public function test_assign_with_operations_writes_session_and_contact_in_one_node(): void
     {
-        $writer = Mockery::mock(\FAPost\Foundation\Flow\Contracts\ContactWriterInterface::class);
+        $writer = Mockery::mock(\Fapost\Foundation\Flow\Contracts\ContactWriterInterface::class);
         $writer->shouldReceive('write')->once()->with('contact.first_name', 'Jane');
 
         $handler = new AssignNodeHandler(new TemplateRenderer(), new VariableResolver());
@@ -1486,7 +1486,7 @@ final class BuiltInNodeHandlersTest extends TestCase
     }
 
     private function contextWithContactWriter(
-        \FAPost\Foundation\Flow\Contracts\ContactWriterInterface $writer,
+        \Fapost\Foundation\Flow\Contracts\ContactWriterInterface $writer,
     ): NodeExecutionContext {
         return new NodeExecutionContext(
             tenantId: 'tenant-1',

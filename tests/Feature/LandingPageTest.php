@@ -22,7 +22,7 @@ final class LandingPageTest extends FeatureTestCase
     {
         $response = $this->get('/');
 
-        $response->assertSee('FAPOST');
+        $response->assertSee('FaPost');
         $response->assertSee('presale-form');
     }
 

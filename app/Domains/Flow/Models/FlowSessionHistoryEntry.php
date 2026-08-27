@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Models;
 
-use FAPost\Foundation\Flow\History\HistoryEventType;
-use FAPost\Support\Concerns\HasUlidPrimaryKey;
-use FAPost\Support\Models\BaseModel;
+use Fapost\Foundation\Flow\History\HistoryEventType;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
+use Fapost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**

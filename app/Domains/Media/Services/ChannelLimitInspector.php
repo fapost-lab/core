@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Media\Services;
 
-use FAPost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Media\Enums\MediaKind;
 
 /**
  * Compares an uploaded file's size against per-channel provider limits and surfaces
@@ -34,7 +34,7 @@ final readonly class ChannelLimitInspector
         foreach ($this->limits as $channelType => $perKind) {
             $limit = $perKind[$kind->value] ?? null;
 
-            if ( ! is_int($limit) || $sizeBytes <= $limit) {
+            if (! is_int($limit) || $sizeBytes <= $limit) {
                 continue;
             }
 

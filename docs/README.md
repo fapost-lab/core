@@ -1,6 +1,6 @@
 # Documentation
 
-This directory is the repository documentation home for FAPost Core.
+This directory is the repository documentation home for FaPost Core.
 
 Use [INDEX.md](./INDEX.md) for the complete map. The short version:
 

@@ -3,7 +3,130 @@ title: "Runtime architecture"
 description: "How a message travels from webhook to reply."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+## The path of an incoming message
+
+```mermaid
+sequenceDiagram
+    actor U as Contact
+    participant TG as Provider API
+    participant WC as WebhookController
+    participant RD as Redis
+    participant Q as Queue<br/>flow.execution
+    participant J as IncomingMessageJob
+    participant MR as MessageRouter
+    participant FO as FlowOrchestrator
+    participant FE as FlowEngine
+    participant NH as NodeHandler
+    participant MS as MessageSender
+
+    U->>TG: sends a message
+    TG->>WC: POST /webhook/{channel}/{public_hash}
+
+    WC->>RD: GET webhook_registry:{hash}
+    RD-->>WC: tenant, assistant, channel, secret
+    WC->>WC: verify signature
+    WC->>Q: dispatch IncomingMessageJob
+    WC-->>TG: 200 OK (fast ack)
+
+    Note over Q,J: asynchronous, separate worker
+
+    Q->>J: process(message, context)
+    J->>J: set tenant context, switch schema
+    J->>MR: route(incomingMessage)
+
+    Note over MR: 1. idempotency
+    MR->>RD: SET NX processed:{update_id} EX 86400
+    alt already processed
+        RD-->>MR: 0 — duplicate, skip
+    end
+
+    Note over MR: 2. command match
+    MR->>MR: match /reset, /cancel
+
+    Note over MR: 3. distributed lock
+    MR->>RD: LOCK session:{tenant}:{contact}:{assistant} TTL 30s
+    alt lock held
+        MR->>MS: busy notice
+    end
+
+    Note over MR: 4. route on session state
+    MR->>FO: orchestrate(session, message)
+    FO->>FE: execute(session, flowDefinition)
+
+    loop execution loop
+        FE->>FE: resolve handler by (type, version)
+        FE->>NH: execute(nodeConfig, state, context)
+        NH-->>FE: NodeExecutionResult
+        FE->>FE: apply stateChanges (optimistic lock)
+        FE->>FE: next = edge for sourceHandle
+        FE->>MS: deliver outbound messages
+        MS->>TG: reply to the contact
+    end
+
+    FE-->>FO: finished, or waiting for input
+    MR->>RD: release lock (token-checked)
+```
+
+## Tenancy
+
+Tenant context is a runtime coordinate, not an option.
+
+- Tenant context is mandatory; runtime code fails fast without it
+- Core does not branch into `single-tenant` versus `saas` modes
+- Context switching is encapsulated by the Tenancy domain
+- User data lives in tenant schemas
+
+See [Tenant-aware execution](/contributing/tenant-aware-execution).
+
+## Flow engine
+
+- A flow is stored as a JSON graph
+- The execution loop is deterministic
+- Handlers resolve by `(type, version)`
+- Registries are built at boot, with no database lookup on the hot path
+
+A handler is graph-unaware: it returns a `sourceHandle`, and the engine resolves
+the next node from the flow's edges. See
+[Handler contract](/extending/flow-nodes/handler-contract).
+
+## Concurrency
+
+Incoming message processing has three protection layers, and they guard different
+failures:
+
+| Layer | Guards against |
+|---|---|
+| Redis idempotency key | The provider delivering the same update twice |
+| Distributed lock on the session | Two messages from one contact racing each other |
+| Optimistic lock on `flow_sessions.version` | A concurrent write landing between read and update |
+
+A lock that cannot be acquired produces a **busy notice**, not a dropped message —
+the job goes to a backoff queue.
+
+## Webhook routing
+
+The URL is `/webhook/{channel}/{public_hash}`, and `public_hash` resolves through
+Redis.
+
+<Warning>
+  The landlord database must not participate in a routing hot path. Resolution is
+  a Redis lookup precisely so that inbound traffic never waits on platform-level
+  storage.
+</Warning>
+
+Inbound messages are handed to `IncomingMessageJob` and resolved through the
+tenant-aware routing pipeline.
+
+## Queues
+
+Queues are separated by purpose, not by convenience — see
+[Queues](/reference/queues) for the full list and the reasoning.
+
+## Ingress
+
+Webhook ingress is served by PHP-FPM, or — when volume justifies it — by the Go
+[webhook gateway](/self-hosting/gateway) in front of it. Core runs no long-lived
+PHP request runtime.
+
+Queue workers, however, are long-lived: one Horizon process handles many jobs. See
+[Long-lived worker safety](/contributing/worker-safety) for what that forbids.

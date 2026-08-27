@@ -3,7 +3,7 @@
 **Документ:** UX/UI спецификация для Flow Constructor
 **Версия:** 1.0
 **Дата:** Апрель 2026
-**Контекст:** FAPost Phase 2 — Flow Engine, Sprint 6 (Flow Constructor UI)
+**Контекст:** FaPost Phase 2 — Flow Engine, Sprint 6 (Flow Constructor UI)
 **Связанные документы:** Flow Engine Nodes V1, Platform Architecture v2.2
 
 ---

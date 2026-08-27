@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** Апрель 2026
-**Контекст:** FAPost Phase 2 — Flow Engine
+**Контекст:** FaPost Phase 2 — Flow Engine
 **Связанные документы:** `docs/reference/specs/flow-engine/`, `docs/platform/architecture/adr/09-message-routing-concurrency.md`, Platform Architecture v2.2
 
 ---
@@ -124,7 +124,7 @@ Subflow lifecycle — два разных session row. Каждая session ра
 Living в `fapost/foundation`:
 
 ```php
-namespace FAPost\Foundation\Contracts\Flow\State;
+namespace Fapost\Foundation\Contracts\Flow\State;
 
 interface ScopedStateWriterInterface
 {
@@ -151,7 +151,7 @@ interface ScopedStateWriterInterface
 ### ScopedStateReaderInterface
 
 ```php
-namespace FAPost\Foundation\Contracts\Flow\State;
+namespace Fapost\Foundation\Contracts\Flow\State;
 
 interface ScopedStateReaderInterface
 {
@@ -425,7 +425,7 @@ V1.x — добавим retention policy per tenant (например, 90 дне
 ### HistoryLoggerInterface
 
 ```php
-namespace FAPost\Foundation\Contracts\Flow\History;
+namespace Fapost\Foundation\Contracts\Flow\History;
 
 interface HistoryLoggerInterface
 {

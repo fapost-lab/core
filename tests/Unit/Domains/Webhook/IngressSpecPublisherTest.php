@@ -9,7 +9,7 @@ use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Telegram\TelegramAdapter;
 use App\Domains\Webhook\Services\IngressSpecPublisher;
 use App\Domains\Webhook\Services\IngressSpecResolver;
-use FAPost\Foundation\Channel\Ingress\IngressSpec;
+use Fapost\Foundation\Channel\Ingress\IngressSpec;
 use Illuminate\Support\Facades\Redis;
 use Mockery\MockInterface;
 use Tests\TestCase;

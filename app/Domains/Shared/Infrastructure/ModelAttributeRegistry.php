@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Shared\Infrastructure;
 
 use Closure;
-use FAPost\Foundation\Contracts\ModelAttributeResolverInterface;
+use Fapost\Foundation\Contracts\ModelAttributeResolverInterface;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 
@@ -15,7 +15,7 @@ use LogicException;
  * Implements {@see ModelAttributeResolverInterface} so the fapost/support traits can depend
  * on the contract without coupling to this Core implementation.
  *
- * Used by {@see \FAPost\Support\Concerns\HasComputedAttributes} to resolve computed attributes
+ * Used by {@see \Fapost\Support\Concerns\HasComputedAttributes} to resolve computed attributes
  * and to include only {@code append=true} attributes into {@see Model::toArray()} / toJson().
  *
  * @phpstan-type RegisteredEntry array{0: Closure(Model): mixed, 1: bool} // [resolver, append]
@@ -75,7 +75,7 @@ final class ModelAttributeRegistry implements ModelAttributeResolverInterface
      */
     public function resolve(string $modelClass, string $name, Model $model): mixed
     {
-        if ( ! isset($this->entries[$modelClass][$name])) {
+        if (! isset($this->entries[$modelClass][$name])) {
             throw new LogicException(
                 sprintf(
                     'No model attribute [%s] registered on [%s].',

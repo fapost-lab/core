@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Flow\Expression;
 
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
-use FAPost\Foundation\Flow\Contracts\ExpressionEngineInterface;
-use FAPost\Foundation\Flow\Contracts\ExpressionEngineNotFoundException;
-use FAPost\Foundation\Flow\DTO\ExpressionContext;
+use Fapost\Foundation\Flow\Contracts\ExpressionEngineInterface;
+use Fapost\Foundation\Flow\Contracts\ExpressionEngineNotFoundException;
+use Fapost\Foundation\Flow\DTO\ExpressionContext;
 use LogicException;
 use Tests\TestCase;
 

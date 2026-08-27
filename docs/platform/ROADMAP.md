@@ -1,4 +1,4 @@
-# FAPost Core — Дорожная карта
+# FaPost Core — Дорожная карта
 
 Product vision от текущего состояния до SaaS-оболочки, Solutions и Inbox.  
 Детализация по задачам — [[TASKS]]. Навигация по документам — [[INDEX]].
@@ -300,7 +300,7 @@ M9 (Multi-channel / WhatsApp) удалён из планов.
 - [ ] `SolutionManifest` validation при `platform:update`  
 - [ ] `vendor:publish` для Solution Vue компонентов + `npm run build` шаг  
 - [ ] `ActionHandlerRegistry` — регистрация `hr.*`, `crm.*` handler'ов  
-- [ ] Первый Solution: **FAPost HR** (`hr.sync_employee`, `hr.create_assessment`)  
+- [ ] Первый Solution: **FaPost HR** (`hr.sync_employee`, `hr.create_assessment`)  
 - [ ] Filament: Solution activation UI (install/activate/deactivate)  
 - [ ] E2E тест: Solution installs → handler available → call node executes
 
@@ -345,7 +345,7 @@ M9 (Multi-channel / WhatsApp) удалён из планов.
 
 ## 📋 Milestone 12 — MCP Server
 
-> *FAPost как surface для AI-агентов: внешний агент (Claude, ChatGPT, собственный агент арендатора)
+> *FaPost как surface для AI-агентов: внешний агент (Claude, ChatGPT, собственный агент арендатора)
 > читает и управляет платформой через Model Context Protocol.*
 
 **Когда:** после M2; растёт вместе с M3/M4 (транскрипты и рассылки — основной материал для tool'ов)

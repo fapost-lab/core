@@ -14,7 +14,7 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Database\Seeders\TenantAclSeeder;
-use FAPost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Media\Enums\MediaKind;
 use Illuminate\Http\UploadedFile;
 use Tests\Feature\FeatureTestCase;
 

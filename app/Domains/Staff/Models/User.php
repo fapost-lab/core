@@ -9,7 +9,7 @@ use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Database\Factories\UserFactory;
-use FAPost\Support\Concerns\HasUlidPrimaryKey;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;

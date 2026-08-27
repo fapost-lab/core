@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** Апрель 2026
-**Контекст:** FAPost Phase 2 — Flow Engine
+**Контекст:** FaPost Phase 2 — Flow Engine
 **Связанные документы:** `docs/reference/specs/flow-engine/`, Platform Architecture v2.2
 
 ---
@@ -436,7 +436,7 @@ Notice text — `assistant.busy_message` field, default value provided. Tenant �
 ### ChannelAdapter Abstraction
 
 ```php
-namespace FAPost\Foundation\Contracts\Channel;
+namespace Fapost\Foundation\Contracts\Channel;
 
 interface ChannelAdapterInterface
 {
@@ -595,7 +595,7 @@ final class TypingSession
 ### MessageSender
 
 ```php
-namespace FAPost\Foundation\Contracts\Messaging;
+namespace Fapost\Foundation\Contracts\Messaging;
 
 interface MessageSenderInterface
 {

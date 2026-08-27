@@ -13,7 +13,7 @@ use App\Domains\Flow\History\NoOpHistoryWriter;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
-use FAPost\Foundation\Flow\History\HistoryEventType;
+use Fapost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Support\Str;
 use Psr\Log\NullLogger;
 use Tests\Feature\FeatureTestCase;

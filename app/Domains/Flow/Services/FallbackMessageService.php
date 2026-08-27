@@ -9,9 +9,9 @@ use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
-use FAPost\Foundation\Messaging\MessagePayload;
-use FAPost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Messaging\MessagePayload;
+use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
+use Fapost\Foundation\Messaging\OutboundMessage;
 use Illuminate\Support\Str;
 use Throwable;
 

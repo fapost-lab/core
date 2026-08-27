@@ -3,7 +3,73 @@ title: "Testing and architecture checks"
 description: "PHPUnit suites and the PHPat rules that guard boundaries."
 ---
 
+Every code change carries a minimal relevant test, and that test is run.
+
+## Commands
+
+```bash
+composer test
+```
+
+Runs the PHPUnit suites declared in `phpunit.xml`. `php artisan test` does the
+same; `--compact` is useful when you only care about failures.
+
+```bash
+composer run test:arch
+```
+
+Runs the PHPat architecture rules through PHPStan. The rules live in
+`tests/Architecture`. The low-level equivalent:
+
+```bash
+vendor/bin/phpstan analyse --configuration phpstan.neon
+```
+
+<Warning>
+  Do not run `php artisan test tests/Architecture` as the architecture check.
+  Those classes are not PHPUnit `TestCase`s — the command reports success while
+  verifying nothing, which is worse than not running it at all.
+</Warning>
+
+The default PHPUnit run does cover PHPat, indirectly: `tests/Unit/Architecture/MigrationTest.php`
+invokes PHPStan. So `composer test` catches an architecture violation even when
+`test:arch` is not run separately.
+
+## What the architecture rules enforce
+
+They are the executable form of the boundaries described in this section:
+
+- [Dependency direction](/contributing/dependency-direction) — `foundation` and
+  `support` must not reference `App\…`
+- [Migration isolation](/contributing/migration-isolation) — no runtime state in
+  `up()` or `down()`
+- [Tenant-aware execution](/contributing/tenant-aware-execution) — no landlord
+  access from domains outside `Tenancy`
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  The PHPat rules and the prose describing them are expected to agree. If you
+  change one, change the other — a rule that no document explains gets worked
+  around, and a document no rule enforces gets ignored.
 </Note>
+
+## Formatting
+
+```bash
+vendor/bin/pint --dirty --format agent
+```
+
+Run after changing PHP.
+
+## What a good test covers
+
+Test the contract, not the implementation. For a node handler that means the
+status, the `sourceHandle` per outcome, and the `stateChanges` — those are what
+the engine and the flow author depend on.
+
+Tenant isolation deserves explicit coverage wherever code touches persistence. Two
+tenants, and an assertion that one cannot see the other's rows, is worth more than
+several tests of the happy path — it is the failure that matters most and shows up
+least.
+
+Retry safety deserves the same. Execute twice, assert the external effect happened
+once. See [Idempotency and retries](/extending/flow-nodes/idempotency).

@@ -16,7 +16,7 @@ final class MessagingBoundariesTest
             ->classes(Selector::inNamespace('App\\Domains\\Flow', true))
             ->shouldNotDependOn()
             ->classes(
-                Selector::classname('FAPost\\Foundation\\Messaging\\ProviderSenderInterface'),
+                Selector::classname('Fapost\\Foundation\\Messaging\\ProviderSenderInterface'),
                 Selector::inNamespace('App\\Domains\\Messaging\\Telegram', true),
             )
             ->because('Flow domain must stay decoupled from messaging provider implementations.');

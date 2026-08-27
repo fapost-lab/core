@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Logging;
 
-use FAPost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
-use FAPost\Foundation\Analytics\DTO\AnalyticsEvent;
+use Fapost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
+use Fapost\Foundation\Analytics\DTO\AnalyticsEvent;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Str;
 use JsonException;

@@ -3,7 +3,53 @@ title: "Migration isolation"
 description: "Why migrations must not depend on runtime state."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+A migration is a DDL operation. `up()` and `down()` must not depend on runtime
+state.
+
+## Not allowed
+
+- `app()`, `config()`, or `env()` for runtime decisions
+- `TenantContext::get()` and tenant-aware services
+- Branching on feature or module activation
+- Seed data that depends on runtime state
+- `DB::table()` against another module's tables from this module's migration
+
+## Why
+
+A migration runs in contexts its author did not picture: on a fresh install with
+no configuration yet, during a rollback, on a tenant created next year, from a CI
+job with a different environment, in whatever order the migrator chose.
+
+A migration that reads configuration produces a **different schema** depending on
+when it ran. Two installations then diverge structurally while reporting the same
+migration state — and the next migration, which assumes one shape, meets the
+other.
+
+Branching on module activation has the same effect with an extra trap: enabling
+the module later does not re-run the migration, so the table never appears and the
+failure surfaces as a missing column at runtime.
+
+Touching another module's tables makes the migration order a hidden dependency.
+Migrations from separate modules interleave; the table you read may not exist yet,
+and nothing in either module says so.
+
+## The consequence for extensions
+
+This applies to Plugin and Solution migrations exactly as it applies to Core.
+Register a migrations path through `CoreRegistrarInterface` and let the platform
+mount it — see [Building a Plugin](/extending/plugins).
+
+## How it is checked
+
+These rules are PHPat rules, executed through `phpstan.neon`. The default PHPUnit
+run covers them through `tests/Unit/Architecture/MigrationTest.php`, which invokes
+PHPStan.
+
+```bash
+composer run test:arch
+```
+
+<Warning>
+  Do not run `php artisan test tests/Architecture` as the architecture check —
+  those classes are not PHPUnit `TestCase`s, so the command verifies nothing.
+</Warning>

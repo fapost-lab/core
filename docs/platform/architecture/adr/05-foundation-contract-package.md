@@ -51,7 +51,7 @@ packages/fapost-support/src/
     └── BaseModel.php                  ← агрегирует все три трейта
 ```
 
-`App\Domains\Shared\Concerns\*` и `App\Domains\Shared\Models\BaseModel` — deprecated shell-классы, делегируют в `FAPost\Support\*`. Существуют только для backward compatibility.
+`App\Domains\Shared\Concerns\*` и `App\Domains\Shared\Models\BaseModel` — deprecated shell-классы, делегируют в `Fapost\Support\*`. Существуют только для backward compatibility.
 
 ## Почему HasComputedAttributes в support, а не в Core
 

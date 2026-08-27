@@ -13,8 +13,8 @@ use InvalidArgumentException;
  * Resolves a per-tenant filesystem disk for media storage.
  *
  * Built through {@see Storage::build()} on every call so no global config is mutated —
- * required for Octane safety, since registering tenant-specific disks at boot time
- * would leak between requests.
+ * registering tenant-specific disks at boot time would leak between tenants on a
+ * long-lived worker.
  *
  * Configuration is read from the tenant config namespace `media.storage`. Defaults to
  * a private local disk under `storage/app/tenants/{id}/media` when nothing is configured.
@@ -25,7 +25,7 @@ final class TenantMediaDisk
     {
         $config = $tenant->getConfig('media.storage', []);
 
-        if ( ! is_array($config)) {
+        if (! is_array($config)) {
             $config = [];
         }
 

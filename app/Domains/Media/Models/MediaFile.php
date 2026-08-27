@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Domains\Media\Models;
 
 use App\Domains\Media\Enums\MediaSource;
-use FAPost\Foundation\Media\Enums\MediaKind;
-use FAPost\Support\Concerns\HasUlidPrimaryKey;
-use FAPost\Support\Models\BaseModel;
+use Fapost\Foundation\Media\Enums\MediaKind;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
+use Fapost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;

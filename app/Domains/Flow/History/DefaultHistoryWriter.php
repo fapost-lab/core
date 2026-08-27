@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\History;
 
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
-use FAPost\Foundation\Flow\History\HistoryEventType;
+use Fapost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Support\Carbon;
 use Psr\Log\LoggerInterface;
 use Throwable;

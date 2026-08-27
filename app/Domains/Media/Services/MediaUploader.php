@@ -14,7 +14,7 @@ use App\Domains\Media\Models\MediaFolder;
 use App\Domains\Media\Storage\StoragePathFactory;
 use App\Domains\Media\Storage\TenantMediaDisk;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
-use FAPost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Media\Enums\MediaKind;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use Psr\Http\Message\StreamInterface;
@@ -127,7 +127,7 @@ final class MediaUploader implements MediaUploaderInterface
         $bytesWritten = 0;
 
         try {
-            while ( ! feof($resource)) {
+            while (! feof($resource)) {
                 $chunk = fread($resource, 1024 * 256);
 
                 if (false === $chunk || '' === $chunk) {
@@ -232,7 +232,7 @@ final class MediaUploader implements MediaUploaderInterface
 
         $stream->rewind();
 
-        while ( ! $stream->eof()) {
+        while (! $stream->eof()) {
             $chunk = $stream->read(1024 * 256);
 
             if ('' === $chunk) {

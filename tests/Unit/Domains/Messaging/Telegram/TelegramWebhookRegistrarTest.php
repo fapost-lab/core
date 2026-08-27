@@ -8,7 +8,7 @@ use App\Domains\Channels\Telegram\Contracts\TelegramBotIdentityStoreInterface;
 use App\Domains\Channels\Telegram\TelegramBotApiClientFactory;
 use App\Domains\Channels\Telegram\TelegramWebhookRegistrar;
 use App\Domains\Webhook\Services\WebhookUrlGenerator;
-use FAPost\Foundation\Channel\WebhookRegistrationPayload;
+use Fapost\Foundation\Channel\WebhookRegistrationPayload;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Mockery\MockInterface;

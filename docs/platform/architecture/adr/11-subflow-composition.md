@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** Апрель 2026
-**Контекст:** FAPost Phase 2 — Flow Engine, Sprint 6
+**Контекст:** FaPost Phase 2 — Flow Engine, Sprint 6
 **Связанные документы:** `docs/reference/specs/flow-engine/`, `docs/platform/architecture/adr/09-message-routing-concurrency.md`, `docs/platform/architecture/adr/10-state-writer-semantics.md`, Platform Architecture v2.2
 
 ---

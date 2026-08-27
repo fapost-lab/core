@@ -3,7 +3,77 @@ title: "Channel drivers"
 description: "Adding support for a new messaging provider."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+A channel has two halves: **ingress**, which accepts and verifies what the provider
+sends you, and **egress**, which delivers what the assistant says back.
+
+<Warning>
+  `CoreRegistrarInterface` has no channel-adapter surface today. The contracts
+  below exist and are stable, but there is no registration entry point for a
+  Plugin to add a channel with — a new provider is currently a Core change. The
+  docblock on `AbstractPluginServiceProvider` shows a `registerChannelAdapter()`
+  call; that example is ahead of the interface.
+</Warning>
+
+## Identity
+
+`Fapost\Foundation\Channel\ChannelInterface` is the minimal identity exposed across
+the extension boundary. Core's Eloquent channel models implement it so that
+adapters living outside Core can read identity and credentials without depending
+on `App\…`:
+
+```php
+interface ChannelInterface
+{
+    public function getId(): string;      // ULID stored as lowercase RFC-4122 UUID
+    public function getType(): string;    // "telegram", "whatsapp", …
+    /** @return array<string, mixed> */
+    public function getConfig(): array;   // transport credentials and per-channel options
+}
+```
+
+`getType()` is deliberately a string rather than an enum, so that Foundation stays
+free of Core's taxonomies; Core casts to and from its own enum at the boundary.
+
+## Ingress
+
+The ingress side is declarative. A provider integration describes how its webhook
+is authenticated and deduplicated through an `IngressSpec`, exposed by
+`ProvidesIngressSpecInterface`:
+
+| Piece | Role |
+|---|---|
+| `IngressSpec` | The declarative description of a provider's webhook contract |
+| `SignatureScheme` | How the request is verified — for example `header_equals` |
+| `SignedRequest` | The request as presented for verification |
+| `IngressSpecExecutor` | Applies a spec to an incoming request |
+| `WebhookRegistrarInterface` / `WebhookRegistrationPayload` | Registering the webhook with the provider |
+
+Because the spec is data rather than code, the same description can be executed by
+PHP or by the Go [webhook gateway](/self-hosting/gateway) in front of it. The spec
+also carries the idempotency key template — this is where a value such as
+`tg:{channel}:{body.update_id}` is declared.
+
+Verified traffic becomes an `InboundWebhookPayload`, and then an `IncomingMessage`
+with its `IncomingMessageType` and any `IncomingMedia`.
+
+## Egress
+
+Delivery goes through a transport sender:
+
+```php
+interface ProviderSenderInterface
+{
+    public function deliver(OutboundMessage $message): DeliveryResult;
+}
+```
+
+Two optional capabilities sit alongside it. `TypingCapableProviderInterface`
+exposes a typing or processing indicator through a `ProcessingIndicatorHandle`;
+`ChannelMediaUploaderInterface` and `ChannelMediaDownloaderInterface` handle media
+in each direction.
+
+## Rate limits are preventive
+
+Provider rate limits and backpressure are handled before sending, not as a
+reaction to the provider's error. A sender that discovers the limit by being
+rejected has already spent the request, and on a broadcast that failure multiplies.

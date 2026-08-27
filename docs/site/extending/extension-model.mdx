@@ -3,7 +3,60 @@ title: "Extension model"
 description: "How Features, Solutions, and Plugins differ."
 ---
 
+FaPost Core can be extended in three ways. They differ in who owns the code, how it
+is deployed, and what it is allowed to do to the front end.
+
+| | Lives in | Front end | Released with |
+|---|---|---|---|
+| **Feature** | The Core repository | May ship Core UI | Core itself |
+| **Solution** | Your own Composer package | Requires the build and publish contract | Its own release cycle |
+| **Plugin** | Your own Composer package | No arbitrary runtime Vue | Its own release cycle |
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  The Solution and Plugin lifecycles are not product-complete in Core. The
+  boundaries described here are settled and enforced; the tooling around
+  installing and releasing them is still being built.
 </Note>
+
+## Feature
+
+A Feature is part of the core product surface. It lives in the Core repository,
+follows the same review process as the rest of Core, and ships when Core ships.
+Because it is inside the repository, it may contribute UI to the builder and the
+admin panels directly.
+
+Choose a Feature when the capability belongs to the platform itself — something
+every installation should have, not something a particular customer needs.
+
+## Solution
+
+A Solution is a vertical package: a coherent product module such as HR or
+recruitment, with its own domain behaviour, its own tables, and its own screens.
+It is distributed as a Composer package under your own vendor and installed
+alongside Core.
+
+A Solution must not live under `app/Solutions` inside Core. Its public contracts
+belong in `fapost/foundation`; reusable primitives that carry no domain meaning
+belong in `fapost/support`, which itself depends only on `fapost/foundation`. Front-end components are possible, but only through the agreed
+build and publish contract — not by dropping Vue files into the running
+application.
+
+## Plugin
+
+A Plugin registers runtime behaviour with Core: node handlers, transports,
+commands, routes, schedules, migrations. It is the smallest of the three and the
+most constrained, because it is installed into a running system rather than built
+into it.
+
+A Plugin depends on public contracts, never on concrete Core internals, and it
+cannot inject arbitrary Vue components into the builder — the front end is already
+compiled by the time a Plugin is enabled.
+
+## The rule underneath all three
+
+Everything outside the Core repository depends on `fapost/foundation`, never on
+`App\…`. That single constraint is what makes Core able to refactor its own
+internals without breaking the extensions built on it. See
+[Stability policy](/extending/stability-policy) for what that promise covers.
+
+Next: [Choosing an extension type](/extending/choosing-an-extension-type).

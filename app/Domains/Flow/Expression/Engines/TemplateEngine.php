@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Expression\Engines;
 
-use FAPost\Foundation\Flow\Contracts\ExpressionEngineInterface;
-use FAPost\Foundation\Flow\Contracts\ExpressionSyntaxException;
-use FAPost\Foundation\Flow\DTO\ExpressionContext;
+use Fapost\Foundation\Flow\Contracts\ExpressionEngineInterface;
+use Fapost\Foundation\Flow\Contracts\ExpressionSyntaxException;
+use Fapost\Foundation\Flow\DTO\ExpressionContext;
 
 /**
  * Built-in V1 expression engine — pure {@code {{path}}} substitution.
@@ -41,7 +41,7 @@ final class TemplateEngine implements ExpressionEngineInterface
 
     public function evaluate(string $source, ExpressionContext $context): string
     {
-        if ( ! str_contains($source, '{{')) {
+        if (! str_contains($source, '{{')) {
             return $source;
         }
 

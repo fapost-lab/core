@@ -22,7 +22,7 @@ $iterator = Finder::create()
     ->in($paths);
 
 return new Doctum($iterator, [
-    'title'                => 'FAPost Core API',
+    'title'                => 'FaPost Core API',
     'build_dir'            => __DIR__ . '/../../public/core',
     'cache_dir'            => __DIR__ . '/cache',
     'default_opened_level' => 2,

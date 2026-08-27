@@ -1,0 +1,60 @@
+---
+title: "Long-lived worker safety"
+description: "Why state must not survive between jobs, and how to keep it from doing so."
+---
+
+HTTP requests are served by PHP-FPM, where the process dies at the end of each
+request and forgetting to reset state costs nothing.
+
+Queue workers are different. A Horizon worker boots once and processes many jobs
+in the same process. Anything held across jobs — a captured request, a resolved
+tenant, a cached config value, a static property — is still there when the next
+job starts. In a multi-tenant system that has a name: one tenant reading another's
+data.
+
+## Rules
+
+**Do not hold request, config repository, tenant context, or current assistant in
+a singleton constructor.** A singleton is resolved once and reused; whatever it
+captured on the first job is what every later job sees.
+
+**Keep mutable request or job state in `scoped` bindings.** Laravel rebuilds
+`scoped` bindings per job, which is exactly the lifetime such an object needs.
+
+**Switch tenants through `TenantSwitcher::runForTenant()`, restoring in
+`finally`.** Without the restore, the next job inherits the context.
+
+```php
+$switcher->runForTenant($tenantId, function () {
+    // work in that tenant's context
+});
+```
+
+**Never write to static properties between jobs.** A static is process-wide, not
+job-wide.
+
+## Why this is a boundary and not a guideline
+
+These mistakes do not show up in testing. Locally you are the only user, jobs run
+one at a time, and the tenant is always the same — so state that leaks is state
+that happens to be correct. The failure needs concurrency and more than one tenant,
+which is to say it needs production.
+
+That is why the constraint is enforced rather than recommended, and why a binding
+that looks safe today carries a note explaining what it assumes. If the assumption
+changes, the note is what tells the next person to audit it.
+
+## Where the ingress load goes instead
+
+FaPost does not run a long-lived PHP request runtime. Webhook ingress — the one
+surface with enormous volume and trivial per-request work — is handled either by
+PHP-FPM directly or, when the volume justifies it, by the Go
+[webhook gateway](/self-hosting/gateway) in front of it.
+
+<Note>
+  Core previously used Laravel Octane for ingress, and ADR-01 recorded that
+  decision. Octane has been removed: `laravel/octane`, `config/octane.php`, and
+  `OCTANE_SERVER` are no longer part of Core. The rules on this page survived the
+  removal because they were never really about Octane — queue workers are
+  long-lived too.
+</Note>

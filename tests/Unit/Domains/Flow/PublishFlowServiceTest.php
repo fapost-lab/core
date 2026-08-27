@@ -101,7 +101,7 @@ final class PublishFlowServiceTest extends TestCase
                     return false;
                 }
 
-                public function resolve(string $namespacePrefix): \FAPost\Foundation\Contracts\DataAccessorInterface
+                public function resolve(string $namespacePrefix): \Fapost\Foundation\Contracts\DataAccessorInterface
                 {
                     throw new LogicException('Not needed in this test.');
                 }

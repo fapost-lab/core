@@ -3,7 +3,60 @@ title: "Coding conventions"
 description: "The style and idioms Core code follows."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+The first rule is the one that overrides the rest: **follow the patterns of the
+files around you.** These conventions describe what you will find there.
+
+## PHP
+
+- Every `.php` file starts with `declare(strict_types=1);`
+- `final class` by default
+- Constructor property promotion, and explicit return types
+- `enum` for fixed sets, never a group of constants
+- Enum cases in `TitleCase`
+
+## Comments
+
+PHPDoc carries meaning, array shapes, and generics — not a restatement of the
+signature. Inline comments are for logic that is genuinely non-obvious, and they
+explain **why**, not what.
+
+## Dependencies in domain code
+
+<Warning>
+  Do not use `app()`, `resolve()`, or global Laravel helpers as hidden
+  dependencies inside domain services.
+</Warning>
+
+Inject what you need. A service whose dependencies are visible in its constructor
+can be tested, reasoned about, and safely reused across jobs; one that reaches
+into the container cannot.
+
+Facades are acceptable in the infrastructure layer — providers, jobs, controllers,
+migrations, framework adapters. That is the boundary where the framework is
+already present.
+
+## Persistence
+
+Eloquent models live in `Domains/{Domain}/Models`. Relations stay on the models,
+where Eloquent's query capabilities need them.
+
+Use a repository or port where the domain crosses a persistence boundary or
+another bounded context. Do not query Eloquent directly from a domain service that
+has a repository available.
+
+## Creating things
+
+Prefer `php artisan make:* --no-interaction` for new Laravel artifacts where it
+fits — it produces the shape the framework expects.
+
+Do not add dependencies without agreement.
+
+## After you change PHP
+
+```bash
+vendor/bin/pint --dirty --format agent
+```
+
+Every change is expected to carry a minimal relevant test, and that test is
+expected to have been run. See
+[Testing and architecture checks](/contributing/testing).

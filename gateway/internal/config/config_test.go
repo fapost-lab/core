@@ -23,7 +23,7 @@ func TestDotenvParsesTheFormatsLaravelFilesUse(t *testing.T) {
 	path := writeDotenv(t, `
 # comment line
 APP_URL=http://localhost
-APP_NAME="FAPost Core"
+APP_NAME="FaPost Core"
 QUOTED_SINGLE='single value'
 WEBHOOK_BASE_URL="${APP_URL}"
 export EXPORTED=yes
@@ -42,7 +42,7 @@ EMPTY=
 
 	expected := map[string]string{
 		"APP_URL":          "http://localhost",
-		"APP_NAME":         "FAPost Core",
+		"APP_NAME":         "FaPost Core",
 		"QUOTED_SINGLE":    "single value",
 		"WEBHOOK_BASE_URL": "http://localhost",
 		"EXPORTED":         "yes",
@@ -119,7 +119,7 @@ func TestLoadRejectsAnUpstreamWithoutSchemeOrHost(t *testing.T) {
 func TestRedisPrefixFallsBackToTheFrameworkDerivation(t *testing.T) {
 	t.Setenv("GATEWAY_UPSTREAM_URL", "https://app.example.com")
 	os.Unsetenv("REDIS_PREFIX")
-	t.Setenv("APP_NAME", "FAPost Core")
+	t.Setenv("APP_NAME", "FaPost Core")
 
 	settings, err := Load("")
 	if err != nil {
@@ -166,10 +166,10 @@ func TestDurationsAcceptBareSeconds(t *testing.T) {
 
 func TestSlugMatchesTheFrameworkForApplicationNames(t *testing.T) {
 	cases := map[string]string{
-		"FAPost Core":  "fapost-core",
+		"FaPost Core":  "fapost-core",
 		"fapost_core":  "fapost-core",
-		"  FAPost  ":   "fapost",
-		"FAPost--Core": "fapost-core",
+		"  FaPost  ":   "fapost",
+		"FaPost--Core": "fapost-core",
 	}
 
 	for input, want := range cases {

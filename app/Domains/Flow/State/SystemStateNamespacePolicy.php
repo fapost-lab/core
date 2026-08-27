@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\State;
 
 use App\Domains\Flow\Exceptions\StateNamespaceViolationException;
-use FAPost\Foundation\Flow\Enums\StateNamespace;
+use Fapost\Foundation\Flow\Enums\StateNamespace;
 
 /**
  * Runtime authority over which node types may write into which top-level

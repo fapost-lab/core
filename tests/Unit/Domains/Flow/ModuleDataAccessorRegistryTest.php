@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Flow;
 
 use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
-use FAPost\Foundation\Contracts\DataAccessorInterface;
+use Fapost\Foundation\Contracts\DataAccessorInterface;
 use LogicException;
 use Tests\TestCase;
 

@@ -18,7 +18,7 @@ use App\Domains\Flow\State\StateReader;
 use App\Domains\Flow\State\StateWriter;
 use App\Domains\Flow\State\WriteContext;
 use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
-use FAPost\Foundation\Contracts\DataAccessorInterface;
+use Fapost\Foundation\Contracts\DataAccessorInterface;
 use InvalidArgumentException;
 use LogicException;
 use Tests\TestCase;

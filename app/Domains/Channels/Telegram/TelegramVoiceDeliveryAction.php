@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Channels\Telegram;
 
 use App\Domains\Channels\Telegram\Dto\SendVoiceDto;
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Messaging\OutboundMessage;
 
 final class TelegramVoiceDeliveryAction implements TelegramDeliveryActionInterface
 {

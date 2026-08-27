@@ -3,7 +3,59 @@ title: "Testing your extension"
 description: "The checks an extension is expected to pass."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+Every change needs a focused programmatic check. Not a full suite run per edit —
+the specific test that proves the thing you changed does what you say it does.
+
+## Commands
+
+```bash
+php artisan test --compact path/to/Test.php
+```
+
+```bash
+npm run type-check
+```
+
+```bash
+composer run test:arch
+```
+
+## The architecture check
+
+`composer run test:arch` runs the PHPat rules through PHPStan. These are the rules
+that enforce the boundaries this section describes — dependency direction,
+migration isolation, tenant-aware execution — so an extension that violates one
+fails here rather than in review.
+
+<Warning>
+  Do not run `php artisan test tests/Architecture` as the architecture check.
+  Those classes are not PHPUnit `TestCase`s, so the command reports nothing and
+  the boundary goes unverified.
+</Warning>
+
+The default PHPUnit run covers PHPat indirectly through
+`tests/Unit/Architecture/MigrationTest.php`, which invokes PHPStan. The low-level
+equivalent is:
+
+```bash
+vendor/bin/phpstan analyse --configuration phpstan.neon
+```
+
+## What to cover
+
+**A node handler** should be tested for what it returns, not for what it does
+internally: the status, the `sourceHandle` for each outcome, and the
+`stateChanges` it produces. Those three are the contract; everything else is
+implementation.
+
+**Retry safety** deserves its own test. Run `execute()` twice with the same input
+and assert the external effect happened once — this is the failure that only
+appears in production, under load, at the worst time.
+
+**A data accessor** should be tested for `supportedKeys()` matching what `get()`
+actually answers. A key listed but unanswered passes flow validation and fails at
+runtime.
+
+**Tenant isolation** matters wherever your code touches persistence. A test that
+sets up two tenants and asserts one cannot see the other's rows is worth more than
+several tests of the happy path.

@@ -7,8 +7,8 @@ namespace App\Domains\Conversation\Models;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Conversation\Enums\ConversationOwner;
 use App\Domains\Conversation\Enums\ConversationStatus;
-use FAPost\Support\Concerns\HasUlidPrimaryKey;
-use FAPost\Support\Models\BaseModel;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
+use Fapost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 

@@ -33,7 +33,7 @@ final class ApplicationStep implements InstallStep
         $values = [
             'APP_NAME' => text(
                 label: 'Application name',
-                default: $env->get('APP_NAME') ?? 'FAPost',
+                default: $env->get('APP_NAME') ?? 'FaPost',
                 required: true,
             ),
             'APP_URL' => mb_rtrim(text(

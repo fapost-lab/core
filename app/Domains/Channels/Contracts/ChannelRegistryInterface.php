@@ -7,8 +7,8 @@ namespace App\Domains\Channels\Contracts;
 use App\Domains\Channels\ChannelIntegrationDefinition;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
-use FAPost\Foundation\Channel\WebhookRegistrarInterface;
-use FAPost\Foundation\Messaging\ProviderSenderInterface;
+use Fapost\Foundation\Channel\WebhookRegistrarInterface;
+use Fapost\Foundation\Messaging\ProviderSenderInterface;
 
 /**
  * Registry of enabled channel integrations and their runtime services.

@@ -3,7 +3,55 @@ title: "State key namespaces"
 description: "Reserved key spaces and their access rules."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+`Fapost\Foundation\Flow\Enums\StateNamespace` is the canonical list of top-level
+namespaces in `flow_sessions.state`. It is part of the Foundation contract.
+
+```php
+enum StateNamespace: string
+{
+    case System  = 'system';
+    case Flow    = 'flow';
+    case Rag     = 'rag';
+    case Module  = 'module';
+    case Contact = 'contact';
+    case Call    = 'call';
+}
+```
+
+| Namespace | Stored in session | Readable | Writable by |
+|---|---|---|---|
+| `system` | Yes | Yes | Engine and whitelisted system handlers |
+| `flow` | Yes | Yes | `input`, `assign`, and extension handlers |
+| `rag` | Yes | Yes | `rag_query` |
+| `module` | **No** — resolved lazily | Yes | Nobody |
+| `contact` | **No** — derived projection | Yes | Nobody (use the contact writer) |
+| `call` | **No** — derived projection | Yes | Nobody |
+
+## Path notation
+
+Keys are dotted paths under a namespace, addressable the same way in templates,
+branch conditions, and state pickers:
+
+```
+flow.answer
+rag.last_result
+module.hr.department
+contact.language
+call.status
+```
+
+`module` paths carry the accessor's namespace as their second segment —
+`module.<accessor namespace>.<key>` — which is what the registry resolves against.
+
+## Adding a namespace
+
+New top-level namespaces go into the enum. They are not invented per node: a node
+that writes into a namespace nobody else knows about produces state that no
+condition can read and no picker can offer.
+
+Solutions and Plugins consume the enum to declare allowed namespaces in schema
+fields and to resolve paths through a data accessor or the variable resolver.
+
+See [State namespaces](/extending/flow-nodes/state-namespaces) for the rules
+behind these, and [Data accessors](/extending/data-accessors) for exposing data
+under `module`.

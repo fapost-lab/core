@@ -8,7 +8,7 @@ use App\Domains\Channels\Telegram\TelegramAdapter;
 use App\Domains\Channels\Telegram\TelegramInboundNormalizer;
 use App\Domains\Channels\Telegram\TelegramSignatureVerifier;
 use App\Domains\Contact\Enums\PlatformEnum;
-use FAPost\Foundation\DTO\IncomingMessageType;
+use Fapost\Foundation\DTO\IncomingMessageType;
 use Illuminate\Http\Request;
 use Tests\TestCase;
 

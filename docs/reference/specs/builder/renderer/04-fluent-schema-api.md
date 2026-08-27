@@ -1,6 +1,6 @@
 # 04 · Fluent schema API (Filament-style builders)
 
-> **Статус: РЕАЛИЗОВАНО.** Namespace зафиксирован как `FAPost\Support\Builder\Schema` (`packages/fapost-support/`),
+> **Статус: РЕАЛИЗОВАНО.** Namespace зафиксирован как `Fapost\Support\Builder\Schema` (`packages/fapost-support/`),
 > Phase 1 **и** Phase 2 vocabulary в проде, все 10 Core-handler'ов мигрированы на fluent.
 > **Поправка к примерам ниже:** фактический API — `XxxField::make($name)` (`TextField::make()`, `NumberField::make()`,
 > …), а не `Field::string()` / `Number::make()`. У `Schema` также есть `defaultConfig()`. Канон — в

@@ -6,8 +6,8 @@ namespace App\Providers;
 
 use App\Domains\Flow\Logging\DatabaseAnalyticsWriter;
 use App\Domains\Shared\Infrastructure\ModelAttributeRegistry;
-use FAPost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
-use FAPost\Foundation\Contracts\ModelAttributeResolverInterface;
+use Fapost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
+use Fapost\Foundation\Contracts\ModelAttributeResolverInterface;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;

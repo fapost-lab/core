@@ -11,8 +11,8 @@ use App\Domains\Flow\State\Exceptions\ReservedContactPathException;
 use App\Domains\Flow\State\Exceptions\StructuralPathConflictException;
 use App\Domains\Flow\State\Variables\VariableType;
 use Closure;
-use FAPost\Foundation\Flow\Contracts\ContactWriterInterface;
-use FAPost\Foundation\Flow\History\HistoryEventType;
+use Fapost\Foundation\Flow\Contracts\ContactWriterInterface;
+use Fapost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Database\ConnectionInterface;
 use InvalidArgumentException;
 

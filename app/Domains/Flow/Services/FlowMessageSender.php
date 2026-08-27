@@ -17,12 +17,12 @@ use App\Domains\Media\DTO\DispatchResult;
 use App\Domains\Media\Exceptions\MediaDeletedException;
 use App\Domains\Media\Exceptions\MediaNotFoundException;
 use App\Domains\Media\Models\MediaFile;
-use FAPost\Foundation\Flow\Enums\KeyboardMode;
-use FAPost\Foundation\Media\DTO\UploadContext;
-use FAPost\Foundation\Messaging\DeliveryResult;
-use FAPost\Foundation\Messaging\MessagePayload;
-use FAPost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Flow\Enums\KeyboardMode;
+use Fapost\Foundation\Media\DTO\UploadContext;
+use Fapost\Foundation\Messaging\DeliveryResult;
+use Fapost\Foundation\Messaging\MessagePayload;
+use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
+use Fapost\Foundation\Messaging\OutboundMessage;
 use RuntimeException;
 
 final readonly class FlowMessageSender implements MessageSenderInterface
@@ -138,8 +138,8 @@ final readonly class FlowMessageSender implements MessageSenderInterface
     /**
      * Record an upload-as-send outbound message in the transcript. Used only for
      * the media path that bypasses MessageSender (which owns capture for every
-     * other outbound). The binding is scoped so the tenant-aware logger stays
-     * Octane-safe.
+     * other outbound). The binding is scoped so the tenant-aware logger is rebuilt
+     * per job rather than shared across them.
      */
     private function captureOutbound(OutboundMessage $message, ?string $deliveredMessageId): void
     {

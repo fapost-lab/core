@@ -6,8 +6,8 @@ namespace Tests\Unit\Domains\Messaging\Typing;
 
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingSession;
-use FAPost\Foundation\Messaging\ProcessingIndicatorHandle;
-use FAPost\Foundation\Messaging\TypingCapableProviderInterface;
+use Fapost\Foundation\Messaging\ProcessingIndicatorHandle;
+use Fapost\Foundation\Messaging\TypingCapableProviderInterface;
 use Mockery;
 use Mockery\MockInterface;
 use Tests\TestCase;

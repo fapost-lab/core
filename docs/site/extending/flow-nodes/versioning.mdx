@@ -3,7 +3,66 @@ title: "Versioning and compatibility"
 description: "Changing a node without breaking published flows."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+Flows are saved documents. Somewhere there is a published flow, built months ago,
+whose nodes were configured against the handler as it existed then — and it is
+running right now. Node versioning exists so that changing a handler does not
+reach backwards into those flows.
+
+## The rule
+
+| Change | What to do |
+|---|---|
+| Backward-compatible — a new field with a default | Leave `version()` unchanged |
+| Breaking — a field removed, renamed, or reinterpreted | Increment `version()`, and keep the old handler registered |
+| Retiring a version | Only once no active flow references it |
+
+The engine resolves a handler by `(type, version)`. An old flow definition names
+the version it was built against, so it keeps reaching the handler it was designed
+for, while new flows get the current one.
+
+## supportedVersions()
+
+`supportedVersions()` declares which node versions a handler can execute. It is
+usually just the current version:
+
+```php
+public function version(): int
+{
+    return 2;
+}
+
+/** @return int[] */
+public function supportedVersions(): array
+{
+    return [2];
+}
+```
+
+When one implementation can correctly handle both the old and the new shape, it
+may declare both, and the older handler can then be removed:
+
+```php
+public function supportedVersions(): array
+{
+    return [2, 1];
+}
+```
+
+Do this only when the old shape really is handled correctly — declaring a version
+you no longer honour is how a published flow starts behaving differently without
+anyone touching it.
+
+## What counts as breaking
+
+The test is not "did the code change" but "would a flow configured against the old
+contract still do what its author meant". Removing a config field is breaking.
+Renaming one is breaking. Changing the meaning of an existing value is breaking,
+even when the field name and type are identical. Adding an optional field with a
+default is not.
+
+## Sessions hold their definition
+
+A running flow session snapshots its `flow_definition_id` and keeps it until the
+session finishes. Publishing a new version of a flow therefore does not rewrite
+what an in-flight conversation is doing — it changes what the next conversation
+starts with.

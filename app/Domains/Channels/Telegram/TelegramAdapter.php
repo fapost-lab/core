@@ -6,11 +6,11 @@ namespace App\Domains\Channels\Telegram;
 
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
-use FAPost\Foundation\Channel\Ingress\IngressSpec;
-use FAPost\Foundation\Channel\Ingress\ProvidesIngressSpecInterface;
-use FAPost\Foundation\DTO\IncomingMessage;
-use FAPost\Foundation\DTO\OutgoingMessage;
-use FAPost\Foundation\DTO\SendResult;
+use Fapost\Foundation\Channel\Ingress\IngressSpec;
+use Fapost\Foundation\Channel\Ingress\ProvidesIngressSpecInterface;
+use Fapost\Foundation\DTO\IncomingMessage;
+use Fapost\Foundation\DTO\OutgoingMessage;
+use Fapost\Foundation\DTO\SendResult;
 use Illuminate\Http\Request;
 
 /**

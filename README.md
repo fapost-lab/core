@@ -1,6 +1,11 @@
-# FAPost Core
+# FaPost Core
 
-FAPost Core (`Flow Automation Post`) is the platform kernel for building conversational bots and automation flows. This
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](./LICENSE)
+[![PHP 8.4](https://img.shields.io/badge/php-8.4-777bb4.svg)](https://www.php.net/releases/8.4/en.php)
+[![Laravel 12](https://img.shields.io/badge/laravel-12-ff2d20.svg)](https://laravel.com)
+[![Status: active development](https://img.shields.io/badge/status-active%20development-5a6e58.svg)](./docs/platform/current-state.md)
+
+FaPost Core (`Flow Automation Post`) is the platform kernel for building conversational bots and automation flows. This
 repository is intended for core development that later supports separate solution and SaaS repositories.
 
 The codebase is an active Laravel 12 core application with tenant-aware domains, a flow engine, channel/webhook
@@ -17,7 +22,7 @@ documentation map below to distinguish implemented code from target architecture
 
 - [Documentation Index](./docs/README.md) - stable tracked documentation entry point.
 - [Full Documentation Index](./docs/INDEX.md) - complete map for roadmap, tasks, ADRs, specs, plans, and archive.
-- [Platform Docs](./docs/platform/README.md) - build and maintain FAPost Core.
+- [Platform Docs](./docs/platform/README.md) - build and maintain FaPost Core.
 - [Developer Portal](./docs/developers/index.html) - HTML docs for future Features, Solutions, Plugins, nodes, and builder extensions.
 - [Reference](./docs/reference/README.md) - detailed specs, schemas, and diagrams.
 - [Getting Started](./docs/platform/getting-started.md) - local setup, dependencies, and basic commands.
@@ -32,7 +37,6 @@ Current stack based on code and configuration:
 - PostgreSQL
 - Redis
 - Horizon
-- Octane
 - Filament
 - Inertia + Vue 3
 - Vite + Tailwind CSS 4
@@ -96,3 +100,17 @@ Documentation in this repository should answer four questions:
 
 If an architectural decision changes, update the stable summary in `docs/` and the corresponding ADR/platform document.
 For detailed specs and task statuses, use `docs/INDEX.md` and `docs/platform/TASKS.md`.
+
+## License and Trademark
+
+FaPost Core is licensed under the [Apache License 2.0](./LICENSE). The same applies to `fapost/foundation` and
+`fapost/support`. You may use, modify, and distribute the code — including in closed-source Solutions and Plugins built
+on top of the platform — under the terms of that license.
+
+The license covers the code, not the name. Use of the FaPost name and logo is governed by the
+[Trademark Policy](./TRADEMARK.md): referring to the project, describing compatibility, and redistributing unmodified
+releases need no permission; naming a fork, a hosted service, or your own product after FaPost does.
+
+Contributions are accepted under the [Contributor License Agreement](./CLA.md). You keep the copyright in your work;
+the agreement grants the project the rights it needs to distribute it. Accepting it is a line in the pull request
+description.

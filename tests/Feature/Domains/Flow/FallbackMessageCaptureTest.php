@@ -12,9 +12,9 @@ use App\Domains\Contact\Models\Contact;
 use App\Domains\Conversation\Capture\ConversationCaptureFactory;
 use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Flow\Services\FallbackMessageService;
-use FAPost\Foundation\Messaging\DeliveryResult;
-use FAPost\Foundation\Messaging\MessageSenderInterface;
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Messaging\DeliveryResult;
+use Fapost\Foundation\Messaging\MessageSenderInterface;
+use Fapost\Foundation\Messaging\OutboundMessage;
 use Tests\Feature\FeatureTestCase;
 
 /**

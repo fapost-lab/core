@@ -6,7 +6,7 @@ namespace Tests\Unit\Domains\Webhook;
 
 use App\Domains\Webhook\Jobs\IncomingMessageJob;
 use App\Domains\Webhook\Jobs\RawIncomingMessageHandler;
-use FAPost\Foundation\DTO\InboundWebhookPayload;
+use Fapost\Foundation\DTO\InboundWebhookPayload;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Queue\Job;
 use Mockery;

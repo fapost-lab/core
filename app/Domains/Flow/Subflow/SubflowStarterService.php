@@ -16,7 +16,7 @@ use App\Domains\Flow\Services\FlowGraphResolver;
 use Closure;
 use DateInterval;
 use Exception;
-use FAPost\Foundation\Flow\History\HistoryEventType;
+use Fapost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Database\ConnectionInterface;
 use RuntimeException;
 

@@ -40,7 +40,7 @@ final class InstallGatewayCommand extends Command
 
     public function handle(): int
     {
-        $this->components->info('FAPost webhook gateway setup');
+        $this->components->info('FaPost webhook gateway setup');
 
         $env = new EnvFile(base_path('.env'));
 

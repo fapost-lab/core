@@ -9,7 +9,7 @@ use App\Domains\Channels\ChannelRegistry;
 use App\Domains\Channels\Telegram\TelegramAdapter;
 use App\Domains\Channels\Telegram\TelegramSender;
 use App\Domains\Channels\Telegram\TelegramWebhookRegistrar;
-use FAPost\Foundation\Messaging\ProviderSenderInterface;
+use Fapost\Foundation\Messaging\ProviderSenderInterface;
 use Illuminate\Contracts\Container\Container;
 use Mockery;
 use Mockery\MockInterface;

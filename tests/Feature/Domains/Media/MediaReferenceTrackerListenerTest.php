@@ -11,7 +11,7 @@ use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFileReference;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
-use FAPost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Media\Enums\MediaKind;
 use Tests\Feature\FeatureTestCase;
 
 final class MediaReferenceTrackerListenerTest extends FeatureTestCase

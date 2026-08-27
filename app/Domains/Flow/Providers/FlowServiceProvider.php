@@ -135,8 +135,8 @@ use App\Domains\Messaging\Typing\TypingIndicatorService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\FlowExecutionGuard;
-use FAPost\Foundation\Flow\Contracts\TriggerResolverInterface;
-use FAPost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
+use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
+use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -181,8 +181,8 @@ final class FlowServiceProvider extends ServiceProvider
     public function register(): void
     {
         // NOTE: ModuleResolutionContext is scoped (per-request), but NamespaceResolverRegistry
-        // is a singleton. This is safe because flow execution runs in queue workers (FPM),
-        // never in Octane ingress. If that changes — audit this binding.
+        // is a singleton. This is safe because flow execution runs in queue workers, where
+        // the scoped context is rebuilt per job. If that changes — audit this binding.
         $this->app->scoped(ModuleResolutionContext::class);
         $this->app->singleton(NamespaceResolverRegistry::class, function ($app): NamespaceResolverRegistry {
             $registry = new NamespaceResolverRegistry();
@@ -245,8 +245,8 @@ final class FlowServiceProvider extends ServiceProvider
             fn ($app): ModuleDataAccessorRegistry => $app->make(ModuleDataAccessorRegistry::class)
         );
         // Scoped (not singleton): it depends on the scoped, tenant-aware
-        // conversation logger, so it must rebuild per scope to stay Octane-safe —
-        // consistent with the Foundation MessageSender binding.
+        // conversation logger, so it must rebuild per scope rather than persist across
+        // jobs — consistent with the Foundation MessageSender binding.
         $this->app->scoped(
             MessageSenderInterface::class,
             fn ($app): FlowMessageSender => new FlowMessageSender(

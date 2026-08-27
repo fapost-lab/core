@@ -1,4 +1,4 @@
-# FAPost Core — full stack.
+# FaPost Core — full stack.
 #
 #   docker compose --env-file ../.env up -d
 #

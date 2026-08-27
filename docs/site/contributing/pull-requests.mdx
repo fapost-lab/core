@@ -3,7 +3,61 @@ title: "Pull requests"
 description: "How a change gets reviewed and merged."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+Work happens on a branch and reaches `main` through a pull request.
+
+## Before opening one
+
+```bash
+vendor/bin/pint --dirty --format agent
+composer test
+composer run test:arch
+```
+
+A change that has not been run is not finished. If part of the work is incomplete
+or deliberately left out, say so in the pull request rather than leaving it to be
+discovered.
+
+## What a reviewer is looking for
+
+**The boundaries hold.** Dependency direction, migration isolation, tenant-aware
+execution, worker safety. Most of these are checked mechanically — see
+[Testing and architecture checks](/contributing/testing) — but the rules cannot
+see intent, only shape.
+
+**Business logic is in the right place.** Controllers and jobs orchestrate;
+services and domain classes decide.
+
+**The change is covered.** A minimal relevant test, not an exhaustive suite.
+
+**The code reads like its neighbours.** Matching the surrounding conventions
+matters more than any individual preference — see
+[Coding conventions](/contributing/conventions).
+
+## Documentation that travels with the change
+
+Documentation lives in this repository, so a change to a public contract and the
+change to the page describing it belong in the same pull request. That is the
+point of keeping them together: they cannot drift apart between releases.
+
+If a change alters something on the [Extending](/extending/extension-model) side,
+it is a change to a public promise. Say so explicitly — see
+[Stability policy](/extending/stability-policy).
+
+## Dependencies
+
+Do not add a dependency without agreement. Raise it before the pull request rather
+than inside it.
+
+## Contributor License Agreement
+
+A first pull request needs one extra line in its description:
+
+```text
+I have read the FaPost Contributor License Agreement (CLA.md) and I accept it.
+Signed-off-by: Full Name <email@example.com>
+```
+
+You keep the copyright in your work. The agreement grants the project the rights it
+needs to distribute that work and confirms you are entitled to contribute it. If you
+are contributing on behalf of an employer, the entity signs once and covers every
+account it lists — see `CLA.md` in the repository root.

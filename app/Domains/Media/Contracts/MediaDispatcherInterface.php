@@ -7,7 +7,7 @@ namespace App\Domains\Media\Contracts;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Media\DTO\DispatchResult;
 use App\Domains\Media\Models\MediaFile;
-use FAPost\Foundation\Media\DTO\UploadContext;
+use Fapost\Foundation\Media\DTO\UploadContext;
 
 /**
  * Resolves the provider-side file id for sending a media file through a channel.

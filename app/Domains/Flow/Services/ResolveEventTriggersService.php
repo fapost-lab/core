@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Services;
 
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
-use FAPost\Foundation\Flow\DTO\ResolvedTrigger;
+use Fapost\Foundation\Flow\DTO\ResolvedTrigger;
 
 final readonly class ResolveEventTriggersService
 {

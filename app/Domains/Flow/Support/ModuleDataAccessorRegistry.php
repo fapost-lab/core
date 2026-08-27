@@ -7,7 +7,7 @@ namespace App\Domains\Flow\Support;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
 use App\Domains\Flow\Exceptions\UnknownDataAccessorNamespacePrefixException;
-use FAPost\Foundation\Contracts\DataAccessorInterface;
+use Fapost\Foundation\Contracts\DataAccessorInterface;
 use LogicException;
 
 final class ModuleDataAccessorRegistry implements DataAccessorRegistryInterface, MutableDataAccessorRegistryInterface
@@ -30,7 +30,7 @@ final class ModuleDataAccessorRegistry implements DataAccessorRegistryInterface,
             throw new LogicException("Namespace prefix '{$namespacePrefix}' is reserved by engine.");
         }
 
-        if ( ! str_starts_with($namespacePrefix, 'module.')) {
+        if (! str_starts_with($namespacePrefix, 'module.')) {
             throw new LogicException(
                 "Namespace prefix '{$namespacePrefix}' must start with 'module.'."
             );
@@ -45,7 +45,7 @@ final class ModuleDataAccessorRegistry implements DataAccessorRegistryInterface,
 
     public function resolve(string $namespacePrefix): DataAccessorInterface
     {
-        if ( ! $this->has($namespacePrefix)) {
+        if (! $this->has($namespacePrefix)) {
             throw new UnknownDataAccessorNamespacePrefixException(
                 "No data accessor registered for namespace prefix '{$namespacePrefix}'."
             );

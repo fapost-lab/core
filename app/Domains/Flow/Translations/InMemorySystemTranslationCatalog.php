@@ -11,7 +11,7 @@ use LogicException;
  * In-memory catalog populated at boot. Single instance per app lifecycle:
  * registered entries are immutable for the rest of the request.
  *
- * Singleton-bound — Octane workers reuse the same instance across requests,
+ * Singleton-bound — long-lived workers reuse the same instance across jobs,
  * which is correct because the catalog is global platform-level metadata.
  */
 final class InMemorySystemTranslationCatalog implements SystemTranslationCatalogInterface

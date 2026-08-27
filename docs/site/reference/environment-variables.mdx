@@ -1,9 +1,92 @@
 ---
 title: "Environment variables"
-description: "Every variable Core reads, with defaults."
+description: "The variables Core reads beyond the Laravel defaults."
 ---
 
+`.env.example` is the authoritative list. This page covers the variables specific
+to FaPost, and the Laravel ones whose value matters here.
+
+## Application
+
+| Variable | Default | Notes |
+|---|---|---|
+| `APP_NAME` | `FaPost-CORE` | |
+| `APP_ENV` | `local` | `production` in a deployment |
+| `APP_KEY` | *empty* | Generate with `php artisan key:generate`; never reuse across installations |
+| `APP_DEBUG` | `true` | **Must be `false` in production** |
+| `APP_URL` | `http://localhost` | Used to build webhook URLs |
+
+## Tenancy and webhooks
+
+| Variable | Default | Notes |
+|---|---|---|
+| `TENANCY_BASE_DOMAIN` | `localhost` | Base domain tenant hosts are derived from |
+| `WEBHOOK_BASE_URL` | `${APP_URL}` | The base providers will call back on |
+| `WEBHOOK_INGRESS_DRIVER` | `laravel` | `laravel` or `gateway` |
+| `WEBHOOK_GATEWAY_URL` | *empty* | Required when the driver is `gateway` |
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  `WEBHOOK_INGRESS_DRIVER` applies to **newly registered channels only**. The
+  Laravel route always stays live, so switching it does not move channels that
+  already exist — use `ops:ingress-migrate` for those. See
+  [Webhook gateway](/self-hosting/gateway).
 </Note>
+
+## Database
+
+| Variable | Default |
+|---|---|
+| `DB_CONNECTION` | `pgsql` |
+| `DB_HOST` | `127.0.0.1` |
+| `DB_PORT` | `5432` |
+| `DB_DATABASE` | `fapost_core` |
+| `DB_USERNAME` | `root` |
+| `DB_PASSWORD` | *empty* |
+
+PostgreSQL is required, not one option among several — landlord and tenant
+connections both depend on it. The database user needs the `CREATE` privilege; see
+[Requirements](/self-hosting/requirements).
+
+## Redis, cache, queues, sessions
+
+| Variable | Default | Notes |
+|---|---|---|
+| `REDIS_CLIENT` | `phpredis` | |
+| `REDIS_HOST` | `127.0.0.1` | |
+| `REDIS_PORT` | `6379` | |
+| `REDIS_PASSWORD` | `null` | Set one on any non-local install |
+| `QUEUE_CONNECTION` | `redis` | |
+| `CACHE_STORE` | `redis` | |
+| `SESSION_DRIVER` | `redis` | |
+| `SESSION_LIFETIME` | `120` | Minutes |
+
+Redis is not optional: it carries queues, cache, locks, and the webhook routing
+registry. The registry is what keeps the landlord database off the inbound hot
+path — see [Runtime architecture](/contributing/runtime).
+
+## Localisation
+
+| Variable | Default |
+|---|---|
+| `APP_LOCALE` | `en` |
+| `APP_FALLBACK_LOCALE` | `en` |
+
+This is the admin UI language. Content language — what the assistant says to a
+contact — is resolved separately at runtime; see
+[Multilingual extensions](/extending/multilingual).
+
+## Mail, logging, other
+
+`MAIL_*` follow Laravel's conventions; the default `MAIL_MAILER=log` writes mail to
+the log rather than sending it. `LOG_CHANNEL=stack` with `LOG_LEVEL=debug` is the
+development default — raise the level in production.
+
+`TELESCOPE_ENABLED` defaults to `true` locally and should be `false` in production.
+`HCAPTCHA_SITE_KEY` and `HCAPTCHA_SECRET_KEY` ship with hCaptcha's public test
+values, which always pass — replace them before exposing any public form.
+
+<Warning>
+  The shipped `.env.example` values for `APP_DEBUG`, `TELESCOPE_ENABLED`, and the
+  hCaptcha keys are development defaults. Each is safe locally and unsafe in
+  production.
+</Warning>

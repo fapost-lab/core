@@ -3,7 +3,90 @@ title: "Handler contract"
 description: "What a node handler receives and what it must return."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+A node handler is the runtime behaviour behind one kind of node on the flow
+canvas. It implements `Fapost\Foundation\Contracts\NodeHandlerInterface`.
+
+```php
+interface NodeHandlerInterface
+{
+    public function type(): string;
+    public function version(): int;
+    /** @return int[] */
+    public function supportedVersions(): array;
+    public function label(): string;
+    public function category(): string;
+    /** @return array<string, mixed> */
+    public function configSchema(): array;
+
+    public function execute(
+        array $nodeConfig,
+        array $state,
+        NodeExecutionContext $context,
+    ): NodeExecutionResult;
+}
+```
+
+## Identity
+
+`type()` is the node's unique identifier, such as `send_message`. It must be
+unique across every registered handler, including those from other extensions.
+`version()` is the handler's current version; the engine resolves a handler by the
+pair `(type, version)` from an in-memory registry, with no database query on the
+hot path.
+
+`label()` and `category()` are what the builder shows: the node's name and the
+group it appears under.
+
+## Configuration
+
+`configSchema()` returns the schema the builder uses to validate the node and draw
+its form. This is the mechanism that lets an extension be configurable without
+shipping any front-end code — see [Builder UI extensions](/extending/builder-ui).
+
+## Execution
+
+`execute()` receives three things:
+
+| Argument | What it is |
+|---|---|
+| `$nodeConfig` | The node's payload from the flow definition JSON: `id`, `type`, `version`, `config`, and so on |
+| `$state` | Namespaced session state, **read-only** for the handler |
+| `$context` | `NodeExecutionContext` — tenant, contact, and session metadata, plus the writers a handler is allowed to use |
+
+It returns a `NodeExecutionResult`, built through one of its named constructors:
+
+```php
+NodeExecutionResult::executed(sourceHandle: 'default', stateChanges: [
+    'flow.answer' => $value,
+]);
+
+NodeExecutionResult::waiting();   // the flow pauses for input
+NodeExecutionResult::delayed();   // the flow resumes later
+```
+
+## The handler must be graph-unaware
+
+<Warning>
+  A handler returns a `sourceHandle`, never the id of the next node.
+</Warning>
+
+The engine resolves what comes next from the flow's edges, using the source node
+id together with the handle the handler returned. A handler that decides which
+node runs next has taken a decision that belongs to the flow definition, and the
+same handler can then no longer be reused in a differently-shaped flow.
+
+`sourceHandle` defaults to `'default'`. A node with several outcomes — a branch, a
+validation that can fail — returns a different handle per outcome, and the person
+building the flow wires each handle where they want it to go.
+
+## Writing outside the session
+
+State changes go back through `stateChanges` on the result. Mutations that live
+outside the session JSON — contact attributes, contact language — are performed by
+the handler through the writer it receives on `NodeExecutionContext`, such as
+`ContactWriterInterface`.
+
+<Warning>
+  Do not return a legacy `effects[]` array. It was removed; handlers use the
+  writer or port from the execution context instead.
+</Warning>

@@ -6,9 +6,9 @@ namespace App\Domains\Channels\Telegram\Media;
 
 use App\Domains\Channels\Telegram\TelegramBotApiClientFactory;
 use App\Domains\Media\Exceptions\MediaIngestException;
-use FAPost\Foundation\Channel\ChannelInterface;
-use FAPost\Foundation\Media\ChannelMediaDownloaderInterface;
-use FAPost\Foundation\Media\DTO\DownloadResult;
+use Fapost\Foundation\Channel\ChannelInterface;
+use Fapost\Foundation\Media\ChannelMediaDownloaderInterface;
+use Fapost\Foundation\Media\DTO\DownloadResult;
 use GuzzleHttp\Psr7\Utils;
 use Throwable;
 

@@ -13,9 +13,9 @@ use App\Domains\Conversation\Contracts\ConversationReplyServiceInterface;
 use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Conversation\Exceptions\ConversationReplyUndeliverableException;
 use App\Domains\Conversation\Models\Conversation;
-use FAPost\Foundation\Messaging\DeliveryResult;
-use FAPost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Messaging\DeliveryResult;
+use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
+use Fapost\Foundation\Messaging\OutboundMessage;
 use Mockery\MockInterface;
 use Tests\Feature\FeatureTestCase;
 

@@ -3,7 +3,50 @@ title: "Builder UI extensions"
 description: "Schema-driven configuration and when an override is justified."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+The builder draws a node's configuration form from the schema its handler
+declares. This is what lets an extension be fully configurable without shipping
+any front-end code.
+
+## Start with the schema
+
+`configSchema()` on your handler returns the schema the builder validates against
+and renders from:
+
+```php
+/** @return array<string, mixed> */
+public function configSchema(): array
+{
+    return [
+        // fields the generic renderer will draw
+    ];
+}
+```
+
+The full vocabulary is in the
+[Builder config schema reference](/reference/builder-config-schema).
+
+## Rules
+
+**Prefer backend schema and generic rendering.** If the generic renderer can
+express the control you need, use it. A schema-driven field works everywhere,
+survives front-end refactors, and needs no build step.
+
+**Bespoke Core overrides only when the schema cannot express the UX.** Core nodes
+may ship a hand-written Vue component, but only where a schema-driven control
+genuinely cannot do the job — not because a bespoke component would look nicer.
+
+**A Plugin cannot inject arbitrary Vue components.** The builder front end is
+compiled before your Plugin is enabled. There is no runtime component injection,
+by design: it would mean shipping unreviewed code into a running admin surface. If
+the schema renderer cannot express what your node needs, the fix is to extend the
+renderer in Core, not to work around it.
+
+**Solution components need the approved build and publish contract.** A Solution
+may contribute front-end code, but through the agreed Vite glob and publish
+contract — not by writing into the application's source tree.
+
+## When the renderer is not enough
+
+That situation is a Core change, and it is worth raising rather than working
+around. Extending the schema renderer benefits every extension that hits the same
+limit; a one-off override benefits one node and has to be maintained forever.

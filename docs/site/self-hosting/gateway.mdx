@@ -3,7 +3,247 @@ title: "Webhook gateway"
 description: "The optional Go ingress in front of webhook traffic."
 ---
 
+An optional Go service that accepts provider webhooks, verifies them and queues
+them, taking that work off PHP.
+
+**It is optional and the application is complete without it.** Without the
+gateway, webhooks go to the Laravel route exactly as they always have. Deploy it
+when webhook volume becomes a bottleneck, not because it exists.
+
+## What it does
+
+```
+provider ──▶ gateway ──▶ Redis queue ──▶ Horizon ──▶ flow execution
+                │
+                └──▶ application ingress   (anything it cannot decide itself)
+```
+
+Per delivery: rate-limit by channel, read the routing entry from Redis, verify
+the signature, claim an idempotency key, publish the job. About a millisecond,
+no PHP process involved.
+
+The second arrow matters more than the first. **Redis is a cache for the gateway,
+never the source of truth.** On a cache miss, an unreadable Redis, an unknown
+platform or a spec it cannot execute, it forwards the request to the application,
+which resolves the channel from its database and repopulates the cache. A cold or
+broken Redis costs throughput, not deliveries.
+
+## How verification works without platform code
+
+The gateway knows nothing about Telegram. Each channel adapter publishes an
+**ingress spec** — a small declaration of how that platform's webhook is signed
+and deduplicated:
+
+```json
+{
+  "v": 1,
+  "scheme": "header_equals",
+  "parameter": "x-telegram-bot-api-secret-token",
+  "prefix": "",
+  "idempotency": "tg:{channel}:{body.update_id}"
+}
+```
+
+Adding a channel therefore stays a pure PHP change and needs no gateway release.
+A platform whose verification is too complex to express declaratively simply does
+not publish a spec, and its webhooks stay on the PHP path.
+
+Both implementations are held to
+[`contracts/ingress/golden.json`](https://github.com/fapost-lab/core/blob/main/contracts/ingress/golden.json) — 40 cases
+executed by both the PHP and the Go test suites, so the two cannot drift apart.
+
+## Building from source
+
+The gateway is a single static binary with no runtime dependencies: a build on any
+machine runs on any Linux of the same architecture — no matching libc, no
+interpreter, nothing to install alongside it.
+
+**Prerequisites:** Go 1.27 or newer. Nothing else; the only dependency is the
+Redis client, vendored through `go.mod`.
+
+```bash
+cd gateway
+make build
+```
+
+That produces `bin/gateway`, with the version stamped in from `git describe` so a
+running process can be traced back to a commit.
+
+| Target | Does |
+|---|---|
+| `make build` | Build for the host platform |
+| `make dist` | Cross-compile for `linux/amd64`, `linux/arm64`, `darwin/arm64` |
+| `make test` | Run the suite with the race detector |
+| `make lint` | Check `gofmt` formatting and run `go vet` |
+| `make check` | `lint` then `test` |
+| `make all` | `check` then `build` |
+| `make install-local` | Install the binary into `/usr/local/bin` |
+| `make clean` | Remove `bin/` |
+
+Go needs no per-target toolchain, so `make dist` produces every supported
+platform's release binary from one developer machine.
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  Run `make check` before shipping a gateway build. Its spec executor is held to
+  the same golden file as the PHP implementation, so a regression here is a
+  regression in webhook verification for every channel.
 </Note>
+
+### As a container image
+
+```bash
+docker build -t fapost-gateway:local --build-arg VERSION=$(git describe --tags --always) gateway/
+```
+
+The build is two-stage and the final stage is `scratch`: the shipped image holds
+the binary, root certificates, and nothing else — no Go toolchain, no shell, no
+package manager. That keeps it small and leaves an attacker who reaches the most
+exposed process in the stack with no tools to work with.
+
+The image runs as UID 65534 and carries no `.env`; configuration is injected by
+the runtime, so one image is promoted unchanged from staging to production.
+
+## Installing
+
+### With Docker Compose
+
+The gateway sits behind a profile, so it starts only when asked:
+
+```bash
+docker compose -f docker/compose.yaml --env-file .env --profile gateway up -d
+```
+
+### Standalone
+
+```bash
+cd gateway
+make build
+sudo install -m 0755 bin/gateway /usr/local/bin/gateway
+```
+
+Then generate the supervisor files:
+
+```bash
+php artisan gateway:install
+```
+
+It asks how the gateway will run, where providers will deliver, and where to log,
+then writes the settings into `.env` and generates a systemd unit, a logrotate
+config or a compose fragment into `gateway/dist/` for you to review and install.
+Nothing is written outside the project and no service is restarted.
+
+## Configuration
+
+Set by `gateway:install`, or by hand.
+
+### Routing
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `WEBHOOK_INGRESS_DRIVER` | `laravel` | `laravel` or `gateway` — where **newly registered** channels point |
+| `WEBHOOK_GATEWAY_URL` | — | Public URL providers deliver to |
+| `GATEWAY_ADDR` | `:8080` | Listen address, e.g. `127.0.0.1:8080` |
+| `GATEWAY_UPSTREAM_URL` | `WEBHOOK_BASE_URL` | The application's own ingress, used for the fallback |
+| `GATEWAY_TRUSTED_PROXIES` | *empty* | Addresses whose `X-Forwarded-For` may be believed |
+| `GATEWAY_QUEUE` | `flow.execution` | Queue verified deliveries are pushed onto |
+
+### Limits and timeouts
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `GATEWAY_RATE_PER_SECOND` | `30` | Per-channel limit; `0` disables |
+| `GATEWAY_RATE_BURST` | `60` | Burst allowance above the sustained rate |
+| `GATEWAY_MAX_BODY_BYTES` | `1048576` | 1 MiB — well above any provider's update payload |
+| `GATEWAY_DEDUP_TTL` | `24h` | How long an idempotency key is remembered |
+| `GATEWAY_SPEC_CACHE_TTL` | `30s` | How long a published ingress spec is cached |
+| `GATEWAY_READ_TIMEOUT` | `10s` | |
+| `GATEWAY_WRITE_TIMEOUT` | `15s` | |
+| `GATEWAY_IDLE_TIMEOUT` | `60s` | |
+| `GATEWAY_SHUTDOWN_TIMEOUT` | `20s` | Drain window on `SIGTERM` |
+| `GATEWAY_REDIS_TIMEOUT` | `2s` | |
+
+### Logging
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `GATEWAY_LOG_LEVEL` | `info` | |
+| `GATEWAY_LOG_FORMAT` | `json` | |
+| `GATEWAY_LOG_DESTINATION` | `stdout` | `stdout` or `file` |
+| `GATEWAY_LOG_PATH` | *empty* | Required when the destination is `file` |
+
+### Redis
+
+| Variable | Default |
+|---|---|
+| `REDIS_HOST` | `127.0.0.1` |
+| `REDIS_PORT` | `6379` |
+| `REDIS_USERNAME` | *empty* |
+| `REDIS_PASSWORD` | *empty* |
+| `REDIS_DB` | `0` |
+| `REDIS_PREFIX` | derived from `APP_NAME` |
+
+Redis settings are **not** duplicated: the gateway reads the same `REDIS_*`
+variables as the application. `REDIS_PREFIX` in particular must match, or every
+lookup misses and the gateway proxies everything while appearing healthy.
+
+## Migrating existing channels
+
+Switching the driver only affects channels registered from that moment on.
+Existing ones keep the URL their provider stored, and **both paths stay valid**,
+so there is no cutover and no window to race against.
+
+```bash
+php artisan ops:ingress-migrate              # report what is still behind
+php artisan ops:ingress-migrate --apply      # queue re-registration, in batches
+```
+
+Re-registration reuses the same public hash and secret — only the host changes —
+so the provider sees no interruption. Batching exists because `setWebhook` is
+rate-limited; re-run until the report is empty.
+
+Rolling back is the same command after setting the driver back to `laravel`.
+
+## Order of operations
+
+1. Publish the specs — `php artisan ops:ingress-specs-publish`
+2. Deploy the gateway and put TLS in front of it
+3. Set `WEBHOOK_INGRESS_DRIVER=gateway` and `WEBHOOK_GATEWAY_URL`
+4. Migrate existing channels at your own pace
+
+Step 1 comes first for a reason: without published specs the gateway has nothing
+to verify against and proxies every delivery straight back to the application.
+`ops:webhook-warmup` republishes them too, so a single command restores all
+ingress state after a Redis flush.
+
+## Verifying
+
+```bash
+php artisan gateway:doctor
+```
+
+Checks the driver, that Redis is reachable, that the key prefix is what the
+gateway will resolve, that published specs match the adapters, that the gateway's
+health endpoint answers, and how many channels are still on the old URL.
+
+## Operating
+
+**TLS.** The gateway speaks plain HTTP; terminate in front with Traefik or Caddy.
+The terminator must not modify the request body — signatures cover the exact
+bytes the provider sent.
+
+**Logs.** JSON on stdout by default. In file mode, `SIGHUP` reopens the file, so
+`logrotate` handles rotation; the same signal also drops cached ingress specs, so
+a republish takes effect without a restart.
+
+**Shutdown.** `SIGTERM` drains in-flight requests. This matters more than usual:
+a delivery already answered with 200 will not be sent again, so cutting those
+requests off loses messages outright.
+
+**What is never logged.** The webhook hash is the credential for a channel, so
+only a fingerprint of it appears. Request bodies and signature headers never do.
+
+## Related
+
+- [Deployment overview](/self-hosting/overview)
+- [Docker Compose](/self-hosting/docker-compose)
+- [Long-running services](/self-hosting/services)

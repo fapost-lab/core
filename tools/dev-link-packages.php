@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * Local package development linker.
  *
- * The FAPost packages (foundation, support, …) are published as standalone git
+ * The FaPost packages (foundation, support, …) are published as standalone git
  * repositories and consumed by Core through VCS repositories + version
  * constraints in composer.json. That keeps composer.json / composer.lock
  * production-safe: a prod `composer install` pulls the packages from GitHub,

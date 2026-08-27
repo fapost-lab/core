@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Channels\Telegram;
 
-use FAPost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Messaging\OutboundMessage;
 
 interface TelegramDeliveryActionInterface
 {

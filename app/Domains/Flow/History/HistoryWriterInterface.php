@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\History;
 
-use FAPost\Foundation\Flow\History\HistoryEventType;
+use Fapost\Foundation\Flow\History\HistoryEventType;
 
 /**
  * Engine-driven history writer.

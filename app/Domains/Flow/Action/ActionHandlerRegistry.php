@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Action;
 
-use FAPost\Foundation\Action\ActionHandlerInterface;
+use Fapost\Foundation\Action\ActionHandlerInterface;
 use LogicException;
 
 /**

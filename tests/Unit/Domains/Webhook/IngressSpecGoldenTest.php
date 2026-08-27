@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Webhook;
 
-use FAPost\Foundation\Channel\Ingress\IngressSpec;
-use FAPost\Foundation\Channel\Ingress\IngressSpecExecutor;
-use FAPost\Foundation\Channel\Ingress\SignedRequest;
+use Fapost\Foundation\Channel\Ingress\IngressSpec;
+use Fapost\Foundation\Channel\Ingress\IngressSpecExecutor;
+use Fapost\Foundation\Channel\Ingress\SignedRequest;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 

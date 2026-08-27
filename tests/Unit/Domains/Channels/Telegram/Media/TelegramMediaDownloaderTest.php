@@ -7,7 +7,7 @@ namespace Tests\Unit\Domains\Channels\Telegram\Media;
 use App\Domains\Channels\Telegram\Media\TelegramMediaDownloader;
 use App\Domains\Channels\Telegram\TelegramBotApiClientFactory;
 use App\Domains\Media\Exceptions\MediaIngestException;
-use FAPost\Foundation\Channel\ChannelInterface;
+use Fapost\Foundation\Channel\ChannelInterface;
 use Illuminate\Support\Facades\Http;
 use Mockery;
 use Tests\TestCase;

@@ -1,4 +1,4 @@
-# FAPost Core images.
+# FaPost Core images.
 #
 # One file with two published targets, `core` and `web`, because they share the
 # same Composer install. The front-end cannot be built without it: the Filament

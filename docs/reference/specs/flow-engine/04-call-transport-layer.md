@@ -3,7 +3,7 @@
 ## 4.1 CallTransportInterface
 
 ```php
-namespace FAPost\Foundation\Contracts\Flow\Call;
+namespace Fapost\Foundation\Contracts\Flow\Call;
 
 interface CallTransportInterface
 {
@@ -67,7 +67,7 @@ final class CallResult
 ## 4.4 ActionHandlerInterface
 
 ```php
-namespace FAPost\Foundation\Contracts\Action;
+namespace Fapost\Foundation\Contracts\Action;
 
 interface ActionHandlerInterface
 {

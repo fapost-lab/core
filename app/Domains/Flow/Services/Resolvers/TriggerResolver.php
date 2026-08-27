@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Services\Resolvers;
 
 use App\Domains\Flow\Enums\FlowTriggerType;
-use FAPost\Foundation\Flow\Contracts\TriggerResolverInterface;
-use FAPost\Foundation\Flow\Contracts\TriggerTypeResolverInterface;
-use FAPost\Foundation\Flow\DTO\ResolvedTrigger;
-use FAPost\Foundation\Flow\DTO\TriggerContext;
+use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
+use Fapost\Foundation\Flow\Contracts\TriggerTypeResolverInterface;
+use Fapost\Foundation\Flow\DTO\ResolvedTrigger;
+use Fapost\Foundation\Flow\DTO\TriggerContext;
 
 final readonly class TriggerResolver implements TriggerResolverInterface
 {

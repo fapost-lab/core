@@ -8,8 +8,8 @@ use App\Domains\Flow\Contracts\VariableCoercerInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use Closure;
-use FAPost\Foundation\DTO\NodeExecutionContext;
-use FAPost\Foundation\Flow\Enums\StateNamespace;
+use Fapost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\Flow\Enums\StateNamespace;
 use InvalidArgumentException;
 
 /**

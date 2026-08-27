@@ -3,7 +3,50 @@ title: "Queues"
 description: "Every queue, what belongs on it, and why they stay separate."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+| Queue | Carries |
+|---|---|
+| `flow.execution` | Inbound message handling and the execution pipeline |
+| `messaging.transactional` | Replies inside an active conversation |
+| `messaging.broadcast` | Low-priority fan-out for broadcasts |
+| `messaging.system` | Service notifications |
+| `scheduled.triggers` | Scheduled and event trigger fan-out |
+| `sync.external` | External synchronisations |
+
+## Why they are separate
+
+The separation is by **purpose**, not by convenience, and the reason is head-of-line
+blocking.
+
+A broadcast to fifty thousand contacts is a large volume of individually
+unimportant work. A reply to someone who just asked a question is a single piece of
+work that is urgent by definition — a person is watching a chat window. Put them on
+one queue and the broadcast is in front, and every reply waits behind it.
+
+The same argument separates `flow.execution` from `messaging.transactional`:
+inbound processing can be slow, because a flow may make an HTTP call or a retrieval
+query. Delivering the reply it produces should not queue behind the next contact's
+inbound message.
+
+`sync.external` is isolated for a different reason: it depends on systems whose
+availability is not ours. When a third party is down and its jobs are retrying with
+backoff, that retry storm must not occupy the workers that answer contacts.
+
+<Warning>
+  Do not mix queues by purpose. A job placed on a queue because it happens to be
+  configured, rather than because it belongs there, removes the isolation the
+  separation exists to provide.
+</Warning>
+
+## Backpressure
+
+Provider rate limits and backpressure are handled **preventively**, not as a
+reaction to a provider's error response.
+
+A sender that discovers a limit by being rejected has already spent the request,
+and on a broadcast that failure multiplies across the whole fan-out — turning one
+rate limit into tens of thousands of failed jobs, each of which will retry.
+
+## Running the workers
+
+Queues are processed by Horizon. An installation without it accepts messages and
+never answers them — see [Services](/self-hosting/services).

@@ -12,7 +12,7 @@ use App\Domains\Channels\Observers\ChannelObserver;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
-use FAPost\Foundation\Channel\WebhookRegistrarInterface;
+use Fapost\Foundation\Channel\WebhookRegistrarInterface;
 use Illuminate\Support\Facades\Bus;
 use Mockery\MockInterface;
 use RuntimeException;

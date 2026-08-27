@@ -3,7 +3,7 @@
 ## 10.1 Существующие документы
 
 - `Platform Architecture v2.2` — раздел 3.4 Flow Engine, раздел 5 Concurrency
-- `FAPost Plan v2.0` — Phase 2 tasks 09-16
+- `FaPost Plan v2.0` — Phase 2 tasks 09-16
 - `ADR-05 Foundation Package` — где живут foundation contracts
 - `ADR Handler Versioning Contract` — task 09
 

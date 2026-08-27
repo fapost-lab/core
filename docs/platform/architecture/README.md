@@ -1,6 +1,6 @@
 # Architecture
 
-This section is the architecture summary for FAPost Core.
+This section is the architecture summary for FaPost Core.
 
 Detailed architecture documents live in this directory. Use [`../INDEX.md`](../INDEX.md) as the documentation index.
 `CLAUDE.md` contains agent rules and coding constraints only; it is not the architecture index or task tracker.

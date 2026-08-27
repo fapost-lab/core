@@ -7,23 +7,23 @@ namespace App\Domains\Flow\Handlers;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Rag\RagAdapterRegistry;
-use FAPost\Foundation\DTO\NodeExecutionContext;
-use FAPost\Foundation\DTO\NodeExecutionResult;
-use FAPost\Foundation\DTO\NodeExecutionStatus;
-use FAPost\Foundation\DTO\RagQueryContext;
-use FAPost\Foundation\Flow\Enums\StateNamespace;
-use FAPost\Foundation\Flow\Handlers\AbstractVersionedHandler;
-use FAPost\Support\Builder\Schema\Fields\JsonField;
-use FAPost\Support\Builder\Schema\Fields\TextareaField;
-use FAPost\Support\Builder\Schema\Fields\TextField;
-use FAPost\Support\Builder\Schema\Schema;
-use FAPost\Support\Builder\Schema\Section;
+use Fapost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\DTO\NodeExecutionResult;
+use Fapost\Foundation\DTO\NodeExecutionStatus;
+use Fapost\Foundation\DTO\RagQueryContext;
+use Fapost\Foundation\Flow\Enums\StateNamespace;
+use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use Fapost\Support\Builder\Schema\Fields\JsonField;
+use Fapost\Support\Builder\Schema\Fields\TextareaField;
+use Fapost\Support\Builder\Schema\Fields\TextField;
+use Fapost\Support\Builder\Schema\Schema;
+use Fapost\Support\Builder\Schema\Section;
 use LogicException;
 use Throwable;
 
 /**
  * Queries a RAG provider via {@see RagAdapterRegistry} and writes the
- * deterministic {@see \FAPost\Foundation\DTO\StructuredRagResult} into
+ * deterministic {@see \Fapost\Foundation\DTO\StructuredRagResult} into
  * {@code state.rag.*}. The condition node downstream branches on
  * {@code rag.found}/{@code rag.confidence}; send_message uses {@code rag.answer}.
  *

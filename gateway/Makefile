@@ -1,4 +1,4 @@
-# Build targets for the FAPost webhook gateway.
+# Build targets for the FaPost webhook gateway.
 #
 # The gateway is a single static binary with no runtime dependencies, so a build
 # on any machine produces something that runs on any Linux of the same

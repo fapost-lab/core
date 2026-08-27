@@ -1,9 +1,65 @@
 ---
 title: "Flow node reference"
-description: "Type, version, configuration, and handles for each node."
+description: "Type, version, and category for each node Core registers."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+Nodes registered by Core. A handler is resolved by the pair `(type, version)`;
+every Core node is currently at version 1.
+
+| Category | Type | Label |
+|---|---|---|
+| Core | `input` | Input |
+| Core | `send_message` | Send message |
+| Logic | `branch` | Branch |
+| Logic | `delay` | Delay |
+| Logic | `loop` | Loop |
+| Logic | `loop_end` | Loop end |
+| Logic | `subflow` | Subflow |
+| Logic | `emit_event` | Emit event |
+| Logic | `end` | End |
+| Data | `assign` | Assign |
+| Data | `set_tag` | Set tag |
+| Contact | `auth_request` | Auth request |
+| Contact | `notify` | Notify |
+| Integration | `call` | Call |
+| AI | `rag_query` | Rag query |
+
+`type` is what a flow definition stores and what the registry resolves against. It
+is unique across every registered handler, Core and extension alike, so an
+extension picking a name that Core might later want is a collision waiting to
+happen — prefix yours.
+
+## Nodes the engine treats specially
+
+Most nodes execute and return a handle. Four alter the shape of execution itself:
+
+| Type | Effect |
+|---|---|
+| `end` | Sets the session status; the flow finishes |
+| `loop_end` | Returns to the `loop` node named in its config |
+| `subflow` | Creates a child session and pauses the parent until it completes |
+| `input` | Returns `waiting`; the session pauses for the contact's reply |
+
+## Declaring a node
+
+`type`, `version`, `label`, and `category` come from the handler. Core handlers
+extend `AbstractVersionedHandler`, which derives them from a `TYPE` constant:
+
+```php
+final class SendMessageNodeHandler extends AbstractVersionedHandler
+{
+    final public const string TYPE = 'send_message';
+
+    public function version(): int
+    {
+        return 1;
+    }
+}
+```
+
+The base class defaults `label()` to a humanised form of the type and `category()`
+to `Core`; override either to place a node elsewhere in the builder's palette.
+
+See [Handler contract](/extending/flow-nodes/handler-contract) for the full
+interface and [Versioning](/extending/flow-nodes/versioning) for when the version
+must change.

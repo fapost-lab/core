@@ -6,9 +6,9 @@ namespace Tests\Unit\Domains\Flow\Call;
 
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Call\Transports\HandlerTransport;
-use FAPost\Foundation\Action\ActionHandlerInterface;
-use FAPost\Foundation\Flow\Call\CallContext;
-use FAPost\Foundation\Flow\Call\CallRequest;
+use Fapost\Foundation\Action\ActionHandlerInterface;
+use Fapost\Foundation\Flow\Call\CallContext;
+use Fapost\Foundation\Flow\Call\CallRequest;
 use RuntimeException;
 use Tests\TestCase;
 

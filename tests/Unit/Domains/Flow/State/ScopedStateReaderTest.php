@@ -7,7 +7,7 @@ namespace Tests\Unit\Domains\Flow\State;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\State\Readers\ScopedStateReader;
-use FAPost\Foundation\Contracts\DataAccessorInterface;
+use Fapost\Foundation\Contracts\DataAccessorInterface;
 use Tests\TestCase;
 
 final class ScopedStateReaderTest extends TestCase

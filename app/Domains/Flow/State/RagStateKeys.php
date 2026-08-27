@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\State;
 
-use FAPost\Foundation\Flow\Enums\StateNamespace;
+use Fapost\Foundation\Flow\Enums\StateNamespace;
 
 final class RagStateKeys
 {

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Contracts;
 
 use App\Domains\Flow\State\Variables\Variable;
-use FAPost\Foundation\DTO\NodeExecutionContext;
+use Fapost\Foundation\DTO\NodeExecutionContext;
 use InvalidArgumentException;
 
 /**

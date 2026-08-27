@@ -7,8 +7,8 @@ namespace App\Domains\Channels;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
-use FAPost\Foundation\Channel\WebhookRegistrarInterface;
-use FAPost\Foundation\Messaging\ProviderSenderInterface;
+use Fapost\Foundation\Channel\WebhookRegistrarInterface;
+use Fapost\Foundation\Messaging\ProviderSenderInterface;
 use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
 

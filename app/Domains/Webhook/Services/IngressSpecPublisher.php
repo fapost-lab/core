@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Webhook\Services;
 
 use App\Domains\Channels\Enums\ChannelTypeEnum;
-use FAPost\Foundation\Channel\Ingress\IngressSpec;
+use Fapost\Foundation\Channel\Ingress\IngressSpec;
 use Illuminate\Support\Facades\Redis;
 use JsonException;
 

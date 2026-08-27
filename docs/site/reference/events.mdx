@@ -1,9 +1,54 @@
 ---
 title: "Events"
-description: "Events Core emits and what they carry."
+description: "Flow-level events, and the state of the platform event surface."
 ---
 
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  Core does not publish a catalogue of platform events yet. There is no stable
+  set of domain events an extension can subscribe to, and this page will not
+  invent one. What exists today is the flow-level event mechanism described
+  below.
 </Note>
+
+## Flow events
+
+A flow emits an event through the `emit_event` node. Emission is queued rather
+than synchronous — `QueuedFlowTriggerEventPublisher` hands it to the
+`scheduled.triggers` queue, so a flow that emits does not wait for whatever
+consumes the event.
+
+## Triggers
+
+What an event causes is resolved through the trigger contracts in
+`fapost/foundation`:
+
+| Contract | Role |
+|---|---|
+| `Flow\Contracts\TriggerResolverInterface` | Resolves which flow an incoming trigger starts |
+| `Flow\Contracts\TriggerTypeResolverInterface` | Resolves the kind of a trigger |
+| `Flow\DTO\ResolvedTrigger` | The resolution result |
+| `Flow\DTO\TriggerContext` | The context a trigger carries |
+
+Trigger fan-out runs on `scheduled.triggers`, separate from message handling, so a
+broad fan-out cannot delay a conversation — see [Queues](/reference/queues).
+
+## Analytics
+
+Analytics is a distinct stream, not the event bus. It is written through
+`Analytics\Contracts\AnalyticsWriterInterface` with `AnalyticsEvent` and
+`AnalyticsEventType`, and it exists to record what happened rather than to
+trigger behaviour.
+
+## History
+
+`Flow\History\HistoryEventType` enumerates the event kinds recorded against a
+flow session's history. It is a record of session progression, readable after the
+fact — not a subscription surface.
+
+## If you need to react to something
+
+Today that means a node handler on the flow, or a registered schedule — see
+[Building a Plugin](/extending/plugins). If the reaction you need cannot be
+expressed either way, that is a missing contract in `fapost/foundation`, and the
+right move is to propose it rather than to hook into a Core internal that carries
+no stability promise.

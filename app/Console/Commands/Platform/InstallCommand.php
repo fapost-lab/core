@@ -35,7 +35,7 @@ final class InstallCommand extends Command
         {--skip-gateway : Do not offer to set up the webhook gateway}
         {--env-path= : Environment file to configure (default: .env in the project root)}';
 
-    protected $description = 'Configure and install FAPost Core step by step';
+    protected $description = 'Configure and install FaPost Core step by step';
 
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
@@ -45,7 +45,7 @@ final class InstallCommand extends Command
 
     public function handle(): int
     {
-        $this->components->info('FAPost Core installation');
+        $this->components->info('FaPost Core installation');
 
         $path = (string) ($this->option('env-path') ?: base_path('.env'));
         $env  = new EnvFile($path);

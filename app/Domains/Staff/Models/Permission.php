@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Models;
 
-use FAPost\Support\Concerns\HasUlidPrimaryKey;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Spatie\Permission\Models\Permission as SpatiePermission;
 
 /**

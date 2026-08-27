@@ -1,9 +1,70 @@
 ---
 title: "State namespaces"
-description: "The system, flow, rag, and module key spaces."
+description: "The system, flow, rag, module, contact, and call key spaces."
 ---
 
+Session state is partitioned by owner. The namespace is not decoration — it
+determines who may write a key and where its value comes from.
+
+The canonical list is the `StateNamespace` enum in
+`Fapost\Foundation\Flow\Enums`, which is part of the extension contract:
+
+| Namespace | Contains | Written by |
+|---|---|---|
+| `system` | Engine-owned session facts | The engine and explicitly whitelisted system handlers |
+| `flow` | What the flow collects and uses | `input` and `assign` nodes, and your handlers |
+| `rag` | Retrieval results | `rag_query` |
+| `module` | Canonical data owned by a module | **Nobody** — read-only, resolved lazily through a data accessor |
+| `contact` | The contact profile | A derived projection, not stored in the session |
+| `call` | The last HTTP call response | A derived projection, not stored in the session |
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  New top-level namespaces are added to the enum, never invented per node. A
+  Solution or Plugin consumes the enum to declare allowed namespaces in schema
+  fields and to resolve paths.
 </Note>
+
+Handlers write through `stateChanges` on their result:
+
+```php
+return NodeExecutionResult::executed(stateChanges: [
+    'flow.answer' => $value,
+]);
+```
+
+## `flow` is yours
+
+This is where an extension's handlers keep what they collect. It is per-session,
+it is what conditions and message templates read, and nothing outside the flow
+depends on its shape.
+
+## `system` is not
+
+`system` carries the engine's own bookkeeping about the session. Writes are
+allowed only from runtime handlers explicitly whitelisted for it. A handler that
+writes a `system` key is setting a value the engine may overwrite or rely on
+having set itself.
+
+## `module` is read-only, and that is the point
+
+`module` is never stored in the session. It is resolved at read time through a
+`DataAccessorInterface` registered by the module that owns the data.
+
+<Warning>
+  A condition node must never read module tables directly.
+</Warning>
+
+Copying module data into session state would give every session a snapshot that
+was correct when the session began and wrong an hour later, with no single place
+to fix it. Resolving on read keeps the module the single source of truth.
+
+See [Data accessors](/extending/data-accessors) for exposing your own data here.
+
+## `contact` and `call` are projections
+
+Neither is stored in session state. They are derived views — the contact profile,
+and the response from the most recent HTTP call — addressable with the same dotted
+path notation in templates, branch conditions, and state pickers.
+
+Treat them as read-only. To change a contact, use the writer on
+`NodeExecutionContext`, not a state write.
