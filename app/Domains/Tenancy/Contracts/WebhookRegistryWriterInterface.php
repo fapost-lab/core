@@ -16,4 +16,13 @@ interface WebhookRegistryWriterInterface
     ): void;
 
     public function delete(string $publicHash): void;
+
+    /**
+     * Record which ingress host this webhook was actually registered against.
+     *
+     * Called only after the provider has accepted the URL, so the stored value
+     * describes reality rather than current configuration. Null clears it, which
+     * is the correct state once the provider-side webhook is removed.
+     */
+    public function recordIngress(string $publicHash, ?string $baseUrl): void;
 }

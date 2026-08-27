@@ -26,8 +26,11 @@ Homestead.yaml
 Thumbs.db
 /.claude
 
-**/caddy
-frankenphp
+# Binaries FrankenPHP/Octane downloads into the project root. Anchored to the
+# root on purpose: an unanchored **/caddy also swallowed docker/caddy/, so the
+# TLS configuration silently never reached git.
+/caddy
+/frankenphp
 frankenphp-worker.php
 
 _ide_helper.php

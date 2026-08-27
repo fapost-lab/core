@@ -22,9 +22,10 @@ use Illuminate\Support\Carbon;
  * @property string                          $tenant_id
  * @property string                          $assistant_id
  * @property string                          $name
- * @property string                          $message
+ * @property array<string, string>|null      $message
  * @property BroadcastTarget                 $target_type
  * @property list<string>|null               $target_tags
+ * @property string|null                     $target_segment_id
  * @property BroadcastStatus                 $status
  * @property int                             $total_recipients
  * @property int                             $sent_count
@@ -84,8 +85,11 @@ final class Broadcast extends BaseModel
     protected function casts(): array
     {
         return [
-            'target_type'      => BroadcastTarget::class,
-            'target_tags'      => 'array',
+            'target_type' => BroadcastTarget::class,
+            'target_tags' => 'array',
+            // JSONB locale map `{lang: text}`, resolved at send time via
+            // {@see \App\Domains\Flow\Contracts\ContentTranslatorInterface::resolveField}.
+            'message'          => 'array',
             'status'           => BroadcastStatus::class,
             'total_recipients' => 'integer',
             'sent_count'       => 'integer',

@@ -7,7 +7,10 @@ namespace Tests\Unit\Jobs\Messaging;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
+use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use App\Domains\Webhook\Enums\IngressDriver;
+use App\Domains\Webhook\Services\WebhookUrlGenerator;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
 use FAPost\Foundation\Channel\WebhookRegistrarInterface;
 use FAPost\Foundation\Channel\WebhookRegistrationPayload;
@@ -45,7 +48,43 @@ final class SyncChannelWebhookJobTest extends TestCase
             register: true,
         );
 
-        $job->handle($registry, $this->tenantSwitcher());
+        $writer = $this->registryWriter(expected: 'https://app.example.com');
+
+        $job->handle($registry, $this->tenantSwitcher(), $this->urlGenerator(), $writer);
+    }
+
+    /**
+     * The recorded host must describe what the provider accepted, so it is written
+     * against the gateway base only when the channel was actually pointed there.
+     */
+    public function test_handle_records_the_gateway_host_when_the_channel_is_routed_to_it(): void
+    {
+        $registrar = $this->mock(WebhookRegistrarInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('register')->once();
+        });
+
+        $registry = $this->mock(ChannelRegistryInterface::class, function (MockInterface $mock) use ($registrar): void {
+            $mock->shouldReceive('webhookRegistrar')->once()->with('telegram')->andReturn($registrar);
+        });
+
+        $job = new SyncChannelWebhookJob(
+            tenantId: 'tenant-1',
+            schema: 'tenant_test',
+            channelId: 'channel-1',
+            channelType: 'telegram',
+            webhookPublicHash: 'hash-1',
+            token: 'token-1',
+            secretToken: 'secret-1',
+            config: [],
+            register: true,
+        );
+
+        $job->handle(
+            $registry,
+            $this->tenantSwitcher(),
+            $this->urlGenerator(driver: IngressDriver::Gateway),
+            $this->registryWriter(expected: 'https://webhook.example.com'),
+        );
     }
 
     public function test_handle_deregisters_provider_webhook_when_requested(): void
@@ -74,7 +113,12 @@ final class SyncChannelWebhookJobTest extends TestCase
             register: false,
         );
 
-        $job->handle($registry, $this->tenantSwitcher());
+        $job->handle(
+            $registry,
+            $this->tenantSwitcher(),
+            $this->urlGenerator(),
+            $this->registryWriter(expected: null),
+        );
     }
 
     public function test_handle_returns_silently_when_no_registrar_exists(): void
@@ -95,9 +139,33 @@ final class SyncChannelWebhookJobTest extends TestCase
             register: true,
         );
 
-        $job->handle($registry, $this->tenantSwitcher());
+        $writer = $this->mock(WebhookRegistryWriterInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('recordIngress')->never();
+        });
+
+        $job->handle($registry, $this->tenantSwitcher(), $this->urlGenerator(), $writer);
 
         $this->addToAssertionCount(1);
+    }
+
+    private function urlGenerator(IngressDriver $driver = IngressDriver::Laravel): WebhookUrlGenerator
+    {
+        return new WebhookUrlGenerator(
+            baseUrl: 'https://app.example.com',
+            gatewayUrl: 'https://webhook.example.com',
+            driver: $driver,
+            gatewayPlatforms: ['telegram'],
+        );
+    }
+
+    private function registryWriter(?string $expected): WebhookRegistryWriterInterface
+    {
+        return $this->mock(
+            WebhookRegistryWriterInterface::class,
+            function (MockInterface $mock) use ($expected): void {
+                $mock->shouldReceive('recordIngress')->once()->with('hash-1', $expected);
+            }
+        );
     }
 
     private function tenantSwitcher(): TenantSwitcher

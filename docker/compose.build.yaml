@@ -1,0 +1,47 @@
+# Build overlay.
+#
+# Merge this on top of compose.yaml to build the images locally instead of
+# pulling them:
+#
+#   docker compose -f compose.yaml -f compose.build.yaml --env-file ../.env build
+#   docker compose -f compose.yaml -f compose.build.yaml --env-file ../.env up -d
+#
+# Kept separate rather than adding `build:` to compose.yaml, because Compose
+# treats a service that declares a build as one it should build: with both keys
+# present it compiles locally and never contacts the registry, even with
+# pull_policy set to always. Splitting the two is what makes pulling the default
+# and building an explicit choice.
+#
+# Build locally when you ship Solutions or Plugins of your own — those are
+# Composer packages, so they have to be inside the application image.
+
+services:
+  app:
+    build: &core-build
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: core
+      args:
+        VERSION: ${APP_VERSION:-dev}
+
+  # The worker roles run the same image as app; naming the build here keeps
+  # Compose from treating them as a different one.
+  horizon:
+    build: *core-build
+
+  scheduler:
+    build: *core-build
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: web
+      args:
+        VERSION: ${APP_VERSION:-dev}
+
+  gateway:
+    build:
+      context: ../gateway
+      args:
+        VERSION: ${GATEWAY_VERSION:-dev}

@@ -11,6 +11,7 @@ use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Exceptions\InvalidTenantSlugException;
 use App\Domains\Tenancy\Exceptions\TenantProvisioningException;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Models\TenantStatus;
@@ -29,6 +30,7 @@ final readonly class TenantProvisioningService
         private TenantSwitcher $tenantSwitcher,
         private AclBootstrapService $aclBootstrapService,
         private ChannelWebhookRegistryInterface $channelWebhookRegistry,
+        private TenantSlugPolicy $slugPolicy,
     ) {
     }
 
@@ -43,6 +45,7 @@ final readonly class TenantProvisioningService
      *
      * @param  array<string, mixed>  $config
      *
+     * @throws InvalidTenantSlugException  when the slug is malformed or reserved by the platform.
      * @throws TenantProvisioningException on schema conflict, missing admin credentials, or any step failure.
      */
     public function provision(
@@ -52,6 +55,10 @@ final readonly class TenantProvisioningService
         string $firstAdminName = 'Administrator',
         array $config = [],
     ): TenantInterface {
+        // Checked before anything is created: the slug determines both the schema
+        // name and, on a subdomain deployment, a hostname the tenant would control.
+        $this->slugPolicy->assertAssignable($slug);
+
         if ('' === $firstAdminPassword || '' === mb_trim($firstAdminEmail)) {
             throw new TenantProvisioningException('First admin email and password are required.');
         }

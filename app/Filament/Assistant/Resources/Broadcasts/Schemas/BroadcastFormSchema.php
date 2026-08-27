@@ -10,10 +10,10 @@ use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Services\BroadcastRecipientResolver;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
 use App\Domains\Contact\Models\ContactSegment;
+use App\Filament\Support\LocalizedTextarea;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
@@ -34,12 +34,12 @@ final class BroadcastFormSchema
                 ->required()
                 ->maxLength(255),
 
-            Textarea::make('message')
-                ->label(__('broadcast.fields.message'))
-                ->required()
-                ->rows(5)
-                ->maxLength(4096)
-                ->helperText(__('broadcast.fields.message_help')),
+            LocalizedTextarea::tabs(
+                statePath: 'message',
+                label: __('broadcast.fields.message'),
+                helperText: __('broadcast.fields.message_help'),
+                rows: 5,
+            ),
 
             Select::make('target_type')
                 ->label(__('broadcast.fields.target'))

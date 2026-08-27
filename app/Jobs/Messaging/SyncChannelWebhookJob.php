@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Jobs\Messaging;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use App\Domains\Webhook\Services\WebhookUrlGenerator;
 use FAPost\Foundation\Channel\WebhookRegistrationPayload;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -51,11 +53,15 @@ final class SyncChannelWebhookJob implements ShouldQueue
     /**
      * Resolve the channel registrar and apply the requested provider webhook action.
      */
-    public function handle(ChannelRegistryInterface $channelRegistry, TenantSwitcher $switcher): void
-    {
+    public function handle(
+        ChannelRegistryInterface $channelRegistry,
+        TenantSwitcher $switcher,
+        WebhookUrlGenerator $urlGenerator,
+        WebhookRegistryWriterInterface $registryWriter,
+    ): void {
         $tenant = new RuntimeTenant(id: $this->tenantId, schemaName: $this->schema);
 
-        $switcher->runForTenant($tenant, function () use ($channelRegistry): void {
+        $switcher->runForTenant($tenant, function () use ($channelRegistry, $urlGenerator, $registryWriter): void {
             $registrar = $channelRegistry->webhookRegistrar($this->channelType);
 
             if (null === $registrar) {
@@ -73,10 +79,20 @@ final class SyncChannelWebhookJob implements ShouldQueue
             if ($this->register) {
                 $registrar->register($payload);
 
+                // Recorded only after the provider accepted the URL: until then there
+                // is no fact to record, and a failed registration must not look like a
+                // completed migration to the ingress drift report.
+                $registryWriter->recordIngress(
+                    $this->webhookPublicHash,
+                    $urlGenerator->baseFor($this->channelType),
+                );
+
                 return;
             }
 
             $registrar->deregister($payload);
+
+            $registryWriter->recordIngress($this->webhookPublicHash, null);
         });
     }
 }

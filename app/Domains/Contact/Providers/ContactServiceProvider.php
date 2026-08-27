@@ -7,6 +7,8 @@ namespace App\Domains\Contact\Providers;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Contact\Models\ContactGroup;
+use App\Domains\Contact\Policies\ContactGroupPolicy;
 use App\Domains\Contact\Policies\ContactPolicy;
 use App\Domains\Contact\Repositories\ContactTagRepository;
 use App\Domains\Contact\Services\ContactService;
@@ -30,10 +32,11 @@ final class ContactServiceProvider extends ServiceProvider
     }
 
     /**
-     * Register contact authorization policy.
+     * Register contact authorization policies.
      */
     public function boot(): void
     {
         Gate::policy(Contact::class, ContactPolicy::class);
+        Gate::policy(ContactGroup::class, ContactGroupPolicy::class);
     }
 }

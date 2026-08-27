@@ -79,6 +79,12 @@ final class ContactInfolistSchema
                     ->columnSpanFull()
                     ->state(static fn (Contact $record): array => $record->tags()->orderBy('tag')->pluck('tag')->all())
                     ->placeholder(self::placeholder()),
+                TextEntry::make('contact_groups')
+                    ->label(__('contact.groups.label'))
+                    ->badge()
+                    ->columnSpanFull()
+                    ->state(static fn (Contact $record): array => $record->groups()->orderBy('name')->pluck('name')->all())
+                    ->placeholder(self::placeholder()),
             ]);
     }
 

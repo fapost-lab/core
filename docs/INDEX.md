@@ -6,12 +6,26 @@ historical material do not compete for the same entry point.
 ## Start Here
 
 - [README.md](./README.md) — short documentation entry point.
+- [deployment/README.md](./deployment/README.md) — running FAPost Core on your own infrastructure.
 - [platform/README.md](./platform/README.md) — documentation for developing FAPost Core itself.
 - [developers/index.html](./developers/index.html) — HTML developer portal for Features, Solutions, Plugins, nodes, and
   builder extensions.
 - [reference/README.md](./reference/README.md) — low-level specs, schemas, diagrams, and generated API docs.
 - [archive/README.md](./archive/README.md) — historical documents and old Notion exports.
 - [../drafts/CURRENT_TASK.md](../drafts/CURRENT_TASK.md) — current operational focus for agents.
+
+## Deployment
+
+Documents for people running FAPost Core rather than developing it. These are the
+source of truth for deployment: every step can be followed by hand, and the files
+under `docker/` and `deploy/` automate exactly what they describe.
+
+- [deployment/README.md](./deployment/README.md) — choosing a method, and the shape of an installation.
+- [deployment/requirements.md](./deployment/requirements.md) — what a host must provide.
+- [deployment/docker-compose.md](./deployment/docker-compose.md) — the container path, start to finish.
+- [deployment/services.md](./deployment/services.md) — Horizon and the scheduler, without which nothing is processed.
+- [deployment/gateway.md](./deployment/gateway.md) — the optional Go webhook ingress.
+- [deployment/upgrading.md](./deployment/upgrading.md) — release order, migrations, rollback.
 
 ## Platform Development
 

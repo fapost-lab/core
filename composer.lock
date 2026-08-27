@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "3ad09adb02c5b10f2cfa57feb2bfa1cf",
+  "content-hash": "b43a99d19fc75d2f250b3158711a8978",
   "packages": [
     {
       "name": "blade-ui-kit/blade-heroicons",
@@ -1276,16 +1276,16 @@
     },
     {
       "name": "fapost/foundation",
-      "version": "v0.1.0",
+      "version": "v0.1.1",
       "source": {
         "type": "git",
         "url": "https://github.com/fapost-lab/foundation.git",
-        "reference": "ff22a998a1a580e6c103c9e580812a2138356e10"
+        "reference": "8766c4892b5c5c439bd7db9791a2c3bf1b4022d6"
       },
       "dist": {
         "type": "zip",
-        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/ff22a998a1a580e6c103c9e580812a2138356e10",
-        "reference": "ff22a998a1a580e6c103c9e580812a2138356e10",
+        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/8766c4892b5c5c439bd7db9791a2c3bf1b4022d6",
+        "reference": "8766c4892b5c5c439bd7db9791a2c3bf1b4022d6",
         "shasum": ""
       },
       "require": {
@@ -1318,10 +1318,10 @@
       ],
       "description": "FAPost public contract layer for Solutions, Plugins and external integrations",
       "support": {
-        "source": "https://github.com/fapost-lab/foundation/tree/v0.1.0",
+        "source": "https://github.com/fapost-lab/foundation/tree/v0.1.1",
         "issues": "https://github.com/fapost-lab/foundation/issues"
       },
-      "time": "2026-08-03T16:51:54+00:00"
+      "time": "2026-08-25T07:08:01+00:00"
     },
     {
       "name": "fapost/support",

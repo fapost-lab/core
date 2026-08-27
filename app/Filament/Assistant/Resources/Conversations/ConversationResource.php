@@ -67,14 +67,41 @@ final class ConversationResource extends Resource
         ];
     }
 
+    /**
+     * Gated by {@see \App\Domains\Conversation\Policies\ConversationPolicy} —
+     * transcripts hold every message a contact ever sent, so being signed in is
+     * not enough. Filament resolves canViewAny() through the policy; this only
+     * keeps the nav item in step with it.
+     */
     public static function shouldRegisterNavigation(): bool
     {
-        return Auth::user() instanceof User;
+        return Auth::user() instanceof User && static::canViewAny();
     }
 
     public static function canCreate(): bool
     {
         return false;
+    }
+
+    /**
+     * Count of threads with unread messages in the current assistant scope.
+     * Reuses {@see getEloquentQuery()} so the count follows the exact same
+     * tenant/assistant scoping as the list itself.
+     */
+    public static function getNavigationBadge(): ?string
+    {
+        if (! static::shouldRegisterNavigation()) {
+            return null;
+        }
+
+        $count = static::getEloquentQuery()->where('unread_count', '>', 0)->count();
+
+        return $count > 0 ? (string) $count : null;
+    }
+
+    public static function getNavigationBadgeColor(): ?string
+    {
+        return 'danger';
     }
 
     /**

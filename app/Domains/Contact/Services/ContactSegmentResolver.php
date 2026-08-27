@@ -16,13 +16,19 @@ use Illuminate\Support\Carbon;
  * contact query. Rules shape:
  *
  *   { "match": "all"|"any", "conditions": [
- *       { "type": "tag",      "operator": "has"|"not_has", "value": "vip" },
- *       { "type": "language", "operator": "in"|"eq",       "value": ["en"] },
- *       { "type": "platform", "operator": "in"|"eq",       "value": "telegram" }
+ *       { "type": "tag",      "operator": "has"|"not_has",   "value": "vip" },
+ *       { "type": "language", "operator": "in"|"eq",         "value": ["en"] },
+ *       { "type": "platform", "operator": "in"|"eq",         "value": "telegram" },
+ *       { "type": "group",    "operator": "in"|"not_in",     "value": ["<group-id>"] }
  *   ] }
  *
- * Unknown / malformed conditions are skipped defensively. An empty condition set
- * matches every contact of the tenant.
+ * A condition we cannot evaluate — unknown type, blank tag, empty group list,
+ * malformed attribute key — resolves to nobody rather than being dropped. These
+ * rules choose broadcast audiences, so failing open would mean messaging the
+ * whole tenant instead of a handful of people.
+ *
+ * An empty condition set is the separate, deliberate case and still matches
+ * every contact of the tenant.
  */
 final class ContactSegmentResolver
 {
@@ -95,8 +101,29 @@ final class ContactSegmentResolver
             SegmentConditionType::Language  => $this->applyColumn($query, 'language', $operator, $value, $or),
             SegmentConditionType::Platform  => $this->applyColumn($query, 'platform', $operator, $value, $or),
             SegmentConditionType::Attribute => $this->applyAttribute($query, $condition, $operator, $value, $or),
-            null                            => null,
+            SegmentConditionType::Group     => $this->applyGroup($query, $operator, $value, $or),
+            null                            => $this->matchNothing($query, $or),
         };
+    }
+
+    /**
+     * Constraint for a condition we cannot evaluate — unknown type, blank tag,
+     * empty group list, malformed attribute key.
+     *
+     * Such a condition must narrow to nobody, never silently disappear. These
+     * rules pick broadcast audiences: a dropped condition widens the segment,
+     * and the failure mode is messaging every contact in the tenant instead of
+     * the handful that was intended. Under `any` (OR) this is a no-op, which is
+     * the correct reading — an unusable alternative contributes no matches.
+     *
+     * A segment with no conditions at all is a different, deliberate case and
+     * still resolves to every contact — see {@see query()}.
+     *
+     * @param  Builder<\App\Domains\Contact\Models\Contact>  $query
+     */
+    private function matchNothing(Builder $query, bool $or): void
+    {
+        $or ? $query->orWhereRaw('1 = 0') : $query->whereRaw('1 = 0');
     }
 
     /**
@@ -113,6 +140,8 @@ final class ContactSegmentResolver
 
         // Only allow safe dot-path identifiers into the JSON selector.
         if (1 !== preg_match('/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$/', $key)) {
+            $this->matchNothing($query, $or);
+
             return;
         }
 
@@ -127,6 +156,8 @@ final class ContactSegmentResolver
         $scalar = is_array($value) ? ($value[0] ?? null) : $value;
 
         if (! is_string($scalar) || '' === $scalar) {
+            $this->matchNothing($query, $or);
+
             return;
         }
 
@@ -144,6 +175,8 @@ final class ContactSegmentResolver
         $tag = is_array($value) ? ($value[0] ?? null) : $value;
 
         if (! is_string($tag) || '' === $tag) {
+            $this->matchNothing($query, $or);
+
             return;
         }
 
@@ -163,6 +196,42 @@ final class ContactSegmentResolver
     }
 
     /**
+     * Filter on membership in one or more {@see \App\Domains\Contact\Models\ContactGroup}.
+     * Value is a list of group ids (Filament Select, multiple).
+     *
+     * @param  Builder<\App\Domains\Contact\Models\Contact>  $query
+     */
+    private function applyGroup(Builder $query, string $operator, mixed $value, bool $or): void
+    {
+        $ids = array_values(array_filter(
+            is_array($value) ? $value : [$value],
+            static fn ($v): bool => is_string($v) && '' !== $v,
+        ));
+
+        if ([] === $ids) {
+            $this->matchNothing($query, $or);
+
+            return;
+        }
+
+        // Qualified: the whereHas subquery joins the pivot, so a bare `id`
+        // would be ambiguous the moment that table grows a surrogate key.
+        $constraint = static fn (QueryBuilder $q): QueryBuilder => $q->whereIn('contact_groups.id', $ids);
+
+        if ('not_in' === $operator) {
+            $or
+                ? $query->orWhereDoesntHave('groups', $constraint)
+                : $query->whereDoesntHave('groups', $constraint);
+
+            return;
+        }
+
+        $or
+            ? $query->orWhereHas('groups', $constraint)
+            : $query->whereHas('groups', $constraint);
+    }
+
+    /**
      * @param  Builder<\App\Domains\Contact\Models\Contact>  $query
      */
     private function applyColumn(Builder $query, string $column, string $operator, mixed $value, bool $or): void
@@ -173,6 +242,8 @@ final class ContactSegmentResolver
         ));
 
         if ([] === $values) {
+            $this->matchNothing($query, $or);
+
             return;
         }
 

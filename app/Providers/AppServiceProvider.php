@@ -38,7 +38,11 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->scoped(DatabaseAnalyticsWriter::class);
         $this->app->scoped(AnalyticsWriterInterface::class, DatabaseAnalyticsWriter::class);
 
-        if ($this->app->environment('local')) {
+        // Telescope is a dev dependency, so a production install does not have it.
+        // The class check matters beyond that: an image built with --no-dev but
+        // started with APP_ENV=local would otherwise fail to boot at all, with an
+        // error naming a package the operator never asked for.
+        if ($this->app->environment('local') && class_exists(\Laravel\Telescope\TelescopeServiceProvider::class)) {
             $this->app->register(\Laravel\Telescope\TelescopeServiceProvider::class);
             $this->app->register(TelescopeServiceProvider::class);
         }

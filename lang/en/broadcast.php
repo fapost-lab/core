@@ -9,7 +9,7 @@ return [
     'fields' => [
         'name'         => 'Name',
         'message'      => 'Message',
-        'message_help' => 'Sent as-is to every recipient. Basic HTML is supported.',
+        'message_help' => 'Sent to each recipient in their language, falling back to the assistant\'s default language. Basic HTML is supported.',
         'target'       => 'Audience',
         'tags'         => 'Tags',
         'segment'      => 'Segment',
@@ -47,5 +47,9 @@ return [
         'started'         => 'Broadcast started.',
         'already_started' => 'Broadcast has already been started.',
         'cancelled'       => 'Broadcast cancelled.',
+    ],
+
+    'errors' => [
+        'message_required_base_language' => 'Add message text for :language — it is this tenant\'s base language and can\'t be empty.',
     ],
 ];

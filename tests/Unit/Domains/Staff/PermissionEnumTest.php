@@ -26,14 +26,20 @@ final class PermissionEnumTest extends TestCase
 
         sort($values);
         $this->assertSame(
-            ['manage_roles', 'publish_flow', 'rotate_channel_token'],
+            [
+                'manage_roles',
+                'publish_flow',
+                'reply_conversations',
+                'rotate_channel_token',
+                'view_conversations',
+            ],
             $values,
         );
     }
 
     public function test_every_permission_belongs_to_a_group(): void
     {
-        $allowedGroups = ['assistants', 'users', 'content', 'contacts', 'analytics', 'system'];
+        $allowedGroups = ['assistants', 'users', 'content', 'contacts', 'conversations', 'analytics', 'system'];
 
         foreach (Permission::cases() as $permission) {
             $this->assertContains(
@@ -44,22 +50,24 @@ final class PermissionEnumTest extends TestCase
         }
     }
 
-    public function test_grouped_by_group_returns_six_groups(): void
+    public function test_grouped_by_group_covers_every_ui_group(): void
     {
         $groups = Permission::groupedByGroup();
 
-        $this->assertCount(6, $groups);
+        $this->assertCount(7, $groups);
         $this->assertArrayHasKey('assistants', $groups);
         $this->assertArrayHasKey('users', $groups);
         $this->assertArrayHasKey('content', $groups);
         $this->assertArrayHasKey('contacts', $groups);
+        $this->assertArrayHasKey('conversations', $groups);
         $this->assertArrayHasKey('analytics', $groups);
         $this->assertArrayHasKey('system', $groups);
     }
 
-    public function test_values_returns_all_21_permissions(): void
+    public function test_values_covers_every_declared_case(): void
     {
-        $this->assertCount(21, Permission::values());
+        $this->assertCount(count(Permission::cases()), Permission::values());
+        $this->assertSame(Permission::values(), array_unique(Permission::values()));
     }
 
     public function test_admin_role_contains_all_permissions(): void
@@ -91,6 +99,24 @@ final class PermissionEnumTest extends TestCase
 
         $this->assertContains(Permission::ViewFlowSessions, $analystPerms);
         $this->assertContains(Permission::ViewContacts, $analystPerms);
+    }
+
+    public function test_content_manager_can_work_the_inbox(): void
+    {
+        $perms = RoleEnum::ContentManager->permissions();
+
+        $this->assertContains(Permission::ViewConversations, $perms);
+        $this->assertContains(Permission::ReplyConversations, $perms);
+    }
+
+    public function test_analyst_cannot_read_transcripts(): void
+    {
+        // Analyst is an aggregate-numbers role. Message transcripts are the
+        // most sensitive data we hold and must be granted deliberately.
+        $perms = RoleEnum::Analyst->permissions();
+
+        $this->assertNotContains(Permission::ViewConversations, $perms);
+        $this->assertNotContains(Permission::ReplyConversations, $perms);
     }
 
     public function test_deprecated_manage_flow_is_not_in_non_admin_system_roles(): void

@@ -53,6 +53,11 @@ enum RoleEnum: string
                 Permission::ViewMedia,
                 // Contacts
                 Permission::ViewContacts,
+                // Inbox — this role already reaches every contact through
+                // broadcasts, so replying in a thread is not a wider blast
+                // radius than it already has.
+                Permission::ViewConversations,
+                Permission::ReplyConversations,
                 // Analytics
                 Permission::ViewAnalytics,
             ],

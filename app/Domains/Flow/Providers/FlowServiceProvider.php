@@ -15,6 +15,7 @@ use App\Domains\Flow\Commands\GlobalCommandExecutorInterface;
 use App\Domains\Flow\Concurrency\LockAcquisitionPolicy;
 use App\Domains\Flow\Concurrency\LockHeartbeat;
 use App\Domains\Flow\Concurrency\SessionLockManager;
+use App\Domains\Flow\Concurrency\SessionLockRegistry;
 use App\Domains\Flow\Contracts\AssistantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationServiceInterface;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
@@ -136,11 +137,8 @@ use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\FlowExecutionGuard;
 use FAPost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use FAPost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
-use Illuminate\Contracts\Cache\LockProvider;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
-use LogicException;
 
 final class FlowServiceProvider extends ServiceProvider
 {
@@ -316,9 +314,23 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->singleton(DefaultHistoryWriter::class);
         $this->app->singleton(NoOpHistoryWriter::class);
         $this->app->singleton(HistoryWriterFactory::class);
+        // Session lock stack. Parameters live in config/flow.php rather than
+        // constructor defaults so TTL and retry budget are tunable per install.
         $this->app->singleton(SessionLockManager::class);
-        $this->app->singleton(LockHeartbeat::class);
-        $this->app->singleton(LockAcquisitionPolicy::class);
+        $this->app->singleton(LockHeartbeat::class, fn ($app): LockHeartbeat => new LockHeartbeat(
+            manager: $app->make(SessionLockManager::class),
+            intervalSeconds: (int)$app->make('config')->get('flow.lock.heartbeat.interval_seconds', 10),
+            extendToSeconds: (int)$app->make('config')->get('flow.lock.heartbeat.extend_to_seconds', 30),
+        ));
+        $this->app->singleton(LockAcquisitionPolicy::class, fn ($app): LockAcquisitionPolicy => new LockAcquisitionPolicy(
+            manager: $app->make(SessionLockManager::class),
+            maxAttempts: (int)$app->make('config')->get('flow.lock.acquisition_retries', 3),
+            retryDelayMs: (int)$app->make('config')->get('flow.lock.retry_delay_ms', 2000),
+            ttlSeconds: (int)$app->make('config')->get('flow.lock.ttl_seconds', 30),
+        ));
+        // Per-request slot holding this worker's claim: keeps the execution
+        // guard re-entrant and gives the engine a handle to heartbeat.
+        $this->app->scoped(SessionLockRegistry::class);
         $this->app->singleton(CallTransportRegistry::class, function ($app): CallTransportRegistry {
             $registry = new CallTransportRegistry();
             $registry->register($app->make(HttpTransport::class));
@@ -379,15 +391,8 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->bind(PersistentButtonRegistryInterface::class, PersistentButtonRegistry::class);
         $this->app->scoped(FlowOrchestrator::class);
         $this->app->scoped(FlowOrchestratorInterface::class, FlowOrchestrator::class);
-        $this->app->singleton(FlowExecutionGuardInterface::class, function (): FlowExecutionGuard {
-            $store = Cache::store('redis')->getStore();
-
-            if (!$store instanceof LockProvider) {
-                throw new LogicException('Configured redis cache store does not support distributed locks.');
-            }
-
-            return new FlowExecutionGuard(store: $store, ttl: 30);
-        });
+        // Scoped, not singleton: the guard reads the per-request lock registry.
+        $this->app->scoped(FlowExecutionGuardInterface::class, FlowExecutionGuard::class);
     }
 
     /**

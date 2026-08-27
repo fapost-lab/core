@@ -13,6 +13,7 @@ use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Contact\Models\ContactTag;
 use Illuminate\Support\Facades\Bus;
@@ -74,6 +75,41 @@ final class RunBroadcastJobTest extends FeatureTestCase
             'tenant_id' => self::TENANT_ID,
             'name'      => 'VIP',
             'rules'     => ['match' => 'all', 'conditions' => [['type' => 'tag', 'operator' => 'has', 'value' => 'vip']]],
+        ]);
+
+        $broadcast = Broadcast::query()->create([
+            'tenant_id'         => self::TENANT_ID,
+            'assistant_id'      => (string) $channel->assistant_id,
+            'name'              => 'Promo',
+            'message'           => 'Hello!',
+            'target_type'       => 'segment',
+            'target_segment_id' => $segment->getKey(),
+            'status'            => BroadcastStatus::Running->value,
+        ]);
+
+        $this->runJob($broadcast);
+
+        $this->assertSame(1, $broadcast->fresh()->total_recipients);
+        Bus::assertDispatchedTimes(SendBroadcastRecipientJob::class, 1);
+    }
+
+    public function test_segment_target_with_group_condition_only_reaches_group_members(): void
+    {
+        Bus::fake();
+
+        $channel = $this->channel();
+
+        $group  = ContactGroup::query()->create(['tenant_id' => self::TENANT_ID, 'name' => 'VIP Group']);
+        $member = $this->contact();
+        $member->groups()->attach($group);
+        $this->bind($member, $channel);
+
+        $this->bind($this->contact(), $channel); // not a member → excluded by the segment
+
+        $segment = ContactSegment::query()->create([
+            'tenant_id' => self::TENANT_ID,
+            'name'      => 'VIP Group Segment',
+            'rules'     => ['match' => 'all', 'conditions' => [['type' => 'group', 'operator' => 'in', 'value' => [$group->getKey()]]]],
         ]);
 
         $broadcast = Broadcast::query()->create([

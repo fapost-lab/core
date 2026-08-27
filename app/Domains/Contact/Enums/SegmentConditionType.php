@@ -6,8 +6,8 @@ namespace App\Domains\Contact\Enums;
 
 /**
  * Contact attribute a segment condition filters on: tag membership, content
- * language, platform, or a flow-collected value in the `attributes` json
- * (dot-path key). Group conditions arrive with the contact-groups feature.
+ * language, platform, a flow-collected value in the `attributes` json
+ * (dot-path key), or {@see \App\Domains\Contact\Models\ContactGroup} membership.
  */
 enum SegmentConditionType: string
 {
@@ -15,4 +15,5 @@ enum SegmentConditionType: string
     case Language  = 'language';
     case Platform  = 'platform';
     case Attribute = 'attribute';
+    case Group     = 'group';
 }

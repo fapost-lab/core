@@ -20,6 +20,7 @@ use App\Domains\Flow\Exceptions\FlowExecutionLimitExceededException;
 use App\Domains\Flow\Exceptions\HandlerNotFoundException;
 use App\Domains\Flow\Exceptions\InvalidFlowGraphException;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
+use App\Domains\Flow\Exceptions\SessionLockLostException;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Handlers\LoopEndNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
@@ -67,6 +68,8 @@ final readonly class FlowEngine implements FlowEngineInterface
         private \App\Domains\Messaging\Typing\TypingHeartbeatRegistry $typingHeartbeat,
         private LoggerInterface $logger,
         private VariableSchemaRegistryInterface $schemaRegistry,
+        private \App\Domains\Flow\Concurrency\SessionLockRegistry $sessionLock,
+        private \App\Domains\Flow\Concurrency\LockHeartbeat $lockHeartbeat,
     ) {
     }
 
@@ -363,6 +366,11 @@ final readonly class FlowEngine implements FlowEngineInterface
             // bypass the routing pipeline).
             $this->typingHeartbeat->current()?->refresh();
 
+            // Same cadence, different purpose: extend the session lock TTL so a
+            // long chain of nodes does not outlive the claim. Throws when the
+            // claim has drifted — see refreshSessionLock().
+            $this->refreshSessionLock();
+
             try {
                 $result = $handler->execute($node, $session->state ?? [], $handlerContext);
             } catch (Throwable $handlerException) {
@@ -587,5 +595,35 @@ final readonly class FlowEngine implements FlowEngineInterface
         }
 
         return null;
+    }
+
+    /**
+     * Extend the session lock before running the next node.
+     *
+     * The tick is bound to loop iterations rather than wall-clock time, which
+     * is sufficient because the lock TTL only has to cover the gap between two
+     * ticks — i.e. the slowest single node — not the whole run. Outbound calls
+     * cap out well below the TTL (`HttpTransport` defaults to a 10s timeout).
+     *
+     * A false return means the TTL lapsed and another worker claimed the slot.
+     * ADR Message Routing & Concurrency Control requires abandoning the run at
+     * that point: continuing would race the new owner over session state.
+     *
+     * No-op when nothing is registered — sweepers and timeout resume jobs that
+     * enter the engine outside a routing pipeline hold no handle.
+     */
+    private function refreshSessionLock(): void
+    {
+        $handle = $this->sessionLock->current();
+
+        if (null === $handle) {
+            return;
+        }
+
+        if (! $this->lockHeartbeat->extend($handle)) {
+            $this->sessionLock->clear();
+
+            throw new SessionLockLostException($handle->key);
+        }
     }
 }

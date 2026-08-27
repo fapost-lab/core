@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Services;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
 use FAPost\Foundation\Messaging\MessagePayload;
 use FAPost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
@@ -60,7 +61,17 @@ final readonly class FallbackMessageService implements FallbackMessageServiceInt
                         type: 'text',
                         text: $text,
                     ),
-                    metadata: ['parse_mode' => 'HTML'],
+                    // contact_id / assistant_id are what let the capture funnel
+                    // recognise this as part of a transcript — without them the
+                    // message is silently dropped from the log, and an operator
+                    // opening the thread would see the contact talking to
+                    // nobody where the busy/fallback reply actually went out.
+                    metadata: [
+                        'parse_mode'   => 'HTML',
+                        'contact_id'   => (string)$contact->getKey(),
+                        'assistant_id' => $assistantId,
+                        'origin'       => MessageOrigin::System->value,
+                    ],
                 )
             );
         } catch (Throwable) {

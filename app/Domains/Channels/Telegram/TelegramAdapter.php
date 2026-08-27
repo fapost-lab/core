@@ -6,6 +6,8 @@ namespace App\Domains\Channels\Telegram;
 
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
+use FAPost\Foundation\Channel\Ingress\IngressSpec;
+use FAPost\Foundation\Channel\Ingress\ProvidesIngressSpecInterface;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\DTO\OutgoingMessage;
 use FAPost\Foundation\DTO\SendResult;
@@ -17,8 +19,13 @@ use Illuminate\Http\Request;
  * Implements two distinct responsibilities:
  *   - Ingress methods (verifySignature, extractIdempotencyKey): minimal, stateless, no DB.
  *   - Worker method (normalize): full payload parsing via TelegramInboundNormalizer.
+ *
+ * Ingress rules are additionally published declaratively via {@see self::ingressSpec()},
+ * which lets non-PHP ingress runtimes verify Telegram webhooks without Telegram-specific
+ * code. The spec and the two ingress methods must stay behaviourally identical —
+ * TelegramIngressSpecParityTest enforces that.
  */
-final readonly class TelegramAdapter implements ChannelAdapterInterface
+final readonly class TelegramAdapter implements ChannelAdapterInterface, ProvidesIngressSpecInterface
 {
     private const string SECRET_HEADER = 'x-telegram-bot-api-secret-token';
 
@@ -62,6 +69,20 @@ final readonly class TelegramAdapter implements ChannelAdapterInterface
         $updateId = (string)($request->json('update_id') ?? '');
 
         return "tg:{$channelId}:{$updateId}";
+    }
+
+    /**
+     * Declarative form of the two ingress methods above.
+     *
+     * Telegram signs nothing: it echoes back the secret token that was supplied to
+     * setWebhook, so a constant-time header comparison is the whole check.
+     */
+    public function ingressSpec(): IngressSpec
+    {
+        return IngressSpec::headerEquals(
+            header: self::SECRET_HEADER,
+            idempotencyTemplate: 'tg:{channel}:{body.update_id}',
+        );
     }
 
     /**

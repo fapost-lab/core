@@ -49,12 +49,13 @@ return [
     ],
 
     'permission_groups' => [
-        'assistants' => 'Assistants',
-        'users'      => 'Users',
-        'content'    => 'Content',
-        'contacts'   => 'Contacts',
-        'analytics'  => 'Analytics',
-        'system'     => 'System',
+        'assistants'    => 'Assistants',
+        'users'         => 'Users',
+        'content'       => 'Content',
+        'contacts'      => 'Contacts',
+        'conversations' => 'Conversations',
+        'analytics'     => 'Analytics',
+        'system'        => 'System',
     ],
 
     'permissions' => [
@@ -77,6 +78,8 @@ return [
             'manage_roles'              => 'Manage roles',
             'view_contacts'             => 'View contacts',
             'manage_contacts'           => 'Manage contacts',
+            'view_conversations'        => 'View conversations',
+            'reply_conversations'       => 'Reply in conversations',
             'view_analytics'            => 'View analytics',
             'view_system'               => 'View system',
             'manage_settings'           => 'Manage settings',
@@ -86,6 +89,8 @@ return [
             'publish_flow'         => 'Promotes a draft to live. Takes effect immediately for all incoming sessions.',
             'manage_roles'         => 'Create and edit custom roles with their permission sets.',
             'manage_flow'          => 'Legacy coarse-grained permission. Covers all flow operations. Use granular permissions for new roles.',
+            'view_conversations'   => 'Opens full message transcripts between contacts and the assistant, including media.',
+            'reply_conversations'  => 'Sends messages to a contact from the operator inbox under the assistant identity.',
         ],
         'sensitive_warning' => 'Sensitive — review carefully before assigning.',
     ],

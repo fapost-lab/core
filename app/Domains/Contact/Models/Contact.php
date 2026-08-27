@@ -10,6 +10,7 @@ use FAPost\Support\Concerns\HasUlidPrimaryKey;
 use FAPost\Support\Models\BaseModel;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -82,6 +83,16 @@ final class Contact extends BaseModel
     public function tags(): HasMany
     {
         return $this->hasMany(ContactTag::class);
+    }
+
+    /**
+     * Named groups this contact belongs to (see {@see ContactGroup}).
+     *
+     * @return BelongsToMany<ContactGroup, $this>
+     */
+    public function groups(): BelongsToMany
+    {
+        return $this->belongsToMany(ContactGroup::class, 'contact_group_members');
     }
 
     protected static function newFactory(): ContactFactory

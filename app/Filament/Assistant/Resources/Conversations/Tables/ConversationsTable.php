@@ -78,7 +78,8 @@ final class ConversationsTable
             ->recordActions([
                 ViewAction::make(),
             ])
-            ->paginated([25, 50, 100]);
+            ->paginated([25, 50, 100])
+            ->poll('30s');
     }
 
     private static function contactLabel(object $record): string

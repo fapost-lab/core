@@ -84,7 +84,7 @@ WhatsApp, Facebook Messenger, Slack, Microsoft Teams и далее по спро
 | **Assistant** | `app/Domains/Assistant/` | Assistant + Channel агрегаты, Redis registry |
 | **Contact** | `app/Domains/Contact/` | Контакты, теги, группы, сегменты |
 | **Media** | `app/Domains/Media/` | Хранение медиа, деdup SHA-256, channel refs |
-| **Conversation** | `app/Domains/Conversation/` | Транскрипт диалогов (🚧 в разработке) |
+| **Conversation** | `app/Domains/Conversation/` | Транскрипт диалогов, инбокс оператора, takeover |
 | **Shared** | `app/Domains/Shared/` | BaseModel, HasUlidPrimaryKey, общие трейты |
 
 ---
@@ -211,18 +211,19 @@ active / waiting_input → error (uncaught exception)
 | # | Milestone | Статус | Когда |
 |---|-----------|--------|-------|
 | M1 | Platform Core | ✅ | Закрыт (июнь 2026) |
-| M2 | Runtime Hardening | 🔄 | Текущий; открыт только heartbeat |
+| M2 | Runtime Hardening | ✅ | Закрыт |
 | M3 | Conversation Logging | ✅ | Закрыт; reader-порт отложен до ClickHouse |
-| M4 | Broadcasting & Segments | 🔄 | Ядро закрыто; i18n рассылок и группы — открыты |
+| M4 | Broadcasting & Segments | ✅ | Закрыт |
 | M5 | RAG Feature | 🧊 | Бэклог, после M12 |
 | M6 | emit_event + Event Chains | ✅ | Закрыт |
 | M7 | Solutions Framework | 📋 | После M8 |
-| M8 | Inbox / Live Chat | 🔄 | Read-only viewer есть; оператор — предстоит |
+| M8 | Inbox / Live Chat | ✅ | Закрыт |
 | M10 | SaaS Shell | 🔮 | Отдельный репо |
 | M11 | Plugin Marketplace | 🔮 | После M7 |
 | M12 | MCP Server | 📋 | После релизного трека M2 → M4 → M8 |
 
-> Релизный трек до передачи в тестирование: **M2 → M4 → M8**. M9 (Multi-channel / WhatsApp) удалён из планов.
+> Релизный трек **M2 → M4 → M8** закрыт — готово к выкладке и передаче в тестирование.
+> M9 (Multi-channel / WhatsApp) удалён из планов.
 
 **Фазы из исходного Notion-плана:**
 

@@ -6,9 +6,11 @@ namespace Tests\Feature\Domains\Contact;
 
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Contact\Models\ContactTag;
 use App\Domains\Contact\Services\ContactSegmentResolver;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\FeatureTestCase;
 
 final class ContactSegmentResolverTest extends FeatureTestCase
@@ -114,6 +116,159 @@ final class ContactSegmentResolverTest extends FeatureTestCase
         $this->assertNotNull($segment->cached_count_at);
     }
 
+    public function test_group_in_matches_only_members(): void
+    {
+        $group  = $this->group();
+        $member = $this->contact('en', []);
+        $member->groups()->attach($group);
+        $this->contact('en', []); // not a member
+
+        $segment = $this->segment('all', [
+            ['type' => 'group', 'operator' => 'in', 'value' => [$group->getKey()]],
+        ]);
+
+        $this->assertSame([(string) $member->getKey()], $this->resolver->resolveContactIds($segment));
+    }
+
+    public function test_group_not_in_excludes_members(): void
+    {
+        $group      = $this->group();
+        $member     = $this->contact('en', []);
+        $nonMember  = $this->contact('en', []);
+        $member->groups()->attach($group);
+
+        $segment = $this->segment('all', [
+            ['type' => 'group', 'operator' => 'not_in', 'value' => [$group->getKey()]],
+        ]);
+
+        $this->assertSame([(string) $nonMember->getKey()], $this->resolver->resolveContactIds($segment));
+    }
+
+    public function test_group_in_with_multiple_ids_matches_any_membership(): void
+    {
+        $groupA = $this->group('Group A');
+        $groupB = $this->group('Group B');
+
+        $inA = $this->contact('en', []);
+        $inA->groups()->attach($groupA);
+
+        $inB = $this->contact('en', []);
+        $inB->groups()->attach($groupB);
+
+        $this->contact('en', []); // in neither group
+
+        $segment = $this->segment('all', [
+            ['type' => 'group', 'operator' => 'in', 'value' => [$groupA->getKey(), $groupB->getKey()]],
+        ]);
+
+        $ids = $this->resolver->resolveContactIds($segment);
+
+        $this->assertEqualsCanonicalizing([(string) $inA->getKey(), (string) $inB->getKey()], $ids);
+    }
+
+    public function test_all_match_intersects_group_and_tag(): void
+    {
+        $group = $this->group();
+
+        $both = $this->contact('en', ['vip']);
+        $both->groups()->attach($group);
+
+        $groupOnly = $this->contact('en', []);
+        $groupOnly->groups()->attach($group);
+
+        $tagOnly = $this->contact('en', ['vip']); // not a member of the group
+
+        $segment = $this->segment('all', [
+            ['type' => 'group', 'operator' => 'in', 'value' => [$group->getKey()]],
+            ['type' => 'tag', 'operator' => 'has', 'value' => 'vip'],
+        ]);
+
+        $this->assertSame([(string) $both->getKey()], $this->resolver->resolveContactIds($segment));
+    }
+
+    public function test_any_match_unions_group_and_tag(): void
+    {
+        $group = $this->group();
+
+        $groupOnly = $this->contact('en', []);
+        $groupOnly->groups()->attach($group);
+
+        $tagOnly = $this->contact('en', ['vip']);
+
+        $this->contact('en', []); // matches neither
+
+        $segment = $this->segment('any', [
+            ['type' => 'group', 'operator' => 'in', 'value' => [$group->getKey()]],
+            ['type' => 'tag', 'operator' => 'has', 'value' => 'vip'],
+        ]);
+
+        $ids = $this->resolver->resolveContactIds($segment);
+
+        $this->assertEqualsCanonicalizing([(string) $groupOnly->getKey(), (string) $tagOnly->getKey()], $ids);
+    }
+
+    /**
+     * An unusable condition must narrow to nobody, never quietly vanish.
+     * These rules pick broadcast audiences: dropping a condition would widen
+     * the segment to every contact of the tenant and blast the whole base.
+     *
+     * @param  array<string, mixed>  $condition
+     */
+    #[DataProvider('unusableConditions')]
+    public function test_unusable_condition_matches_nobody(array $condition): void
+    {
+        $this->contact('en', []);
+        $this->contact('ru', ['vip']);
+
+        $segment = $this->segment('all', [$condition]);
+
+        $this->assertSame(0, $this->resolver->count($segment));
+    }
+
+    /**
+     * @return array<string, array{0: array<string, mixed>}>
+     */
+    public static function unusableConditions(): array
+    {
+        return [
+            'empty group list'      => [['type' => 'group', 'operator' => 'in', 'value' => []]],
+            'blank tag'             => [['type' => 'tag', 'operator' => 'has', 'value' => '']],
+            'empty language list'   => [['type' => 'language', 'operator' => 'in', 'value' => []]],
+            'malformed attr key'    => [['type' => 'attribute', 'key' => 'a-b; drop', 'operator' => 'eq', 'value' => 'x']],
+            'blank attr value'      => [['type' => 'attribute', 'key' => 'city', 'operator' => 'eq', 'value' => '']],
+            'unknown type'          => [['type' => 'nonsense', 'operator' => 'in', 'value' => ['x']]],
+        ];
+    }
+
+    /**
+     * Under `any` an unusable alternative contributes no matches, but must not
+     * suppress the alternatives that are usable.
+     */
+    public function test_unusable_condition_does_not_suppress_other_any_branches(): void
+    {
+        $this->contact('en', []);
+        $vip = $this->contact('ru', ['vip']);
+
+        $segment = $this->segment('any', [
+            ['type' => 'group', 'operator' => 'in', 'value' => []],
+            ['type' => 'tag', 'operator' => 'has', 'value' => 'vip'],
+        ]);
+
+        $this->assertSame([(string) $vip->getKey()], $this->resolver->resolveContactIds($segment));
+    }
+
+    /**
+     * A segment with no conditions at all is the deliberate "everyone" case and
+     * must stay that way — it is not the same as an unusable condition.
+     */
+    public function test_segment_without_conditions_still_matches_everyone(): void
+    {
+        $this->contact('en', []);
+        $this->contact('ru', ['vip']);
+
+        $this->assertSame(2, $this->resolver->count($this->segment('all', [])));
+    }
+
     /**
      * @param  list<string>  $tags
      */
@@ -142,6 +297,14 @@ final class ContactSegmentResolverTest extends FeatureTestCase
     private function contactWithAttributes(array $attributes): Contact
     {
         return Contact::factory()->forTenant(self::TENANT_ID)->create(['attributes' => $attributes]);
+    }
+
+    private function group(string $name = 'Group'): ContactGroup
+    {
+        return ContactGroup::query()->create([
+            'tenant_id' => self::TENANT_ID,
+            'name'      => $name,
+        ]);
     }
 
     /**

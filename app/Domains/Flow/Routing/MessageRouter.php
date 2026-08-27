@@ -7,19 +7,24 @@ namespace App\Domains\Flow\Routing;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Conversation\Contracts\ConversationOwnershipInterface;
+use App\Domains\Conversation\DTO\ConversationRef;
 use App\Domains\Flow\Commands\CommandMatcher;
 use App\Domains\Flow\Commands\GlobalCommandExecutorInterface;
+use App\Domains\Flow\Concurrency\LockAcquisitionPolicy;
+use App\Domains\Flow\Concurrency\LockScope;
+use App\Domains\Flow\Concurrency\SessionLockManager;
+use App\Domains\Flow\Concurrency\SessionLockRegistry;
 use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowTriggerType;
+use App\Domains\Flow\Exceptions\SessionLockLostException;
 use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
-use App\Domains\Messaging\Typing\TypingSession;
 use FAPost\Foundation\DTO\IncomingMessage;
 use FAPost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use FAPost\Foundation\Flow\DTO\TriggerContext;
-use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Throwable;
@@ -35,6 +40,10 @@ use Throwable;
  *   5. Flow execution via {@see FlowOrchestratorInterface}
  *   6. Cleanup (stop typing, release lock)
  *
+ * The lock claimed in step 3 is the single session lock for the whole run:
+ * it is published to {@see SessionLockRegistry} so the execution guard stays
+ * re-entrant and the engine can heartbeat it between nodes.
+ *
  * The router is transport-agnostic: webhook ingress jobs invoke {@see route()}
  * after switching tenant context and resolving Contact / Assistant / Channel.
  *
@@ -44,10 +53,6 @@ use Throwable;
  */
 final readonly class MessageRouter
 {
-    private const int LOCK_TTL_SECONDS         = 30;
-    private const int LOCK_ACQUISITION_RETRIES = 3;
-    private const int LOCK_RETRY_DELAY_SECONDS = 2;
-
     public function __construct(
         private CommandMatcher $commandMatcher,
         private GlobalCommandExecutorInterface $commandExecutor,
@@ -57,20 +62,13 @@ final readonly class MessageRouter
         private FlowSessionRepositoryInterface $sessions,
         private TriggerResolverInterface $triggerResolver,
         private FlowOrchestratorInterface $orchestrator,
-        private CacheRepository $cache,
+        private LockAcquisitionPolicy $lockPolicy,
+        private SessionLockManager $lockManager,
+        private SessionLockRegistry $lockRegistry,
+        private ConversationOwnershipInterface $ownership,
         private TypingHeartbeatRegistry $typingHeartbeat,
         private LoggerInterface $logger = new NullLogger(),
     ) {
-    }
-
-    /**
-     * Per-tick callback to refresh both the lock TTL and the typing
-     * indicator. Intended for the engine's heartbeat hook (Phase A-5).
-     * Currently exposed but not yet wired (engine still owns lock).
-     */
-    public static function tickHeartbeat(?TypingSession $typing): void
-    {
-        $typing?->refresh();
     }
 
     public function route(
@@ -106,29 +104,39 @@ final readonly class MessageRouter
         }
 
         try {
-            // Step 3: lock acquisition with backoff retry.
-            $lockKey  = $this->buildLockKey($contact, $assistant, $message);
-            $lock     = $this->cache->lock($lockKey, self::LOCK_TTL_SECONDS);
-            $acquired = false;
+            // Step 3: lock acquisition with backoff retry. Scope is the
+            // (tenant, contact, assistant) triple from ADR § "Distributed Lock
+            // Strategy" — the same scope the execution guard uses further down,
+            // so the whole pipeline holds exactly one lock.
+            $scope = new LockScope(
+                tenantId: (string)$contact->tenant_id,
+                contactId: (string)$contact->getKey(),
+                assistantId: $assistantId,
+            );
+            $handle = $this->lockPolicy->acquireWithRetry($scope);
 
-            for ($attempt = 0; $attempt < self::LOCK_ACQUISITION_RETRIES; ++$attempt) {
-                if ($lock->get()) {
-                    $acquired = true;
-                    break;
-                }
-                if ($attempt < self::LOCK_ACQUISITION_RETRIES - 1) {
-                    sleep(self::LOCK_RETRY_DELAY_SECONDS);
-                }
-            }
-
-            if ( ! $acquired) {
+            if (null === $handle) {
                 $this->dropPolicy->applyBusy($contact, $assistant);
 
                 return RoutingOutcome::dropped('lock_timeout');
             }
 
+            // Hand the claim to the per-request registry: the execution guard
+            // reads it to stay re-entrant, the engine reads it to heartbeat.
+            $this->lockRegistry->set($handle);
+
             try {
-                // Step 4: classify by session state.
+                // Step 4a: an operator holding this thread outranks the flow
+                // engine. Checked before session state because the session may
+                // still be sitting in waiting_input from before the takeover —
+                // classifying first would resume a flow the operator replaced.
+                // The message is already in the transcript (IncomingMessageJob
+                // captures before routing), so nothing is lost by stopping here.
+                if ($this->ownership->isHandledByStaff($this->conversationRef($contact, $assistant, $channel, $message))) {
+                    return RoutingOutcome::dropped('staff_handled');
+                }
+
+                // Step 4b: classify by session state.
                 $session  = $this->sessions->findActiveForContact($contact, $assistantId);
                 $decision = $this->stateRouter->decide($session);
 
@@ -160,13 +168,28 @@ final readonly class MessageRouter
                     ]);
 
                     return RoutingOutcome::dropped('engine_lock_timeout');
+                } catch (SessionLockLostException $exception) {
+                    // Heartbeat found the claim taken over mid-execution. The
+                    // engine already abandoned the run; nothing to retry here,
+                    // the new owner is processing this contact.
+                    $this->logger->warning('messaging.routing.lock_lost', [
+                        'tenant_id'    => (string)$contact->tenant_id,
+                        'contact_id'   => (string)$contact->getKey(),
+                        'assistant_id' => $assistantId,
+                        'error'        => $exception->getMessage(),
+                    ]);
+
+                    return RoutingOutcome::dropped('lock_lost');
                 }
 
                 return RoutingOutcome::executed($decision);
             } finally {
-                // Step 6a: release lock.
+                // Step 6a: release lock (token-checked — a drifted claim is a
+                // silent no-op rather than stealing the new owner's lock).
+                $this->lockRegistry->clear();
+
                 try {
-                    $lock->release();
+                    $this->lockManager->release($handle);
                 } catch (Throwable $exception) {
                     $this->logger->debug('messaging.routing.lock_release_failed', [
                         'error' => $exception->getMessage(),
@@ -181,14 +204,18 @@ final readonly class MessageRouter
         }
     }
 
-    private function buildLockKey(Contact $contact, Assistant $assistant, IncomingMessage $message): string
-    {
-        return sprintf(
-            'session_lock:%s:%s:%s:%s',
-            (string)$contact->tenant_id,
-            $message->platform,
-            $message->externalUserId,
-            (string)$assistant->getKey(),
+    private function conversationRef(
+        Contact $contact,
+        Assistant $assistant,
+        Channel $channel,
+        IncomingMessage $message,
+    ): ConversationRef {
+        return new ConversationRef(
+            tenantId: (string)$contact->tenant_id,
+            assistantId: (string)$assistant->getKey(),
+            contactId: (string)$contact->getKey(),
+            channelId: (string)$channel->getKey(),
+            platform: $message->platform,
         );
     }
 

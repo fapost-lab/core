@@ -30,6 +30,7 @@ return [
             'language'  => 'Language',
             'platform'  => 'Platform',
             'attribute' => 'Attribute',
+            'group'     => 'Group',
         ],
     ],
 
@@ -37,6 +38,7 @@ return [
         'has'     => 'has tag',
         'not_has' => 'does not have tag',
         'in'      => 'is any of',
+        'not_in'  => 'is none of',
         'eq'      => 'equals',
         'ne'      => 'not equals',
         'exists'  => 'is set',

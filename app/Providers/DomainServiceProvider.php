@@ -18,8 +18,10 @@ use App\Domains\Tenancy\Services\ConfigTenantResolver;
 use App\Domains\Tenancy\Services\CoreBootstrap;
 use App\Domains\Tenancy\Services\DomainBootstrapper;
 use App\Domains\Tenancy\Services\TenantContext;
+use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Services\WebhookRegistryWriter;
+use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -51,6 +53,11 @@ final class DomainServiceProvider extends ServiceProvider
             ->needs('$defaultTenantSlug')
             ->giveConfig('tenancy.default_tenant_slug');
 
+        $this->app->bind(
+            TenantSlugPolicy::class,
+            fn ($app): TenantSlugPolicy => new TenantSlugPolicy($this->reservedSlugs($app['config'])),
+        );
+
         $this->app->scoped(CoreBootstrap::class);
         $this->app->scoped(CoreBootstrapInterface::class, fn ($app): CoreBootstrap => $app->make(CoreBootstrap::class));
         $this->app->scoped(DomainBootstrapper::class);
@@ -66,5 +73,75 @@ final class DomainServiceProvider extends ServiceProvider
                 $app->make(CoreBootstrapInterface::class)->reset();
             });
         });
+    }
+
+    /**
+     * Slugs no tenant may claim: the configured list plus the platform's own
+     * ingress hostnames, minus the default tenant slug.
+     *
+     * Ingress hostnames are derived rather than listed so that pointing the
+     * gateway at a different subdomain reserves that name automatically. A
+     * hand-maintained list would silently fall out of step with the URL that
+     * actually receives webhooks.
+     *
+     * @return list<string>
+     */
+    private function reservedSlugs(ConfigRepository $config): array
+    {
+        $reserved = array_map(mb_strtolower(...), (array) $config->get('tenancy.reserved_slugs', []));
+
+        foreach ($this->ingressLabels($config) as $label) {
+            $reserved[] = $label;
+        }
+
+        // The stock installation provisions the default tenant, so its own slug
+        // must stay assignable even when the list would otherwise claim it.
+        $default = mb_strtolower((string) $config->get('tenancy.default_tenant_slug'));
+
+        return array_values(array_filter(
+            array_unique($reserved),
+            static fn (string $slug): bool => '' !== $slug && $slug !== $default,
+        ));
+    }
+
+    /**
+     * Subdomain labels of the platform's own ingress URLs, when they sit under
+     * the tenancy base domain.
+     *
+     * @return list<string>
+     */
+    private function ingressLabels(ConfigRepository $config): array
+    {
+        $baseDomain = mb_strtolower((string) $config->get('tenancy.base_domain'));
+
+        if ('' === $baseDomain) {
+            return [];
+        }
+
+        $labels = [];
+
+        foreach (['webhook.base_url', 'webhook.ingress.gateway_url'] as $key) {
+            $host = parse_url((string) $config->get($key), PHP_URL_HOST);
+
+            if (! is_string($host)) {
+                continue;
+            }
+
+            $suffix = '.' . $baseDomain;
+            $host   = mb_strtolower($host);
+
+            if (! str_ends_with($host, $suffix)) {
+                continue;
+            }
+
+            $label = mb_substr($host, 0, -mb_strlen($suffix));
+
+            // Only a direct child of the base domain maps onto a tenant slug.
+            if ('' !== $label && ! str_contains($label, '.')) {
+                $labels[] = $label;
+            }
+        }
+
+        return $labels;
     }
 }

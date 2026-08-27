@@ -5,7 +5,7 @@
         $lastDate = null;
     @endphp
 
-    <div class="mx-auto w-full max-w-3xl">
+    <div class="mx-auto w-full max-w-3xl" wire:poll.30s>
         {{-- Thread header --}}
         <div class="mb-4 flex items-center justify-between border-b border-gray-200 pb-3 dark:border-gray-700">
             <div>
@@ -13,6 +13,7 @@
                 <div class="text-xs text-gray-500 dark:text-gray-400">
                     {{ ucfirst($conversation->platform) }}
                     &middot; {{ trans_choice('conversation.message_count', $conversation->message_count, ['count' => $conversation->message_count]) }}
+                    &middot; {{ $ownerLabel }}
                 </div>
             </div>
             <span @class([
@@ -24,6 +25,19 @@
                 {{ __('conversation.statuses.' . $conversation->status->value) }}
             </span>
         </div>
+
+        {{-- Load older messages --}}
+        @if ($hasMoreMessages)
+            <div class="mb-4 flex justify-center">
+                <button
+                    type="button"
+                    wire:click="loadOlderMessages"
+                    class="rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                    {{ __('conversation.load_older') }}
+                </button>
+            </div>
+        @endif
 
         {{-- Message stream --}}
         <div class="space-y-2">
@@ -69,14 +83,51 @@
                         @if (is_array($message->media) && count($message->media) > 0)
                             <div class="mt-1 space-y-1">
                                 @foreach ($message->media as $item)
-                                    <div @class([
-                                        'flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs',
-                                        'bg-primary-500/40' => $isOutbound,
-                                        'bg-gray-100 dark:bg-gray-700/60' => ! $isOutbound,
-                                    ])>
-                                        <span>&#128196;</span>
-                                        <span class="truncate">{{ $item['file_name'] ?? ($item['kind'] ?? __('conversation.attachment')) }}</span>
-                                    </div>
+                                    @php
+                                        $status = $item['status'] ?? null;
+                                        $mediaFileId = $item['media_file_id'] ?? null;
+                                        $mediaUrl = 'ready' === $status && is_string($mediaFileId) ? $this->mediaUrl($mediaFileId) : null;
+                                    @endphp
+
+                                    @if ('ready' === $status && is_string($mediaUrl) && 'image' === ($item['kind'] ?? null))
+                                        <a href="{{ $mediaUrl }}" target="_blank" rel="noopener" class="block">
+                                            <img
+                                                src="{{ $mediaUrl }}"
+                                                alt="{{ $item['file_name'] ?? __('conversation.attachment') }}"
+                                                class="max-h-64 max-w-full rounded-lg object-contain"
+                                            >
+                                        </a>
+                                    @elseif ('ready' === $status && is_string($mediaUrl))
+                                        <a
+                                            href="{{ $mediaUrl }}"
+                                            target="_blank"
+                                            rel="noopener"
+                                            @class([
+                                                'flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs underline',
+                                                'bg-primary-500/40' => $isOutbound,
+                                                'bg-gray-100 dark:bg-gray-700/60' => ! $isOutbound,
+                                            ])
+                                        >
+                                            <span>&#128196;</span>
+                                            <span class="truncate">{{ $item['file_name'] ?? __('conversation.attachment') }}</span>
+                                        </a>
+                                    @else
+                                        <div @class([
+                                            'flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs',
+                                            'bg-primary-500/40' => $isOutbound,
+                                            'bg-gray-100 dark:bg-gray-700/60' => ! $isOutbound,
+                                        ])>
+                                            <span>&#128196;</span>
+                                            <span class="truncate">
+                                                {{ $item['file_name'] ?? ($item['kind'] ?? __('conversation.attachment')) }}
+                                                @if ('pending' === $status)
+                                                    &middot; {{ __('conversation.media.pending') }}
+                                                @elseif ('failed' === $status)
+                                                    &middot; {{ __('conversation.media.failed') }}
+                                                @endif
+                                            </span>
+                                        </div>
+                                    @endif
                                 @endforeach
                             </div>
                         @endif

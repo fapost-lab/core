@@ -1,0 +1,96 @@
+# Development overlay.
+#
+#   docker compose -f compose.yaml -f compose.dev.yaml --env-file ../.env up -d
+#
+# Or `make dev` from this directory.
+#
+# Replaces the published images with a locally built `dev` target and mounts the
+# working tree, so edits take effect without rebuilding anything. Everything else
+# — Postgres, Redis, the service topology — stays exactly as in production, which
+# is the point: the parts that differ are only the parts that must.
+#
+# Not for production. The container runs as your user, source is mounted over the
+# image, and errors are rendered into responses.
+
+services:
+  app:
+    build: &dev-build
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: dev
+      args:
+        # Files the container writes come back owned by this user rather than
+        # root, which is what keeps a Linux host usable without sudo.
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+        INSTALL_XDEBUG: ${INSTALL_XDEBUG:-0}
+    image: fapost/dev:local
+    volumes: &dev-volumes
+      # The whole tree, so PHP, config and migrations are all live.
+      - ..:/var/www/html
+      # Except vendor and node_modules: those are installed inside the container
+      # for its own platform. Mounting the host's copies would drag in binaries
+      # built for a different OS, and on macOS would be painfully slow besides.
+      - /var/www/html/vendor
+      - /var/www/html/node_modules
+    environment: &dev-environment
+      APP_ENV: local
+      APP_DEBUG: "true"
+      # Development images revalidate opcache anyway; skipping the warm-up keeps
+      # a stale config cache from masking .env edits.
+      SKIP_CACHE_WARMUP: "1"
+      # Where Xdebug should call back to. Not baked into the image because it
+      # differs per host; override with XDEBUG_CLIENT_HOST if the default does
+      # not reach your IDE.
+      XDEBUG_CONFIG: "client_host=${XDEBUG_CLIENT_HOST:-host.docker.internal}"
+    extra_hosts: &dev-hosts
+      # Makes host.docker.internal resolve on Linux too, where it is not built
+      # in. Without this the default above would work on Docker Desktop and fail
+      # silently everywhere else.
+      - "host.docker.internal:host-gateway"
+
+  horizon:
+    build: *dev-build
+    image: fapost/dev:local
+    volumes: *dev-volumes
+    environment: *dev-environment
+    extra_hosts: *dev-hosts
+
+  scheduler:
+    build: *dev-build
+    image: fapost/dev:local
+    volumes: *dev-volumes
+    environment: *dev-environment
+    extra_hosts: *dev-hosts
+
+  web:
+    # nginx serves from the mounted tree instead of a baked-in web root, so a
+    # rebuilt asset appears without touching the image.
+    image: nginx:1.27-alpine
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ../public:/var/www/html/public:ro
+
+  # Vite in watch mode. Runs beside the stack rather than inside the app
+  # container so it can be restarted on its own while everything else keeps
+  # running.
+  vite:
+    image: node:22-alpine
+    working_dir: /var/www/html
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    volumes:
+      - ..:/var/www/html
+      - /var/www/html/vendor
+    ports:
+      - "${VITE_PORT:-5173}:5173"
+    environment:
+      # Vite writes a hot file the application reads to build asset URLs.
+      APP_URL: ${APP_URL:-http://localhost:8000}
+    restart: unless-stopped
+
+  gateway:
+    build:
+      context: ../gateway
+      args:
+        VERSION: dev
+    image: fapost/gateway:local

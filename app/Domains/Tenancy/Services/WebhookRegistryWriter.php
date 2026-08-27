@@ -61,6 +61,21 @@ final class WebhookRegistryWriter implements WebhookRegistryWriterInterface
         );
     }
 
+    /**
+     * Landlord-only: the ingress host is operational metadata for migration
+     * tracking, never consulted on the request path, so it stays out of the
+     * Redis entry that ingress reads on every webhook.
+     */
+    public function recordIngress(string $publicHash, ?string $baseUrl): void
+    {
+        DB::connection('landlord')->table('webhook_registry')
+            ->where('webhook_public_hash', $publicHash)
+            ->update([
+                'ingress_base_url' => $baseUrl,
+                'updated_at'       => now(),
+            ]);
+    }
+
     public function delete(string $publicHash): void
     {
         Redis::del($this->key($publicHash));

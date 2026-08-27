@@ -22,6 +22,10 @@ return [
         'label'  => 'Tags',
         'manage' => 'Manage tags',
     ],
+    'groups' => [
+        'label'  => 'Groups',
+        'manage' => 'Manage groups',
+    ],
     'sections' => [
         'header'        => 'Identity',
         'profile'       => 'Profile',

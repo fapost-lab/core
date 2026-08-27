@@ -44,6 +44,10 @@ enum Permission: string
     case ViewContacts   = 'view_contacts';
     case ManageContacts = 'manage_contacts';
 
+    // ── Conversations / Inbox group ───────────────────────────────────────────
+    case ViewConversations  = 'view_conversations';
+    case ReplyConversations = 'reply_conversations';
+
     // ── Analytics / System group ──────────────────────────────────────────────
     case ViewAnalytics  = 'view_analytics';
     case ViewSystem     = 'view_system';
@@ -117,8 +121,13 @@ enum Permission: string
         return match ($this) {
             self::RotateChannelToken,
             self::PublishFlow,
-            self::ManageRoles => true,
-            default           => false,
+            self::ManageRoles,
+            // Full conversation transcripts are the most sensitive data the
+            // platform stores — everything a contact ever sent the assistant.
+            self::ViewConversations,
+            // Replying puts words in the assistant's mouth, to a real person.
+            self::ReplyConversations => true,
+            default                  => false,
         };
     }
 
@@ -149,6 +158,9 @@ enum Permission: string
 
             self::ViewContacts,
             self::ManageContacts => 'contacts',
+
+            self::ViewConversations,
+            self::ReplyConversations => 'conversations',
 
             self::ViewAnalytics => 'analytics',
 

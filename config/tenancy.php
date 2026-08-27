@@ -13,4 +13,44 @@ return [
         'tenant'   => database_path('migrations/tenant'),
         'features' => database_path('migrations/features'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Reserved tenant slugs
+    |--------------------------------------------------------------------------
+    |
+    | On a subdomain deployment a slug becomes a hostname the tenant controls,
+    | so these names must never be assignable. The ingress hostnames are added
+    | automatically from the webhook configuration — see DomainServiceProvider —
+    | because a tenant answering there would receive other tenants' webhooks,
+    | whose headers carry their channel secrets.
+    |
+    | The configured default tenant slug is exempted at bind time so that a
+    | stock installation still provisions.
+    |
+    */
+    'reserved_slugs' => [
+        // Platform surfaces
+        'www', 'api', 'admin', 'administrator', 'app', 'dashboard', 'panel', 'console',
+        'auth', 'login', 'logout', 'register', 'signup', 'id', 'account', 'accounts',
+        'billing', 'status', 'health', 'metrics', 'monitor', 'grafana', 'horizon',
+
+        // Content and assets
+        'cdn', 'static', 'assets', 'media', 'files', 'img', 'images',
+        'docs', 'doc', 'help', 'support', 'blog', 'news', 'about', 'legal', 'terms', 'privacy',
+
+        // Ingress and networking
+        'gateway', 'ingress', 'webhook', 'webhooks', 'hooks', 'callback', 'callbacks',
+        'vpn', 'proxy', 'ws', 'wss', 'rpc',
+
+        // Mail and name service
+        'mail', 'email', 'smtp', 'imap', 'pop', 'pop3', 'webmail',
+        'ns', 'ns1', 'ns2', 'ns3', 'mx', 'ftp', 'sftp',
+
+        // Delegation labels: controlling these allows mail spoofing or certificate issuance
+        'autodiscover', 'autoconfig', '_dmarc', '_domainkey', '_acme-challenge',
+
+        // Environments
+        'test', 'staging', 'stage', 'dev', 'demo', 'sandbox', 'local', 'internal', 'preview',
+    ],
 ];

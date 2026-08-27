@@ -193,37 +193,32 @@
 
 ---
 
-## 💬 Inbox / Live Chat (M8, релизный трек)
+## 💬 Inbox / Live Chat (M8) — закрыт
 
-Детальная разбивка с точками врезки — [[ROADMAP]] § Milestone 8. Заложено в M3 и ждёт использования:
-case'ы `MessageSenderType::Staff` / `MessageOrigin::Staff`, колонки `conversations.owner_type`,
-`conversations.owner_staff_user_id`, `conversation_messages.sender_staff_user_id` (объявлены, нигде не используются).
+Детали и обоснования решений — [[ROADMAP]] § Milestone 8.
 
-### Безопасность (закрыть до выкладки)
-- [ ] 🔒 Права на диалоги в `Permission` enum — сейчас их нет вовсе, а `ConversationResource` пускает любого
-  аутентифицированного пользователя (`shouldRegisterNavigation()` проверяет только `instanceof User`)
-- [ ] `ConversationPolicy` + точечная регистрация в сервис-провайдере
-- [ ] Раздача новых прав в `RoleEnum::permissions()`; не забыть `Permission::group()` — `match` без `default`
+### Безопасность
+- [x] `Permission::ViewConversations` / `ReplyConversations` (обе sensitive), группа `conversations`, раздача ролям
+- [x] `ConversationPolicy` + регистрация в провайдере; ресурс спрашивает политику вместо `instanceof User`
+- [x] Кастомная страница треда авторизуется явно — Filament покрывает только встроенные страницы ресурса
 
 ### Takeover
-- [ ] Владелец треда через `owner_type` (`bot`/`staff`) + `owner_staff_user_id`, без нового case в `ConversationStatus`
-- [ ] Врезка в `MessageRouter` шаг 4 (строки 130-145) — сейчас решение принимается только по `FlowSession`
-- [ ] Возврат треда боту + действия «Взять / Вернуть» в UI
+- [x] `ConversationOwner` (`bot` / `staff`) поверх зарезервированных `owner_type` / `owner_staff_user_id`
+- [x] `ConversationOwnershipInterface` + Eloquent-реализация, отдельно от append-only store-порта
+- [x] Врезка в `MessageRouter` шагом 4a — до классификации состояния сессии; `/reset` по-прежнему раньше
+- [x] Действия «Взять диалог» / «Вернуть боту»
 
 ### Ответ оператора
-- [ ] Reply input в `ViewConversation` → `MessageSender::send()`
-- [ ] Проброс `senderType`/`senderStaffUserId` — `ConversationCaptureFactory::forOutbound():95` хардкодит `Assistant`
+- [x] `ConversationReplyService` через общий `MessageSender::send()`, на канал самого треда
+- [x] `senderType = Staff` выводится из `origin`, а не из отдельного ключа metadata
+- [x] Ответ уходит без `parse_mode`: под HTML обычное «R&D» ломает доставку целиком
 
-### Unread и назначение
-- [ ] `markRead` — метода нет ни в `ConversationStoreInterface`, ни где-либо ещё; `unread_count` только растёт
-- [ ] Badge непрочитанных
-- [ ] Решить scope оператора: `User::getTenants()` игнорирует пивот `user_assistants`
-
-### Качество треда
-- [ ] Пагинация в `ViewConversation::messages()` — сейчас весь тред одним запросом
-- [ ] Медиа в транскрипте через `MediaService::signedUrl()` (механизм готов, к blade не подключён)
-- [ ] `FallbackMessageService` не пишет в транскрипт — нет `contact_id`/`assistant_id` в metadata
-- [ ] Polling в inbox-ленте (прецеденты: `FlowLogsTable` 60s, `FlowSessionsTable` 30s). Real-time стек — вне релиза
+### Тред и лента
+- [x] `markRead` при открытии треда (после проверки прав), badge непрочитанных в навигации
+- [x] Пагинация треда (50 + догрузка) вместо неограниченной выборки
+- [x] Медиа через `MediaService::signedUrl()`, состояния `pending` / `failed`
+- [x] Polling 30 s (real-time стека в проекте нет — `config/broadcasting.php` отсутствует)
+- [x] `FallbackMessageService` пишется в транскрипт: раньше busy/fallback-ответы молча выпадали из лога
 
 ---
 
@@ -236,12 +231,8 @@ case'ы `MessageSenderType::Staff` / `MessageOrigin::Staff`, колонки `con
 - [x] Rate limiting per `(channel, chat)` — переиспользуется превентивный лимит `MessageSender`
 - [x] Filament UI: полноценный **дашборд рассылок** (assistant-панель) — composer (name/message/audience All|Tags), lifecycle-таблица со статус-бейджами и прогрессом, confirmable **Send** + **Cancel**, edit/delete только в Draft; lang en/ru/uk
 - [x] Filament UI: TenantSettings таб Broadcasts (настройки chunk_size / backpressure — теперь реально читаются)
-- [ ] **Мультиязычный контент рассылки** (релизный трек M4). Доставка уже готова — `SendBroadcastRecipientJob:87`
-  зовёт `resolveField()`. Осталось: миграция `broadcasts.message` text → jsonb (прецедент
-  `2026_05_08_000002_localize_assistant_messages.php`), cast `'message' => 'array'`, замена `Textarea` на
-  `LocalizedTextarea::tabs()` в `BroadcastFormSchema:37-42`, нормализация по образцу `AssistantSettings::cleanLocalized()`,
-  валидация непустого текста на базовом языке, lang-ключи вкладок
-- [ ] Таргетинг по группам контактов — ждёт `contact_groups` (см. Contact Domain). Может быть вынесен за релиз
+- [x] **Мультиязычный контент рассылки**: `broadcasts.message` text → jsonb, cast `'message' => 'array'`, вкладки локалей через `LocalizedTextarea::tabs()`, нормализация карты + валидация непустого текста на `content_base_language` (раньше рассылка без текста молча уходила в `skipped` у всех получателей), lang en/ru/uk. Доставка не менялась — `SendBroadcastRecipientJob` уже звал `resolveField()`
+- [x] Таргетинг по группам контактов — через `SegmentConditionType::Group`
 
 ---
 
@@ -263,15 +254,15 @@ case'ы `MessageSenderType::Staff` / `MessageOrigin::Staff`, колонки `con
 
 - [x] `Contact` модель: `id`, `channel`, `language` (canonical), `meta`, `attributes`
 - [x] `contact_tags` + `ContactTagRepository` (set_tag нода)
-- [ ] `contact_groups` + `contact_group_members` — **в коде отсутствуют** (ни миграции, ни модели). Ранее строка
-  стояла как выполненная — ложный статус, исправлен по факту. Из-за этого заблокированы условия сегмента по группам.
+- [x] `contact_groups` + `contact_group_members`: миграции, модель `ContactGroup`, связь `Contact::groups()`, Filament-ресурс групп и назначение групп контакту
+- [x] Условия сегмента по группам: `SegmentConditionType::Group` + `ContactSegmentResolver::applyGroup()` (операторы `in` / `not_in`)
+- [x] **Дефект таргетинга закрыт:** нераспознанное условие (пустой список групп, пустой тег, битый dot-path, неизвестный тип) молча выбрасывалось, из-за чего сегмент под `match: all` становился «все контакты тенанта» вместо «никто» — рассылка ушла бы по всей базе. Теперь такое условие резолвится в «никто» (`matchNothing()`); сегмент без условий по-прежнему осознанно значит «все»
 - [x] `ContactResource` Filament (group sections, «Manage tags» action)
 - [x] `contact_segments` (rules JSON `{match, conditions[]}`, `cached_count`/`cached_count_at`) — модель + миграция
 - [x] `ContactSegmentResolver` — компилирует rules в tenant-scoped Contact-запрос (условия: tag has/not_has, language/platform in/eq; all/any); `resolveContactIds` / `count` / `refreshCount`
 - [x] Интеграция в Broadcasting: `BroadcastTarget::Segment` + `broadcasts.target_segment_id`; `BroadcastRecipientResolver` резолвит сегмент → пересечение с deliverable-контактами ассистента
 - [x] Filament: `ContactSegmentResource` (assistant-панель, tenant-scoped) — rules-builder (match + Repeater условий), «Recount» action; segment-опция в composer'е рассылки; lang en/ru/uk
 - [x] Условия по attributes-json (dot-path key, eq/ne/exists) — реализованы в `ContactSegmentResolver` + Filament
-- [ ] Условия по группам (ждут `contact_groups` — в коде отсутствуют)
 
 ---
 
@@ -331,7 +322,8 @@ case'ы `MessageSenderType::Staff` / `MessageOrigin::Staff`, колонки `con
 - [ ] `flow_active_node_stats` — статистика активных нод для safe handler removal — [[specs/flow-engine/node-usage-statistics]]
 - [x] End-to-end integration тесты: subflow lifecycle — success/failed (были) + **cancelled** (добавлен, `SubflowLifecycleTest`); timeout покрыт `SubflowTimeoutSweeperTest` (нет отдельного `timeout`-статуса — таймаут = child `failed` + parent `failed`/`expired`)
 - [-] Concurrency hardening тесты: **optimistic-lock retry** (`FlowOrchestratorRetryTest`) + **engine_lock_timeout** drop-outcome (`MessageRouterTest`) добавлены; distributed lock покрыт unit-тестами (`FlowExecutionGuardTest`, `SessionLockManagerTest`, `LockAcquisitionPolicyTest`). Не покрыто: real-Redis integration (везде моки; инфраструктуры под такой suite в `phpunit.xml` нет), **heartbeat** (теста нет вовсе)
-- [ ] **Консолидация блокировок (релизный трек M2).** В коде две несвязанные реализации: пакет `Domains/Flow/Concurrency/` (`SessionLockManager`/`LockHeartbeat`/`LockAcquisitionPolicy`/`LockScope`/`LockHandle`) — умеет `extend()`, но **не используется в production-коде вообще**; реальные локи держат `MessageRouter` (`Cache::lock`, ключ с `platform:externalUserId`) и `FlowExecutionGuard` (`LockProvider`, ключ с `contactId`) — оба без продления TTL. Детальный список подзадач — [[ROADMAP]] § Milestone 2
+- [x] **Консолидация блокировок + heartbeat (ADR-09).** Один lock на `(tenant, contact, assistant)` вместо двух вложенных с разными ключами. Новый `SessionLockRegistry` (scoped) — слот текущего захвата; `FlowExecutionGuard` переписан на `SessionLockManager`, стал ре-энтрантным и возвращает слот внешнему владельцу при вложенном вызове на другой scope; `FlowEngine::executeLoop()` продлевает TTL перед каждой нодой, при потере владения бросает `SessionLockLostException` → роутер отдаёт `dropped('lock_lost')`; параметры вынесены в `config/flow.php` (`lock.*`), пять хардкодов `30` убраны; удалены мёртвые `MessageRouter::tickHeartbeat()` и `buildLockKey()`. Тесты: `LockHeartbeatTest`, `SessionLockRegistryTest`, `FlowEngineSessionLockTest` + расширены `FlowExecutionGuardTest` / `MessageRouterTest`
+- [ ] Redis-integration suite: `phpunit.xml` знает только `Unit`/`Feature`, `CACHE_STORE=array`, `REDIS_*` не задан — вся блокировка покрыта моками
 - [x] `/reset` migration под `BuiltinCommandsRegistry` с force unlock (D-3)
 - [x] Routing pipeline 6 шагов end-to-end с typing indicator (D-1+D-2)
 

@@ -6,6 +6,8 @@ namespace App\Filament\Assistant\Resources\ContactSegments\Schemas;
 
 use App\Domains\Contact\Enums\SegmentConditionType;
 use App\Domains\Contact\Enums\SegmentMatch;
+use App\Domains\Contact\Models\ContactGroup;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TagsInput;
@@ -16,8 +18,10 @@ use Filament\Schemas\Schema;
 /**
  * Segment rule builder: a name, an all/any combinator, and a repeater of
  * conditions. Each condition filters on a contact attribute (tag / language /
- * platform). The composite is folded into the model's `rules` json by the
- * create/edit pages.
+ * platform / group). The composite is folded into the model's `rules` json by
+ * the create/edit pages, which also fold the group condition's dedicated
+ * `value_group` field back into the single `value` key the resolver expects
+ * (see {@see \App\Filament\Assistant\Resources\ContactSegments\Pages\CreateContactSegment}).
  */
 final class ContactSegmentFormSchema
 {
@@ -54,6 +58,7 @@ final class ContactSegmentFormSchema
                             SegmentConditionType::Language->value  => __('segment.condition.types.language'),
                             SegmentConditionType::Platform->value  => __('segment.condition.types.platform'),
                             SegmentConditionType::Attribute->value => __('segment.condition.types.attribute'),
+                            SegmentConditionType::Group->value     => __('segment.condition.types.group'),
                         ]),
 
                     TextInput::make('key')
@@ -70,9 +75,17 @@ final class ContactSegmentFormSchema
 
                     TagsInput::make('value')
                         ->label(__('segment.condition.value'))
-                        ->required(fn (Get $get): bool => 'exists' !== $get('operator'))
-                        ->visible(fn (Get $get): bool => 'exists' !== $get('operator'))
+                        ->required(fn (Get $get): bool => self::usesFreeformValue($get))
+                        ->visible(fn (Get $get): bool => self::usesFreeformValue($get))
                         ->helperText(__('segment.condition.value_help')),
+
+                    Select::make('value_group')
+                        ->label(__('segment.condition.value'))
+                        ->multiple()
+                        ->searchable()
+                        ->options(static fn (): array => self::groupOptions())
+                        ->required(fn (Get $get): bool => SegmentConditionType::Group->value === $get('type'))
+                        ->visible(fn (Get $get): bool => SegmentConditionType::Group->value === $get('type')),
                 ]),
         ]);
     }
@@ -92,10 +105,36 @@ final class ContactSegmentFormSchema
                 'ne'     => __('segment.operators.ne'),
                 'exists' => __('segment.operators.exists'),
             ],
+            SegmentConditionType::Group => [
+                'in'     => __('segment.operators.in'),
+                'not_in' => __('segment.operators.not_in'),
+            ],
             default => [
                 'in' => __('segment.operators.in'),
                 'eq' => __('segment.operators.eq'),
             ],
         };
+    }
+
+    /**
+     * The freeform {@see TagsInput} value field applies to every condition
+     * type except `group` (dedicated {@see Select}) and the `exists` operator
+     * (no value needed).
+     */
+    private static function usesFreeformValue(Get $get): bool
+    {
+        return SegmentConditionType::Group->value !== $get('type') && 'exists' !== $get('operator');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function groupOptions(): array
+    {
+        return ContactGroup::query()
+            ->where('tenant_id', app(TenantContextInterface::class)->get()->getId())
+            ->orderBy('name')
+            ->pluck('name', 'id')
+            ->all();
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Conversation\Models;
 
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Conversation\Enums\ConversationOwner;
 use App\Domains\Conversation\Enums\ConversationStatus;
 use FAPost\Support\Concerns\HasUlidPrimaryKey;
 use FAPost\Support\Models\BaseModel;
@@ -24,7 +25,7 @@ use Illuminate\Support\Carbon;
  * @property string                  $channel_id
  * @property string                  $platform
  * @property ConversationStatus      $status
- * @property string|null             $owner_type
+ * @property ConversationOwner|null  $owner_type
  * @property string|null             $owner_staff_user_id
  * @property Carbon|null             $last_message_at
  * @property Carbon|null             $last_inbound_at
@@ -83,6 +84,7 @@ final class Conversation extends BaseModel
     {
         return [
             'status'           => ConversationStatus::class,
+            'owner_type'       => ConversationOwner::class,
             'last_message_at'  => 'datetime',
             'last_inbound_at'  => 'datetime',
             'last_outbound_at' => 'datetime',

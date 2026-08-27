@@ -85,6 +85,13 @@ final class ConversationCaptureFactory
         $originRef = is_array($metadata['origin_ref'] ?? null) ? $metadata['origin_ref'] : [];
         $keyboard  = $message->payload->keyboard;
 
+        // An operator reply is still an outbound message on the same funnel, but
+        // the transcript must attribute it to the person, not to the assistant.
+        // Derived from origin rather than a separate metadata key so senders
+        // cannot claim staff authorship without also declaring a staff origin.
+        $isStaffReply = MessageOrigin::Staff === $origin;
+        $staffUserId  = $isStaffReply ? $this->stringOrNull($originRef['staff_user_id'] ?? null) : null;
+
         return new MessageLogEntry(
             tenantId: $message->tenantId,
             assistantId: $assistantId,
@@ -92,7 +99,7 @@ final class ConversationCaptureFactory
             channelId: $message->channelId,
             platform: $message->channelType,
             direction: MessageDirection::Outbound,
-            senderType: MessageSenderType::Assistant,
+            senderType: $isStaffReply ? MessageSenderType::Staff : MessageSenderType::Assistant,
             contentType: MessageContentType::fromOutbound($message->payload->type),
             text: $message->payload->text,
             payload: null !== $keyboard ? ['keyboard' => $keyboard] : [],
@@ -104,6 +111,7 @@ final class ConversationCaptureFactory
             idempotencyKey: $message->idempotencyKey,
             status: DeliveryStatus::Sent,
             occurredAt: CarbonImmutable::now('UTC'),
+            senderStaffUserId: $staffUserId,
         );
     }
 

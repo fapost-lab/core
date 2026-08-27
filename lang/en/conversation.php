@@ -48,4 +48,35 @@ return [
     'today'         => 'Today',
     'attachment'    => 'Attachment',
     'empty'         => 'No messages in this conversation yet.',
+    'load_older'    => 'Load older messages',
+
+    'owner' => [
+        'bot'         => 'Bot is answering',
+        'staff'       => 'Operator is answering',
+        'staff_named' => ':name is answering',
+    ],
+
+    'actions' => [
+        'reply'         => 'Reply',
+        'take_over'     => 'Take over',
+        'return_to_bot' => 'Return to bot',
+    ],
+
+    'reply' => [
+        'label'       => 'Message',
+        'placeholder' => 'Type a reply to the contact…',
+    ],
+
+    'notifications' => [
+        'reply_sent'          => 'Reply sent.',
+        'reply_failed'        => 'Could not send the reply. Please try again.',
+        'reply_undeliverable' => 'This contact has no active channel to reply on.',
+        'taken_over'          => 'You are now handling this conversation.',
+        'returned_to_bot'     => 'Conversation returned to the bot.',
+    ],
+
+    'media' => [
+        'pending' => 'Downloading…',
+        'failed'  => 'Failed to download',
+    ],
 ];

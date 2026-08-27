@@ -11,6 +11,7 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantProvisioningService;
+use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -53,6 +54,7 @@ final class InstallPlatformCommandTest extends TestCase
                 $tenantSwitcher,
                 new AclBootstrapService(),
                 Mockery::mock(ChannelWebhookRegistryInterface::class),
+                new TenantSlugPolicy(),
             ),
         );
 
@@ -108,6 +110,7 @@ final class InstallPlatformCommandTest extends TestCase
                 $tenantSwitcher,
                 new AclBootstrapService(),
                 Mockery::mock(ChannelWebhookRegistryInterface::class),
+                new TenantSlugPolicy(),
             ),
         );
 

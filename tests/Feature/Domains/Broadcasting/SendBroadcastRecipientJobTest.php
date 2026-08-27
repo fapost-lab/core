@@ -77,6 +77,40 @@ final class SendBroadcastRecipientJobTest extends FeatureTestCase
         $this->assertSame(1, $broadcast->fresh()->skipped_count);
     }
 
+    public function test_delivers_the_locale_matching_the_contacts_language(): void
+    {
+        $sender = $this->fakeSenderCapturing(new DeliveryResult(sent: true, providerMessageId: 'pmid-1'));
+
+        [, $recipient] = $this->scenario(
+            message: ['en' => 'Hello!', 'ru' => 'Привет!'],
+            contactLanguage: 'ru',
+        );
+
+        $this->send($recipient);
+
+        $this->assertCount(1, $sender->sent);
+        $this->assertSame('Привет!', $sender->sent[0]->payload->text);
+    }
+
+    public function test_falls_back_to_the_tenant_base_language_when_contact_language_is_unmapped(): void
+    {
+        // TenantSettings::content_base_language defaults to 'en'. The contact's
+        // language ('fr') is neither blank (so the job passes it straight
+        // through) nor present in the message map, so ContentTranslator's own
+        // fallback chain must land on the base language entry.
+        $sender = $this->fakeSenderCapturing(new DeliveryResult(sent: true, providerMessageId: 'pmid-1'));
+
+        [, $recipient] = $this->scenario(
+            message: ['en' => 'Hello!', 'ru' => 'Привет!'],
+            contactLanguage: 'fr',
+        );
+
+        $this->send($recipient);
+
+        $this->assertCount(1, $sender->sent);
+        $this->assertSame('Hello!', $sender->sent[0]->payload->text);
+    }
+
     private function send(BroadcastRecipient $recipient): void
     {
         $job = new SendBroadcastRecipientJob(self::TENANT_ID, (string) $recipient->getKey());
@@ -98,9 +132,37 @@ final class SendBroadcastRecipientJobTest extends FeatureTestCase
     }
 
     /**
+     * Same fake as {@see fakeSender()} but records every outbound message so
+     * assertions can inspect the resolved locale text.
+     */
+    private function fakeSenderCapturing(DeliveryResult $result): object
+    {
+        $sender = new class ($result) implements MessageSenderInterface {
+            /** @var list<OutboundMessage> */
+            public array $sent = [];
+
+            public function __construct(private readonly DeliveryResult $result)
+            {
+            }
+
+            public function send(OutboundMessage $message): DeliveryResult
+            {
+                $this->sent[] = $message;
+
+                return $this->result;
+            }
+        };
+
+        $this->app->instance(MessageSenderInterface::class, $sender);
+
+        return $sender;
+    }
+
+    /**
+     * @param  array<string, string>|string  $message
      * @return array{0: Broadcast, 1: BroadcastRecipient}
      */
-    private function scenario(): array
+    private function scenario(array|string $message = 'Hello!', string $contactLanguage = 'en'): array
     {
         $assistant = Assistant::factory()->create(['tenant_id' => self::TENANT_ID, 'default_language' => 'en']);
         $channel   = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
@@ -110,13 +172,16 @@ final class SendBroadcastRecipientJobTest extends FeatureTestCase
             'token'        => 'bot-token',
             'is_active'    => true,
         ]));
-        $contact = Contact::factory()->forTenant(self::TENANT_ID)->create(['external_id' => 'chat-1']);
+        $contact = Contact::factory()->forTenant(self::TENANT_ID)->create([
+            'external_id' => 'chat-1',
+            'language'    => $contactLanguage,
+        ]);
 
         $broadcast = Broadcast::query()->create([
             'tenant_id'        => self::TENANT_ID,
             'assistant_id'     => $assistant->getKey(),
             'name'             => 'Promo',
-            'message'          => 'Hello!',
+            'message'          => $message,
             'target_type'      => 'all',
             'status'           => BroadcastStatus::Running->value,
             'total_recipients' => 1,

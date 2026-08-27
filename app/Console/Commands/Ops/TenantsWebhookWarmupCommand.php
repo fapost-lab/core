@@ -8,6 +8,7 @@ use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use App\Domains\Webhook\Services\IngressSpecPublisher;
 use Illuminate\Console\Command;
 use Throwable;
 
@@ -26,12 +27,20 @@ final class TenantsWebhookWarmupCommand extends Command
         private readonly TenantRepositoryInterface $tenantRepository,
         private readonly TenantSwitcher $tenantSwitcher,
         private readonly ChannelWebhookRegistryInterface $channelWebhookRegistry,
+        private readonly IngressSpecPublisher $ingressSpecPublisher,
     ) {
         parent::__construct();
     }
 
     public function handle(): int
     {
+        // Specs are republished as part of warmup, not left to a separate command.
+        // The application itself never reads them — it asks the adapter directly —
+        // so a missing spec is invisible here and only breaks the external gateway,
+        // which has no way to rebuild one. Anything that repopulates Redis for
+        // ingress must repopulate all of it.
+        $this->publishIngressSpecs();
+
         $active = $this->tenantRepository->findAllActive();
 
         if ([] === $active) {
@@ -73,6 +82,23 @@ final class TenantsWebhookWarmupCommand extends Command
         $this->components->twoColumnDetail('Failed', (string)$fail);
 
         return $fail > 0 ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * Republish declarative ingress specs, reporting rather than aborting on failure.
+     *
+     * Spec publication is independent of tenant routing: losing it must not stop
+     * the warmup that repopulates the registry, which is the more urgent half.
+     */
+    private function publishIngressSpecs(): void
+    {
+        try {
+            $published = $this->ingressSpecPublisher->publishAll();
+
+            $this->components->twoColumnDetail('ingress specs', sprintf('%d published', count($published)));
+        } catch (Throwable $throwable) {
+            $this->components->warn("Ingress spec publication failed: {$throwable->getMessage()}");
+        }
     }
 
     /**
