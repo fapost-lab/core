@@ -1,0 +1,80 @@
+# What must never enter the build context.
+#
+# Two reasons, and the first one matters more: secrets. The build context is
+# copied into the image, and an .env committed that way ships the application
+# key, database password and every provider token to whoever pulls the image.
+#
+# The second is correctness. A local vendor/ contains symlinks into packages/
+# from `composer dev:link`, which collide with the real directories the image
+# installs — the build fails outright rather than producing something wrong,
+# but only because the collision happens to be visible.
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+auth.json
+
+# Installed dependencies — the image builds its own
+vendor/
+node_modules/
+
+# Local package checkouts.
+#
+# Excluded deliberately, not incidentally. These are separate git repositories
+# that `composer dev:link` symlinks over vendor/ for local development; the
+# image installs the published versions from the lock file instead. Their
+# presence would also make dev:link do its work inside the image, silently
+# replacing released packages with whatever happened to be checked out.
+packages/
+
+# Build output — regenerated inside the image
+public/build/
+public/hot
+gateway/bin/
+gateway/dist/
+
+# Runtime state, which belongs in volumes rather than layers
+storage/app/*
+storage/framework/cache/*
+storage/framework/sessions/*
+storage/framework/views/*
+storage/logs/*
+!storage/**/.gitignore
+
+# Version control and CI
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# Developer tooling with no place in a runtime image
+.idea/
+.vscode/
+.fleet/
+*.iml
+.phpunit.result.cache
+.phpstan.cache/
+.php-cs-fixer.cache
+coverage/
+
+# Tests and local documentation: not needed at runtime, and excluding them keeps
+# the context small enough that builds stay fast.
+tests/
+drafts/
+docs/
+
+# Docker's own files, except what a stage explicitly copies
+docker/
+!docker/php/php.ini
+!docker/php/php.dev.ini
+!docker/php/www.conf
+!docker/php/entrypoint.sh
+!docker/nginx/default.conf
+
+# macOS and editor noise
+.DS_Store
+Thumbs.db
+*.swp

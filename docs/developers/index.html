@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>FAPost Developer Portal</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">FAPost Developer Portal</div>
+        <div class="subtitle">Features, Solutions, Plugins, nodes, builder extensions.</div>
+        <div class="nav-group">
+          <div class="nav-title">Start</div>
+          <a class="nav-link" href="./index.html">Overview</a>
+          <a class="nav-link" href="./extension-model.html">Extension Model</a>
+          <a class="nav-link" href="./testing.html">Testing</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-title">Build</div>
+          <a class="nav-link" href="./features.html">Features</a>
+          <a class="nav-link" href="./solutions.html">Solutions</a>
+          <a class="nav-link" href="./plugins.html">Plugins</a>
+          <a class="nav-link" href="./package-development.html">Package Development</a>
+          <a class="nav-link" href="./flow-nodes.html">Flow Nodes</a>
+          <a class="nav-link" href="./builder-extensions.html">Builder Extensions</a>
+          <a class="nav-link" href="./api-reference.html">API Reference</a>
+        </div>
+        <div class="nav-group">
+          <div class="nav-title">Repository</div>
+          <a class="nav-link" href="../platform/current-state.md">Current State</a>
+          <a class="nav-link" href="../reference/README.md">Reference</a>
+        </div>
+      </aside>
+      <main class="content">
+        <div class="eyebrow">Developer Documentation</div>
+        <h1>Build on top of FAPost Core without guessing the boundaries.</h1>
+        <p class="lead">
+          This portal is for developers implementing future Features, Solutions, Plugins, Flow nodes, and Builder
+          extensions. Internal platform development remains in the markdown documentation under <code>docs/platform</code>.
+        </p>
+
+        <div class="notice">
+          Some extension surfaces are still planned or partial. Each guide marks current support explicitly and links
+          back to the platform state when needed.
+        </div>
+
+        <div class="grid">
+          <a class="card" href="./extension-model.html">
+            <span class="tag">Start here</span>
+            <h3>Choose the extension type</h3>
+            <p>Understand when to build a Feature, Solution, or Plugin.</p>
+          </a>
+          <a class="card" href="./flow-nodes.html">
+            <span class="tag">Runtime</span>
+            <h3>Add Flow behavior</h3>
+            <p>Handler versioning, state rules, retries, and validation.</p>
+          </a>
+          <a class="card" href="./builder-extensions.html">
+            <span class="tag">Frontend</span>
+            <h3>Expose configuration</h3>
+            <p>Schema-driven controls, bespoke overrides, and frontend boundaries.</p>
+          </a>
+          <a class="card" href="./package-development.html">
+            <span class="tag">Packages</span>
+            <h3>Develop shared packages</h3>
+            <p>Local checkout, symlinks, versioning, and adding a new package.</p>
+          </a>
+          <a class="card" href="./testing.html">
+            <span class="tag">Release</span>
+            <h3>Verify the extension</h3>
+            <p>Focused tests, type checks, and architecture checks.</p>
+          </a>
+          <a class="card" href="./api-reference.html">
+            <span class="tag">API</span>
+            <h3>Browse generated docs</h3>
+            <p>Build Doctum API docs for Core domains and public contracts.</p>
+          </a>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

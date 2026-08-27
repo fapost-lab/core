@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Package Development | FAPost Developer Portal</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar"><div class="brand">FAPost Developer Portal</div><a class="nav-link" href="./index.html">Overview</a></aside>
+      <main class="content">
+        <div class="eyebrow">Package Development</div>
+        <h1>Develop the shared packages locally</h1>
+        <p class="lead">
+          <code>fapost/foundation</code> and <code>fapost/support</code> — and any Solution or Plugin package you build —
+          live in their own git repositories and are consumed by Core as versioned Composer dependencies. This guide
+          explains the two-lane setup and how to add a new package to it.
+        </p>
+
+        <div class="notice">
+          The Core-owned shared packages use the <code>fapost/*</code> vendor and live under the <code>fapost-lab</code>
+          GitHub org. A Solution or Plugin you contribute is <strong>your own</strong> package: it uses your vendor
+          (for example <code>acme/hr-solution</code>) and any git host you like. Everything below works the same
+          regardless of vendor — nothing is hard-coded to <code>fapost</code>.
+        </div>
+
+        <h2>How it works</h2>
+        <p>
+          Each package is a standalone repository. During development its source is checked out into
+          <code>packages/&lt;dir&gt;</code>, which the Core repository ignores (<code>/packages</code> in
+          <code>.gitignore</code>). The checkout directory name is free; the package's Composer <code>name</code> is what
+          matters. Two lanes coexist without ever editing <code>composer.json</code> per environment:
+        </p>
+        <table>
+          <thead>
+            <tr><th>Lane</th><th>Source of the package</th><th>Where</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Production / CI</strong></td>
+              <td>VCS repository + version constraint in the committed <code>composer.json</code>; the exact commit is
+                pinned in <code>composer.lock</code>. Pulled from the package's git host.</td>
+              <td>No <code>packages/</code> directory required.</td>
+            </tr>
+            <tr>
+              <td><strong>Local development</strong></td>
+              <td>The checkout under <code>packages/&lt;dir&gt;</code>, symlinked into <code>vendor/</code> so edits are
+                live with no <code>composer update</code>.</td>
+              <td><code>tools/dev-link-packages.php</code></td>
+            </tr>
+          </tbody>
+        </table>
+        <p>
+          <code>composer.json</code> and <code>composer.lock</code> always describe the production (VCS) lane, so they are
+          safe to commit. The local symlinks are created <em>outside</em> Composer's dependency resolution, so they never
+          leak into the lock file.
+        </p>
+
+        <h3>The linker</h3>
+        <p>
+          <code>tools/dev-link-packages.php</code> (exposed as the <code>dev:link</code> Composer script) replaces the
+          Composer-installed copy of each package under <code>vendor/</code> with a relative symlink to its local source.
+          It is wired into <code>post-install-cmd</code> and <code>post-update-cmd</code>, so it runs automatically after
+          every <code>composer install</code> and <code>composer update</code>. It auto-discovers packages by reading each
+          <code>packages/*/composer.json</code> and linking <code>vendor/&lt;name&gt;</code> from that file's
+          <code>name</code> — so any vendor works with no changes to the linker — and is a no-op when
+          <code>packages/</code> is absent (production, CI), which is why the same hook is safe everywhere.
+        </p>
+
+        <h2>Set up an existing package for development</h2>
+        <p>Clone the package into <code>packages/</code> next to the others, then let Composer link it:</p>
+        <pre>git clone git@github.com:fapost-lab/foundation.git packages/fapost-foundation
+
+# from the Core project root — creates vendor/fapost/foundation -> packages/fapost-foundation
+composer dev:link</pre>
+        <p>
+          A plain <code>composer install</code> re-creates the symlink on its own. From here, edits inside
+          <code>packages/fapost-foundation</code> are picked up instantly — no <code>composer update</code> needed. The
+          checkout is a normal git repository: branch, commit, and push it independently of Core.
+        </p>
+
+        <h2>Add a new package for development</h2>
+        <p>
+          Assume a new package <code>&lt;vendor&gt;/&lt;name&gt;</code> — for a Solution or Plugin this is your own vendor,
+          not <code>fapost</code>. The steps are vendor- and host-agnostic; substitute your own values.
+        </p>
+
+        <h3>1. Create the package repository</h3>
+        <p>
+          Scaffold <code>packages/&lt;dir&gt;</code> (any directory name) with its own <code>composer.json</code>
+          (<code>"name": "&lt;vendor&gt;/&lt;name&gt;"</code>, PSR-4 autoload, a <code>license</code>), initialise a git
+          repository, push it to your host, and tag the first release:
+        </p>
+        <pre>cd packages/&lt;dir&gt;
+git init && git add -A && git commit -m "init"
+git remote add origin git@&lt;git-host&gt;:&lt;org&gt;/&lt;name&gt;.git
+git push -u origin main
+git tag v0.1.0 && git push origin v0.1.0</pre>
+        <p>
+          If the package builds on the platform contracts, require them by constraint in its own
+          <code>composer.json</code> (for example <code>"fapost/foundation": "^0.1"</code>). A Solution/Plugin may depend
+          on <code>fapost/foundation</code>; it must not depend on Core (<code>App\\…</code>) directly.
+        </p>
+
+        <h3>2. Declare it in the root <code>composer.json</code></h3>
+        <p>Add a VCS repository and a version constraint. This is the only manual edit in Core, and it is what production
+          resolves against:</p>
+        <pre>"repositories": [
+  { "type": "vcs", "url": "git@&lt;git-host&gt;:&lt;org&gt;/&lt;name&gt;.git" }
+],
+"require": {
+  "&lt;vendor&gt;/&lt;name&gt;": "^0.1"
+}</pre>
+        <p>Private repositories on a non-GitHub host may need Composer authentication configured
+          (<code>composer config</code> / <code>auth.json</code>).</p>
+
+        <h3>3. Resolve and link</h3>
+        <pre>composer update &lt;vendor&gt;/&lt;name&gt;</pre>
+        <p>
+          Composer pins the tagged version into <code>composer.lock</code> from the VCS, and <code>post-update-cmd</code>
+          runs <code>dev:link</code> for you, replacing <code>vendor/&lt;vendor&gt;/&lt;name&gt;</code> with a symlink to
+          the local checkout. The linker needs no changes — it discovers the new package automatically from its
+          <code>composer.json</code> <code>name</code>, whatever the vendor.
+        </p>
+
+        <h2>Publish a new version</h2>
+        <p>Package changes reach production through tags, not the local checkout:</p>
+        <pre># inside packages/&lt;dir&gt;
+git commit -am "feat: ..."
+git push
+git tag v0.2.0 && git push origin v0.2.0
+
+# in Core — raise the constraint if the minor changed, then re-resolve
+composer update &lt;vendor&gt;/&lt;name&gt;</pre>
+        <p>
+          With <code>0.x</code> versions, <code>^0.1</code> accepts <code>0.1.*</code> only; bump the constraint to
+          <code>^0.2</code> to adopt a new minor. Until you re-run <code>composer update</code>, Core keeps the version
+          pinned in <code>composer.lock</code> — local symlinked edits are visible to <em>you</em> but do not change what
+          production installs.
+        </p>
+
+        <div class="notice">
+          Composer needs git/SSH access to each package repository to resolve it — the <code>fapost-lab</code> org for the
+          Core packages, and your own host for your Solution/Plugin. Ensure your key is authorised (or
+          <code>auth.json</code> is set for private hosts) before running <code>composer update</code>.
+        </div>
+
+        <h2>Reference</h2>
+        <table>
+          <thead>
+            <tr><th>Piece</th><th>Role</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>packages/&lt;dir&gt;</code></td><td>Local checkout of a package repo. Ignored by Core (<code>/packages</code>).</td></tr>
+            <tr><td><code>repositories[]</code> (root)</td><td>VCS entry per package — the production source.</td></tr>
+            <tr><td><code>require</code> (root)</td><td>Version constraint per package (e.g. <code>^0.1</code>).</td></tr>
+            <tr><td><code>composer.lock</code></td><td>Pins the exact commit of each tagged version. Always the VCS lane — safe to commit.</td></tr>
+            <tr><td><code>tools/dev-link-packages.php</code> / <code>composer dev:link</code></td><td>Symlinks <code>vendor/&lt;name&gt;</code> to the local checkout. Auto-runs on install/update; no-op without <code>packages/</code>.</td></tr>
+          </tbody>
+        </table>
+        <p>Related: <a href="./solutions.html">Solutions</a> · <a href="./plugins.html">Plugins</a> ·
+          <a href="./extension-model.html">Extension Model</a>.</p>
+      </main>
+    </div>
+  </body>
+</html>

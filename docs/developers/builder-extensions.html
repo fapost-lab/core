@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Builder Extensions | FAPost Developer Portal</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar"><div class="brand">FAPost Developer Portal</div><a class="nav-link" href="./index.html">Overview</a></aside>
+      <main class="content">
+        <div class="eyebrow">Builder UI</div>
+        <h1>Expose configuration in the builder</h1>
+        <p class="lead">Prefer backend schema and generic rendering before bespoke Vue components.</p>
+        <h2>Rules</h2>
+        <ul>
+          <li>Use backend-provided config schema where possible.</li>
+          <li>Use bespoke Core overrides only when schema-driven controls cannot express the UX.</li>
+          <li>Runtime Plugins must not assume arbitrary Vue component injection.</li>
+          <li>Solution components require the approved Vite glob/publish contract.</li>
+        </ul>
+        <p>Reference: <a href="../reference/builder-config-schema-reference.md">Builder config schema</a>.</p>
+        <p>Generated PHP API docs: <a href="./api-reference.html">API reference</a>.</p>
+      </main>
+    </div>
+  </body>
+</html>

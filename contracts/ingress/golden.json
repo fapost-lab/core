@@ -1,0 +1,893 @@
+{
+    "version": 1,
+    "description": "Golden cases for IngressSpec execution. Every ingress runtime must produce these verdicts and keys exactly.",
+    "cases": [
+        {
+            "name": "header_equals: exact match",
+            "spec": {
+                "v": 1,
+                "scheme": "header_equals",
+                "parameter": "x-telegram-bot-api-secret-token",
+                "prefix": "",
+                "idempotency": "tg:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "x-telegram-bot-api-secret-token": "channel-secret"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "tg:channel-42:987654"
+            }
+        },
+        {
+            "name": "header_equals: header name is case insensitive",
+            "spec": {
+                "v": 1,
+                "scheme": "header_equals",
+                "parameter": "x-telegram-bot-api-secret-token",
+                "prefix": "",
+                "idempotency": "tg:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "X-Telegram-Bot-Api-Secret-Token": "channel-secret"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "tg:channel-42:987654"
+            },
+            "note": "Header lookup must be case insensitive in every runtime."
+        },
+        {
+            "name": "header_equals: wrong secret",
+            "spec": {
+                "v": 1,
+                "scheme": "header_equals",
+                "parameter": "x-telegram-bot-api-secret-token",
+                "prefix": "",
+                "idempotency": "tg:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "x-telegram-bot-api-secret-token": "forged"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "tg:channel-42:987654"
+            }
+        },
+        {
+            "name": "header_equals: header absent",
+            "spec": {
+                "v": 1,
+                "scheme": "header_equals",
+                "parameter": "x-telegram-bot-api-secret-token",
+                "prefix": "",
+                "idempotency": "tg:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "tg:channel-42:987654"
+            }
+        },
+        {
+            "name": "header_equals: empty header value",
+            "spec": {
+                "v": 1,
+                "scheme": "header_equals",
+                "parameter": "x-telegram-bot-api-secret-token",
+                "prefix": "",
+                "idempotency": "tg:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "x-telegram-bot-api-secret-token": ""
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "tg:channel-42:987654"
+            }
+        },
+        {
+            "name": "header_equals: secret with trailing character",
+            "spec": {
+                "v": 1,
+                "scheme": "header_equals",
+                "parameter": "x-telegram-bot-api-secret-token",
+                "prefix": "",
+                "idempotency": "tg:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "x-telegram-bot-api-secret-token": "channel-secretx"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "tg:channel-42:987654"
+            }
+        },
+        {
+            "name": "header_equals: whitespace padded secret",
+            "spec": {
+                "v": 1,
+                "scheme": "header_equals",
+                "parameter": "x-telegram-bot-api-secret-token",
+                "prefix": "",
+                "idempotency": "tg:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "x-telegram-bot-api-secret-token": " channel-secret"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "tg:channel-42:987654"
+            },
+            "note": "No trimming: the comparison is over exact bytes."
+        },
+        {
+            "name": "hmac_sha256: valid signature with prefix",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-hub-signature-256",
+                "prefix": "sha256=",
+                "idempotency": "wa:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "x-hub-signature-256": "sha256=66f9aeb4445d9c467e491986dad11fcfce163c380e3d0d961a2716388ca7b556"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "wa:channel-42:987654"
+            }
+        },
+        {
+            "name": "hmac_sha256: signature without the required prefix",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-hub-signature-256",
+                "prefix": "sha256=",
+                "idempotency": "wa:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "x-hub-signature-256": "66f9aeb4445d9c467e491986dad11fcfce163c380e3d0d961a2716388ca7b556"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "wa:channel-42:987654"
+            },
+            "note": "The prefix is part of the expected value, not stripped from the candidate."
+        },
+        {
+            "name": "hmac_sha256: empty prefix accepts a bare digest",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-hub-signature-256",
+                "idempotency": "wa:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "x-hub-signature-256": "66f9aeb4445d9c467e491986dad11fcfce163c380e3d0d961a2716388ca7b556"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "wa:channel-42:987654"
+            }
+        },
+        {
+            "name": "hmac_sha256: digest of a different body",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-hub-signature-256",
+                "prefix": "sha256=",
+                "idempotency": "wa:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "x-hub-signature-256": "sha256=c1043408b8f36e1ec2bcde7304408decf2ca7aa77c954d0528dfc111149c6bf7"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "wa:channel-42:987654"
+            }
+        },
+        {
+            "name": "hmac_sha256: digest under a different secret",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-hub-signature-256",
+                "prefix": "sha256=",
+                "idempotency": "wa:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "x-hub-signature-256": "sha256=901c21353e9213c720ed14bec022e51ab602304b9572a6d778ac38e8d03a2a3c"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "wa:channel-42:987654"
+            }
+        },
+        {
+            "name": "hmac_sha256: signature over unmodified bytes",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-hub-signature-256",
+                "idempotency": "wa:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"b\":2,\"a\":1,\"text\":\"café\"}",
+                "headers": {
+                    "x-hub-signature-256": "ae541b0f2cfaeb2476dbbc9aa9dbbbaa5e778adcfebafd8d7eed653cef22e3a4"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "wa:channel-42:"
+            },
+            "note": "Body must be signed as received. Decoding and re-encoding reorders keys and escapes non-ASCII, which changes the digest."
+        },
+        {
+            "name": "hmac_sha256: signature over re-encoded bytes must fail",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-hub-signature-256",
+                "idempotency": "wa:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"b\":2,\"a\":1,\"text\":\"café\"}",
+                "headers": {
+                    "x-hub-signature-256": "66897d3831313832eacb7eb849bc90557db2cf41a1d457d01008b5c3804e49d6"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "wa:channel-42:"
+            },
+            "note": "Guards the round-trip mistake explicitly: this digest is valid for the re-encoded body and must still be rejected."
+        },
+        {
+            "name": "hmac_sha256: header absent",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-hub-signature-256",
+                "prefix": "sha256=",
+                "idempotency": "wa:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "wa:channel-42:987654"
+            }
+        },
+        {
+            "name": "hmac_sha1: valid signature",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha1",
+                "parameter": "x-sig",
+                "prefix": "sha1=",
+                "idempotency": "l:{channel}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "x-sig": "sha1=91955393bb450c0e4c3b9c9972ee08eedbf96d2f"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "l:channel-42"
+            }
+        },
+        {
+            "name": "hmac_sha1: sha256 digest is not accepted",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha1",
+                "parameter": "x-sig",
+                "prefix": "sha1=",
+                "idempotency": "l:{channel}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {
+                    "x-sig": "sha1=66f9aeb4445d9c467e491986dad11fcfce163c380e3d0d961a2716388ca7b556"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "l:channel-42"
+            }
+        },
+        {
+            "name": "query_param: matching token",
+            "spec": {
+                "v": 1,
+                "scheme": "query_param",
+                "parameter": "token",
+                "prefix": "",
+                "idempotency": "q:{channel}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "query": {
+                    "token": "channel-secret"
+                },
+                "headers": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "q:channel-42"
+            }
+        },
+        {
+            "name": "query_param: mismatched token",
+            "spec": {
+                "v": 1,
+                "scheme": "query_param",
+                "parameter": "token",
+                "prefix": "",
+                "idempotency": "q:{channel}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "query": {
+                    "token": "forged"
+                },
+                "headers": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "q:channel-42"
+            }
+        },
+        {
+            "name": "query_param: token absent",
+            "spec": {
+                "v": 1,
+                "scheme": "query_param",
+                "parameter": "token",
+                "prefix": "",
+                "idempotency": "q:{channel}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "q:channel-42"
+            }
+        },
+        {
+            "name": "none: accepts any request",
+            "spec": {
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "n:{channel}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "n:channel-42"
+            },
+            "note": "The unguessable public hash is the only credential for this scheme."
+        },
+        {
+            "name": "template: channel placeholder",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "c:{channel}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "c:channel-42"
+            }
+        },
+        {
+            "name": "template: top level scalar",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "tg:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "tg:channel-42:987654"
+            }
+        },
+        {
+            "name": "template: nested dot path",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "{body.message.chat.id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "5"
+            }
+        },
+        {
+            "name": "template: header lookup",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "h:{header.X-Delivery}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{}",
+                "headers": {
+                    "x-delivery": "d-42"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "h:d-42"
+            }
+        },
+        {
+            "name": "template: missing path collapses to empty",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "tg:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "tg:channel-42:"
+            }
+        },
+        {
+            "name": "template: path through a scalar leaf",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "{body.a.b}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"a\":1}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "template: non scalar value collapses to empty",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "{body.message}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654,\"message\":{\"chat\":{\"id\":5},\"text\":\"hi\"}}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "template: boolean renders as 1",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "{body.ok}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"ok\":true}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "1"
+            }
+        },
+        {
+            "name": "template: false renders as 0",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "{body.ok}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"ok\":false}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "0"
+            }
+        },
+        {
+            "name": "template: float renders without formatting",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "{body.n}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"n\":1.5}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "1.5"
+            }
+        },
+        {
+            "name": "template: float with zero fraction loses it",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "{body.n}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"n\":1.0}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "1"
+            },
+            "note": "Numbers render as values, not as their JSON spelling. A runtime that echoes the literal would emit \"1.0\" here."
+        },
+        {
+            "name": "template: large integer keeps full precision",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "{body.n}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"n\":9223372036854775807}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "9223372036854775807"
+            },
+            "note": "Must not go through a float: that would round to 9223372036854775808."
+        },
+        {
+            "name": "template: unknown namespace collapses to empty",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "{cookie.sid}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "template: no placeholders",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "static-key"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "static-key"
+            }
+        },
+        {
+            "name": "template: malformed body yields empty placeholders",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "tg:{channel}:{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "not json at all",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "tg:channel-42:"
+            },
+            "note": "Ingress must answer the provider even for garbage bodies."
+        },
+        {
+            "name": "template: json array body yields empty placeholders",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "{body.update_id}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "[1,2,3]",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": ""
+            },
+            "note": "An array body has no field of that name."
+        },
+        {
+            "name": "template: array element by numeric segment",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "{body.0}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "[10,20,30]",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "10"
+            },
+            "note": "PHP resolves a numeric string against integer array keys, so array elements are addressable. A runtime that only walks objects would return an empty key here and dedupe unrelated messages together."
+        },
+        {
+            "name": "template: nested array element",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "i:{body.items.1}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"items\":[\"a\",\"b\"]}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "i:b"
+            }
+        },
+        {
+            "name": "template: array index out of range",
+            "spec": {
+                "prefix": "",
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "idempotency": "i:{body.items.9}"
+            },
+            "secret": "channel-secret",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"items\":[\"a\",\"b\"]}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "i:"
+            }
+        }
+    ]
+}

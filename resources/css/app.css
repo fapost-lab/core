@@ -6,6 +6,88 @@
 @source '../**/*.js';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'PT Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+    'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-heading: 'Montserrat', ui-sans-serif, system-ui, sans-serif;
+    --color-brand: #4338ca;
+    --color-brand-light: #6366f1;
+    --color-brand-dark: #312e81;
+    --color-accent: #f97316;
+    --color-accent-light: #fb923c;
+    --color-surface-dark: #0f0d1a;
+    --color-surface-darker: #0a0814;
+}
+
+/* Scroll animations */
+[data-animate] {
+    opacity: 0;
+    transform: translateY(32px);
+    transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-animate].visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Stagger delays */
+[data-animate-delay="1"] {
+    transition-delay: 100ms;
+}
+
+[data-animate-delay="2"] {
+    transition-delay: 200ms;
+}
+
+[data-animate-delay="3"] {
+    transition-delay: 300ms;
+}
+
+[data-animate-delay="4"] {
+    transition-delay: 400ms;
+}
+
+[data-animate-delay="5"] {
+    transition-delay: 500ms;
+}
+
+[data-animate-delay="6"] {
+    transition-delay: 600ms;
+}
+
+[data-animate-delay="7"] {
+    transition-delay: 700ms;
+}
+
+[data-animate-delay="8"] {
+    transition-delay: 800ms;
+}
+
+/* Gradient text utility */
+.text-gradient {
+    background: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #f97316 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Glow effect for hero mockup */
+.glow-ring {
+    box-shadow: 0 0 80px rgba(99, 102, 241, 0.3), 0 0 160px rgba(99, 102, 241, 0.1);
+}
+
+/* Headings font */
+h1, h2, h3 {
+    font-family: var(--font-heading);
+}
+
+/* Smooth scroll for mobile nav */
+html {
+    scroll-behavior: smooth;
+}
+
+@layer components {
+    .field {
+        @apply w-full rounded border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:border-blue-400;
+    }
 }

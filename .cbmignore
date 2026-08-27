@@ -1,0 +1,12 @@
+# codebase-memory-mcp exclusions.
+# Generated / compiled artifacts: they are not source and only pollute the
+# indexing-coverage report with unparsable files.
+
+storage/framework/
+storage/logs/
+bootstrap/cache/
+
+# Published vendor assets (Filament) + Vite build output.
+public/css/
+public/js/
+public/build/

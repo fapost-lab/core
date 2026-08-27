@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Extension Model | FAPost Developer Portal</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">FAPost Developer Portal</div>
+        <div class="subtitle">Extension model</div>
+        <a class="nav-link" href="./index.html">Overview</a>
+        <a class="nav-link" href="./features.html">Features</a>
+        <a class="nav-link" href="./solutions.html">Solutions</a>
+        <a class="nav-link" href="./plugins.html">Plugins</a>
+      </aside>
+      <main class="content">
+        <div class="eyebrow">Architecture Boundary</div>
+        <h1>Feature, Solution, or Plugin?</h1>
+        <p class="lead">Pick the extension type by ownership, deployment model, and frontend needs.</p>
+
+        <table>
+          <thead>
+            <tr><th>Type</th><th>Lives In</th><th>Frontend</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Feature</td><td>Core repository</td><td>Can ship Core UI</td><td>Planned/partial lifecycle</td></tr>
+            <tr><td>Solution</td><td>External composer package</td><td>Requires build/publish contract</td><td>Planned</td></tr>
+            <tr><td>Plugin</td><td>External composer package</td><td>No arbitrary runtime Vue</td><td>Planned</td></tr>
+          </tbody>
+        </table>
+
+        <h2>Decision Rules</h2>
+        <div class="grid">
+          <section class="card">
+            <h3>Use a Feature when</h3>
+            <p>The capability belongs to the core product surface and should release with Core.</p>
+          </section>
+          <section class="card">
+            <h3>Use a Solution when</h3>
+            <p>The capability is a vertical package such as HR with its own domain behavior.</p>
+          </section>
+          <section class="card">
+            <h3>Use a Plugin when</h3>
+            <p>The extension registers runtime behavior, adapters, handlers, commands, or schedules.</p>
+          </section>
+          <section class="card">
+            <h3>Check current support</h3>
+            <p>Read <a href="../platform/current-state.md">platform/current-state.md</a> before implementing.</p>
+          </section>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

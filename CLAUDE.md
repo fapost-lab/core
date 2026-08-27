@@ -1,425 +1,218 @@
-# CLAUDE.md — FAPost Core
+# CLAUDE.md - FAPost Core Agent Rules
 
-Контекст для Claude Code. Читай перед каждой задачей.
+Контекст для Claude Code и других агентов. Читать перед началом задачи.
 
----
+Этот файл не является roadmap и не фиксирует статусы реализации. Здесь живут устойчивые правила кода, архитектурные
+ограничения и навигация по рабочей документации.
 
-## Что это за проект
+## Project Context
 
-FAPost Core (Flow Automation Post) — платформа для построения диалоговых ботов в Telegram и WhatsApp.
-Архитектура: FAPost Core (этот репо) + FAPost HR / FAPost {Niche} (отдельные репо) + FAPost SaaS (отдельный репо).
+FAPost Core - ядро платформы для диалоговых ассистентов и flow automation. Этот репозиторий содержит Core без SaaS shell
+и без нишевых Solution-пакетов.
 
-Сейчас разрабатывается только FAPost Core. Без FAPost SaaS, без модулей.
+Рабочая документация:
 
----
+- `drafts/CURRENT_TASK.md` - текущий операционный фокус. Оставлять как главный краткосрочный ориентир.
+- `docs/INDEX.md` - основной индекс документации.
+- `docs/platform/TASKS.md` - трекер статусов реализации.
+- `docs/platform/ROADMAP.md` - milestone'ы и зависимости.
+- `docs/platform/PROJECT.md` - краткий проектный контекст.
+- `docs/platform/current-state.md` - фактическое состояние репозитория.
+- `docs/developers/index.html` - HTML-портал для будущих разработчиков Features, Solutions и Plugins.
 
-## Стек
+Не дублировать в этом файле чекбоксы, планы, списки будущих таблиц или продуктовые обещания. Если статус изменился,
+обновлять `docs/platform/TASKS.md`, `docs/platform/ROADMAP.md` и/или `docs/platform/current-state.md`.
+
+## Current Stack
 
 - PHP 8.4
 - Laravel 12
-- Laravel Horizon (очереди)
-- Laravel Octane (ускорение)
-- PostgreSQL (schema per tenant)
-- Redis (кеш, очереди, locks)
-- Filament (admin-панель)
-- Inertia + Vue (клиентский конструктор, позже)
+- PostgreSQL с landlord / tenant connections
+- Redis для cache, queues, locks и hot-path registry
+- Horizon queues
+- Octane ограниченно, только для webhook ingress, если включен окружением
+- Filament admin
+- Inertia + Vue builder
+- PHPUnit 12
+- PHPat/PHPStan architecture checks
 
----
+## Directory Boundaries
 
-## Структура директорий
+Основной код:
 
-```
+```text
 app/
-  Domains/
-    Tenancy/          — tenant context, switching, config
-    Flow/             — flow engine, node registry, session management
-    Messaging/        — channel adapters, incoming/outgoing pipeline
-    Contact/          — участники диалогов
-    Bot/              — боты, webhook management
-  Jobs/               — оркестрационные jobs (пересекают домены)
-  Http/
-    Middleware/       — глобальные middleware (tenant resolve, auth)
-  Console/
-    Commands/         — artisan команды (platform:update и др.)
-  Providers/
-    AppServiceProvider.php
-    DomainServiceProvider.php   — регистрирует всё из Domains/
-
-database/
-  migrations/
-    landlord/         — migrations для landlord schema (tenants, plans)
-    tenant/           — migrations для tenant schema (платформенные)
-```
-
-Структура внутри каждого домена:
-
-```
-Domains/{Domain}/
-  Models/
-  Contracts/          — интерфейсы (source of truth для домена)
-  Services/
-  Jobs/               — jobs принадлежащие этому домену
-  Http/
-    Controllers/
-    Requests/
-  Exceptions/
-```
-
----
-
-## Соглашения по коду
-
-**Общие:**
-- Подход близкий к DDD, без фанатизма
-- Интерфейсы — везде где это целесообразно, не ради галочки
-- Финальные классы (`final class`) по умолчанию, снимать явно если нужно наследование
-- Readonly properties где возможно
-- Enums вместо констант для фиксированных наборов значений
-
-**Именование:**
-- Интерфейсы: `{Name}Interface` (не `I{Name}`, не `{Name}Contract`)
-- Services: `{Name}Service` — содержат бизнес-логику
-- Jobs: `{Verb}{Entity}Job` — `ProcessIncomingMessageJob`, `ExecuteFlowNodeJob`
-- Exceptions: `{Name}Exception` — доменные, не используем базовые Laravel exceptions в доменном коде
-
-**Запрещено:**
-- Бизнес-логика в Controllers и Jobs — только оркестрация
-- Eloquent в доменных сервисах напрямую — только через Repository
-- `app()` и `resolve()` внутри доменного кода — всё через DI
-- Хелперы Laravel (`config()`, `cache()`) внутри доменных сервисов — инжектить зависимости явно
-
-**Можно и нужно:**
-- Eloquent Models в `Domains/{Domain}/Models/` — это нормально
-- Laravel Jobs, Events, Listeners — в соответствующих папках домена
-- Facades — только в infrastructure слое (Jobs, Controllers, Providers)
-
----
-
-## Tenant-aware execution model
-
-**Принципиальная позиция:** Core всегда работает внутри tenant-контекста. Tenant — базовая координата runtime, не опциональная абстракция.
-
-**Core не знает:**
-- Сколько tenant существует
-- Есть ли landlord DB
-- Используется ли SaaS wrapper
-
-**Запрещено в core:**
-- SaaS-логика, landlord DB lookups
-- `if (isSaas())` / `if (isSingleTenant())`
-- Опциональные tenant проверки — только hard fail если контекст не установлен
-
-```php
-// Правильно — бросает исключение если контекст не установлен
-$tenant = $this->tenantContext->get();
-
-// Запрещено — никакого fallback
-$tenant = $this->tenantContext->get() ?? $this->getDefaultTenant();
-```
-
-**Self-hosted = один tenant**, создаётся при `platform:install`. Не отдельная архитектурная ветка — частный случай общей модели.
-
-**SaaS = внешний control plane** поверх core. Добавляет: tenant lifecycle, billing, provisioning, feature flags, onboarding. Core об этом не знает.
-
-**Users — всегда в tenant schema**, без исключений. Одинаково для self-hosted и SaaS.
-
-**TenantProvisioningService** — единый сервис для обоих сценариев:
-```
-platform:install   → TenantProvisioningService::provision()
-SaaS onboarding    → TenantProvisioningService::provision() + billing, flags
-```
-
-## Multi-tenancy
-
-**Две базы данных:**
-- `landlord` — одна на всю платформу. Содержит: tenants, plans, subscriptions.
-- `tenant_{slug}` — отдельная PostgreSQL schema per tenant. Содержит всё остальное.
-
-**Как работает переключение:**
-- `TenantContextInterface` — синглтон в контейнере
-- Перед обработкой любого запроса/job — вызвать `TenantContext::set()`
-- Octane: использовать `runForTenant(callable)` для изоляции между запросами
-
-**Правило:** никакой код платформы не обращается к landlord напрямую кроме `Tenancy` домена.
-
----
-
-## Flow Engine
-
-**Ключевые принципы:**
-- Flow = граф нод хранящийся как JSON в `flow_definitions.nodes`
-- Engine детерминирован — никакого недетерминированного кода внутри execution loop
-- Node handler резолвится по паре `(type, version)` из in-memory `NodeHandlerRegistry`
-- Registry собирается при boot из ServiceProviders — никаких запросов в БД при резолвинге
-
-**Структура ноды в JSON:**
-```json
-{
-  "id": "uuid",
-  "type": "send_message",
-  "version": 1,
-  "config": {},
-  "transitions": []
-}
-```
-
-**Версионирование:**
-- Backward-compatible изменение → version не меняется
-- Breaking change → version++ в новых flow, старый handler остаётся зарегистрированным
-- `FlowSession` фиксирует `flow_definition_id` на старте и выполняется по нему до конца
-
-**State namespace-ы** (строго, нарушение = ошибка валидации):
-- `system.*` — только engine
-- `flow.*` — input/set_attribute ноды
-- `rag.*` — rag_query нода, умирает с сессией
-- `module.*` — модули через DataAccessorInterface
-
----
-
-## Concurrency
-
-Три обязательных уровня защиты в `ProcessIncomingMessageJob`:
-
-1. **Idempotency key:** `Redis SET NX "processed:{update_id}" EX 86400`
-2. **Distributed lock:** `Redis lock "session_lock:{tenant_id}:{contact_id}:{bot_id}" TTL=30`
-3. **Optimistic locking:** `flow_sessions.version` — UPDATE WHERE version = N
-
-Если lock не получен — job уходит в backoff очередь, не дропается.
-
----
-
-## Очереди (Horizon)
-
-Жёсткая изоляция, никогда не смешивать:
-
-```
-messaging.transactional   — ответы в диалоге, HIGH priority
-messaging.broadcast       — рассылки, LOW priority
-flow.execution            — обработка входящих
-sync.external             — синхронизации из внешних систем
-scheduled.triggers        — крон-запуски flow
-```
-
-`messaging.broadcast` workers проверяют насыщение `messaging.transactional` перед отправкой.
-
----
-
-## Webhook routing
-
-URL: `/webhook/{channel}/{public_hash}`
-
-`public_hash` → Redis → `{ tenant_id, bot_id, schema_name, secret_token }`
-
-Landlord не участвует в hot path. Redis — единственный источник для webhook routing.
-
----
-
-## RAG
-
-RAG нода никогда не кладёт raw LLM output в state.
-Только через `RagAdapterInterface::query()` → `StructuredRagResult`.
-`StructuredRagResult` содержит: `found`, `confidence`, `answer`, `intent?`, `metadata`.
-
----
-
-## Логирование и retention
-
-- `flow_logs` — raw, партиционирование по `created_at` (monthly), retention 30 дней
-- `analytics_events` — агрегированные бизнес-события, хранятся постоянно
-- Delay nodes, idempotency hits — не логировать в raw
-
----
-
-
-
-## Boot Lifecycle
-
-**Порядок boot pipeline — строгий:**
-```
-1. Core boot     → AppServiceProvider, DomainServiceProvider
-                   contracts, bindings, registries, infrastructure
-2. Feature boot  → FeatureServiceProvider
-                   читает config/features.php
-                   регистрирует все installed Features в ActivationRegistry
-3. Solution boot → SolutionServiceProvider
-                   обнаруживает composer packages с SolutionInterface
-                   регистрирует в ActivationRegistry
-4. Plugin boot   → PluginServiceProvider
-                   регистрирует в PluginRegistry (отдельный от ActivationRegistry)
-5. Tenant runtime → TenantActivationRuntime
-                   ТОЛЬКО после установки tenant context
-                   ActivationRegistry + tenant_activations DB → active surface
-```
-
-**register() — только декларативно. Запрещено:**
-- side effects
-- обращения к БД
-- tenant-specific логика
-- прямые вызовы Route/Scheduler facades
-
-**boot() — только для поздних runtime hooks после сборки registry.**
-
----
-
-## Runtime Surface Governance (Platform Law)
-
-**Никто кроме Core не имеет права напрямую мутировать global runtime.**
-
-| Запрещено | Правильно |
-|-----------|-----------|
-| `Route::get(...)` напрямую | `$registrar->routes(fn(Router $r) => ...)` |
-| `Schedule::call(...)` напрямую | `$registrar->schedule(...)` |
-| `Artisan::call('migrate')` напрямую | `$registrar->migrations(__DIR__ . '/Database/Migrations')` |
-| `app()->bind(...)` глобально | Только через DomainServiceProvider |
-
-**CoreRegistrar** — единственный контракт через который Feature/Solution/Plugin взаимодействуют с runtime. Core автоматически оборачивает routes в tenant + auth + activation middleware.
-
-**Migration phase order (platform:install / platform:update):**
-```
-Phase 1: tenant platform migrations   (database/migrations/tenant/)
-Phase 2: feature migrations           (database/migrations/features/{name}/)
-Phase 3: solution migrations          (из solution package)
-Phase 4: boot validation
-Phase 5: activation
-```
-
-**Governance модель:**
-```
-Domain    → владеет infrastructure surface
-Feature   → декларирует capability surface
-Solution  → декларирует product surface
-Plugin    → декларирует extension surface
-Core      → собирает final runtime из всех деклараций
-```
-
-## Domain, Feature, Solution, Plugin
-
-Четыре понятия с разной ответственностью. Смешивать — архитектурная ошибка.
-
-**Domain** — технический bounded context, всегда активен:
-```
-app/Domains/
-  Tenancy/, Flow/, Messaging/, Contact/, Bot/, Broadcasting/
-```
-
-**Feature** — built-in capability Core, активируется per tenant:
-```
-app/Features/
-  Rag/, AccessControl/, Analytics/
-  каждая: Contracts/, Services/, Http/
-
-resources/js/features/
-  rag/, analytics/, access-control/   ← Vite видит как монолит
-
-database/migrations/features/
-  rag/, analytics/                    ← изолированы от platform
-```
-
-**Solution** — готовое нишевое решение, ВСЕГДА внешний composer package:
-```
-fapost/solution-hr          → implements SolutionInterface
-fapost/solution-education   → implements SolutionInterface
-```
-`app/Solutions/` — НЕ СУЩЕСТВУЕТ в Core.
-
-**Plugin** — ecosystem extension от сторонних разработчиков:
-```
-fapost/plugin-{name}   → реализует публичные extension points Core
-```
-
----
-
-**Единая модель активации для Feature и Solution:**
-
-```php
-interface ActivatableInterface
-{
-    public function getId(): string;       // hardcoded: 'rag', 'hr'
-    public function getVersion(): string;
-    public function register(CoreRegistrar $registrar): void;
-    public function boot(): void;
-}
-```
-
-```
-ActivationRegistry       — global, in-memory, все установленные
-tenant_activations (DB)  — tenant_id, activatable_id, type, is_active
-TenantActivationRuntime  — per request/job, что активно для tenant
-```
-
-Активация:
-- Self-hosted: `config/features.php`, `config/solutions.php`
-- SaaS: billing plan → `tenant_activations`
-
-
-**Ownership boundary: Feature vs Solution:**
-- Feature owns contract (напр. `KnowledgeQueryInterface`)
-- Solution может предоставить свою реализацию через тот же contract
-- Если capability нужна только внутри одного Solution → internal solution service, НЕ global Feature
-
-**Solution versioning — identity сильнее version:**
-- Backward compatible change → обычный semver, тот же solution ID
-- Breaking change → новый solution identity (`hr` vs `hr_v2`), не upgrade
-- Tenant явно мигрирует на новый identity
-
-**Schema lifecycle независим от activation:**
-- `tenant_activations.is_active = false` → capability скрыта из runtime
-- Таблицы Feature/Solution в tenant schema НЕ удаляются
-- Удаление schema — только явная administrative операция, никогда автоматически
-
-**Installed ≠ Enabled** — одинаково для Feature и Solution.
-
-**TenantActivationRuntime влияет на:** routes, flows, screens, menu, API surface, execution rules.
-
----
-
-**Структура директорий Core (финальная):**
-
-```
-app/
-  Domains/          — технические bounded contexts
-  Features/         — built-in capabilities
-  Http/Middleware/  — глобальные middleware
-  Console/Commands/ — platform:install, feature:activate, solution:activate
-  Jobs/             — оркестрационные
-  Providers/        — App, Domain, Feature ServiceProviders
-
-resources/js/
-  features/         — Vue компоненты per feature
+  Domains/          Technical bounded contexts: Tenancy, Flow, Messaging, Contact, Assistant, Channels, Media, Conversation, Broadcasting, Staff.
+  Filament/         Admin UI.
+  Http/             Controllers, middleware, builder endpoints.
+  Jobs/             Cross-domain orchestration jobs.
+  Providers/        Laravel service providers.
 
 database/migrations/
-  landlord/         — landlord schema
-  tenant/           — platform tenant migrations
-  features/         — per feature migrations
+  landlord/         Platform / landlord schema.
+  tenant/           Tenant schema.
+
+packages/
+  fapost-foundation Public contracts and DTOs for Core/Solutions/Plugins.
+  fapost-support    Shared primitives.
+
+resources/js/builder/
+  Vue flow builder.
 ```
 
-## Что делать автономно
+Не создавать новые base folders без явного решения. В частности, `app/Features` и Solution folders не считать
+существующими, пока они реально не добавлены в код.
 
-- Создавать модели, миграции, factories, seeders по готовой схеме
-- Писать unit и feature тесты
-- Генерировать boilerplate по существующим паттернам в проекте
-- Создавать Filament resources по существующим моделям
-- Рефакторинг внутри домена без изменения интерфейсов
+## Laravel And PHP Rules
 
-## Что требует уточнения перед реализацией
+- Следовать существующим паттернам соседних файлов.
+- Каждый `.php` файл начинается с `declare(strict_types=1);`.
+- `final class` по умолчанию.
+- Constructor property promotion и explicit return types.
+- Enum cases в TitleCase.
+- PHPDoc использовать для смысла, array shapes и дженериков; inline comments - только для сложной логики.
+- Для новых Laravel artifacts предпочитать `php artisan make:* --no-interaction`, если это уместно.
+- Не добавлять зависимости без согласования.
+- После изменения PHP запускать `vendor/bin/pint --dirty --format agent`.
+- Каждое изменение кода покрывать минимальным релевантным тестом и запускать этот тест.
+- Документационные файлы создавать только когда пользователь явно просит.
 
-- Любое изменение интерфейсов в `Contracts/`
-- Новые доменные концепции которых нет в этом файле
-- Изменение структуры `flow_definitions.nodes` JSON
-- Добавление новых очередей или изменение приоритетов
-- Любое обращение к landlord БД из кода вне `Tenancy` домена
-- Изменение namespace-ов в `flow_sessions.state`
+## Tenant-Aware Execution
 
----
+Tenant - базовая координата runtime. Core-код в runtime должен fail fast, если tenant context обязателен, но не установлен.
 
-## Текущий этап
+Запрещено:
 
-Этап 1 — Платформа.
+- SaaS-specific branching внутри Core runtime.
+- `if (isSaas())` и похожие проверки.
+- fallback на "default tenant" вместо явного tenant context.
+- прямой landlord lookup из доменов вне `Tenancy`.
 
-Порядок реализации:
-1. Структура проекта, базовые providers
-2. Multi-tenancy (TenantContext, переключение схем, миграции)
-3. Flow engine (registry, execution loop, session)
-4. Messaging pipeline (webhook → queue → worker → response)
-5. Filament admin (tenants, bots, базовое управление)
-6. Перенос текущего клиента как первый tenant
+Разрешенный landlord access pattern: доменам нужен контракт из `Tenancy/Contracts`; прямой `DB::connection('landlord')`
+остается внутри Tenancy infrastructure.
+
+## Migration Isolation
+
+Миграция - DDL-операция. В `up()` / `down()` нельзя завязываться на runtime state.
+
+Запрещено:
+
+- `app()`, `config()`, `env()` для runtime решений.
+- `TenantContext::get()` и tenant-aware сервисы.
+- ветки на feature/module activation.
+- seed-данные, зависящие от runtime состояния.
+- `DB::table()` поверх таблиц другого модуля из миграции модуля.
+
+Важно: PHPat-правила должны соответствовать тексту этого раздела. Они выполняются через `phpstan.neon`; default
+PHPUnit run покрывает их через `tests/Unit/Architecture/MigrationTest.php`.
+
+## Octane Scope
+
+Octane допустим только для stateless webhook ingress. Admin, builder, Filament и stateful user flows не должны
+предполагать long-lived request runtime.
+
+Для Octane-safe кода:
+
+- не держать request, config repository, tenant context или current assistant в singleton constructor;
+- mutable request/job state держать в `scoped` bindings;
+- tenant switch выполнять через `TenantSwitcher::runForTenant()` с restore в `finally`;
+- не писать в static properties между запросами.
+
+## ID Strategy
+
+- Tenant-schema primary keys: ULID, сохраненный в PostgreSQL `uuid`.
+- Использовать `App\Domains\Shared\Concerns\HasUlidPrimaryKey`, если модель следует этой стратегии.
+- Миграции: `$table->uuid('id')->primary()` без database default.
+- FK: `foreignUuid(...)->constrained()->cascadeOnDelete()` или локальный эквивалент по существующему стилю.
+- Не менять специальные публичные идентификаторы вроде webhook public hash без отдельного решения.
+
+## Dependency Direction
+
+`packages/fapost-foundation` и `packages/fapost-support` не зависят от Core.
+
+Запрещено:
+
+- `use App\...` внутри foundation/support.
+- ссылки из foundation/support на конкретные доменные классы Core.
+- перенос бизнес-логики Core в support.
+
+Если контракт нужен внешним Solution/Plugin - он принадлежит foundation. Если это чистый переиспользуемый примитив без
+Core-зависимостей - support. Если используется в одном домене и несет доменную семантику - остается в Core.
+
+## Domain Code Rules
+
+- Controllers и Jobs только оркестрируют; бизнес-логика живет в services/domain classes.
+- В доменных сервисах не использовать `app()`, `resolve()`, глобальные Laravel helpers как скрытые зависимости.
+- Repositories/ports использовать там, где домен пересекает persistence boundary или другой bounded context.
+- Facades допустимы в infrastructure layer: providers, jobs, controllers, migrations, framework adapters.
+- Eloquent models живут в `Domains/{Domain}/Models`.
+- Relations остаются на моделях, когда нужны Eloquent query capabilities.
+
+## Flow Engine Rules
+
+- Handler резолвится по `(type, version)` из in-memory registry.
+- Handler должен быть graph-unaware: возвращает `sourceHandle`, а не следующий node id.
+- Breaking change в node contract требует новую версию handler; старые flow definitions продолжают работать.
+- Flow session выполняет snapshot своего `flow_definition_id` до завершения.
+- Handler обязан быть safe to retry; внешние side effects должны иметь idempotency marker или эквивалентную защиту.
+- State key должен быть namespaced: `system.*`, `flow.*`, `rag.*`, `module.*`.
+- `module.*` read-only для Flow Engine и резолвится через `DataAccessorInterface`.
+- `system.*` writes разрешать только явно whitelisted runtime handlers.
+- Не возвращать legacy `effects[]`; использовать writer/port из execution context.
+
+## Messaging And Queues
+
+Очереди не смешивать по назначению:
+
+- `flow.execution` - обработка входящих и execution pipeline.
+- `messaging.transactional` - ответы в активном диалоге.
+- `messaging.broadcast` - низкоприоритетные рассылки/fan-out.
+- `messaging.system` - служебные уведомления.
+- `scheduled.triggers` - scheduled/event trigger fan-out.
+- `sync.external` - внешние синхронизации.
+
+Provider rate limit и backpressure должны быть превентивными, а не только реакцией на ошибку провайдера.
+
+## Multilingual Rules
+
+Разделять два языковых слоя:
+
+- Admin UI language - Laravel lang files, Filament/backend validation/staff UI.
+- Content language - runtime сообщения ассистента конечному пользователю.
+
+Runtime language resolution проходит через `LanguageResolverInterface` / content translator chain. Не вставлять
+пользовательские bot-facing литералы напрямую в handlers/senders. Такие строки должны быть системными translation keys
+или flow content.
+
+Button/select `value` language-agnostic и не переводится; переводится только label/content.
+
+## Frontend Builder Rules
+
+- Builder должен опираться на registry/config schema и существующие overrides.
+- Для core node-specific UI использовать bespoke override только когда schema-driven renderer недостаточен.
+- Plugin без rebuild frontend не может поставлять Vue components; расширять schema renderer в Core.
+- Solution/vendor components допустимы только через согласованный Vite glob/publish contract.
+- Не добавлять маркетинговые landing surfaces в builder/admin вместо рабочей функциональности.
+
+## Documentation Discipline
+
+- `docs/platform/current-state.md` описывает факт, а не цель.
+- `docs/platform/TASKS.md` может использовать `done / partial / pending`, если одна строка содержит и каркас, и продуктовую
+  фичу.
+- `docs/platform/ROADMAP.md` описывает будущие milestone'ы и зависимости.
+- `docs/developers/` - HTML developer portal, не внутренняя Obsidian/markdown-база.
+- Active source-of-truth documentation must be written in English. Archive files may keep their original language until
+  deleted or rewritten.
+- `drafts/` должен содержать только `CURRENT_TASK.md`.
+- `CLAUDE.md` не должен утверждать наличие таблиц, моделей, jobs или UI, если это не архитектурное правило и не
+  подтверждено кодом.
+- При обнаружении расхождения между кодом и документацией сначала уточнить: это stale documentation, partial feature
+  или false positive в коде.
+
+## Verification Notes
+
+- `composer test` / `php artisan test` запускает PHPUnit suites из `phpunit.xml`.
+- `composer run test:arch` запускает PHPat architecture rules через PHPStan.
+- PHPat rules лежат в `tests/Architecture`; низкоуровневая команда: `vendor/bin/phpstan analyse --configuration phpstan.neon`.
+- Default PHPUnit run покрывает PHPat через `tests/Unit/Architecture/MigrationTest.php`, который запускает phpstan.
+- Не запускать `php artisan test tests/Architecture` как проверку PHPat: эти классы не являются PHPUnit `TestCase`.
