@@ -37,7 +37,8 @@ entry pointing at a missing file fails the build.
 ### Records
 
 - [`platform/architecture/adr`](./platform/architecture/adr) — architecture decision records, including
-  superseded ones. A curated subset is published; the rest is history.
+  superseded ones. Internal: the constraints they impose are published on the site in their own words, the
+  records themselves are not.
 
 ### Specs and diagrams
 

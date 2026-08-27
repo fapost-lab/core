@@ -178,7 +178,6 @@
           {
             "group": "Quality",
             "pages": [
-              "contributing/architecture-decisions",
               "contributing/testing",
               "contributing/pull-requests",
               "contributing/legal"
