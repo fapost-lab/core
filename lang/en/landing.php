@@ -153,7 +153,7 @@ return [
     'deployment' => [
         'title'    => 'Your Infrastructure, Your Rules',
         'subtitle' => 'Choose the deployment model that fits your business requirements.',
-        'saas'     => [
+        'cloud'    => [
             'title'       => 'Cloud',
             'badge'       => 'Quick Start',
             'description' => 'Get started in minutes. We handle the infrastructure so you can focus on building.',

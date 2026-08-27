@@ -72,7 +72,7 @@ sequenceDiagram
 Tenant context is a runtime coordinate, not an option.
 
 - Tenant context is mandatory; runtime code fails fast without it
-- Core does not branch into `single-tenant` versus `saas` modes
+- There is one runtime model, with no deployment mode to branch on
 - Context switching is encapsulated by the Tenancy domain
 - User data lives in tenant schemas
 

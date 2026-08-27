@@ -8,8 +8,8 @@ does not have it must **fail fast** rather than continue.
 
 ## Not allowed
 
-- SaaS-specific branching inside Core runtime
-- `if (isSaas())` and anything shaped like it
+- Branching on deployment shape inside Core runtime
+- `if (isSingleTenant())` and anything shaped like it
 - Falling back to a "default tenant" instead of an explicit context
 - Direct landlord lookups from domains outside `Tenancy`
 
@@ -24,7 +24,7 @@ Failing fast is the cheaper failure.
 
 ## Why no mode branching
 
-`if (isSaas())` means two runtimes sharing one codebase, where only one of them is
+A mode flag means two runtimes sharing one codebase, where only one of them is
 exercised by any given test run. The branch that is not taken locally is the branch
 that breaks in production. Core has one runtime model: multi-tenant, context
 always present.

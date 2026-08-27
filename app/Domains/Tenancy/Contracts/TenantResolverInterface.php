@@ -11,7 +11,7 @@ use Illuminate\Http\Request;
 /**
  * Picks the tenant that owns the incoming request (or equivalent unit of work).
  *
- * Resolution strategy is implementation-defined (e.g. self-hosted config vs SaaS host/header).
+ * Resolution strategy is implementation-defined (e.g. static config vs host or header lookup).
  */
 interface TenantResolverInterface
 {
