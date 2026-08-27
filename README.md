@@ -6,7 +6,7 @@
 [![Status: active development](https://img.shields.io/badge/status-active%20development-5a6e58.svg)](./docs/platform/current-state.md)
 
 FaPost Core (`Flow Automation Post`) is the platform kernel for building conversational bots and automation flows. This
-repository is intended for core development that later supports separate solution and SaaS repositories.
+repository is intended for core development that later supports separate solution repositories.
 
 The codebase is an active Laravel 12 core application with tenant-aware domains, a flow engine, channel/webhook
 infrastructure, Filament administration, and a Vue/Inertia flow builder. Some product areas are still partial; use the
@@ -14,7 +14,7 @@ documentation map below to distinguish implemented code from target architecture
 
 ## Repository Purpose
 
-- Build the core platform without SaaS logic or tenant control plane concerns.
+- Build the core platform without vertical product logic or control plane concerns.
 - Keep architectural rules stable while domain implementation evolves.
 - Provide a clear onboarding entry point for developers.
 

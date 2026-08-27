@@ -15,7 +15,7 @@
            data-animate data-animate-delay="1">
         {{-- Badge --}}
         <span class="inline-flex items-center rounded-full bg-indigo-500/10 px-3 py-1 text-xs font-semibold text-indigo-300">
-                    {{ __('landing.deployment.saas.badge') }}
+                    {{ __('landing.deployment.cloud.badge') }}
                 </span>
 
         <div class="mt-4 flex items-center gap-3">
@@ -26,13 +26,13 @@
                     d="M2.25 15a4.5 4.5 0 0 0 4.5 4.5H18a3.75 3.75 0 0 0 1.332-7.257 3 3 0 0 0-3.758-3.848 5.25 5.25 0 0 0-10.233 2.33A4.502 4.502 0 0 0 2.25 15Z"/>
             </svg>
           </div>
-          <h3 class="text-2xl font-bold text-white">{{ __('landing.deployment.saas.title') }}</h3>
+          <h3 class="text-2xl font-bold text-white">{{ __('landing.deployment.cloud.title') }}</h3>
         </div>
 
-        <p class="mt-3 text-gray-400">{{ __('landing.deployment.saas.description') }}</p>
+        <p class="mt-3 text-gray-400">{{ __('landing.deployment.cloud.description') }}</p>
 
         <ul class="mt-8 space-y-4">
-          @foreach (__('landing.deployment.saas.features') as $feature)
+          @foreach (__('landing.deployment.cloud.features') as $feature)
             <li class="flex items-start gap-3">
               <svg class="mt-0.5 size-5 flex-shrink-0 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd"

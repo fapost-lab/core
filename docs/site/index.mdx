@@ -8,8 +8,7 @@ connects to messaging channels such as Telegram and WhatsApp, holds conversation
 with contacts, and runs them through flows designed on a visual canvas — with
 contacts, segments, broadcasts, and conversation history around it.
 
-This repository is Core: the platform without the SaaS shell and without vertical
-product packages.
+This repository is Core: the platform itself, without vertical product packages.
 
 <Accordion title="What is a flow?">
   A flow is a directed graph, stored as JSON, that describes a conversation. Each
@@ -33,9 +32,9 @@ platform is not limited to that: an assistant can qualify leads, run a
 multi-step intake form, notify a team, look up records in another system through
 an HTTP call, or broadcast to a segment of contacts on a schedule.
 
-Because everything is multi-tenant from the ground up, one installation can serve
-many independent organisations, each with its own assistants, contacts, and data —
-without a line of `if (isSaas())` anywhere in the runtime.
+Tenancy is not a layer bolted on top — it is a coordinate of the runtime. One
+installation serves many independent organisations, each with its own assistants,
+contacts, channels, and data, isolated in its own schema.
 
 ## Packages
 

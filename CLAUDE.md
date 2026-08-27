@@ -7,8 +7,8 @@
 
 ## Project Context
 
-FaPost Core - ядро платформы для диалоговых ассистентов и flow automation. Этот репозиторий содержит Core без SaaS shell
-и без нишевых Solution-пакетов.
+FaPost Core - ядро платформы для диалоговых ассистентов и flow automation. Этот репозиторий содержит саму платформу,
+без нишевых Solution-пакетов.
 
 Рабочая документация:
 
@@ -83,8 +83,8 @@ Tenant - базовая координата runtime. Core-код в runtime д�
 
 Запрещено:
 
-- SaaS-specific branching внутри Core runtime.
-- `if (isSaas())` и похожие проверки.
+- Ветвление по форме развёртывания внутри Core runtime.
+- `if (isSingleTenant())` и похожие проверки.
 - fallback на "default tenant" вместо явного tenant context.
 - прямой landlord lookup из доменов вне `Tenancy`.
 
