@@ -1,0 +1,209 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "FAPost Core",
+  "description": "Conversational assistants and flow automation platform.",
+  "colors": {
+    "primary": "#5a6e58",
+    "light": "#94a187",
+    "dark": "#3f4f3d"
+  },
+  "favicon": "/favicon.svg",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Using FAPost",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "index",
+              "using/concepts",
+              "using/quickstart"
+            ]
+          },
+          {
+            "group": "Assistants and channels",
+            "pages": [
+              "using/assistants",
+              "using/channels"
+            ]
+          },
+          {
+            "group": "Flow Builder",
+            "pages": [
+              "using/flow-builder/overview",
+              "using/flow-builder/node-catalogue",
+              "using/flow-builder/variables-and-state",
+              "using/flow-builder/conditions",
+              "using/flow-builder/publishing"
+            ]
+          },
+          {
+            "group": "Contacts and broadcasts",
+            "pages": [
+              "using/contacts",
+              "using/segments",
+              "using/broadcasts"
+            ]
+          },
+          {
+            "group": "Conversations and team",
+            "pages": [
+              "using/conversations",
+              "using/staff-and-roles",
+              "using/media"
+            ]
+          },
+          {
+            "group": "Appendix",
+            "pages": [
+              "using/glossary"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Self-Hosting",
+        "groups": [
+          {
+            "group": "Install",
+            "pages": [
+              "self-hosting/overview",
+              "self-hosting/requirements",
+              "self-hosting/docker-compose",
+              "self-hosting/bare-metal"
+            ]
+          },
+          {
+            "group": "Run",
+            "pages": [
+              "self-hosting/configuration",
+              "self-hosting/services",
+              "self-hosting/gateway"
+            ]
+          },
+          {
+            "group": "Operate",
+            "pages": [
+              "self-hosting/tenancy",
+              "self-hosting/upgrading",
+              "self-hosting/observability",
+              "self-hosting/troubleshooting"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Extending",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "extending/extension-model",
+              "extending/choosing-an-extension-type"
+            ]
+          },
+          {
+            "group": "Packages",
+            "pages": [
+              "extending/development-setup",
+              "extending/solutions",
+              "extending/plugins"
+            ]
+          },
+          {
+            "group": "Flow nodes",
+            "pages": [
+              "extending/flow-nodes/handler-contract",
+              "extending/flow-nodes/versioning",
+              "extending/flow-nodes/state-namespaces",
+              "extending/flow-nodes/idempotency"
+            ]
+          },
+          {
+            "group": "Extension surfaces",
+            "pages": [
+              "extending/builder-ui",
+              "extending/channel-drivers",
+              "extending/data-accessors",
+              "extending/multilingual"
+            ]
+          },
+          {
+            "group": "Shipping",
+            "pages": [
+              "extending/testing",
+              "extending/stability-policy"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Contributing",
+        "groups": [
+          {
+            "group": "Get started",
+            "pages": [
+              "contributing/local-setup",
+              "contributing/repo-layout",
+              "contributing/conventions"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "contributing/runtime",
+              "contributing/tenant-aware-execution",
+              "contributing/migration-isolation",
+              "contributing/octane-scope",
+              "contributing/id-strategy",
+              "contributing/dependency-direction"
+            ]
+          },
+          {
+            "group": "Quality",
+            "pages": [
+              "contributing/architecture-decisions",
+              "contributing/testing",
+              "contributing/pull-requests"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Contracts",
+            "pages": [
+              "reference/foundation-contracts",
+              "reference/flow-nodes",
+              "reference/builder-config-schema"
+            ]
+          },
+          {
+            "group": "Runtime",
+            "pages": [
+              "reference/state-namespaces",
+              "reference/queues",
+              "reference/events"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "reference/environment-variables",
+              "reference/artisan-commands"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/fapost-lab/core"
+    }
+  }
+}
