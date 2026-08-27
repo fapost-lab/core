@@ -2,7 +2,7 @@
 
 > **Статус (актуализировано 2026-06-05): задачи 01–04 РЕАЛИЗОВАНЫ.**
 > Sections с иконками (01), Phase 2 field-типы object/key-value/object-array/visible_when/inline-validators (02),
-> reference-doc (03, → [`docs/reference/builder-config-schema-reference.md`](../../../builder-config-schema-reference.md)) и
+> reference-doc (03, → [`docs/reference/builder-config-schema-reference.md`](https://docs.fapost.in/reference/builder-config-schema)) и
 > fluent API в `fapost/support` (04) — всё в проде. Все 10 Core-handler'ов используют `Schema::make()` + `XxxField::make()`.
 > Этот файл сохранён как исторический контекст плана; «Карта задач» ниже больше не backlog.
 > Поправка к тексту ниже: Core overrides сейчас — `send_message`, `input`, `condition`/`branch`, `assign`, `call`,

@@ -19,7 +19,7 @@ onboarding path.
 
 ## Schema References
 
-- [builder-config-schema-reference.md](./builder-config-schema-reference.md) — schema returned by node handlers and used
+- [builder-config-schema-reference.md](https://docs.fapost.in/reference/builder-config-schema) — schema returned by node handlers and used
   by the Vue builder.
 
 ## Generated API

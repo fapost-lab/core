@@ -63,10 +63,10 @@ sequenceDiagram
     loop Execution loop
         FE->>FE: resolve NodeHandler(type, version)
         FE->>NH: execute(nodeConfig, state, context)
-        NH-->>FE: NodeExecutionResult<br/>{sourceHandle, stateChanges, messages}
+        NH-->>FE: NodeExecutionResult<br/>{status, sourceHandle, stateChanges}
         FE->>FE: apply stateChanges
         FE->>FE: next = outputs[sourceHandle].next
-        FE->>MS: send(messages[])
+        FE->>MS: отправка исходящих
         MS->>TG: сообщение пользователю
     end
 

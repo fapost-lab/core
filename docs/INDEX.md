@@ -1,84 +1,66 @@
-# FaPost Core — Documentation Index
+# FaPost Documentation Index
 
-Documentation is organized by audience so platform development, extension developer docs, low-level reference, and
-historical material do not compete for the same entry point.
+**Published documentation lives at [docs.fapost.in](https://docs.fapost.in) and is the single source of
+truth.** Its source is `docs/site/` in this repository; a push to the deploy branch republishes the site.
 
-## Start Here
+What remains under `docs/` is working material: drafts, plans, specs still being designed, and records.
+None of it is published, and none of it overrides the site. Where a subject is covered on the site, the
+document here has been removed rather than left to drift.
 
-- [README.md](./README.md) — short documentation entry point.
-- [deployment/README.md](./deployment/README.md) — running FaPost Core on your own infrastructure.
-- [platform/README.md](./platform/README.md) — documentation for developing FaPost Core itself.
-- [developers/index.html](./developers/index.html) — HTML developer portal for Features, Solutions, Plugins, nodes, and
-  builder extensions.
-- [reference/README.md](./reference/README.md) — low-level specs, schemas, diagrams, and generated API docs.
-- [archive/README.md](./archive/README.md) — historical documents and old Notion exports.
-- [../drafts/CURRENT_TASK.md](../drafts/CURRENT_TASK.md) — current operational focus for agents.
+## Published — go to the site
 
-## Deployment
+| Subject | Where |
+|---|---|
+| What FaPost is, packages, licence | [Introduction](https://docs.fapost.in/) |
+| Using the product | [Using FaPost](https://docs.fapost.in/using/concepts) |
+| Installing and operating | [Self-Hosting](https://docs.fapost.in/self-hosting/overview) |
+| Building a Solution or Plugin | [Extending](https://docs.fapost.in/extending/extension-model) |
+| Working on Core itself | [Contributing](https://docs.fapost.in/contributing/local-setup) |
+| Contracts, schemas, queues, commands | [Reference](https://docs.fapost.in/reference/foundation-contracts) |
+| Licence, CLA, trademark | [Legal](https://docs.fapost.in/contributing/legal) |
 
-Documents for people running FaPost Core rather than developing it. These are the
-source of truth for deployment: every step can be followed by hand, and the files
-under `docker/` and `deploy/` automate exactly what they describe.
+Editing the site: change the MDX under `docs/site/`, preview with `cd docs/site && mint dev`, and open a
+pull request. Navigation is defined in `docs/site/docs.json` — a page absent from it does not appear, and an
+entry pointing at a missing file fails the build.
 
-- [deployment/README.md](./deployment/README.md) — choosing a method, and the shape of an installation.
-- [deployment/requirements.md](./deployment/requirements.md) — what a host must provide.
-- [deployment/docker-compose.md](./deployment/docker-compose.md) — the container path, start to finish.
-- [deployment/services.md](./deployment/services.md) — Horizon and the scheduler, without which nothing is processed.
-- [deployment/gateway.md](./deployment/gateway.md) — the optional Go webhook ingress.
-- [deployment/upgrading.md](./deployment/upgrading.md) — release order, migrations, rollback.
+## Working material — stays here
 
-## Platform Development
+### Status and planning
 
-Documents for people changing the Core platform:
+- [`platform/TASKS.md`](./platform/TASKS.md) — the only implementation checkbox tracker.
+- [`platform/ROADMAP.md`](./platform/ROADMAP.md) — milestones and dependencies.
+- [`platform/current-state.md`](./platform/current-state.md) — what exists in code today.
+- [`platform/PROJECT.md`](./platform/PROJECT.md) — short project context.
+- [`platform/plans`](./platform/plans) — implementation plans and brownfield audits.
+- [`../drafts/CURRENT_TASK.md`](../drafts/CURRENT_TASK.md) — current operational focus for agents.
 
-- [platform/PROJECT.md](./platform/PROJECT.md) — product and architecture context.
-- [platform/current-state.md](./platform/current-state.md) — what exists in code today.
-- [platform/ROADMAP.md](./platform/ROADMAP.md) — platform roadmap.
-- [platform/TASKS.md](./platform/TASKS.md) — only implementation checkbox tracker.
-- [platform/getting-started.md](./platform/getting-started.md) — local setup and commands.
-- [platform/architecture](./platform/architecture) — architecture summaries, ADRs, and platform sections.
-- [platform/runtime/flow](./platform/runtime/flow) — Flow Engine runtime chain.
-- [platform/plans](./platform/plans) — implementation plans, brownfield audits, and synthesis docs.
+### Records
 
-## Extension Developers
+- [`platform/architecture/adr`](./platform/architecture/adr) — architecture decision records, including
+  superseded ones. A curated subset is published; the rest is history.
 
-HTML docs for future implementation work on top of the platform:
+### Specs and diagrams
 
-- [developers/extension-model.html](./developers/extension-model.html) — Feature vs Solution vs Plugin.
-- [developers/features.html](./developers/features.html) — built-in platform features.
-- [developers/solutions.html](./developers/solutions.html) — composer-based Solutions.
-- [developers/plugins.html](./developers/plugins.html) — runtime Plugins.
-- [developers/package-development.html](./developers/package-development.html) — developing shared packages locally and
-  adding a new Solution/Plugin package.
-- [developers/flow-nodes.html](./developers/flow-nodes.html) — adding or extending Flow nodes.
-- [developers/builder-extensions.html](./developers/builder-extensions.html) — Builder UI and frontend extension boundary.
-- [developers/testing.html](./developers/testing.html) — required checks for extension work.
-- [developers/api-reference.html](./developers/api-reference.html) — generated PHP API docs through Doctum.
+- [`reference/specs`](./reference/specs) — auth, builder, Flow Engine, and messaging specs. Design documents
+  for implementers, not product documentation.
+- [`reference/diagrams`](./reference/diagrams) — Mermaid sources.
 
-## Reference
+### Archive
 
-Detailed documents usually reached from platform or developer guides:
-
-- [reference/specs](./reference/specs) — auth, builder, Flow Engine, and messaging specs.
-- [reference/specs/flow-engine/nodes](./reference/specs/flow-engine/nodes) — per-node specs.
-- [reference/builder-config-schema-reference.md](./reference/builder-config-schema-reference.md) — Builder renderer schema
-  reference.
-- [reference/diagrams](./reference/diagrams) — Mermaid diagrams.
-- `composer run docs:build` — generates Doctum API docs to `public/core`.
-
-## Language Policy
-
-- Active documentation that remains as source of truth must be written in English.
-- Historical archive files may keep their original language until they are deleted or rewritten.
-- New developer-facing docs must be HTML under `developers/`.
-- Markdown remains appropriate for platform, architecture, operations, and reference docs.
+- [`archive`](./archive) — historical documents and old Notion exports. Kept in their original language
+  until deleted or rewritten.
 
 ## Rules
 
-- `platform/TASKS.md` is the only checkbox/status tracker.
-- `platform/ROADMAP.md` is the milestone roadmap.
-- `platform/current-state.md` describes code reality, not desired architecture.
-- `developers/` is a static HTML developer portal; if a pattern is not supported yet, say so there.
-- `reference/` contains detailed contracts and specs; do not use it as the main onboarding path.
-- `CLAUDE.md` contains agent rules and stable code/architecture constraints; it is not roadmap documentation.
-- `drafts/` must contain only `CURRENT_TASK.md`.
+- If a subject is on the site, do not restate it here — link to it.
+- `platform/TASKS.md` is the only status tracker. No status tables anywhere else.
+- `platform/current-state.md` describes code reality, not intended architecture.
+- Published documentation is written in English. Working material and archive may be in any language.
+- `drafts/` contains only `CURRENT_TASK.md`.
+- `CLAUDE.md` holds agent rules and stable constraints; it is not roadmap documentation.
+- When code and a document disagree, verify against the code and fix the document.
+
+## Generated API docs
+
+`composer run docs:build` regenerates the Doctum PHP API reference into `public/core`. It covers every class
+in the repository; the site covers the ones extensions may depend on.

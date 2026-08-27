@@ -4,7 +4,7 @@
 > Phase 1 **и** Phase 2 vocabulary в проде, все 10 Core-handler'ов мигрированы на fluent.
 > **Поправка к примерам ниже:** фактический API — `XxxField::make($name)` (`TextField::make()`, `NumberField::make()`,
 > …), а не `Field::string()` / `Number::make()`. У `Schema` также есть `defaultConfig()`. Канон — в
-> [`docs/reference/builder-config-schema-reference.md`](../../../builder-config-schema-reference.md) §9.
+> [`docs/reference/builder-config-schema-reference.md`](https://docs.fapost.in/reference/builder-config-schema) §9.
 
 **Длительность:** ~1.5–2 дня
 **Зависит от:** 03 (Schema reference) — vocabulary должен быть зафиксирован до того, как мы оборачиваем его в типизированный API

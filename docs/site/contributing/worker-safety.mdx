@@ -50,11 +50,3 @@ FaPost does not run a long-lived PHP request runtime. Webhook ingress — the on
 surface with enormous volume and trivial per-request work — is handled either by
 PHP-FPM directly or, when the volume justifies it, by the Go
 [webhook gateway](/self-hosting/gateway) in front of it.
-
-<Note>
-  Core previously used Laravel Octane for ingress, and ADR-01 recorded that
-  decision. Octane has been removed: `laravel/octane`, `config/octane.php`, and
-  `OCTANE_SERVER` are no longer part of Core. The rules on this page survived the
-  removal because they were never really about Octane — queue workers are
-  long-lived too.
-</Note>

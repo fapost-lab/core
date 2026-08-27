@@ -8,8 +8,8 @@ Detailed architecture documents live in this directory. Use [`../INDEX.md`](../I
 ## Section Contents
 
 - [Architecture Vision](./vision.md) - the boundaries of core and its role in the overall system.
-- [Layers and Domains](./layers-and-domains.md) - how the codebase should be structured.
-- [Runtime Principles](./runtime.md) - tenancy, queues, flow execution, and concurrency.
+- [Layers and Domains](https://docs.fapost.in/contributing/repo-layout) - how the codebase should be structured.
+- [Runtime Principles](https://docs.fapost.in/contributing/runtime) - tenancy, queues, flow execution, and concurrency.
 
 ## Architecture Sources
 
