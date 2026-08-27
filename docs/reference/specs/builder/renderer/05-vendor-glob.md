@@ -61,7 +61,7 @@ config — `flow.id` (UUID, language-agnostic), а не имя.
 - **PHP:** `packages/fapost-support/src/Builder/Schema/Fields/FlowPickerField.php` (`type() === 'flow-picker'`).
   По аналогии со `StatePickerField` — опционально метод `excludeCurrent(bool)`.
 - **Docs:** добавить §3.12 `flow-picker` в
-  [`docs/reference/builder-config-schema-reference.md`](../../../builder-config-schema-reference.md) + строку в таблицу §9
+  [`docs/reference/builder-config-schema-reference.md`](https://docs.fapost.in/reference/builder-config-schema) + строку в таблицу §9
   (контракт: новый field-тип → расширил reference в той же PR).
 
 ---

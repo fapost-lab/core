@@ -4,7 +4,7 @@
 > `resources/js/builder/components/editor/config/fields/`; `visible_when` резолвится через
 > `composables/useFieldVisibility.ts` (операторы `equals`/`in`/`truthy`); inline-валидаторы (`regex`, `min`/`max`) — в
 > `TextField.vue`. `CallNodeHandler` уже строит схему на `ObjectField`+`ObjectArrayField`. Документировано в
-> [`docs/reference/builder-config-schema-reference.md`](../../../builder-config-schema-reference.md) §3.9–3.11, §5–§6.
+> [`docs/reference/builder-config-schema-reference.md`](https://docs.fapost.in/reference/builder-config-schema) §3.9–3.11, §5–§6.
 
 **Длительность:** 2–3 дня
 **Зависит от:** Phase 1 (выполнена), 01-visual-polish (рекомендуется но не строго)

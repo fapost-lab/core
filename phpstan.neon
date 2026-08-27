@@ -8,3 +8,12 @@ parameters:
 		- database
 		- tests/Architecture
 
+	ignoreErrors:
+		# laravel/framework 12.68 annotates the Redis facade as
+		# `@method static void keys(string $pattern)`. The command returns the
+		# matching keys — the annotation is wrong, not the call. Compare `get`
+		# and `del` in the same docblock, which are typed correctly.
+		# Remove this once the upstream annotation is fixed.
+		-
+			message: '#^Result of static method Illuminate\\Support\\Facades\\Redis\:\:keys\(\) \(void\) is used\.$#'
+			path: app/Domains/Tenancy/Services/WebhookRegistryHealthChecker.php

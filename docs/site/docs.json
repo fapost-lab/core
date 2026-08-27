@@ -180,7 +180,8 @@
             "pages": [
               "contributing/architecture-decisions",
               "contributing/testing",
-              "contributing/pull-requests"
+              "contributing/pull-requests",
+              "contributing/legal"
             ]
           }
         ]
@@ -217,7 +218,8 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/fapost-lab/core"
+      "github": "https://github.com/fapost-lab/core",
+      "website": "https://fapost.in"
     }
   }
 }

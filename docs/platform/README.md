@@ -8,12 +8,15 @@ This section is for developers changing FaPost Core itself.
 - [PROJECT.md](./PROJECT.md) — product, architecture, layers, and domain context.
 - [ROADMAP.md](./ROADMAP.md) — milestone roadmap.
 - [TASKS.md](./TASKS.md) — implementation checklist and partial/done status.
-- [getting-started.md](./getting-started.md) — local setup and commands.
+- [getting-started.md](https://docs.fapost.in/contributing/local-setup) — local setup and commands.
 
 ## Architecture And Runtime
 
-- [architecture](./architecture) — architecture summaries, ADRs, and platform sections.
+- [architecture/adr](./architecture/adr) — architecture decision records, including superseded ones.
 - [runtime/flow](./runtime/flow) — webhook → queue → worker → session → flow engine → outbound message.
+
+Architecture summaries now live on the site: [Runtime architecture](https://docs.fapost.in/contributing/runtime)
+and [Repository layout](https://docs.fapost.in/contributing/repo-layout).
 - [plans](./plans) — implementation plans, audits, and synthesis documents.
 
 ## Rules

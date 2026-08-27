@@ -1,6 +1,6 @@
 # 03 · Schema reference document
 
-> **Статус: РЕАЛИЗОВАНО.** Документ создан: [`docs/reference/builder-config-schema-reference.md`](../../../builder-config-schema-reference.md)
+> **Статус: РЕАЛИЗОВАНО.** Документ создан: [`docs/reference/builder-config-schema-reference.md`](https://docs.fapost.in/reference/builder-config-schema)
 > — покрывает все field-типы, top-level keys, `visible_when`, валидаторы, reserved keys и fluent API.
 
 **Длительность:** ~0.5 дня

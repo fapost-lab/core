@@ -1,0 +1,92 @@
+---
+title: "Licence, CLA and trademark"
+description: "What you grant by contributing, and what you may call the result."
+---
+
+Three documents govern contributions. They live in the repository, and each is
+authoritative over what this page summarises.
+
+<CardGroup cols={3}>
+  <Card title="LICENSE" href="https://github.com/fapost-lab/core/blob/main/LICENSE" icon="scale-balanced">
+    Apache-2.0. What everyone may do with the code.
+  </Card>
+  <Card title="CLA.md" href="https://github.com/fapost-lab/core/blob/main/CLA.md" icon="file-signature">
+    What you grant FaPost Lab by contributing.
+  </Card>
+  <Card title="TRADEMARK.md" href="https://github.com/fapost-lab/core/blob/main/TRADEMARK.md" icon="copyright">
+    What you may call your own work.
+  </Card>
+</CardGroup>
+
+## Licence
+
+Core and both packages are Apache-2.0. See [Introduction](/#licence) for why that
+licence rather than MIT.
+
+## Contributor License Agreement
+
+The CLA must be accepted before a contribution can be merged. It does **not**
+transfer ownership: you keep the copyright in everything you contribute and stay
+free to use it elsewhere, including in other projects.
+
+Accept it by stating this in your pull request:
+
+```text
+I have read the FaPost Contributor License Agreement (CLA.md) and I accept it.
+Signed-off-by: Full Name <email@example.com>
+```
+
+Contributing on behalf of an employer or another legal entity has its own
+section in the agreement — read it before signing on someone else's behalf.
+
+### The clause worth reading twice
+
+Section 4 lets FaPost Lab distribute your contribution under Apache-2.0 **and
+under any other licence the project later adopts**, including a commercial or
+source-available one.
+
+It is bounded: a contribution stays available under Apache-2.0 in the releases
+where it was already published. The clause exists so the project can change how
+it is licensed without tracking down every past contributor — not so that
+published code can be withdrawn from open source retroactively.
+
+If that trade is not acceptable to you, it is better to know before you write the
+patch than after.
+
+## Trademark
+
+The Apache licence covers the code and explicitly does not grant rights in the
+name or logo. The trademark policy is what governs those.
+
+The short version for people building on FaPost:
+
+**No permission needed** to say your product works with FaPost, to write about
+the project, to redistribute unmodified releases, or to run a community meetup.
+
+**Permission needed** to name a product or company after the Marks, to run a
+hosted service under the name, to register a domain containing "fapost", or to
+publish under the `fapost/*` Packagist namespace.
+
+The naming rule that catches people out: the Marks may be a descriptive
+qualifier, never the leading element.
+
+| | |
+|---|---|
+| Allowed | `Acme Analytics for FaPost`, `acme/fapost-analytics` |
+| Not allowed | `FaPost Analytics`, `fapost/analytics`, `FaPost Pro` |
+
+Forks are welcome — the licence permits them — but a fork distributed under the
+FaPost name needs written permission. Give it its own name and state factually
+that it is a fork.
+
+## Spelling
+
+The policy also fixes the spelling, and the codebase follows it:
+
+| Form | Where |
+|---|---|
+| `FaPost` | Prose, UI, documentation |
+| `Fapost` | PHP namespaces — `Fapost\Foundation\…` |
+| `fapost` | Composer vendor names, package directories, URLs |
+
+`FAPost`, `FAPOST`, and `FA Post` are not used.

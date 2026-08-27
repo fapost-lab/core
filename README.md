@@ -23,9 +23,9 @@ documentation map below to distinguish implemented code from target architecture
 - [Documentation Index](./docs/README.md) - stable tracked documentation entry point.
 - [Full Documentation Index](./docs/INDEX.md) - complete map for roadmap, tasks, ADRs, specs, plans, and archive.
 - [Platform Docs](./docs/platform/README.md) - build and maintain FaPost Core.
-- [Developer Portal](./docs/developers/index.html) - HTML docs for future Features, Solutions, Plugins, nodes, and builder extensions.
+- [Developer Portal](https://docs.fapost.in/extending/extension-model) - HTML docs for future Features, Solutions, Plugins, nodes, and builder extensions.
 - [Reference](./docs/reference/README.md) - detailed specs, schemas, and diagrams.
-- [Getting Started](./docs/platform/getting-started.md) - local setup, dependencies, and basic commands.
+- [Getting Started](https://docs.fapost.in/contributing/local-setup) - local setup, dependencies, and basic commands.
 - [Current Project State](./docs/platform/current-state.md) - what actually exists in the repository today.
 
 ## Technology Stack
@@ -87,7 +87,7 @@ composer run test:arch
 composer run docs:build
 ```
 
-More details and environment requirements are documented in [Getting Started](./docs/platform/getting-started.md).
+More details and environment requirements are documented in [Getting Started](https://docs.fapost.in/contributing/local-setup).
 
 ## Documentation Principle
 
