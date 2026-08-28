@@ -48,7 +48,7 @@ jobs:
             target: ""
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # QEMU lets an amd64 runner emit arm64 layers.
       - uses: docker/setup-qemu-action@v3
