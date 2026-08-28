@@ -1,0 +1,100 @@
+---
+title: "Roles and permissions"
+description: "What each permission grants, and which ones deserve a second thought."
+---
+
+A user gets exactly one role, and the role carries a set of permissions. There is
+no per-user override: to give someone a different set, make a role for it.
+
+## The roles that ship
+
+| Role | Permissions | For |
+|---|---|---|
+| `admin` | 21 | Full access, including roles and settings |
+| `content_manager` | 12 | Building and running assistants, without platform administration |
+| `analyst` | 3 | Reading — analytics and reports |
+
+All three are marked **System**. They exist on every tenant and are the sensible
+starting point: assign one of them before inventing your own.
+
+**New Role** creates a custom role, and **Edit** opens any role's permission set.
+
+## How permissions are grouped
+
+The role editor arranges permissions into seven groups, each with **Select all**
+and **Deselect all** so a whole area can be granted or withheld at once.
+
+| Group | Covers |
+|---|---|
+| **Assistants** | Creating and configuring assistants, and connecting channels |
+| **Content** | Flows, translations, broadcasts, knowledge base, and the media library |
+| **Users** | Inviting people, and defining roles |
+| **Contacts** | Reading and editing the contact base |
+| **Conversations** | Reading transcripts, and replying to contacts |
+| **Analytics** | Reports |
+| **System** | Installation settings |
+
+Two distinctions recur across the groups and are worth noticing, because they are
+what makes a useful role possible:
+
+**Viewing is separate from managing.** The media library, contacts and
+conversations each split read access from write access, so someone can be given
+what they need to look at without the ability to change it.
+
+**Drafting is separate from publishing.** Working on a flow and putting it in
+front of contacts are different permissions. That separation is the point of the
+Content group — see [Manage flows (legacy)](#manage-flows-legacy) below.
+
+## The five that warrant a pause
+
+The editor marks certain permissions **Sensitive — review carefully before
+assigning** and explains each one in place. They are worth repeating, because
+what they do is not obvious from the name.
+
+<Warning>
+  **Rotate channel webhook hash** reissues the webhook URL. Existing webhook
+  configuration becomes invalid until re-configured on the provider side —
+  meaning the assistant stops receiving messages until someone fixes it.
+
+  **Publish flow to live** promotes a draft. It takes effect immediately for
+  every incoming session; there is no staging step between the click and the
+  contacts.
+
+  **Manage roles** lets its holder create roles and choose their permissions —
+  including a role more powerful than their own. Granting it is granting the
+  ability to grant.
+
+  **View conversations** opens full transcripts between contacts and the
+  assistant, including media. Whatever people have said to the bot, the holder
+  can read.
+
+  **Reply in conversations** sends messages to a contact from the operator inbox
+  **under the assistant's identity**. The contact sees the assistant, not the
+  person typing.
+</Warning>
+
+The last two are the ones most often handed out without thinking, because
+"answer customer questions" sounds routine. It means reading everything anyone
+ever told the bot, and speaking as the company.
+
+## Manage flows (legacy)
+
+This permission is marked legacy in the interface itself: it covers every flow
+operation in one switch, from editing a draft to publishing it live.
+
+<Note>
+  Use the granular permissions for new roles. Reach for **Create / edit flow
+  drafts** on its own where someone should build flows without being able to
+  publish them — a separation the legacy permission cannot express.
+</Note>
+
+## Choosing a set
+
+Start from the role closest to the person's job and remove what they do not need,
+rather than starting from nothing and adding. The shipped roles encode a working
+division already:
+
+- Someone writing conversations needs flow drafts, translations, media, and
+  contacts — not settings, users, or publishing
+- Someone answering customers needs conversations and contacts — not flows
+- Someone reporting needs analytics, and nothing else

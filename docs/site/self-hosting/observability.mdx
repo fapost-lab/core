@@ -1,9 +1,101 @@
 ---
 title: "Observability"
-description: "Logs, queue health, and provider backpressure."
+description: "What to watch, and which command answers which question."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+Most failures in FaPost are silent by nature. A provider that cannot reach you
+does not complain; a queue that is not being worked simply grows. Knowing where
+to look matters more than having alerts on everything.
+
+## Horizon
+
+Queues are processed by Horizon, and its dashboard is the first place to look
+when messages arrive but nothing happens.
+
+Four supervisors run, grouped so that the latency-critical work is isolated:
+inbound processing and conversation replies share dedicated processes, while
+broadcasts, logging and background synchronisation are worked elsewhere. See
+[Queues](/reference/queues).
+
+What to watch:
+
+- **Wait time on `flow.execution`** — this is how long a contact waits before the
+  assistant even begins. It should be near zero.
+- **Failed jobs** — a rising count on `messaging.transactional` means replies
+  are not reaching people.
+- **Throughput on `messaging.broadcast`** — expected to spike; it is the one
+  queue whose depth is not alarming.
+
+<Warning>
+  An installation without Horizon running accepts messages and never answers
+  them. Everything looks healthy from the browser — the site serves, the panel
+  works — because nothing about the web tier depends on the workers. See
+  [Services](/self-hosting/services).
+</Warning>
+
+## The scheduler
+
+Three scheduled tasks matter, and all fail silently if the scheduler is not
+running:
+
+| Task | When | If it does not run |
+|---|---|---|
+| `flow:sweep-subflow-timeouts` | Every minute | Parent flows waiting on expired subflows never resume |
+| `logs:create-partition` | Monthly, on the 1st | Next month's flow-log partition is missing |
+| `logs:prune-flow` | Daily, 03:00 | Old log partitions accumulate |
+
+The monthly one is the trap: it fails at a month boundary, weeks after the
+scheduler stopped, and presents as flow logging breaking for no apparent reason.
+
+## Webhook routing
+
+Inbound routing resolves through Redis rather than the database, which makes the
+registry a cache with a source of truth behind it — and caches drift.
+
+```bash
+php artisan ops:webhook-registry-health
+```
+
+Reports and optionally repairs inconsistency between Redis and the database.
+
+```bash
+php artisan ops:webhook-warmup
+```
+
+Rebuilds the registry from the database. Run it after a Redis flush, a restore,
+or a move to new Redis infrastructure — without it, channels exist and no message
+resolves.
+
+```bash
+php artisan gateway:doctor
+```
+
+Checks the ingress end to end: which driver is active, whether Redis is
+reachable, whether the key prefix matches, whether published specs agree with the
+adapters, and how many channels still point at a previous address. Run it first
+whenever webhooks are not arriving.
+
+## Per-assistant health
+
+Each [assistant console](/using/console-overview) shows two counters that should
+stay boring: **live sessions** and **errors in the last 24 hours**.
+
+Live sessions climbing without traffic to explain it means conversations start
+and do not finish — usually a flow waiting at an input nobody answers. Errors
+above zero means at least one node failed; [Flow logs](/using/flow-logs) says
+which.
+
+## Application logs
+
+Laravel's log carries application errors. Telescope is available in development
+and records every request with its contents — which is why it must be off in
+production.
+
+## Backpressure
+
+Provider rate limits are handled preventively rather than as a reaction to being
+rejected. The relevant settings are per-tenant: message rate per chat, broadcast
+chunk size, and how hard the platform pushes when a provider strains.
+
+A provider complaining about rate is a signal to lower those, not to add
+retries — a retry storm against a limit is the same request made worse.

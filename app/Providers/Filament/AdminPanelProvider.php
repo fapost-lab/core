@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers\Filament;
 
 use App\Domains\Staff\Http\Middleware\EnsureUserIsActive;
+use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TenancyMiddleware;
@@ -61,6 +62,13 @@ final class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
+            // The tenant panels live on the tenant host only. The base domain is
+            // reserved: a control plane for managing tenants belongs there, and a
+            // tenant panel answering on it would be a surface nobody asked for.
+            ->domain(TenantHost::forDefaultTenant())
+            ->brandLogo(fn (): string => asset('logo.png'))
+            ->brandLogoHeight('1.75rem')
+            ->favicon(asset('favicon.png'))
             ->login()
             ->topNavigation()
             ->plugins([

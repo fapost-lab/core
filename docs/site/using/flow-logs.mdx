@@ -1,0 +1,58 @@
+---
+title: "Flow logs"
+description: "What a flow actually did, step by step."
+---
+
+One row per node execution. Where sessions show *where* a conversation is, logs
+show *what happened* to get it there.
+
+## The list
+
+| Column | |
+|---|---|
+| **When** | Time of the step |
+| **Status** | Whether it succeeded |
+| **Type** | Which kind of node ran |
+| **Node** | Which node in the flow |
+| **Handle** | Which outcome it reported |
+| **Error** | What went wrong, when something did |
+| **Session** | Which session this belongs to |
+
+Filters narrow the view, with **Apply filters** and **Reset**.
+
+## Handle is the column to learn
+
+Every node reports an outcome — a **handle** — and the flow follows whichever
+edge that handle is wired to. A branch reports `yes` or `no`; a call reports
+whether it succeeded.
+
+Reading the handle column tells you which way a conversation actually went, as
+opposed to which way it was supposed to. A branch that reports the same handle
+for every contact is a branch that is not branching: the condition is wrong, or
+the value it tests is never what the author expected.
+
+<Note>
+  The node did not choose where to go next. It reported an outcome, and the flow
+  decided. So a conversation ending up somewhere unexpected is either a wrong
+  handle — the node's own logic — or a wrong edge — the way the flow is drawn.
+  The log tells you which of the two to go and fix.
+</Note>
+
+## Reading a failure
+
+Filter by status to find failed steps. Each carries the error and the session it
+belongs to, so a failure leads straight to the conversation it happened in.
+
+Steps that call outside systems are retried before the branch is treated as
+failed; how many times is a tenant setting. A single failure in the log with no
+consequence downstream usually means a retry succeeded.
+
+## When to come here
+
+Sessions and conversations answer most questions. Come to the logs when a
+conversation went somewhere it should not have and you need to know at which step
+it turned, or when the dashboard's error count is above zero and you want to know
+what it counted.
+
+Start from the session, not from the log. The log is long by nature — one row per
+node per contact — and filtering it by session turns it back into a single story.

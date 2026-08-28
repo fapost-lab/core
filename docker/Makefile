@@ -6,15 +6,22 @@
 
 # Compose interpolates ${...} from a file next to itself, so the project's .env
 # has to be named explicitly. Every target carries the flag for that reason.
-COMPOSE := docker compose --env-file ../.env
+#
+# ENV_FILE does the same job for the containers' own environment. The compose
+# file defaults it to a .env beside itself, which is what a standalone
+# installation has; a clone keeps the application's .env at the project root
+# instead, and that is the one file both the containers and a local `php artisan`
+# should read.
+ENV := ENV_FILE=../.env
+COMPOSE := $(ENV) docker compose --env-file ../.env
 
 # Building requires the overlay: compose.yaml alone only ever pulls, because a
 # service that declares a build is one Compose builds instead of fetching.
-COMPOSE_BUILD := docker compose --env-file ../.env -f compose.yaml -f compose.build.yaml
+COMPOSE_BUILD := $(ENV) docker compose --env-file ../.env -f compose.yaml -f compose.build.yaml
 
 # Development runs the same topology from a `dev` image with the source mounted.
 # UID/GID are passed through so files the containers write stay yours.
-COMPOSE_DEV := UID=$(shell id -u) GID=$(shell id -g) \
+COMPOSE_DEV := $(ENV) UID=$(shell id -u) GID=$(shell id -g) \
 	docker compose --env-file ../.env -f compose.yaml -f compose.dev.yaml
 
 .PHONY: help up up-built dev dev-down dev-shell dev-test down restart ps logs build shell artisan install doctor migrate horizon-restart pull clean

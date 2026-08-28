@@ -1,9 +1,81 @@
 ---
 title: "Glossary"
-description: "Terms used throughout FaPost, in one place."
+description: "Terms used throughout FaPost, and the pairs that get confused."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+## Terms
+
+**Assistant** — one bot, with its own channels, flows and contacts.
+[More](/using/assistants)
+
+**Broadcast** — one message sent to a chosen audience at once.
+[More](/using/broadcasts)
+
+**Channel** — an assistant's presence on one messaging platform.
+[More](/using/channels)
+
+**Contact** — a person who has written to the assistant on a channel.
+[More](/using/contacts)
+
+**Conversation** — the whole exchange with one contact on one channel.
+[More](/using/conversations)
+
+**Draft** — a flow being worked on, not yet visible to contacts.
+
+**Flow** — a conversation drawn as connected nodes. [More](/using/flows)
+
+**Flow group** — a folder for flows. [More](/using/flow-groups)
+
+**Group** — a hand-maintained list of contacts.
+[More](/using/contact-groups)
+
+**Handle** — the outcome a node reports, which decides which connection is
+followed.
+
+**Node** — one step in a flow: send, ask, branch, call.
+
+**Published version** — the version of a flow contacts are currently getting.
+[More](/using/publishing)
+
+**Reach** — how many contacts a broadcast could actually be delivered to, which
+is not the same as the size of its audience. [More](/using/broadcasts)
+
+**Role** — a named set of permissions. A user has exactly one.
+[More](/using/roles-and-permissions)
+
+**Segment** — a saved condition over contacts, evaluated rather than listed.
+[More](/using/segments)
+
+**Session** — one contact's single pass through one flow.
+[More](/using/sessions)
+
+**Tenant** — one organisation's installation. On a self-hosted install, the only
+one.
+
+**Trigger** — what starts a flow: a keyword, an event, or being the default.
+
+**Webhook hash** — the secret part of the URL a provider delivers to. Identifies
+a channel. [More](/using/channels)
+
+## Pairs that get confused
+
+**Conversation and session.** The conversation is the whole relationship; the
+session is one journey through one flow inside it. A conversation can hold many
+sessions or none.
+
+**Group and segment.** A group is a list somebody maintains. A segment is a
+condition the platform evaluates. Membership of one is a decision; of the other,
+a property.
+
+**Flow groups and contact groups.** Two screens named *Groups*, in different
+sections of the console sidebar, holding entirely different things.
+
+**Active and published.** A flow can be active but never published — ready to
+run, with no live version to run. Both columns appear on the flows list.
+
+**Audience and reach.** The audience is who a broadcast targets; the reach is how
+many of them can actually receive it.
+
+**Tenant settings and assistant settings.** Languages and runtime limits are
+tenant-wide; default language, served countries and fallback messages belong to
+one assistant. Changing the wrong one is the usual reason nothing happens.

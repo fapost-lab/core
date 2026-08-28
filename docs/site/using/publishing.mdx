@@ -1,0 +1,73 @@
+---
+title: "Publishing a flow"
+description: "Taking a draft live, and what happens to conversations already running."
+---
+
+A flow has two states at once: the **draft** being worked on, and the
+**published version** contacts are receiving. They move independently.
+
+## Save draft, then publish
+
+**Save draft** stores your work. Nothing reaches contacts.
+
+**Publish** promotes the draft to live. From that moment, new conversations use
+it.
+
+<Warning>
+  There is no staging step between the click and the contacts. A published flow
+  is in front of real people immediately, which is why the permission to publish
+  is separate from the permission to edit — see
+  [Roles and permissions](/using/roles-and-permissions).
+</Warning>
+
+Run **Validate** in the [builder](/using/flow-builder) first. It catches the
+problems that are cheap to fix before publishing and expensive after: a required
+field left empty, an outcome wired to nothing, a structure that cannot complete.
+
+## The version badge
+
+The builder shows the flow's published version — `Published v1` — and the
+[flows list](/using/flows) shows the same in its *Versions* column.
+
+**A dash means the flow has never been published.** It can be built, saved,
+validated and made active, and contacts will still never see it. This is the
+single most common reason a finished-looking flow does nothing.
+
+## Conversations already running
+
+Publishing does not disturb them.
+
+A [session](/using/sessions) holds the version of the flow it started with and
+keeps it until it ends. Someone halfway through answering questions carries on
+with the flow they began, even while a new version is live for everyone starting
+fresh.
+
+<Note>
+  This is why publishing a fix does not repair conversations already stuck in the
+  broken version. They finish, or time out, on the old one. Where that matters,
+  the session lifetime in [Settings](/using/tenant-settings) is what decides how
+  long they linger.
+</Note>
+
+## Active and published
+
+Two independent switches, and the combination is what confuses people:
+
+| Active | Published | Result |
+|---|---|---|
+| Yes | Yes | Running normally |
+| Yes | No | Ready to run, nothing to run — still being written |
+| No | Yes | A published version exists, but nothing starts it |
+| No | No | Neither |
+
+Deactivating stops new sessions starting. It does not unpublish, and it does not
+stop sessions already under way.
+
+## Publishing again
+
+Every publish produces a new version. The one before it is not lost — the version
+history is what makes a flow a versioned document rather than a file that gets
+overwritten.
+
+In practice this means publishing is reversible in the way that matters:
+returning to a previous version is a publish, not a rebuild.

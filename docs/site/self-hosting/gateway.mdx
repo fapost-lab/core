@@ -110,7 +110,7 @@ the runtime, so one image is promoted unchanged from staging to production.
 The gateway sits behind a profile, so it starts only when asked:
 
 ```bash
-docker compose -f docker/compose.yaml --env-file .env --profile gateway up -d
+docker compose --profile gateway up -d
 ```
 
 ### Standalone
@@ -144,7 +144,7 @@ Set by `gateway:install`, or by hand.
 | `WEBHOOK_GATEWAY_URL` | — | Public URL providers deliver to |
 | `GATEWAY_ADDR` | `:8080` | Listen address, e.g. `127.0.0.1:8080` |
 | `GATEWAY_UPSTREAM_URL` | `WEBHOOK_BASE_URL` | The application's own ingress, used for the fallback |
-| `GATEWAY_TRUSTED_PROXIES` | *empty* | Addresses whose `X-Forwarded-For` may be believed |
+| `GATEWAY_TRUSTED_PROXIES` | *empty* | Addresses or CIDR ranges whose `X-Forwarded-For` may be believed |
 | `GATEWAY_QUEUE` | `flow.execution` | Queue verified deliveries are pushed onto |
 
 ### Limits and timeouts

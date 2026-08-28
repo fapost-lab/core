@@ -8,6 +8,7 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"net/url"
 	"os"
 	"strconv"
@@ -48,10 +49,15 @@ type Config struct {
 	DedupTTL      time.Duration
 	SpecCacheTTL  time.Duration
 
-	// TrustedProxies lists addresses whose X-Forwarded-For may be believed.
+	// TrustedProxies lists the networks whose X-Forwarded-For may be believed.
 	// Empty means the header is ignored entirely — trusting it unconditionally
 	// would let any caller forge a client address and slip past rate limiting.
-	TrustedProxies []string
+	//
+	// Entries are ranges rather than plain addresses because a sidecar proxy
+	// rarely has a stable one: on a compose network the address of whatever
+	// terminates TLS is handed out by Docker and changes whenever the container
+	// is recreated, so the subnet is the only value an operator can pin down.
+	TrustedProxies []netip.Prefix
 }
 
 // Redis describes how to reach the shared instance.
@@ -104,6 +110,11 @@ func Load(dotenvPath string) (Config, error) {
 		return Config{}, err
 	}
 
+	trustedProxies, err := parseTrustedProxies(envList("GATEWAY_TRUSTED_PROXIES"))
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		Addr:     env("GATEWAY_ADDR", defaultAddr),
 		Upstream: upstream,
@@ -133,8 +144,47 @@ func Load(dotenvPath string) (Config, error) {
 		RateBurst:      envInt("GATEWAY_RATE_BURST", defaultRateBurst),
 		DedupTTL:       envDuration("GATEWAY_DEDUP_TTL", defaultDedupTTL),
 		SpecCacheTTL:   envDuration("GATEWAY_SPEC_CACHE_TTL", defaultSpecCacheTTL),
-		TrustedProxies: envList("GATEWAY_TRUSTED_PROXIES"),
+		TrustedProxies: trustedProxies,
 	}, nil
+}
+
+// parseTrustedProxies resolves the configured entries into networks.
+//
+// Both forms are accepted: "10.0.0.5" trusts exactly that peer, "172.16.0.0/12"
+// trusts a whole range — which is what makes the setting usable behind a proxy
+// whose address the container runtime assigns.
+//
+// A malformed entry fails the load rather than being dropped silently. Skipping
+// it would leave the gateway trusting nothing while looking configured, and the
+// symptom — every delivery rate-limited under the proxy's own address, because
+// X-Forwarded-For is never believed — points nowhere near the typo that caused it.
+func parseTrustedProxies(entries []string) ([]netip.Prefix, error) {
+	prefixes := make([]netip.Prefix, 0, len(entries))
+
+	for _, entry := range entries {
+		if strings.Contains(entry, "/") {
+			prefix, err := netip.ParsePrefix(entry)
+			if err != nil {
+				return nil, fmt.Errorf("config: GATEWAY_TRUSTED_PROXIES entry %q is not a valid CIDR range: %w", entry, err)
+			}
+
+			prefixes = append(prefixes, prefix.Masked())
+
+			continue
+		}
+
+		address, err := netip.ParseAddr(entry)
+		if err != nil {
+			return nil, fmt.Errorf("config: GATEWAY_TRUSTED_PROXIES entry %q is not a valid address or CIDR range: %w", entry, err)
+		}
+
+		// A single address is the range that contains only itself, so matching
+		// has one shape to deal with rather than two.
+		address = address.Unmap()
+		prefixes = append(prefixes, netip.PrefixFrom(address, address.BitLen()))
+	}
+
+	return prefixes, nil
 }
 
 // resolveUpstream determines where unhandled requests are proxied.

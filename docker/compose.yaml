@@ -1,33 +1,41 @@
 # FaPost Core — full stack.
 #
-#   docker compose --env-file ../.env up -d
+#   docker compose up -d
+#
+# This file stands on its own: images come from the registry and every
+# configuration file a service needs is inlined below, so an installation is
+# this file plus a .env beside it and nothing else. No clone, no directory
+# layout to reproduce.
 #
 # The gateway is optional and sits behind a profile, so a plain `up` gives the
 # supported setup without it:
-#   docker compose --env-file ../.env --profile gateway up -d
+#   docker compose --profile gateway up -d
 #
 # Images are pulled from the registry. To build them locally instead — which is
 # what you need when shipping Solutions or Plugins of your own, since those are
 # Composer packages that must live inside the application image — merge the build
 # overlay on top:
 #
-#   docker compose -f compose.yaml -f compose.build.yaml --env-file ../.env up -d --build
+#   ENV_FILE=../.env docker compose -f compose.yaml -f compose.build.yaml up -d --build
 #
 # The build definitions live in that separate file on purpose: a service that
 # declares a `build:` is one Compose will build, and with both keys present it
 # never contacts the registry at all.
 #
-# Configuration comes from ../.env — the same file the application reads outside
-# containers, so there is one place to look and nothing to keep in step.
+# Configuration comes from the .env beside this file. Inside a clone of the
+# repository the application's own .env sits one level up instead — the Makefile
+# and the documented commands there pass ENV_FILE=../.env for that reason, so
+# there is still one file to look at rather than two to keep in step.
 
 name: fapost
 
 x-app: &app
   image: ${REGISTRY:-ghcr.io/fapost-lab}/core:${APP_VERSION:-latest}
-  # Which file the containers read. Override with ENV_FILE to run a second
-  # environment from the same compose file — staging alongside production, or a
-  # throwaway stack for testing an upgrade.
-  env_file: ${ENV_FILE:-../.env}
+  # Which file the containers read. Override with ENV_FILE to point at the
+  # project root inside a clone, or to run a second environment from the same
+  # compose file — staging alongside production, or a throwaway stack for
+  # testing an upgrade.
+  env_file: ${ENV_FILE:-.env}
   environment:
     # Container networking overrides whatever the file says about hosts: inside
     # compose these are service names, not localhost.
@@ -90,12 +98,14 @@ services:
     environment:
       POSTGRES_DB: ${DB_DATABASE:-fapost}
       POSTGRES_USER: ${DB_USERNAME:-fapost}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in ../.env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD must be set in the .env beside this file}
     volumes:
       - postgres:/var/lib/postgresql/data
+    configs:
       # Grants CREATE on the database: tenant provisioning issues CREATE SCHEMA
       # at runtime, and without it the first tenant fails after a clean install.
-      - ./postgres/init.sh:/docker-entrypoint-initdb.d/10-init.sh:ro
+      - source: postgres_init
+        target: /docker-entrypoint-initdb.d/10-init.sh
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-fapost} -d ${DB_DATABASE:-fapost}"]
       interval: 5s
@@ -110,7 +120,7 @@ services:
     command: >
       redis-server
       --appendonly yes
-      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in ../.env}
+      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set in the .env beside this file}
     volumes:
       - redis:/data
     healthcheck:
@@ -137,15 +147,35 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       # Certificates and ACME account keys. Losing this volume means re-issuing
       # every certificate, which the rate limits punish.
       - caddy-data:/data
       - caddy-config:/config
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
     environment:
-      APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN must be set to use the tls profile}
-      GATEWAY_DOMAIN: ${GATEWAY_DOMAIN:-}
-      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL must be set to use the tls profile}
+      # Required even when the tls profile is off: Compose interpolates the whole
+      # file before it knows which profiles are active, so a missing value here
+      # stops a plain HTTP `up` too. Set it to the base domain and forget about
+      # it — it costs nothing when Caddy is not running.
+      APP_DOMAIN: ${APP_DOMAIN:?APP_DOMAIN must be set — see .env.production.example}
+      # The admin panel and the assistant console are served from the tenant's
+      # own host, never from the base domain — so that host needs a certificate
+      # of its own or the panel is unreachable over TLS. Derived from the same
+      # two values the application resolves it from, because an operator asked
+      # to keep a third one in step will eventually not.
+      PANEL_DOMAIN: ${PANEL_DOMAIN:-${TENANT_SLUG:-app}.${APP_DOMAIN}}
+      # Inert unless the gateway is actually deployed on its own subdomain. The
+      # placeholder has to be supplied here rather than as a Caddyfile default:
+      # Caddy falls back to `{$VAR:default}` only when the variable is unset,
+      # and an empty value passed from here is a site address with no name —
+      # which Caddy rejects at startup, taking TLS down with it.
+      GATEWAY_DOMAIN: ${GATEWAY_DOMAIN:-http://gateway.internal.invalid}
+      # Same: required to render the file, used only when Caddy runs. It must be
+      # non-empty — Caddy's `email` directive with no argument is a parse error,
+      # and a certificate would never be issued.
+      ACME_EMAIL: ${ACME_EMAIL:?ACME_EMAIL must be set — see .env.production.example}
     restart: unless-stopped
 
   gateway:
@@ -189,3 +219,124 @@ volumes:
   storage:
   caddy-data:
   caddy-config:
+
+# Inlined rather than mounted from neighbouring files, so this compose file is
+# the whole installation. `$$` is how a literal `$` is written here: Compose
+# interpolates the content like any other value, and an unescaped `${...}` or
+# `$VAR` would be substituted away before the container ever sees it.
+configs:
+  postgres_init:
+    content: |
+      #!/bin/bash
+      # Database initialisation for FaPost Core.
+      #
+      # A shell script rather than plain SQL because the database and user names
+      # come from the environment, and psql does not receive them as variables
+      # on its own.
+      #
+      # Runs once, when the postgres volume is first created. Editing it later
+      # has no effect on an existing volume — apply such changes by hand with
+      # psql.
+      set -euo pipefail
+
+      psql -v ON_ERROR_STOP=1 --username "$${POSTGRES_USER}" --dbname "$${POSTGRES_DB}" <<-EOSQL
+          -- Tenant isolation is schema-per-tenant, and schemas are created at
+          -- runtime when a tenant is provisioned. Inside this container the
+          -- application user already owns the database and holds this
+          -- implicitly, so the grant is a no-op here — it is stated because the
+          -- same requirement is easy to miss on a managed PostgreSQL, where a
+          -- clean install succeeds and then fails on the first tenant with a
+          -- permission error that points nowhere useful.
+          GRANT CREATE ON DATABASE "$${POSTGRES_DB}" TO "$${POSTGRES_USER}";
+
+          -- Landlord tables live in the public schema and are created by migrations.
+          GRANT ALL ON SCHEMA public TO "$${POSTGRES_USER}";
+      EOSQL
+
+      echo "init: grants applied to $${POSTGRES_DB} for $${POSTGRES_USER}"
+
+  caddyfile:
+    content: |
+      # TLS termination with automatic certificates.
+      #
+      # Caddy obtains and renews Let's Encrypt certificates on its own — no
+      # certbot, no renewal cron, no reload hooks. That is the whole reason it is
+      # here rather than nginx with an ACME client: getting a certificate should
+      # not be a project.
+      #
+      # Used only when the `tls` profile is enabled. Without it the stack serves
+      # plain HTTP and you terminate TLS with whatever you already run.
+
+      {
+      	# Where Let's Encrypt sends expiry warnings and problem reports.
+      	email {$$ACME_EMAIL}
+
+      	# Uncomment while testing to use the staging CA. The real one
+      	# rate-limits failed attempts per domain, and burning that budget on a
+      	# misconfigured DNS record locks you out for a week.
+      	# acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+      }
+
+      # Shared by both application hostnames. They differ in which name Caddy
+      # gets a certificate for, not in how requests are proxied.
+      (application) {
+      	# X-Forwarded-For, -Proto and -Host are set by Caddy already; only
+      	# X-Real-IP needs stating. The application builds absolute URLs and
+      	# rate-limits by client address, so these have to survive the hop.
+      	reverse_proxy web:80 {
+      		header_up X-Real-IP {remote_host}
+      	}
+
+      	encode gzip
+
+      	header {
+      		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+      		X-Content-Type-Options "nosniff"
+      		X-Frame-Options "SAMEORIGIN"
+      		Referrer-Policy "strict-origin-when-cross-origin"
+      		-Server
+      	}
+
+      	log {
+      		output stdout
+      		format json
+      	}
+      }
+
+      # The base domain: the installation's welcome page, and reserved for a
+      # control plane that manages tenants.
+      {$$APP_DOMAIN} {
+      	import application
+      }
+
+      # The tenant's own host, where the admin panel and the assistant console
+      # are served. A separate site because it is a separate certificate; the
+      # panel answers on this name only, so without this block TLS reaches the
+      # welcome page and nothing an operator actually logs into.
+      {$$PANEL_DOMAIN} {
+      	import application
+      }
+
+      # The webhook gateway, when it is deployed on its own subdomain.
+      #
+      # When it is not, the compose file supplies an `http://` placeholder for
+      # this name on purpose. Reusing APP_DOMAIN would declare the same site
+      # twice and Caddy refuses to start; naming any real hostname would send it
+      # chasing a certificate for a domain that does not exist. An explicit
+      # http:// scheme keeps this block inert — no ACME, no listener worth
+      # reaching — until GATEWAY_DOMAIN names something.
+      {$$GATEWAY_DOMAIN} {
+      	reverse_proxy gateway:8080 {
+      		header_up X-Real-IP {remote_host}
+      	}
+
+      	# No `encode` here, deliberately. Webhook signatures are computed over
+      	# the exact bytes the provider sent, and anything that rewrites the
+      	# request body breaks verification for every channel. Compression of
+      	# responses would be harmless, but leaving it off keeps the rule visible.
+
+      	log {
+      		output stdout
+      		format json
+      	}
+      }

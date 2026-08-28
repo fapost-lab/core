@@ -1,0 +1,64 @@
+---
+title: "Sessions"
+description: "Conversations currently moving through a flow, and where each one stopped."
+---
+
+A session is one contact making one pass through one flow. This screen shows
+them: what is running now, and what finished.
+
+## The list
+
+| Column | |
+|---|---|
+| **Session** | Its identifier |
+| **Status** | Whether it is still running |
+| **End status** | How it finished, once it has |
+| **Contact** | Who is in it |
+| **Flow** | Which flow they are in |
+| **Current node** | Where they are right now |
+| **Updated** | When it last moved |
+
+Filters narrow the view, with **Apply filters** and **Reset**.
+
+## Current node is the useful column
+
+It answers the question people actually arrive with: *where do conversations get
+stuck?*
+
+A handful of sessions sitting on the same node, all updated hours ago, is a
+diagnosis. That node asked something people are not answering — the question is
+unclear, the expected reply is not obvious, or the buttons offered do not cover
+what they want to say.
+
+<Note>
+  Sessions waiting on a node that asks a question are normal. Sessions waiting on
+  a node that should not wait at all — a message, a branch, a call — are not, and
+  usually mean the step before it never completed.
+</Note>
+
+## Status and end status
+
+**Status** is about now: is this session still live.
+
+**End status** is about the outcome: how it finished. A session can end because
+the flow reached its end, because it was abandoned after waiting past the session
+lifetime, or because execution failed.
+
+The tenant-wide session lifetime decides how long a paused session survives — see
+[Settings](/using/tenant-settings). Sessions abandoned by that timeout are the
+usual reason a *Waiting sessions* count on the dashboard falls without anyone
+doing anything.
+
+## Session, conversation, or log
+
+Three screens describe the same events from different angles, and picking the
+right one saves time:
+
+| Question | Screen |
+|---|---|
+| Where is this person stuck right now? | **Sessions** |
+| What did they actually say? | [Conversations](/using/conversations) |
+| What did the flow do, step by step? | [Flow logs](/using/flow-logs) |
+
+A session points at a node. A log explains what that node did. A conversation
+shows whether the person got what they came for.

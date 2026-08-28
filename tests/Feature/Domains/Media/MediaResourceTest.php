@@ -46,7 +46,7 @@ final class MediaResourceTest extends FeatureTestCase
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        $this->get('/admin/media')->assertOk();
+        $this->get($this->panelUrl('/admin/media'))->assertOk();
     }
 
     public function test_user_without_media_permission_cannot_load_media_index(): void
@@ -56,7 +56,7 @@ final class MediaResourceTest extends FeatureTestCase
 
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
-        $this->get('/admin/media')->assertForbidden();
+        $this->get($this->panelUrl('/admin/media'))->assertForbidden();
     }
 
     public function test_navigation_visibility_follows_permission(): void

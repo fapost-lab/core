@@ -1,0 +1,58 @@
+---
+title: "Users"
+description: "Inviting people and controlling their access."
+---
+
+Everyone who can sign in to this tenant, listed with their name, email, phone,
+status, whether they are active, and their role.
+
+## Adding someone
+
+**New User** asks for four things:
+
+| Field | |
+|---|---|
+| **Name** | required |
+| **Email** | required — this is what they sign in with |
+| **Phone** | optional |
+| **Role** | required — see [Roles and permissions](/using/roles-and-permissions) |
+
+There is no password field. You are not creating credentials for someone else:
+the account is created and the person sets their own password through an
+activation link sent to the address you entered.
+
+<Note>
+  This is deliberate and worth preserving as a habit. A password you typed is a
+  password you know, and an account whose owner cannot honestly say only they
+  could have used it is not much of an account.
+</Note>
+
+**Create & create another** keeps the form open, which is the faster path when
+onboarding several people at once.
+
+## Status and active
+
+The list shows two separate columns, and they mean different things.
+
+**Status** tracks the account's lifecycle — whether the invitation has been
+accepted and the account completed.
+
+**Active** is the switch you control. Turning it off blocks sign-in while
+keeping the account, its role, and everything it has done. That is what you want
+when someone leaves or goes on extended leave: deleting the user would take their
+history with them.
+
+## One role each
+
+A user has exactly one role. There is no way to combine two, and no per-user
+exception to a role's permissions.
+
+That constraint is what makes access reviewable: to know what someone can do you
+look at one role, not at a role plus a list of adjustments. When somebody needs a
+combination that no existing role covers, create the role — see
+[Roles and permissions](/using/roles-and-permissions).
+
+## Editing
+
+**Edit** on a row changes the same fields, including the role. Changing a role
+takes effect on the person's next request; they do not need to sign in again.

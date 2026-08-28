@@ -8,49 +8,8 @@ use App\Mail\NewPresaleRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 
-final class LandingPageTest extends FeatureTestCase
+final class PresaleRequestTest extends FeatureTestCase
 {
-    public function test_landing_page_returns_200(): void
-    {
-        $response = $this->get('/');
-
-        $response->assertStatus(200);
-        $response->assertViewIs('landing');
-    }
-
-    public function test_landing_page_contains_key_sections(): void
-    {
-        $response = $this->get('/');
-
-        $response->assertSee('FaPost');
-        $response->assertSee('presale-form');
-    }
-
-    public function test_locale_switches_via_query_param(): void
-    {
-        $response = $this->get('/?lang=ru');
-
-        $response->assertStatus(200);
-        $response->assertSessionHas('locale', 'ru');
-    }
-
-    public function test_locale_persists_in_session(): void
-    {
-        $this->get('/?lang=uk');
-        $response = $this->get('/');
-
-        $response->assertStatus(200);
-        $response->assertSessionHas('locale', 'uk');
-    }
-
-    public function test_invalid_locale_is_ignored(): void
-    {
-        $response = $this->get('/?lang=xx');
-
-        $response->assertStatus(200);
-        $response->assertSessionMissing('locale', 'xx');
-    }
-
     public function test_presale_store_with_valid_data(): void
     {
         Mail::fake();

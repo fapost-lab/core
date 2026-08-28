@@ -3,7 +3,127 @@ title: "Troubleshooting"
 description: "Symptoms, likely causes, and where to look first."
 ---
 
+Failures here are usually silent rather than loud. Start from the symptom.
+
+## The bot does not answer at all
+
+Work outwards from the flow, because the most common cause is the least
+technical.
+
+| Check | How |
+|---|---|
+| Is the flow published? | A dash in *Versions* on the [flows list](/using/flows) means it never was |
+| Does anything start it? | No trigger and not the assistant's default flow |
+| Is the assistant active? | Inactive assistants keep everything and answer nothing |
+| Are workers running? | Horizon — see [Services](/self-hosting/services) |
+| Do webhooks arrive? | `php artisan gateway:doctor` |
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  A published flow that is not active, and an active flow that was never
+  published, look identical from the outside: silence. Both columns are on the
+  flows list for exactly this reason.
 </Note>
+
+## It answered before and stopped
+
+Something changed about where providers deliver.
+
+The usual cause is the public address moving — a tunnel restarted, a domain
+changed, an ingress driver switched — while channels keep the URL their provider
+already stored. Nothing warns you: deliveries go to an address that no longer
+answers.
+
+```bash
+php artisan gateway:doctor
+```
+
+reports how many channels are still pointing elsewhere.
+
+```bash
+php artisan ops:ingress-migrate --apply
+```
+
+re-registers them. Re-registration reuses the same hash and secret, so the
+provider sees no interruption; batching exists because provider APIs rate-limit
+this call.
+
+The other cause is a rotated webhook hash. Rotation invalidates the URL
+immediately and requires re-registration — see [Channels](/using/channels).
+
+## Messages arrive but nothing is processed
+
+Redis or the workers.
+
+```bash
+php artisan ops:webhook-registry-health
+```
+
+If the registry has drifted from the database, rebuild it:
+
+```bash
+php artisan ops:webhook-warmup
+```
+
+An empty registry after a Redis flush is the classic case: channels exist, the
+application is fine, and every inbound message resolves to nothing.
+
+## Everything is slow, and the gateway seems idle
+
+Check that `REDIS_PREFIX` matches between the application and the gateway. A
+mismatch means the gateway reads an empty registry, concludes it knows nothing,
+and forwards every request to PHP. Nothing breaks — the gateway simply stops
+being a gateway.
+
+`gateway:doctor` reports the prefix it resolves.
+
+## A conversation is stuck
+
+Open [Sessions](/using/sessions) and read the *Current node* column.
+
+Several sessions on the same node, all idle, is a diagnosis rather than a
+coincidence: that node asks something people are not answering. Sessions stuck on
+a node that should not wait — a message, a branch — mean the step before it never
+completed, and [Flow logs](/using/flow-logs) says why.
+
+Publishing a fix does not rescue sessions already running. They hold the version
+they started with until they finish or time out.
+
+## Flow logging stopped working
+
+A missing monthly partition, which means the scheduler is not running.
+`logs:create-partition` runs on the first of the month, so the failure surfaces
+weeks after the scheduler actually stopped.
+
+## The admin panel looks broken after an upgrade
+
+Rebuild the front end:
+
+```bash
+npm run build
+```
+
+Filament ships compiled assets and the custom theme is compiled alongside them.
+After a Filament upgrade the built theme is stale, and the symptom is visual
+rather than functional — controls that render with the wrong colours, or text
+that disappears against its own background.
+
+Check the build manifest's date before assuming anything subtler.
+
+## Migrations pending after a deploy
+
+Tenant migrations do not run with the landlord ones. They run per tenant:
+
+```bash
+php artisan ops:tenants-migrate
+```
+
+The symptom is an application that starts, serves the panel, and fails on the
+first request that touches a table the release added. See
+[Tenancy operations](/self-hosting/tenancy).
+
+## What to collect before asking for help
+
+- What `php artisan gateway:doctor` reports
+- Whether Horizon is running, and its failed-job count
+- The assistant's error count for the last 24 hours
+- For one broken conversation: its session id, and the flow log filtered to it

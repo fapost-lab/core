@@ -164,6 +164,42 @@ func TestDurationsAcceptBareSeconds(t *testing.T) {
 	}
 }
 
+// A range is the form that works behind a container runtime, where the proxy's
+// address is assigned on start and changes with every recreate.
+func TestTrustedProxiesAcceptBothExactAddressesAndRanges(t *testing.T) {
+	t.Setenv("GATEWAY_UPSTREAM_URL", "https://app.example.com")
+	t.Setenv("GATEWAY_TRUSTED_PROXIES", "10.0.0.5, 172.16.0.0/12")
+
+	settings, err := Load("")
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+
+	if len(settings.TrustedProxies) != 2 {
+		t.Fatalf("trusted proxies = %v, want two entries", settings.TrustedProxies)
+	}
+
+	if got := settings.TrustedProxies[0].String(); got != "10.0.0.5/32" {
+		t.Errorf("exact entry = %q, want the single-address range 10.0.0.5/32", got)
+	}
+
+	if got := settings.TrustedProxies[1].String(); got != "172.16.0.0/12" {
+		t.Errorf("range entry = %q, want 172.16.0.0/12", got)
+	}
+}
+
+// Dropping the bad entry would leave the gateway trusting nothing while looking
+// configured, and the symptom — every delivery rate-limited under the proxy's own
+// address — gives no hint that a typo is the cause.
+func TestLoadRejectsAMalformedTrustedProxy(t *testing.T) {
+	t.Setenv("GATEWAY_UPSTREAM_URL", "https://app.example.com")
+	t.Setenv("GATEWAY_TRUSTED_PROXIES", "10.0.0.5, not-an-address")
+
+	if _, err := Load(""); err == nil {
+		t.Fatal("expected an error for a malformed GATEWAY_TRUSTED_PROXIES entry")
+	}
+}
+
 func TestSlugMatchesTheFrameworkForApplicationNames(t *testing.T) {
 	cases := map[string]string{
 		"FaPost Core":  "fapost-core",

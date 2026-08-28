@@ -6,6 +6,7 @@ namespace App\Providers\Filament;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Staff\Http\Middleware\EnsureUserIsActive;
+use App\Domains\Tenancy\Support\TenantHost;
 use App\Filament\Assistant\Pages\AssistantDashboard;
 use App\Http\Controllers\Filament\AssistantPanelHomeController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
@@ -69,6 +70,13 @@ final class AssistantPanelProvider extends PanelProvider
         return $panel
             ->id('assistant')
             ->path('assistant')
+            // The tenant panels live on the tenant host only. The base domain is
+            // reserved: a control plane for managing tenants belongs there, and a
+            // tenant panel answering on it would be a surface nobody asked for.
+            ->domain(TenantHost::forDefaultTenant())
+            ->brandLogo(fn (): string => asset('logo.png'))
+            ->brandLogoHeight('1.75rem')
+            ->favicon(asset('favicon.png'))
             ->login()
             ->spa()
             ->sidebarFullyCollapsibleOnDesktop()

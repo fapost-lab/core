@@ -11,6 +11,8 @@ description: "Every queue, what belongs on it, and why they stay separate."
 | `messaging.system` | Service notifications |
 | `scheduled.triggers` | Scheduled and event trigger fan-out |
 | `sync.external` | External synchronisations |
+| `messaging.logging` | Conversation capture, written outside the delivery path |
+| `default` | Anything not explicitly routed |
 
 ## Why they are separate
 
@@ -45,6 +47,21 @@ reaction to a provider's error response.
 A sender that discovers a limit by being rejected has already spent the request,
 and on a broadcast that failure multiplies across the whole fan-out — turning one
 rate limit into tens of thousands of failed jobs, each of which will retry.
+
+## Which worker takes which
+
+Horizon runs four supervisors, and the grouping is the separation made
+operational:
+
+| Supervisor | Queues |
+|---|---|
+| 1 | `flow.execution`, `messaging.transactional` |
+| 2 | `sync.external`, `scheduled.triggers` |
+| 3 | `messaging.broadcast`, `messaging.system`, `messaging.logging` |
+| 4 | `default` |
+
+The first pair is the latency-critical path — a message arriving and the reply
+going out — and it has its own processes so nothing else can crowd it.
 
 ## Running the workers
 

@@ -15,7 +15,8 @@ final class InstallPlatformCommand extends Command
     protected $signature = 'platform:install
         {--tenant-slug=app : Slug for the first tenant}
         {--admin-email= : Email for the first admin}
-        {--admin-password= : Password for the first admin}';
+        {--admin-password= : Password for the first admin}
+        {--admin-password-file= : Read the admin password from a file, or from standard input when given as -}';
 
     protected $description = 'Install FaPost Core platform';
 
@@ -41,6 +42,17 @@ final class InstallPlatformCommand extends Command
             return self::FAILURE;
         }
 
+        // Before any DDL: an unreadable password file is a typo on the command
+        // line, and finding it out afterwards leaves a migrated landlord schema
+        // with no tenant in it.
+        $slug     = (string)$this->option('tenant-slug');
+        $email    = $this->option('admin-email') ?: $this->ask('Admin email');
+        $password = $this->resolveAdminPassword();
+
+        if (null === $password) {
+            return self::FAILURE;
+        }
+
         $migrateExitCode = 0;
         $this->components->task('Running landlord migrations', function () use (&$migrateExitCode): void {
             $migrateExitCode = Artisan::call('migrate', [
@@ -55,10 +67,6 @@ final class InstallPlatformCommand extends Command
 
             return self::FAILURE;
         }
-
-        $slug     = (string)$this->option('tenant-slug');
-        $email    = $this->option('admin-email') ?: $this->ask('Admin email');
-        $password = $this->option('admin-password') ?: $this->secret('Admin password');
 
         $this->components->task(
             "Provisioning tenant [{$slug}] and first admin",
@@ -82,5 +90,47 @@ final class InstallPlatformCommand extends Command
         $this->newLine();
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The admin password, or null when it could not be read — in which case the
+     * reason has already been reported.
+     *
+     * An unattended installer needs to supply this without a prompt, and
+     * --admin-password puts it in the process list of every user on the host for
+     * as long as the command runs. Reading it from a file, or from standard
+     * input as `-`, keeps it out of argv entirely:
+     *
+     *     printf '%s' "$password" | php artisan platform:install \
+     *         --admin-email=… --admin-password-file=-
+     */
+    private function resolveAdminPassword(): ?string
+    {
+        $path = (string)$this->option('admin-password-file');
+
+        if ('' === $path) {
+            return (string)($this->option('admin-password') ?: $this->secret('Admin password'));
+        }
+
+        $contents = @file_get_contents('-' === $path ? 'php://stdin' : $path);
+
+        if (false === $contents) {
+            $this->components->error("Could not read the admin password from [{$path}].");
+
+            return null;
+        }
+
+        // Only the line ending goes: a password may legitimately start or end
+        // with a space, and trimming it would leave an account whose password
+        // is not the one that was written.
+        $password = mb_rtrim($contents, "\r\n");
+
+        if ('' === $password) {
+            $this->components->error("The admin password read from [{$path}] is empty.");
+
+            return null;
+        }
+
+        return $password;
     }
 }

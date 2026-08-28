@@ -1,0 +1,136 @@
+---
+title: "Receiving webhooks locally"
+description: "Giving your development machine a public HTTPS address so a provider can reach it."
+---
+
+Messaging providers deliver by calling you. Telegram and WhatsApp both require a
+public **HTTPS** URL and will not talk to `localhost`, so nothing arrives on a
+development machine until it has an address on the public internet.
+
+A tunnel solves this: a small process holds an outbound connection to a public
+endpoint, and traffic arriving there is forwarded to your local web server. No
+port forwarding, no router configuration, no certificate of your own.
+
+<Note>
+  You only need this to receive real messages. Running the application, the
+  builder, the admin panels and the test suite needs no tunnel at all — see
+  [Local setup](/contributing/local-setup).
+</Note>
+
+## A stable address
+
+This is the arrangement worth having if you touch channels more than once. The
+hostname survives restarts, so `.env` stays valid and channels stay registered.
+
+```bash
+brew install cloudflared        # or see the Cloudflare docs for your platform
+```
+
+```bash
+cloudflared tunnel login
+```
+
+```bash
+composer run tunnel fapost-core dev.example.com
+```
+
+The first run creates the tunnel, points a DNS record at it, and starts serving.
+Every run after that reuses both. It needs a Cloudflare account and a domain on
+it; nothing else.
+
+## The quick way, where it works
+
+`cloudflared` can also hand out a throwaway address with no account at all:
+
+```bash
+composer run tunnel fapost-core
+```
+
+It prints a hostname such as `https://calm-oak-2187.trycloudflare.com`, valid
+until you stop the process. The address **changes on every run**, so each restart
+means editing `.env` and re-registering channels — which is the reason to prefer
+a named tunnel once you are past the first afternoon.
+
+<Warning>
+  **Quick tunnels are blocked on some networks.** They are provisioned through
+  `api.trycloudflare.com`, a host that filtering commonly blocks because tunnel
+  services are used to bypass restrictions. The symptom is unmistakable:
+
+  ```
+  failed to request quick Tunnel: Post "https://api.trycloudflare.com/tunnel":
+  context deadline exceeded
+  ```
+
+  This does not mean `cloudflared` is unusable. Named tunnels reach different
+  infrastructure — `api.cloudflare.com` to manage them and
+  `region1.v2.argotunnel.com:7844` to carry traffic — which is typically not
+  filtered. Check in two commands:
+
+  ```bash
+  nc -z api.trycloudflare.com 443      # quick tunnels
+  nc -z region1.v2.argotunnel.com 7844 # named tunnels
+  ```
+
+  If the first fails and the second succeeds, use a named tunnel.
+</Warning>
+
+## Pointing the application at it
+
+Whatever the address, the application has to build its webhook URLs from it:
+
+```dotenv
+WEBHOOK_BASE_URL=https://dev.example.com
+```
+
+Then re-register the channels so the provider learns the new address:
+
+```bash
+php artisan ops:ingress-migrate --apply
+```
+
+<Warning>
+  A channel registered against an address that no longer exists keeps that URL at
+  the provider. Messages are delivered into nothing, and the failure is silent —
+  the provider has no reason to tell you. This is the usual cause of "my bot
+  stopped answering" after a tunnel restart.
+
+  `php artisan gateway:doctor` reports how many channels are still pointing
+  somewhere else.
+</Warning>
+
+## Why the Host header is rewritten
+
+The helper passes `--http-host-header` for a reason worth knowing if you write
+your own command.
+
+A local site is usually served by name — `fapost-core.test` — and the web server
+picks which site to serve from the `Host` header. A tunnel forwards the public
+hostname in that header, so the request arrives asking for
+`dev.example.com`, which the local server does not recognise. The flag rewrites
+it back to the name your vhost expects.
+
+If you serve the application on a bare port instead, this does not arise.
+
+## Alternatives
+
+Anything that gives a public HTTPS URL forwarding to a local port will do. ngrok
+is the other common choice and the repository carries `tools/ngrok-http` for it:
+
+```bash
+composer run ngrok fapost-core
+```
+
+It reaches its own endpoints, so it is a reasonable fallback on a network where
+Cloudflare's are filtered. A stable ngrok hostname is a paid feature, which is
+the main reason `cloudflared` is documented first.
+
+## When a tunnel is not enough
+
+A tunnel gets deliveries to your machine; it does not make them valid. A provider
+signs its requests, and the signature is verified against the channel's secret —
+so a webhook forwarded to the wrong installation, or to one whose channel was
+registered with different credentials, is rejected rather than processed.
+
+See [Webhook gateway](/self-hosting/gateway) for how that verification works, and
+[Channel drivers](/extending/channel-drivers) for the ingress spec a provider
+integration declares.

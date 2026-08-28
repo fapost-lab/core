@@ -1,0 +1,67 @@
+---
+title: "Assistant settings"
+description: "How one assistant behaves — its language, its default flow, and what it says when it cannot answer."
+---
+
+Configuration belonging to this assistant alone. Three tabs — **General**,
+**Commands**, **Advanced** — and one **Save** covering all of them.
+
+Not to be confused with the tenant-wide [Settings](/using/tenant-settings) in the
+admin panel: those apply to every assistant at once.
+
+## General
+
+**Default language** — what this assistant answers in when the contact's own
+language is unknown.
+
+<Warning>
+  It cannot be changed once flows exist. Content already written is treated as
+  being in it, so switching later would mislabel rather than translate.
+</Warning>
+
+**Served countries** — which countries this assistant serves. This is not
+cosmetic: it drives phone-number formats and validation in input nodes. An
+assistant serving Ukraine validates a phone number differently from one serving
+Poland, and a contact entering a valid local number should not be told it is
+wrong.
+
+**Default flow** — what runs when nothing else matches. Without one, a message
+that triggers no flow produces nothing at all.
+
+**Fallback message** — per language, what the contact hears when the assistant
+cannot answer.
+
+**Busy notice** — per language, sent when the assistant is still working on the
+previous message. Leaving it empty is safe: a localised system text is used
+instead.
+
+<Note>
+  The busy notice exists because a contact who sends two messages quickly would
+  otherwise get silence while the first is still running. Silence reads as
+  broken; a sentence reads as busy.
+</Note>
+
+## Commands
+
+The built-in commands this assistant responds to — things like cancelling the
+current session.
+
+What those commands *say* is set in [Translations](/using/translations); this tab
+is about which exist and how they behave.
+
+## Advanced
+
+The less-used settings, kept out of the way of everything above.
+
+## Which settings live where
+
+Three levels, and putting a value at the wrong one is the usual source of "I
+changed it and nothing happened":
+
+| Level | Where | Examples |
+|---|---|---|
+| **Tenant** | Admin panel → [Settings](/using/tenant-settings) | Available languages, runtime limits, broadcast pacing |
+| **Assistant** | Here | Default language, served countries, default flow, fallback |
+| **Flow** | In the flow itself | What is actually said, and when |
+
+A language must exist at tenant level before an assistant can default to it.

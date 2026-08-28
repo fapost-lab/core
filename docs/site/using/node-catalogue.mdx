@@ -1,0 +1,234 @@
+---
+title: "Node catalogue"
+description: "Every block you can put in a flow, and what it does."
+---
+
+Fifteen blocks, grouped the way the builder's palette groups them. Each does one
+thing and reports an outcome; the flow decides what follows.
+
+For the technical contract behind each — its type, version and configuration
+schema — see [Flow node reference](/reference/flow-nodes).
+
+## Core
+
+The two blocks almost every flow uses.
+
+### Send message
+
+Sends a message to the contact on the channel they wrote from.
+
+The **content type** decides what it sends: plain text, an image, a document, a
+video, a voice message — or **text with a keyboard**, which turns this block into
+something rather different from a send.
+
+Message text is written per language on the builder's **Content** tab.
+
+#### The keyboard
+
+Choosing *text with keyboard* reveals the keyboard section, and a **mode**:
+
+| Mode | |
+|---|---|
+| **Inline** | Buttons attached to the message itself |
+| **Reply** | Buttons replacing the contact's keyboard |
+
+Buttons are built in two ways, and they can be combined.
+
+**Fixed buttons** are listed by hand. Each has an **ID**, a **label**, and an
+optional **value**.
+
+<Warning>
+  The label is translated; the **ID and value are not**. They are identifiers the
+  flow compares against, so translating them silently breaks every condition that
+  tests the answer — and it breaks it only for contacts in that language, which
+  makes it hard to spot.
+</Warning>
+
+**Dynamic buttons** are generated from a value in the session. Point **source**
+at a state path — `flow.items`, or something under `contact.` — and one button is
+produced per entry, laid out **max per row** at a time (one to eight, two by
+default).
+
+Use dynamic buttons whenever the options are not known when the flow is written:
+a list fetched by a [Call](#call), a set of appointment slots, whatever the
+contact's own record holds.
+
+#### Waiting for the press
+
+A keyboard makes this block **wait**, the way [Input](#input) does. The flow does
+not continue until the contact presses something or the block times out.
+
+The **Response** section — collapsed by default — controls what happens then:
+
+**Save answer to** stores the press at a state path. **Save answer variable**
+does the same with more control: a name, a type (text, number, confirm), and
+whether it is stored on the **session** or on the **contact**. Session storage
+disappears when the session ends; contact storage stays.
+
+**Timeout** is how long to wait before giving up and moving on.
+
+#### Buttons that outlive the session
+
+**Remove keyboard after press** is on by default: once the contact presses,
+the keyboard goes.
+
+Turn it off and something more interesting happens. Each button is registered
+against the flow version and node that sent it, so a press is still understood
+**after the session has ended** — the platform re-enters that branch and carries
+on from there.
+
+<Note>
+  This is how a message stays useful long after the conversation ended: a
+  confirmation sent last week can still be acted on today, and the flow resumes
+  where the button pointed rather than starting over.
+
+  It is also why leaving the keyboard in place is a decision rather than a
+  cosmetic preference. Every such message is a live entry point into a flow, on a
+  version of that flow which may since have been replaced.
+</Note>
+
+### Input
+
+Asks the contact something and **waits for the answer**.
+
+It validates what comes back and stores it, so the value is available to every
+block after it. This is the only block that pauses a flow indefinitely: while it
+waits, the session stays open, and if nobody answers it eventually times out
+under the tenant's session lifetime.
+
+<Note>
+  Input is where flows get stuck, and the *Current node* column in
+  [Sessions](/using/sessions) is where that shows. Several contacts waiting on the
+  same input usually means the question is unclear or the answer it accepts is
+  narrower than what people naturally type.
+</Note>
+
+## Logic
+
+Blocks that decide what happens next, or change the shape of the run.
+
+### Branch
+
+Splits the flow by condition. It covers both a simple yes/no test and a
+multi-way switch, so one block handles "is this person a customer" and "which of
+five options did they pick".
+
+Each outcome is a separate connection. A branch that always reports the same
+outcome is not branching — [Flow logs](/using/flow-logs) shows which one it
+actually reported.
+
+### Delay
+
+Pauses before continuing.
+
+Useful for pacing a conversation so a series of messages does not arrive as a
+wall, and for waiting a defined period before a follow-up.
+
+### Loop and Loop end
+
+Repeats the blocks between them.
+
+`Loop` opens the repetition and `Loop end` closes it; everything nested inside
+runs each time round. The **Structure** panel in the builder is the practical way
+to see what is inside a loop, since the main column can get long.
+
+### Subflow
+
+Runs another flow, and **pauses this one until it finishes**.
+
+This is how a piece of conversation gets reused — an address collection, an
+identity check — without copying it into every flow that needs it. The parent
+resumes with whatever the child produced.
+
+### Emit event
+
+Raises an event that can start other flows.
+
+It does not wait: the event goes out and this flow carries on. Use it to set
+something else in motion — a notification pipeline, a follow-up sequence —
+without coupling the two flows together.
+
+### End
+
+Finishes the flow explicitly.
+
+A flow also ends by running out of blocks. `End` is for finishing early — after a
+branch that concludes the conversation, for instance.
+
+## Data
+
+Blocks that record something rather than say something.
+
+### Assign
+
+Writes a value into the session.
+
+It both stores plain values and transforms existing ones, so it covers "remember
+what they answered" and "reformat it before using it". Values written here are
+available to every block after it, and to conditions in branches.
+
+### Set tag
+
+Attaches a tag to the contact.
+
+Tags outlive the session: they stay on the contact afterwards and can target a
+[broadcast](/using/broadcasts) or feed a [segment](/using/segments). This is the
+block that turns a conversation into something you can act on later.
+
+## Integration
+
+### Call
+
+Calls another system — an HTTP endpoint, or an internal action.
+
+It reports whether the call succeeded, so the flow can respond to a failure
+rather than pretending it did not happen. Failed calls are retried before the
+failure outcome is taken; how many times is a tenant setting.
+
+<Warning>
+  A call reaches outside the platform, so it is the block most likely to be slow
+  or to fail. Give its failure outcome somewhere to go — a flow that only handles
+  success leaves the contact with silence when the other system is down.
+</Warning>
+
+## AI
+
+### Rag query
+
+Asks the knowledge base a question and returns what it finds.
+
+This is the block behind "answer from our documents": the contact's question goes
+in, retrieved content comes back, and the flow decides what to do with it —
+including what to do when nothing relevant was found.
+
+## Contact
+
+### Auth request
+
+Checks that the contact is who they claim to be before continuing.
+
+It compares an answer against an expected value and records the result on the
+session, so later blocks can require it. Use it to gate anything that should not
+be available to a stranger who found the bot.
+
+### Notify
+
+Sends a notification, in one of two modes.
+
+**Staff** alerts people on your side — the escalation path when a conversation
+needs a human. **Contacts** sends to contacts by tag or to all of them, through
+the assistant, on the broadcast queue.
+
+The second mode is a broadcast raised from inside a flow rather than composed by
+hand, which is why it shares the pacing described in
+[Broadcasts](/using/broadcasts).
+
+## Annotation
+
+### Comment
+
+Not a step. A note for whoever reads the flow next.
+
+It does nothing at runtime and costs nothing to add. A flow is read far more
+often than it is written, and a condition that made obvious sense the day it was
+written rarely does six months later.

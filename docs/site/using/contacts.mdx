@@ -1,9 +1,59 @@
 ---
 title: "Contacts"
-description: "Contact records, attributes, and where they come from."
+description: "The people an assistant talks to, and where their details come from."
 ---
 
+Everyone who has written to this assistant. Contacts are not created by hand in
+the usual case — they appear the moment someone first sends a message.
+
+## The list
+
+| Column | |
+|---|---|
+| **ID** | The contact's identifier inside FaPost |
+| **Channel** | Which channel they arrived on |
+| **Channel user ID** | Who they are *on that platform* |
+| **Name** | What the assistant knows to call them, if anything |
+| **Language** | Which language they are answered in |
+| **Created** | When they first wrote |
+
+Filters narrow the list, with **Apply filters** and **Reset**.
+
+## Where the details come from
+
+A contact starts as almost nothing: a platform identifier and a channel. That is
+all a first message carries.
+
+Everything else is learned. A name appears once a flow asks for one and stores
+it. A language is set when the platform reports one or a flow establishes it.
+Attributes accumulate as conversations collect them.
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  A list full of numbers and blank names is not a fault. It means those people
+  have written but no flow has yet asked them anything that would fill the
+  columns in. If names matter to you, that is a flow to write rather than a
+  setting to change.
 </Note>
+
+## One person, several contacts
+
+A contact belongs to a channel. The same human writing on two platforms produces
+two contacts, and FaPost does not merge them — it has no reliable way to know
+they are the same person, and guessing wrong would join two strangers' histories.
+
+## Language
+
+The contact's language decides which translation they receive, both in flow
+content and in [broadcasts](/using/broadcasts). When it is unknown, the
+assistant's default is used, and failing that the tenant's fallback — see
+[Settings](/using/tenant-settings).
+
+## Grouping and selecting
+
+Two different tools, easy to confuse:
+
+- **[Groups](/using/contact-groups)** — a list you maintain by hand
+- **[Segments](/using/segments)** — a condition, evaluated against everyone
+
+Reach for a group when membership is a decision, and a segment when it is a
+property.

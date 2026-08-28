@@ -1,0 +1,91 @@
+---
+title: "The flow builder"
+description: "Building a conversation from blocks."
+---
+
+The builder is where a flow is actually written. It opens from **Builder** on any
+row of the [flows list](/using/flows).
+
+Blocks are stacked vertically in the order they run. There is no canvas to
+arrange and no lines to draw: a flow reads top to bottom, the way the
+conversation happens.
+
+## The screen
+
+**Left — Structure.** A tree of every block in the flow, including those nested
+inside loops and subflows. On a long flow this is how you navigate; the main
+column is for editing, the tree is for finding.
+
+**Right — Main flow.** The blocks themselves. Each shows its type, its number,
+and its configured values inline, so the flow can be read without opening
+anything.
+
+**Top — the toolbar.** The flow's name, its published version, and whether the
+current work is saved.
+
+## The trigger
+
+The first card in every flow is its trigger — what causes this flow to start.
+
+A new flow shows **No trigger configured**. That is not an error and the flow can
+still be built, but nothing will start it: it can only run as another flow's
+subflow, or as the assistant's default flow.
+
+## Working with blocks
+
+**+ Add block** appears between every pair of blocks and at the ends. Where you
+click is where the block lands — this is how order is chosen, rather than adding
+and then moving.
+
+The palette that opens has a search box and seven categories:
+
+| Category | What it does |
+|---|---|
+| **Core** | Send a message, ask for a reply |
+| **Logic** | Branch, wait, loop, end, run a subflow, raise an event |
+| **Data** | Store a value, tag a contact |
+| **Integration** | Call another system over HTTP |
+| **AI** | Query the knowledge base |
+| **Contact** | Ask for authentication, notify staff |
+| **Annotation** | A comment for whoever reads the flow next |
+
+The full list with each block's exact type and configuration is in
+[Flow node reference](/reference/flow-nodes).
+
+<Note>
+  Comments are worth using. A flow is read far more often than it is written, and
+  a branch whose condition made obvious sense in the moment rarely does six
+  months later.
+</Note>
+
+Each block carries its own controls: move up, move down, swap, and delete.
+
+## Two tabs: Builder and Content
+
+**Builder** is the structure — which blocks, in what order, with what settings.
+
+**Content** is the words. The language selector beside it switches between the
+languages the tenant has enabled.
+
+The separation is deliberate. Someone translating a flow should not be able to
+rearrange it by accident, and someone rearranging it should not have to scroll
+past paragraphs of text to see the shape.
+
+## Undo, redo, validate
+
+**Undo** and **Redo** cover editing within the session.
+
+**Validate** checks the flow for problems without publishing it — blocks missing
+required configuration, outcomes that lead nowhere, structures that cannot
+complete. Run it before publishing rather than after.
+
+## Saving is not publishing
+
+The toolbar shows the save state — **Saved** when there is nothing pending.
+
+**Save draft** stores your work. **Publish** puts it in front of contacts. They
+are separate buttons because they are separate decisions, and saving is safe at
+any moment: contacts keep receiving the published version until someone
+explicitly publishes a new one.
+
+See [Publishing a flow](/using/publishing).

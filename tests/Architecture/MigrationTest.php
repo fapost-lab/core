@@ -18,8 +18,8 @@ final class MigrationTest
             )
             ->shouldNotDependOn()
             ->classes(
-                Selector::inNamespace('App\\Domains', true),
-                Selector::inNamespace('App\\Services', true),
+                Selector::inNamespace('App\\Domains'),
+                Selector::inNamespace('App\\Services'),
             )
             ->because(
                 'Migrations are pure DDL. They must not depend on application services, ' .

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"strings"
 	"sync"
@@ -546,16 +547,49 @@ func TestForwardedForIsIgnoredFromAnUntrustedPeer(t *testing.T) {
 	}
 }
 
-func TestForwardedForIsHonouredFromATrustedProxy(t *testing.T) {
-	h := newHarness(t, nil)
-	h.handler.trusted = map[string]struct{}{"10.0.0.5": {}}
+// The two entry forms an operator may configure, and the peer that neither of
+// them covers. A range matters more than the exact address: behind Docker
+// Compose the proxy's address is assigned by the network driver and changes on
+// every recreate, so a subnet is the only value that survives a restart.
+func TestForwardedForIsHonouredOnlyFromAConfiguredNetwork(t *testing.T) {
+	exact := netip.PrefixFrom(netip.MustParseAddr("10.0.0.5"), 32)
+	composeSubnet := netip.MustParsePrefix("172.16.0.0/12")
 
-	request := httptest.NewRequest(http.MethodPost, "/webhook/telegram/"+testHash, strings.NewReader(testBody))
-	request.RemoteAddr = "10.0.0.5:5555"
-	request.Header.Set("X-Forwarded-For", "198.51.100.1, 10.0.0.5")
+	cases := map[string]struct {
+		trusted []netip.Prefix
+		peer    string
+		want    string
+	}{
+		"exact address": {
+			trusted: []netip.Prefix{exact},
+			peer:    "10.0.0.5:5555",
+			want:    "198.51.100.1",
+		},
+		"inside a range": {
+			trusted: []netip.Prefix{composeSubnet},
+			peer:    "172.19.0.7:5555",
+			want:    "198.51.100.1",
+		},
+		"outside the range": {
+			trusted: []netip.Prefix{composeSubnet},
+			peer:    "203.0.113.9:5555",
+			want:    "203.0.113.9",
+		},
+	}
 
-	if got := h.handler.clientIP(request); got != "198.51.100.1" {
-		t.Errorf("clientIP = %q, want the left-most forwarded address", got)
+	for name, testCase := range cases {
+		t.Run(name, func(t *testing.T) {
+			h := newHarness(t, nil)
+			h.handler.options.TrustedProxies = testCase.trusted
+
+			request := httptest.NewRequest(http.MethodPost, "/webhook/telegram/"+testHash, strings.NewReader(testBody))
+			request.RemoteAddr = testCase.peer
+			request.Header.Set("X-Forwarded-For", "198.51.100.1, 10.0.0.5")
+
+			if got := h.handler.clientIP(request); got != testCase.want {
+				t.Errorf("clientIP = %q, want %q", got, testCase.want)
+			}
+		})
 	}
 }
 

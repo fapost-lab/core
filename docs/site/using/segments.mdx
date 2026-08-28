@@ -1,9 +1,54 @@
 ---
 title: "Segments"
-description: "Grouping contacts by attribute-based conditions."
+description: "Selecting contacts by condition, and why the size needs recounting."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+A segment is a saved set of conditions over the contact base — "everyone who did
+X", rather than a list of names. It is the precise way to choose a
+[broadcast](/using/broadcasts) audience.
+
+## The list
+
+Each segment shows its **name**, how many **conditions** it is built from, its
+**size**, and when that size was last **counted**.
+
+Three actions sit on every row: **Recount**, **Edit**, **Delete**.
+
+## Size is a snapshot, not a live number
+
+This is the one thing about segments worth understanding, and the *Counted*
+column is the clue.
+
+A segment's size is calculated when you ask for it and stored. It does not
+update itself as contacts arrive, change, or leave. A segment counted a month ago
+shows what it matched a month ago.
+
+**Recount** re-evaluates the conditions against the contact base as it stands
+now.
+
+<Warning>
+  Recount before using a segment for a broadcast. Sending against a stale count
+  is not dangerous in itself — the conditions are re-evaluated when the send
+  runs, so the right people are reached either way — but you will be deciding
+  whether to send based on a number that no longer describes anything.
+</Warning>
+
+## Segments and groups
+
+Both narrow the contact base, and they are not interchangeable:
+
+| | |
+|---|---|
+| **Segment** | A condition. Membership is derived, and changes as contacts do. |
+| **[Group](/using/contact-groups)** | A list. Membership is assigned, and changes when someone changes it. |
+
+Use a segment for "everyone who bought in the last month" — nobody should have to
+maintain that. Use a group for "beta testers" — that is a decision, not a
+property.
+
+## Empty segments
+
+A size of zero means the conditions currently match nobody. That is a legitimate
+state — a segment for "abandoned cart in the last hour" is empty most of the
+time — but if you did not expect it, the conditions are usually narrower than
+intended rather than the contact base being emptier than expected.

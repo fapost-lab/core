@@ -1,0 +1,63 @@
+---
+title: "Settings"
+description: "Languages, runtime limits, and broadcast behaviour for the whole tenant."
+---
+
+Configuration shared by every assistant in the installation. Three tabs, one
+**Save** button covering all of them — changes on one tab are not lost by
+switching to another before saving.
+
+## Languages
+
+Sets which languages exist and how one is chosen for a given contact.
+
+FaPost separates the language content is **written in** from the languages it is
+**delivered in**. The tab reflects that: one field for the source language flows
+are authored in, one for the languages available to translate into, and one for
+what to use when neither the contact nor the assistant has said which they want.
+
+<Warning>
+  The source language cannot be changed once a flow has been published.
+  Everything already written is treated as being in it, so switching later would
+  relabel existing content rather than translate it. This is the one decision on
+  this page to make deliberately before going live.
+</Warning>
+
+Adding a language here makes it available in the content manager; it does not
+translate anything on its own. See [Translations](/using/translations).
+
+## Runtime
+
+How the engine behaves while conversations are running — the limits that keep one
+assistant from overwhelming a provider or accumulating abandoned work.
+
+Two areas:
+
+**Messaging** caps how fast the assistant sends to a single contact. Providers
+rate-limit per chat, and exceeding the limit costs delivery rather than speed.
+
+**Flow execution** governs how long a paused session waits before it is abandoned,
+how many times a node is retried before its branch is treated as failed, and what
+the contact is told when execution cannot continue at all.
+
+<Note>
+  The session lifetime is worth setting deliberately. Too short and a contact who
+  steps away comes back to a flow that has forgotten them; too long and abandoned
+  sessions accumulate — which is what a rising *Waiting sessions* count on the
+  dashboard is telling you.
+
+  Leaving the failure message empty means a failure reaches the contact as
+  silence.
+</Note>
+
+## Broadcasts
+
+How large sends are paced.
+
+The settings here control how many recipients go out per batch and how hard the
+platform pushes when a provider starts to strain. Together they are the mechanism
+behind the rule that a broadcast never delays a reply: a mailout is split and
+paced so it cannot sit in front of the person who just asked a question.
+
+Leave them alone unless a provider is complaining, and change one at a time — the
+two interact, and a change to both at once tells you nothing about which helped.

@@ -17,6 +17,13 @@
 @source '../../../app/Filament';
 @source '../../../resources/views/filament';
 
+/*
+ * Светлый режим адресуется через `html:not(.dark)`, а не `.fi-body:not(.dark)`.
+ * Filament 5 перенёс класс `dark` с элемента body на `<html>`, из-за чего старый
+ * селектор совпадал в обоих режимах: поля получали светлый фон поверх тёмного
+ * текста и становились нечитаемыми.
+ */
+
 /* ───────────────────────────── Дизайн-токены ──────────────────────────── */
 
 :root {
@@ -49,7 +56,7 @@
 }
 
 /* Тёплый воздушный фон только в светлой теме; тёмную не трогаем. */
-.fi-body:not(.dark) {
+html:not(.dark) .fi-body {
     background-color: var(--fapost-bg);
 }
 
@@ -63,7 +70,7 @@
     backdrop-filter: saturate(1.1);
 }
 
-.fi-body:not(.dark) .fi-topbar nav {
+html:not(.dark) .fi-body .fi-topbar nav {
     background-color: color-mix(in srgb, var(--fapost-surface) 85%, transparent);
 }
 
@@ -73,7 +80,7 @@
     border-right: 1px solid var(--fapost-border);
 }
 
-.fi-body:not(.dark) .fi-sidebar {
+html:not(.dark) .fi-body .fi-sidebar {
     background-color: var(--fapost-surface);
 }
 
@@ -111,17 +118,17 @@
 }
 
 /* Наведение — едва тёплая подсветка. */
-.fi-body:not(.dark) .fi-sidebar-item-btn:hover {
+html:not(.dark) .fi-body .fi-sidebar-item-btn:hover {
     background-color: var(--fapost-surface-muted);
 }
 
 /* Активный пункт — мягкая шалфейная заливка вместо жирного фона. */
-.fi-body:not(.dark) .fi-sidebar-item-active .fi-sidebar-item-btn {
+html:not(.dark) .fi-body .fi-sidebar-item-active .fi-sidebar-item-btn {
     background-color: var(--fapost-accent-soft);
     color: var(--fapost-accent);
 }
 
-.fi-body:not(.dark) .fi-sidebar-item-active .fi-sidebar-item-icon {
+html:not(.dark) .fi-body .fi-sidebar-item-active .fi-sidebar-item-icon {
     color: var(--fapost-accent);
 }
 
@@ -160,7 +167,7 @@
     border-radius: var(--fapost-radius);
 }
 
-.fi-body:not(.dark) .fi-section {
+html:not(.dark) .fi-body .fi-section {
     border: 1px solid var(--fapost-border);
     background-color: var(--fapost-surface);
     box-shadow: var(--fapost-shadow-sm);
@@ -182,7 +189,7 @@
 /* ───────────────────────────── Таблицы ──────────────────────────── */
 
 /* Таблица как самостоятельная карточка. */
-.fi-body:not(.dark) .fi-ta {
+html:not(.dark) .fi-body .fi-ta {
     border: 1px solid var(--fapost-border);
     background-color: var(--fapost-surface);
     box-shadow: var(--fapost-shadow-sm);
@@ -230,7 +237,7 @@
 }
 
 /* Разделители строк — hairline; наведение — едва тёплое. */
-.fi-body:not(.dark) .fi-ta-row:hover {
+html:not(.dark) .fi-body .fi-ta-row:hover {
     background-color: var(--fapost-surface-muted);
 }
 
@@ -268,7 +275,7 @@
     min-height: 0;
 }
 
-.fi-body:not(.dark) .fi-input-wrp {
+html:not(.dark) .fi-body .fi-input-wrp {
     border-radius: var(--fapost-radius-sm);
     border: 1px solid var(--fapost-border-strong);
     background-color: var(--fapost-surface);
@@ -276,7 +283,7 @@
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.fi-body:not(.dark) .fi-input-wrp:focus-within {
+html:not(.dark) .fi-body .fi-input-wrp:focus-within {
     border-color: var(--fapost-accent);
     box-shadow: 0 0 0 3px var(--fapost-ring);
 }
@@ -312,17 +319,17 @@
 
 /* ───────────────────────────── Скроллбары ──────────────────────────── */
 
-.fi-body:not(.dark) ::-webkit-scrollbar {
+html:not(.dark) .fi-body ::-webkit-scrollbar {
     width: 10px;
     height: 10px;
 }
 
-.fi-body:not(.dark) ::-webkit-scrollbar-thumb {
+html:not(.dark) .fi-body ::-webkit-scrollbar-thumb {
     background-color: var(--fapost-border-strong);
     border: 3px solid var(--fapost-bg);
     border-radius: 999px;
 }
 
-.fi-body:not(.dark) ::-webkit-scrollbar-thumb:hover {
+html:not(.dark) .fi-body ::-webkit-scrollbar-thumb:hover {
     background-color: var(--fapost-text-3);
 }

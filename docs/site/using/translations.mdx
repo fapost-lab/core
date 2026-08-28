@@ -1,0 +1,53 @@
+---
+title: "Translations"
+description: "The words the assistant uses that no flow author wrote."
+---
+
+Not everything a contact reads comes from a flow. Button labels, command
+responses, and system messages are supplied by the platform, and this screen is
+where they are changed.
+
+## What is in here
+
+A table of translation keys, one row each: the **group** it belongs to, the
+**key** itself, a **description** of when it is used, and a column per language
+the tenant has enabled.
+
+Keys are grouped by where they appear — `buttons.*` for the labels on generated
+buttons, `commands.*` for what built-in commands reply, and so on. The
+description column says exactly when each is used, which matters because the key
+name alone rarely does.
+
+## Defaults are already filled in
+
+Every cell arrives with a sensible default in every enabled language. The screen
+is not a translation task waiting to be done — the assistant works without anyone
+opening it.
+
+**Filling a cell overrides that default for that language.** Leave a cell alone
+and the catalogue default stands; edit it and your text is used from then on.
+
+<Note>
+  Override selectively. Changing `buttons.yes` from "Yes" to "Sure" affects every
+  confirmation the assistant ever offers, in every flow, forever. That is
+  sometimes exactly right — a brand with a particular voice — and sometimes an
+  accident nobody connects to the button they changed months earlier.
+</Note>
+
+## Where this sits among the languages
+
+Three different things carry language, and they are edited in three places:
+
+| | Where |
+|---|---|
+| What flows say | In the flow itself |
+| Buttons, commands, system messages | **Here** |
+| Which languages exist at all | [Settings](/using/tenant-settings) |
+
+A language must be enabled in Settings before a column for it appears here.
+
+## Per assistant
+
+This screen belongs to one assistant. Two assistants can answer the same command
+differently — useful when one is formal and another is not, and worth knowing
+before wondering why an override did not take effect somewhere else.

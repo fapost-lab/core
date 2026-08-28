@@ -6,8 +6,14 @@ description: "The container installation path, start to finish."
 Runs the whole stack in containers. The host needs Docker and nothing else — no
 PHP 8.4, no Composer, no Node.
 
-Everything below has been executed against this compose file; the troubleshooting
+An installation is one compose file and one `.env` beside it. The troubleshooting
 section lists failures actually encountered rather than ones imagined.
+
+<Note>
+Requires Compose **v2.23 or newer** — check with `docker compose version`. The
+compose file carries the configuration files its services need inline, and inline
+config content is not supported before that release.
+</Note>
 
 ## What you get
 
@@ -34,54 +40,87 @@ happens.
 
 ## Requirements
 
-- Docker Engine 24+ with the Compose plugin (`docker compose`, not `docker-compose`)
+- Docker Engine 24+ with the Compose plugin v2.23+ (`docker compose`, not `docker-compose`)
 - 4 GB RAM and 10 GB disk to start with
 
 Read [Requirements](/self-hosting/requirements) for what the application itself needs;
 the images already satisfy the runtime and extension list.
 
-## 1. Get the files
+## The short way
 
 ```bash
-git clone https://github.com/fapost-lab/core.git
-cd fapost-core
-cp .env.example .env
+sh -c "$(curl -fsSL https://get.fapost.in/install.sh)"
 ```
 
-Only `docker/` and `.env` are needed at runtime — images come from the registry.
-The clone is the simplest way to obtain them and gives you the docs besides.
+The [installer](https://github.com/fapost-lab/install) performs every step below:
+it checks the host, asks for the domain and the administrator's email, generates
+the application key and the two service passwords, writes the `.env`, starts the
+stack and creates the first tenant. Use it unless you want to see what it does —
+which is what the rest of this page is.
+
+<Note>
+Written as `sh -c "$(curl …)"` rather than `curl … | sh` deliberately: the second
+form hands the script itself to standard input, leaving nothing for the questions
+to be answered on.
+</Note>
+
+## 1. Get the files
+
+An installation is two files in a directory of its own — no clone, no directory
+layout to reproduce. `compose.yaml` stands alone: images come from the registry,
+and every configuration file the services need is inlined in it.
+
+```bash
+mkdir fapost && cd fapost
+curl -fsSLO https://raw.githubusercontent.com/fapost-lab/core/main/docker/compose.yaml
+curl -fsSL  https://raw.githubusercontent.com/fapost-lab/core/main/.env.production.example -o .env
+```
+
+<Note>
+Working from a clone instead? The application's `.env` sits at the project root
+there rather than beside the compose file, so the commands need `ENV_FILE=../.env`
+to point the containers at it. Running `make` from `docker/` carries that for you.
+</Note>
 
 ## 2. Configure `.env`
 
 Compose reads this file twice, in two different ways, and the distinction matters:
 
 - **Interpolation** — `${DB_PASSWORD}` inside `compose.yaml` is resolved from the
-  file named by `--env-file`, which defaults to a `.env` **next to the compose
-  file**. That is why every command below passes `--env-file ../.env` explicitly.
+  `.env` **next to the compose file**, which is picked up automatically.
 - **Container environment** — `env_file:` hands the whole file to the containers.
-  It defaults to `../.env` and can be pointed elsewhere with `ENV_FILE`.
+  It defaults to that same `.env` and can be pointed elsewhere with `ENV_FILE`.
 
-The values that must be right before the first start:
+`.env.production.example` documents every value; four have to be filled in before
+the first start.
 
 ```dotenv
-APP_ENV=production
-APP_DEBUG=false
-APP_KEY=                      # generated in step 3
+APP_KEY=                       # generated below
 APP_URL=https://fapost.example.com
+TENANCY_BASE_DOMAIN=fapost.example.com
+TENANT_SLUG=app
 
-DB_CONNECTION=pgsql
-DB_DATABASE=fapost
-DB_USERNAME=fapost
 DB_PASSWORD=<a real password>  # must not be empty
-
 REDIS_PASSWORD=<a real password>
-REDIS_PREFIX=fapost:
+```
 
-QUEUE_CONNECTION=redis
+The key and the two passwords can be generated on the spot. Do the key **before**
+the first start: containers cache their configuration at boot, so a key written
+afterwards is one the running processes have not read.
+
+```bash
+printf 'APP_KEY=base64:%s\n' "$(openssl rand -base64 32)"
+printf 'DB_PASSWORD=%s\nREDIS_PASSWORD=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 24)"
 ```
 
 `DB_HOST` and `REDIS_HOST` are overridden by Compose to the service names, so
 whatever they say is ignored inside containers.
+
+**The panel is not served from the base domain.** `TENANCY_BASE_DOMAIN` carries
+the welcome page and is reserved for a control plane; the admin panel and the
+assistant console are served from the tenant's own host, `TENANT_SLUG` prefixed
+to it. With the values above that is `app.fapost.example.com` — two names, both
+of which must resolve to this host.
 
 **`APP_ENV=production` is not cosmetic.** The images are built with `--no-dev`,
 and development tooling registered for the `local` environment is absent from
@@ -100,41 +139,47 @@ required variable DB_PASSWORD is missing a value
 ## 3. Start the stack
 
 ```bash
-docker compose -f docker/compose.yaml --env-file .env up -d
-```
-
-Or from `docker/` with the shorthand, which carries the flags for you:
-
-```bash
-cd docker && make up
+docker compose up -d
 ```
 
 First start pulls the images and initialises the database volume. Watch it settle:
 
 ```bash
-docker compose -f docker/compose.yaml --env-file .env ps
+docker compose ps
 ```
 
 `postgres` and `redis` should reach `healthy` before `app` starts — that ordering
 is enforced by health checks, not by sleeps.
 
-## 4. Install
+## 4. Create the first tenant
+
+Nothing is provisioned automatically: migrations and tenant creation are an
+operator's decision, not something three replicas race each other through on
+boot.
 
 ```bash
-docker compose -f docker/compose.yaml --env-file .env exec app php artisan install
+printf '%s' '<the admin password>' | docker compose exec -T app \
+  php artisan platform:install \
+    --tenant-slug=app \
+    --admin-email=admin@fapost.example.com \
+    --admin-password-file=-
 ```
 
-The wizard generates the application key if there is none, verifies the database
-and Redis connections, applies the landlord migrations, and provisions the first
-tenant with its administrator. Steps that are already done are skipped, so it is
-safe to re-run after fixing something.
+This applies the landlord migrations, creates the tenant schema, runs the tenant
+migrations, bootstraps the ACL and creates the administrator. The password comes
+in on standard input so it never appears in a process list; `--admin-password`
+takes it as an argument instead, and omitting both prompts for it.
 
-The containers hold a cached config from startup, so restart them once the
-wizard has written new values:
+The panel is then at `https://app.fapost.example.com/admin` — the tenant host,
+not the base domain.
 
-```bash
-docker compose -f docker/compose.yaml --env-file .env up -d --force-recreate app horizon scheduler
-```
+<Note>
+Prefer to be walked through it? `docker compose exec app php artisan install` is
+a wizard that verifies each connection before writing it, generates the
+application key if there is none, and ends by calling the command above. It
+writes to `.env` as it goes, so recreate the containers afterwards — they cached
+their configuration at boot: `docker compose up -d --force-recreate app horizon scheduler`.
+</Note>
 
 Until a tenant exists the site answers **500** — the request cannot be resolved to
 a tenant. That is expected before this step, not a fault.
@@ -142,13 +187,11 @@ a tenant. That is expected before this step, not a fault.
 ## 5. Verify
 
 ```bash
-C="docker compose -f docker/compose.yaml --env-file .env"
-
-$C ps                                  # every service up, postgres/redis healthy
-curl -I http://localhost:8000/         # 200 once a tenant exists
-curl -I http://localhost:8000/build/manifest.json   # 200 — assets are being served
-$C exec app php artisan horizon:status # workers running
-$C logs -f horizon
+docker compose ps                       # every service up, postgres/redis healthy
+curl -I http://localhost:8000/          # 200 once a tenant exists
+curl -I http://localhost:8000/build/manifest.json    # 200 — assets are being served
+docker compose exec app php artisan horizon:status   # workers running
+docker compose logs -f horizon
 ```
 
 A growing queue with no movement means Horizon is not consuming — see
@@ -167,7 +210,7 @@ Enable the `tls` profile and Caddy obtains and renews Let's Encrypt certificates
 on its own — no certbot, no renewal cron, no reload hooks:
 
 ```dotenv
-APP_DOMAIN=fapost.example.com
+APP_DOMAIN=fapost.example.com        # must equal TENANCY_BASE_DOMAIN
 ACME_EMAIL=ops@example.com
 GATEWAY_DOMAIN=webhook.example.com   # only if you deploy the gateway
 
@@ -178,15 +221,23 @@ GATEWAY_BIND=127.0.0.1
 ```
 
 ```bash
-docker compose -f docker/compose.yaml --env-file .env --profile tls up -d
+docker compose --profile tls up -d
 ```
 
-Both domains must already resolve to this host — Caddy proves control over them
-by answering an HTTP challenge on port 80, so DNS comes first.
+Caddy gets a certificate for **two** application names: `APP_DOMAIN`, and the
+tenant host that the panel is served from. The second is derived from
+`TENANT_SLUG` and `APP_DOMAIN` rather than configured separately, which is why
+`APP_DOMAIN` has to match `TENANCY_BASE_DOMAIN` — a mismatch means a certificate
+for a name nothing answers on, and none for the panel. Override the derived value
+with `PANEL_DOMAIN` if your deployment does not follow that shape.
 
-While testing, uncomment `acme_ca` in [`docker/caddy/Caddyfile`](https://github.com/fapost-lab/core/blob/main/docker/caddy/Caddyfile)
-to use the staging CA. The production one rate-limits failed attempts per domain,
-and spending that budget on a typo in a DNS record locks you out for a week.
+Every name must already resolve to this host — Caddy proves control over each by
+answering an HTTP challenge on port 80, so DNS comes first.
+
+While testing, switch to the staging CA by uncommenting the `acme_ca` line in the
+`caddyfile` config at the bottom of `compose.yaml`. The production one rate-limits
+failed attempts per domain, and spending that budget on a typo in a DNS record
+locks you out for a week.
 
 ### Or terminate it yourself
 
@@ -198,23 +249,44 @@ are computed over the exact bytes the provider sent, so any middleware that
 rewrites, decompresses or re-encodes the body breaks verification for every
 channel. Compressing *responses* is fine.
 
-Set `GATEWAY_TRUSTED_PROXIES` to the address of the terminator. The gateway
-ignores `X-Forwarded-For` from anyone not listed — otherwise a caller could forge
-a client address and walk straight past the rate limit.
+Set `GATEWAY_TRUSTED_PROXIES` to the terminator — an address or a CIDR range, and
+a range is what you want on a compose network, where Docker reassigns container
+addresses. The gateway ignores `X-Forwarded-For` from anyone not listed —
+otherwise a caller could forge a client address and walk straight past the rate
+limit.
+
+Entries are exact addresses or CIDR ranges, comma-separated. Prefer a range when
+the terminator runs as a container: its address on the compose network is handed
+out by Docker and changes whenever the container is recreated, so an exact one
+stops matching after the next `up`.
+
+```bash
+GATEWAY_TRUSTED_PROXIES=172.16.0.0/12
+```
+
+Check the actual subnet with `docker network inspect` if your daemon is
+configured with a different address pool. An entry the gateway cannot parse stops
+it from starting, rather than being dropped and leaving it trusting nothing.
 
 ## Building your own images
 
 Solutions and Plugins are Composer packages, so they have to be inside the
 application image.
 
-Building is an explicit choice, made by merging an overlay:
+This is the one path that needs a clone: the build context is the repository, not
+a compose file on its own. Building is then an explicit choice, made by merging
+an overlay:
 
 ```bash
-docker compose -f docker/compose.yaml -f docker/compose.build.yaml --env-file .env build
-docker compose -f docker/compose.yaml -f docker/compose.build.yaml --env-file .env up -d
+cd docker && make build && make up-built
 ```
 
-Or `make build && make up-built` from `docker/`.
+Or written out, from the project root:
+
+```bash
+ENV_FILE=../.env docker compose -f docker/compose.yaml -f docker/compose.build.yaml build
+ENV_FILE=../.env docker compose -f docker/compose.yaml -f docker/compose.build.yaml up -d
+```
 
 The build definitions live in a separate file deliberately. Compose treats a
 service that declares a `build:` as one it should build: with both `image:` and
@@ -235,13 +307,11 @@ to be checked out.
 ## Upgrading
 
 ```bash
-C="docker compose -f docker/compose.yaml --env-file .env"
-
-$C pull
-$C up -d
-$C exec app php artisan migrate --database=landlord --path=database/migrations/landlord --force
-$C exec app php artisan ops:tenants-migrate
-$C exec app php artisan horizon:terminate
+docker compose pull
+docker compose up -d
+docker compose exec app php artisan migrate --database=landlord --path=database/migrations/landlord --force
+docker compose exec app php artisan ops:tenants-migrate
+docker compose exec app php artisan horizon:terminate
 ```
 
 `horizon:terminate` lets running jobs finish and exits; Compose restarts the
@@ -256,7 +326,7 @@ See [Upgrading and rollback](/self-hosting/upgrading) for the details, including
 content, so rebuilding under the same tag changes nothing on its own:
 
 ```bash
-docker compose -f docker/compose.yaml --env-file .env up -d --force-recreate
+docker compose up -d --force-recreate
 ```
 
 **`horizon` restarts in a loop.** Check its logs first: it fails on start rather
@@ -264,16 +334,22 @@ than degrading. A boot error affecting the whole application shows up here first
 because the web tier can still serve cached pages.
 
 ```bash
-docker compose -f docker/compose.yaml --env-file .env logs horizon --tail 30
+docker compose logs horizon --tail 30
 ```
 
 **The site returns 500 right after installation.** Almost always no tenant yet —
 run `platform:install`. Confirm with:
 
 ```bash
-docker compose -f docker/compose.yaml --env-file .env exec app \
+docker compose exec app \
   php artisan tinker --execute='echo App\Domains\Tenancy\Models\Tenant::query()->count();'
 ```
+
+**`caddy` exits immediately with "server block without any key".** A site address
+resolved to an empty string. `GATEWAY_DOMAIN` is the usual cause: leave it unset
+or empty and compose supplies an inert placeholder, but a name that resolves to
+nothing useful — a stray space, a half-edited value — becomes a block Caddy
+cannot parse, and it refuses to start rather than serve part of the config.
 
 **Changes to `.env` have no effect.** Config is cached at container start for
 `APP_ENV=production`. Recreate the containers, or set `SKIP_CACHE_WARMUP=1` while
@@ -283,8 +359,8 @@ debugging.
 file and use a separate project name, so volumes and containers do not collide:
 
 ```bash
-ENV_FILE=../.env.staging docker compose -p fapost-staging \
-  -f docker/compose.yaml --env-file ../.env.staging up -d
+ENV_FILE=.env.staging docker compose -p fapost-staging \
+  --env-file .env.staging up -d
 ```
 
 **Assets 404 while pages load.** The web image carries the compiled front-end, so

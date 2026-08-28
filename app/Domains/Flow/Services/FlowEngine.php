@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Services;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
@@ -41,7 +42,6 @@ use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\ConnectionInterface;
-use Illuminate\Support\Facades\DB;
 use LogicException;
 use Psr\Log\LoggerInterface;
 use Throwable;
@@ -60,6 +60,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         private ContactServiceInterface $contactService,
         private LanguageResolverInterface $languageResolver,
         private ConnectionInterface $connection,
+        private AfterCommitDispatcherInterface $afterCommitDispatcher,
         private Repository $config,
         private \App\Domains\Flow\Expression\ExpressionEngineRegistry $expressionEngines,
         private \App\Domains\Flow\Contracts\DataAccessorRegistryInterface $dataAccessors,
@@ -244,9 +245,7 @@ final readonly class FlowEngine implements FlowEngineInterface
 
     private function afterCommit(callable $callback): void
     {
-        // Flow engine transactions run on the default tenant connection in current runtime,
-        // so facade-level afterCommit is coupled to the same transaction lifecycle.
-        DB::afterCommit($callback);
+        $this->afterCommitDispatcher->afterCommit($callback);
     }
 
     /**

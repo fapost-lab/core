@@ -26,7 +26,7 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Using FaPost",
+        "tab": "User guide",
         "groups": [
           {
             "group": "Get started",
@@ -37,36 +37,50 @@
             ]
           },
           {
-            "group": "Assistants and channels",
+            "group": "Admin panel",
             "pages": [
+              "using/admin-overview",
               "using/assistants",
-              "using/channels"
+              "using/tenant-settings",
+              "using/users",
+              "using/roles-and-permissions",
+              "using/media"
             ]
           },
           {
-            "group": "Flow Builder",
+            "group": "Assistant console",
             "pages": [
-              "using/flow-builder/overview",
-              "using/flow-builder/node-catalogue",
-              "using/flow-builder/variables-and-state",
-              "using/flow-builder/conditions",
-              "using/flow-builder/publishing"
+              "using/console-overview",
+              "using/channels",
+              "using/assistant-settings",
+              "using/translations"
             ]
           },
           {
-            "group": "Contacts and broadcasts",
+            "group": "Flows",
             "pages": [
+              "using/flows",
+              "using/flow-groups",
+              "using/flow-builder",
+              "using/node-catalogue",
+              "using/publishing"
+            ]
+          },
+          {
+            "group": "People",
+            "pages": [
+              "using/conversations",
               "using/contacts",
+              "using/contact-groups",
               "using/segments",
               "using/broadcasts"
             ]
           },
           {
-            "group": "Conversations and team",
+            "group": "Diagnostics",
             "pages": [
-              "using/conversations",
-              "using/staff-and-roles",
-              "using/media"
+              "using/sessions",
+              "using/flow-logs"
             ]
           },
           {
@@ -78,7 +92,7 @@
         ]
       },
       {
-        "tab": "Self-Hosting",
+        "tab": "Self-hosting",
         "groups": [
           {
             "group": "Install",
@@ -109,17 +123,32 @@
         ]
       },
       {
-        "tab": "Extending",
+        "tab": "Developers",
         "groups": [
           {
             "group": "Overview",
+            "pages": [
+              "contributing/overview"
+            ]
+          },
+          {
+            "group": "Development environment",
+            "pages": [
+              "contributing/local-setup",
+              "contributing/local-webhooks",
+              "contributing/repo-layout",
+              "contributing/conventions"
+            ]
+          },
+          {
+            "group": "Extension model",
             "pages": [
               "extending/extension-model",
               "extending/choosing-an-extension-type"
             ]
           },
           {
-            "group": "Packages",
+            "group": "Building extensions",
             "pages": [
               "extending/development-setup",
               "extending/solutions",
@@ -145,27 +174,14 @@
             ]
           },
           {
-            "group": "Shipping",
+            "group": "Shipping an extension",
             "pages": [
               "extending/testing",
               "extending/stability-policy"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "Contributing",
-        "groups": [
-          {
-            "group": "Get started",
-            "pages": [
-              "contributing/local-setup",
-              "contributing/repo-layout",
-              "contributing/conventions"
-            ]
           },
           {
-            "group": "Architecture",
+            "group": "Core internals",
             "pages": [
               "contributing/runtime",
               "contributing/tenant-aware-execution",
@@ -176,7 +192,7 @@
             ]
           },
           {
-            "group": "Quality",
+            "group": "Contributing to Core",
             "pages": [
               "contributing/testing",
               "contributing/pull-requests",

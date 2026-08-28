@@ -1,9 +1,81 @@
 ---
 title: "Quickstart"
-description: "Take an assistant from empty to answering its first message."
+description: "From a fresh installation to an assistant that answers."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+Four steps, in this order. Each depends on the one before, which is why an
+assistant that seems finished but stays silent is almost always missing one of
+them.
+
+<Steps>
+  <Step title="Set the languages">
+    Admin panel → **Settings** → *Languages*.
+
+    Choose the language flows will be written in, and any others you will
+    translate into.
+
+    <Warning>
+      The source language cannot be changed once a flow has been published. This
+      is the only step here that is hard to undo, which is why it comes first.
+    </Warning>
+
+    See [Settings](/using/tenant-settings).
+  </Step>
+
+  <Step title="Create an assistant">
+    Admin panel → **Assistants** → **New Assistant**.
+
+    A name, a default language, active. Then **Manage** to open its console —
+    everything after this happens there.
+
+    See [Assistants](/using/assistants).
+  </Step>
+
+  <Step title="Connect a channel">
+    Console → **Channels** → **New Channel**.
+
+    Have the bot token ready: saving contacts the provider and registers the
+    webhook, so a token that does not belong to a real bot will not save.
+
+    Once it saves, messages sent to that bot reach the assistant — and, with
+    nothing to answer them yet, produce nothing.
+
+    See [Channels](/using/channels).
+  </Step>
+
+  <Step title="Build and publish a flow">
+    Console → **Flows** → **New Flow**, then **Builder**.
+
+    Start small: one node that sends a message. Give the flow a trigger so
+    something starts it, or set it as the assistant's default flow in
+    [Assistant settings](/using/assistant-settings).
+
+    Then **publish** it. A flow that is built and saved is still invisible —
+    contacts only ever see published versions.
+
+    See [The flow builder](/using/flow-builder) and
+    [Publishing](/using/publishing).
+  </Step>
+</Steps>
+
+## Checking it worked
+
+Write to the bot from your own messaging account.
+
+If nothing comes back, work backwards through the four steps — the failure is
+almost always one of these:
+
+| Symptom | Usually |
+|---|---|
+| Nothing at all happens | The flow was never published, or has no trigger and is not the default |
+| The bot answers in the wrong language | Contact's language unknown and the assistant's default is not what you expected |
+| It answered once and then stopped | The flow is waiting at a node — check [Sessions](/using/sessions) |
+| Messages arrive nowhere | The channel's webhook is registered against an address that no longer exists |
+
+The console's **Assistant Dashboard** shows live sessions and errors in the last
+24 hours, which is the fastest place to see whether anything arrived at all.
+
+## What next
+
+- [Core concepts](/using/concepts) — the vocabulary the rest of the guide uses
+- [The assistant console](/using/console-overview) — a map of where everything is

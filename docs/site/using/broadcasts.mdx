@@ -3,7 +3,59 @@ title: "Broadcasts"
 description: "Sending a message to many contacts at once."
 ---
 
+A broadcast sends one message to a chosen audience. It is composed, checked, and
+then run — the three steps are deliberately separate, because a send cannot be
+recalled.
+
+## Composing
+
+**Name** is for you, not the recipients. It is how the broadcast appears in the
+list afterwards, so name it by what it is rather than when you sent it.
+
+**Message** has a tab per language the tenant has enabled. Each recipient gets
+the message in **their own** language, falling back to the assistant's default
+when the contact's language is unknown or has no translation. Basic HTML is
+supported.
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  Filling only one language is normal and safe — everyone falls back to it. What
+  is not safe is filling several and leaving one half-written: a contact whose
+  language matches the unfinished tab gets the unfinished text, not the complete
+  one from another tab.
 </Note>
+
+## Choosing the audience
+
+Three ways, in increasing precision:
+
+| | |
+|---|---|
+| **All contacts** | Everyone this assistant knows |
+| **By tags** | Contacts carrying particular tags |
+| **By segment** | A saved [segment](/using/segments) — a condition, evaluated |
+
+## Reach
+
+As the audience is chosen, **Reach** shows how many contacts would actually
+receive the message.
+
+This is the number to read before sending, and it is not the same as the size of
+the audience. A contact is counted only if the assistant can still reach them —
+a segment of five thousand can have a reach far below that if most of those
+people have blocked the bot or never opened a channel.
+
+<Warning>
+  A reach of zero means the send would do nothing. That is worth resolving before
+  running it rather than after: the usual causes are an audience that matches
+  nobody, or contacts who exist in the database but have no reachable channel.
+</Warning>
+
+## Running it
+
+A broadcast is editable while it is still a draft. Once a run has started or
+finished, it is a record rather than a document — the message that went out
+cannot be revised after the fact.
+
+Large sends are split into batches and paced, so they cannot delay replies to
+people in live conversations. How aggressively is a tenant-wide setting; see
+[Settings](/using/tenant-settings).

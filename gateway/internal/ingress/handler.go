@@ -22,6 +22,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"time"
@@ -46,8 +47,10 @@ type Options struct {
 	MaxBodyBytes int64
 	DedupTTL     time.Duration
 
-	// TrustedProxies are the addresses whose X-Forwarded-For may be believed.
-	TrustedProxies []string
+	// TrustedProxies are the networks whose X-Forwarded-For may be believed.
+	// A single address is expressed as the range containing only itself, which
+	// config does when resolving the setting.
+	TrustedProxies []netip.Prefix
 }
 
 // Channels is the registry surface the handler needs.
@@ -70,21 +73,15 @@ type Publisher interface {
 // Handler serves webhook deliveries.
 type Handler struct {
 	options Options
-	trusted map[string]struct{}
 }
 
 // New builds the handler.
 func New(options Options) *Handler {
-	trusted := make(map[string]struct{}, len(options.TrustedProxies))
-	for _, address := range options.TrustedProxies {
-		trusted[address] = struct{}{}
-	}
-
 	if options.Client == nil {
 		options.Client = &http.Client{Timeout: 15 * time.Second}
 	}
 
-	return &Handler{options: options, trusted: trusted}
+	return &Handler{options: options}
 }
 
 // outcome names why a request ended the way it did. It is logged, not returned
@@ -358,7 +355,7 @@ func (h *Handler) clientIP(r *http.Request) string {
 		peer = r.RemoteAddr
 	}
 
-	if _, trusted := h.trusted[peer]; !trusted {
+	if !h.trusts(peer) {
 		return peer
 	}
 
@@ -373,6 +370,36 @@ func (h *Handler) clientIP(r *http.Request) string {
 	}
 
 	return strings.TrimSpace(forwarded)
+}
+
+// trusts reports whether the peer falls inside one of the configured networks.
+//
+// Ranges rather than exact addresses because the proxy in front of the gateway
+// usually has no fixed address: on a compose network Docker hands one out and
+// changes it whenever the container is recreated, leaving the subnet as the only
+// thing an operator can name in advance.
+func (h *Handler) trusts(peer string) bool {
+	if len(h.options.TrustedProxies) == 0 {
+		return false
+	}
+
+	address, err := netip.ParseAddr(peer)
+	if err != nil {
+		return false
+	}
+
+	// A v4-mapped v6 peer ("::ffff:10.0.0.5") is the same host as its v4 form, and
+	// a link-local zone describes the local interface rather than the network, so
+	// neither may keep a configured range from matching.
+	address = address.Unmap().WithZone("")
+
+	for _, prefix := range h.options.TrustedProxies {
+		if prefix.Contains(address) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (h *Handler) log(r *http.Request, requestID string, result outcome, message string, started time.Time, extra ...any) {

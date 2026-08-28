@@ -16,9 +16,13 @@ final class HandlerVersionContractTest
         return PHPat::rule()
             ->classes(
                 Selector::AllOf(
-                    Selector::inNamespace('App\\Domains\\Flow\\Handlers', true),
+                    Selector::inNamespace('App\\Domains\\Flow\\Handlers'),
                     Selector::NoneOf(
-                        Selector::inNamespace('App\\Domains\\Flow\\Handlers\\Abstract', true),
+                        Selector::inNamespace('App\\Domains\\Flow\\Handlers\\Abstract'),
+                        // Handlers\Support holds collaborators the handlers are built
+                        // from (operand resolution, comparison, templating) — they are
+                        // not nodes and have no (type, version) identity.
+                        Selector::inNamespace('App\\Domains\\Flow\\Handlers\\Support'),
                     ),
                 ),
             )
@@ -38,7 +42,7 @@ final class HandlerVersionContractTest
             )
             ->shouldNotDependOn()
             ->classes(
-                Selector::inNamespace('Illuminate\\Database', true),
+                Selector::inNamespace('Illuminate\\Database'),
                 Selector::classname('Illuminate\\Support\\Facades\\DB'),
                 Selector::classname('Illuminate\\Support\\Facades\\Schema'),
             )

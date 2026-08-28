@@ -1,9 +1,57 @@
 ---
 title: "Conversations"
-description: "Reading conversation history and message logs."
+description: "Reading what contacts sent, and replying when the flow cannot."
 ---
 
+Every exchange between a contact and this assistant, newest activity first.
+
+## The list
+
+Each row summarises one conversation: which **contact**, over which **channel**,
+the **last message**, how many are **unread**, the total **messages**, the
+**status**, and when it was **last active**.
+
+**View** opens the full transcript.
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  A contact is identified by the id the messaging platform gave them until the
+  assistant learns something better — a name collected in a flow, for instance.
+  A list of numbers is not a bug; it means those conversations have not reached
+  a point where a name was asked for.
 </Note>
+
+## Unread and status
+
+**Unread** counts inbound messages nobody has looked at. It is the queue for a
+human, and it does not go down on its own.
+
+**Status** is the conversation's state — open, or closed. Open means the exchange
+is considered ongoing, whether or not a flow is currently running inside it.
+
+<Note>
+  A conversation and a [session](/using/sessions) are different things and are
+  easy to confuse. The conversation is the whole relationship with that contact
+  on that channel. A session is one pass through one flow. A conversation can
+  have had many sessions, or none at all.
+</Note>
+
+## Replying
+
+Where a person replies from — the operator inbox — the message goes out **under
+the assistant's identity**. The contact sees the assistant, not the individual
+typing.
+
+That is usually what you want, and it is exactly why the permission to do it is
+marked sensitive: reading transcripts and speaking as the company are two
+separate grants, and neither is routine. See
+[Roles and permissions](/using/roles-and-permissions).
+
+## When to read them
+
+Transcripts answer the question flow logs cannot: *what did the person actually
+want*. A flow that technically completed while the contact rephrased the same
+question four times is working and failing at once, and only the transcript shows
+it.
+
+For the mechanical side — which node ran, what it returned, where execution
+stopped — see [Flow logs](/using/flow-logs).

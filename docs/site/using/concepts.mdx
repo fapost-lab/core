@@ -1,19 +1,84 @@
 ---
 title: "Core concepts"
-description: "Tenants, assistants, channels, contacts, conversations, flows, and sessions."
+description: "The nine words the rest of the guide assumes you know."
 ---
 
-<Warning>
-  **This section is not written yet.** Every page in it is a placeholder.
+Nine terms carry most of FaPost. They are worth reading once in order, because
+each builds on the one before.
 
-  It is meant to cover the admin panels and the flow canvas, and writing that
-  from source code rather than from the running interface is how documentation
-  ends up describing a product that does not exist. Until then,
-  [Self-Hosting](/self-hosting/overview) covers installing and operating, and
-  [Extending](/extending/extension-model) covers building on the platform.
-</Warning>
+## Tenant
+
+One organisation's installation — its assistants, its people, its data. On a
+self-hosted installation there is exactly one, and it is mostly invisible: it
+shows up as the tenant-wide [Settings](/using/tenant-settings) that every
+assistant shares.
+
+## Assistant
+
+One bot. It has its own channels, flows, contacts and conversations, and shares
+nothing with other assistants. See [Assistants](/using/assistants).
+
+## Channel
+
+The assistant's presence on a messaging platform — the Telegram or WhatsApp bot
+people actually write to. An assistant without a channel cannot hear anyone. See
+[Channels](/using/channels).
+
+## Contact
+
+A person the assistant has talked to, on one channel. Contacts are not entered by
+hand: one appears the first time someone writes. See [Contacts](/using/contacts).
 
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  A contact belongs to a channel, not to a person. The same human writing on two
+  platforms is two contacts, because the assistant has no way to know they are
+  the same and guessing wrong would merge two strangers.
 </Note>
+
+## Flow
+
+A conversation, drawn rather than coded. A flow is a sequence of **nodes** — send
+a message, wait for a reply, branch on a condition, call another system — and the
+connections between them. See [Flows](/using/flows).
+
+## Node and handle
+
+A node does one thing and reports an **outcome**: a branch reports `yes` or `no`,
+a call reports whether it worked. That outcome is called a handle, and the flow
+decides where each handle leads.
+
+The node does not choose what comes next. That separation is why a flow can be
+rearranged without rewriting its parts, and why an unexpected path is either a
+wrong outcome or a wrongly connected one — a distinction
+[Flow logs](/using/flow-logs) makes visible.
+
+## Session
+
+One contact making one pass through one flow. A session starts when a flow is
+triggered and ends when the flow finishes or is abandoned. See
+[Sessions](/using/sessions).
+
+<Note>
+  A **conversation** is the whole history with a contact on a channel. A
+  **session** is one journey through one flow inside it. A conversation may
+  contain many sessions, or none.
+</Note>
+
+## Publishing
+
+Editing a flow does not change what contacts see. Work happens in a draft, and
+contacts keep receiving the published version until someone publishes the new
+one. See [Publishing a flow](/using/publishing).
+
+A session also holds the version it started with, so publishing never changes a
+conversation already under way.
+
+## Trigger
+
+What causes a flow to start — a keyword the contact sends, an event raised
+elsewhere, or being the assistant's default flow. A flow with no trigger is
+started by another flow, or not at all.
+
+---
+
+Everything else in this guide is a screen for managing one of these.

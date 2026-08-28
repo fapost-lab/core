@@ -12,7 +12,7 @@ use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\Models\FlowSession;
 use Closure;
 use Fapost\Foundation\Flow\History\HistoryEventType;
-use Illuminate\Support\Facades\Log;
+use Psr\Log\LoggerInterface;
 
 /**
  * Production resumer: walks the parent → success/cancelled/failed handle when
@@ -30,6 +30,7 @@ final readonly class DefaultSubflowResumer implements SubflowResumerInterface
     public function __construct(
         private Closure $engineResolver,
         private HistoryWriterFactory $historyWriterFactory,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -44,7 +45,7 @@ final readonly class DefaultSubflowResumer implements SubflowResumerInterface
         $parent = FlowSession::query()->find($parentId);
 
         if (!$parent instanceof FlowSession) {
-            Log::warning('flow.subflow.resume.parent_missing', [
+            $this->logger->warning('flow.subflow.resume.parent_missing', [
                 'child_id'  => (string)$child->getKey(),
                 'parent_id' => $parentId,
             ]);
@@ -53,7 +54,7 @@ final readonly class DefaultSubflowResumer implements SubflowResumerInterface
         }
 
         if (FlowSessionStatus::PausedSubflow !== $parent->status) {
-            Log::warning('flow.subflow.resume.parent_not_paused', [
+            $this->logger->warning('flow.subflow.resume.parent_not_paused', [
                 'child_id'      => (string)$child->getKey(),
                 'parent_id'     => (string)$parent->getKey(),
                 'parent_status' => $parent->status?->value,

@@ -1,6 +1,31 @@
 includes:
 	- vendor/phpat/phpat/extension.neon
 
+# PHPat discovers rules ONLY through services tagged `phpat.test` — a class in
+# tests/Architecture that is not listed here is never executed. Register every
+# new architecture test class below.
+services:
+	-
+		class: Tests\Architecture\FlowRuntimeIsolationTest
+		tags:
+			- phpat.test
+	-
+		class: Tests\Architecture\HandlerVersionContractTest
+		tags:
+			- phpat.test
+	-
+		class: Tests\Architecture\IdStrategyTest
+		tags:
+			- phpat.test
+	-
+		class: Tests\Architecture\MessagingBoundariesTest
+		tags:
+			- phpat.test
+	-
+		class: Tests\Architecture\MigrationTest
+		tags:
+			- phpat.test
+
 parameters:
 	level: 0
 	paths:

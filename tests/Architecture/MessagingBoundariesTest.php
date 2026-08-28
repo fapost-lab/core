@@ -13,11 +13,11 @@ final class MessagingBoundariesTest
     public function test_flow_domain_does_not_depend_on_provider_sender_or_telegram_implementation(): Rule
     {
         return PHPat::rule()
-            ->classes(Selector::inNamespace('App\\Domains\\Flow', true))
+            ->classes(Selector::inNamespace('App\\Domains\\Flow'))
             ->shouldNotDependOn()
             ->classes(
                 Selector::classname('Fapost\\Foundation\\Messaging\\ProviderSenderInterface'),
-                Selector::inNamespace('App\\Domains\\Messaging\\Telegram', true),
+                Selector::inNamespace('App\\Domains\\Messaging\\Telegram'),
             )
             ->because('Flow domain must stay decoupled from messaging provider implementations.');
     }

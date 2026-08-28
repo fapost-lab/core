@@ -1,0 +1,55 @@
+---
+title: "The assistant console"
+description: "Where the day-to-day work happens."
+---
+
+Everything that belongs to one assistant lives in its own console: its channels,
+its flows, the people it talks to, and the record of what it did.
+
+You get there from the assistant list in the admin panel — **Manage** opens the
+console, **View** stays in the admin panel and shows the record. If you are
+looking for flows or conversations and cannot find them, you are in the admin
+panel; see [The admin panel](/using/admin-overview).
+
+## The sidebar
+
+The console groups its screens by what you are doing rather than by what the data
+is called.
+
+| Group | Screens | For |
+|---|---|---|
+| **Overview** | Assistant Dashboard | Is it running, and is anything wrong |
+| **Channels** | Channels | Where messages arrive from |
+| **Flow** | Flows, Groups | What the assistant says and asks |
+| **Settings** | Settings, Translations | How it behaves, and in which languages |
+| **Operations** | Sessions, Contacts, Flow Logs, Groups, Conversations, Segments, Broadcasts | The people, the traffic, and the record |
+
+Operations is the largest group because it holds two different jobs that happen
+to share a home: **working with people** — conversations, contacts, groups,
+segments, broadcasts — and **finding out what happened** — sessions and flow
+logs.
+
+## The overview screen
+
+Four panels, arranged in the order questions usually arrive:
+
+**Summary** — the assistant's name and whether it is active. An inactive
+assistant keeps everything it has but stops responding.
+
+**Channels** — how many are connected, with a pointer to where they are managed.
+
+**Flow** — where flow and automation surface.
+
+**Operations** — two shortcuts that are really a health check: **Live sessions**
+and **Errors 24 h**. Both are counters that should stay boring. Live sessions
+rising without traffic to explain it means conversations are starting and not
+finishing; errors above zero means at least one flow could not complete a step.
+
+## Two assistants, two consoles
+
+Each assistant has its own console at its own address, and nothing is shared
+between them except what the tenant-wide [Settings](/using/tenant-settings)
+define — languages, runtime limits, broadcast pacing.
+
+Contacts are not shared. A person who writes to two assistants is two contacts,
+because from each assistant's point of view they arrived independently.

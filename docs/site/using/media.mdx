@@ -1,9 +1,51 @@
 ---
-title: "Media"
-description: "Uploading and reusing images, documents, and other assets."
+title: "Media library"
+description: "Files an assistant can send, and what stops one being deleted."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+Images, documents and other files that flows can send to contacts. Uploaded once
+here, referenced from anywhere.
+
+## The library
+
+Files are organised in folders, starting at **Root**. **Upload files** adds them;
+**Create folder** organises them.
+
+Each file shows its **type**, **name**, **size**, when it was **uploaded** — and
+**Used in**.
+
+## Used in is the column that matters
+
+It lists where the file is referenced. That is what turns the library from a
+folder into something safe to tidy.
+
+<Warning>
+  A file that is used somewhere cannot simply be removed. Deletion is blocked
+  while references exist, because the alternative is a flow that sends a broken
+  attachment to a contact and nobody finding out until they complain.
+
+  To remove such a file, first change whatever references it.
+</Warning>
+
+Before deleting anything, read *Used in*. An empty value means nothing points at
+it; anything else is a list of things that would break.
+
+## Uploading once, sending many times
+
+A file lives in the library, and flows reference it. Changing the file changes
+what every flow referencing it sends — which is usually the point.
+
+That also means the same file uploaded twice is two files, tracked separately.
+Where a document is genuinely shared, reference the one copy rather than
+uploading it per flow, or updating it later becomes a hunt.
+
+## Folders
+
+Folders are organisational only: they change where a file is found, not what may
+use it. Any flow can reference any file regardless of folder.
+
+## Access
+
+Viewing the library and changing it are separate permissions. Someone can be
+given the ability to use existing files in flows without the ability to upload or
+delete — see [Roles and permissions](/using/roles-and-permissions).

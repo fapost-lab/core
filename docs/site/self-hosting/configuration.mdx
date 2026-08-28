@@ -1,9 +1,94 @@
 ---
 title: "Configuration"
-description: "Environment variables, database connections, and Redis."
+description: "The decisions behind the environment file, and what must change before production."
 ---
 
+Configuration lives in `.env`. The full list of variables with their defaults is
+in [Environment variables](/reference/environment-variables); this page is about
+the choices behind them.
+
+## Two database connections
+
+FaPost uses one PostgreSQL server with two logical scopes.
+
+**Landlord** holds platform-level records — the tenant list, the webhook routing
+registry, queues and cache tables. **Tenant** holds everything belonging to an
+organisation, in its own schema.
+
+You configure one connection. The tenant schema is selected at runtime from it,
+which is why there is no second set of `DB_*` variables and why the database user
+needs the `CREATE` privilege: schemas are created as tenants are.
+
+## Redis is not optional
+
+Redis carries four things, and losing any of them has a distinct symptom:
+
+| Carries | If it goes |
+|---|---|
+| Queues | Nothing is processed — messages arrive and are never answered |
+| Cache | Slower, but working |
+| Locks | Concurrent messages from one contact can race |
+| Webhook routing registry | Inbound messages resolve nowhere |
+
+The registry is the one that surprises people. It exists so that resolving an
+incoming webhook never touches the landlord database — the hot path stays a Redis
+lookup. That makes Redis part of the delivery path, not just an accelerator.
+
+<Warning>
+  `REDIS_PREFIX` must match between the application and the
+  [webhook gateway](/self-hosting/gateway) if you run one. A mismatch is silent:
+  the gateway reads an empty registry, decides it knows nothing, and forwards
+  every delivery to PHP. Everything works, slower, for no visible reason.
+</Warning>
+
+## Webhooks and the public address
+
+Two variables decide where providers deliver.
+
+`WEBHOOK_BASE_URL` is the address the application builds callback URLs from. It
+must be publicly reachable over HTTPS — providers will not deliver to anything
+else.
+
+`WEBHOOK_INGRESS_DRIVER` chooses what handles them: `laravel` for the application
+itself, `gateway` for the Go service.
+
 <Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
+  The driver applies to **newly registered channels only**. Existing channels
+  keep the URL their provider already stored, and the Laravel route stays live
+  regardless — so switching is not a cutover. Move the rest with
+  `php artisan ops:ingress-migrate --apply`.
 </Note>
+
+## What must change for production
+
+The shipped `.env.example` is a development file. Four values are unsafe as they
+stand:
+
+| | |
+|---|---|
+| `APP_DEBUG` | `true` exposes stack traces with configuration in them. Set `false`. |
+| `APP_KEY` | Empty. Generate one, and never reuse it across installations. |
+| `TELESCOPE_ENABLED` | `true` records every request, including their contents. |
+| `HCAPTCHA_*` | Ships with hCaptcha's public test keys, which always pass. |
+
+Set a `REDIS_PASSWORD` on anything but a local machine.
+
+## Languages
+
+`APP_LOCALE` and `APP_FALLBACK_LOCALE` are the **admin interface** language.
+
+What an assistant says to a contact is decided elsewhere entirely — tenant
+settings, assistant settings, and the flow itself. Changing these variables does
+not change a single word a contact receives.
+
+## Applying changes
+
+Configuration is read at boot. After editing `.env`:
+
+```bash
+php artisan config:clear
+```
+
+Then restart Horizon — long-running workers hold the configuration they started
+with, and a worker that has not been restarted is still using the old values
+however many times you clear the cache.

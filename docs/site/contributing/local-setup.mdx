@@ -4,9 +4,9 @@ description: "Getting a Core checkout running on your machine."
 ---
 
 <Note>
-  This section is current and describes the repository as it stands today.
-  Architecture decision records themselves stay in the repository; the
-  constraints they impose are written out here in their own words.
+  This is the development environment — a checkout you can run and change. For
+  installing FaPost on a server, see [Self-hosting](/self-hosting/overview)
+  instead; the two have different goals and different trade-offs.
 </Note>
 
 There are two ways to start. Docker gives you a runtime that matches production;
@@ -103,16 +103,28 @@ Check them all at once:
     php artisan key:generate
     ```
 
-    Then check the database settings:
+    `.env.example` ships the credentials the Docker stack creates for itself, so
+    that path works unedited. Running against services you provisioned yourself
+    means pointing these at them:
 
     ```dotenv
     DB_CONNECTION=pgsql
     DB_HOST=127.0.0.1
     DB_PORT=5432
     DB_DATABASE=fapost_core
-    DB_USERNAME=root
-    DB_PASSWORD=
+    DB_USERNAME=fapost
+    DB_PASSWORD=secret
+
+    REDIS_HOST=127.0.0.1
+    REDIS_PORT=6379
+    REDIS_PASSWORD=secret
     ```
+
+    <Note>
+      If your Redis runs without `requirepass`, set `REDIS_PASSWORD=null` rather
+      than leaving it empty — Laravel reads the literal `null` as "no password",
+      and an empty string is a password of zero length.
+    </Note>
   </Step>
 
   <Step title="Migrate and run">

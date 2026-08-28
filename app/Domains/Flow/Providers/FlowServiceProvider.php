@@ -16,6 +16,7 @@ use App\Domains\Flow\Concurrency\LockAcquisitionPolicy;
 use App\Domains\Flow\Concurrency\LockHeartbeat;
 use App\Domains\Flow\Concurrency\SessionLockManager;
 use App\Domains\Flow\Concurrency\SessionLockRegistry;
+use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationServiceInterface;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
@@ -134,11 +135,14 @@ use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Infrastructure\Flow\CachedContentTranslator;
+use App\Infrastructure\Flow\ConnectionAfterCommitDispatcher;
 use App\Infrastructure\Flow\FlowExecutionGuard;
 use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
+use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Psr\Log\LoggerInterface;
 
 final class FlowServiceProvider extends ServiceProvider
 {
@@ -271,6 +275,7 @@ final class FlowServiceProvider extends ServiceProvider
             fn ($app): DefaultSubflowResumer => new DefaultSubflowResumer(
                 fn (): FlowEngineInterface => $app->make(FlowEngineInterface::class),
                 $app->make(HistoryWriterFactory::class),
+                $app->make(LoggerInterface::class),
             ),
         );
         $this->app->scoped(CallGraphRepository::class);
@@ -349,6 +354,13 @@ final class FlowServiceProvider extends ServiceProvider
         // System translation catalog is platform-global metadata — seeded once
         // at boot, then read-only for the rest of the lifecycle.
         $this->app->singleton(SystemTranslationCatalogInterface::class, InMemorySystemTranslationCatalog::class);
+
+        $this->app->scoped(
+            AfterCommitDispatcherInterface::class,
+            fn ($app): AfterCommitDispatcherInterface => new ConnectionAfterCommitDispatcher(
+                $app->make(DatabaseManager::class)->connection(),
+            ),
+        );
 
         $this->app->scoped(FlowEngineInterface::class, FlowEngine::class);
         $this->app->scoped(FlowGraphResolver::class);

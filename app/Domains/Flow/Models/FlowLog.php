@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -30,7 +30,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 final class FlowLog extends Model
 {
-    use HasUuids;
+    use HasUlidPrimaryKey;
 
     public $timestamps = false;
 

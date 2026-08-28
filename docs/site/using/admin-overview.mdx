@@ -1,0 +1,67 @@
+---
+title: "The admin panel"
+description: "What the platform-level panel covers, and what it does not."
+---
+
+FaPost has two panels, and knowing which one you are in saves a lot of hunting.
+
+| | Covers |
+|---|---|
+| **Admin panel** | The installation as a whole — settings, people, media, and the list of assistants |
+| **Assistant console** | One assistant — its channels, flows, contacts, and conversations |
+
+The admin panel is where you set things up. The console is where you work day to
+day. Most of the user guide is about the console; this group is about everything
+that sits above it.
+
+## The dashboard
+
+Opening the panel lands you on a set of counters, each linking to what it counts:
+
+- **Assistants** — how many exist, how many are active
+- **Contacts** — everyone the installation has ever talked to
+- **Channels** — how many are configured and how many are connected
+- **Published flows** — flows currently deployed and answering
+- **Waiting sessions** — conversations paused mid-flow, awaiting a reply
+- **Staff users** — people with access to this tenant
+
+Below them, **Flow Activity** charts the last 14 days.
+
+The counters are the fastest health check available. *Waiting sessions* climbing
+without *published flows* changing usually means a flow asks a question nobody is
+answering; *channels configured but not connected* means messages are arriving
+nowhere.
+
+## What lives here
+
+<CardGroup cols={2}>
+  <Card title="Assistants" href="/using/assistants" icon="rocket">
+    The list of assistants, and the way into each one's console.
+  </Card>
+  <Card title="Settings" href="/using/tenant-settings" icon="sliders">
+    Languages, runtime limits, and broadcast behaviour — shared by every
+    assistant.
+  </Card>
+  <Card title="Users" href="/using/users" icon="users">
+    Who can sign in.
+  </Card>
+  <Card title="Roles and permissions" href="/using/roles-and-permissions" icon="shield-check">
+    What each of them may do.
+  </Card>
+  <Card title="Media" href="/using/media" icon="image">
+    Files assistants can send.
+  </Card>
+  <Card title="Translations" href="/using/translations" icon="language">
+    Content in more than one language.
+  </Card>
+</CardGroup>
+
+## What does not live here
+
+Channels, flows, contacts, conversations, sessions and logs all belong to a
+particular assistant, so they are not in this panel at all. Open the assistant
+first — see [The assistant console](/using/console-overview).
+
+The one exception is counting: the dashboard totals contacts and channels across
+every assistant, because that is a question about the installation rather than
+about one of them.

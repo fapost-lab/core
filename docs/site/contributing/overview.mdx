@@ -1,0 +1,117 @@
+---
+title: "For developers"
+description: "What the platform is made of, and which half of this section promises anything."
+---
+
+This section covers two different jobs. They share a codebase and almost nothing
+else, and knowing which one you are doing decides what you are allowed to rely on.
+
+## Two halves, one section
+
+**Building an extension** — the groups from *Extension model* through *Shipping
+an extension*. These describe the public surface: the contracts in
+`fapost/foundation` that Core undertakes not to break within a major version.
+Everything there is a promise.
+
+**Core internals** and **Contributing to Core** describe how Core is built: its
+domains, its runtime, the decisions that shape it. Nothing there is a promise —
+it is refactored freely.
+
+<Warning>
+  An extension written against the second half will break. That is not a failure
+  of the documentation; it is the arrangement that lets Core keep improving
+  without coordinating with every extension ever written. See
+  [Stability policy](/extending/stability-policy).
+</Warning>
+
+## What the platform is made of
+
+Three Composer packages plus a standalone Go service. The split is not
+organisational tidiness — it is what makes the platform extensible without
+freezing its internals.
+
+<CardGroup cols={2}>
+  <Card title="fapost/core" icon="cube">
+    The platform itself: domains, flow engine, admin panels, and the Vue builder.
+    This is the application an operator deploys.
+  </Card>
+  <Card title="fapost/foundation" icon="handshake">
+    The public contract layer for Solutions, Plugins, and external integrations.
+    Everything an extension is allowed to depend on.
+  </Card>
+  <Card title="fapost/support" icon="screwdriver-wrench">
+    Reusable primitives: the ULID trait, a base model, model concerns, and the
+    builder schema field classes.
+  </Card>
+  <Card title="gateway" icon="bolt">
+    An optional Go service that accepts, verifies, and queues provider webhooks
+    without involving PHP.
+  </Card>
+</CardGroup>
+
+### fapost/core
+
+Thirteen domains under `app/Domains`, the flow engine, the Filament admin and
+assistant panels, and the Inertia + Vue flow builder. It depends on both packages
+below.
+
+Core is where a **Feature** lives — a capability that belongs to the product
+surface and releases with the platform. Anything narrower belongs outside it; see
+[Choosing an extension type](/extending/choosing-an-extension-type).
+
+### fapost/foundation
+
+Node handlers, data accessors, channel and messaging interfaces, RAG adapters,
+the plugin and solution lifecycle base classes, and the DTOs that travel between
+them.
+
+This package is the extension boundary. A Solution or Plugin depends on
+`fapost/foundation` and never on `App\…`, which is what lets Core refactor its
+own internals without breaking anything built on top.
+
+It has no FaPost dependencies of its own — only PHP 8.4, `illuminate/support`,
+`psr/http-message`, and `spatie/laravel-data`.
+
+### fapost/support
+
+Primitives with no domain meaning. `HasUlidPrimaryKey`, a `BaseModel`, concerns
+for computed attributes and utilities — and the field classes that describe a
+node's configuration form: `TextField`, `SelectField`, `StatePickerField`,
+`ObjectArrayField` and the rest, assembled into a `Schema` of `Section`s.
+
+`fapost/support` depends on `fapost/foundation`. The arrow runs one way and never
+back toward Core.
+
+<Note>
+  Both packages live in their own repositories under
+  [fapost-lab](https://github.com/fapost-lab). During development they are
+  checked out into `packages/` and symlinked into `vendor/`; in production they
+  resolve from git like any other dependency. See
+  [Development setup](/extending/development-setup).
+</Note>
+
+### gateway
+
+A Go service in `gateway/`, shipped inside the Core repository rather than as a
+Composer package, because it is not PHP.
+
+It sits in front of webhook ingress: rate-limits by channel, resolves the routing
+entry from Redis, verifies the provider's signature, claims an idempotency key,
+and pushes the job — about a millisecond, with no PHP process involved. It knows
+nothing about any particular platform; each channel adapter publishes a
+declarative **ingress spec** describing how its webhook is signed, and both the
+Go and PHP implementations are held to the same golden file so they cannot drift.
+
+It is optional. Without it, webhooks go to the Laravel route exactly as they
+always have. See [Webhook gateway](/self-hosting/gateway).
+
+## Where to start
+
+<CardGroup cols={2}>
+  <Card title="Local setup" href="/contributing/local-setup" icon="terminal">
+    Get a checkout running on your machine.
+  </Card>
+  <Card title="Extension model" href="/extending/extension-model" icon="puzzle-piece">
+    Feature, Solution, or Plugin — and how they differ.
+  </Card>
+</CardGroup>

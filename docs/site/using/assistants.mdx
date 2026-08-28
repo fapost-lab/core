@@ -1,9 +1,59 @@
 ---
 title: "Assistants"
-description: "Creating an assistant and configuring how it behaves."
+description: "Creating an assistant, and opening its console."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+An assistant is one bot: its own channels, its own flows, its own contacts. The
+admin panel lists them; the work happens inside each one.
+
+## The list
+
+Each row shows the assistant's **name**, whether it is **active**, its **default
+language**, and when it was last **updated**.
+
+Two actions, and the difference matters:
+
+| | |
+|---|---|
+| **Manage** | Opens the [assistant console](/using/console-overview) — channels, flows, contacts, conversations |
+| **View** | Stays in the admin panel and shows the record |
+
+Almost everything you would want to do with an assistant is behind **Manage**.
+**View** is for the record itself.
+
+## Creating one
+
+**New Assistant** asks for three things:
+
+**Name** — how it appears in this list. Contacts never see it; what they see is
+the bot on the messaging platform.
+
+**Default language** — what it answers in when the contact's language is unknown.
+Only languages enabled tenant-wide are offered; see
+[Settings](/using/tenant-settings).
+
+**Active** — whether it serves.
+
+That is all. A new assistant has no channel, no flow, and no contacts — it exists
+and does nothing. The next two steps are connecting a
+[channel](/using/channels) so messages can arrive, and building a
+[flow](/using/flows) so there is something to answer with.
+
+## Active and inactive
+
+Deactivating stops an assistant responding while keeping everything it has:
+channels stay configured, flows stay published, contacts and conversations stay
+readable.
+
+Reach for it when a bot should stop talking but nothing should be lost — a
+seasonal campaign ending, or a flow that needs fixing before it keeps running.
+
+## More than one
+
+Assistants are fully separate. Two assistants share nothing but the tenant-wide
+settings — not contacts, not flows, not conversations.
+
+That separation is the reason to have several: a support bot and a recruitment
+bot have different flows, different people answering them, and no reason to see
+each other's conversations. It is also the reason not to split without cause —
+two assistants mean two sets of everything to maintain.

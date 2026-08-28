@@ -21,15 +21,13 @@ new database schema, which is the worst combination of the two.
 ## Docker Compose
 
 ```bash
-C="docker compose -f docker/compose.yaml --env-file .env"
+docker compose pull
+docker compose up -d
 
-$C pull
-$C up -d
+docker compose exec app php artisan migrate --database=landlord --path=database/migrations/landlord --force
+docker compose exec app php artisan ops:tenants-migrate
 
-$C exec app php artisan migrate --database=landlord --path=database/migrations/landlord --force
-$C exec app php artisan ops:tenants-migrate
-
-$C exec app php artisan horizon:terminate
+docker compose exec app php artisan horizon:terminate
 ```
 
 `horizon:terminate` lets in-flight jobs finish and then exits; Compose restarts
@@ -60,7 +58,7 @@ methods exist but are exercised far less than `up()`, and a partial rollback on 
 schema-per-tenant layout is worse than a restore.
 
 ```bash
-docker compose -f docker/compose.yaml --env-file .env exec postgres \
+docker compose exec postgres \
   pg_dump -U fapost fapost | gzip > backup-$(date +%F).sql.gz
 ```
 
@@ -85,8 +83,8 @@ The gateway upgrades independently of the application — it shares only Redis a
 the queue format, both versioned.
 
 ```bash
-docker compose -f docker/compose.yaml --env-file .env --profile gateway pull
-docker compose -f docker/compose.yaml --env-file .env --profile gateway up -d
+docker compose --profile gateway pull
+docker compose --profile gateway up -d
 php artisan ops:ingress-specs-publish   # if adapters changed
 php artisan gateway:doctor
 ```
@@ -103,7 +101,7 @@ APP_VERSION=v1.4.1
 ```
 
 ```bash
-docker compose -f docker/compose.yaml --env-file .env up -d
+docker compose up -d
 ```
 
 Code rolls back cleanly. **The database does not.** If the release you are leaving
@@ -114,12 +112,10 @@ the new columns.
 ## Verifying
 
 ```bash
-C="docker compose -f docker/compose.yaml --env-file .env"
-
-$C ps                                     # all services up
-$C exec app php artisan about              # version, environment, cache state
-$C exec app php artisan horizon:status     # workers running the new code
-$C logs --tail 50 horizon
+docker compose ps                                     # all services up
+docker compose exec app php artisan about              # version, environment, cache state
+docker compose exec app php artisan horizon:status     # workers running the new code
+docker compose logs --tail 50 horizon
 ```
 
 ## Related

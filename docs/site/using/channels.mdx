@@ -1,9 +1,77 @@
 ---
 title: "Channels"
-description: "Connecting messaging providers and routing their traffic."
+description: "Connecting a messaging provider to an assistant."
 ---
 
-<Note>
-  This page has not been written yet. Its place in the navigation is settled;
-  the content is not.
-</Note>
+A channel is the assistant's presence on one messaging platform — the bot people
+actually write to. Without one, an assistant has flows and contacts but no way to
+hear from anyone.
+
+## The list
+
+Each channel shows its **platform**, its **webhook hash**, whether it is
+**active**, and when it was last **updated**. Three actions: **Edit**, **Rotate
+webhook hash**, **Delete**.
+
+## Connecting one
+
+**New Channel** asks for the platform and its credentials:
+
+**Token** — the bot token issued by the platform. This is what authorises the
+assistant to send.
+
+**Secret token** — used to verify that an incoming request genuinely came from
+the provider and not from someone who guessed the URL. For Telegram this is the
+value checked against the `X-Telegram-Bot-Api-Secret-Token` header.
+
+**Active** — whether the channel is in service.
+
+**Channel settings** — free-form key/value pairs for options a particular
+platform needs beyond the two above.
+
+<Warning>
+  Saving a channel contacts the provider and registers the webhook. A token that
+  does not belong to a real bot makes the save fail — the platform is not storing
+  a credential and hoping, it is proving the credential works before accepting
+  it.
+
+  This is why a channel cannot be prepared in advance and filled in later. Have
+  the token ready.
+</Warning>
+
+## The webhook hash
+
+Every channel gets a unique hash, which becomes part of the URL the provider
+delivers to. It is not a display value: **it is the credential that identifies
+this channel**, which is why the list shows it in full only to those who may
+manage channels.
+
+**Rotate webhook hash** issues a new one.
+
+<Warning>
+  Rotating invalidates the URL the provider currently has. Deliveries stop until
+  the webhook is re-registered on the provider side, and nothing warns you —
+  messages simply arrive nowhere.
+
+  Rotate when the hash may have leaked. Do not rotate to "refresh" a channel that
+  is misbehaving; that is not what it fixes.
+</Warning>
+
+The permission to rotate is marked sensitive for exactly this reason — see
+[Roles and permissions](/using/roles-and-permissions).
+
+## Active and deleted
+
+Deactivating stops the channel serving without discarding it: the token, the
+hash, and the conversations that came through it all remain. Deleting removes the
+channel itself.
+
+Prefer deactivating. A deleted channel takes its identity with it, and
+reconnecting later means a new hash and a fresh registration with the provider.
+
+## Several channels, one assistant
+
+An assistant can hold more than one channel — the same flows answering on
+Telegram and WhatsApp, for instance. Contacts remain per channel: the same person
+writing on two platforms is two contacts, because from the assistant's side two
+separate people started talking.

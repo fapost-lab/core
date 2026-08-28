@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Architecture;
 
+use App\Domains\Flow\Models\FlowCallgraphEdge;
 use App\Domains\Presale\Models\PreSaleRequest;
 use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use PHPat\Selector\Selector;
@@ -17,10 +18,14 @@ final class IdStrategyTest
         return PHPat::rule()
             ->classes(
                 Selector::AllOf(
-                    Selector::inNamespace('^App\\\\Domains\\\\.*\\\\Models$', true),
+                    Selector::inNamespace('#^App\\\\Domains\\\\.*\\\\Models$#', true),
                     Selector::NoneOf(
                         Selector::isEnum(),
                         Selector::classname(PreSaleRequest::class),
+                        // Composite primary key (caller_flow_id, callee_flow_id,
+                        // caller_definition_id) — the row has no surrogate id column
+                        // for a ULID to occupy.
+                        Selector::classname(FlowCallgraphEdge::class),
                     ),
                 ),
             )
