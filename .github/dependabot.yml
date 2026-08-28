@@ -1,0 +1,54 @@
+# Dependabot opens pull requests for outdated dependencies. The alerts enabled on
+# this repository only report that a problem exists; this is what proposes the
+# fix.
+#
+# Every ecosystem in the repository is listed, because the one left out is the
+# one that goes stale: PHP and the front-end, the Go gateway, both Dockerfiles,
+# and the Actions the workflows pin.
+
+version: 2
+updates:
+  - package-ecosystem: composer
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # One pull request for the routine bumps rather than five. Anything that
+      # is not a patch still arrives on its own, where it can be read properly.
+      patch-updates:
+        update-types: ["patch"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      patch-updates:
+        update-types: ["patch"]
+
+  - package-ecosystem: gomod
+    directory: /gateway
+    schedule:
+      interval: weekly
+      day: monday
+
+  # Base images. Both are listed separately because Dependabot reads one
+  # Dockerfile per directory entry.
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: docker
+    directory: /gateway
+    schedule:
+      interval: monthly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

@@ -1,0 +1,70 @@
+/* ---------------------------------------------------------------------------
+   Heading hierarchy
+
+   Mintlify's default scale renders h2/h3/h4 at 24/20/18px, all at weight 600.
+   Four pixels apart with no other cue reads as one level in three sizes, not
+   as a hierarchy — readers cannot tell a section from a subsection.
+
+   These rules widen the steps and, more importantly, give each level a
+   different *kind* of treatment: h2 opens a section with a rule above it,
+   h3 is a plain bold heading, h4 steps down in size and colour. Size alone
+   is a weak signal; structure and colour are strong ones.
+
+   Scoped to #content.mdx-content so the sidebar and table of contents keep
+   their own, deliberately flat, scale.
+   --------------------------------------------------------------------------- */
+
+#content.mdx-content h2 {
+  font-size: 1.75rem; /* 28px, up from 24 */
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  margin-top: 4rem;
+  padding-top: 2rem;
+  border-top: 1px solid rgb(23 23 23 / 12%);
+}
+
+.dark #content.mdx-content h2 {
+  border-top-color: rgb(255 255 255 / 12%);
+}
+
+/* A section rule directly under the page title is a line with nothing above
+   it to separate. */
+#content.mdx-content h2:first-child {
+  margin-top: 1rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
+#content.mdx-content h3 {
+  font-size: 1.3125rem; /* 21px */
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+  margin-top: 2.75rem;
+}
+
+#content.mdx-content h4 {
+  font-size: 1.0625rem; /* 17px */
+  line-height: 1.4;
+  margin-top: 2rem;
+  color: rgb(82 82 82);
+}
+
+.dark #content.mdx-content h4 {
+  color: rgb(163 163 163);
+}
+
+/* Mintlify drops h1 from 36px to 30px below Tailwind's `sm` breakpoint
+   (`text-3xl sm:text-4xl`). A fixed 28px h2 nearly collides with it there, so
+   the whole scale steps down with it. */
+@media (max-width: 639px) {
+  #content.mdx-content h2 {
+    font-size: 1.5rem;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+  }
+
+  #content.mdx-content h3 {
+    font-size: 1.1875rem;
+    margin-top: 2.25rem;
+  }
+}
