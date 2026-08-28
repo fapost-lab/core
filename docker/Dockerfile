@@ -88,7 +88,7 @@ RUN composer install \
 # ---------------------------------------------------------------------------
 # assets — compiled front-end
 # ---------------------------------------------------------------------------
-FROM node:22-alpine AS assets
+FROM node:25-alpine AS assets
 
 WORKDIR /build
 
