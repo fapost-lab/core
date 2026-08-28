@@ -181,6 +181,24 @@ systemctl status fapost-scheduler.timer
 curl -I https://fapost.example.com/
 ```
 
+## Optional: the webhook gateway
+
+The [webhook gateway](/self-hosting/gateway) is a separate Go service that takes
+provider webhooks ahead of PHP. **Nothing above depends on it.** Without it,
+webhooks go to the Laravel route — a supported mode, not a degraded one.
+
+Add it when webhook volume makes PHP the bottleneck, not because it exists.
+
+Installing it here needs no Go toolchain: the binary lifts straight out of the
+published container image on any machine that has Docker. Then
+
+```bash
+php artisan gateway:install
+```
+
+writes the settings into `.env` and generates a systemd unit and logrotate config
+into `gateway/dist/` for you to review before installing them.
+
 ## Upgrading
 
 ```bash
@@ -218,4 +236,5 @@ which would remove Composer and Node from the host entirely.
 - [Deployment overview](/self-hosting/overview)
 - [Requirements](/self-hosting/requirements)
 - [Long-running services](/self-hosting/services)
+- [Webhook gateway](/self-hosting/gateway) — the optional Go ingress
 - [Docker Compose](/self-hosting/docker-compose) — less work if containers are an option

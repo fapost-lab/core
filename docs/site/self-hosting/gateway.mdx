@@ -52,68 +52,49 @@ Both implementations are held to
 [`contracts/ingress/golden.json`](https://github.com/fapost-lab/core/blob/main/contracts/ingress/golden.json) — 40 cases
 executed by both the PHP and the Go test suites, so the two cannot drift apart.
 
-## Building from source
-
-The gateway is a single static binary with no runtime dependencies: a build on any
-machine runs on any Linux of the same architecture — no matching libc, no
-interpreter, nothing to install alongside it.
-
-**Prerequisites:** Go 1.27 or newer. Nothing else; the only dependency is the
-Redis client, vendored through `go.mod`.
-
-```bash
-cd gateway
-make build
-```
-
-That produces `bin/gateway`, with the version stamped in from `git describe` so a
-running process can be traced back to a commit.
-
-| Target | Does |
-|---|---|
-| `make build` | Build for the host platform |
-| `make dist` | Cross-compile for `linux/amd64`, `linux/arm64`, `darwin/arm64` |
-| `make test` | Run the suite with the race detector |
-| `make lint` | Check `gofmt` formatting and run `go vet` |
-| `make check` | `lint` then `test` |
-| `make all` | `check` then `build` |
-| `make install-local` | Install the binary into `/usr/local/bin` |
-| `make clean` | Remove `bin/` |
-
-Go needs no per-target toolchain, so `make dist` produces every supported
-platform's release binary from one developer machine.
-
-<Note>
-  Run `make check` before shipping a gateway build. Its spec executor is held to
-  the same golden file as the PHP implementation, so a regression here is a
-  regression in webhook verification for every channel.
-</Note>
-
-### As a container image
-
-```bash
-docker build -t fapost-gateway:local --build-arg VERSION=$(git describe --tags --always) gateway/
-```
-
-The build is two-stage and the final stage is `scratch`: the shipped image holds
-the binary, root certificates, and nothing else — no Go toolchain, no shell, no
-package manager. That keeps it small and leaves an attacker who reaches the most
-exposed process in the stack with no tools to work with.
-
-The image runs as UID 65534 and carries no `.env`; configuration is injected by
-the runtime, so one image is promoted unchanged from staging to production.
-
 ## Installing
 
 ### With Docker Compose
 
-The gateway sits behind a profile, so it starts only when asked:
+The gateway ships as a published image, `ghcr.io/fapost-lab/gateway`, built by
+the same workflow that publishes `core` and `web`. Nothing is compiled locally.
+
+It sits behind a Compose profile, so it starts only when asked:
 
 ```bash
 docker compose --profile gateway up -d
 ```
 
+`docker/compose.yaml` already references the image; `GATEWAY_VERSION` pins the
+tag and defaults to `latest`.
+
+The image is built in two stages and the final stage is `scratch`: it holds the
+binary, root certificates, and nothing else — no Go toolchain, no shell, no
+package manager. That keeps it small and leaves an attacker who reaches the most
+exposed process in the stack with no tools to work with. It runs as UID 65534 and
+carries no `.env`, so one image is promoted unchanged from staging to production.
+
 ### Standalone
+
+Without Docker the gateway needs a binary rather than an image. Neither way of
+getting one requires a Go toolchain on the server.
+
+**Out of the published image**, if Docker is available on any machine — no build
+at all:
+
+```bash
+id=$(docker create ghcr.io/fapost-lab/gateway:latest)
+docker cp "$id:/gateway" ./gateway
+docker rm "$id"
+sudo install -m 0755 ./gateway /usr/local/bin/gateway
+```
+
+The image's final stage is `scratch` with the binary at `/gateway`, so this lifts
+it straight out. The machine you do it on need not be the target server: the
+binary is static, so only the architecture has to match.
+
+**From source**, if you would rather not pull an image, or you are changing the
+gateway:
 
 ```bash
 cd gateway
@@ -121,7 +102,29 @@ make build
 sudo install -m 0755 bin/gateway /usr/local/bin/gateway
 ```
 
-Then generate the supervisor files:
+**Prerequisites:** Go 1.27 or newer. Nothing else; the only dependency is the
+Redis client, vendored through `go.mod`. The version is stamped in from
+`git describe`, so a running process can be traced back to a commit.
+
+| Target | Does |
+|---|---|
+| `make build` | Build for the host platform |
+| `make dist` | Cross-compile for `linux/amd64`, `linux/arm64`, `darwin/arm64` |
+| `make install-local` | Install the binary into `/usr/local/bin` |
+| `make clean` | Remove `bin/` |
+
+Go needs no per-target toolchain, so `make dist` cross-compiles from whatever
+machine you have in front of you: build on a Mac, copy the `linux/amd64` binary
+to the server.
+
+<Note>
+  If you are modifying the gateway rather than deploying it, its test and lint
+  targets are covered in [Testing](/contributing/testing).
+</Note>
+
+### Generating the service files
+
+Either way, once the gateway is available:
 
 ```bash
 php artisan gateway:install

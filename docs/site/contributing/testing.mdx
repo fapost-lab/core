@@ -60,6 +60,31 @@ vendor/bin/pint --dirty --format agent
 
 Run after changing PHP.
 
+## The gateway
+
+The Go gateway carries its own suite, run from `gateway/`:
+
+| Target | Does |
+|---|---|
+| `make test` | Run the suite with the race detector |
+| `make lint` | Check `gofmt` formatting and run `go vet` |
+| `make check` | `lint` then `test` |
+| `make all` | `check` then `build` |
+
+<Warning>
+  Run `make check` before shipping a gateway build. Its spec executor is held to
+  the same golden file as the PHP implementation, so a regression here is a
+  regression in webhook verification for every channel.
+</Warning>
+
+That golden file is `contracts/ingress/golden.json`, and both suites execute its
+40 cases. A verification change that passes in one language and fails in the
+other is precisely what it exists to catch — so extend the golden file rather
+than either language's own tests.
+
+Deploying the gateway rather than changing it needs none of this: see
+[Webhook gateway](/self-hosting/gateway).
+
 ## What a good test covers
 
 Test the contract, not the implementation. For a node handler that means the
