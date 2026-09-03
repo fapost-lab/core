@@ -113,17 +113,35 @@ final class ValidateFlowServiceMediaTest extends FeatureTestCase
 
 final class MediaValidationSendMessageStub implements NodeHandlerInterface
 {
-    public function type(): string { return 'send_message'; }
+    public function type(): string
+    {
+        return 'send_message';
+    }
 
-    public function version(): int { return 1; }
+    public function version(): int
+    {
+        return 1;
+    }
 
-    public function supportedVersions(): array { return [1]; }
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
 
-    public function label(): string { return 'Send Message'; }
+    public function label(): string
+    {
+        return 'Send Message';
+    }
 
-    public function category(): string { return 'Test'; }
+    public function category(): string
+    {
+        return 'Test';
+    }
 
-    public function configSchema(): array { return []; }
+    public function configSchema(): array
+    {
+        return [];
+    }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
@@ -133,7 +151,10 @@ final class MediaValidationSendMessageStub implements NodeHandlerInterface
 
 final class MediaValidationNullDataAccessors implements DataAccessorRegistryInterface
 {
-    public function has(string $namespacePrefix): bool { return false; }
+    public function has(string $namespacePrefix): bool
+    {
+        return false;
+    }
 
     public function resolve(string $namespacePrefix): DataAccessorInterface
     {
@@ -143,19 +164,28 @@ final class MediaValidationNullDataAccessors implements DataAccessorRegistryInte
 
 final class MediaValidationNullTriggerValidator implements FlowTriggerConfigValidatorInterface
 {
-    public function validate(string $type, array $config): void {}
+    public function validate(string $type, array $config): void
+    {
+    }
 }
 
 final class MediaValidationNullTenantEvents implements TenantEventRepositoryInterface
 {
-    public function getEventNamesByTenant(string $tenantId): array { return []; }
+    public function getEventNamesByTenant(string $tenantId): array
+    {
+        return [];
+    }
 
-    public function registerEventNames(string $tenantId, array $eventNames): void {}
+    public function registerEventNames(string $tenantId, array $eventNames): void
+    {
+    }
 }
 
 final class MediaValidationResolvedTenantContext implements TenantContextInterface
 {
-    public function set(TenantInterface $tenant): void {}
+    public function set(TenantInterface $tenant): void
+    {
+    }
 
     public function get(): TenantInterface
     {
@@ -167,5 +197,7 @@ final class MediaValidationResolvedTenantContext implements TenantContextInterfa
         return true;
     }
 
-    public function reset(): void {}
+    public function reset(): void
+    {
+    }
 }

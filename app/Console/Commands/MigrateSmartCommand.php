@@ -59,7 +59,7 @@ final class MigrateSmartCommand extends Command
         $checkLandlord = $checkAll || (bool)$this->option('landlord');
         $checkTenant   = $checkAll || (bool)$this->option('tenant');
 
-        if ( ! $checkLandlord && ! $checkTenant) {
+        if (! $checkLandlord && ! $checkTenant) {
             return [
                 'landlord' => true,
                 'tenant'   => true,
@@ -88,7 +88,7 @@ final class MigrateSmartCommand extends Command
         return $this->migrator->usingConnection($connection, function () use ($paths): int {
             $migrationFiles = $this->migrator->getMigrationFiles($paths);
 
-            if ( ! $this->migrator->repositoryExists()) {
+            if (! $this->migrator->repositoryExists()) {
                 return count($migrationFiles);
             }
 

@@ -380,7 +380,7 @@ final class FlowEngineTest extends FeatureTestCase
     {
         $readRegistry = $this->app->make(DataAccessorRegistryInterface::class);
 
-        if ( ! $readRegistry->has($prefix)) {
+        if (! $readRegistry->has($prefix)) {
             $this->app->make(MutableDataAccessorRegistryInterface::class)->register($prefix, $accessor);
         }
     }

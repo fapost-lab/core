@@ -92,7 +92,7 @@ final class AssistantResource extends Resource
         $query = parent::getEloquentQuery();
         $user  = Auth::user();
 
-        if ( ! $user instanceof User) {
+        if (! $user instanceof User) {
             return $query->whereRaw('0 = 1');
         }
 

@@ -121,14 +121,14 @@ final class ContactWriterTest extends FeatureTestCase
 
     public function test_writes_emit_history_when_writer_records(): void
     {
-        $tenantId = (string) \Illuminate\Support\Str::uuid();
-        $contact  = \App\Domains\Contact\Models\Contact::factory()->forTenant($tenantId)->create();
+        $tenantId = (string) Str::uuid();
+        $contact  = Contact::factory()->forTenant($tenantId)->create();
 
         // history requires a real session row because of the FK constraint
-        $assistant = \App\Domains\Assistant\Models\Assistant::factory()->create(['tenant_id' => $tenantId]);
+        $assistant  = \App\Domains\Assistant\Models\Assistant::factory()->create(['tenant_id' => $tenantId]);
         $definition = \App\Domains\Flow\Models\FlowDefinition::query()->create([
             'tenant_id'         => $tenantId,
-            'flow_id'           => \Illuminate\Support\Str::uuid()->toString(),
+            'flow_id'           => Str::uuid()->toString(),
             'version'           => 1,
             'name'              => 'Test',
             'nodes'             => [],

@@ -24,13 +24,11 @@ final class QueuedFlowTriggerEventPublisherTest extends TestCase
             source: ['session_id' => 'sess-1', 'node_id' => 'emit-1'],
         );
 
-        Queue::assertPushed(DispatchFlowTriggerEventJob::class, function (DispatchFlowTriggerEventJob $job): bool {
-            return 'tenant-A' === $job->tenantId
+        Queue::assertPushed(DispatchFlowTriggerEventJob::class, fn (DispatchFlowTriggerEventJob $job): bool => 'tenant-A' === $job->tenantId
                 && 'sales.order.created' === $job->eventName
                 && ['order_id' => 'ORD-1', 'total' => 99] === $job->payload
                 && 'sess-1' === $job->source['session_id']
-                && 'emit-1' === $job->source['node_id'];
-        });
+                && 'emit-1' === $job->source['node_id']);
 
         Queue::assertPushedOn('scheduled.triggers', DispatchFlowTriggerEventJob::class);
     }

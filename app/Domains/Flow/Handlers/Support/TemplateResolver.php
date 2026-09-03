@@ -11,7 +11,7 @@ final class TemplateResolver
      */
     public function resolve(mixed $value, array $state): mixed
     {
-        if ( ! is_string($value) || ! str_contains($value, '{{')) {
+        if (! is_string($value) || ! str_contains($value, '{{')) {
             return $value;
         }
 

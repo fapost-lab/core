@@ -21,6 +21,17 @@ use Tests\TestCase;
 
 final class ConversationCaptureFactoryTest extends TestCase
 {
+    /**
+     * @return iterable<string, array{MessageOrigin}>
+     */
+    public static function nonStaffOrigins(): iterable
+    {
+        yield 'flow' => [MessageOrigin::Flow];
+        yield 'broadcast' => [MessageOrigin::Broadcast];
+        yield 'notify' => [MessageOrigin::Notify];
+        yield 'command' => [MessageOrigin::Command];
+        yield 'system' => [MessageOrigin::System];
+    }
     public function test_maps_inbound_text_message(): void
     {
         $message = new IncomingMessage(
@@ -230,17 +241,5 @@ final class ConversationCaptureFactoryTest extends TestCase
         $this->assertSame(MessageSenderType::Assistant, $entry->senderType);
         $this->assertNull($entry->senderStaffUserId);
         $this->assertSame($origin, $entry->origin);
-    }
-
-    /**
-     * @return iterable<string, array{MessageOrigin}>
-     */
-    public static function nonStaffOrigins(): iterable
-    {
-        yield 'flow' => [MessageOrigin::Flow];
-        yield 'broadcast' => [MessageOrigin::Broadcast];
-        yield 'notify' => [MessageOrigin::Notify];
-        yield 'command' => [MessageOrigin::Command];
-        yield 'system' => [MessageOrigin::System];
     }
 }

@@ -53,7 +53,7 @@ final class EditChannel extends EditRecord
 
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
-        if ( ! $record instanceof Channel) {
+        if (! $record instanceof Channel) {
             throw new InvalidArgumentException('Expected channel record.');
         }
 

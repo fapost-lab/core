@@ -99,6 +99,24 @@ abstract class FeatureTestCase extends TestCase
     }
 
     /**
+     * Absolute URL for a panel path.
+     *
+     * The admin and assistant panels are bound to the tenant host, so a bare
+     * path resolves against the base domain and answers 404. Tests that exercise
+     * a panel go through here rather than repeating the host.
+     */
+    protected function panelUrl(string $path): string
+    {
+        $host = TenantHost::forDefaultTenant();
+
+        if (null === $host) {
+            return $path;
+        }
+
+        return 'http://' . $host . '/' . mb_ltrim($path, '/');
+    }
+
+    /**
      * The application, and with it the config, is rebuilt for every test, so
      * the search_path is set again each time, before the transaction starts.
      * A connection opened during boot would still carry the old search_path;
@@ -107,7 +125,7 @@ abstract class FeatureTestCase extends TestCase
      */
     private function pointDefaultConnectionAtTenantSchema(): void
     {
-        if ( ! $this->usingPostgres()) {
+        if (! $this->usingPostgres()) {
             return;
         }
 
@@ -123,7 +141,7 @@ abstract class FeatureTestCase extends TestCase
      */
     private function createTenantSchema(): void
     {
-        if ( ! $this->usingPostgres()) {
+        if (! $this->usingPostgres()) {
             return;
         }
 
@@ -173,23 +191,5 @@ abstract class FeatureTestCase extends TestCase
             'status'      => 'active',
             'config'      => '{}',
         ]);
-    }
-
-    /**
-     * Absolute URL for a panel path.
-     *
-     * The admin and assistant panels are bound to the tenant host, so a bare
-     * path resolves against the base domain and answers 404. Tests that exercise
-     * a panel go through here rather than repeating the host.
-     */
-    protected function panelUrl(string $path): string
-    {
-        $host = TenantHost::forDefaultTenant();
-
-        if (null === $host) {
-            return $path;
-        }
-
-        return 'http://' . $host . '/' . ltrim($path, '/');
     }
 }

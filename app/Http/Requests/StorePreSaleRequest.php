@@ -62,7 +62,7 @@ final class StorePreSaleRequest extends FormRequest
             ]
         );
 
-        if ( ! $response->successful() || ! $response->json('success')) {
+        if (! $response->successful() || ! $response->json('success')) {
             $validator->errors()->add('h-captcha-response', 'Captcha verification failed. Please try again.');
         }
     }

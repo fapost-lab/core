@@ -73,7 +73,7 @@ final class UserService
      */
     private function isLastActiveAdmin(User $target): bool
     {
-        if ( ! $target->isAdmin()) {
+        if (! $target->isAdmin()) {
             return false;
         }
 

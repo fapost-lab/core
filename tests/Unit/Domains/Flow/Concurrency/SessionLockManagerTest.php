@@ -101,7 +101,9 @@ abstract class SessionLockManagerTestBase extends TestCase
 
         $this->connection = $this->createMock(Connection::class);
         $this->factory    = new class ($this->connection) implements RedisFactory {
-            public function __construct(private readonly Connection $connection) {}
+            public function __construct(private readonly Connection $connection)
+            {
+            }
 
             public function connection($name = null): Connection
             {

@@ -9,10 +9,11 @@ use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Console\Command;
-use RuntimeException;
-use Throwable;
 
 use function Laravel\Prompts\multiselect;
+
+use RuntimeException;
+use Throwable;
 
 /**
  * Runs {@see TenantAclSeeder::run()} per selected active tenant via {@see TenantSwitcher}.
@@ -125,7 +126,7 @@ final class TenantsSeedAclCommand extends Command
             $out = [];
             foreach ($requested as $slug) {
                 $key = mb_strtolower($slug);
-                if ( ! isset($bySlug[$key])) {
+                if (! isset($bySlug[$key])) {
                     throw new RuntimeException(
                         sprintf('Active tenant with slug [%s] not found.', $slug),
                     );

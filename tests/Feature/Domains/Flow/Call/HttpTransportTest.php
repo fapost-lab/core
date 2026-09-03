@@ -124,9 +124,7 @@ final class HttpTransportTest extends TestCase
             $this->context(idempotencyKey: 'session-1:node-X:1'),
         );
 
-        Http::assertSent(static function ($request): bool {
-            return 'session-1:node-X:1' === $request->header('Idempotency-Key')[0];
-        });
+        Http::assertSent(static fn ($request): bool => 'session-1:node-X:1' === $request->header('Idempotency-Key')[0]);
     }
 
     public function test_invalid_target_returns_error(): void

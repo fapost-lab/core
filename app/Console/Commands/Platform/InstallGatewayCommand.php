@@ -11,12 +11,13 @@ use App\Domains\Webhook\Deployment\LogTarget;
 use App\Domains\Webhook\Deployment\RunMode;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
-use RuntimeException;
-use Throwable;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\select;
 use function Laravel\Prompts\text;
+
+use RuntimeException;
+use Throwable;
 
 /**
  * Interactive installer for the webhook ingress gateway.

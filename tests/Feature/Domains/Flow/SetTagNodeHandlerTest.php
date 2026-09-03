@@ -24,7 +24,7 @@ final class SetTagNodeHandlerTest extends FeatureTestCase
     {
         parent::setUp();
 
-        $this->handler   = new SetTagNodeHandler(
+        $this->handler = new SetTagNodeHandler(
             new ContactTagRepository(),
             $this->app->make(TemplateRenderer::class),
         );

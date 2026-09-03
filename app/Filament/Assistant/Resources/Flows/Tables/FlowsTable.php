@@ -261,7 +261,7 @@ final class FlowsTable
      */
     private static function collectItems(mixed $values): array
     {
-        if ( ! is_array($values)) {
+        if (! is_array($values)) {
             return [];
         }
 

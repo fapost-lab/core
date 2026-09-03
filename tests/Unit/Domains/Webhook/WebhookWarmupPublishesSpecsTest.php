@@ -6,6 +6,7 @@ namespace Tests\Unit\Domains\Webhook;
 
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use Illuminate\Support\Facades\Redis;
+use Mockery;
 use Mockery\MockInterface;
 use RuntimeException;
 use Tests\TestCase;
@@ -26,7 +27,7 @@ final class WebhookWarmupPublishesSpecsTest extends TestCase
 
         Redis::shouldReceive('set')
             ->once()
-            ->with('ingress:spec:telegram', \Mockery::type('string'))
+            ->with('ingress:spec:telegram', Mockery::type('string'))
             ->andReturnTrue();
 
         Redis::shouldReceive('del')->andReturn(1);

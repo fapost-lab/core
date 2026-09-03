@@ -43,6 +43,7 @@ use Fapost\Foundation\Flow\Call\CallResult;
 use Fapost\Foundation\Flow\Call\CallTransportInterface;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
 use Mockery;
+use RuntimeException;
 use Tests\TestCase;
 
 final class BuiltInNodeHandlersTest extends TestCase
@@ -146,7 +147,7 @@ final class BuiltInNodeHandlersTest extends TestCase
     {
         $sender     = Mockery::mock(MessageSenderInterface::class);
         $translator = Mockery::mock(ContentTranslatorInterface::class);
-        $handler = $this->makeHandler($sender, $translator);
+        $handler    = $this->makeHandler($sender, $translator);
 
         $this->expectException(InvalidNodeConfigException::class);
 
@@ -189,7 +190,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $sender->shouldNotReceive('send');
 
         $translator = Mockery::mock(ContentTranslatorInterface::class);
-        $handler = $this->makeHandler($sender, $translator);
+        $handler    = $this->makeHandler($sender, $translator);
         $node       = [
             'id'     => 'node-inline',
             'config' => [
@@ -219,7 +220,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $sender->shouldNotReceive('send');
 
         $translator = Mockery::mock(ContentTranslatorInterface::class);
-        $handler = $this->makeHandler($sender, $translator);
+        $handler    = $this->makeHandler($sender, $translator);
         $node       = [
             'id'     => 'node-inline',
             'config' => [
@@ -285,7 +286,7 @@ final class BuiltInNodeHandlersTest extends TestCase
     {
         $sender     = Mockery::mock(MessageSenderInterface::class);
         $translator = Mockery::mock(ContentTranslatorInterface::class);
-        $handler = $this->makeHandler($sender, $translator);
+        $handler    = $this->makeHandler($sender, $translator);
 
         $this->expectException(InvalidNodeConfigException::class);
         $this->expectExceptionMessage('media_file_id');
@@ -319,7 +320,7 @@ final class BuiltInNodeHandlersTest extends TestCase
     {
         $sender     = Mockery::mock(MessageSenderInterface::class);
         $translator = Mockery::mock(ContentTranslatorInterface::class);
-        $handler = $this->makeHandler($sender, $translator);
+        $handler    = $this->makeHandler($sender, $translator);
 
         $this->expectException(InvalidNodeConfigException::class);
         $this->expectExceptionMessage('keyboard_mode');
@@ -346,7 +347,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             Mockery::mock(ContentTranslatorInterface::class),
             new \App\Domains\Flow\Validation\InputValidator(),
         );
-        $node    = ['id' => 'input-1', 'config' => ['save_to' => StateNamespace::Flow->value . '.user_name']];
+        $node = ['id' => 'input-1', 'config' => ['save_to' => StateNamespace::Flow->value . '.user_name']];
 
         $waiting  = $handler->execute($node, [], $this->context(incoming: null));
         $executed = $handler->execute($node, [], $this->context(incoming: $this->incoming('John')));
@@ -740,7 +741,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         // dashes and unpacks two 32-char hex halves on decode.
         $sessionId = '550e8400-e29b-41d4-a716-446655440000';
         $buttonId  = '11111111-1111-4111-8111-111111111111';
-        $payload   = \App\Domains\Flow\Support\CallbackDataCodec::encode($sessionId, $buttonId);
+        $payload   = CallbackDataCodec::encode($sessionId, $buttonId);
 
         $handler = $this->makeInputHandler();
 
@@ -776,26 +777,6 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame(NodeExecutionStatus::Executed, $result->status);
         $this->assertSame('default', $result->sourceHandle);
         $this->assertSame('option_a', $result->stateChanges['flow.choice']);
-    }
-
-    private function makeInputHandler(): InputNodeHandler
-    {
-        $sender = Mockery::mock(MessageSenderInterface::class);
-        $sender->shouldReceive('send')->zeroOrMoreTimes()->andReturn('ext-msg');
-
-        $translator = Mockery::mock(ContentTranslatorInterface::class);
-        $translator->shouldReceive('resolveField')->andReturnUsing(
-            static fn (mixed $field): string => is_array($field) ? (string)reset($field) : (string)$field,
-        );
-
-        return new InputNodeHandler(
-            Mockery::mock(MediaIngestorInterface::class),
-            Mockery::mock(MediaServiceInterface::class),
-            new VariableResolver(),
-            $sender,
-            $translator,
-            new \App\Domains\Flow\Validation\InputValidator(),
-        );
     }
 
     public function test_assign_with_operations_writes_session_and_contact_in_one_node(): void
@@ -846,8 +827,8 @@ final class BuiltInNodeHandlersTest extends TestCase
         $buttonUuid  = '11111111-1111-4111-8111-111111111199';
         $cbData      = CallbackDataCodec::encode($sessionUuid, $buttonUuid);
 
-        $sender = Mockery::mock(MessageSenderInterface::class);
-        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $sender         = Mockery::mock(MessageSenderInterface::class);
+        $translator     = Mockery::mock(ContentTranslatorInterface::class);
         $keyboardEditor = Mockery::mock(InlineKeyboardEditorInterface::class);
         $keyboardEditor->shouldReceive('removeKeyboard')->zeroOrMoreTimes();
 
@@ -880,11 +861,11 @@ final class BuiltInNodeHandlersTest extends TestCase
         $node = [
             'id'     => 'sm-1',
             'config' => [
-                'content_type'    => 'text_with_keyboard',
-                'text'            => ['en' => 'pick'],
-                'keyboard_mode'   => 'inline',
+                'content_type'     => 'text_with_keyboard',
+                'text'             => ['en' => 'pick'],
+                'keyboard_mode'    => 'inline',
                 'save_to_variable' => ['name' => 'choice', 'storage' => 'session'],
-                'buttons'         => [
+                'buttons'          => [
                     ['id' => $buttonUuid, 'label' => ['en' => 'Yes'], 'value' => 'yes', 'row' => 0, 'order' => 0],
                 ],
             ],
@@ -1045,14 +1026,6 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('POST https://example.test/hook', $transport->lastRequest?->target);
     }
 
-    private function makeCallHandler(CallTransportInterface $transport): CallNodeHandler
-    {
-        $registry = new CallTransportRegistry();
-        $registry->register($transport);
-
-        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver());
-    }
-
     public function test_emit_event_publishes_resolved_payload_and_returns_success_handle(): void
     {
         $publisher = Mockery::mock(FlowTriggerEventPublisherInterface::class);
@@ -1062,12 +1035,10 @@ final class BuiltInNodeHandlersTest extends TestCase
                 'tenant-1',
                 'sales.order.created',
                 ['order_id' => 'ORD-7', 'amount' => '199', 'meta' => ['source' => 'web']],
-                Mockery::on(static function (array $source): bool {
-                    return 'tenant-1' === $source['tenant_id']
+                Mockery::on(static fn (array $source): bool => 'tenant-1' === $source['tenant_id']
                         && 'session-1' === $source['session_id']
                         && 'emit-1' === $source['node_id']
-                        && 'contact-1' === $source['contact_id'];
-                })
+                        && 'contact-1' === $source['contact_id'])
             );
 
         $handler = new EmitEventNodeHandler($publisher, new TemplateRenderer());
@@ -1239,7 +1210,7 @@ final class BuiltInNodeHandlersTest extends TestCase
     public function test_send_message_returns_error_handle_when_sender_throws(): void
     {
         $sender = Mockery::mock(MessageSenderInterface::class);
-        $sender->shouldReceive('send')->once()->andThrow(new \RuntimeException('connection refused'));
+        $sender->shouldReceive('send')->once()->andThrow(new RuntimeException('connection refused'));
 
         $translator = Mockery::mock(ContentTranslatorInterface::class);
         $translator->shouldReceive('resolveField')->andReturn('hello');
@@ -1338,9 +1309,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
         $translator = Mockery::mock(ContentTranslatorInterface::class);
         $translator->shouldReceive('resolveField')
-            ->andReturnUsing(static function (array|string $content, string $lang): string {
-                return is_array($content) ? ($content[$lang] ?? $content['en'] ?? '') : $content;
-            });
+            ->andReturnUsing(static fn (array|string $content, string $lang): string => is_array($content) ? ($content[$lang] ?? $content['en'] ?? '') : $content);
 
         $handler = $this->makeHandler($sender, $translator);
 
@@ -1382,7 +1351,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $buttonId = \Ramsey\Uuid\Uuid::uuid5(\Ramsey\Uuid\Uuid::NAMESPACE_OID, "{$nodeId}:0")->toString();
         $cbData   = CallbackDataCodec::encode($sessionUuid, $buttonId);
 
-        $sender     = Mockery::mock(MessageSenderInterface::class);
+        $sender = Mockery::mock(MessageSenderInterface::class);
         $sender->shouldNotReceive('send');
         $translator = Mockery::mock(ContentTranslatorInterface::class);
 
@@ -1453,6 +1422,34 @@ final class BuiltInNodeHandlersTest extends TestCase
             ['label' => 'Alice', 'id' => 'emp-1', 'dept' => 'Engineering'],
             $result->stateChanges['flow.selected_employee'] ?? null,
         );
+    }
+
+    private function makeInputHandler(): InputNodeHandler
+    {
+        $sender = Mockery::mock(MessageSenderInterface::class);
+        $sender->shouldReceive('send')->zeroOrMoreTimes()->andReturn('ext-msg');
+
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $translator->shouldReceive('resolveField')->andReturnUsing(
+            static fn (mixed $field): string => is_array($field) ? (string)reset($field) : (string)$field,
+        );
+
+        return new InputNodeHandler(
+            Mockery::mock(MediaIngestorInterface::class),
+            Mockery::mock(MediaServiceInterface::class),
+            new VariableResolver(),
+            $sender,
+            $translator,
+            new \App\Domains\Flow\Validation\InputValidator(),
+        );
+    }
+
+    private function makeCallHandler(CallTransportInterface $transport): CallNodeHandler
+    {
+        $registry = new CallTransportRegistry();
+        $registry->register($transport);
+
+        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver());
     }
 
     private function makeHandler(
@@ -1542,7 +1539,7 @@ final class ThrowingRagAdapter implements RagAdapterInterface
 
     public function query(string $prompt, RagQueryContext $context): StructuredRagResult
     {
-        throw new \RuntimeException($this->message);
+        throw new RuntimeException($this->message);
     }
 }
 

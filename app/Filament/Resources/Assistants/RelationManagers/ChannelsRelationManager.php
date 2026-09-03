@@ -38,11 +38,11 @@ final class ChannelsRelationManager extends RelationManager
 
     public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
     {
-        if ( ! $ownerRecord instanceof Assistant) {
+        if (! $ownerRecord instanceof Assistant) {
             return false;
         }
 
-        if ( ! Gate::check('view', $ownerRecord)) {
+        if (! Gate::check('view', $ownerRecord)) {
             return false;
         }
 

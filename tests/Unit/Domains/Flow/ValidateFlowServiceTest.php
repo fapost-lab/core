@@ -489,20 +489,6 @@ final class ValidateFlowServiceTest extends TestCase
         $this->assertTrue($result->valid, implode(', ', array_map(static fn ($e) => $e->code, $result->errors)));
     }
 
-    private function makeServiceWithEmitEvent(): ValidateFlowService
-    {
-        $registry = new NodeHandlerRegistry();
-        $registry->register(new EmitEventStubHandler());
-
-        return new ValidateFlowService(
-            registry: $registry,
-            dataAccessors: new NullDataAccessorRegistry(),
-            triggerValidator: new NullTriggerConfigValidator(),
-            tenantEvents: new NullTenantEventRepository(),
-            tenantContext: new NullTenantContext(),
-        );
-    }
-
     public function test_end_node_with_invalid_status_fails_validation(): void
     {
         $service = $this->makeServiceWithEnd();
@@ -718,6 +704,20 @@ final class ValidateFlowServiceTest extends TestCase
         $this->assertTrue($result->valid, 'Comment nodes must not produce validation errors.');
     }
 
+    private function makeServiceWithEmitEvent(): ValidateFlowService
+    {
+        $registry = new NodeHandlerRegistry();
+        $registry->register(new EmitEventStubHandler());
+
+        return new ValidateFlowService(
+            registry: $registry,
+            dataAccessors: new NullDataAccessorRegistry(),
+            triggerValidator: new NullTriggerConfigValidator(),
+            tenantEvents: new NullTenantEventRepository(),
+            tenantContext: new NullTenantContext(),
+        );
+    }
+
     private function makeServiceWithLoop(): ValidateFlowService
     {
         $registry = new NodeHandlerRegistry();
@@ -851,7 +851,9 @@ final class NullTenantEventRepository implements TenantEventRepositoryInterface
 
 final class NullTenantContext implements TenantContextInterface
 {
-    public function set(TenantInterface $tenant): void {}
+    public function set(TenantInterface $tenant): void
+    {
+    }
 
     public function get(): TenantInterface
     {
@@ -863,7 +865,9 @@ final class NullTenantContext implements TenantContextInterface
         return false;
     }
 
-    public function reset(): void {}
+    public function reset(): void
+    {
+    }
 }
 
 final class SendMessageStubHandler implements NodeHandlerInterface

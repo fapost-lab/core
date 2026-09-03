@@ -94,9 +94,7 @@ final class SendContactNotificationJobTest extends FeatureTestCase
 
         $this->runJob($channel->assistant_id, 'all', [], ['en' => 'Welcome', 'ru' => 'Добро пожаловать']);
 
-        Bus::assertDispatched(BroadcastSendJob::class, function (BroadcastSendJob $job): bool {
-            return 'Добро пожаловать' === $job->message->payload->text;
-        });
+        Bus::assertDispatched(BroadcastSendJob::class, fn (BroadcastSendJob $job): bool => 'Добро пожаловать' === $job->message->payload->text);
     }
 
     private function channel(): Channel

@@ -25,6 +25,7 @@ use App\Domains\Tenancy\Settings\TenantSettings;
 use Fapost\Foundation\DTO\IncomingMessage;
 use Fapost\Foundation\DTO\IncomingMessageType;
 use Fapost\Foundation\Flow\DTO\ResolvedTrigger;
+use ReflectionClass;
 use Tests\TestCase;
 
 final class FlowOrchestratorTest extends TestCase
@@ -219,7 +220,7 @@ final class FlowOrchestratorTest extends TestCase
         $engine->shouldReceive('start')->once()->with($definition, $contact, [])->andReturn(FlowSession::make());
         $engine->shouldNotReceive('resume');
 
-        $assistant        = Assistant::factory()->make(
+        $assistant = Assistant::factory()->make(
             ['default_flow_id' => 'default-flow-id', 'fallback_message' => null]
         );
         $currentAssistant = $this->mock(CurrentAssistantInterface::class);
@@ -247,7 +248,7 @@ final class FlowOrchestratorTest extends TestCase
         $engine->shouldNotReceive('start');
         $engine->shouldNotReceive('resume');
 
-        $assistant        = Assistant::factory()->make(
+        $assistant = Assistant::factory()->make(
             ['default_flow_id' => null, 'fallback_message' => 'Sorry, I did not understand you.']
         );
         $currentAssistant = $this->mock(CurrentAssistantInterface::class);
@@ -364,7 +365,7 @@ final class FlowOrchestratorTest extends TestCase
 
         $contact       = Contact::factory()->make(['tenant_id' => 'tenant-1']);
         $message       = $this->callbackMessage($cbData);
-        $activeSession = tap(new FlowSession(), fn($s) => $s->setAttribute('id', $sessionId));
+        $activeSession = tap(new FlowSession(), fn ($s) => $s->setAttribute('id', $sessionId));
         $guard         = $this->guardThatRunsCallback();
         $sessions      = $this->mock(FlowSessionRepositoryInterface::class);
         $engine        = $this->mock(FlowEngineInterface::class);
@@ -431,7 +432,7 @@ final class FlowOrchestratorTest extends TestCase
             $this->mock(CurrentAssistantInterface::class),
             fn ($m) => $m->shouldReceive('isResolved')->andReturn(false)->byDefault()
         );
-        $fallbackSender   ??= tap(
+        $fallbackSender ??= tap(
             $this->mock(FallbackMessageServiceInterface::class),
             fn ($m) => $m->shouldNotReceive('send')->byDefault()
         );
@@ -447,7 +448,7 @@ final class FlowOrchestratorTest extends TestCase
             ),
         );
 
-        $settings                    = (new \ReflectionClass(TenantSettings::class))->newInstanceWithoutConstructor();
+        $settings                    = (new ReflectionClass(TenantSettings::class))->newInstanceWithoutConstructor();
         $settings->fallback_language = 'en';
 
         return new FlowOrchestrator(

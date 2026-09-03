@@ -176,7 +176,7 @@ final readonly class CachedContentTranslator implements ContentTranslatorInterfa
     private function resolveAssistantId(): ?string
     {
         try {
-            if ( ! $this->assistantContext->isResolved()) {
+            if (! $this->assistantContext->isResolved()) {
                 return null;
             }
 

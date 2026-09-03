@@ -13,6 +13,12 @@ final class VariableSchemaCollectorTest extends TestCase
 {
     private VariableSchemaCollector $collector;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->collector = new VariableSchemaCollector();
+    }
+
     public function test_collects_input_node_variable(): void
     {
         $nodes = [
@@ -53,7 +59,7 @@ final class VariableSchemaCollectorTest extends TestCase
                                 'group'   => 'profile',
                                 'type'    => 'number',
                             ],
-                            'value'    => '42',
+                            'value' => '42',
                         ],
                         [
                             'variable' => [
@@ -61,7 +67,7 @@ final class VariableSchemaCollectorTest extends TestCase
                                 'storage' => 'session',
                                 'type'    => 'confirm',
                             ],
-                            'value'    => 'yes',
+                            'value' => 'yes',
                         ],
                     ],
                 ],
@@ -222,11 +228,5 @@ final class VariableSchemaCollectorTest extends TestCase
         $result = $this->collector->collect($nodes);
 
         $this->assertCount(3, $result);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->collector = new VariableSchemaCollector();
     }
 }

@@ -53,8 +53,8 @@ final class NodeHandlerSchemaSectionsTest extends TestCase
         $this->assertIsArray($sections);
         $this->assertNotEmpty($sections);
 
-        $reserved      = ['required', 'sections'];
-        $declaredKeys  = [];
+        $reserved     = ['required', 'sections'];
+        $declaredKeys = [];
         foreach ($schema as $key => $value) {
             if (in_array($key, $reserved, true)) {
                 continue;

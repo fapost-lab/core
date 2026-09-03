@@ -23,7 +23,7 @@ final class TelegramMediaDownloaderTest extends TestCase
     public function test_downloads_file_via_get_file_then_streams_bytes(): void
     {
         Http::fake([
-            'api.telegram.org/bot*/getFile'                   => Http::response([
+            'api.telegram.org/bot*/getFile' => Http::response([
                 'ok'     => true,
                 'result' => [
                     'file_path' => 'documents/report.pdf',

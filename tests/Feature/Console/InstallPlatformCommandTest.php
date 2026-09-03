@@ -25,6 +25,10 @@ use Tests\Feature\FeatureTestCase;
 
 final class InstallPlatformCommandTest extends FeatureTestCase
 {
+    /**
+     * Output of the most recently executed command, captured by {@see executeInstallCommand()}.
+     */
+    private string $lastCommandDisplay = '';
     public function test_fails_when_tenant_already_exists_and_does_not_provision(): void
     {
         $this->mockLandlordConnectionCheck();
@@ -165,18 +169,13 @@ final class InstallPlatformCommandTest extends FeatureTestCase
         }
     }
 
-    /**
-     * Output of the most recently executed command, captured by {@see executeInstallCommand()}.
-     */
-    private string $lastCommandDisplay = '';
-
     private function executeInstallCommand(array $input): int
     {
         $command = $this->app->make(InstallPlatformCommand::class);
         $command->setLaravel($this->app);
         $tester = new CommandTester($command);
 
-        $exitCode                = $tester->execute($input);
+        $exitCode                 = $tester->execute($input);
         $this->lastCommandDisplay = $tester->getDisplay();
 
         return $exitCode;

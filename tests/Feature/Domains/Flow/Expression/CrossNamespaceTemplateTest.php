@@ -74,7 +74,7 @@ final class CrossNamespaceTemplateTest extends FeatureTestCase
                     ],
                 ],
             ],
-            'edges' => [],
+            'edges'     => [],
             'is_active' => true,
         ]);
 

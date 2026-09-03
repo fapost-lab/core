@@ -33,19 +33,19 @@ final readonly class SyncFlowTriggerService
         }
 
         $type = $triggerPayload['type'] ?? null;
-        if ( ! is_string($type) || '' === $type) {
+        if (! is_string($type) || '' === $type) {
             throw new InvalidTriggerPayloadException('Trigger type is required.');
         }
 
         $config = $triggerPayload['config'] ?? null;
-        if ( ! is_array($config)) {
+        if (! is_array($config)) {
             throw new InvalidTriggerPayloadException('Trigger config must be an object.');
         }
 
         if ('event' === $type) {
             $eventName = $config['event_name'] ?? null;
 
-            if ( ! is_string($eventName) || '' === mb_trim($eventName)) {
+            if (! is_string($eventName) || '' === mb_trim($eventName)) {
                 throw new InvalidTriggerPayloadException('Event trigger requires an existing event selection.');
             }
 

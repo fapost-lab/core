@@ -52,7 +52,7 @@ final class MediaReferenceTrackerListenerTest extends FeatureTestCase
                     'config' => ['text' => 'no media here'],
                 ],
             ],
-            'edges'     => [],
+            'edges' => [],
         ]);
 
         $refs = MediaFileReference::query()
@@ -80,7 +80,7 @@ final class MediaReferenceTrackerListenerTest extends FeatureTestCase
             'nodes'     => [
                 ['id' => 'n1', 'type' => 'send_message', 'config' => ['media_file_id' => $oldMedia->id]],
             ],
-            'edges'     => [],
+            'edges' => [],
         ]);
 
         $definition->forceFill([

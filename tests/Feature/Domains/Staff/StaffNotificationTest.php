@@ -53,7 +53,7 @@ final class StaffNotificationTest extends FeatureTestCase
 
     public function test_resolver_selects_by_role(): void
     {
-        $role = Role::query()->create(['name' => 'manager', 'guard_name' => 'web', 'priority' => 50]);
+        $role     = Role::query()->create(['name' => 'manager', 'guard_name' => 'web', 'priority' => 50]);
         $withRole = User::factory()->create();
         User::factory()->create();
         $withRole->assignRole($role);
@@ -79,7 +79,7 @@ final class StaffNotificationTest extends FeatureTestCase
         $assistant = Assistant::factory()->create();
         $user      = User::factory()->create();
         $user->assistants()->attach($assistant->id);
-        $session   = $this->createSession($assistant->id);
+        $session = $this->createSession($assistant->id);
 
         $this->runJob($session, ['target' => 'assistant'], [StaffNotifyChannel::InApp->value]);
 
@@ -92,7 +92,7 @@ final class StaffNotificationTest extends FeatureTestCase
         $assistant = Assistant::factory()->create();
         $user      = User::factory()->create();
         $user->assistants()->attach($assistant->id);
-        $session   = $this->createSession($assistant->id);
+        $session = $this->createSession($assistant->id);
 
         $this->runJob($session, ['target' => 'assistant'], [StaffNotifyChannel::Email->value]);
 
@@ -104,7 +104,7 @@ final class StaffNotificationTest extends FeatureTestCase
         $assistant = Assistant::factory()->create();
         $user      = User::factory()->create();
         $user->assistants()->attach($assistant->id);
-        $session   = $this->createSession($assistant->id);
+        $session = $this->createSession($assistant->id);
 
         $this->runJob($session, ['target' => 'assistant'], [StaffNotifyChannel::InApp->value]);
         // Same (session, node) — the guard must suppress a second delivery.

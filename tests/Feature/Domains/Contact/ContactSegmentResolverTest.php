@@ -25,6 +25,21 @@ final class ContactSegmentResolverTest extends FeatureTestCase
         $this->resolver = app(ContactSegmentResolver::class);
     }
 
+    /**
+     * @return array<string, array{0: array<string, mixed>}>
+     */
+    public static function unusableConditions(): array
+    {
+        return [
+            'empty group list'    => [['type' => 'group', 'operator' => 'in', 'value' => []]],
+            'blank tag'           => [['type' => 'tag', 'operator' => 'has', 'value' => '']],
+            'empty language list' => [['type' => 'language', 'operator' => 'in', 'value' => []]],
+            'malformed attr key'  => [['type' => 'attribute', 'key' => 'a-b; drop', 'operator' => 'eq', 'value' => 'x']],
+            'blank attr value'    => [['type' => 'attribute', 'key' => 'city', 'operator' => 'eq', 'value' => '']],
+            'unknown type'        => [['type' => 'nonsense', 'operator' => 'in', 'value' => ['x']]],
+        ];
+    }
+
     public function test_all_match_intersects_tag_and_language(): void
     {
         $match = $this->contact('en', ['vip']);
@@ -132,9 +147,9 @@ final class ContactSegmentResolverTest extends FeatureTestCase
 
     public function test_group_not_in_excludes_members(): void
     {
-        $group      = $this->group();
-        $member     = $this->contact('en', []);
-        $nonMember  = $this->contact('en', []);
+        $group     = $this->group();
+        $member    = $this->contact('en', []);
+        $nonMember = $this->contact('en', []);
         $member->groups()->attach($group);
 
         $segment = $this->segment('all', [
@@ -223,21 +238,6 @@ final class ContactSegmentResolverTest extends FeatureTestCase
         $segment = $this->segment('all', [$condition]);
 
         $this->assertSame(0, $this->resolver->count($segment));
-    }
-
-    /**
-     * @return array<string, array{0: array<string, mixed>}>
-     */
-    public static function unusableConditions(): array
-    {
-        return [
-            'empty group list'      => [['type' => 'group', 'operator' => 'in', 'value' => []]],
-            'blank tag'             => [['type' => 'tag', 'operator' => 'has', 'value' => '']],
-            'empty language list'   => [['type' => 'language', 'operator' => 'in', 'value' => []]],
-            'malformed attr key'    => [['type' => 'attribute', 'key' => 'a-b; drop', 'operator' => 'eq', 'value' => 'x']],
-            'blank attr value'      => [['type' => 'attribute', 'key' => 'city', 'operator' => 'eq', 'value' => '']],
-            'unknown type'          => [['type' => 'nonsense', 'operator' => 'in', 'value' => ['x']]],
-        ];
     }
 
     /**

@@ -19,7 +19,7 @@ use Tests\Feature\FeatureTestCase;
 
 /**
  * Regression coverage for the inbox authorization hole: conversation transcripts
- * must be gated by {@see \App\Domains\Conversation\Policies\ConversationPolicy}
+ * must be gated by {@see ConversationPolicy}
  * (ViewConversations / ReplyConversations), not merely by being an authenticated
  * staff user. Mirrors the style of {@see \Tests\Feature\Domains\Media\MediaResourceTest}.
  */

@@ -33,12 +33,10 @@ final class NotifyNodeHandlerTest extends TestCase
         $this->assertSame('default', $result->sourceHandle);
         $this->assertTrue($result->stateChanges[SystemStateKeys::STAFF_NOTIFIED_PREFIX . '.node-notify']);
 
-        Bus::assertDispatched(SendStaffNotificationJob::class, function (SendStaffNotificationJob $job): bool {
-            return 'Help billing' === $job->message
+        Bus::assertDispatched(SendStaffNotificationJob::class, fn (SendStaffNotificationJob $job): bool => 'Help billing' === $job->message
                 && ['in_app'] === $job->channels
                 && 'assistant' === $job->targetConfig['target']
-                && 'node-notify' === $job->nodeId;
-        });
+                && 'node-notify' === $job->nodeId);
     }
 
     public function test_staff_channel_all_expands_to_registered_transports(): void
@@ -51,9 +49,7 @@ final class NotifyNodeHandlerTest extends TestCase
             $this->context(),
         );
 
-        Bus::assertDispatched(SendStaffNotificationJob::class, function (SendStaffNotificationJob $job): bool {
-            return in_array('in_app', $job->channels, true) && in_array('email', $job->channels, true);
-        });
+        Bus::assertDispatched(SendStaffNotificationJob::class, fn (SendStaffNotificationJob $job): bool => in_array('in_app', $job->channels, true) && in_array('email', $job->channels, true));
     }
 
     public function test_staff_does_not_dispatch_when_already_marked(): void
@@ -108,13 +104,11 @@ final class NotifyNodeHandlerTest extends TestCase
         $this->assertEqualsCanonicalizing(['vip', 'lead'], $result->metadata['tags']);
         $this->assertTrue($result->stateChanges[SystemStateKeys::CONTACTS_NOTIFIED_PREFIX . '.node-notify']);
 
-        Bus::assertDispatched(SendContactNotificationJob::class, function (SendContactNotificationJob $job): bool {
-            return 'assistant-9' === $job->assistantId
+        Bus::assertDispatched(SendContactNotificationJob::class, fn (SendContactNotificationJob $job): bool => 'assistant-9' === $job->assistantId
                 && 'tag' === $job->contactTarget
                 && ['vip', 'lead'] === $job->tags
                 && 'Promo sale' === $job->message
-                && 'node-notify' === $job->nodeId;
-        });
+                && 'node-notify' === $job->nodeId);
     }
 
     public function test_contacts_mode_does_not_dispatch_when_already_marked(): void

@@ -20,7 +20,7 @@ final class CommandMatcherTest extends TestCase
 
     public function test_returns_builtin_reset_with_translation_key(): void
     {
-        $matcher = new CommandMatcher(new BuiltinCommandsRegistry());
+        $matcher  = new CommandMatcher(new BuiltinCommandsRegistry());
         $resolved = $matcher->match('/reset', $this->assistant([]));
 
         $this->assertNotNull($resolved);

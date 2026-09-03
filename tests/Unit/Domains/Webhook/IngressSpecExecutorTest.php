@@ -20,6 +20,24 @@ use ValueError;
  */
 final class IngressSpecExecutorTest extends TestCase
 {
+    /**
+     * @return array<string, array{0: string, 1: array<string, mixed>, 2: string}>
+     */
+    public static function idempotencyCases(): array
+    {
+        return [
+            'channel only'      => ['c:{channel}', [], 'c:channel-7'],
+            'top level scalar'  => ['tg:{channel}:{body.update_id}', ['update_id' => 99], 'tg:channel-7:99'],
+            'nested path'       => ['{body.message.chat.id}', ['message' => ['chat' => ['id' => 5]]], '5'],
+            'header value'      => ['h:{header.X-Delivery}', [], 'h:d-42'],
+            'missing path'      => ['tg:{channel}:{body.update_id}', [], 'tg:channel-7:'],
+            'path through leaf' => ['{body.a.b}', ['a' => 1], ''],
+            'non scalar value'  => ['{body.message}', ['message' => ['x' => 1]], ''],
+            'bool value'        => ['{body.ok}', ['ok' => true], '1'],
+            'unknown namespace' => ['{cookie.sid}', [], ''],
+            'no placeholders'   => ['static-key', [], 'static-key'],
+        ];
+    }
     public function test_header_equals_accepts_matching_secret(): void
     {
         $spec = IngressSpec::headerEquals('X-Secret', 'k:{channel}');
@@ -160,25 +178,6 @@ final class IngressSpecExecutorTest extends TestCase
                 'channel-7',
             ),
         );
-    }
-
-    /**
-     * @return array<string, array{0: string, 1: array<string, mixed>, 2: string}>
-     */
-    public static function idempotencyCases(): array
-    {
-        return [
-            'channel only'      => ['c:{channel}', [], 'c:channel-7'],
-            'top level scalar'  => ['tg:{channel}:{body.update_id}', ['update_id' => 99], 'tg:channel-7:99'],
-            'nested path'       => ['{body.message.chat.id}', ['message' => ['chat' => ['id' => 5]]], '5'],
-            'header value'      => ['h:{header.X-Delivery}', [], 'h:d-42'],
-            'missing path'      => ['tg:{channel}:{body.update_id}', [], 'tg:channel-7:'],
-            'path through leaf' => ['{body.a.b}', ['a' => 1], ''],
-            'non scalar value'  => ['{body.message}', ['message' => ['x' => 1]], ''],
-            'bool value'        => ['{body.ok}', ['ok' => true], '1'],
-            'unknown namespace' => ['{cookie.sid}', [], ''],
-            'no placeholders'   => ['static-key', [], 'static-key'],
-        ];
     }
 
     public function test_malformed_body_yields_empty_placeholders_instead_of_failing(): void

@@ -20,7 +20,7 @@ return [
     | the upload outright when exceeded (HTTP 422). Per-channel provider limits
     | below are warnings, not hard rejections.
     */
-    'max_size_bytes'           => 100 * 1024 * 1024, // 100 MB
+    'max_size_bytes' => 100 * 1024 * 1024, // 100 MB
 
     /*
     |--------------------------------------------------------------------------
@@ -29,7 +29,7 @@ return [
     | Detected via finfo, never trusted from the upload extension alone. Anything
     | outside this list returns a 422 with the rejected mime in the response.
     */
-    'allowed_mime_types'       => [
+    'allowed_mime_types' => [
         // images
         'image/jpeg',
         'image/png',
@@ -61,7 +61,7 @@ return [
     | Folder rules
     |--------------------------------------------------------------------------
     */
-    'folder'                   => [
+    'folder' => [
         'max_depth'      => 10,
         'name_max_chars' => 255,
     ],
@@ -90,7 +90,7 @@ return [
     |
     | Source: https://core.telegram.org/bots/api#sending-files
     */
-    'channel_limits'           => [
+    'channel_limits' => [
         'telegram' => [
             'image'    => 10 * 1024 * 1024,
             'video'    => 50 * 1024 * 1024,

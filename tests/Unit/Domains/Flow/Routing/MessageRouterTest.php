@@ -263,7 +263,7 @@ final class MessageRouterTest extends TestCase
 
     public function test_staff_handled_thread_still_releases_the_session_lock(): void
     {
-        $calls = [];
+        $calls                      = [];
         [$lockPolicy, $lockManager] = $this->acquiringLockWithCallLog(true, $calls);
 
         $ownership = Mockery::mock(ConversationOwnershipInterface::class);
@@ -469,7 +469,9 @@ final class MessageRouterTest extends TestCase
     private function factoryFor(MockObject&Connection $connection): RedisFactory
     {
         return new class ($connection) implements RedisFactory {
-            public function __construct(private readonly Connection $connection) {}
+            public function __construct(private readonly Connection $connection)
+            {
+            }
 
             public function connection($name = null): Connection
             {

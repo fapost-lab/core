@@ -209,7 +209,7 @@ final class PublishFlowServiceTest extends TestCase
                     'id'      => 'start',
                     'type'    => 'input',
                     'version' => 1,
-                    'config' => [
+                    'config'  => [
                         'variable' => [
                             'name'    => 'answer',
                             'type'    => 'text',
@@ -548,7 +548,7 @@ final class PublishFlowServiceTest extends TestCase
                 ['id' => 'note', 'type' => 'comment', 'version' => 1, 'config' => ['text' => 'note']],
                 ['id' => 'sm', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
             ],
-            'edges'   => [
+            'edges' => [
                 ['id' => 'e1', 'from' => 'note', 'to' => 'sm', 'handle' => 'default'],
             ],
         ]);

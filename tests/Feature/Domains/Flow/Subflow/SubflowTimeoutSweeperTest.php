@@ -50,7 +50,7 @@ final class SubflowTimeoutSweeperTest extends FeatureTestCase
 
     public function test_expired_parent_with_live_child_force_fails_child_and_resumes_parent_via_failed_handle(): void
     {
-        $childDefinition  = $this->createDefinition([
+        $childDefinition = $this->createDefinition([
             ['id' => 'c-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
         ], []);
         $parentDefinition = $this->createDefinition(

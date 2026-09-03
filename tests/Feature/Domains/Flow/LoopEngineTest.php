@@ -20,7 +20,7 @@ final class LoopEngineTest extends FeatureTestCase
 {
     public function test_counted_loop_executes_body_n_times_and_completes(): void
     {
-        $tenantId = (string) Str::uuid();
+        $tenantId  = (string) Str::uuid();
         $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
         $contact   = Contact::factory()->forTenant($tenantId)->create();
 
@@ -80,7 +80,7 @@ final class LoopEngineTest extends FeatureTestCase
 
     public function test_counted_loop_body_executes_exactly_n_times(): void
     {
-        $tenantId = (string) Str::uuid();
+        $tenantId  = (string) Str::uuid();
         $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
         $contact   = Contact::factory()->forTenant($tenantId)->create();
 
@@ -135,7 +135,7 @@ final class LoopEngineTest extends FeatureTestCase
 
     public function test_while_loop_exits_immediately_when_condition_initially_false(): void
     {
-        $tenantId = (string) Str::uuid();
+        $tenantId  = (string) Str::uuid();
         $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
         $contact   = Contact::factory()->forTenant($tenantId)->create();
 
@@ -195,7 +195,7 @@ final class LoopEngineTest extends FeatureTestCase
 
     public function test_loop_iterator_null_after_exit(): void
     {
-        $tenantId = (string) Str::uuid();
+        $tenantId  = (string) Str::uuid();
         $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
         $contact   = Contact::factory()->forTenant($tenantId)->create();
 

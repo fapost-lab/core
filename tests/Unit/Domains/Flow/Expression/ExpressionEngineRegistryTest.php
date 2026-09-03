@@ -64,7 +64,8 @@ final class FakeEngine implements ExpressionEngineInterface
     public function __construct(
         private readonly string $id,
         private readonly int $version,
-    ) {}
+    ) {
+    }
 
     public function id(): string
     {
@@ -81,7 +82,9 @@ final class FakeEngine implements ExpressionEngineInterface
         return $source;
     }
 
-    public function validate(string $source): void {}
+    public function validate(string $source): void
+    {
+    }
 
     /**
      * @return list<string>

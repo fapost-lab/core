@@ -34,7 +34,7 @@ final class CallbackDataCodec
         $s = mb_substr($callbackData, 0, 32);
         $b = mb_substr($callbackData, 32, 32);
 
-        if ( ! ctype_xdigit($s) || ! ctype_xdigit($b)) {
+        if (! ctype_xdigit($s) || ! ctype_xdigit($b)) {
             return null;
         }
 
