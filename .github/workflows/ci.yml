@@ -58,6 +58,19 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
+      redis:
+        # Session locks and the hot-path registry are exercised against a real
+        # Redis in a few feature tests (tests/Feature/Domains/Flow/Routing);
+        # the array cache store phpunit.xml configures does not cover those.
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
     steps:
       - uses: actions/checkout@v7
 
@@ -113,6 +126,11 @@ jobs:
           LANDLORD_DB_DRIVER: ${{ matrix.database }}
           LANDLORD_DB_DATABASE: ${{ matrix.database == 'pgsql' && 'fapost_landlord_test' || ':memory:' }}
           TENANT_DB_CONNECTION: ${{ matrix.database }}
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          # The service runs without requirepass; the literal null is what
+          # Laravel reads as "no password" (.env.example ships a password).
+          REDIS_PASSWORD: "null"
         run: php artisan test --compact
 
       - name: Architecture rules
@@ -144,6 +162,24 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+
+      # The Filament theme (resources/css/filament/theme.css) imports its base
+      # from vendor/filament, so the front-end build needs the Composer result
+      # first — the same order docker/Dockerfile follows. No scripts and no
+      # dev packages: only the files are needed, not a working application.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+
+      - name: Cache Composer packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - run: composer install --no-interaction --no-progress --prefer-dist --no-dev --no-scripts --ignore-platform-reqs
 
       - uses: actions/setup-node@v7
         with:
