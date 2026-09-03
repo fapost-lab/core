@@ -115,9 +115,13 @@ final class ScopedStateReaderTest extends TestCase
             }
         };
 
-        $registry = $this->createMock(DataAccessorRegistryInterface::class);
-        $registry->method('has')->with('hr')->willReturn(true);
-        $registry->method('resolve')->with('hr')->willReturn($accessor);
+        // A stub rather than a mock: the test asserts on the value read, not on
+        // how the registry was called. willReturnMap keeps the namespace
+        // meaningful — any namespace other than `hr` falls through to the
+        // return type's default.
+        $registry = $this->createStub(DataAccessorRegistryInterface::class);
+        $registry->method('has')->willReturnMap([['hr', true]]);
+        $registry->method('resolve')->willReturnMap([['hr', $accessor]]);
 
         $reader = new ScopedStateReader(
             sessionState: [],

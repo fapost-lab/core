@@ -28,11 +28,12 @@
         "laravel/framework": "^12.0",
         "laravel/horizon": "^5.45",
         "laravel/tinker": "^3.0",
+        "phpunit/phpunit": "^13.3",
         "romanzipp/laravel-queue-monitor": "^5.4",
-        "spatie/laravel-activitylog": "^4.12",
+        "spatie/laravel-activitylog": "^5.0",
         "spatie/laravel-data": "^4.20",
         "spatie/laravel-model-states": "^2.13",
-        "spatie/laravel-permission": "^6.0",
+        "spatie/laravel-permission": "^8.3",
         "spatie/laravel-query-builder": "^7.0",
         "spatie/laravel-settings": "^3.7",
         "tpetry/laravel-postgresql-enhanced": "^3.6"
@@ -47,7 +48,6 @@
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
         "phpat/phpat": "^0.12.4",
-        "phpunit/phpunit": "^12.5.12",
         "spatie/laravel-ray": "^1.43"
     },
     "autoload": {
