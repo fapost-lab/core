@@ -92,6 +92,14 @@ jobs:
           restore-keys: composer-${{ runner.os }}-
 
       - name: Install dependencies
+        # fapost/foundation and fapost/support are public, but they are `vcs`
+        # repositories: Composer reads them through the GitHub API and their
+        # zipballs come from api.github.com. Unauthenticated that is 60 calls
+        # an hour per IP, and past it Composer falls back to `git clone` over
+        # SSH and fails with a misleading "Permission denied (publickey)".
+        # The token every run gets automatically lifts the limit.
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
         run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Prepare environment
@@ -179,7 +187,9 @@ jobs:
           key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
           restore-keys: composer-${{ runner.os }}-
 
-      - run: composer install --no-interaction --no-progress --prefer-dist --no-dev --no-scripts --ignore-platform-reqs
+      - env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
+        run: composer install --no-interaction --no-progress --prefer-dist --no-dev --no-scripts --ignore-platform-reqs
 
       - uses: actions/setup-node@v7
         with:
