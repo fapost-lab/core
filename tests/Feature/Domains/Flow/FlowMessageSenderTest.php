@@ -25,6 +25,7 @@ use App\Domains\Media\Models\MediaFile;
 use Fapost\Foundation\Media\Enums\MediaKind;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
+use Illuminate\Support\Str;
 use Mockery;
 use Mockery\MockInterface;
 use Tests\Feature\FeatureTestCase;
@@ -55,7 +56,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
 
         $definition = FlowDefinition::query()->create([
             'tenant_id' => $tenantId,
-            'flow_id'   => 'flow-1',
+            'flow_id'   => (string) Str::uuid(),
             'version'   => 1,
             'name'      => 'Test Flow',
             'nodes'     => [],
@@ -138,7 +139,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
 
         $definition = FlowDefinition::query()->create([
             'tenant_id' => $tenantId,
-            'flow_id'   => 'flow-2',
+            'flow_id'   => (string) Str::uuid(),
             'version'   => 1,
             'name'      => 'Reply Test Flow',
             'nodes'     => [],
@@ -219,7 +220,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
 
         $definition = FlowDefinition::query()->create([
             'tenant_id' => $tenantId,
-            'flow_id'   => 'flow-3',
+            'flow_id'   => (string) Str::uuid(),
             'version'   => 1,
             'name'      => 'Image Test Flow',
             'nodes'     => [],
@@ -307,7 +308,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
 
         $definition = FlowDefinition::query()->create([
             'tenant_id' => $tenantId,
-            'flow_id'   => 'flow-uas',
+            'flow_id'   => (string) Str::uuid(),
             'version'   => 1,
             'name'      => 'Test Flow',
             'nodes'     => [],

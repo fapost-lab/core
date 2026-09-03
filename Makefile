@@ -43,7 +43,7 @@ TUNNEL_HOST ?=
 .DEFAULT_GOAL := help
 
 .PHONY: help setup dev test test-filter test-arch stan lint fix \
-        hooks-install dev-link ngrok tunnel docs-build artisan shell \
+        hooks-install dev-link ngrok tunnel docs-build docs-dev artisan shell \
         horizon queue-restart fresh
 
 # Prints each target with its description and the command that will actually
@@ -147,3 +147,9 @@ tunnel: ## Cloudflare tunnel to the local site — TUNNEL_HOST=<name> keeps the 
 
 docs-build: ## Regenerate the Doctum PHP API reference into public/core
 	$(EXEC) php tools/doctum/doctum.phar update tools/doctum/config.php --ignore-parse-errors
+
+# Runs on the host, not in the container: the Mintlify CLI is a Node tool and
+# the container has no Node. npx uses an installed `mint` when there is one
+# and fetches it otherwise.
+docs-dev: ## Preview docs.fapost.in locally from docs/site (Mintlify)
+	cd docs/site && npx --yes mint dev

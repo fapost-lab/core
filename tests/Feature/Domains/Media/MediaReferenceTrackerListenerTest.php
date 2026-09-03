@@ -12,6 +12,7 @@ use App\Domains\Media\Models\MediaFileReference;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Fapost\Foundation\Media\Enums\MediaKind;
+use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
 
 final class MediaReferenceTrackerListenerTest extends FeatureTestCase
@@ -34,7 +35,7 @@ final class MediaReferenceTrackerListenerTest extends FeatureTestCase
 
         $definition = FlowDefinition::query()->create([
             'tenant_id' => '00000000-0000-0000-0000-000000000001',
-            'flow_id'   => 'flow-1',
+            'flow_id'   => (string) Str::uuid(),
             'version'   => 1,
             'name'      => 'Onboarding',
             'is_active' => false,
@@ -72,7 +73,7 @@ final class MediaReferenceTrackerListenerTest extends FeatureTestCase
 
         $definition = FlowDefinition::query()->create([
             'tenant_id' => '00000000-0000-0000-0000-000000000001',
-            'flow_id'   => 'flow-2',
+            'flow_id'   => (string) Str::uuid(),
             'version'   => 1,
             'name'      => 'Onboarding v2',
             'is_active' => false,

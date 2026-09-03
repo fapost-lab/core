@@ -9,19 +9,27 @@ use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Services\Resolvers\MessageTriggerResolver;
 use Fapost\Foundation\Flow\DTO\TriggerContext;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use Tests\Feature\FeatureTestCase;
 
 final class MessageTriggerResolverTest extends FeatureTestCase
 {
+    private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
+    private const string ASSISTANT_ID = '00000000-0000-0000-0000-000000000002';
+
     public function test_it_prefers_exact_match_over_higher_priority_contains_match(): void
     {
-        $this->createAssistant('assistant-1');
+        $this->createAssistant(self::ASSISTANT_ID);
+
+        $flowContainsId = (string) Str::uuid();
+        $flowExactId    = (string) Str::uuid();
 
         FlowTrigger::query()->create([
-            'tenant_id'    => 'tenant-1',
-            'assistant_id' => 'assistant-1',
-            'flow_id'      => 'flow-contains',
+            'tenant_id'    => self::TENANT_ID,
+            'assistant_id' => self::ASSISTANT_ID,
+            'flow_id'      => $flowContainsId,
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
             'priority'     => 100,
@@ -32,9 +40,9 @@ final class MessageTriggerResolverTest extends FeatureTestCase
         ]);
 
         FlowTrigger::query()->create([
-            'tenant_id'    => 'tenant-1',
-            'assistant_id' => 'assistant-1',
-            'flow_id'      => 'flow-exact',
+            'tenant_id'    => self::TENANT_ID,
+            'assistant_id' => self::ASSISTANT_ID,
+            'flow_id'      => $flowExactId,
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
             'priority'     => 200,
@@ -49,24 +57,26 @@ final class MessageTriggerResolverTest extends FeatureTestCase
         $trigger = $resolver->resolve(
             new TriggerContext(
                 type: FlowTriggerType::Message->value,
-                tenantId: 'tenant-1',
-                assistantId: 'assistant-1',
+                tenantId: self::TENANT_ID,
+                assistantId: self::ASSISTANT_ID,
                 payload: ['text' => 'vacation leave'],
             )
         );
 
         $this->assertNotNull($trigger);
-        $this->assertSame('flow-exact', $trigger->flowId);
+        $this->assertSame($flowExactId, $trigger->flowId);
     }
 
     public function test_it_matches_normalized_text_before_contains_fallback(): void
     {
-        $this->createAssistant('assistant-1');
+        $this->createAssistant(self::ASSISTANT_ID);
+
+        $flowNormalizedId = (string) Str::uuid();
 
         FlowTrigger::query()->create([
-            'tenant_id'    => 'tenant-1',
-            'assistant_id' => 'assistant-1',
-            'flow_id'      => 'flow-normalized',
+            'tenant_id'    => self::TENANT_ID,
+            'assistant_id' => self::ASSISTANT_ID,
+            'flow_id'      => $flowNormalizedId,
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
             'priority'     => 100,
@@ -81,24 +91,26 @@ final class MessageTriggerResolverTest extends FeatureTestCase
         $trigger = $resolver->resolve(
             new TriggerContext(
                 type: FlowTriggerType::Message->value,
-                tenantId: 'tenant-1',
-                assistantId: 'assistant-1',
+                tenantId: self::TENANT_ID,
+                assistantId: self::ASSISTANT_ID,
                 payload: ['text' => ' OTP!!! '],
             )
         );
 
         $this->assertNotNull($trigger);
-        $this->assertSame('flow-normalized', $trigger->flowId);
+        $this->assertSame($flowNormalizedId, $trigger->flowId);
     }
 
     public function test_it_uses_contains_fallback_after_exact_lookup(): void
     {
-        $this->createAssistant('assistant-1');
+        $this->createAssistant(self::ASSISTANT_ID);
+
+        $flowContainsId = (string) Str::uuid();
 
         FlowTrigger::query()->create([
-            'tenant_id'    => 'tenant-1',
-            'assistant_id' => 'assistant-1',
-            'flow_id'      => 'flow-contains',
+            'tenant_id'    => self::TENANT_ID,
+            'assistant_id' => self::ASSISTANT_ID,
+            'flow_id'      => $flowContainsId,
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
             'priority'     => 100,
@@ -113,22 +125,24 @@ final class MessageTriggerResolverTest extends FeatureTestCase
         $trigger = $resolver->resolve(
             new TriggerContext(
                 type: FlowTriggerType::Message->value,
-                tenantId: 'tenant-1',
-                assistantId: 'assistant-1',
+                tenantId: self::TENANT_ID,
+                assistantId: self::ASSISTANT_ID,
                 payload: ['text' => 'I want vacation tomorrow'],
             )
         );
 
         $this->assertNotNull($trigger);
-        $this->assertSame('flow-contains', $trigger->flowId);
+        $this->assertSame($flowContainsId, $trigger->flowId);
     }
 
     public function test_it_uses_global_trigger_when_assistant_specific_does_not_match(): void
     {
+        $flowGlobalId = (string) Str::uuid();
+
         FlowTrigger::query()->create([
-            'tenant_id'    => 'tenant-1',
+            'tenant_id'    => self::TENANT_ID,
             'assistant_id' => null,
-            'flow_id'      => 'flow-global',
+            'flow_id'      => $flowGlobalId,
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
             'priority'     => 100,
@@ -143,24 +157,27 @@ final class MessageTriggerResolverTest extends FeatureTestCase
         $trigger = $resolver->resolve(
             new TriggerContext(
                 type: FlowTriggerType::Message->value,
-                tenantId: 'tenant-1',
-                assistantId: 'assistant-1',
+                tenantId: self::TENANT_ID,
+                assistantId: self::ASSISTANT_ID,
                 payload: ['text' => '/start'],
             )
         );
 
         $this->assertNotNull($trigger);
-        $this->assertSame('flow-global', $trigger->flowId);
+        $this->assertSame($flowGlobalId, $trigger->flowId);
     }
 
     public function test_it_prefers_assistant_specific_trigger_over_global_with_same_priority(): void
     {
-        $this->createAssistant('assistant-1');
+        $this->createAssistant(self::ASSISTANT_ID);
+
+        $flowGlobalId    = (string) Str::uuid();
+        $flowAssistantId = (string) Str::uuid();
 
         FlowTrigger::query()->create([
-            'tenant_id'    => 'tenant-1',
+            'tenant_id'    => self::TENANT_ID,
             'assistant_id' => null,
-            'flow_id'      => 'flow-global',
+            'flow_id'      => $flowGlobalId,
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
             'priority'     => 100,
@@ -171,9 +188,9 @@ final class MessageTriggerResolverTest extends FeatureTestCase
         ]);
 
         FlowTrigger::query()->create([
-            'tenant_id'    => 'tenant-1',
-            'assistant_id' => 'assistant-1',
-            'flow_id'      => 'flow-assistant',
+            'tenant_id'    => self::TENANT_ID,
+            'assistant_id' => self::ASSISTANT_ID,
+            'flow_id'      => $flowAssistantId,
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
             'priority'     => 100,
@@ -188,26 +205,26 @@ final class MessageTriggerResolverTest extends FeatureTestCase
         $trigger = $resolver->resolve(
             new TriggerContext(
                 type: FlowTriggerType::Message->value,
-                tenantId: 'tenant-1',
-                assistantId: 'assistant-1',
+                tenantId: self::TENANT_ID,
+                assistantId: self::ASSISTANT_ID,
                 payload: ['text' => '/start'],
             )
         );
 
         $this->assertNotNull($trigger);
-        $this->assertSame('flow-assistant', $trigger->flowId);
+        $this->assertSame($flowAssistantId, $trigger->flowId);
     }
 
     public function test_it_rejects_empty_message_trigger_config(): void
     {
-        $this->createAssistant('assistant-1');
+        $this->createAssistant(self::ASSISTANT_ID);
 
         $this->expectException(InvalidArgumentException::class);
 
         FlowTrigger::query()->create([
-            'tenant_id'    => 'tenant-1',
-            'assistant_id' => 'assistant-1',
-            'flow_id'      => 'flow-invalid-message',
+            'tenant_id'    => self::TENANT_ID,
+            'assistant_id' => self::ASSISTANT_ID,
+            'flow_id'      => (string) Str::uuid(),
             'type'         => FlowTriggerType::Message,
             'is_active'    => true,
             'priority'     => 100,
@@ -223,7 +240,7 @@ final class MessageTriggerResolverTest extends FeatureTestCase
         $assistant = new Assistant();
         $assistant->forceFill([
             'id'        => $assistantId,
-            'tenant_id' => 'tenant-1',
+            'tenant_id' => self::TENANT_ID,
             'name'      => 'Test assistant',
             'is_active' => true,
             'settings'  => [],

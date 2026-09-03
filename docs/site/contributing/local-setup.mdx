@@ -138,6 +138,58 @@ Check them all at once:
   </Step>
 </Steps>
 
+## The Makefile
+
+The repository root has a `Makefile` that wraps the everyday commands. It is a
+front-end, not a second source of truth: where Composer holds a sequence
+(`setup`, `dev`, `test`) the target delegates to it, so there is one definition
+of each.
+
+```bash
+make              # list every target and the exact command it will run
+make test
+make test-filter FILTER=FlowEngineTest
+make test-arch
+make lint         # pint --test, changes nothing
+make fix          # pint --dirty
+make artisan CMD="tinker"
+make docs-dev     # preview docs.fapost.in from docs/site
+```
+
+`make` with no arguments prints each target with its description and, under
+it, the command that would actually run. Read that before running anything
+unfamiliar: it also shows whether the command goes through a container.
+
+### Running commands inside a container
+
+By default every target runs against whatever PHP is on your `PATH`. If your
+PHP lives in a container — devilbox, a Compose stack, anything `docker exec`
+can reach — set `CONTAINER` and the PHP-side targets are prefixed with
+`docker exec` automatically:
+
+```bash
+make test CONTAINER=server-php-1
+```
+
+To stop typing it, put the setting in `.make.local` at the repository root.
+The file is git-ignored: it describes your machine, not the project.
+
+```makefile
+# .make.local
+CONTAINER = server-php-1            # container name from `docker ps`
+WORKDIR   = /shared/httpd/fapost-core   # where the checkout is mounted inside it
+TUNNEL_HOST = dev.fapost.in         # optional, stable hostname for `make tunnel`
+```
+
+`WORKDIR` defaults to devilbox's layout, `/shared/httpd/<directory name>`; set
+it when your container mounts the checkout elsewhere. The container name comes
+from Docker Compose: `<project>-<service>-<index>`, so devilbox's PHP service is
+`server-php-1` and its PostgreSQL is `server-pgsql-1`.
+
+Targets that run host tools stay on the host regardless of `CONTAINER`:
+`make dev` (Vite needs the host's Node), `make docs-dev` (Mintlify), the tunnel
+targets. `make` shows which is which.
+
 ## Checks
 
 ```bash
@@ -145,6 +197,8 @@ composer test
 composer run test:arch
 vendor/bin/pint --dirty --format agent
 ```
+
+Or, through the Makefile, `make test`, `make test-arch`, `make fix`.
 
 See [Testing and architecture checks](/contributing/testing) for what each covers.
 

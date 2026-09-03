@@ -12,6 +12,7 @@ use App\Domains\Tenancy\Contracts\TenantResolverInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryReaderInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Database\TenantDatabaseManager;
+use App\Domains\Tenancy\Database\TenantPostgresConnection;
 use App\Domains\Tenancy\Infrastructure\EloquentWebhookRegistryReader;
 use App\Domains\Tenancy\Repositories\TenantRepository;
 use App\Domains\Tenancy\Services\ConfigTenantResolver;
@@ -22,6 +23,7 @@ use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Services\WebhookRegistryWriter;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
+use Illuminate\Database\Connection;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -36,6 +38,15 @@ final class DomainServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Every pgsql connection (landlord included, not only the tenant one)
+        // can then have its search_path moved while it stays open. The class
+        // adds nothing else; TenantDatabaseManager relies on it to switch
+        // tenants without dropping a transaction that is already running.
+        Connection::resolverFor(
+            'pgsql',
+            static fn ($pdo, string $database, string $prefix, array $config): TenantPostgresConnection => new TenantPostgresConnection($pdo, $database, $prefix, $config),
+        );
+
         $this->app->scoped(TenantContextInterface::class, TenantContext::class);
 
         $this->app->scoped(

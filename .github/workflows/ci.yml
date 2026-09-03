@@ -1,0 +1,158 @@
+# The checks a change has to pass before it reaches main.
+#
+# Runs on every pull request and on every push to main, so a merged change is
+# checked once more on the exact commit a release tag would point at. The three
+# parts of the repository (PHP application, Go gateway, Vue builder) have
+# nothing in common at build time, so they are separate jobs and run at once.
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A new push to the same pull request supersedes the previous run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: "8.4"
+  NODE_VERSION: "22"
+
+jobs:
+  php:
+    name: PHP (${{ matrix.database }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # SQLite is what phpunit.xml and the pre-commit hook use, so it matches
+        # what a developer saw locally. PostgreSQL is what production runs on:
+        # schema-per-tenant switching, partitioned tables and uuid columns
+        # behave differently from SQLite, and this leg is where they are
+        # exercised (tests/Feature/FeatureTestCase.php migrates the tenant
+        # tables into a schema of their own there).
+        database: [sqlite, pgsql]
+
+    services:
+      postgres:
+        # Kept in step with the version operators are told to run. The sqlite
+        # leg starts it too and ignores it; a conditional service is not
+        # something the matrix can express.
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: fapost
+          POSTGRES_PASSWORD: secret
+          POSTGRES_DB: fapost_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fapost"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          # The same set the production image installs (docker/Dockerfile),
+          # plus pdo_sqlite for the test database.
+          extensions: pdo_pgsql, pdo_sqlite, intl, bcmath, zip, gd, pcntl, sockets, redis
+          coverage: none
+        env:
+          fail-fast: true
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+
+      - name: Code style
+        # --test reports without changing anything; a style problem fails the
+        # job so it is fixed in the branch, not silently on main.
+        run: vendor/bin/pint --test
+
+      - name: Create the landlord database
+        # The landlord connection gets a database of its own, as the local
+        # PostgreSQL setup in docs/site/contributing/testing.mdx has it. The
+        # service only creates POSTGRES_DB; psql ships on the runner image.
+        if: matrix.database == 'pgsql'
+        run: psql -h 127.0.0.1 -U fapost -d fapost_test -c 'CREATE DATABASE fapost_landlord_test'
+        env:
+          PGPASSWORD: secret
+
+      - name: Tests
+        env:
+          # phpunit.xml sets these for SQLite; a variable that already exists
+          # in the environment wins, which is how the pgsql leg switches over.
+          DB_CONNECTION: ${{ matrix.database }}
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: ${{ matrix.database == 'pgsql' && 'fapost_test' || ':memory:' }}
+          DB_USERNAME: fapost
+          DB_PASSWORD: secret
+          LANDLORD_DB_DRIVER: ${{ matrix.database }}
+          LANDLORD_DB_DATABASE: ${{ matrix.database == 'pgsql' && 'fapost_landlord_test' || ':memory:' }}
+          TENANT_DB_CONNECTION: ${{ matrix.database }}
+        run: php artisan test --compact
+
+      - name: Architecture rules
+        # Static analysis; the database it runs against is irrelevant.
+        if: matrix.database == 'sqlite'
+        run: composer run test:arch
+
+  gateway:
+    name: Gateway
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: gateway
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: gateway/go.mod
+          cache-dependency-path: gateway/go.sum
+
+      - run: go vet ./...
+      - run: go test ./...
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm test
+      # The production image runs this same build; a change that breaks it
+      # should fail here rather than at release time.
+      - run: npm run build

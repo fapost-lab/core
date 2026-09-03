@@ -8,11 +8,15 @@ use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Services\ResolveEventTriggersService;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Tests\TestCase;
 
 final class ResolveEventTriggersServiceTest extends TestCase
 {
+    use DatabaseTransactions;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -35,10 +39,15 @@ final class ResolveEventTriggersServiceTest extends TestCase
 
     public function test_it_resolves_all_matching_event_triggers_inside_tenant(): void
     {
+        $tenantId      = (string) Str::uuid();
+        $otherTenantId = (string) Str::uuid();
+        $flowAId       = (string) Str::uuid();
+        $flowBId       = (string) Str::uuid();
+
         FlowTrigger::query()->create([
-            'tenant_id'    => 'tenant-1',
-            'assistant_id' => 'assistant-a',
-            'flow_id'      => 'flow-b',
+            'tenant_id'    => $tenantId,
+            'assistant_id' => (string) Str::uuid(),
+            'flow_id'      => $flowBId,
             'type'         => FlowTriggerType::Event,
             'is_active'    => true,
             'priority'     => 200,
@@ -46,9 +55,9 @@ final class ResolveEventTriggersServiceTest extends TestCase
         ]);
 
         FlowTrigger::query()->create([
-            'tenant_id'    => 'tenant-1',
-            'assistant_id' => 'assistant-b',
-            'flow_id'      => 'flow-a',
+            'tenant_id'    => $tenantId,
+            'assistant_id' => (string) Str::uuid(),
+            'flow_id'      => $flowAId,
             'type'         => FlowTriggerType::Event,
             'is_active'    => true,
             'priority'     => 100,
@@ -56,20 +65,20 @@ final class ResolveEventTriggersServiceTest extends TestCase
         ]);
 
         FlowTrigger::query()->create([
-            'tenant_id'    => 'tenant-2',
-            'assistant_id' => 'assistant-x',
-            'flow_id'      => 'flow-x',
+            'tenant_id'    => $otherTenantId,
+            'assistant_id' => (string) Str::uuid(),
+            'flow_id'      => (string) Str::uuid(),
             'type'         => FlowTriggerType::Event,
             'is_active'    => true,
             'priority'     => 50,
             'config'       => ['event_name' => 'employee_registered'],
         ]);
 
-        $resolved = app(ResolveEventTriggersService::class)->execute('tenant-1', 'employee_registered');
+        $resolved = app(ResolveEventTriggersService::class)->execute($tenantId, 'employee_registered');
 
         $this->assertCount(2, $resolved);
-        $this->assertSame('flow-a', $resolved[0]->flowId);
-        $this->assertSame('flow-b', $resolved[1]->flowId);
+        $this->assertSame($flowAId, $resolved[0]->flowId);
+        $this->assertSame($flowBId, $resolved[1]->flowId);
         $this->assertSame('employee_registered', $resolved[0]->metadata['event_name']);
     }
 }

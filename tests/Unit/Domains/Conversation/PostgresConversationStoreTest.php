@@ -15,12 +15,15 @@ use App\Domains\Conversation\Store\Postgres\ConversationPartitionManager;
 use App\Domains\Conversation\Store\Postgres\PostgresConversationStore;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 final class PostgresConversationStoreTest extends TestCase
 {
+    use DatabaseTransactions;
+
     private PostgresConversationStore $store;
 
     protected function setUp(): void
@@ -51,32 +54,82 @@ final class PostgresConversationStoreTest extends TestCase
             $table->unique(['tenant_id', 'assistant_id', 'contact_id', 'channel_id'], 'conversations_thread_unique');
         });
 
-        Schema::create('conversation_messages', function (Blueprint $table): void {
-            $table->uuid('id')->primary();
-            $table->uuid('tenant_id');
-            $table->uuid('conversation_id');
-            $table->uuid('contact_id');
-            $table->uuid('assistant_id');
-            $table->uuid('channel_id');
-            $table->string('direction', 16);
-            $table->string('sender_type', 16);
-            $table->uuid('sender_staff_user_id')->nullable();
-            $table->string('content_type', 32);
-            $table->text('text')->nullable();
-            $table->jsonb('payload')->nullable();
-            $table->jsonb('media')->nullable();
-            $table->string('provider_message_id')->nullable();
-            $table->string('reply_to_provider_message_id')->nullable();
-            $table->string('status', 16);
-            $table->jsonb('error')->nullable();
-            $table->string('origin', 16);
-            $table->jsonb('origin_ref')->nullable();
-            $table->string('idempotency_key')->nullable();
-            $table->timestampTz('created_at');
-            $table->unique(['conversation_id', 'direction', 'idempotency_key', 'created_at'], 'conversation_messages_idem_unique');
-        });
+        if ('pgsql' === Schema::getConnection()->getDriverName()) {
+            $this->createPartitionedConversationMessages();
+        } else {
+            Schema::create('conversation_messages', function (Blueprint $table): void {
+                $table->uuid('id')->primary();
+                $table->uuid('tenant_id');
+                $table->uuid('conversation_id');
+                $table->uuid('contact_id');
+                $table->uuid('assistant_id');
+                $table->uuid('channel_id');
+                $table->string('direction', 16);
+                $table->string('sender_type', 16);
+                $table->uuid('sender_staff_user_id')->nullable();
+                $table->string('content_type', 32);
+                $table->text('text')->nullable();
+                $table->jsonb('payload')->nullable();
+                $table->jsonb('media')->nullable();
+                $table->string('provider_message_id')->nullable();
+                $table->string('reply_to_provider_message_id')->nullable();
+                $table->string('status', 16);
+                $table->jsonb('error')->nullable();
+                $table->string('origin', 16);
+                $table->jsonb('origin_ref')->nullable();
+                $table->string('idempotency_key')->nullable();
+                $table->timestampTz('created_at');
+                $table->unique(['conversation_id', 'direction', 'idempotency_key', 'created_at'], 'conversation_messages_idem_unique');
+            });
+        }
 
         $this->store = new PostgresConversationStore(new ConversationPartitionManager());
+    }
+
+    /**
+     * Mirrors database/migrations/tenant/2026_06_12_000002_create_conversation_messages_table.php's
+     * pgsql branch: {@see ConversationPartitionManager} runs `CREATE TABLE ... PARTITION OF
+     * conversation_messages`, which fails against a plain (non-partitioned) table.
+     */
+    private function createPartitionedConversationMessages(): void
+    {
+        DB::statement(<<<'SQL'
+CREATE TABLE conversation_messages (
+    id uuid NOT NULL,
+    tenant_id uuid NOT NULL,
+    conversation_id uuid NOT NULL,
+    contact_id uuid NOT NULL,
+    assistant_id uuid NOT NULL,
+    channel_id uuid NOT NULL,
+    direction varchar(16) NOT NULL,
+    sender_type varchar(16) NOT NULL,
+    sender_staff_user_id uuid NULL,
+    content_type varchar(32) NOT NULL,
+    text text NULL,
+    payload jsonb NULL,
+    media jsonb NULL,
+    provider_message_id varchar(255) NULL,
+    reply_to_provider_message_id varchar(255) NULL,
+    status varchar(16) NOT NULL,
+    error jsonb NULL,
+    origin varchar(16) NOT NULL,
+    origin_ref jsonb NULL,
+    idempotency_key varchar(255) NULL,
+    created_at timestamp with time zone NOT NULL,
+    PRIMARY KEY (id, created_at)
+) PARTITION BY RANGE (created_at)
+SQL);
+
+        DB::statement('CREATE UNIQUE INDEX conversation_messages_idem_unique ON conversation_messages (conversation_id, direction, idempotency_key, created_at)');
+
+        $start = CarbonImmutable::now('UTC')->startOfMonth();
+        for ($i = 0; $i < 3; $i++) {
+            $month      = $start->addMonths($i);
+            $monthStart = $month->startOfMonth()->format('Y-m-d H:i:sP');
+            $monthEnd   = $month->addMonth()->startOfMonth()->format('Y-m-d H:i:sP');
+            $suffix     = $month->format('Y_m');
+            DB::statement("CREATE TABLE IF NOT EXISTS conversation_messages_{$suffix} PARTITION OF conversation_messages FOR VALUES FROM ('{$monthStart}') TO ('{$monthEnd}')");
+        }
     }
 
     public function test_ensure_conversation_is_idempotent_by_ref(): void

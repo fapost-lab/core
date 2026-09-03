@@ -35,6 +35,48 @@ The default PHPUnit run does cover PHPat, indirectly: `tests/Unit/Architecture/M
 invokes PHPStan. So `composer test` catches an architecture violation even when
 `test:arch` is not run separately.
 
+## Continuous integration
+
+The same checks run in GitHub Actions (`.github/workflows/ci.yml`) on every
+pull request and on every push to `main`. Three jobs run in parallel:
+
+- **PHP** — Pint in `--test` mode, the PHPUnit suites, the architecture rules.
+  The suites run twice, as a matrix: once on SQLite in memory, exactly as
+  `phpunit.xml` and the pre-commit hook run them locally, and once on
+  PostgreSQL 15, which is what production uses.
+- **Gateway** — `go vet` and `go test` in `gateway/`.
+- **Frontend** — `vue-tsc` type check, Vitest, and the production Vite build.
+
+A pull request is merged only when all of them are green. The push-to-`main` run
+exists so that the commit a release tag points at has been checked as merged,
+not only as proposed.
+
+<Warning>
+  The PostgreSQL leg is the only place schema-per-tenant switching, partitioned
+  tables and `uuid` columns are exercised for real; SQLite approximates them.
+  A test that is green locally on SQLite can still fail there, so read a
+  PostgreSQL-only failure as a real finding, not as CI noise.
+</Warning>
+
+### Running the suite on PostgreSQL locally
+
+Create two empty databases — the default connection gets one, the landlord
+connection the other — and pass the connection settings on the command line.
+Variables that already exist in the environment win over the SQLite values in
+`phpunit.xml`, which is all the switch is:
+
+```bash
+DB_CONNECTION=pgsql DB_DATABASE=fapost_core_test \
+LANDLORD_DB_DRIVER=pgsql LANDLORD_DB_DATABASE=fapost_core_landlord_test \
+TENANT_DB_CONNECTION=pgsql \
+php artisan test --compact
+```
+
+`DB_HOST`, `DB_USERNAME` and `DB_PASSWORD` come from `.env` unless you set
+them too. Both databases are dropped and re-migrated on every run: the tenant
+tables go into a schema named `main`, the schema of the tenant the suite runs
+as, and the landlord tables into `public` of the landlord database.
+
 ## What the architecture rules enforce
 
 They are the executable form of the boundaries described in this section:

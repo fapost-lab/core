@@ -10,6 +10,7 @@ use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Models\TenantEvent;
 use App\Domains\Staff\Models\User;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\FeatureTestCase;
 
@@ -122,12 +123,13 @@ final class BuilderApiTest extends FeatureTestCase
      */
     public function test_save_draft_persists_even_with_duplicate_message_keywords(): void
     {
-        $draft = $this->draft(['draft_version' => 5]);
+        $draft        = $this->draft(['draft_version' => 5]);
+        $otherFlowId  = (string) Str::uuid();
 
         FlowTrigger::query()->create([
             'tenant_id'    => $draft->tenant_id,
             'assistant_id' => $draft->assistant_id,
-            'flow_id'      => 'other-flow',
+            'flow_id'      => $otherFlowId,
             'type'         => 'message',
             'is_active'    => true,
             'priority'     => 10,
@@ -166,12 +168,13 @@ final class BuilderApiTest extends FeatureTestCase
 
     public function test_validate_endpoint_reports_duplicate_message_keywords(): void
     {
-        $draft = $this->draft(['draft_version' => 5]);
+        $draft       = $this->draft(['draft_version' => 5]);
+        $otherFlowId = (string) Str::uuid();
 
         FlowTrigger::query()->create([
             'tenant_id'    => $draft->tenant_id,
             'assistant_id' => $draft->assistant_id,
-            'flow_id'      => 'other-flow',
+            'flow_id'      => $otherFlowId,
             'type'         => 'message',
             'is_active'    => true,
             'priority'     => 10,
@@ -288,12 +291,13 @@ final class BuilderApiTest extends FeatureTestCase
 
     public function test_validate_returns_duplicate_keyword_error_for_exact_message_trigger_conflict(): void
     {
-        $draft = $this->draft();
+        $draft       = $this->draft();
+        $otherFlowId = (string) Str::uuid();
 
         FlowTrigger::query()->create([
             'tenant_id'    => $draft->tenant_id,
             'assistant_id' => $draft->assistant_id,
-            'flow_id'      => 'other-flow',
+            'flow_id'      => $otherFlowId,
             'type'         => 'message',
             'is_active'    => true,
             'priority'     => 10,

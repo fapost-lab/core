@@ -13,14 +13,15 @@ use App\Domains\Staff\Policies\RolePolicy;
 use App\Domains\Staff\Policies\UserPolicy;
 use App\Domains\Staff\Services\RoleWriterService;
 use App\Domains\Staff\Services\UserService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-final class AuthorizationHardeningTest extends TestCase
+/**
+ * Extends FeatureTestCase for its migrated tenant schema: the staff tables come
+ * from the tenant migrations, which a plain RefreshDatabase does not run.
+ */
+final class AuthorizationHardeningTest extends FeatureTestCase
 {
-    use RefreshDatabase;
-
     public function test_manager_cannot_update_admin_user(): void
     {
         $manager = User::factory()->create();

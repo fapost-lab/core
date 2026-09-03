@@ -17,15 +17,25 @@ use Illuminate\Database\UniqueConstraintViolationException;
  */
 final class ContactTagRepository implements ContactTagRepositoryInterface
 {
+    /**
+     * The insert runs in its own (nested) transaction: on PostgreSQL a failed
+     * statement aborts the whole surrounding transaction, so catching the
+     * violation without a savepoint to roll back to would leave every later
+     * query of the caller's transaction failing.
+     */
     public function add(string $contactId, string $tag, ?string $taggedBy): bool
     {
+        $query = ContactTag::query();
+
         try {
-            ContactTag::query()->create([
-                'contact_id' => $contactId,
-                'tag'        => $tag,
-                'tagged_by'  => $taggedBy,
-                'tagged_at'  => now(),
-            ]);
+            $query->getConnection()->transaction(static function () use ($query, $contactId, $tag, $taggedBy): void {
+                $query->create([
+                    'contact_id' => $contactId,
+                    'tag'        => $tag,
+                    'tagged_by'  => $taggedBy,
+                    'tagged_at'  => now(),
+                ]);
+            });
 
             return true;
         } catch (UniqueConstraintViolationException) {

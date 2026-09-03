@@ -1,44 +1,33 @@
 # CLAUDE.md - FaPost Core Agent Rules
 
-Контекст для Claude Code и других агентов. Читать перед началом задачи.
+Context for Claude Code and other coding agents. Read before starting a task.
 
-Этот файл не является roadmap и не фиксирует статусы реализации. Здесь живут устойчивые правила кода, архитектурные
-ограничения и навигация по рабочей документации.
+This file is not a roadmap and does not track implementation status. It holds the
+durable rules of the codebase: architectural constraints, coding conventions, and
+where the authoritative documentation lives. Do not add checklists, plans, future
+tables or product promises here; a status change belongs in `docs/platform/`.
 
 ## Project Context
 
-FaPost Core - ядро платформы для диалоговых ассистентов и flow automation. Этот репозиторий содержит саму платформу,
-без нишевых Solution-пакетов.
+FaPost Core is the platform for conversational assistants and flow automation.
+This repository contains the platform itself, without niche Solution packages.
 
-Рабочая документация:
+- https://docs.fapost.in is the single source of truth. Sources are in `docs/site/`.
+- `docs/INDEX.md` indexes the internal documentation under `docs/`.
+- `drafts/CURRENT_TASK.md` is the current operational focus and the only file `drafts/` may contain.
 
-- `drafts/CURRENT_TASK.md` - текущий операционный фокус. Оставлять как главный краткосрочный ориентир.
-- `docs/INDEX.md` - основной индекс документации.
-- `docs/platform/TASKS.md` - трекер статусов реализации.
-- `docs/platform/ROADMAP.md` - milestone'ы и зависимости.
-- `docs/platform/PROJECT.md` - краткий проектный контекст.
-- `docs/platform/current-state.md` - фактическое состояние репозитория.
-- https://docs.fapost.in - опубликованная документация, единственный источник правды. Исходники в `docs/site/`.
+## Stack
 
-Не дублировать в этом файле чекбоксы, планы, списки будущих таблиц или продуктовые обещания. Если статус изменился,
-обновлять `docs/platform/TASKS.md`, `docs/platform/ROADMAP.md` и/или `docs/platform/current-state.md`.
-
-## Current Stack
-
-- PHP 8.4
-- Laravel 12
-- PostgreSQL с landlord / tenant connections
-- Redis для cache, queues, locks и hot-path registry
+- PHP 8.4, Laravel 12
+- PostgreSQL with landlord / tenant connections (schema per tenant)
+- Redis for cache, queues, locks and the hot-path registry
 - Horizon queues
-- Go webhook gateway (`gateway/`) — опциональный ingress перед PHP
+- Go webhook gateway (`gateway/`), an optional ingress in front of PHP
 - Filament admin
-- Inertia + Vue builder
-- PHPUnit 12
-- PHPat/PHPStan architecture checks
+- Inertia + Vue flow builder
+- PHPUnit 12, PHPat/PHPStan architecture checks
 
 ## Directory Boundaries
-
-Основной код:
 
 ```text
 app/
@@ -53,173 +42,198 @@ database/migrations/
   tenant/           Tenant schema.
 
 packages/
-  fapost-foundation Public contracts and DTOs for Core/Solutions/Plugins.
-  fapost-support    Shared primitives.
+  fapost-foundation Public contracts and DTOs for Core/Solutions/Plugins (separate repository, git-ignored here).
+  fapost-support    Shared primitives (separate repository, git-ignored here).
 
 resources/js/builder/
   Vue flow builder.
 ```
 
-Не создавать новые base folders без явного решения. В частности, `app/Features` и Solution folders не считать
-существующими, пока они реально не добавлены в код.
+Do not create new base folders without an explicit decision. In particular,
+`app/Features` and Solution folders do not exist until they are actually added
+to the code.
+
+## Workflow
+
+- `main` is the only long-lived branch. Work happens on short-lived branches
+  (`feat/`, `fix/`, `chore/`, `docs/`, `refactor/`) and reaches `main` through
+  a squash-merged pull request. Releases are `v*` tags on `main`.
+- Commit messages and pull request titles use Conventional Commits:
+  `type(scope): subject`. Full rules: https://docs.fapost.in/contributing/commits
+- Do not commit or push unless explicitly asked to.
+- Process documentation: `CONTRIBUTING.md` (short), `docs/site/contributing/` (full).
 
 ## Laravel And PHP Rules
 
-- Следовать существующим паттернам соседних файлов.
-- Каждый `.php` файл начинается с `declare(strict_types=1);`.
-- `final class` по умолчанию.
-- Constructor property promotion и explicit return types.
-- Enum cases в TitleCase.
-- PHPDoc использовать для смысла, array shapes и дженериков; inline comments - только для сложной логики.
-- Для новых Laravel artifacts предпочитать `php artisan make:* --no-interaction`, если это уместно.
-- Не добавлять зависимости без согласования.
-- После изменения PHP запускать `vendor/bin/pint --dirty --format agent`.
-- Каждое изменение кода покрывать минимальным релевантным тестом и запускать этот тест.
-- Документационные файлы создавать только когда пользователь явно просит.
+- Follow the patterns of neighbouring files.
+- Every `.php` file starts with `declare(strict_types=1);`.
+- `final class` by default.
+- Constructor property promotion and explicit return types.
+- Enum cases in TitleCase.
+- PHPDoc for meaning, array shapes and generics; inline comments only for genuinely complex logic.
+- Prefer `php artisan make:* --no-interaction` for new Laravel artifacts where it applies.
+- Do not add dependencies without agreement.
+- After changing PHP, run `vendor/bin/pint --dirty --format agent`.
+- Cover every code change with a minimal relevant test and run that test.
+- Create documentation files only when the user explicitly asks.
 
 ## Tenant-Aware Execution
 
-Tenant - базовая координата runtime. Core-код в runtime должен fail fast, если tenant context обязателен, но не установлен.
+The tenant is the base coordinate of the runtime. Core runtime code must fail
+fast when a tenant context is required and not set.
 
-Запрещено:
+Forbidden:
 
-- Ветвление по форме развёртывания внутри Core runtime.
-- `if (isSingleTenant())` и похожие проверки.
-- fallback на "default tenant" вместо явного tenant context.
-- прямой landlord lookup из доменов вне `Tenancy`.
+- Branching on the deployment shape inside Core runtime.
+- `if (isSingleTenant())` and similar checks.
+- Falling back to a "default tenant" instead of an explicit tenant context.
+- Direct landlord lookups from domains outside `Tenancy`.
 
-Разрешенный landlord access pattern: доменам нужен контракт из `Tenancy/Contracts`; прямой `DB::connection('landlord')`
-остается внутри Tenancy infrastructure.
+Allowed landlord access pattern: domains depend on a contract from
+`Tenancy/Contracts`; direct `DB::connection('landlord')` stays inside Tenancy
+infrastructure.
 
 ## Migration Isolation
 
-Миграция - DDL-операция. В `up()` / `down()` нельзя завязываться на runtime state.
+A migration is a DDL operation. `up()` / `down()` must not depend on runtime state.
 
-Запрещено:
+Forbidden:
 
-- `app()`, `config()`, `env()` для runtime решений.
-- `TenantContext::get()` и tenant-aware сервисы.
-- ветки на feature/module activation.
-- seed-данные, зависящие от runtime состояния.
-- `DB::table()` поверх таблиц другого модуля из миграции модуля.
+- `app()`, `config()`, `env()` for runtime decisions.
+- `TenantContext::get()` and tenant-aware services.
+- Branching on feature/module activation.
+- Seed data that depends on runtime state.
+- `DB::table()` over another module's tables from a module's migration.
 
-Важно: PHPat-правила должны соответствовать тексту этого раздела. Они выполняются через `phpstan.neon`; default
-PHPUnit run покрывает их через `tests/Unit/Architecture/MigrationTest.php`.
+The PHPat rules must match the text of this section. They run through
+`phpstan.neon`; the default PHPUnit run covers them via
+`tests/Unit/Architecture/MigrationTest.php`.
 
 ## Long-Lived Worker Safety
 
-HTTP-запросы обслуживает PHP-FPM: процесс живёт один запрос. А вот Horizon-воркеры и очереди долгоживущие —
-один процесс обрабатывает много job подряд, и всё удержанное состояние протекает между ними. В multi-tenant
-системе такая утечка означает, что один тенант видит данные другого.
+HTTP requests are served by PHP-FPM, where a process lives for one request.
+Horizon workers are long-lived: one process handles many jobs in a row, and any
+retained state leaks between them. In a multi-tenant system that leak means one
+tenant seeing another's data.
 
-Правила:
+Rules:
 
-- не держать request, config repository, tenant context или current assistant в singleton constructor;
-- mutable request/job state держать в `scoped` bindings — они пересоздаются на каждую job;
-- tenant switch выполнять через `TenantSwitcher::runForTenant()` с restore в `finally`;
-- не писать в static properties между job.
+- Do not hold the request, the config repository, the tenant context or the current assistant in a singleton constructor.
+- Keep mutable request/job state in `scoped` bindings; they are rebuilt for every job.
+- Switch tenants through `TenantSwitcher::runForTenant()` with the restore in `finally`.
+- Do not write to static properties between jobs.
 
 ## ID Strategy
 
-- Tenant-schema primary keys: ULID, сохраненный в PostgreSQL `uuid`.
-- Использовать `Fapost\Support\Concerns\HasUlidPrimaryKey`, если модель следует этой стратегии.
-- Миграции: `$table->uuid('id')->primary()` без database default.
-- FK: `foreignUuid(...)->constrained()->cascadeOnDelete()` или локальный эквивалент по существующему стилю.
-- Не менять специальные публичные идентификаторы вроде webhook public hash без отдельного решения.
+- Tenant-schema primary keys: ULID stored in a PostgreSQL `uuid` column.
+- Use `Fapost\Support\Concerns\HasUlidPrimaryKey` when a model follows this strategy.
+- Migrations: `$table->uuid('id')->primary()` without a database default.
+- Foreign keys: `foreignUuid(...)->constrained()->cascadeOnDelete()` or the local equivalent in the existing style.
+- Do not change special public identifiers such as the webhook public hash without a separate decision.
 
 ## Dependency Direction
 
-`packages/fapost-foundation` и `packages/fapost-support` не зависят от Core.
+`packages/fapost-foundation` and `packages/fapost-support` do not depend on Core.
 
-Запрещено:
+Forbidden:
 
-- `use App\...` внутри foundation/support.
-- ссылки из foundation/support на конкретные доменные классы Core.
-- перенос бизнес-логики Core в support.
+- `use App\...` inside foundation/support.
+- References from foundation/support to concrete Core domain classes.
+- Moving Core business logic into support.
 
-Если контракт нужен внешним Solution/Plugin - он принадлежит foundation. Если это чистый переиспользуемый примитив без
-Core-зависимостей - support. Если используется в одном домене и несет доменную семантику - остается в Core.
+A contract needed by external Solutions/Plugins belongs in foundation. A pure
+reusable primitive with no Core dependency belongs in support. Anything used by
+one domain and carrying domain semantics stays in Core.
 
 ## Domain Code Rules
 
-- Controllers и Jobs только оркестрируют; бизнес-логика живет в services/domain classes.
-- В доменных сервисах не использовать `app()`, `resolve()`, глобальные Laravel helpers как скрытые зависимости.
-- Repositories/ports использовать там, где домен пересекает persistence boundary или другой bounded context.
-- Facades допустимы в infrastructure layer: providers, jobs, controllers, migrations, framework adapters.
-- Eloquent models живут в `Domains/{Domain}/Models`.
-- Relations остаются на моделях, когда нужны Eloquent query capabilities.
+- Controllers and Jobs only orchestrate; business logic lives in services and domain classes.
+- Domain services do not use `app()`, `resolve()` or global Laravel helpers as hidden dependencies.
+- Use repositories/ports where a domain crosses a persistence boundary or another bounded context.
+- Facades are acceptable in the infrastructure layer: providers, jobs, controllers, migrations, framework adapters.
+- Eloquent models live in `Domains/{Domain}/Models`.
+- Relations stay on models when Eloquent query capabilities are needed.
 
 ## Flow Engine Rules
 
-- Handler резолвится по `(type, version)` из in-memory registry.
-- Handler должен быть graph-unaware: возвращает `sourceHandle`, а не следующий node id.
-- Breaking change в node contract требует новую версию handler; старые flow definitions продолжают работать.
-- Flow session выполняет snapshot своего `flow_definition_id` до завершения.
-- Handler обязан быть safe to retry; внешние side effects должны иметь idempotency marker или эквивалентную защиту.
-- State key должен быть namespaced. Канонический список - enum `Fapost\Foundation\Flow\Enums\StateNamespace`:
-  `system`, `flow`, `rag`, `module`, `contact`, `call`. Новые namespace добавлять в enum, не выдумывать по нодам.
-- `module.*` read-only и резолвится через `DataAccessorInterface`; `contact.*` и `call.*` - производные
-  проекции, в сессии не хранятся и не пишутся.
-- `system.*` writes разрешать только явно whitelisted runtime handlers.
-- Не возвращать legacy `effects[]`; использовать writer/port из execution context.
+- A handler is resolved by `(type, version)` from the in-memory registry.
+- A handler is graph-unaware: it returns a `sourceHandle`, not the next node id.
+- A breaking change in a node contract requires a new handler version; existing flow definitions keep working.
+- A flow session snapshots its `flow_definition_id` until it completes.
+- A handler must be safe to retry; external side effects need an idempotency marker or equivalent protection.
+- State keys are namespaced. The canonical list is the enum `Fapost\Foundation\Flow\Enums\StateNamespace`:
+  `system`, `flow`, `rag`, `module`, `contact`, `call`. New namespaces go into the enum, not into individual nodes.
+- `module.*` is read-only and resolved through `DataAccessorInterface`; `contact.*` and `call.*` are derived
+  projections, neither stored in nor written to the session.
+- `system.*` writes are allowed only for explicitly whitelisted runtime handlers.
+- Do not return legacy `effects[]`; use the writer/port from the execution context.
 
 ## Messaging And Queues
 
-Очереди не смешивать по назначению:
+Queues are not mixed by purpose:
 
-- `flow.execution` - обработка входящих и execution pipeline.
-- `messaging.transactional` - ответы в активном диалоге.
-- `messaging.broadcast` - низкоприоритетные рассылки/fan-out.
-- `messaging.system` - служебные уведомления.
+- `flow.execution` - inbound processing and the execution pipeline.
+- `messaging.transactional` - replies in an active dialogue.
+- `messaging.broadcast` - low-priority broadcasts / fan-out.
+- `messaging.system` - service notifications.
 - `scheduled.triggers` - scheduled/event trigger fan-out.
-- `sync.external` - внешние синхронизации.
+- `sync.external` - external synchronisations.
 
-Provider rate limit и backpressure должны быть превентивными, а не только реакцией на ошибку провайдера.
+Provider rate limits and backpressure are preventive, not only a reaction to a
+provider error.
 
 ## Multilingual Rules
 
-Разделять два языковых слоя:
+Two language layers are kept apart:
 
-- Admin UI language - Laravel lang files, Filament/backend validation/staff UI.
-- Content language - runtime сообщения ассистента конечному пользователю.
+- Admin UI language - Laravel lang files, Filament/backend validation, staff UI.
+- Content language - runtime assistant messages to the end user.
 
-Runtime language resolution проходит через `LanguageResolverInterface` / content translator chain. Не вставлять
-пользовательские bot-facing литералы напрямую в handlers/senders. Такие строки должны быть системными translation keys
-или flow content.
+Runtime language resolution goes through `LanguageResolverInterface` and the
+content translator chain. Do not put user-facing, bot-facing literals directly
+into handlers or senders; such strings are system translation keys or flow
+content.
 
-Button/select `value` language-agnostic и не переводится; переводится только label/content.
+A button/select `value` is language-agnostic and never translated; only the
+label/content is.
 
 ## Frontend Builder Rules
 
-- Builder должен опираться на registry/config schema и существующие overrides.
-- Для core node-specific UI использовать bespoke override только когда schema-driven renderer недостаточен.
-- Plugin без rebuild frontend не может поставлять Vue components; расширять schema renderer в Core.
-- Solution/vendor components допустимы только через согласованный Vite glob/publish contract.
-- Не добавлять маркетинговые landing surfaces в builder/admin вместо рабочей функциональности.
+- The builder is driven by the registry/config schema and the existing overrides.
+- Use a bespoke override for core node-specific UI only when the schema-driven renderer is insufficient.
+- A plugin cannot ship Vue components without a frontend rebuild; extend the schema renderer in Core instead.
+- Solution/vendor components are allowed only through the agreed Vite glob/publish contract.
+- Do not add marketing landing surfaces to the builder/admin in place of working functionality.
 
 ## Documentation Discipline
 
-- `docs/platform/current-state.md` описывает факт, а не цель.
-- `docs/platform/TASKS.md` может использовать `done / partial / pending`, если одна строка содержит и каркас, и продуктовую
-  фичу.
-- `docs/platform/ROADMAP.md` описывает будущие milestone'ы и зависимости.
-- `docs/site/` - исходники опубликованного сайта (Mintlify, docs.fapost.in). Всё, что описано там,
-  не дублировать в `docs/` — ставить ссылку.
-- Active source-of-truth documentation must be written in English. Archive files may keep their original language until
-  deleted or rewritten.
-- `drafts/` должен содержать только `CURRENT_TASK.md`.
-- `CLAUDE.md` не должен утверждать наличие таблиц, моделей, jobs или UI, если это не архитектурное правило и не
-  подтверждено кодом.
-- При обнаружении расхождения между кодом и документацией сначала уточнить: это stale documentation, partial feature
-  или false positive в коде.
+- `docs/platform/current-state.md` describes fact, not intent.
+- `docs/platform/TASKS.md` may use `done / partial / pending` when one line covers both scaffolding and product feature.
+- `docs/platform/ROADMAP.md` describes future milestones and dependencies.
+- `docs/site/` holds the sources of the published site (Mintlify, docs.fapost.in). Anything described there is
+  not duplicated under `docs/`; link to it instead.
+- Active source-of-truth documentation is written in English. Archive files may keep their original language
+  until deleted or rewritten.
+- `drafts/` contains only `CURRENT_TASK.md`.
+- `CLAUDE.md` must not claim that tables, models, jobs or UI exist unless that is an architectural rule
+  confirmed by the code.
+- On a discrepancy between code and documentation, first establish which it is: stale documentation, a partial
+  feature, or a false positive in the code.
 
-## Verification Notes
+## Verification
 
-- `composer test` / `php artisan test` запускает PHPUnit suites из `phpunit.xml`.
-- `composer run test:arch` запускает PHPat architecture rules через PHPStan.
-- PHPat rules лежат в `tests/Architecture`; низкоуровневая команда: `vendor/bin/phpstan analyse --configuration phpstan.neon`.
-- Default PHPUnit run покрывает PHPat через `tests/Unit/Architecture/MigrationTest.php`, который запускает phpstan.
-- Не запускать `php artisan test tests/Architecture` как проверку PHPat: эти классы не являются PHPUnit `TestCase`.
+- `composer test` / `php artisan test` runs the PHPUnit suites from `phpunit.xml` (SQLite in memory).
+- `composer run test:arch` runs the PHPat architecture rules through PHPStan.
+- PHPat rules live in `tests/Architecture`; the low-level command is
+  `vendor/bin/phpstan analyse --configuration phpstan.neon`.
+- The default PHPUnit run covers PHPat through `tests/Unit/Architecture/MigrationTest.php`, which runs phpstan.
+- Do not run `php artisan test tests/Architecture` as the PHPat check: those classes are not PHPUnit `TestCase`s
+  and the command reports success while verifying nothing.
+- `make` lists the wrapped commands; `CONTAINER` in `.make.local` routes them into a container.
+- CI (`.github/workflows/ci.yml`) runs the same checks on every pull request, plus `go test` for the gateway
+  and type-check/Vitest/build for the frontend. The PHPUnit suite runs twice there: on SQLite, as locally,
+  and on PostgreSQL 15, where schema switching, partitions and `uuid` columns are exercised for real.
+  How to run it on PostgreSQL locally: https://docs.fapost.in/contributing/testing
 
 ===
 

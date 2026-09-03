@@ -322,11 +322,12 @@ final class SubflowLifecycleTest extends FeatureTestCase
 
     public function test_subflow_with_inactive_callee_marks_parent_session_failed(): void
     {
-        $parentFlowId   = (string) Str::uuid();
+        $missingFlowId    = (string) Str::uuid();
+        $parentFlowId     = (string) Str::uuid();
         $parentDefinition = $this->createDefinition(
             flowId: $parentFlowId,
             nodes: [
-                ['id' => 'p-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => 'no-such-flow', 'timeout' => 'PT1H']],
+                ['id' => 'p-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => $missingFlowId, 'timeout' => 'PT1H']],
                 ['id' => 'p-end', 'type' => 'end',     'version' => 1, 'config' => ['status' => 'success']],
             ],
             edges: [

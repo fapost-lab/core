@@ -13,16 +13,17 @@ use App\Domains\Staff\Policies\UserPolicy;
 use App\Domains\Staff\Services\UserService;
 use Database\Seeders\RoleSeeder;
 use Filament\Panel;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Validation\ValidationException;
 use Mockery;
 use Spatie\Permission\PermissionRegistrar;
-use Tests\TestCase;
+use Tests\Feature\FeatureTestCase;
 
-final class UserPolicyTest extends TestCase
+/**
+ * Extends FeatureTestCase for its migrated tenant schema: the staff tables come
+ * from the tenant migrations, which a plain RefreshDatabase does not run.
+ */
+final class UserPolicyTest extends FeatureTestCase
 {
-    use RefreshDatabase;
-
     protected function setUp(): void
     {
         parent::setUp();

@@ -23,7 +23,7 @@ use InvalidArgumentException;
 final class TenantDatabaseManager implements TenantDatabaseManagerInterface
 {
     /**
-     * @var array<int, array{connection: string, search_path: string|null}>
+     * @var array<int, array{connection: string, search_path: array<int, string>|string|null}>
      */
     private array $stack = [];
 
@@ -70,7 +70,7 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         $previousSearchPath = null;
 
         if ($previousConnection === $tenantConnection) {
-            /** @var string|null $configured */
+            /** @var array<int, string>|string|null $configured */
             $configured         = config("database.connections.{$tenantConnection}.search_path");
             $previousSearchPath = $configured;
         }
@@ -80,12 +80,7 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
             'search_path' => $previousSearchPath,
         ];
 
-        config(["database.connections.{$tenantConnection}.search_path" => $tenant->getSchemaName()]);
-
-        // SQLite has no schema concept — purging an :memory: connection destroys it.
-        if ('sqlite' !== $this->connectionDriver($tenantConnection)) {
-            DB::purge($tenantConnection);
-        }
+        $this->applySearchPath($tenantConnection, $tenant->getSchemaName());
 
         DB::setDefaultConnection($tenantConnection);
     }
@@ -105,11 +100,7 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         $previous         = array_pop($this->stack);
 
         if ($previous['connection'] === $tenantConnection) {
-            config(["database.connections.{$tenantConnection}.search_path" => $previous['search_path']]);
-
-            if ('sqlite' !== $this->connectionDriver($tenantConnection)) {
-                DB::purge($tenantConnection);
-            }
+            $this->applySearchPath($tenantConnection, $previous['search_path']);
         }
 
         DB::setDefaultConnection($previous['connection']);
@@ -127,9 +118,41 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         ]);
     }
 
+    /**
+     * Point the tenant connection at a schema.
+     *
+     * The config is what a connection opened later reads. A connection that is
+     * already open is moved in place when it can be, so a transaction that is
+     * running on it (a queue job's, a test's) survives the switch; any other
+     * open connection is purged and re-created with the new config on next use.
+     * SQLite has no schemas, and purging an :memory: database destroys it.
+     *
+     * @param  array<int, string>|string|null  $searchPath
+     */
+    private function applySearchPath(string $connectionName, array|string|null $searchPath): void
+    {
+        config(["database.connections.{$connectionName}.search_path" => $searchPath]);
+
+        if ('sqlite' === $this->connectionDriver($connectionName)) {
+            return;
+        }
+
+        $connection = DB::getConnections()[$connectionName] ?? null;
+
+        if ($connection instanceof TenantPostgresConnection) {
+            $connection->useSearchPath($searchPath);
+
+            return;
+        }
+
+        if (null !== $connection) {
+            DB::purge($connectionName);
+        }
+    }
+
     private function quoteIdentifier(string $name): string
     {
-        if ( ! preg_match('/^[a-z][a-z0-9_]*$/', $name)) {
+        if (! preg_match('/^[a-z][a-z0-9_]*$/', $name)) {
             throw new InvalidArgumentException(
                 "Invalid schema name: [{$name}]. Only lowercase alphanumeric and underscores allowed."
             );

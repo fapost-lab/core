@@ -59,17 +59,22 @@ final class TenantSwitcher
         try {
             return $callback();
         } finally {
-            $this->databaseManager->restore();
-            $this->permissionRegistrar->forgetCachedPermissions();
+            try {
+                $this->databaseManager->restore();
+            } finally {
+                // A restore that fails (the database went away) must not leave
+                // the tenant identity behind for the next job on this worker.
+                $this->permissionRegistrar->forgetCachedPermissions();
 
-            foreach ($this->restoreHooks as $hook) {
-                $hook();
-            }
+                foreach ($this->restoreHooks as $hook) {
+                    $hook();
+                }
 
-            if (null !== $previousTenant) {
-                $this->tenantContext->set($previousTenant);
-            } else {
-                $this->tenantContext->reset();
+                if (null !== $previousTenant) {
+                    $this->tenantContext->set($previousTenant);
+                } else {
+                    $this->tenantContext->reset();
+                }
             }
         }
     }

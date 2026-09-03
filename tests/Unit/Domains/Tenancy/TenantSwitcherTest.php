@@ -59,6 +59,34 @@ final class TenantSwitcherTest extends TestCase
         });
     }
 
+    public function test_resets_tenant_context_and_runs_hooks_even_when_restore_throws(): void
+    {
+        $tenant              = Mockery::mock(TenantInterface::class);
+        $dbManager           = Mockery::mock(TenantDatabaseManagerInterface::class);
+        $permissionRegistrar = Mockery::mock(PermissionRegistrar::class);
+        $context             = new TenantContext();
+        $hookRan             = false;
+
+        $dbManager->shouldReceive('switchTo')->once()->with($tenant);
+        $dbManager->shouldReceive('restore')->once()->andThrow(new RuntimeException('database went away'));
+        $permissionRegistrar->shouldReceive('forgetCachedPermissions')->twice();
+
+        $switcher = new TenantSwitcher($context, $dbManager, $permissionRegistrar);
+        $switcher->registerRestoreHook(function () use (&$hookRan): void {
+            $hookRan = true;
+        });
+
+        try {
+            $switcher->runForTenant($tenant, fn (): string => 'ok');
+            $this->fail('The restore failure must propagate.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('database went away', $exception->getMessage());
+        }
+
+        $this->assertTrue($hookRan);
+        $this->assertFalse($context->isResolved());
+    }
+
     public function test_restores_previous_tenant_context(): void
     {
         $outerTenant         = Mockery::mock(TenantInterface::class);

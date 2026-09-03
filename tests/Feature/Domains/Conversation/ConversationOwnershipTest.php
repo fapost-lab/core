@@ -22,16 +22,18 @@ final class ConversationOwnershipTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
+    private const string STAFF_ID = '00000000-0000-0000-0000-0000000000aa';
+
     public function test_assign_staff_sets_owner_type_and_staff_user_id(): void
     {
         $conversation = $this->createConversation();
         $ownership    = app(ConversationOwnershipInterface::class);
 
-        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Staff, 'staff-1');
+        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Staff, self::STAFF_ID);
 
         $fresh = $conversation->fresh();
         $this->assertSame(ConversationOwner::Staff, $fresh->owner_type);
-        $this->assertSame('staff-1', $fresh->owner_staff_user_id);
+        $this->assertSame(self::STAFF_ID, $fresh->owner_staff_user_id);
     }
 
     public function test_assign_bot_clears_owner_staff_user_id(): void
@@ -39,7 +41,7 @@ final class ConversationOwnershipTest extends FeatureTestCase
         $conversation = $this->createConversation();
         $ownership    = app(ConversationOwnershipInterface::class);
 
-        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Staff, 'staff-1');
+        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Staff, self::STAFF_ID);
         $ownership->assign((string) $conversation->getKey(), ConversationOwner::Bot);
 
         $fresh = $conversation->fresh();
@@ -62,7 +64,7 @@ final class ConversationOwnershipTest extends FeatureTestCase
 
         $this->assertFalse($ownership->isHandledByStaff($ref));
 
-        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Staff, 'staff-1');
+        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Staff, self::STAFF_ID);
 
         $this->assertTrue($ownership->isHandledByStaff($ref));
     }
@@ -98,7 +100,7 @@ final class ConversationOwnershipTest extends FeatureTestCase
         $conversation = $this->createConversation();
         $ownership    = app(ConversationOwnershipInterface::class);
 
-        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Staff, 'staff-1');
+        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Staff, self::STAFF_ID);
 
         $otherChannelRef = new ConversationRef(
             tenantId: (string) $conversation->tenant_id,

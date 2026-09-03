@@ -4,18 +4,22 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 final class FlowSessionSchemaTest extends FeatureTestCase
 {
     public function test_flow_sessions_foreign_keys_match_the_schema_contract(): void
     {
-        $foreignKeys = collect(DB::select("PRAGMA foreign_key_list('flow_sessions')"))
-            ->mapWithKeys(fn (object $foreignKey): array => [
-                $foreignKey->from => [
-                    'table'     => $foreignKey->table,
-                    'to'        => $foreignKey->to,
-                    'on_delete' => mb_strtolower((string) $foreignKey->on_delete),
+        /** @var array<int, array{columns: list<string>, foreign_table: string, foreign_columns: list<string>, on_delete: string}> $definitions */
+        $definitions = Schema::getForeignKeys('flow_sessions');
+
+        $foreignKeys = collect($definitions)
+            ->filter(fn (array $foreignKey): bool => 1 === count($foreignKey['columns']))
+            ->mapWithKeys(fn (array $foreignKey): array => [
+                $foreignKey['columns'][0] => [
+                    'table'     => $foreignKey['foreign_table'],
+                    'to'        => $foreignKey['foreign_columns'][0],
+                    'on_delete' => mb_strtolower($foreignKey['on_delete']),
                 ],
             ]);
 

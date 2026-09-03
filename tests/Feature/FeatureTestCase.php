@@ -22,12 +22,23 @@ use Tests\TestCase;
  * {@see RefreshDatabase::restoreInMemoryDatabase()}. A subclass that overrides
  * {@see migrateFreshUsing()} gets its own signature and therefore its own fresh
  * migration when it is reached.
+ *
+ * On PostgreSQL the tenant tables live in a schema of their own, as they do in
+ * production, and the default connection is pointed at that schema for every
+ * test. The seeded tenant names the same schema, so a tenant switch during a
+ * test lands on the migrated tables. The landlord connection may target the
+ * same database (its tables stay in `public`) or a separate one.
  */
 abstract class FeatureTestCase extends TestCase
 {
     use RefreshDatabase {
         migrateDatabases as private migrateDefaultConnection;
     }
+
+    /**
+     * Schema the seeded tenant owns. Its slug matches TENANT_SLUG in phpunit.xml.
+     */
+    private const string TENANT_SCHEMA = 'main';
 
     /**
      * Migration signature this process last migrated for, or null before the first run.
@@ -51,6 +62,8 @@ abstract class FeatureTestCase extends TestCase
      */
     protected function beforeRefreshingDatabase(): void
     {
+        $this->pointDefaultConnectionAtTenantSchema();
+
         $signature = json_encode($this->migrateFreshUsing());
 
         if (self::$migratedSignature !== $signature) {
@@ -65,6 +78,7 @@ abstract class FeatureTestCase extends TestCase
      */
     protected function migrateDatabases(): void
     {
+        $this->createTenantSchema();
         $this->migrateDefaultConnection();
 
         $this->migrateSettingsTable();
@@ -72,7 +86,7 @@ abstract class FeatureTestCase extends TestCase
     }
 
     /**
-     * Run only tenant-schema migrations on the default (sqlite) connection.
+     * Run only tenant-schema migrations on the default connection.
      *
      * @return array<string, mixed>
      */
@@ -82,6 +96,45 @@ abstract class FeatureTestCase extends TestCase
             '--path'  => 'database/migrations/tenant',
             '--force' => true,
         ];
+    }
+
+    /**
+     * The application, and with it the config, is rebuilt for every test, so
+     * the search_path is set again each time, before the transaction starts.
+     * A connection opened during boot would still carry the old search_path;
+     * purging it is safe here because nothing has been written on it yet.
+     * SQLite has no schemas, and purging an :memory: database destroys it.
+     */
+    private function pointDefaultConnectionAtTenantSchema(): void
+    {
+        if ( ! $this->usingPostgres()) {
+            return;
+        }
+
+        $default = (string) config('database.default');
+
+        config(["database.connections.{$default}.search_path" => self::TENANT_SCHEMA]);
+        DB::purge($default);
+    }
+
+    /**
+     * `migrate:fresh` drops every table in the search_path but does not create
+     * the schema the search_path names.
+     */
+    private function createTenantSchema(): void
+    {
+        if ( ! $this->usingPostgres()) {
+            return;
+        }
+
+        DB::statement('CREATE SCHEMA IF NOT EXISTS "' . self::TENANT_SCHEMA . '"');
+    }
+
+    private function usingPostgres(): bool
+    {
+        $default = (string) config('database.default');
+
+        return 'pgsql' === config("database.connections.{$default}.driver");
     }
 
     /**
@@ -116,7 +169,7 @@ abstract class FeatureTestCase extends TestCase
         DB::connection('landlord')->table('tenants')->insert([
             'id'          => '00000000-0000-0000-0000-000000000001',
             'slug'        => 'main',
-            'schema_name' => 'main',
+            'schema_name' => self::TENANT_SCHEMA,
             'status'      => 'active',
             'config'      => '{}',
         ]);

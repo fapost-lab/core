@@ -126,12 +126,13 @@ final class SetTagNodeHandlerTest extends FeatureTestCase
         $repo->add($contact->id, 'old', null);
         $repo->add($contact->id, 'keep', null);
 
-        $repo->syncForContact($contact->id, ['keep', 'new', '  ', 'new'], 'staff-7');
+        $staffId = (string) Str::uuid();
+        $repo->syncForContact($contact->id, ['keep', 'new', '  ', 'new'], $staffId);
 
         $rows = ContactTag::query()->where('contact_id', $contact->id)->get();
         $this->assertEqualsCanonicalizing(['keep', 'new'], $rows->pluck('tag')->all());
         // Newly added row is attributed to the acting staff user.
-        $this->assertSame('staff-7', $rows->firstWhere('tag', 'new')?->tagged_by);
+        $this->assertSame($staffId, $rows->firstWhere('tag', 'new')?->tagged_by);
     }
 
     public function test_templated_tags_resolve_and_blank_values_are_dropped(): void

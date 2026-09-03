@@ -35,7 +35,7 @@ final class LocalizeBroadcastMessageMigrationTest extends FeatureTestCase
         $migration->down();
 
         DB::table('broadcasts')->insert([
-            'id'           => (string) Str::ulid(),
+            'id'           => mb_strtolower(Str::ulid()->toRfc4122()),
             'tenant_id'    => self::TENANT_ID,
             'assistant_id' => $assistant->getKey(),
             'name'         => 'Legacy promo',
