@@ -17,7 +17,7 @@
 # ---------------------------------------------------------------------------
 # base — PHP with every extension the application and its workers need
 # ---------------------------------------------------------------------------
-FROM php:8.4-fpm-alpine AS base
+FROM php:8.5-fpm-alpine AS base
 
 # The -dev packages are build inputs for the extensions below and are removed
 # again once compilation finishes.
