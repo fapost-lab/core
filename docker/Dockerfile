@@ -205,7 +205,7 @@ CMD ["php-fpm"]
 # repository, and so the assets can never fall out of step with a volume that
 # Docker refuses to re-seed once it is non-empty.
 # ---------------------------------------------------------------------------
-FROM nginx:1.27-alpine AS web
+FROM nginx:1.31-alpine AS web
 
 COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 
