@@ -70,7 +70,7 @@ final class ListMedia extends ListRecords
      */
     public function initDeleteFolder(string $folderId): void
     {
-        if ( ! $this->canManage()) {
+        if (! $this->canManage()) {
             return;
         }
 
@@ -96,7 +96,7 @@ final class ListMedia extends ListRecords
      */
     public function executeDeleteFolder(MediaServiceInterface $service): void
     {
-        if ( ! $this->canManage() || null === $this->deleteFolderId) {
+        if (! $this->canManage() || null === $this->deleteFolderId) {
             return;
         }
 
@@ -174,7 +174,7 @@ final class ListMedia extends ListRecords
      */
     public function initRenameFolder(string $folderId): void
     {
-        if ( ! $this->canManage()) {
+        if (! $this->canManage()) {
             return;
         }
 
@@ -195,7 +195,7 @@ final class ListMedia extends ListRecords
      */
     public function executeRenameFolder(MediaServiceInterface $service): void
     {
-        if ( ! $this->canManage() || null === $this->renameFolderId) {
+        if (! $this->canManage() || null === $this->renameFolderId) {
             return;
         }
 
@@ -322,7 +322,7 @@ final class ListMedia extends ListRecords
 
                     foreach ($paths as $storedPath) {
                         $fullPath = Storage::disk('local')->path($storedPath);
-                        if ( ! file_exists($fullPath)) {
+                        if (! file_exists($fullPath)) {
                             continue;
                         }
 

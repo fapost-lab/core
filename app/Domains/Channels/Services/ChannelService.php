@@ -136,7 +136,7 @@ final readonly class ChannelService implements ChannelServiceInterface
         $hasConfig  = array_key_exists('config', $data);
 
         foreach ($data as $key => $value) {
-            if ( ! is_string($key) || ! str_starts_with($key, 'config.')) {
+            if (! is_string($key) || ! str_starts_with($key, 'config.')) {
                 continue;
             }
 

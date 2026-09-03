@@ -10,6 +10,7 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\State\ChannelStateProjector;
+use DateTimeInterface;
 use Tests\Feature\FeatureTestCase;
 
 final class ChannelStateProjectorTest extends FeatureTestCase
@@ -118,7 +119,7 @@ final class ChannelStateProjectorTest extends FeatureTestCase
         });
     }
 
-    private function link(string $contactId, string $channelId, \DateTimeInterface $lastInteractionAt): void
+    private function link(string $contactId, string $channelId, DateTimeInterface $lastInteractionAt): void
     {
         ChannelContact::query()->create([
             'contact_id'          => $contactId,

@@ -11,36 +11,20 @@ use Tests\TestCase;
 
 final class TenantSlugPolicyTest extends TestCase
 {
-    #[DataProvider('wellFormedSlugs')]
-    public function test_accepts_valid_dns_labels(string $slug): void
-    {
-        $this->policy()->assertAssignable($slug);
-
-        $this->addToAssertionCount(1);
-    }
-
     /**
      * @return array<string, array{0: string}>
      */
     public static function wellFormedSlugs(): array
     {
         return [
-            'simple'          => ['acme'],
-            'with hyphen'     => ['acme-corp'],
-            'digits'          => ['acme2024'],
-            'leading digit'   => ['2acme'],
-            'all digits'      => ['12345'],
-            'single char'     => ['a'],
-            'max length'      => [str_repeat('a', 63)],
+            'simple'        => ['acme'],
+            'with hyphen'   => ['acme-corp'],
+            'digits'        => ['acme2024'],
+            'leading digit' => ['2acme'],
+            'all digits'    => ['12345'],
+            'single char'   => ['a'],
+            'max length'    => [str_repeat('a', 63)],
         ];
-    }
-
-    #[DataProvider('malformedSlugs')]
-    public function test_rejects_invalid_dns_labels(string $slug): void
-    {
-        $this->expectException(InvalidTenantSlugException::class);
-
-        $this->policy()->assertAssignable($slug);
     }
 
     /**
@@ -49,18 +33,33 @@ final class TenantSlugPolicyTest extends TestCase
     public static function malformedSlugs(): array
     {
         return [
-            'empty'            => [''],
-            'uppercase'        => ['Acme'],
-            'space'            => ['acme corp'],
-            'underscore'       => ['acme_corp'],
-            'leading hyphen'   => ['-acme'],
-            'trailing hyphen'  => ['acme-'],
-            'dot'              => ['acme.corp'],
-            'too long'         => [str_repeat('a', 64)],
-            'slash'            => ['acme/corp'],
-            'unicode'          => ['акме'],
-            'null byte'        => ["acme\0"],
+            'empty'           => [''],
+            'uppercase'       => ['Acme'],
+            'space'           => ['acme corp'],
+            'underscore'      => ['acme_corp'],
+            'leading hyphen'  => ['-acme'],
+            'trailing hyphen' => ['acme-'],
+            'dot'             => ['acme.corp'],
+            'too long'        => [str_repeat('a', 64)],
+            'slash'           => ['acme/corp'],
+            'unicode'         => ['акме'],
+            'null byte'       => ["acme\0"],
         ];
+    }
+    #[DataProvider('wellFormedSlugs')]
+    public function test_accepts_valid_dns_labels(string $slug): void
+    {
+        $this->policy()->assertAssignable($slug);
+
+        $this->addToAssertionCount(1);
+    }
+
+    #[DataProvider('malformedSlugs')]
+    public function test_rejects_invalid_dns_labels(string $slug): void
+    {
+        $this->expectException(InvalidTenantSlugException::class);
+
+        $this->policy()->assertAssignable($slug);
     }
 
     /**

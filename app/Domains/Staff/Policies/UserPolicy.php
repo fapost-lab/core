@@ -34,11 +34,11 @@ final class UserPolicy
 
     public function update(AuthUser $authUser, User $user): bool
     {
-        if ( ! $authUser->can(Permission::ManageUsers->value)) {
+        if (! $authUser->can(Permission::ManageUsers->value)) {
             return false;
         }
 
-        if ( ! $authUser instanceof User) {
+        if (! $authUser instanceof User) {
             return false;
         }
 
@@ -47,11 +47,11 @@ final class UserPolicy
 
     public function delete(AuthUser $authUser, User $user): bool
     {
-        if ( ! $authUser->can(Permission::ManageUsers->value)) {
+        if (! $authUser->can(Permission::ManageUsers->value)) {
             return false;
         }
 
-        if ( ! $authUser instanceof User) {
+        if (! $authUser instanceof User) {
             return false;
         }
 
@@ -70,7 +70,7 @@ final class UserPolicy
 
     public function deactivate(AuthUser $authUser, User $user): bool
     {
-        if ( ! $authUser instanceof User) {
+        if (! $authUser instanceof User) {
             return false;
         }
 
@@ -80,7 +80,7 @@ final class UserPolicy
 
     public function activate(AuthUser $authUser, User $user): bool
     {
-        if ( ! $authUser instanceof User) {
+        if (! $authUser instanceof User) {
             return false;
         }
 
@@ -117,7 +117,7 @@ final class UserPolicy
             return false;
         }
 
-        if ( ! $this->actorOutranks($actor, $target)) {
+        if (! $this->actorOutranks($actor, $target)) {
             return false;
         }
 

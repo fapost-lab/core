@@ -37,11 +37,10 @@ final class ConversationReplyServiceTest extends FeatureTestCase
         $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock) use ($conversation, $contact, $channel): void {
             $mock->shouldReceive('send')
                 ->once()
-                ->withArgs(function (OutboundMessage $message) use ($conversation, $contact, $channel): bool {
-                    return $message->chatId === $contact->external_id
+                ->withArgs(fn (OutboundMessage $message): bool => $message->chatId === $contact->external_id
                         && $message->channelId === (string) $channel->getKey()
                         && $message->channelType === ChannelTypeEnum::Telegram->value
-                        && $message->payload->text === 'Thanks for reaching out'
+                        && 'Thanks for reaching out' === $message->payload->text
                         && $message->metadata['contact_id'] === (string) $conversation->contact_id
                         && $message->metadata['assistant_id'] === (string) $conversation->assistant_id
                         && $message->metadata['origin'] === MessageOrigin::Staff->value
@@ -49,8 +48,7 @@ final class ConversationReplyServiceTest extends FeatureTestCase
                         // Operator prose must not be sent as HTML markup: a bare
                         // "R&D" or "5 < 10" would be malformed and Telegram would
                         // reject the whole message.
-                        && ! array_key_exists('parse_mode', $message->metadata);
-                })
+                        && ! array_key_exists('parse_mode', $message->metadata))
                 ->andReturn(new DeliveryResult(sent: true, providerMessageId: 'provider-1'));
         });
 

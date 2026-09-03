@@ -68,7 +68,7 @@ final class ChannelResource extends Resource
     {
         $tenant = Filament::getTenant();
 
-        if ( ! $tenant instanceof Assistant) {
+        if (! $tenant instanceof Assistant) {
             return false;
         }
 

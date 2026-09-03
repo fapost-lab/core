@@ -27,7 +27,7 @@ final class FlowExecutionGuardTest extends TestCase
 {
     public function test_it_executes_callback_and_returns_result_when_lock_is_acquired(): void
     {
-        $connection = $this->connectionAcquiring(true);
+        $connection           = $this->connectionAcquiring(true);
         [$guard, , $registry] = $this->guard($connection);
 
         $result = $guard->run('tenant-1', 'contact-1', 'assistant-1', static fn (): string => 'ok');
@@ -39,7 +39,7 @@ final class FlowExecutionGuardTest extends TestCase
     public function test_it_throws_when_lock_is_busy(): void
     {
         $connection = $this->connectionAcquiring(false);
-        [$guard] = $this->guard($connection);
+        [$guard]    = $this->guard($connection);
 
         $this->expectException(SessionLockTimeoutException::class);
 
@@ -48,7 +48,7 @@ final class FlowExecutionGuardTest extends TestCase
 
     public function test_it_releases_lock_when_callback_throws(): void
     {
-        $connection = $this->connectionAcquiring(true);
+        $connection           = $this->connectionAcquiring(true);
         [$guard, , $registry] = $this->guard($connection);
 
         $this->expectException(RuntimeException::class);
@@ -86,7 +86,7 @@ final class FlowExecutionGuardTest extends TestCase
 
     public function test_it_acquires_its_own_lock_when_registry_holds_a_different_scope(): void
     {
-        $connection = $this->connectionAcquiring(true);
+        $connection           = $this->connectionAcquiring(true);
         [$guard, , $registry] = $this->guard($connection);
 
         $outerHandle = new LockHandle((new LockScope('tenant-1', 'contact-A', 'assistant-1'))->key(), 'token-outer', 30);
@@ -130,7 +130,9 @@ final class FlowExecutionGuardTest extends TestCase
     private function factoryFor(MockObject&Connection $connection): RedisFactory
     {
         return new class ($connection) implements RedisFactory {
-            public function __construct(private readonly Connection $connection) {}
+            public function __construct(private readonly Connection $connection)
+            {
+            }
 
             public function connection($name = null): Connection
             {

@@ -123,8 +123,8 @@ final class BuilderApiTest extends FeatureTestCase
      */
     public function test_save_draft_persists_even_with_duplicate_message_keywords(): void
     {
-        $draft        = $this->draft(['draft_version' => 5]);
-        $otherFlowId  = (string) Str::uuid();
+        $draft       = $this->draft(['draft_version' => 5]);
+        $otherFlowId = (string) Str::uuid();
 
         FlowTrigger::query()->create([
             'tenant_id'    => $draft->tenant_id,
@@ -217,7 +217,7 @@ final class BuilderApiTest extends FeatureTestCase
                     'id'      => 'input_1',
                     'type'    => 'input',
                     'version' => 1,
-                    'config' => [
+                    'config'  => [
                         'variable' => [
                             'name'    => 'answer',
                             'type'    => 'text',
@@ -268,7 +268,7 @@ final class BuilderApiTest extends FeatureTestCase
                     'id'      => 'input_1',
                     'type'    => 'input',
                     'version' => 1,
-                    'config' => [
+                    'config'  => [
                         'variable' => [
                             'name'    => 'answer',
                             'type'    => 'text',
@@ -316,7 +316,7 @@ final class BuilderApiTest extends FeatureTestCase
                     'id'      => 'input_1',
                     'type'    => 'input',
                     'version' => 1,
-                    'config' => [
+                    'config'  => [
                         'variable' => [
                             'name'    => 'answer',
                             'type'    => 'text',

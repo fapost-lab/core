@@ -50,7 +50,7 @@ final class RolePolicy
 
     private function isAdminWithUserManagement(AuthUser $authUser): bool
     {
-        if ( ! $authUser instanceof User) {
+        if (! $authUser instanceof User) {
             return false;
         }
 

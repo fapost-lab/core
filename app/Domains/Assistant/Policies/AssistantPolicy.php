@@ -78,7 +78,7 @@ final class AssistantPolicy
 
     private function isAssignedOrAdmin(AuthUser $authUser, Assistant $assistant): bool
     {
-        if ( ! $authUser instanceof User) {
+        if (! $authUser instanceof User) {
             return false;
         }
 

@@ -64,8 +64,8 @@ final class V1WiringSmokeTest extends FeatureTestCase
         // FlowEngine ↔ SubflowResumer is a known circular dependency that's
         // broken by the Closure resolver in DefaultSubflowResumer. This test
         // is the single safety net that catches a regression.
-        $engine   = $this->app->make(FlowEngineInterface::class);
-        $resumer  = $this->app->make(SubflowResumerInterface::class);
+        $engine  = $this->app->make(FlowEngineInterface::class);
+        $resumer = $this->app->make(SubflowResumerInterface::class);
 
         $this->assertInstanceOf(FlowEngineInterface::class, $engine);
         $this->assertInstanceOf(SubflowResumerInterface::class, $resumer);

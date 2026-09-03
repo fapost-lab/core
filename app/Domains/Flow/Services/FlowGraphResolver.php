@@ -20,7 +20,7 @@ final class FlowGraphResolver
         $incoming = [];
 
         foreach ($definition->edges as $edge) {
-            if ( ! is_array($edge)) {
+            if (! is_array($edge)) {
                 continue;
             }
 
@@ -34,17 +34,17 @@ final class FlowGraphResolver
         $candidates = [];
 
         foreach ($nodes as $node) {
-            if ( ! is_array($node)) {
+            if (! is_array($node)) {
                 continue;
             }
 
             $id = $node['id'] ?? null;
 
-            if ( ! is_string($id) || '' === $id) {
+            if (! is_string($id) || '' === $id) {
                 continue;
             }
 
-            if ( ! isset($incoming[$id])) {
+            if (! isset($incoming[$id])) {
                 $candidates[] = $id;
             }
         }
@@ -62,7 +62,7 @@ final class FlowGraphResolver
     public function findNode(FlowDefinition $definition, string $nodeId): array
     {
         foreach ($definition->nodes as $node) {
-            if ( ! is_array($node)) {
+            if (! is_array($node)) {
                 continue;
             }
 
@@ -80,7 +80,7 @@ final class FlowGraphResolver
         string $sourceHandle,
     ): ?string {
         foreach ($definition->edges as $edge) {
-            if ( ! is_array($edge)) {
+            if (! is_array($edge)) {
                 continue;
             }
 

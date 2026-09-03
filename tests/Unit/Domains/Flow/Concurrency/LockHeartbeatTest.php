@@ -16,7 +16,7 @@ use Tests\TestCase;
  * The heartbeat is exercised against a real {@see SessionLockManager} driving
  * a fake Redis connection, since {@see SessionLockManager} is final per pint
  * policy and cannot be mocked directly — same pattern as
- * {@see \Tests\Unit\Domains\Flow\Concurrency\LockAcquisitionPolicyTest}.
+ * {@see LockAcquisitionPolicyTest}.
  */
 final class LockHeartbeatTest extends TestCase
 {
@@ -69,7 +69,9 @@ final class LockHeartbeatTest extends TestCase
     private function factoryFor(MockObject&Connection $connection): RedisFactory
     {
         return new class ($connection) implements RedisFactory {
-            public function __construct(private readonly Connection $connection) {}
+            public function __construct(private readonly Connection $connection)
+            {
+            }
 
             public function connection($name = null): Connection
             {

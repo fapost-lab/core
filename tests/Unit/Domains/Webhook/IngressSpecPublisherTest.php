@@ -11,6 +11,7 @@ use App\Domains\Webhook\Services\IngressSpecPublisher;
 use App\Domains\Webhook\Services\IngressSpecResolver;
 use Fapost\Foundation\Channel\Ingress\IngressSpec;
 use Illuminate\Support\Facades\Redis;
+use Mockery;
 use Mockery\MockInterface;
 use Tests\TestCase;
 
@@ -22,7 +23,7 @@ final class IngressSpecPublisherTest extends TestCase
 
         Redis::shouldReceive('set')
             ->once()
-            ->with('ingress:spec:telegram', \Mockery::capture($captured))
+            ->with('ingress:spec:telegram', Mockery::capture($captured))
             ->andReturn(true);
 
         Redis::shouldReceive('del')->andReturn(1);

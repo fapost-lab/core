@@ -7,13 +7,14 @@ namespace App\Console\Installer\Steps;
 use App\Console\Installer\InstallStep;
 use App\Domains\Webhook\Deployment\EnvFile;
 use Illuminate\Console\Command;
-use Redis;
-use RedisException;
-use Throwable;
 
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\password;
 use function Laravel\Prompts\text;
+
+use Redis;
+use RedisException;
+use Throwable;
 
 /**
  * Redis connection details, verified before they are written.

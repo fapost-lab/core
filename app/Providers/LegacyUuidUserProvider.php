@@ -20,7 +20,7 @@ final class LegacyUuidUserProvider extends EloquentUserProvider
      */
     public function retrieveById($identifier): ?\Illuminate\Contracts\Auth\Authenticatable
     {
-        if ( ! $this->isValidAuthIdentifier($identifier)) {
+        if (! $this->isValidAuthIdentifier($identifier)) {
             return null;
         }
 
@@ -37,7 +37,7 @@ final class LegacyUuidUserProvider extends EloquentUserProvider
         #[SensitiveParameter]
         $token
     ): ?\Illuminate\Contracts\Auth\Authenticatable {
-        if ( ! $this->isValidAuthIdentifier($identifier)) {
+        if (! $this->isValidAuthIdentifier($identifier)) {
             return null;
         }
 

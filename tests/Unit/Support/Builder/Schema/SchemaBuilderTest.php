@@ -116,7 +116,7 @@ final class SchemaBuilderTest extends TestCase
                     'value' => ['image', 'video'],
                 ],
             ],
-            'options'      => ['text', 'image', 'video'],
+            'options' => ['text', 'image', 'video'],
         ], $array);
     }
 
@@ -261,9 +261,9 @@ final class SchemaBuilderTest extends TestCase
             ->toArray();
 
         $this->assertSame([
-            'type'     => 'object',
-            'label'    => 'Transport options',
-            'fields'   => [
+            'type'   => 'object',
+            'label'  => 'Transport options',
+            'fields' => [
                 'retries'    => ['type' => 'number', 'default' => 0],
                 'verify_ssl' => ['type' => 'boolean', 'required' => true, 'default' => true],
             ],
@@ -285,10 +285,10 @@ final class SchemaBuilderTest extends TestCase
             ->toArray();
 
         $this->assertSame([
-            'type'      => 'object-array',
-            'label'     => 'Mapping',
-            'item'      => [
-                'fields'     => [
+            'type'  => 'object-array',
+            'label' => 'Mapping',
+            'item'  => [
+                'fields' => [
                     'from' => ['type' => 'state-picker', 'required' => true],
                     'to'   => ['type' => 'state-picker', 'required' => true],
                 ],
@@ -382,9 +382,9 @@ final class SchemaBuilderTest extends TestCase
                     'collapsed' => true,
                 ],
             ],
-            'url'      => ['type' => 'string', 'label' => 'URL', 'required' => true],
-            'timeout'  => ['type' => 'number', 'default' => 10],
-            'headers'  => ['type' => 'key-value', 'label' => 'Custom headers'],
+            'url'     => ['type' => 'string', 'label' => 'URL', 'required' => true],
+            'timeout' => ['type' => 'number', 'default' => 10],
+            'headers' => ['type' => 'key-value', 'label' => 'Custom headers'],
         ], $array);
     }
 

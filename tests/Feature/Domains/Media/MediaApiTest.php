@@ -85,7 +85,7 @@ final class MediaApiTest extends FeatureTestCase
             'name'       => 'NotEmpty',
             'path_cache' => '/NotEmpty',
         ]);
-        $blob   = $this->makeBlob();
+        $blob = $this->makeBlob();
         MediaFile::query()->create([
             'tenant_id' => self::TENANT_ID,
             'blob_id'   => $blob->id,

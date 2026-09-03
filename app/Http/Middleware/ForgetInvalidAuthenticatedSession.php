@@ -39,7 +39,7 @@ final readonly class ForgetInvalidAuthenticatedSession
         $sessionKey = $guard->getName();
         $identifier = $request->session()->get($sessionKey);
 
-        if ( ! $this->isValidIdentifier($guard->getProvider(), $identifier)) {
+        if (! $this->isValidIdentifier($guard->getProvider(), $identifier)) {
             $request->session()->forget($sessionKey);
         }
     }
@@ -49,17 +49,17 @@ final readonly class ForgetInvalidAuthenticatedSession
      */
     private function isValidIdentifier(UserProvider $provider, mixed $identifier): bool
     {
-        if ( ! is_string($identifier) || '' === $identifier) {
+        if (! is_string($identifier) || '' === $identifier) {
             return false;
         }
 
-        if ( ! $provider instanceof EloquentUserProvider) {
+        if (! $provider instanceof EloquentUserProvider) {
             return true;
         }
 
         $user = $provider->createModel();
 
-        if ( ! $user instanceof Model) {
+        if (! $user instanceof Model) {
             return true;
         }
 
@@ -74,13 +74,13 @@ final readonly class ForgetInvalidAuthenticatedSession
     {
         $recaller = $request->cookies->get($guard->getRecallerName());
 
-        if ( ! is_string($recaller) || '' === $recaller) {
+        if (! is_string($recaller) || '' === $recaller) {
             return;
         }
 
         [$identifier] = explode('|', $recaller, 2);
 
-        if ( ! $this->isValidIdentifier($guard->getProvider(), $identifier)) {
+        if (! $this->isValidIdentifier($guard->getProvider(), $identifier)) {
             $this->cookies->queue($this->cookies->forget($guard->getRecallerName()));
         }
     }

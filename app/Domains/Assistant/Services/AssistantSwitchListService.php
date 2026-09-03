@@ -29,7 +29,7 @@ final class AssistantSwitchListService
         $tenantId = $this->tenantContext->get()->getId();
         $query    = Assistant::query()->where('tenant_id', $tenantId);
 
-        if ( ! $user->isAdmin()) {
+        if (! $user->isAdmin()) {
             $query->whereHas(
                 'users',
                 fn (Builder $q): Builder => $q->whereKey($user->getKey()),

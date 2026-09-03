@@ -95,7 +95,8 @@ final class ProbeAction implements ActionHandlerInterface
     public function __construct(
         private readonly array $returnPayload = [],
         private readonly bool $throws = false,
-    ) {}
+    ) {
+    }
 
     public function id(): string
     {

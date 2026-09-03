@@ -13,6 +13,12 @@ final class VariableCoercerTest extends TestCase
 {
     private VariableCoercer $coercer;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->coercer = new VariableCoercer();
+    }
+
     /**
      * @return array<string, array{0: mixed, 1: int|float|null}>
      */
@@ -182,11 +188,5 @@ final class VariableCoercerTest extends TestCase
     public function test_json_null_for_empty_string(): void
     {
         $this->assertNull($this->coercer->coerce('', VariableType::Json));
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-        $this->coercer = new VariableCoercer();
     }
 }

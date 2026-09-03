@@ -49,7 +49,7 @@ final class TelegramMediaUploaderTest extends TestCase
         $this->assertSame('777', $result->deliveredMessageId);
         $this->assertNull($result->expiresAt);
 
-        Http::assertSent(static fn($request): bool => str_contains($request->url(), '/sendPhoto'));
+        Http::assertSent(static fn ($request): bool => str_contains($request->url(), '/sendPhoto'));
     }
 
     public function test_uploads_document_when_kind_is_other(): void
@@ -103,7 +103,7 @@ final class TelegramMediaUploaderTest extends TestCase
         $blob->shouldReceive('getMimeType')->andReturn($mimeType);
         $blob->shouldReceive('getSize')->andReturn(100);
         $blob->shouldReceive('getContentHash')->andReturn(str_repeat('a', 64));
-        $blob->shouldReceive('openStream')->andReturnUsing(static fn() => Utils::streamFor('binary-bytes'));
+        $blob->shouldReceive('openStream')->andReturnUsing(static fn () => Utils::streamFor('binary-bytes'));
 
         return $blob;
     }

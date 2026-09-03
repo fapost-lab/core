@@ -77,7 +77,7 @@ final class SubflowLifecycleTest extends FeatureTestCase
             ],
         );
 
-        $parentFlowId   = (string) Str::uuid();
+        $parentFlowId     = (string) Str::uuid();
         $parentDefinition = $this->createDefinition(
             flowId: $parentFlowId,
             nodes: [
@@ -131,7 +131,7 @@ final class SubflowLifecycleTest extends FeatureTestCase
             edges: [],
         );
 
-        $parentFlowId   = (string) Str::uuid();
+        $parentFlowId     = (string) Str::uuid();
         $parentDefinition = $this->createDefinition(
             flowId: $parentFlowId,
             nodes: [

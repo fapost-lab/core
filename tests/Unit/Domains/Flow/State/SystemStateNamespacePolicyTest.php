@@ -25,14 +25,14 @@ final class SystemStateNamespacePolicyTest extends TestCase
      */
     public static function allowedWrites(): iterable
     {
-        yield 'any handler writes flow.*'        => ['custom_solution_node', 'flow.answer'];
-        yield 'any handler writes call.*'        => ['custom_solution_node', 'call.response.body'];
-        yield 'send_message writes system.*'     => ['send_message', 'system.sent_messages.n1'];
-        yield 'input writes system retry'        => ['input', 'system.input.n1.retry_count'];
-        yield 'delay writes system schedule'     => ['delay', 'system.delay.n1.scheduled_at'];
-        yield 'notify writes system marker'      => ['notify', 'system.staff_notified.n1'];
-        yield 'set_tag writes system marker'     => ['set_tag', 'system.set_tag.n1'];
-        yield 'rag_query writes rag.*'           => ['rag_query', 'rag.answer'];
+        yield 'any handler writes flow.*' => ['custom_solution_node', 'flow.answer'];
+        yield 'any handler writes call.*' => ['custom_solution_node', 'call.response.body'];
+        yield 'send_message writes system.*' => ['send_message', 'system.sent_messages.n1'];
+        yield 'input writes system retry' => ['input', 'system.input.n1.retry_count'];
+        yield 'delay writes system schedule' => ['delay', 'system.delay.n1.scheduled_at'];
+        yield 'notify writes system marker' => ['notify', 'system.staff_notified.n1'];
+        yield 'set_tag writes system marker' => ['set_tag', 'system.set_tag.n1'];
+        yield 'rag_query writes rag.*' => ['rag_query', 'rag.answer'];
     }
 
     /**
@@ -41,11 +41,11 @@ final class SystemStateNamespacePolicyTest extends TestCase
     public static function forbiddenWrites(): iterable
     {
         yield 'foreign handler writes system.*' => ['custom_solution_node', 'system.language'];
-        yield 'branch writes system.*'          => ['branch', 'system.sent_messages.n1'];
-        yield 'foreign handler writes rag.*'    => ['send_message', 'rag.answer'];
-        yield 'module namespace is read-only'   => ['custom_solution_node', 'module.hr.department'];
+        yield 'branch writes system.*' => ['branch', 'system.sent_messages.n1'];
+        yield 'foreign handler writes rag.*' => ['send_message', 'rag.answer'];
+        yield 'module namespace is read-only' => ['custom_solution_node', 'module.hr.department'];
         yield 'contact projection not writable' => ['assign', 'contact.first_name'];
-        yield 'unknown namespace'               => ['assign', 'admin.secret'];
+        yield 'unknown namespace' => ['assign', 'admin.secret'];
     }
 
     #[DataProvider('allowedWrites')]

@@ -48,7 +48,7 @@ final readonly class CommandMatcher
         $commands = is_array($assistant->commands) ? $assistant->commands : [];
 
         foreach ($commands as $entry) {
-            if ( ! is_array($entry)) {
+            if (! is_array($entry)) {
                 continue;
             }
 
@@ -117,7 +117,7 @@ final readonly class CommandMatcher
             return '' === $value ? null : $value;
         }
 
-        if ( ! is_array($value)) {
+        if (! is_array($value)) {
             return null;
         }
 

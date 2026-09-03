@@ -82,11 +82,11 @@ final class FlowMessageSenderTest extends FeatureTestCase
                     && 'Choose' === $message->payload->text
                     && (string) $session->getKey() === $message->metadata['flow_session_id']
                                                                                   && CallbackDataCodec::encode(
-                    (string)$session->getKey(),
-                    '11111111-1111-4111-8111-111111111111',
-                ) === $message->payload->keyboard['inline_keyboard'][0][0]['callback_data'])->andReturn(
-                new DeliveryResult(sent: true, providerMessageId: 'provider-1')
-            );
+                                                                                      (string)$session->getKey(),
+                                                                                      '11111111-1111-4111-8111-111111111111',
+                                                                                  ) === $message->payload->keyboard['inline_keyboard'][0][0]['callback_data'])->andReturn(
+                                                                                      new DeliveryResult(sent: true, providerMessageId: 'provider-1')
+                                                                                  );
         });
 
         $flowSender = new FlowMessageSender(
@@ -277,7 +277,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
             'idempotency_key' => 'idem-img',
             'session_id'      => (string) $session->getKey(),
             'content_type'    => 'image',
-            'media_file_id' => $mediaFile->id,
+            'media_file_id'   => $mediaFile->id,
             'caption'         => 'Nice photo',
         ]);
 
@@ -292,7 +292,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
             'external_id' => 'chat-uas',
         ]);
 
-        $channel = Channel::withoutEvents(fn(): Channel => Channel::factory()->create([
+        $channel = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
             'assistant_id' => $assistant->getKey(),
             'tenant_id'    => $tenantId,
             'type'         => ChannelTypeEnum::Telegram,

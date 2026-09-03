@@ -30,7 +30,7 @@ final readonly class ChannelWebhookRegistry implements ChannelWebhookRegistryInt
      */
     public function set(Channel $channel, TenantInterface $tenant): void
     {
-        if ( ! $channel->is_active) {
+        if (! $channel->is_active) {
             return;
         }
 

@@ -23,6 +23,37 @@ final class VariableResolverTest extends TestCase
         parent::tearDown();
     }
 
+    /**
+     * @return array<string, array{0: string, 1: VariableStorage, 2: string, 3: string|null}>
+     */
+    public static function legacyPathProvider(): array
+    {
+        return [
+            'flow prefix'         => ['flow.foo', VariableStorage::Session, 'foo', null],
+            'contact flat'        => ['contact.foo', VariableStorage::Contact, 'foo', null],
+            'contact with group'  => ['contact.bar.foo', VariableStorage::Contact, 'foo', 'bar'],
+            'no prefix → session' => ['foo', VariableStorage::Session, 'foo', null],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function reservedNameProvider(): array
+    {
+        return [
+            'id'          => ['id'],
+            'channel_id'  => ['channel_id'],
+            'tenant_id'   => ['tenant_id'],
+            'external_id' => ['external_id'],
+            'meta'        => ['meta'],
+            'language'    => ['language'],
+            'is_blocked'  => ['is_blocked'],
+            'created_at'  => ['created_at'],
+            'updated_at'  => ['updated_at'],
+        ];
+    }
+
     public function test_resolves_session_variable_into_flow_namespace_path(): void
     {
         $resolver = new VariableResolver();
@@ -69,19 +100,6 @@ final class VariableResolverTest extends TestCase
         $this->assertSame($expectedGroup, $variable->group);
     }
 
-    /**
-     * @return array<string, array{0: string, 1: VariableStorage, 2: string, 3: string|null}>
-     */
-    public static function legacyPathProvider(): array
-    {
-        return [
-            'flow prefix'          => ['flow.foo', VariableStorage::Session, 'foo', null],
-            'contact flat'         => ['contact.foo', VariableStorage::Contact, 'foo', null],
-            'contact with group'   => ['contact.bar.foo', VariableStorage::Contact, 'foo', 'bar'],
-            'no prefix → session'  => ['foo', VariableStorage::Session, 'foo', null],
-        ];
-    }
-
     public function test_from_legacy_path_rejects_contact_path_deeper_than_one_group(): void
     {
         $resolver = new VariableResolver();
@@ -120,24 +138,6 @@ final class VariableResolverTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         new Variable(name: $reserved, storage: VariableStorage::Contact);
-    }
-
-    /**
-     * @return array<string, array{0: string}>
-     */
-    public static function reservedNameProvider(): array
-    {
-        return [
-            'id'          => ['id'],
-            'channel_id'  => ['channel_id'],
-            'tenant_id'   => ['tenant_id'],
-            'external_id' => ['external_id'],
-            'meta'        => ['meta'],
-            'language'    => ['language'],
-            'is_blocked'  => ['is_blocked'],
-            'created_at'  => ['created_at'],
-            'updated_at'  => ['updated_at'],
-        ];
     }
 
     public function test_reserved_meta_group_is_rejected(): void

@@ -24,7 +24,7 @@ return [
 
         'heartbeat' => [
             // Advisory cadence. The engine ticks per node, not on a timer.
-            'interval_seconds'  => (int) env('FLOW_LOCK_HEARTBEAT_INTERVAL', 10),
+            'interval_seconds' => (int) env('FLOW_LOCK_HEARTBEAT_INTERVAL', 10),
             // TTL the lock is refreshed back to on each tick.
             'extend_to_seconds' => (int) env('FLOW_LOCK_HEARTBEAT_EXTEND_TO', 30),
         ],

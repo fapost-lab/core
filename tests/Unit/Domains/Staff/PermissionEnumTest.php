@@ -21,8 +21,8 @@ final class PermissionEnumTest extends TestCase
 
     public function test_sensitive_permissions_are_exactly_the_declared_set(): void
     {
-        $sensitive = array_filter(Permission::cases(), fn(Permission $p) => $p->isSensitive());
-        $values    = array_map(fn(Permission $p) => $p->value, array_values($sensitive));
+        $sensitive = array_filter(Permission::cases(), fn (Permission $p) => $p->isSensitive());
+        $values    = array_map(fn (Permission $p) => $p->value, array_values($sensitive));
 
         sort($values);
         $this->assertSame(
@@ -72,7 +72,7 @@ final class PermissionEnumTest extends TestCase
 
     public function test_admin_role_contains_all_permissions(): void
     {
-        $adminPerms = array_map(fn(Permission $p) => $p->value, RoleEnum::Admin->permissions());
+        $adminPerms = array_map(fn (Permission $p) => $p->value, RoleEnum::Admin->permissions());
         $allPerms   = Permission::values();
 
         sort($adminPerms);
@@ -122,7 +122,7 @@ final class PermissionEnumTest extends TestCase
     public function test_deprecated_manage_flow_is_not_in_non_admin_system_roles(): void
     {
         foreach (RoleEnum::cases() as $role) {
-            if ($role === RoleEnum::Admin) {
+            if (RoleEnum::Admin === $role) {
                 continue; // Admin gets all cases including deprecated — expected.
             }
 

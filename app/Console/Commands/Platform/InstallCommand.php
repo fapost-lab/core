@@ -12,9 +12,10 @@ use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Webhook\Deployment\EnvFile;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
-use Throwable;
 
 use function Laravel\Prompts\confirm;
+
+use Throwable;
 
 /**
  * Guided installation: configure connections, apply migrations, create the first

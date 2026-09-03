@@ -234,7 +234,7 @@ final class TenantDatabaseManagerTest extends TestCase
         /** @var object{search_path: string} $row */
         $row = DB::connection($connection)->selectOne('SHOW search_path');
 
-        return trim($row->search_path, '"');
+        return mb_trim($row->search_path, '"');
     }
 
     private function makeTenant(string $slug): TenantInterface

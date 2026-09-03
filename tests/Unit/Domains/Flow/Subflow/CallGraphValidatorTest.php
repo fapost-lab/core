@@ -11,10 +11,9 @@ use Tests\TestCase;
 
 final class CallGraphValidatorTest extends TestCase
 {
-
     public function test_direct_recursion_is_rejected(): void
     {
-        $repo = $this->repo([]);
+        $repo      = $this->repo([]);
         $validator = new CallGraphValidator($repo);
 
         $violations = $validator->validate('flow-a', ['flow-a']);
@@ -70,7 +69,7 @@ final class CallGraphValidatorTest extends TestCase
 
     public function test_no_callees_passes_immediately(): void
     {
-        $repo = $this->repo([]);
+        $repo      = $this->repo([]);
         $validator = new CallGraphValidator($repo);
 
         $this->assertSame([], $validator->validate('flow-a', []));

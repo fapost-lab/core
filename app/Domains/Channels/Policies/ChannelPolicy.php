@@ -43,7 +43,7 @@ final class ChannelPolicy
      */
     public function create(AuthUser $authUser, ?Assistant $assistant = null): bool
     {
-        if ( ! $this->canManageAssistants($authUser)) {
+        if (! $this->canManageAssistants($authUser)) {
             return false;
         }
 
@@ -86,7 +86,7 @@ final class ChannelPolicy
 
     private function canAccessAssistant(AuthUser $authUser, ?Assistant $assistant): bool
     {
-        if ( ! $authUser instanceof User || ! $assistant) {
+        if (! $authUser instanceof User || ! $assistant) {
             return false;
         }
 

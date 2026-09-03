@@ -62,7 +62,7 @@ final class FlowLogWriterTest extends FeatureTestCase
             'flow_id'   => (string) Str::uuid(),
             'version'   => 1,
             'name'      => 'Flow',
-            'nodes' => [
+            'nodes'     => [
                 [
                     'id'      => 'n1',
                     'type'    => 'input',

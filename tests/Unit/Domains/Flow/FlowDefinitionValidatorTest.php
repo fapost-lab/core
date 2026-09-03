@@ -20,7 +20,7 @@ final class FlowDefinitionValidatorTest extends TestCase
 
         $result = $validator->validate(
             nodes: [
-                ['id' => 'n1', 'type'    => 'branch', 'version' => 2, 'config' => []],
+                ['id' => 'n1', 'type' => 'branch', 'version' => 2, 'config' => []],
                 [
                     'id'      => 'n2',
                     'type'    => 'input',
@@ -223,7 +223,7 @@ final class FlowDefinitionValidatorTest extends TestCase
         $validator = $this->validator();
         try {
             $validator->validate(
-                nodes: [['id' => 'n1', 'type'    => 'branch', 'config' => []]],
+                nodes: [['id' => 'n1', 'type' => 'branch', 'config' => []]],
                 edges: [],
             );
             $this->fail('Expected FlowValidationException was not thrown.');
@@ -238,7 +238,7 @@ final class FlowDefinitionValidatorTest extends TestCase
         try {
             $validator->validate(
                 nodes: [
-                    ['id' => 'n1', 'type'    => 'branch', 'version' => 2, 'config' => []],
+                    ['id' => 'n1', 'type' => 'branch', 'version' => 2, 'config' => []],
                     [
                         'id'      => 'n2',
                         'type'    => 'input',
@@ -283,7 +283,7 @@ final class FlowDefinitionValidatorTest extends TestCase
         try {
             $validator->validate(
                 nodes: [
-                    ['id' => 'n1', 'type'    => 'branch', 'version' => 2, 'config' => []],
+                    ['id' => 'n1', 'type' => 'branch', 'version' => 2, 'config' => []],
                     [
                         'id'      => 'n2',
                         'type'    => 'input',
@@ -330,7 +330,7 @@ final class FlowDefinitionValidatorTest extends TestCase
                 nodes: [
                     [
                         'id'                   => 'n1',
-                        'type'    => 'branch',
+                        'type'                 => 'branch',
                         'version'              => 2,
                         'config'               => [],
                         'required_transitions' => ['timeout'],
@@ -365,7 +365,7 @@ final class FlowDefinitionValidatorTest extends TestCase
         try {
             $validator->validate(
                 nodes: [
-                    ['id' => 'n1', 'type'    => 'branch', 'version' => 99, 'config' => []],
+                    ['id' => 'n1', 'type' => 'branch', 'version' => 99, 'config' => []],
                 ],
                 edges: [],
             );

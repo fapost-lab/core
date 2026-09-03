@@ -71,7 +71,7 @@ final class EnvFileTest extends TestCase
         $this->assertStringNotContainsString('WEBHOOK_INGRESS_DRIVER=laravel', $result);
         $this->assertSame(
             1,
-            substr_count($result, 'WEBHOOK_INGRESS_DRIVER='),
+            mb_substr_count($result, 'WEBHOOK_INGRESS_DRIVER='),
             'The key was duplicated instead of replaced.',
         );
 

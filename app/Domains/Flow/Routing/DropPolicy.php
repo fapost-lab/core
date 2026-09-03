@@ -61,7 +61,7 @@ final readonly class DropPolicy implements DropPolicyInterface
      */
     private function resolveLocalized(mixed $field, string $language): ?string
     {
-        if ( ! is_array($field) && ! is_string($field)) {
+        if (! is_array($field) && ! is_string($field)) {
             return null;
         }
 

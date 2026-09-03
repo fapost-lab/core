@@ -40,7 +40,7 @@ final class CreateChannel extends CreateRecord
     {
         $owner = $this->currentAssistant->get();
 
-        if ( ! $owner instanceof Assistant) {
+        if (! $owner instanceof Assistant) {
             throw new InvalidArgumentException('Current assistant must be an Assistant model.');
         }
 

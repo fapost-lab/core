@@ -211,14 +211,14 @@ final class MessageRouterPipelineTest extends FeatureTestCase
         // and the typing indicator service is a best-effort no-op when no
         // sender is registered for the channel type. Avoids ChannelObserver's
         // Telegram API call on real persistence.
-        $channel             = Channel::factory()->make([
+        $channel = Channel::factory()->make([
             'tenant_id'    => $tenantId,
             'assistant_id' => $assistant->getKey(),
             'type'         => ChannelTypeEnum::Telegram,
             'token'        => 'noop-token',
         ]);
-        $channel->id         = (string) Str::uuid();
-        $channel->exists     = true;
+        $channel->id     = (string) Str::uuid();
+        $channel->exists = true;
 
         $this->app->make(CurrentAssistantInterface::class)->set($assistant);
 

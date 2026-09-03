@@ -28,6 +28,36 @@ final class TelegramIngressSpecParityTest extends TestCase
     private const string HEADER = 'X-Telegram-Bot-Api-Secret-Token';
 
     /**
+     * @return array<string, array{0: array<string, string>, 1: bool}>
+     */
+    public static function signatureCases(): array
+    {
+        return [
+            'exact match'        => [[self::HEADER => self::SECRET], true],
+            'lower case header'  => [['x-telegram-bot-api-secret-token' => self::SECRET], true],
+            'wrong secret'       => [[self::HEADER => 'forged'], false],
+            'empty secret'       => [[self::HEADER => ''], false],
+            'missing header'     => [[], false],
+            'secret with prefix' => [[self::HEADER => self::SECRET . 'x'], false],
+            'whitespace padded'  => [[self::HEADER => ' ' . self::SECRET], false],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: array<string, mixed>}>
+     */
+    public static function idempotencyCases(): array
+    {
+        return [
+            'integer update id' => [['update_id' => 987654]],
+            'zero update id'    => [['update_id' => 0]],
+            'string update id'  => [['update_id' => '123']],
+            'absent update id'  => [['message' => ['text' => 'hi']]],
+            'empty body'        => [[]],
+        ];
+    }
+
+    /**
      * @param  array<string, string>  $headers
      */
     #[DataProvider('signatureCases')]
@@ -48,22 +78,6 @@ final class TelegramIngressSpecParityTest extends TestCase
     }
 
     /**
-     * @return array<string, array{0: array<string, string>, 1: bool}>
-     */
-    public static function signatureCases(): array
-    {
-        return [
-            'exact match'        => [[self::HEADER => self::SECRET], true],
-            'lower case header'  => [['x-telegram-bot-api-secret-token' => self::SECRET], true],
-            'wrong secret'       => [[self::HEADER => 'forged'], false],
-            'empty secret'       => [[self::HEADER => ''], false],
-            'missing header'     => [[], false],
-            'secret with prefix' => [[self::HEADER => self::SECRET . 'x'], false],
-            'whitespace padded'  => [[self::HEADER => ' ' . self::SECRET], false],
-        ];
-    }
-
-    /**
      * @param  array<string, mixed>  $body
      */
     #[DataProvider('idempotencyCases')]
@@ -80,20 +94,6 @@ final class TelegramIngressSpecParityTest extends TestCase
         );
 
         $this->assertSame($viaAdapter, $viaSpec, 'Ingress spec drifted from the adapter implementation.');
-    }
-
-    /**
-     * @return array<string, array{0: array<string, mixed>}>
-     */
-    public static function idempotencyCases(): array
-    {
-        return [
-            'integer update id' => [['update_id' => 987654]],
-            'zero update id'    => [['update_id' => 0]],
-            'string update id'  => [['update_id' => '123']],
-            'absent update id'  => [['message' => ['text' => 'hi']]],
-            'empty body'        => [[]],
-        ];
     }
 
     /**

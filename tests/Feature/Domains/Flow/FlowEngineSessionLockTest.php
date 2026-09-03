@@ -95,7 +95,9 @@ final class FlowEngineSessionLockTest extends FeatureTestCase
     private function factoryFor(Connection $connection): RedisFactory
     {
         return new class ($connection) implements RedisFactory {
-            public function __construct(private readonly Connection $connection) {}
+            public function __construct(private readonly Connection $connection)
+            {
+            }
 
             public function connection($name = null): Connection
             {

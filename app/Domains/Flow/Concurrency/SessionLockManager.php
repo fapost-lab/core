@@ -39,7 +39,7 @@ final readonly class SessionLockManager
 
         $acquired = (bool) $this->client()->set($key, $token, 'EX', $ttlSeconds, 'NX');
 
-        if ( ! $acquired) {
+        if (! $acquired) {
             return null;
         }
 

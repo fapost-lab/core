@@ -10,6 +10,17 @@ use Tests\TestCase;
 final class ViewConversationTest extends TestCase
 {
     /**
+     * @return array<string, array{string}>
+     */
+    public static function reservedLivewireHooks(): array
+    {
+        return [
+            'messages'             => ['messages'],
+            'rules'                => ['rules'],
+            'validationAttributes' => ['validationAttributes'],
+        ];
+    }
+    /**
      * Livewire calls `$this->messages()` on the component while validating a
      * form (SupportValidation\HandlesValidation::getMessages), gated only by
      * `method_exists`. A same-named helper on the page — even a private one —
@@ -25,17 +36,5 @@ final class ViewConversationTest extends TestCase
             method_exists(ViewConversation::class, $reserved),
             "ViewConversation::{$reserved}() collides with a Livewire hook of the same name — rename the helper.",
         );
-    }
-
-    /**
-     * @return array<string, array{string}>
-     */
-    public static function reservedLivewireHooks(): array
-    {
-        return [
-            'messages'             => ['messages'],
-            'rules'                => ['rules'],
-            'validationAttributes' => ['validationAttributes'],
-        ];
     }
 }

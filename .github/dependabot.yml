@@ -15,10 +15,12 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     groups:
-      # One pull request for the routine bumps rather than five. Anything that
-      # is not a patch still arrives on its own, where it can be read properly.
-      patch-updates:
-        update-types: ["patch"]
+      # One pull request for the routine bumps rather than one per package.
+      # Minor and patch updates are what `composer update` would take anyway
+      # within the declared constraints; a major still arrives on its own,
+      # where its upgrade guide can be read properly.
+      routine:
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: npm
     directory: /
@@ -27,14 +29,17 @@ updates:
       day: monday
     open-pull-requests-limit: 5
     groups:
-      patch-updates:
-        update-types: ["patch"]
+      routine:
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: gomod
     directory: /gateway
     schedule:
       interval: weekly
       day: monday
+    groups:
+      routine:
+        update-types: ["minor", "patch"]
 
   # Base images. Both are listed separately because Dependabot reads one
   # Dockerfile per directory entry.
@@ -52,3 +57,8 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    groups:
+      # Action majors are almost always a runtime bump (Node 20 to 24), not an
+      # interface change, and the workflows are read as a whole anyway.
+      actions:
+        patterns: ["*"]

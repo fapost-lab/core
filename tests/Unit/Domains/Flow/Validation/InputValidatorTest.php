@@ -22,6 +22,20 @@ final class InputValidatorTest extends TestCase
         $this->validator = new InputValidator();
     }
 
+    public static function numberCases(): array
+    {
+        return [
+            'plain integer'                 => ['42', [], true, 42.0],
+            'european decimal comma'        => ['3,14', [], true, 3.14],
+            'integer_only rejects fraction' => ['3.14', ['integer_only' => true], false, null],
+            'integer_only accepts integer'  => ['7', ['integer_only' => true], true, 7],
+            'below min'                     => ['5', ['min' => 10], false, null],
+            'above max'                     => ['100', ['max' => 50], false, null],
+            'not a number'                  => ['abc', [], false, null],
+            'in range'                      => ['25', ['min' => 0, 'max' => 100], true, 25.0],
+        ];
+    }
+
     public function test_text_accepts_any_text_when_no_rules(): void
     {
         $result = $this->validator->validate(
@@ -69,20 +83,6 @@ final class InputValidatorTest extends TestCase
         if ($expectedValid) {
             $this->assertSame($expectedValue, $result->value);
         }
-    }
-
-    public static function numberCases(): array
-    {
-        return [
-            'plain integer'                 => ['42', [], true, 42.0],
-            'european decimal comma'        => ['3,14', [], true, 3.14],
-            'integer_only rejects fraction' => ['3.14', ['integer_only' => true], false, null],
-            'integer_only accepts integer'  => ['7', ['integer_only' => true], true, 7],
-            'below min'                     => ['5', ['min' => 10], false, null],
-            'above max'                     => ['100', ['max' => 50], false, null],
-            'not a number'                  => ['abc', [], false, null],
-            'in range'                      => ['25', ['min' => 0, 'max' => 100], true, 25.0],
-        ];
     }
 
     public function test_email_validates_via_filter(): void
@@ -165,7 +165,7 @@ final class InputValidatorTest extends TestCase
     {
         $good = $this->validator->validate(InputExpectedType::Date, $this->text('2026-05-31'), [], []);
         // createFromFormat would silently overflow Feb 30 → mar 02 — round-trip catches it.
-        $bad  = $this->validator->validate(InputExpectedType::Date, $this->text('2026-02-30'), [], []);
+        $bad    = $this->validator->validate(InputExpectedType::Date, $this->text('2026-02-30'), [], []);
         $custom = $this->validator->validate(InputExpectedType::Date, $this->text('31/12/2026'), ['format' => 'd/m/Y'], []);
 
         $this->assertTrue($good->valid);

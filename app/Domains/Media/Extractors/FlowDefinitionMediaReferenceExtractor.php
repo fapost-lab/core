@@ -30,21 +30,21 @@ final class FlowDefinitionMediaReferenceExtractor implements MediaReferenceExtra
     {
         $nodes = $definition->nodes ?? [];
 
-        if ( ! is_array($nodes)) {
+        if (! is_array($nodes)) {
             return [];
         }
 
         $found = [];
 
         foreach ($nodes as $node) {
-            if ( ! is_array($node)) {
+            if (! is_array($node)) {
                 continue;
             }
 
             foreach (self::MEDIA_FILE_ID_PATHS as $path) {
                 $value = data_get($node, $path);
 
-                if ( ! is_string($value) || '' === $value) {
+                if (! is_string($value) || '' === $value) {
                     continue;
                 }
 

@@ -43,11 +43,11 @@ final readonly class AssistantCommandsValidator
 
             $command = $entry['command'] ?? null;
 
-            if ( ! is_string($command) || '' === $command) {
+            if (! is_string($command) || '' === $command) {
                 throw new InvalidArgumentException("{$position}.command is required.");
             }
 
-            if ( ! str_starts_with($command, '/')) {
+            if (! str_starts_with($command, '/')) {
                 throw new InvalidArgumentException("{$position}.command must start with '/'.");
             }
 
@@ -70,7 +70,7 @@ final readonly class AssistantCommandsValidator
 
             if (CommandActionType::StartFlow === $type) {
                 $flowId = $entry['flow_id'] ?? null;
-                if ( ! is_string($flowId) || '' === $flowId) {
+                if (! is_string($flowId) || '' === $flowId) {
                     throw new InvalidArgumentException("{$position}.flow_id is required when type=start_flow.");
                 }
             }

@@ -26,6 +26,28 @@ final class IngressSpecGoldenTest extends TestCase
     private const string FIXTURE = 'contracts/ingress/golden.json';
 
     /**
+     * @return array<string, array{0: array<string, mixed>}>
+     */
+    public static function goldenCases(): array
+    {
+        // Resolved from __DIR__ rather than base_path(): data providers run before
+        // the application container is booted.
+        $document = json_decode(
+            (string) file_get_contents(dirname(__DIR__, 4) . '/' . self::FIXTURE),
+            true,
+            flags: JSON_THROW_ON_ERROR,
+        );
+
+        $cases = [];
+
+        foreach ($document['cases'] as $case) {
+            $cases[$case['name']] = [$case];
+        }
+
+        return $cases;
+    }
+
+    /**
      * @param  array<string, mixed>  $case
      */
     #[DataProvider('goldenCases')]
@@ -47,7 +69,7 @@ final class IngressSpecGoldenTest extends TestCase
             "Signature verdict mismatch: {$context}",
         );
 
-        if ( ! array_key_exists('idempotencyKey', $case['expect'])) {
+        if (! array_key_exists('idempotencyKey', $case['expect'])) {
             return;
         }
 
@@ -72,27 +94,5 @@ final class IngressSpecGoldenTest extends TestCase
                 "Scheme {$scheme} has no golden case, so no runtime is held to it.",
             );
         }
-    }
-
-    /**
-     * @return array<string, array{0: array<string, mixed>}>
-     */
-    public static function goldenCases(): array
-    {
-        // Resolved from __DIR__ rather than base_path(): data providers run before
-        // the application container is booted.
-        $document = json_decode(
-            (string) file_get_contents(dirname(__DIR__, 4) . '/' . self::FIXTURE),
-            true,
-            flags: JSON_THROW_ON_ERROR,
-        );
-
-        $cases = [];
-
-        foreach ($document['cases'] as $case) {
-            $cases[$case['name']] = [$case];
-        }
-
-        return $cases;
     }
 }

@@ -60,11 +60,11 @@ final class TemplateEngineTest extends TestCase
         $engine = new TemplateEngine();
 
         $context = $this->context([
-            'flow.bool_yes'  => true,
-            'flow.bool_no'   => false,
-            'flow.empty'     => null,
-            'flow.list'      => ['a', 'b'],
-            'flow.number'    => 42,
+            'flow.bool_yes' => true,
+            'flow.bool_no'  => false,
+            'flow.empty'    => null,
+            'flow.list'     => ['a', 'b'],
+            'flow.number'   => 42,
         ]);
 
         $this->assertSame('true|false||["a","b"]|42', $engine->evaluate(
@@ -119,7 +119,9 @@ final class TemplateEngineTest extends TestCase
             /**
              * @param  array<string, mixed>  $values
              */
-            public function __construct(private readonly array $values) {}
+            public function __construct(private readonly array $values)
+            {
+            }
 
             public function read(string $path): mixed
             {
