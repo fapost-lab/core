@@ -50,29 +50,46 @@ return [
     'empty'         => 'No messages in this conversation yet.',
     'load_older'    => 'Load older messages',
 
+    'authors' => [
+        'bot'    => 'Assistant',
+        'staff'  => 'Operator',
+        'system' => 'System',
+    ],
+
     'owner' => [
-        'bot'         => 'Bot is answering',
+        'bot'         => 'Assistant is answering',
         'staff'       => 'Operator is answering',
         'staff_named' => ':name is answering',
     ],
 
     'actions' => [
+        'close'         => 'Close',
+        'reopen'        => 'Reopen',
         'reply'         => 'Reply',
         'take_over'     => 'Take over',
-        'return_to_bot' => 'Return to bot',
+        'return_to_bot' => 'Return to assistant',
     ],
 
     'reply' => [
-        'label'       => 'Message',
-        'placeholder' => 'Type a reply to the contact…',
+        'label'                => 'Message',
+        'placeholder'          => 'Type a reply to the contact…',
+        'hint'                 => 'Ctrl / ⌘ + Enter to send. The contact receives it on their channel.',
+        'locked'               => 'The assistant is answering this thread. Take it over to reply yourself.',
+        'required'             => 'Write something before sending.',
+        'attach'               => 'Attach file',
+        'attachment_remove'    => 'Remove attachment',
+        'attachment_uploading' => 'Uploading…',
+        'attachment_too_large' => 'The file is too large.',
     ],
 
     'notifications' => [
-        'reply_sent'          => 'Reply sent.',
-        'reply_failed'        => 'Could not send the reply. Please try again.',
-        'reply_undeliverable' => 'This contact has no active channel to reply on.',
-        'taken_over'          => 'You are now handling this conversation.',
-        'returned_to_bot'     => 'Conversation returned to the bot.',
+        'status_changed'          => 'Conversation is now :status.',
+        'reply_requires_takeover' => 'Take the conversation over before replying.',
+        'reply_sent'              => 'Reply sent.',
+        'reply_failed'            => 'Could not send the reply. Please try again.',
+        'reply_undeliverable'     => 'This contact has no active channel to reply on.',
+        'taken_over'              => 'You are now handling this conversation.',
+        'returned_to_bot'         => 'Conversation returned to the assistant.',
     ],
 
     'media' => [

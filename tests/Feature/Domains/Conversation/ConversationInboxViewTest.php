@@ -32,7 +32,12 @@ final class ConversationInboxViewTest extends FeatureTestCase
         $this->seed(TenantAclSeeder::class);
     }
 
-    public function test_reply_action_is_visible_with_reply_permission(): void
+    /**
+     * Permission alone does not open the composer: while the assistant owns the
+     * thread an operator reply would cut across a running flow, so the input is
+     * closed and the page offers the takeover instead.
+     */
+    public function test_composer_is_locked_while_the_assistant_owns_the_thread(): void
     {
         $assistant    = Assistant::factory()->create();
         $conversation = $this->createConversation($assistant);
@@ -42,7 +47,27 @@ final class ConversationInboxViewTest extends FeatureTestCase
 
         $this->get($this->viewUrl($assistant, $conversation))
             ->assertOk()
-            ->assertSee(__('conversation.actions.reply'));
+            ->assertSee(__('conversation.reply.locked'))
+            ->assertSee(__('conversation.actions.take_over'))
+            ->assertDontSee(__('conversation.actions.reply'));
+    }
+
+    public function test_composer_opens_once_staff_owns_the_thread(): void
+    {
+        $assistant    = Assistant::factory()->create();
+        $conversation = $this->createConversation($assistant, [
+            'owner_type'          => ConversationOwner::Staff,
+            'owner_staff_user_id' => (string) User::factory()->create()->getKey(),
+        ]);
+        $user = $this->userWithAssistantAccess($assistant, [Permission::ViewConversations, Permission::ReplyConversations]);
+
+        $this->actingAs($user);
+
+        $this->get($this->viewUrl($assistant, $conversation))
+            ->assertOk()
+            ->assertSee(__('conversation.actions.reply'))
+            ->assertSee(__('conversation.reply.attach'))
+            ->assertDontSee(__('conversation.reply.locked'));
     }
 
     public function test_reply_action_is_hidden_without_reply_permission(): void

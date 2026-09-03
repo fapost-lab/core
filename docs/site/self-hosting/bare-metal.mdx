@@ -102,9 +102,14 @@ git clone https://github.com/fapost-lab/core.git .
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build
 
-cp .env.example .env
+cp .env.production.example .env
 php artisan key:generate
 ```
+
+`.env.production.example`, not `.env.example` — the second is the development
+configuration and starts you on `APP_ENV=local` with an empty database password.
+The trailing Compose section of the production template is inert here: ports,
+images and TLS are your web server's and supervisor's business on bare metal.
 
 `npm run build` compiles the Vue flow builder. It needs `vendor/` to already
 exist — the Filament theme imports CSS from there — so keep this order.

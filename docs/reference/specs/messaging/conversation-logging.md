@@ -265,7 +265,7 @@ final readonly class MessageLogEntry
 |----------|-----------------|---------------|
 | Скачивание у провайдера по `file_id` + persist | `MediaIngestor::ingestFromChannel(Channel, providerFileId)` | inbound-вложение качается (Telegram `getFile` / WhatsApp Media API) и кладётся в хранилище. Решает «`file_id` протухает». |
 | Физическое хранилище с дедупом | `media_blobs` (`content_hash` SHA-256, `unique(tenant_id, content_hash)`) | один блоб на одинаковые байты; повтор картинки не плодит файлы. |
-| Per-tenant диск local/S3 | `TenantMediaDisk` + `StoragePathFactory` (`tenants/{tenant}/{kind}/{yyyy-mm}/{shard}/{ulid}.{ext}`) | это **и есть** дефолтный диск Laravel с tenant-изоляцией; Octane-safe (`Storage::build()` на вызов). |
+| Per-tenant диск local/S3 | `TenantMediaDisk` + `StoragePathFactory` (`tenants/{tenant}/{kind}/{yyyy-mm}/{shard}/{ulid}.{ext}`) | это **и есть** дефолтный диск Laravel с tenant-изоляцией; безопасно в долгоживущем воркере (`Storage::build()` на вызов, без мутации global config). |
 | Кэш provider `file_id` | `media_channel_refs` (`unique(blob_id, channel_id)`, TTL-aware) | outbound: повторная отправка медиа переиспользует `file_id`, без переаплоада. |
 
 Поэтому:
@@ -376,8 +376,8 @@ WhatsApp шлёт статус-вебхуки (sent/delivered/read). Inbound sta
 - backend-agnostic: для ClickHouse батчинг идёт в драйвере/буфере, для Postgres — дешёвый прямой insert;
 - failure лога не валит обработку сообщения.
 
-**Octane:** все capture-сайты — в worker'ах (не в ingress-контроллере). `ConversationLogger` — `scoped`,
-без mutable-синглтонов. Диспатч job безопасен под Octane.
+**Долгоживущие воркеры:** все capture-сайты — в worker'ах (не в ingress-контроллере). `ConversationLogger` — `scoped`,
+без mutable-синглтонов. Диспатч job безопасен в долгоживущем воркере.
 
 > **Решено:** отдельная очередь `messaging.logging` (LOW priority). Существующие очереди не переиспользуем — лог
 > изолируется, чтобы его объём (особенно broadcast) не конкурировал за worker'ов с транзакционным трафиком.

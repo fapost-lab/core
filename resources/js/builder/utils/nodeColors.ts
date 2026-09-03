@@ -57,6 +57,9 @@ export const NODE_TYPE_COLORS: Record<string, NodeColorScheme> = {
     // Terminal
     end:           { bg: 'var(--rose-bg)',   color: 'var(--rose)',   icon: '🛑' },
 
+    // Annotation — builder-only note, stripped on publish
+    comment:       { bg: '#fdf6dd',          color: '#a06a08',       icon: '🗒️' },
+
     _default:      { bg: 'var(--surface-2)', color: 'var(--text-2)', icon: '⚙️' },
 }
 

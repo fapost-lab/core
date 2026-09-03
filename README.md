@@ -101,7 +101,9 @@ finished, rather than describing an intention as a fact — so
 ## Contributing
 
 Read [Contributing](https://docs.fapost.in/contributing/local-setup) first — it covers the repository
-layout, the boundaries that are enforced, and the conventions Core code follows.
+layout, the boundaries that are enforced, and the conventions Core code follows. The short version of
+how code moves through the repository — branches, commits, pull requests, releases — is in
+[CONTRIBUTING.md](./CONTRIBUTING.md).
 
 Contributions are accepted under the [Contributor License Agreement](./CLA.md). You keep the copyright in
 your work; the agreement grants the project the rights it needs to distribute it. Accepting it is a line in

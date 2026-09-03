@@ -168,6 +168,9 @@ return [
             'secret_token_help'    => 'Used for Telegram X-Telegram-Bot-Api-Secret-Token verification.',
             'is_active'            => 'Active',
             'webhook_hash'         => 'Webhook hash',
+            'webhook_hash_help'    => 'Public part of the webhook URL registered with the provider. Change it with the "Rotate webhook hash" action.',
+            'bot_link'             => 'Bot',
+            'bot_link_pending'     => 'Awaiting registration',
             'allowed_updates'      => 'Allowed updates',
             'allowed_updates_help' => 'Telegram update types that this webhook should receive.',
             'max_connections'      => 'Max connections',
@@ -214,6 +217,9 @@ return [
         'actions' => [
             'rotate_webhook_hash'             => 'Rotate webhook hash',
             'rotate_webhook_hash_description' => 'The public webhook URL will change. Update the channel webhook configuration after rotation.',
+            'generate_secret_token'           => 'Generate',
+            'select_all'                      => 'Select all',
+            'clear_all'                       => 'Clear',
         ],
 
         'notifications' => [

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Logging;
 
+use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Str;
 use JsonException;
@@ -12,6 +14,7 @@ final readonly class FlowLogWriter
 {
     public function __construct(
         private ConnectionInterface $connection,
+        private FlowLogPartitionManagerInterface $partitions,
     ) {
     }
 
@@ -20,6 +23,15 @@ final readonly class FlowLogWriter
      */
     public function write(FlowLogEntry $entry): void
     {
+        $createdAt = CarbonImmutable::now();
+
+        // flow_logs is range-partitioned by month and the partition for the
+        // current month is not guaranteed to exist — a fresh tenant schema or a
+        // scheduler that missed its monthly run both leave a hole, and every
+        // insert into it fails. Create it on demand, the way
+        // PostgresConversationStore does for conversation_messages.
+        $this->partitions->ensureMonthlyPartition($createdAt);
+
         $this->connection->table('flow_logs')->insert([
             'id'            => Str::ulid()->toRfc4122(),
             'session_id'    => $entry->sessionId,
@@ -31,7 +43,7 @@ final readonly class FlowLogWriter
             'state_changes' => $this->encodeNullable($entry->stateChanges),
             'resolved'      => $this->encodeNullable($entry->resolved),
             'error'         => $this->encodeNullable($entry->error),
-            'created_at'    => now(),
+            'created_at'    => $createdAt,
         ]);
     }
 

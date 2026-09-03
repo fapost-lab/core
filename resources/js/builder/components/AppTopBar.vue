@@ -49,7 +49,7 @@ defineProps({
 })
 
 const emit = defineEmits([
-    'tabChange', 'validate', 'saveDraft', 'publish', 'undo', 'redo',
+    'tabChange', 'validate', 'saveDraft', 'publish', 'undo', 'redo', 'reload',
 ])
 
 const SAVE_COLORS: Record<string, string> = {
@@ -90,6 +90,19 @@ const SAVE_COLORS: Record<string, string> = {
                    saveStatus === 'conflict' ? t('topbar.status_conflict') :
                                               t('topbar.status_error') }}
             </span>
+            <!-- A conflict is a dead end: the draft moved on elsewhere and every
+                 later edit is rejected. Reloading is the only way out, so offer
+                 it right next to the status instead of leaving the author to
+                 guess. -->
+            <button
+                v-if="saveStatus === 'conflict'"
+                class="btn-reload"
+                :title="t('topbar.reload_title')"
+                type="button"
+                @click="emit('reload')"
+            >
+                ↻ {{ t('topbar.reload') }}
+            </button>
         </div>
 
         <!-- Tabs -->
@@ -202,6 +215,25 @@ const SAVE_COLORS: Record<string, string> = {
 .btn-back:hover {
     background: var(--surface-2);
     color: var(--text);
+}
+.btn-reload {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: var(--radius);
+    border: 1px solid var(--amber);
+    background: transparent;
+    color: var(--amber);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all .15s;
+    flex-shrink: 0;
+}
+.btn-reload:hover {
+    background: var(--amber);
+    color: #fff;
 }
 .flow-name {
     font-size: 14px;

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import {ref} from 'vue'
+import {computed, ref} from 'vue'
 import VariablePicker from '../VariablePicker.vue'
 import {useInsertAtCursor} from '@builder/composables/useInsertAtCursor'
 
-defineProps({
+const props = defineProps({
     value:  { type: String, default: '' },
     schema: { type: Object, default: () => ({}) },
 })
@@ -12,6 +12,12 @@ const emit = defineEmits(['update:value'])
 
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const insert      = useInsertAtCursor(textareaRef, (next) => emit('update:value', next))
+
+// Opt-out for fields whose text never reaches runtime (builder-only notes) —
+// there `{{ ... }}` would never resolve, so the picker is hidden.
+const showPicker = computed(
+    () => (props.schema as { variable_picker?: boolean })?.variable_picker !== false,
+)
 </script>
 
 <template>
@@ -25,6 +31,7 @@ const insert      = useInsertAtCursor(textareaRef, (next) => emit('update:value'
             @input="emit('update:value', ($event.target as HTMLTextAreaElement).value)"
         />
         <VariablePicker
+            v-if="showPicker"
             class="textarea-picker"
             @select="insert"
         />

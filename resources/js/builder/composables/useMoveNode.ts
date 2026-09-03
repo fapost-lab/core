@@ -7,15 +7,24 @@ import {ref} from 'vue'
  */
 const targetNodeId = ref<string | null>(null)
 
+/**
+ * Preset for the dialog's "move with descendants" toggle. Set when the caller
+ * already knows a whole chain is travelling — e.g. rescuing a branch out of a
+ * node that is about to be deleted.
+ */
+const targetAsChain = ref(false)
+
 export function useMoveNode() {
-  function open(nodeId: string) {
+  function open(nodeId: string, options: { chain?: boolean } = {}) {
     if (!nodeId) return
     targetNodeId.value = nodeId
+    targetAsChain.value = options.chain ?? false
   }
 
   function close() {
     targetNodeId.value = null
+    targetAsChain.value = false
   }
 
-  return {targetNodeId, open, close}
+  return {targetNodeId, targetAsChain, open, close}
 }

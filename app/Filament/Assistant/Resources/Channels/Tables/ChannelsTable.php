@@ -13,6 +13,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Contracts\HasSchemas;
+use Filament\Support\Enums\IconPosition;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
@@ -33,10 +34,19 @@ final class ChannelsTable
 
                         return __($enum->labelKey());
                     }),
-                TextColumn::make('webhook_public_hash')
-                    ->label(__('staff.channels.fields.webhook_hash'))
-                    ->copyable()
-                    ->fontFamily('mono'),
+                // The bot handle is what staff actually need at a glance — it
+                // opens the live bot. The webhook hash moved to the edit form:
+                // it is a debugging detail, not a daily one.
+                TextColumn::make('bot_link')
+                    ->label(__('staff.channels.fields.bot_link'))
+                    ->state(static fn (Channel $record): ?string => $record->publicHandle())
+                    ->url(static fn (Channel $record): ?string => $record->publicUrl(), shouldOpenInNewTab: true)
+                    ->icon(Heroicon::OutlinedArrowTopRightOnSquare)
+                    ->iconPosition(IconPosition::After)
+                    ->color('primary')
+                    // No copyable() here: it binds `x-on:click.prevent.stop`,
+                    // which swallows the click before the link can open.
+                    ->placeholder(__('staff.channels.fields.bot_link_pending')),
                 IconColumn::make('is_active')
                     ->label(__('staff.channels.fields.is_active'))
                     ->boolean(),

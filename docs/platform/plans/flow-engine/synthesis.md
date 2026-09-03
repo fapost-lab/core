@@ -298,9 +298,9 @@ Mechanism:
 
 ---
 
-### D-12 · Octane scope (ADR-01)
+### D-12 · Ingress scope (ADR-01, отменён)
 
-**Existing:** см. CLAUDE.md — Octane только для webhook ingress, main app PHP-FPM. ExpressionEvaluator cache должен быть **per-request scoped**, не cross-request.
+**Existing:** ingress stateless, приложение на PHP-FPM. ExpressionEvaluator cache должен быть **per-request scoped**, не cross-request.
 
 **Decision:** при реализации `ExpressionEngineRegistry` — engines регистрируются in-memory boot-time (singleton OK; immutable). Parsed-expression cache в `TemplateEngine` — **request-scoped**, не сохраняется между requests. Phpat правило: cache static не используется в expression layer.
 

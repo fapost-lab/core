@@ -73,10 +73,17 @@ const BUILTIN_RAG: Array<{ name: string; label: string }> = [
     { name: 'intent',     label: 'Intent' },
 ]
 
+// Everything the engine writes under `system.*` and authors may read back.
+// `system.channel.*` is projected when the session starts — the bot the
+// conversation runs on (see ChannelStateProjector).
 const BUILTIN_LAST_USER: Array<{ path: string; label: string }> = [
-    { path: 'system.last_user_message', label: 'Last user message' },
-    { path: 'system.language',          label: 'System language' },
-    { path: 'system.retry_count',       label: 'Retry count' },
+    { path: 'system.last_user_message',    label: 'Last user message' },
+    { path: 'system.language',             label: 'System language' },
+    { path: 'system.retry_count',          label: 'Retry count' },
+    { path: 'system.channel.bot_username', label: 'Bot username' },
+    { path: 'system.channel.bot_handle',   label: 'Bot handle (@name)' },
+    { path: 'system.channel.link',         label: 'Bot link' },
+    { path: 'system.channel.type',         label: 'Channel type' },
 ]
 
 const BUILTIN_API: Array<{ path: string; label: string }> = [

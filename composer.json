@@ -35,8 +35,6 @@
         "spatie/laravel-permission": "^6.0",
         "spatie/laravel-query-builder": "^7.0",
         "spatie/laravel-settings": "^3.7",
-        "spiral/roadrunner-cli": "^2.6.0",
-        "spiral/roadrunner-http": "^3.3.0",
         "tpetry/laravel-postgresql-enhanced": "^3.6"
     },
     "require-dev": {

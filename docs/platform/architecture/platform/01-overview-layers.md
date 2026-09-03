@@ -37,7 +37,7 @@
 
 ## Связано с
 
-- [[01-octane-ingress-only]] — ADR по Octane
+- [[01-octane-ingress-only]] — ADR-01 (отменён): stateless ingress
 - [[12-solutions-modules]] — Solutions и Plugins
 - [[05-foundation-contract-package]] — Foundation пакет
 - [[ROADMAP]] — дорожная карта платформы

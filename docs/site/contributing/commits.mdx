@@ -1,0 +1,126 @@
+---
+title: "Commit messages"
+description: "The format a commit and a pull request title follow, and why."
+---
+
+Commits and pull request titles use
+[Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/). The
+format is mechanical on purpose: release notes are generated from it, the
+version number is decided from it, and `git log --oneline` has to be readable a
+year later by someone who was not there.
+
+## The format
+
+```text
+type(scope): subject
+
+body
+
+footer
+```
+
+Only the first line is mandatory.
+
+**`type`** — one of:
+
+| Type       | Meaning                                              | Version effect |
+| ---------- | ---------------------------------------------------- | -------------- |
+| `feat`     | behaviour that did not exist before                  | MINOR          |
+| `fix`      | behaviour that existed and was wrong                 | PATCH          |
+| `refactor` | structure changes, behaviour does not                | none           |
+| `perf`     | same behaviour, faster or cheaper                    | PATCH          |
+| `test`     | tests only                                           | none           |
+| `docs`     | documentation only, including `docs/site`            | none           |
+| `chore`    | dependencies, tooling, CI, housekeeping              | none           |
+| `revert`   | undoes an earlier commit; name it in the body        | as reverted    |
+
+`feat` and `fix` are the two that matter to an operator reading release notes.
+If a change is neither, it is not a `feat` dressed up to look productive.
+
+**`scope`** — the part of the system the change belongs to. Use the domain or
+surface name in lower case:
+
+`tenancy`, `flow`, `messaging`, `contact`, `assistant`, `channels`, `media`,
+`conversation`, `broadcasting`, `staff`, `webhook`, `builder`, `admin`,
+`gateway`, `foundation`, `support`, `ci`, `deps`, `docker`.
+
+A change that spans two domains lists both, comma-separated and without a
+space: `feat(flow,contact): …`. A change that spans more than two probably has
+no single scope — leave it off rather than listing five.
+
+**`subject`** — what the change does, in the imperative, lower case, no trailing
+period, under 72 characters including the prefix. Read it as completing the
+sentence *"this commit will …"*:
+
+```text
+feat(webhook): reject ingress payloads over the configured size
+fix(flow): release the session lock when a handler throws
+chore(deps): bump php to 8.5
+docs: describe the maintenance branch procedure
+```
+
+Not:
+
+```text
+feat(webhook): Added size limit          # past tense, capitalised
+fix: bug                                  # says nothing
+feat(flow): update FlowRunner.php         # names the file, not the change
+```
+
+## Breaking changes
+
+A change that breaks an existing contract — a Flow node handler, the webhook
+payload, a configuration key, anything on the
+[extension surface](/extending/extension-model) — carries `!` after the scope
+and a `BREAKING CHANGE:` footer that says what an operator or extension author
+has to do about it:
+
+```text
+feat(flow)!: require a version on every node definition
+
+BREAKING CHANGE: flow definitions without `version` on a node no longer load.
+Add `version` to every node in existing definitions before upgrading.
+```
+
+The footer is copied into the release notes verbatim, so write it for the
+person upgrading, not for the reviewer.
+
+## Body and footer
+
+The body explains *why*, when the subject cannot. What the code does is
+visible in the diff; what the alternatives were and why this one was chosen is
+not. Wrap at 72 characters. Skip the body when the subject is the whole story —
+most `chore` and `docs` commits need none.
+
+The footer links the change to the world outside git:
+
+```text
+Closes #142
+Refs #98
+Co-authored-by: Name <email@example.com>
+```
+
+`Closes #n` on the pull request closes the issue when it merges.
+
+## Commits on a branch versus the pull request title
+
+Pull requests are squash-merged, so the commits *on the branch* are for the
+author and the reviewer, and the **pull request title** is what lands on
+`main`. That has two consequences:
+
+- Branch commits may be rough — `wip`, `fix test`, `address review` are fine
+  there. Do not spend time rewriting branch history to look tidy.
+- The pull request title is held to the full format above, including `!` and
+  the scope, because it is the commit everyone will see. When the pull request
+  has a `BREAKING CHANGE:` footer, put it in the description and it will be
+  kept in the squash commit body.
+
+A pull request title is checked at review the same way the code is: a title
+that does not say what changed is sent back like a test that does not test.
+
+## Reverts
+
+A revert is an ordinary pull request whose title is `revert: <original title>`
+and whose body names the commit being reverted and why. `git revert` produces
+the right starting point; edit the message into the format rather than keeping
+the default one.

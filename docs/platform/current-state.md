@@ -23,7 +23,8 @@ The application is an active Laravel 12 Core implementation, not a starter scaff
 - PHP version: 8.4
 - Tenant model: landlord connection plus tenant connection/schema
 - Redis is part of the runtime design for queues, locks, cache, and webhook registry
-- Horizon, Octane, Filament, Inertia, Vue, Vite, and Tailwind are present in the application stack
+- Horizon, Filament, Inertia, Vue, Vite, and Tailwind are present in the application stack
+- Webhook ingress runs on PHP-FPM; an optional Go gateway in `gateway/` can take it over
 
 ## What Does Not Exist Yet
 

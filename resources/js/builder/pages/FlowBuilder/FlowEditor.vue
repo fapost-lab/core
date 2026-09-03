@@ -14,7 +14,11 @@ import ContentTab from '@builder/components/content/ContentTab.vue'
 import ValidationPanel from '@builder/components/editor/ValidationPanel.vue'
 import ConfirmDialog from '@builder/components/editor/ConfirmDialog.vue'
 import MoveNodeDialog from '@builder/components/editor/MoveNodeDialog.vue'
+import DeleteNodeDialog from '@builder/components/editor/DeleteNodeDialog.vue'
 import {useMoveNode} from '@builder/composables/useMoveNode'
+import {useDeleteNode} from '@builder/composables/useDeleteNode'
+import {useConfirm} from '@builder/composables/useConfirm'
+import {useTranslations} from '@builder/composables/useTranslations'
 
 import type {BuilderFlowPayload} from '@builder/dto/types'
 
@@ -28,7 +32,10 @@ const registryStore = useRegistryStore()
 const { save }      = useAutoSave()
 const { validate }  = useValidation()
 const { publish }   = usePublish()
-const moveNode = useMoveNode()
+const moveNode   = useMoveNode()
+const deleteNode = useDeleteNode()
+const { confirm } = useConfirm()
+const { t }       = useTranslations()
 const validating = ref(false)
 const publishing = ref(false)
 const publishedMsg = ref<string | null>(null)
@@ -38,6 +45,26 @@ builderStore.init(props.flow)
 onMounted(async () => {
     await registryStore.load()
 })
+
+/**
+ * Recover from a save conflict by re-reading the draft the server actually
+ * holds. A full reload rather than a store re-init: the flow arrives as an
+ * Inertia prop, and reloading also drops the undo stack, selection and branch
+ * pointer that all refer to the version being discarded.
+ */
+async function runReload() {
+    const ok = await confirm({
+        title:        t('topbar.reload_confirm_title'),
+        message:      t('topbar.reload_confirm_message'),
+        confirmLabel: t('topbar.reload_confirm_ok'),
+        cancelLabel:  t('topbar.reload_confirm_cancel'),
+        danger:       true,
+    })
+
+    if (ok) {
+        window.location.reload()
+    }
+}
 
 async function runValidate() {
     validating.value = true
@@ -114,6 +141,7 @@ useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
             @redo="builderStore.redo"
             @publish="runPublish"
             @validate="runValidate"
+            @reload="runReload"
         />
 
         <div
@@ -130,9 +158,15 @@ useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
         <ValidationPanel />
         <ConfirmDialog />
         <MoveNodeDialog
+            :chain="moveNode.targetAsChain.value"
             :node-id="moveNode.targetNodeId.value"
             :open="moveNode.targetNodeId.value !== null"
             @close="moveNode.close"
+        />
+        <DeleteNodeDialog
+            :node-id="deleteNode.targetNodeId.value"
+            :open="deleteNode.targetNodeId.value !== null"
+            @close="deleteNode.close"
         />
     </div>
 </template>

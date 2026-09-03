@@ -36,7 +36,9 @@ interface Section {
 const SOURCE_META: Record<PickerSourceKind, { icon: string; title: string }> = {
     'contact-profile':   { icon: '💾', title: 'Contact profile' },
     'temporary':         { icon: '⏱', title: 'Temporary' },
-    'last-user-message': { icon: '💬', title: 'Last user message' },
+    // Holds every `system.*` path — the last inbound message, language, retry
+    // count, and the channel the session runs on.
+    'last-user-message': { icon: '💬', title: 'System' },
     'rag':               { icon: '🧠', title: 'RAG' },
     'api-response':      { icon: '⚡', title: 'API response' },
     'module':            { icon: '🏢', title: 'Module' },

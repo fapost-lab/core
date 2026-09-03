@@ -38,7 +38,7 @@ WhatsApp, Facebook Messenger, Slack, Microsoft Teams и далее по спро
 | Admin UI | Filament 5 |
 | Builder (фронт) | Inertia + Vue 3 |
 | Очереди | Laravel Horizon 5 |
-| Webhook ingress | Laravel Octane 2 (только `/webhooks/*`) |
+| Webhook ingress | PHP-FPM; опционально Go-гейтвей (`gateway/`) перед ним |
 | База данных | PostgreSQL (schema per tenant) |
 | Кэш / очереди / locks | Redis |
 | Мессенджеры | Telegram Bot API (реализован); Viber / WhatsApp / Messenger / Slack / Teams — через `ChannelInterface` |
@@ -99,7 +99,7 @@ WhatsApp, Facebook Messenger, Slack, Microsoft Teams и далее по спро
 
 **3. Handler Version Contract.** Handler резолвится по `(type, version)` из in-memory registry. Breaking change → version++, старый handler остаётся. Сессия выполняется по своему snapshot до конца.
 
-**4. Octane scope (ADR-01).** Octane только для `/webhooks/*`. Main app — PHP-FPM. Причина: mutable scoped context. [[diagrams/01-webhook-pipeline]]
+**4. Ingress boundary (ADR-01, отменён).** Ingress stateless: без БД, только Redis и dispatch. Это позволяет вынести его за пределы PHP — роль быстрого ingress выполняет опциональный Go-гейтвей (`gateway/`), а приложение обслуживает те же запросы на PHP-FPM. [[diagrams/01-webhook-pipeline]]
 
 **5. ID Strategy (ADR-03).** ULID в PostgreSQL `uuid` колонке. Трейт `HasUlidPrimaryKey`. FK через `foreignUuid().constrained().cascadeOnDelete()`.
 
@@ -152,7 +152,7 @@ WhatsApp, Facebook Messenger, Slack, Microsoft Teams и далее по спро
 
 ```
 Telegram → POST /webhook/{channel}/{hash}
-         → WebhookController (Octane)
+         → Go-гейтвей (опционально) либо WebhookController (PHP-FPM)
          → Redis lookup: hash → {tenant_id, assistant_id, channel_id}
          → dispatch IncomingMessageJob (queue: flow.execution)
          → TenantContext::set + schema switch
@@ -182,7 +182,7 @@ Telegram → POST /webhook/{channel}/{hash}
 - `landlord` — одна на платформу: `tenants`, `plans`, `subscriptions`
 - `tenant_{slug}` — отдельная PostgreSQL schema per tenant
 
-**Переключение:** `TenantContextInterface` (scoped binding) + `TenantSwitcher::runForTenant()` в Octane.
+**Переключение:** `TenantContextInterface` (scoped binding) + `TenantSwitcher::runForTenant()` с restore в `finally` — критично для долгоживущих Horizon-воркеров.
 
 **Self-hosted = один tenant**, создаётся при `platform:install`. Частный случай общей модели.
 

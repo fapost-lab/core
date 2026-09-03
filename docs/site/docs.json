@@ -195,7 +195,9 @@
             "group": "Contributing to Core",
             "pages": [
               "contributing/testing",
+              "contributing/commits",
               "contributing/pull-requests",
+              "contributing/releases",
               "contributing/legal"
             ]
           }

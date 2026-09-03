@@ -34,12 +34,30 @@ const colors = computed(() => nodeColors(props.treeNode.node.type))
 
 const nodeLabel = computed((): string => {
     const type = props.treeNode.node.type
+    // Comments all share one type name — the note's first line is what tells
+    // them apart in the outline.
+    if (type === 'comment') {
+        const text = (props.treeNode.node.config ?? {}).text
+        const firstLine = typeof text === 'string' ? text.split('\n')[0].trim() : ''
+        if (firstLine !== '') return firstLine
+    }
     return props.treeNode.node.label
         ?? type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 })
 
+/**
+ * The structure panel navigates, it does not select: opening the config drawer
+ * on every tree click covers the canvas and gets in the way of moving around.
+ * Properties open when the author clicks the node's card.
+ */
+function scrollToCard(nodeId: string) {
+    requestAnimationFrame(() => {
+        document.getElementById(`node-card-${nodeId}`)?.scrollIntoView({behavior: 'smooth', block: 'center'})
+    })
+}
+
 function selectNode() {
-    selectionStore.select(props.treeNode.node.id)
+    scrollToCard(props.treeNode.node.id)
     const meaningfulBranch: string[] = []
 
     for (let i = 0; i < props.parentBranch.length; i += 2) {
@@ -62,8 +80,6 @@ function selectNode() {
 }
 
 function focusBranch(handle: string) {
-    selectionStore.select(props.treeNode.node.id)
-
     // `parentBranch` accumulates `(nodeId, 'default')` pairs while the
     // tree walks linear-continuation children — those are noise for the
     // breadcrumb and for the canvas branch context, which only cares

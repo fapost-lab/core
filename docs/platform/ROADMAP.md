@@ -286,6 +286,75 @@ M9 (Multi-channel / WhatsApp) удалён из планов.
 - [x] `FallbackMessageService` теперь пишется в транскрипт: раньше в metadata не было `contact_id` / `assistant_id`,
   и busy/fallback-ответы молча выпадали из лога — оператор видел контакта, говорящего в пустоту
 
+## 📋 Milestone 9 — Forms / Data Collection
+
+> *Сбор структурированных данных через веб-форму (Telegram Mini App или hosted-страница) вместо цепочки
+> `input`-нод в чате.*
+
+**Когда:** после выкладки релизного трека, параллельно M12. Не блокирует релиз.
+
+**Почему важно:** цепочка `input`-нод собирает анкету по одному полю за сообщение. Это долго для контакта,
+громоздко в builder'е и ограничено валидацией «одно поле за раз». Форма закрывает тот же сценарий одним экраном:
+нормальные контролы, клиентская и серверная валидация по одной схеме, правки до отправки, приемлемый внешний вид.
+
+**Решение о границах: Core, не Solution.** Форма это новая нода flow engine, новый путь возобновления сессии
+по внешнему событию и bespoke override в builder'е. Всё три вещи доступны только Core: Solution регистрирует
+`ActionHandler` для `call`-ноды, а не новые типы нод, Vue-компоненты Solution'ов требуют M7 publish contract,
+которого ещё нет. Solution'ы поверх M9 остаются возможными: готовые шаблоны форм и маппинг ответов в свои
+данные (`hr.*`, `crm.*`).
+
+**Что уже есть в коде:** каркас TMA (`routes/tma.php`, `resources/js/tma` с роутером и `TmaFormRenderer`),
+`InputExpectedType` как словарь типов полей, `MediaIngestor` для файлов, `ContactWriterInterface` для записи в
+контакт. `TmaFormController` и `TmaAuthMiddleware` пока заглушки: контроллер отдаёт захардкоженную анкету,
+middleware вне `local` отвечает 401.
+
+### Архитектурные решения (нужен ADR перед кодом)
+
+1. **Хранение.** Домен `Forms` в tenant schema: `forms` (ULID, `schema` JSON, `version`, `assistant_id`).
+   Сессия snapshot'ит `form_version` при отправке ссылки, как делает `flow_version`. Одна форма переиспользуется
+   в разных flow.
+2. **Нода `form`.** Handler отправляет сообщение с кнопкой: `web_app` для Telegram, обычная ссылка на
+   hosted-страницу для WhatsApp и остальных. Сессия переходит в `waiting_input`, но ждёт не текст, а внешнее
+   событие. Ответы сохраняются в переменную типа `json` по `save_to`, дополнительно опциональный маппинг
+   поле → `contact.*` через `ContactWriterInterface`. Handles: `submitted`, `timeout`.
+3. **Возобновление сессии.** Отдельный вход в `FlowEngine` по submission, не синтетическое `IncomingMessage`
+   через `MessageRouter`: роутер классифицирует по тексту и командам, форме там делать нечего. Тот же lock
+   `(tenant, contact, assistant)`, что и у входящих. Submission id как idempotency-маркер: повторная отправка
+   не двигает сессию дважды.
+4. **Токен ссылки.** Подписанный, привязан к `(tenant, session, node, form_version)`, с TTL. Для Telegram
+   дополнительно initData HMAC и проверка, что telegram id совпадает с контактом сессии. Для hosted-страницы
+   токен единственная защита, поэтому одноразовый.
+5. **Валидация.** Одна схема, две проверки: renderer на клиенте, Laravel rules на сервере по той же схеме.
+   Ответ сервера с ошибками по полям, клиент их показывает. Серверная проверка обязательна, клиентская
+   удобство.
+6. **Мультиязычность.** Label, placeholder и текст ошибок идут через content translator chain как flow content;
+   `value` у select/checkbox language-agnostic, как у кнопок.
+7. **Конструктор.** Редактор схемы в Filament (`FormResource`), в builder'е только выбор формы в конфиге ноды.
+   Встраивать готовый open-source редактор, а не писать свой. Зависимость нужно согласовать отдельно и
+   отфильтровать по лицензии: репозиторий Apache-2.0, AGPL-компоненты (Formbricks, OpnForm, HeyForm, Typebot)
+   не подходят. Кандидаты под MIT: `@bpmn-io/form-js` (editor + viewer, JSON schema, framework-agnostic),
+   `@formio/js` (builder + renderer, есть Vue wrapper). SurveyJS: renderer MIT, Creator коммерческий.
+8. **Таймаут и брошенные формы.** Форма не заполнена в TTL токена → sweeper переводит сессию по handle
+   `timeout`. Механику взять по образцу `SubflowTimeoutSweeper`.
+
+### Фазы
+
+- **Фаза 1, фундамент:** initData HMAC в `TmaAuthMiddleware`, домен `Forms` с миграцией и моделью, подписанный
+  токен, серверная валидация по схеме.
+- **Фаза 2, runtime:** `FormNodeHandler` v1, submission endpoint, resume path с idempotency, sweeper таймаута,
+  `TmaFormRenderer` на реальную схему вместо заглушки, hosted-страница для не-Telegram каналов.
+- **Фаза 3, авторинг:** `FormResource` в Filament с встроенным редактором, `FormConfig.vue` override в builder,
+  палитра и валидация publish (нода ссылается на существующую форму).
+- **Фаза 4, данные:** маппинг ответов в `contact.*`, файлы через Media, ответы в транскрипте как системное
+  сообщение, экспорт ответов.
+
+**Открытые вопросы:**
+- Версионирование схемы формы при уже разосланных ссылках: старые ссылки открывают snapshot или актуальную?
+- Черновики: сохранять частично заполненную форму между открытиями Mini App?
+- Нужен ли `form` как trigger (форма открыта вне flow, submission стартует flow) по аналогии с `emit_event`?
+
+---
+
 ## 📋 Milestone 7 — Solutions Framework
 
 > *Механизм расширения платформы внешними пакетами (Solutions).*
@@ -370,7 +439,7 @@ Core в программируемую поверхность: «покажи, �
 5. **Расширяемость.** `McpToolRegistry` по аналогии с `ActionHandlerRegistry` / `RagAdapterRegistry`; контракт
    `McpToolInterface` живёт в `packages/fapost-foundation`. Core не знает про `hr.*` — Solutions регистрируют свои
    tool'ы сами (связь с M7).
-6. **Octane.** MCP-ingress stateless и допустим в Octane scope наравне с webhook: tenant context и текущий сервер —
+6. **Ingress.** MCP-ingress stateless наравне с webhook: tenant context и текущий сервер —
    только в `scoped` bindings, никаких static между запросами.
 7. **Безопасность операций.** v1 — read-first. Разрушающие операции (delete, publish, send) за отдельным scope, с
    `destructiveHint` / `readOnlyHint` в аннотациях tool'а и с idempotency-маркером на write-пути.
@@ -472,8 +541,10 @@ Core в программируемую поверхность: «покажи, �
 Далее:
 
     ▶ ──► M12 (MCP Server) ──► M7 (Solutions) ──► M11 (Plugins)
-                                    │
-                                    └──► M10 (SaaS) ─ отдельный репо
+     │                              │
+     │                              └──► M10 (SaaS) ─ отдельный репо
+     │
+     └──► M9 (Forms) — параллельно M12, Core; шаблоны форм от Solution'ов после M7
 
     M5 (RAG) — 🧊 бэклог, после M12
 ```
@@ -490,7 +561,7 @@ Core в программируемую поверхность: «покажи, �
   интеграции нет  
 - [x] phpat CI правила enforced через `composer run test:arch`  
 - [x] GDPR cascade delete (contacts/assistants/channels → conversations)  
-- [ ] Load test: 100 concurrent sessions без state leakage (Octane scope)
+- [ ] Load test: 100 concurrent sessions без state leakage (Horizon-воркеры)
 
 ---
 

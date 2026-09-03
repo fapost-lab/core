@@ -5,6 +5,7 @@ import {useBuilderStore} from '@builder/store/builderStore'
 import {nodeColors} from '@builder/utils/nodeColors'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 import {useMoveNode} from '@builder/composables/useMoveNode'
+import {useDeleteNode} from '@builder/composables/useDeleteNode'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 
 
@@ -78,6 +79,7 @@ const canMoveDown = computed(() => {
 
 const moveDialog = useMoveNode()
 
+const deleteDialog = useDeleteNode()
 function openMoveDialog() {
     moveDialog.open(props.treeNode.node.id)
 }
@@ -102,7 +104,7 @@ function openMoveDialog() {
             <span class="node-type-label">Condition</span>
             <div v-if="hasError" class="node-warn" title="Validation error">!</div>
             <span v-if="index != null" class="node-num">#{{ index }}</span>
-            <button class="node-delete-btn" title="Delete node" @click.stop="builderStore.deleteNode(treeNode.node.id)">×</button>
+            <button class="node-delete-btn" title="Delete node" @click.stop="deleteDialog.requestDelete(treeNode.node.id)">×</button>
         </div>
 
         <div class="node-card-body">

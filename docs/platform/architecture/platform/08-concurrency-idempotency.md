@@ -31,5 +31,5 @@
 - [[09-message-routing-concurrency]] — ADR по маршрутизации
 - [[04-session-state-machine]] — state machine сессии
 - [[01-webhook-pipeline]] — webhook pipeline
-- [[01-octane-ingress-only]] — ADR Octane ingress
+- [[01-octane-ingress-only]] — ADR-01 (отменён): stateless ingress
 - [[specs/flow-engine/README]] — обзор flow engine

@@ -558,6 +558,54 @@ final class PublishFlowServiceTest extends TestCase
         $this->assertSame([], $definition->edges, 'Edges touching a comment node must be stripped.');
     }
 
+    public function test_publish_bridges_the_chain_across_comment_nodes(): void
+    {
+        $flowId = '00000000-0000-0000-0000-000000000934';
+
+        FlowDraft::factory()->create([
+            'flow_id' => $flowId,
+            'nodes'   => [
+                ['id' => 'first', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+                ['id' => 'note', 'type' => 'comment', 'version' => 1, 'config' => ['text' => 'why we wait here']],
+                ['id' => 'note2', 'type' => 'comment', 'version' => 1, 'config' => ['text' => 'and here']],
+                ['id' => 'last', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            'edges' => [
+                ['id' => 'e1', 'from' => 'first', 'to' => 'note', 'handle' => 'default'],
+                ['id' => 'e2', 'from' => 'note', 'to' => 'note2', 'handle' => 'default'],
+                ['id' => 'e3', 'from' => 'note2', 'to' => 'last', 'handle' => 'default'],
+            ],
+        ]);
+
+        $definition = app(PublishFlowService::class)->execute($flowId);
+
+        // A note between two steps documents the chain; it must not cut it.
+        $this->assertCount(1, $definition->edges);
+        $this->assertSame('first', $definition->edges[0]['from']);
+        $this->assertSame('last', $definition->edges[0]['to']);
+        $this->assertSame('default', $definition->edges[0]['handle']);
+    }
+
+    public function test_publish_drops_edges_into_a_comment_that_ends_the_chain(): void
+    {
+        $flowId = '00000000-0000-0000-0000-000000000935';
+
+        FlowDraft::factory()->create([
+            'flow_id' => $flowId,
+            'nodes'   => [
+                ['id' => 'first', 'type' => 'send_message', 'version' => 1, 'config' => ['content_type' => 'text']],
+                ['id' => 'note', 'type' => 'comment', 'version' => 1, 'config' => ['text' => 'trailing note']],
+            ],
+            'edges' => [
+                ['id' => 'e1', 'from' => 'first', 'to' => 'note', 'handle' => 'default'],
+            ],
+        ]);
+
+        $definition = app(PublishFlowService::class)->execute($flowId);
+
+        $this->assertSame([], $definition->edges);
+    }
+
     public function test_throws_flow_validation_exception_when_draft_is_invalid(): void
     {
         $flowId = '00000000-0000-0000-0000-000000000654';

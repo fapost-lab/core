@@ -46,6 +46,10 @@ final class ContactSegmentFormSchema
                 ->label(__('segment.fields.conditions'))
                 ->addActionLabel(__('segment.actions.add_condition'))
                 ->default([])
+                // Four fields per row need the whole page: inside the form's
+                // default two-column grid the repeater gets half the width and
+                // every condition field collapses to a sliver.
+                ->columnSpanFull()
                 ->columns(4)
                 ->schema([
                     Select::make('type')
@@ -77,6 +81,7 @@ final class ContactSegmentFormSchema
                         ->label(__('segment.condition.value'))
                         ->required(fn (Get $get): bool => self::usesFreeformValue($get))
                         ->visible(fn (Get $get): bool => self::usesFreeformValue($get))
+                        ->columnSpan(self::valueColumnSpan(...))
                         ->helperText(__('segment.condition.value_help')),
 
                     Select::make('value_group')
@@ -85,7 +90,8 @@ final class ContactSegmentFormSchema
                         ->searchable()
                         ->options(static fn (): array => self::groupOptions())
                         ->required(fn (Get $get): bool => SegmentConditionType::Group->value === $get('type'))
-                        ->visible(fn (Get $get): bool => SegmentConditionType::Group->value === $get('type')),
+                        ->visible(fn (Get $get): bool => SegmentConditionType::Group->value === $get('type'))
+                        ->columnSpan(self::valueColumnSpan(...)),
                 ]),
         ]);
     }
@@ -114,6 +120,17 @@ final class ContactSegmentFormSchema
                 'eq' => __('segment.operators.eq'),
             ],
         };
+    }
+
+    /**
+     * Value takes the width nothing else is using: the row is four columns, and
+     * only the `attribute` type shows the extra `key` field. Without this the
+     * value input — the one holding a list of tags — is the narrowest control on
+     * the row while a quarter of the row sits empty.
+     */
+    private static function valueColumnSpan(Get $get): int
+    {
+        return SegmentConditionType::Attribute->value === $get('type') ? 1 : 2;
     }
 
     /**

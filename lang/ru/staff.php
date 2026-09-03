@@ -168,6 +168,9 @@ return [
             'secret_token_help'    => 'Для проверки заголовка Telegram X-Telegram-Bot-Api-Secret-Token.',
             'is_active'            => 'Активен',
             'webhook_hash'         => 'Webhook hash',
+            'webhook_hash_help'    => 'Публичная часть webhook URL, зарегистрированного у провайдера. Меняется действием «Ротировать webhook hash».',
+            'bot_link'             => 'Бот',
+            'bot_link_pending'     => 'Ожидает регистрации',
             'allowed_updates'      => 'Allowed updates',
             'allowed_updates_help' => 'Типы Telegram-апдейтов, которые должен получать этот webhook.',
             'max_connections'      => 'Max connections',
@@ -214,6 +217,9 @@ return [
         'actions' => [
             'rotate_webhook_hash'             => 'Ротировать webhook hash',
             'rotate_webhook_hash_description' => 'Публичный URL webhook изменится. Обновите настройки webhook в канале после ротации.',
+            'generate_secret_token'           => 'Сгенерировать',
+            'select_all'                      => 'Выбрать все',
+            'clear_all'                       => 'Очистить',
         ],
 
         'notifications' => [

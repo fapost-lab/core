@@ -113,6 +113,13 @@ const SHAPES: Record<string, string> = {
         <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" stroke="none" />
     `,
 
+    // ── comment — note sheet with a folded corner ──
+    comment: `
+        <path d="M5 4.5h9l5 5v10H5z" />
+        <path d="M14 4.5v5h5" />
+        <path d="M8 12.5h7M8 15.5h5" />
+    `,
+
     // ── default — generic gear ──
     _default: `
         <circle cx="12" cy="12" r="3" />

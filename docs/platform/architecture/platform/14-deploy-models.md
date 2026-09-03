@@ -51,4 +51,4 @@
 - [[13-self-hosted]] — self-hosted вариант
 - [[02-saas-shell]] — SaaS вариант
 - [[01-overview-layers]] — архитектура платформы
-- [[01-octane-ingress-only]] — ADR Octane ingress
+- [[01-octane-ingress-only]] — ADR-01 (отменён): stateless ingress

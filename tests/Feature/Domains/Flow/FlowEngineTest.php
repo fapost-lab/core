@@ -6,12 +6,16 @@ namespace Tests\Feature\Domains\Flow;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Models\Channel;
+use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowExecutionLimitExceededException;
+use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
@@ -24,6 +28,8 @@ use Fapost\Foundation\DTO\NodeExecutionResult;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Mockery\MockInterface;
+use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 
 final class FlowEngineTest extends FeatureTestCase
@@ -253,6 +259,121 @@ final class FlowEngineTest extends FeatureTestCase
         $engine->start($definition, $contact);
 
         $this->assertSame('es', $contact->fresh()->language);
+    }
+
+    /**
+     * flow_logs is partitioned by month and the migration only seeds three of
+     * them, so a schema older than that runs into a missing partition. Before
+     * the writer created partitions on demand, that insert failed inside the
+     * persistence transaction, failed the queue job, and every retry re-ran the
+     * flow — re-sending the user every message the flow had already delivered.
+     */
+    public function test_flow_log_partition_is_created_on_demand(): void
+    {
+        if ('pgsql' !== DB::connection()->getDriverName()) {
+            $this->markTestSkipped('flow_logs is only partitioned on Postgres.');
+        }
+
+        DB::statement('DROP TABLE IF EXISTS flow_logs_' . now()->format('Y_m'));
+
+        $session = $this->startLinearFlow();
+
+        $this->assertSame(FlowSessionStatus::Completed, $session->status);
+        $this->assertSame(1, DB::table('flow_logs')->where('session_id', $session->getKey())->count());
+    }
+
+    public function test_broken_flow_log_write_does_not_abort_execution(): void
+    {
+        $this->mock(
+            FlowLogPartitionManagerInterface::class,
+            function (MockInterface $mock): void {
+                $mock->shouldReceive('ensureMonthlyPartition')->andThrow(new RuntimeException('log storage is down'));
+            },
+        );
+
+        $session = $this->startLinearFlow();
+
+        // Telemetry died, the flow did not: the session is still completed, so
+        // the job succeeds and nothing gets re-sent on a retry.
+        $this->assertSame(FlowSessionStatus::Completed, $session->status);
+        $this->assertNull($session->current_node_id);
+    }
+
+    public function test_start_seeds_the_channel_identity_into_system_state(): void
+    {
+        $tenantId = (string) Str::uuid();
+
+        $assistant = Assistant::factory()->create([
+            'tenant_id' => $tenantId,
+        ]);
+
+        $contact = Contact::factory()->forTenant($tenantId)->create();
+
+        $channel = Channel::withoutEvents(function () use ($assistant, $tenantId): Channel {
+            $channel = Channel::factory()->create([
+                'assistant_id' => $assistant->getKey(),
+                'tenant_id'    => $tenantId,
+                'type'         => ChannelTypeEnum::Telegram,
+                'is_active'    => true,
+            ]);
+
+            $channel->forceFill(['telegram_bot_username' => 'engine_demo_bot'])->save();
+
+            return $channel;
+        });
+
+        ChannelContact::query()->create([
+            'contact_id'          => $contact->getKey(),
+            'channel_id'          => $channel->getKey(),
+            'last_interaction_at' => now(),
+        ]);
+
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Channel identity',
+            'nodes'     => [
+                ['id' => 'n1', 'type' => 'waiting_test', 'version' => 1, 'config' => []],
+            ],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        $session = $this->app->make(FlowEngineInterface::class)->start($definition, $contact);
+
+        $this->assertSame('engine_demo_bot', $session->state['system']['channel']['bot_username']);
+        $this->assertSame('@engine_demo_bot', $session->state['system']['channel']['bot_handle']);
+        $this->assertSame('https://t.me/engine_demo_bot', $session->state['system']['channel']['link']);
+    }
+
+    /**
+     * Single-node flow executed to completion — the smallest run that produces
+     * both a session and a flow-log entry.
+     */
+    private function startLinearFlow(): FlowSession
+    {
+        $tenantId  = (string) Str::uuid();
+        $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+        $contact   = Contact::factory()->forTenant($tenantId)->create();
+
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Linear',
+            'nodes'     => [
+                ['id' => 'n1', 'type' => 'sequential_test', 'version' => 1, 'config' => []],
+            ],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        return $this->app->make(FlowEngineInterface::class)->start($definition, $contact);
     }
 
     private function registerModuleAccessorOnce(string $prefix, DataAccessorInterface $accessor): void

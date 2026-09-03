@@ -143,6 +143,13 @@ final class SchemaBuilderTest extends TestCase
         $this->assertSame(['type' => 'text', 'placeholder' => 'Welcome'], $array);
     }
 
+    public function test_textarea_field_can_opt_out_of_the_variable_picker(): void
+    {
+        $array = TextareaField::make('text')->withoutVariablePicker()->toArray();
+
+        $this->assertSame(['type' => 'text', 'variable_picker' => false], $array);
+    }
+
     public function test_array_field_emits_array_type(): void
     {
         $array = ArrayField::make('include_state')->label('Include state')->toArray();

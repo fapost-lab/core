@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed, ref} from 'vue'
+import {computed, ref, watch} from 'vue'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {useNavigationStore} from '@builder/store/navigationStore'
@@ -119,6 +119,24 @@ const branchRoots = computed(() => resolveBranchRoots(
     builderStore.tree,
     selectionStore.activeBranch,
 ))
+
+// Entering a branch gives it the same terminator the main flow has: an empty
+// button/rule branch opens with an End instead of a blank canvas, so the
+// author can see where that path finishes.
+//
+// Not `immediate`: this mutates the definition, and doing that while the store
+// is still hydrating would queue a draft save built on a half-initialised
+// version.
+watch(
+    () => selectionStore.activeBranch,
+    (branch) => {
+        if (branch.length < 2) return
+        const nodeId = branch[branch.length - 2]
+        const handle = branch[branch.length - 1]
+        if (!nodeId || !handle) return
+        builderStore.ensureBranchEnd(nodeId, handle)
+    },
+)
 
 const activeNodes = computed(() => flattenLinear(branchRoots.value))
 

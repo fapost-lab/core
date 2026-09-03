@@ -213,8 +213,15 @@ prepare_env() {
         return
     fi
 
-    cp "$ROOT/.env.example" "$ROOT/.env"
-    ok ".env created from .env.example"
+    # The production template, not .env.example: that one is the development
+    # configuration — APP_ENV=local, debug on, an empty database password — and
+    # this script exists to stand a real installation up. `php artisan install`
+    # still asks for the environment and defaults it to production, so choosing
+    # local remains possible; it is just no longer the starting point.
+    #
+    # For a development checkout, copy .env.example by hand instead.
+    cp "$ROOT/.env.production.example" "$ROOT/.env"
+    ok ".env created from .env.production.example"
 }
 
 # --- main -------------------------------------------------------------------

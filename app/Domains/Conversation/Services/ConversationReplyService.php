@@ -6,10 +6,18 @@ namespace App\Domains\Conversation\Services;
 
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
+use App\Domains\Conversation\Capture\ConversationCaptureFactory;
+use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Conversation\Contracts\ConversationReplyServiceInterface;
 use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Conversation\Exceptions\ConversationReplyUndeliverableException;
 use App\Domains\Conversation\Models\Conversation;
+use App\Domains\Media\Contracts\MediaDispatcherInterface;
+use App\Domains\Media\Exceptions\MediaDeletedException;
+use App\Domains\Media\Exceptions\MediaNotFoundException;
+use App\Domains\Media\Models\MediaFile;
+use Fapost\Foundation\Media\DTO\UploadContext;
+use Fapost\Foundation\Media\Enums\MediaKind;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessagePayload;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
@@ -26,11 +34,18 @@ final readonly class ConversationReplyService implements ConversationReplyServic
 {
     public function __construct(
         private OutboundMessageSenderInterface $sender,
+        private MediaDispatcherInterface $mediaDispatcher,
+        private ConversationLoggerInterface $conversationLogger,
+        private ConversationCaptureFactory $captureFactory,
     ) {
     }
 
-    public function send(Conversation $conversation, string $text, string $staffUserId): DeliveryResult
-    {
+    public function send(
+        Conversation $conversation,
+        string $text,
+        string $staffUserId,
+        ?string $mediaFileId = null,
+    ): DeliveryResult {
         $channel = Channel::query()->find($conversation->channel_id);
 
         if (! $channel instanceof Channel || ! $channel->is_active) {
@@ -51,31 +66,115 @@ final readonly class ConversationReplyService implements ConversationReplyServic
             );
         }
 
-        return $this->sender->send(
-            new OutboundMessage(
-                idempotencyKey: 'staff_reply:' . (string) $conversation->getKey() . ':' . Str::ulid(),
-                tenantId: (string) $conversation->tenant_id,
-                channelId: (string) $channel->getKey(),
-                channelType: $channel->type->value,
-                transportToken: $channel->token,
-                chatId: (string) $channelContact->contact->external_id,
-                payload: new MessagePayload(
-                    type: 'text',
-                    text: $text,
-                ),
-                // No parse_mode, unlike every other outbound path here. Those
-                // carry content an author wrote as markup; this carries prose an
-                // operator typed into a chat box. Under parse_mode=HTML a plain
-                // "R&D" or "5 < 10" is malformed markup and Telegram rejects the
-                // whole message — the operator would watch their reply silently
-                // fail to arrive.
-                metadata: [
-                    'contact_id'   => (string) $conversation->contact_id,
-                    'assistant_id' => (string) $conversation->assistant_id,
-                    'origin'       => MessageOrigin::Staff->value,
-                    'origin_ref'   => ['staff_user_id' => $staffUserId],
-                ],
-            ),
+        $chatId = (string) $channelContact->contact->external_id;
+
+        if (null === $mediaFileId) {
+            return $this->sender->send($this->buildMessage($conversation, $channel, $chatId, new MessagePayload(
+                type: 'text',
+                text: $text,
+            ), $staffUserId));
+        }
+
+        return $this->sendMedia($conversation, $channel, $chatId, $text, $staffUserId, $mediaFileId);
+    }
+
+    /**
+     * Attachment path: the file has to exist provider-side before it can be
+     * referenced in a message, so it goes through the dispatcher first.
+     *
+     * Telegram uploads as it sends — the dispatcher reports `alreadyDelivered`
+     * and the recipient already has the file, so the send is skipped and the
+     * transcript captured here instead of by MessageSender.
+     */
+    private function sendMedia(
+        Conversation $conversation,
+        Channel $channel,
+        string $chatId,
+        string $caption,
+        string $staffUserId,
+        string $mediaFileId,
+    ): DeliveryResult {
+        $media = MediaFile::query()
+            ->withTrashed()
+            ->where('tenant_id', $conversation->tenant_id)
+            ->whereKey($mediaFileId)
+            ->first();
+
+        if (! $media instanceof MediaFile) {
+            throw MediaNotFoundException::forId($mediaFileId);
+        }
+
+        if (null !== $media->deleted_at) {
+            throw MediaDeletedException::forId($mediaFileId);
+        }
+
+        $dispatch = $this->mediaDispatcher->ensureUploadedToChannel(
+            media: $media,
+            channel: $channel,
+            context: new UploadContext(targetChatId: $chatId, caption: '' !== $caption ? $caption : null),
+        );
+
+        $kind    = MediaKind::fromMimeType((string) ($media->blob->mime_type ?? ''));
+        $message = $this->buildMessage(
+            $conversation,
+            $channel,
+            $chatId,
+            $this->mediaPayload($kind, (string) $dispatch->providerFileId, $caption),
+            $staffUserId,
+        );
+
+        if ($dispatch->alreadyDelivered) {
+            $result = new DeliveryResult(sent: true, providerMessageId: $dispatch->deliveredMessageId);
+
+            $entry = $this->captureFactory->forOutbound($message, $result);
+
+            if (null !== $entry) {
+                $this->conversationLogger->log($entry);
+            }
+
+            return $result;
+        }
+
+        return $this->sender->send($message);
+    }
+
+    private function mediaPayload(MediaKind $kind, string $providerFileId, string $caption): MessagePayload
+    {
+        return match ($kind) {
+            MediaKind::Image => new MessagePayload(type: 'photo', text: $caption, media: ['photo' => $providerFileId]),
+            MediaKind::Video => new MessagePayload(type: 'video', text: $caption, media: ['video' => $providerFileId]),
+            MediaKind::Audio => new MessagePayload(type: 'voice', text: '', media: ['voice' => $providerFileId]),
+            default          => new MessagePayload(type: 'document', text: $caption, media: ['document' => $providerFileId]),
+        };
+    }
+
+    private function buildMessage(
+        Conversation $conversation,
+        Channel $channel,
+        string $chatId,
+        MessagePayload $payload,
+        string $staffUserId,
+    ): OutboundMessage {
+        return new OutboundMessage(
+            idempotencyKey: 'staff_reply:' . (string) $conversation->getKey() . ':' . Str::ulid(),
+            tenantId: (string) $conversation->tenant_id,
+            channelId: (string) $channel->getKey(),
+            channelType: $channel->type->value,
+            transportToken: $channel->token,
+            chatId: $chatId,
+            payload: $payload,
+            // No parse_mode, unlike every other outbound path here. Those
+            // carry content an author wrote as markup; this carries prose an
+            // operator typed into a chat box. Under parse_mode=HTML a plain
+            // "R&D" or "5 < 10" is malformed markup and Telegram rejects the
+            // whole message — the operator would watch their reply silently
+            // fail to arrive.
+            metadata: [
+                'contact_id'   => (string) $conversation->contact_id,
+                'assistant_id' => (string) $conversation->assistant_id,
+                'origin'       => MessageOrigin::Staff->value,
+                'origin_ref'   => ['staff_user_id' => $staffUserId],
+            ],
         );
     }
 }

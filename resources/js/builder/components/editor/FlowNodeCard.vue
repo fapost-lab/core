@@ -6,6 +6,7 @@ import {useBuilderStore} from '@builder/store/builderStore'
 import {nodeColors} from '@builder/utils/nodeColors'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 import {useMoveNode} from '@builder/composables/useMoveNode'
+import {useDeleteNode} from '@builder/composables/useDeleteNode'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 import {vendorPreviews} from '@builder/utils/vendorComponents'
 
@@ -50,6 +51,17 @@ const endStatus = computed<string | null>(() => {
 const endStatusLabel = computed<string | null>(() =>
     endStatus.value ? endStatus.value.charAt(0).toUpperCase() + endStatus.value.slice(1) : null,
 )
+
+/**
+ * Comment is an annotation node: its whole point is the note body, so the
+ * card renders the raw text (line breaks kept) instead of a summary row.
+ * Returns null for every other type.
+ */
+const commentText = computed<string | null>(() => {
+    if (props.treeNode.node.type !== 'comment') return null
+    const raw = (props.treeNode.node.config ?? {}).text
+    return typeof raw === 'string' ? raw : ''
+})
 
 /** Compact summary rows for the card body */
 const summaryRows = computed(() => {
@@ -122,7 +134,7 @@ function select() {
 }
 
 function deleteNode() {
-    builderStore.deleteNode(props.treeNode.node.id)
+    deleteDialog.requestDelete(props.treeNode.node.id)
 }
 
 // loop_end is auto-managed: it lives and dies with its parent loop, so the
@@ -176,6 +188,7 @@ function moveDown() {
 
 const moveDialog = useMoveNode()
 
+const deleteDialog = useDeleteNode()
 function openMoveDialog() {
     moveDialog.open(props.treeNode.node.id)
 }
@@ -209,6 +222,11 @@ function openMoveDialog() {
 
         <div v-if="vendorPreview" class="node-card-body">
             <component :is="vendorPreview" :node="treeNode.node" />
+        </div>
+
+        <div v-else-if="commentText !== null" class="node-card-body">
+            <p v-if="commentText.trim() !== ''" class="node-comment-text">{{ commentText }}</p>
+            <p v-else class="node-comment-text node-comment-text--empty">Empty note — click to write one</p>
         </div>
 
         <div v-else-if="summaryRows.length > 0" class="node-card-body">
@@ -250,3 +268,21 @@ function openMoveDialog() {
     </div>
     </div>
 </template>
+
+<style scoped>
+/* Note body: authored line breaks are meaningful, and long notes wrap
+   instead of being truncated the way summary rows are. */
+.node-comment-text {
+    margin: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-size: 12.5px;
+    line-height: 1.45;
+    color: var(--text-2);
+}
+
+.node-comment-text--empty {
+    font-style: italic;
+    color: var(--text-3);
+}
+</style>

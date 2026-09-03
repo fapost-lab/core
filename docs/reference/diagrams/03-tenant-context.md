@@ -1,11 +1,11 @@
 # Tenant Context — установка контекста и переключение схемы
 
-Два пути инициализации tenant-контекста: HTTP webhook запрос (через Octane) и Queue Job (через Horizon worker).
+Два пути инициализации tenant-контекста: HTTP webhook запрос (ingress) и Queue Job (Horizon worker).
 
 ```mermaid
 sequenceDiagram
     participant TG as Telegram API
-    participant OC as Octane Worker
+    participant OC as Ingress
     participant TC as TenantContext<br/>(scoped)
     participant TS as TenantSwitcher
     participant DB as PostgreSQL<br/>tenant_{slug}
@@ -16,7 +16,7 @@ sequenceDiagram
     Note over TG,DB: Путь 1 — HTTP Webhook Request
 
     TG->>OC: POST /webhook/telegram/{hash}
-    Note over OC: WebhookController (Octane ingress)
+    Note over OC: WebhookController (PHP-FPM ingress)
 
     OC->>TS: runForTenant(tenant_id, callable)
     activate TS
@@ -36,7 +36,7 @@ sequenceDiagram
     TS-->>TC: finally: restore(previous_tenant)
     deactivate TC
     deactivate TS
-    Note over TC: Изоляция между запросами<br/>(Octane безопасен)
+    Note over TC: Изоляция между запросами<br/>и между job в воркере
 
     Note over Q,DB: Путь 2 — Queue Job (Horizon Worker)
 
@@ -62,19 +62,19 @@ sequenceDiagram
 | Класс | Путь | Роль |
 |-------|------|------|
 | `TenantContextInterface` | `Domains/Tenancy/Contracts/` | Scoped binding — хранит текущий tenant per-request/job |
-| `TenantSwitcher` | `Domains/Tenancy/Services/` | `runForTenant(callable)` с `finally restore()` — Octane-safe |
+| `TenantSwitcher` | `Domains/Tenancy/Services/` | `runForTenant(callable)` с `finally restore()` — обязателен для долгоживущих воркеров |
 | `TenantDatabaseManager` | `Domains/Tenancy/Services/` | Переключение PostgreSQL search_path на schema tenant |
 | `IncomingMessageJob` | `Jobs/` | `TenantContext::set()` в начале handle(), перед любой бизнес-логикой |
 
 ## Важные инварианты
 
 - **Scoped, не Singleton:** `TenantContext` зарегистрирован как `scoped` — новый экземпляр на каждый HTTP-запрос и Job, нет state leakage
-- **Octane только для webhook** (ADR-01): `/webhook/*` → Octane + `TenantSwitcher::runForTenant()`, всё остальное → PHP-FPM
+- **Restore обязателен** — один Horizon-воркер обрабатывает много job подряд, и незакрытый tenant context утёк бы в следующую
 - **Hard fail без контекста:** `TenantContext::get()` бросает исключение если tenant не установлен — никаких fallback к default tenant
 - **Landlord DB не в hot path:** tenant резолвится из Redis по `public_hash`, `landlord` БД не участвует при обработке webhook
 
 ## Связано с
-- [[01-octane-ingress-only|ADR-01 Octane]] — TenantSwitcher в Octane
+- [[01-octane-ingress-only|ADR-01]] — отменён; сохранён как запись решения
 - [[architecture/platform/01-overview-layers|Platform: Overview]]
 - [[01-webhook-pipeline]]
 - [[01-overview-layers]] — архитектура платформы

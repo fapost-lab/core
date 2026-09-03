@@ -19,6 +19,12 @@ final readonly class FlowLogPartitionManager implements FlowLogPartitionManagerI
 
     public function ensureMonthlyPartition(CarbonImmutable $month): void
     {
+        // Range partitioning is Postgres-only; other drivers (the sqlite test
+        // connection) keep flow_logs as one plain table.
+        if ('pgsql' !== $this->connection->getDriverName()) {
+            return;
+        }
+
         $start = $month->startOfMonth();
         $end   = $start->addMonth();
         $name  = $this->partitionName($start);

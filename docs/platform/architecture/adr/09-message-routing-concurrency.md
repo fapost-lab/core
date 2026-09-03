@@ -758,7 +758,7 @@ ADR considered implemented когда:
 - [[README]] — обзор flow engine
 - [[10-message-pipeline]] — архитектура message pipeline
 - [[diagrams/01-webhook-pipeline]] — диаграмма webhook pipeline
-- [[01-octane-ingress-only]] — ADR Octane ingress
+- [[01-octane-ingress-only]] — ADR-01 (отменён): stateless ingress
 
 ---
 

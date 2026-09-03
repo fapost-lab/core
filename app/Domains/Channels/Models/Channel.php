@@ -103,6 +103,47 @@ final class Channel extends Model implements ChannelInterface
     }
 
     /**
+     * Provider-reported account name, without the leading `@`. Null until the
+     * provider handshake stored the bot identity
+     * ({@see \App\Domains\Channels\Telegram\TelegramWebhookRegistrar}) or for
+     * channel types that have no public account name.
+     */
+    public function publicUsername(): ?string
+    {
+        $username = match ($this->type) {
+            ChannelTypeEnum::Telegram => $this->telegram_bot_username,
+            ChannelTypeEnum::WhatsApp => null,
+        };
+
+        return '' === (string)$username ? null : (string)$username;
+    }
+
+    /**
+     * Public handle of the channel as a person would address it — `@bot` for
+     * Telegram. Null under the same conditions as {@see publicUsername()}.
+     */
+    public function publicHandle(): ?string
+    {
+        $username = $this->publicUsername();
+
+        return null === $username ? null : '@' . $username;
+    }
+
+    /**
+     * Deep link that opens the channel for an end user, e.g. `https://t.me/bot`.
+     * Null under the same conditions as {@see publicHandle()}.
+     */
+    public function publicUrl(): ?string
+    {
+        $username = $this->publicUsername();
+
+        return match ($this->type) {
+            ChannelTypeEnum::Telegram => null === $username ? null : 'https://t.me/' . $username,
+            ChannelTypeEnum::WhatsApp => null,
+        };
+    }
+
+    /**
      * @return BelongsTo<Assistant, $this>
      */
     public function assistant(): BelongsTo

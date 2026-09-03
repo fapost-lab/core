@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace App\Filament\Resources\Assistants\Schemas;
 
 use App\Domains\Channels\Enums\ChannelTypeEnum;
+use Filament\Actions\Action;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Str;
 
 final class ChannelFormSchema
@@ -40,10 +43,30 @@ final class ChannelFormSchema
                     ->required(fn (string $operation): bool => 'create' === $operation)
                     ->maxLength(65535)
                     ->helperText(__('staff.channels.fields.secret_token_help'))
-                    ->dehydrated(fn (?string $state): bool => filled($state)),
+                    ->dehydrated(fn (?string $state): bool => filled($state))
+                    // The value is arbitrary shared entropy — nobody should be
+                    // inventing it by hand. Telegram accepts A-Z a-z 0-9 _ -,
+                    // 1..256 chars; Str::random() stays inside that alphabet.
+                    ->suffixAction(
+                        Action::make('generateSecretToken')
+                            ->label(__('staff.channels.actions.generate_secret_token'))
+                            ->icon(Heroicon::OutlinedSparkles)
+                            ->action(function (Set $set): void {
+                                $set('secret_token', Str::random(48));
+                            })
+                    ),
                 Toggle::make('is_active')
                     ->label(__('staff.channels.fields.is_active'))
                     ->default(true),
+                // Generated on create and rotated through its own action — shown
+                // here read-only so staff can copy the value when debugging the
+                // provider-side webhook.
+                TextInput::make('webhook_public_hash')
+                    ->label(__('staff.channels.fields.webhook_hash'))
+                    ->readOnly()
+                    ->dehydrated(false)
+                    ->visible(fn (string $operation): bool => 'create' !== $operation)
+                    ->helperText(__('staff.channels.fields.webhook_hash_help')),
                 Section::make(__('staff.channels.fields.config'))
                     ->components([
                         Select::make('config.allowed_updates')
@@ -52,6 +75,26 @@ final class ChannelFormSchema
                             ->multiple()
                             ->searchable()
                             ->preload()
+                            // 20+ update types: picking them one by one is the
+                            // common case ("give me everything"), so make it
+                            // one click — and offer the way back out too.
+                            ->hintActions([
+                                Action::make('selectAllAllowedUpdates')
+                                    ->label(__('staff.channels.actions.select_all'))
+                                    ->icon(Heroicon::OutlinedCheckCircle)
+                                    ->link()
+                                    ->action(static function (Set $set): void {
+                                        $set('config.allowed_updates', array_keys(self::telegramAllowedUpdates()));
+                                    }),
+                                Action::make('clearAllowedUpdates')
+                                    ->label(__('staff.channels.actions.clear_all'))
+                                    ->icon(Heroicon::OutlinedXCircle)
+                                    ->link()
+                                    ->color('gray')
+                                    ->action(static function (Set $set): void {
+                                        $set('config.allowed_updates', []);
+                                    }),
+                            ])
                             ->dehydrated(
                                 fn (Get $get): bool => ChannelTypeEnum::Telegram->value === self::resolveChannelType(
                                     $get

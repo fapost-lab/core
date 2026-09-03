@@ -1,0 +1,110 @@
+---
+title: "Releases and versioning"
+description: "How a change on main becomes a version an operator can install."
+---
+
+A release is a git tag on `main`. Nothing else: no release branch, no version
+file to bump, no manual image build. Pushing the tag is the act of releasing.
+
+## Version numbers
+
+Versions follow [Semantic Versioning](https://semver.org) and are written as
+`vMAJOR.MINOR.PATCH` — `v0.4.2`, `v1.0.0`.
+
+While the platform is pre-1.0 the rules are the `0.x` ones:
+
+- **MINOR** goes up for new behaviour, and for anything that breaks an existing
+  contract — a Flow node handler, the webhook format, the extension surface, a
+  configuration key. Read the release notes before adopting a new minor.
+- **PATCH** goes up for fixes that change no contract. A patch is always safe
+  to take.
+
+`1.0.0` is tagged when the public surface described in the
+[stability policy](/extending/stability-policy) is one the project is prepared
+to keep. From then on a breaking change raises MAJOR and nothing else does.
+
+The tag is the only place the version lives. The container images read it from
+the tag name at build time (`org.opencontainers.image.version`), and
+`APP_VERSION` in an operator's environment refers to it directly.
+
+## What a tag produces
+
+Pushing a `v*` tag runs the **Publish images** workflow, which builds `core`,
+`web` and `gateway` for amd64 and arm64 and pushes them to GitHub Container
+Registry under every tag an operator might pin to:
+
+| Image tag  | From `v1.4.2`              | Moves?                       |
+| ---------- | -------------------------- | ---------------------------- |
+| `1.4.2`    | the full version           | never                        |
+| `1.4`      | major.minor                | on each patch of 1.4         |
+| `latest`   | the newest tagged release  | on every release             |
+| `sha-…`    | the short commit hash      | never                        |
+
+Operators who want upgrades to be a decision pin `1.4.2`; the
+[upgrade guide](/self-hosting/upgrading) explains the rest.
+
+## Cutting a release
+
+Releases happen when a coherent piece of work is on `main`, not on a calendar.
+A release every one or two weeks is normal for `0.x`; a release for a single
+fix is fine too.
+
+1. Make sure `main` is green and that any Dependabot pull requests you intend to
+   include are merged.
+2. Decide the number: did anything in `git log <previous-tag>..main` change a
+   contract? Then MINOR, otherwise PATCH.
+3. Tag and push. The tag is annotated so that it carries an author and a date:
+
+```bash
+git switch main && git pull --ff-only
+git tag -a v0.4.2 -m "v0.4.2"
+git push origin v0.4.2
+```
+
+4. Publish the GitHub release with notes generated from the merged pull request
+   titles, then edit the notes so that breaking changes and required operator
+   actions (a migration, a new environment variable, a restart order) are at the
+   top and impossible to miss:
+
+```bash
+gh release create v0.4.2 --generate-notes --verify-tag
+```
+
+5. Check that the [Publish images](https://github.com/fapost-lab/core/actions/workflows/publish-images.yml)
+   run finished and the three images exist under the new tag.
+
+A pushed tag is not undone. If a release turns out to be broken, the fix is the
+next patch tag, not a moved or deleted one — an operator may already have pulled
+the image.
+
+## Hotfixes
+
+A fix for a released version is an ordinary `fix/` branch from `main`, merged
+through a pull request and released as the next PATCH tag. Nothing about the
+process is different; it is just done quickly.
+
+The exception is the case where `main` already carries unreleased breaking
+changes and an operator on the previous minor needs the fix without them. Then,
+and only then, a maintenance branch is created from the released tag:
+
+```bash
+git switch -c release/1.4 v1.4.2
+git cherry-pick <merged fix commit from main>
+git tag -a v1.4.3 -m "v1.4.3"
+git push origin release/1.4 v1.4.3
+```
+
+The fix lands on `main` first and is cherry-picked back, never the other way
+round, so that `main` can never be missing a fix a release has. Maintenance
+branches are created on demand and deleted once the minor they serve is no
+longer in use. Before 1.0 this case is not expected to arise.
+
+## Pre-releases
+
+A change that wants operator feedback before it is called a release is tagged
+`v1.5.0-rc.1`. It builds images like any other tag, but `latest` is not moved
+to it and the GitHub release is marked as a pre-release:
+
+```bash
+gh release create v1.5.0-rc.1 --generate-notes --verify-tag --prerelease
+```

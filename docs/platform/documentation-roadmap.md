@@ -33,7 +33,7 @@ This file defines how `docs/` should be maintained as the repository documentati
 
 ## Next Gaps
 
-1. Local infrastructure details: PostgreSQL, Redis, Horizon, Octane, and optional Docker setup.
+1. Local infrastructure details: PostgreSQL, Redis, Horizon, and the Docker setup.
 2. Boot lifecycle and registries: `DomainServiceProvider`, node handler registry, channel registry, and runtime hooks.
 3. Domain authoring guide for adding code under `app/Domains/*`.
 4. Testing strategy: PHPUnit feature/unit tests, tenant-aware tests, frontend tests, and `composer run test:arch`.

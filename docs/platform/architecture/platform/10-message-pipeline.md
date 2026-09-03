@@ -44,7 +44,7 @@
 
 ## Связано с
 
-- [[01-octane-ingress-only]] — ADR про Octane webhook ingress
+- [[01-octane-ingress-only]] — ADR-01 (отменён): stateless webhook ingress
 - [[01-webhook-pipeline]] — диаграмма webhook pipeline
 - [[09-message-routing-concurrency]] — ADR concurrency
 - [[conversation-logging]] — логирование диалогов

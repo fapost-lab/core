@@ -42,7 +42,7 @@ final class NodeTypesController extends Controller
                 'version'       => 1,
                 'label'         => 'Comment',
                 'category'      => 'Annotation',
-                'config_schema' => (object) [],
+                'config_schema' => AnnotationNodeTypes::commentConfigSchema(),
                 'annotation'    => true,
                 'palette'       => true,
             ]);

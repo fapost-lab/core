@@ -190,6 +190,103 @@ export const useBuilderStore = defineStore('builder', () => {
         return healed
     }
 
+    /**
+     * Self-heal the terminal `end`: every flow is created with one
+     * (CreateFlowAction seeds it), but nothing stops an author from deleting it,
+     * and then the chain just trails off with no visible finish. Re-append it
+     * when the main chain has no terminator of its own. Returns true when the
+     * definition changed.
+     *
+     * Deliberately conservative — skipped when the chain already ends in a node
+     * that owns its exits (branch, inline keyboard, call, subflow, loop_end):
+     * appending after those would produce an unreachable node, not a terminal.
+     */
+    function healTerminalEnd(def: FlowDefinition): boolean {
+        if (def.nodes.some((n) => n.type === 'end')) return false
+
+        const endNode: FlowNode = {
+            id:      nanoid(10),
+            type:    'end',
+            version: 1,
+            config:  { status: 'success' },
+        }
+
+        if (def.nodes.length === 0) {
+            def.nodes.push(endNode)
+            return true
+        }
+
+        // Root of the main chain: the node no edge points at.
+        const targeted = new Set(def.edges.map((e) => e.to))
+        const root     = def.nodes.find((n) => !targeted.has(n.id))
+        if (!root) return false
+
+        let tail = root
+        let next = def.edges.find((e) => e.from === tail.id && (e.handle ?? 'default') === 'default')
+        while (next) {
+            const node = def.nodes.find((n) => n.id === next!.to)
+            if (!node) break
+            tail = node
+            next = def.edges.find((e) => e.from === tail.id && (e.handle ?? 'default') === 'default')
+        }
+
+        if (nodeMustBeLast(tail)) return false
+
+        def.nodes.push(endNode)
+        def.edges.push({ id: nanoid(10), from: tail.id, to: endNode.id, handle: 'default' })
+
+        return true
+    }
+
+    /**
+     * Ensure the chain hanging off a branch slot finishes with an End.
+     *
+     * Opening a button / rule branch should show where that path stops, the
+     * same way the main flow does. Skipped when the branch already terminates
+     * (an End, or a node that owns its own exits) — this only fills a gap, it
+     * never appends after real work. Returns true when a node was added.
+     */
+    function ensureBranchEnd(parentId: string, handle: string): boolean {
+        const def = definition.value
+
+        const parent = def.nodes.find((n) => n.id === parentId)
+        if (!parent) return false
+
+        const endNode: FlowNode = {
+            id:      nanoid(10),
+            type:    'end',
+            version: 1,
+            config:  { status: 'success' },
+        }
+
+        const entry = def.edges.find((e) => e.from === parentId && (e.handle ?? 'default') === handle)
+
+        if (!entry) {
+            def.nodes.push(endNode)
+            def.edges.push({ id: nanoid(10), from: parentId, to: endNode.id, handle })
+
+            return true
+        }
+
+        let tail = def.nodes.find((n) => n.id === entry.to) ?? null
+        if (!tail) return false
+
+        let next = def.edges.find((e) => e.from === tail!.id && (e.handle ?? 'default') === 'default')
+        while (next) {
+            const node = def.nodes.find((n) => n.id === next!.to)
+            if (!node) break
+            tail = node
+            next = def.edges.find((e) => e.from === tail!.id && (e.handle ?? 'default') === 'default')
+        }
+
+        if (tail.type === 'end' || nodeMustBeLast(tail)) return false
+
+        def.nodes.push(endNode)
+        def.edges.push({ id: nanoid(10), from: tail.id, to: endNode.id, handle: 'default' })
+
+        return true
+    }
+
     function init(flow: BuilderFlowPayload) {
         flowId.value = flow.flowId
         flowName.value = flow.name
@@ -197,6 +294,7 @@ export const useBuilderStore = defineStore('builder', () => {
         publishedVersion.value = flow.publishedVersion ?? null
         definition.value = normalizeDefinition(flow.definition)
         const healedLoops = healLoopConstructs(definition.value)
+        const healedEnd   = healTerminalEnd(definition.value)
         trigger.value = normalizeTrigger(flow.trigger)
       tenantEvents.value = Array.isArray(flow.availableEvents) ? flow.availableEvents : []
         contentBaseLanguage.value = flow.contentBaseLanguage ?? 'en'
@@ -205,8 +303,8 @@ export const useBuilderStore = defineStore('builder', () => {
         availableActions.value   = Array.isArray(flow.availableActions) ? flow.availableActions : []
         availableCountries.value = Array.isArray(flow.availableCountries) ? flow.availableCountries : []
         // A healed definition differs from the persisted draft — flag dirty so
-        // the repaired loop_end nodes reach the backend on the next save.
-        isDirty.value = healedLoops
+        // the repaired loop_end / end nodes reach the backend on the next save.
+        isDirty.value = healedLoops || healedEnd
         hydrated      = true
     }
 
@@ -408,6 +506,82 @@ export const useBuilderStore = defineStore('builder', () => {
 
         if (selectionStore.selectedNodeId && toRemove.has(selectionStore.selectedNodeId)) {
             selectionStore.clear()
+        }
+
+        return true
+    }
+
+    /**
+     * Everything hanging off a node's named (non-default) handles — the button,
+     * rule, success/error or loop branches it owns. Empty for a plain linear
+     * node, which is exactly when {@link deleteNode} can bridge and delete on
+     * its own.
+     */
+    function collectBranchDescendantIds(nodeId: string): string[] {
+        const out   = new Set<string>()
+        const queue = definition.value.edges
+            .filter((edge) => edge.from === nodeId && (edge.handle ?? 'default') !== 'default')
+            .map((edge) => edge.to)
+
+        while (queue.length > 0) {
+            const id = queue.shift()!
+            if (id === nodeId || out.has(id)) continue
+            out.add(id)
+            for (const edge of definition.value.edges.filter((e) => e.from === id)) {
+                if (edge.to !== nodeId) queue.push(edge.to)
+            }
+        }
+
+        return [...out]
+    }
+
+    /**
+     * Delete a branching node together with its whole branch subtree, bridging
+     * the flow from the node's incoming edge to its `default` continuation.
+     *
+     * {@link deleteNode} refuses this case on purpose — dropping the node alone
+     * would strand its branches — so callers confirm the cascade with the user
+     * and come here.
+     */
+    function deleteNodeWithBranches(nodeId: string): boolean {
+        const target = definition.value.nodes.find((n) => n.id === nodeId) ?? null
+
+        if (!target || target.type === 'loop_end') return false
+        if (target.type === 'loop') return deleteLoop(nodeId)
+
+        const descendants = collectBranchDescendantIds(nodeId)
+
+        if (descendants.length === 0) return deleteNode(nodeId)
+
+        const selectionStore = useSelectionStore()
+
+        snapshot()
+
+        const incoming    = definition.value.edges.find((e) => e.to === nodeId) ?? null
+        const defaultExit = definition.value.edges
+            .find((e) => e.from === nodeId && (e.handle ?? 'default') === 'default') ?? null
+
+        const toRemove = new Set<string>([nodeId, ...descendants])
+
+        definition.value.nodes = definition.value.nodes.filter((n) => !toRemove.has(n.id))
+        definition.value.edges = definition.value.edges.filter((e) => !toRemove.has(e.from) && !toRemove.has(e.to))
+
+        if (incoming && defaultExit && !toRemove.has(defaultExit.to)) {
+            definition.value.edges.push({
+                id:     nanoid(10),
+                from:   incoming.from,
+                to:     defaultExit.to,
+                handle: incoming.handle ?? 'default',
+            })
+        }
+
+        if (selectionStore.selectedNodeId && toRemove.has(selectionStore.selectedNodeId)) {
+            selectionStore.clear()
+        }
+
+        // The canvas may be standing inside a branch that no longer exists.
+        if (selectionStore.activeBranch.some((segment) => toRemove.has(segment))) {
+            selectionStore.clearBranch()
         }
 
         return true
@@ -815,6 +989,50 @@ export const useBuilderStore = defineStore('builder', () => {
                 return handle === 'default' || validHandles.has(handle)
             })
         }
+
+        syncTerminalEnd(nodeId)
+    }
+
+    /**
+     * Keep the automatic End in step with the node the author just edited.
+     *
+     * Wiring buttons (or a reply keyboard) turns a node terminal: it now exits
+     * through its branches, and the plain End that used to follow can never
+     * run. Drop it rather than parking it in the "unreachable" block — it is
+     * platform scaffolding, not authored intent. Undo the edit and
+     * {@link healTerminalEnd} puts the End back.
+     */
+    function syncTerminalEnd(nodeId: string) {
+        const node = definition.value.nodes.find((n) => n.id === nodeId)
+        if (!node) return
+
+        if (!nodeMustBeLast(node)) {
+            healTerminalEnd(definition.value)
+
+            return
+        }
+
+        const exit = definition.value.edges
+            .find((edge) => edge.from === nodeId && (edge.handle ?? 'default') === 'default')
+        if (!exit) return
+
+        const tail = definition.value.nodes.find((n) => n.id === exit.to)
+
+        // Only a bare, single-parent End goes quietly. A richer tail is real
+        // work the author may still want to rescue, so it stays visible.
+        if (!tail || tail.type !== 'end') return
+        if (definition.value.edges.some((edge) => edge.from === tail.id)) return
+        if (definition.value.edges.filter((edge) => edge.to === tail.id).length > 1) return
+
+        definition.value.nodes = definition.value.nodes.filter((n) => n.id !== tail.id)
+        definition.value.edges = definition.value.edges.filter(
+            (edge) => edge.from !== tail.id && edge.to !== tail.id,
+        )
+
+        const selectionStore = useSelectionStore()
+        if (selectionStore.selectedNodeId === tail.id) {
+            selectionStore.clear()
+        }
     }
 
     /**
@@ -882,7 +1100,10 @@ export const useBuilderStore = defineStore('builder', () => {
         redo,
         updateNodeConfig,
         insertNode,
+        ensureBranchEnd,
         deleteNode,
+        deleteNodeWithBranches,
+        collectBranchDescendantIds,
         removeNodes,
         isNodeInLoopBody,
       moveNode,

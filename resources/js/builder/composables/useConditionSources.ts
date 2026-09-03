@@ -40,7 +40,7 @@ const STATIC_SOURCES: SourceSpec[] = [
     { id: 'contact', label: 'Contact field',      icon: '📇' },
     { id: 'rag',     label: 'RAG result',         icon: '🧠' },
     { id: 'call',    label: 'API response',       icon: '⚡' },
-    { id: 'system',  label: 'Last user message',  icon: '💬' },
+    { id: 'system',  label: 'System',             icon: '💬' },
 ]
 
 function fieldsFromVars(vars: PickerVariable[], stripFirstSegment = true): ConditionField[] {

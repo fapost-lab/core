@@ -15,6 +15,12 @@ import BaseModal from '@builder/components/editor/config/overrides/BaseModal.vue
 const props = defineProps({
     open: {type: Boolean, required: true},
     nodeId: {type: String as () => string | null, default: null},
+    /**
+     * Preset for the "move with descendants" toggle — the author can still
+     * change it. Set by callers who already know a whole chain is travelling,
+     * e.g. rescuing a branch out of a node being deleted.
+     */
+    chain: {type: Boolean, default: false},
 })
 
 const emit = defineEmits(['close'])
@@ -49,7 +55,7 @@ const withDescendants = ref(false)
 watch(() => props.open, (open) => {
     if (open) {
         search.value = ''
-        withDescendants.value = false
+        withDescendants.value = props.chain
     }
 })
 

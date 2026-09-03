@@ -6,7 +6,7 @@
 sequenceDiagram
     actor U as Пользователь
     participant TG as Telegram API
-    participant WC as WebhookController<br/>(Octane)
+    participant WC as Ingress<br/>(Go gateway or PHP-FPM)
     participant RD as Redis
     participant Q as Queue<br/>flow.execution
     participant J as IncomingMessageJob
@@ -88,13 +88,13 @@ sequenceDiagram
 
 ## Важные инварианты
 
-- **Octane только для webhook** (ADR-01): `/webhook/*` → Octane, всё остальное → FPM
+- **Ingress stateless** (ADR-01, отменён): без БД, только Redis и dispatch — поэтому его можно вынести за пределы PHP. Роль быстрого ingress выполняет опциональный Go-гейтвей (`gateway/`); без него те же запросы обслуживает PHP-FPM
 - `public_hash` → Redis — landlord DB не участвует в hot path
 - Lock не получен → **busy notice**, не дроп: job уходит в backoff очередь
 - Optimistic lock: `flow_sessions.version` — `UPDATE WHERE version = N`
 
 ## Связано с
-- [[architecture/adr/01-octane-ingress-only|ADR-01 Octane]] — webhook ingress only
+- [[architecture/adr/01-octane-ingress-only|ADR-01]] — отменён; ingress-only обоснование сохранено как история
 - [[09-message-routing-concurrency|ADR-09 Message Routing]] — concurrency & lock
 - [[architecture/platform/10-message-pipeline|Platform: Message Pipeline]]
 - [[specs/flow-engine/README|Flow Engine спека]]

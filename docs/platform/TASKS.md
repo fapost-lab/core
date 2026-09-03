@@ -88,6 +88,7 @@
   - Остаток (V1.x, warning-only): 8.5 (while condition не меняется), 8.7 (static number check), UI редактирования `max_size`, `{{…length}}` в TemplateEngine
 - [x] `emit_event` — event-chain start завершён: `DispatchFlowTriggerEventJob` теперь фанит `StartFlowFromEventJob` на каждый подписанный event-триггер (было — только лог); flow стартует для emitting-контакта, payload доступен как `flow.event.*`; выровнен формат имени события (trigger `event_name` теперь принимает dotted/mixed-case как emit `event_type`) — [[specs/flow-engine/nodes/07-emit-event]]
 - [-] `rag_query` — handler/registry/validation готовы; Feature: RAG ещё предстоит — [[specs/flow-engine/nodes/09-rag-query]]
+- [ ] `form` — сбор данных через веб-форму (TMA / hosted) вместо цепочки `input` — см. § Forms (M9)
 
 ### P3
 - [-] `comment` (builder-only аннотация): backend готов — палитра (`NodeTypesController`), skip в валидации, strip-at-publish (`AnnotationNodeTypes`); остаётся Vue-рендеринг ноды на канвасе
@@ -181,7 +182,7 @@
 - [x] Postgres driver (`PostgresConversationStore` + `ConversationPartitionManager`), провайдер по config
 - [x] GDPR cascade delete (contacts/assistants/channels → conversations `cascadeOnDelete`)
 - [x] Тесты: store (идемпотентность/агрегат/status), logger (dispatch/enabled), capture factory (11 unit)
-- [x] **Фаза 5 — outbound capture** в едином funnel `MessageSender::send()` (только delivered); metadata обогащается в `FlowMessageSender` (origin=flow) и `SendContactNotificationJob` (origin=notify); `forOutbound()` в capture-factory; binding `MessageSender` → `scoped` (Octane-safe)
+- [x] **Фаза 5 — outbound capture** в едином funnel `MessageSender::send()` (только delivered); metadata обогащается в `FlowMessageSender` (origin=flow) и `SendContactNotificationJob` (origin=notify); `forOutbound()` в capture-factory; binding `MessageSender` → `scoped` (безопасно для долгоживущих воркеров)
 - [x] **Фаза 7 — Filament chat viewer** (assistant-панель, read-only): `ConversationResource` + `ConversationsTable` (inbox-лента) + `ViewConversation` (custom Page, blade-пузыри inbound/outbound, media/keyboard/delivery-status); lang en/ru/uk; scope по `assistant_id`
 - [x] **Фаза 4a — inbound media**: `FetchConversationMediaJob` (queue `messaging.logging`) поверх `MediaIngestor::ingestFromChannel(..., source: Conversation)`; сообщение пишется сразу с media-дескриптором `status:pending`, джоба досоздаёт `media_file_id` (`status:ready`) либо `status:failed` с сохранением `provider_file_id`; `MediaSource::Conversation` + фильтр в `MediaService::listFolderContents` (не засоряет медиа-библиотеку); `appendMessage` возвращает id, `updateMessageMedia()` в store
 - [x] Outbound media через upload-as-send (`FlowMessageSender` `alreadyDelivered`) теперь логируется — `buildOutboundMessage()` + `captureOutbound()` в самом `FlowMessageSender` (единственный путь мимо `MessageSender`)
@@ -219,6 +220,39 @@
 - [x] Медиа через `MediaService::signedUrl()`, состояния `pending` / `failed`
 - [x] Polling 30 s (real-time стека в проекте нет — `config/broadcasting.php` отсутствует)
 - [x] `FallbackMessageService` пишется в транскрипт: раньше busy/fallback-ответы молча выпадали из лога
+
+---
+
+## 📝 Forms / Data Collection (M9)
+
+Решения и обоснования — [[ROADMAP]] § Milestone 9. Границы: Core, не Solution. Перед кодом нужен ADR.
+
+### Фаза 1 — Фундамент
+- [ ] `TmaAuthMiddleware`: реальная HMAC-верификация Telegram initData вместо заглушки «401 вне local»
+- [ ] Домен `Forms`: миграция `forms` (ULID, `schema` JSON, `version`, `assistant_id`), модель, репозиторий
+- [ ] Подписанный токен ссылки `(tenant, session, node, form_version)` + TTL; для hosted-страницы одноразовый
+- [ ] Серверная валидация ответов по схеме формы (schema → Laravel rules), ошибки по полям
+- [ ] Согласовать open-source редактор схемы: только MIT-совместимые (`@bpmn-io/form-js`, `@formio/js`); AGPL исключены
+
+### Фаза 2 — Runtime
+- [ ] `FormNodeHandler` v1: `web_app`-кнопка для Telegram, ссылка для остальных каналов; `save_to` типа `json`; handles `submitted` / `timeout`
+- [ ] Submission endpoint + отдельный resume path в `FlowEngine` (не через `MessageRouter`), тот же lock `(tenant, contact, assistant)`
+- [ ] Idempotency по submission id: повторная отправка не двигает сессию дважды
+- [ ] Sweeper таймаута по образцу `SubflowTimeoutSweeper` → handle `timeout`
+- [ ] `TmaFormRenderer` на реальную схему; проверка, что telegram id initData совпадает с контактом сессии
+- [ ] Hosted-страница формы для не-Telegram каналов (WhatsApp)
+- [ ] Label / placeholder / ошибки через content translator chain; `value` language-agnostic
+
+### Фаза 3 — Авторинг
+- [ ] Filament `FormResource` со встроенным редактором схемы, `FormPolicy` + `Permission`
+- [ ] Builder: `FormConfig.vue` override (выбор формы, `save_to`, маппинг), палитра, `NodeIcon`
+- [ ] Publish-валидация: нода ссылается на существующую форму того же assistant
+
+### Фаза 4 — Данные
+- [ ] Маппинг ответов поле → `contact.*` через `ContactWriterInterface`
+- [ ] Файлы в форме через `MediaIngestor`
+- [ ] Submission в транскрипте как системное сообщение
+- [ ] Экспорт ответов формы
 
 ---
 

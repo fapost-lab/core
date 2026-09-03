@@ -71,6 +71,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         private VariableSchemaRegistryInterface $schemaRegistry,
         private \App\Domains\Flow\Concurrency\SessionLockRegistry $sessionLock,
         private \App\Domains\Flow\Concurrency\LockHeartbeat $lockHeartbeat,
+        private \App\Domains\Flow\State\ChannelStateProjector $channelProjector,
     ) {
     }
 
@@ -84,16 +85,9 @@ final readonly class FlowEngine implements FlowEngineInterface
     ): FlowSession {
         $entry = $this->graphResolver->resolveEntryNode($definition);
 
-        $baseState = array_replace_recursive([
-            StateNamespace::System->value => [
-                SystemStateKeys::STARTED_AT_LEAF  => now()->toIso8601String(),
-                'flow_definition_id'              => (string)$definition->getKey(),
-                'contact_id'                      => (string)$contact->getKey(),
-                SystemStateKeys::RETRY_COUNT_LEAF => 0,
-            ],
-        ], $initialState);
-
         $assistant = $this->currentAssistant->get();
+
+        $baseState = $this->buildBaseState($definition, $contact, (string)$assistant->getKey(), $initialState);
 
         $session = $this->connection->transaction(fn (): FlowSession => $this->sessions->create([
             'tenant_id'          => $contact->tenant_id,
@@ -152,16 +146,9 @@ final readonly class FlowEngine implements FlowEngineInterface
     ): FlowSession {
         $nextNodeId = $this->graphResolver->resolveNextNode($definition, $nodeId, $outputHandle);
 
-        $baseState = array_replace_recursive([
-            StateNamespace::System->value => [
-                SystemStateKeys::STARTED_AT_LEAF  => now()->toIso8601String(),
-                'flow_definition_id'              => (string)$definition->getKey(),
-                'contact_id'                      => (string)$contact->getKey(),
-                SystemStateKeys::RETRY_COUNT_LEAF => 0,
-            ],
-        ], $initialState);
-
         $assistant = $this->currentAssistant->get();
+
+        $baseState = $this->buildBaseState($definition, $contact, (string)$assistant->getKey(), $initialState);
 
         $status  = null !== $nextNodeId ? FlowSessionStatus::Active : FlowSessionStatus::Completed;
         $session = $this->connection->transaction(fn (): FlowSession => $this->sessions->create([
@@ -246,6 +233,37 @@ final readonly class FlowEngine implements FlowEngineInterface
     private function afterCommit(callable $callback): void
     {
         $this->afterCommitDispatcher->afterCommit($callback);
+    }
+
+    /**
+     * Engine-owned `system.*` seed for a freshly created session. Caller state
+     * (trigger payload, subflow input) is merged last so it can extend, but
+     * never silently drop, the engine's own keys.
+     *
+     * @param  array<string, mixed>  $initialState
+     *
+     * @return array<string, mixed>
+     */
+    private function buildBaseState(
+        FlowDefinition $definition,
+        Contact $contact,
+        string $assistantId,
+        array $initialState,
+    ): array {
+        $system = [
+            SystemStateKeys::STARTED_AT_LEAF  => now()->toIso8601String(),
+            'flow_definition_id'              => (string)$definition->getKey(),
+            'contact_id'                      => (string)$contact->getKey(),
+            SystemStateKeys::RETRY_COUNT_LEAF => 0,
+        ];
+
+        $channel = $this->channelProjector->project((string)$contact->getKey(), $assistantId);
+
+        if ([] !== $channel) {
+            $system[SystemStateKeys::CHANNEL_LEAF] = $channel;
+        }
+
+        return array_replace_recursive([StateNamespace::System->value => $system], $initialState);
     }
 
     /**
@@ -421,7 +439,7 @@ final readonly class FlowEngine implements FlowEngineInterface
                 }
             }
 
-            $this->connection->transaction(function () use ($session, $node, $result, $nextNodeId, $endStatus, $skipPersist, $type): void {
+            $this->connection->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type): void {
                 if ($skipPersist) {
                     // No-op: state already reflects the most recent write.
                 } elseif (null !== $endStatus) {
@@ -429,8 +447,6 @@ final readonly class FlowEngine implements FlowEngineInterface
                 } else {
                     $this->persister->persist($session, $result, $nextNodeId, $type);
                 }
-
-                $this->logWriter->write($this->buildLogEntry($session, $node, $result, $nextNodeId));
 
                 $analyticsEventType = $this->resolveAnalyticsEventType($result, $nextNodeId, $endStatus);
                 if (null !== $analyticsEventType) {
@@ -446,6 +462,12 @@ final readonly class FlowEngine implements FlowEngineInterface
                     });
                 }
             });
+
+            // Outside the transaction and deliberately non-fatal: the node's
+            // side effects (a sent message) have already happened, so letting a
+            // telemetry failure bubble up would fail the job, retry it, and
+            // deliver the message again.
+            $this->writeLogSafely($this->buildLogEntry($session, $node, $result, $nextNodeId));
 
             if (null !== $endStatus) {
                 $this->subflowResumer->resumeIfChild($session, $endStatus);
@@ -471,11 +493,11 @@ final readonly class FlowEngine implements FlowEngineInterface
     /**
      * Best-effort failure persistence when a handler throws an unhandled exception.
      *
-     * Marks the session as failed, writes a failed flow-log entry and records a
-     * FlowFailed analytics event so the crash is observable. Runs in its own
-     * transaction; any persistence error (including an optimistic-lock conflict
-     * from a concurrent worker) is logged and swallowed so the original handler
-     * exception always reaches the queue retry policy unmasked.
+     * Marks the session as failed and records a FlowFailed analytics event in its
+     * own transaction, then writes the failed flow-log entry outside it. Every
+     * error here (an optimistic-lock conflict from a concurrent worker, a broken
+     * log write) is logged and swallowed so the original handler exception always
+     * reaches the queue retry policy unmasked.
      */
     private function markSessionFailed(
         FlowSession $session,
@@ -485,22 +507,10 @@ final readonly class FlowEngine implements FlowEngineInterface
         Throwable $handlerException,
     ): void {
         try {
-            $this->connection->transaction(function () use ($session, $nodeId, $nodeType, $nodeVersion, $handlerException): void {
+            $this->connection->transaction(function () use ($session): void {
                 $session->saveWithOptimisticLock([
                     'status' => FlowSessionStatus::Failed,
                 ]);
-
-                $this->logWriter->write(new FlowLogEntry(
-                    sessionId: (string)$session->getKey(),
-                    nodeId: $nodeId,
-                    nodeType: $nodeType,
-                    nodeVersion: $nodeVersion,
-                    status: FlowLogStatus::Failed,
-                    sourceHandle: null,
-                    stateChanges: null,
-                    resolved: null,
-                    error: ['message' => $handlerException->getMessage()],
-                ));
 
                 $this->afterCommit(function () use ($session): void {
                     $this->analyticsWriter->record(
@@ -519,6 +529,37 @@ final readonly class FlowEngine implements FlowEngineInterface
                 'node_id'    => $nodeId,
                 'node_type'  => $nodeType,
                 'error'      => $persistException->getMessage(),
+            ]);
+        }
+
+        $this->writeLogSafely(new FlowLogEntry(
+            sessionId: (string)$session->getKey(),
+            nodeId: $nodeId,
+            nodeType: $nodeType,
+            nodeVersion: $nodeVersion,
+            status: FlowLogStatus::Failed,
+            sourceHandle: null,
+            stateChanges: null,
+            resolved: null,
+            error: ['message' => $handlerException->getMessage()],
+        ));
+    }
+
+    /**
+     * Flow logs are observability, not state: a broken log write must never
+     * abort execution or trigger a queue retry, which would re-run nodes whose
+     * side effects already reached the user.
+     */
+    private function writeLogSafely(FlowLogEntry $entry): void
+    {
+        try {
+            $this->logWriter->write($entry);
+        } catch (Throwable $exception) {
+            $this->logger->warning('flow.log_write_failed', [
+                'session_id' => $entry->sessionId,
+                'node_id'    => $entry->nodeId,
+                'node_type'  => $entry->nodeType,
+                'error'      => $exception->getMessage(),
             ]);
         }
     }

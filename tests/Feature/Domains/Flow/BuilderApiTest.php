@@ -417,6 +417,25 @@ final class BuilderApiTest extends FeatureTestCase
             ]);
     }
 
+    public function test_node_types_exposes_comment_annotation_with_a_text_field(): void
+    {
+        $user = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        $types = $this->actingAs($user)
+            ->getJson('/builder/node-types')
+            ->assertOk()
+            ->json('data');
+
+        $comment = collect($types)->firstWhere('type', 'comment');
+
+        $this->assertNotNull($comment);
+        $this->assertTrue($comment['annotation']);
+        $this->assertSame('text', $comment['config_schema']['text']['type']);
+        $this->assertSame('Note', $comment['config_schema']['text']['label']);
+        $this->assertFalse($comment['config_schema']['text']['variable_picker']);
+    }
+
     private function staffUser(): User
     {
         return User::factory()->createOne();

@@ -30,7 +30,7 @@
 | D-9 | Migrations — pure additive (новые колонки/таблицы) | Phase A-2 ✓ |
 | D-10 | Soft draft / strict publish — extend existing `ValidateFlowService`/`PublishFlowService` | Phase C-4 (subflow validation rules) |
 | D-11 | `flow_logs` (operational) + `flow_session_history` (audit) coexist | Phase A-4 |
-| D-12 | Octane: ExpressionEngine cache request-scoped | Phase A-3 ✓ |
+| D-12 | ExpressionEngine cache request-scoped | Phase A-3 ✓ |
 | Q-1 | `set_attribute → assign`: rename | Phase B-2 |
 | Q-1 | `webhook → call`: rename | Phase B-2 |
 | Q-2 | `condition → branch`: rename | Phase B-2 |
@@ -348,7 +348,7 @@ V1 считается готовым когда:
 - **R-2.** ChannelInterface extension (A-6) coordination с активной разработкой Telegram adapter.
 - **R-3.** RAG adapter contract finalization. Если затягивается → C-3 переносится в V1.x.
 - **R-4.** SubflowHandler + CallGraphValidator (C-4) — самая сложная одиночная задача. Mitigation: изолировать в feature branch, параллелить с другими C-задачами.
-- **R-5.** Octane lifecycle: ExpressionEngine cache (A-3 done) — request-scoped, не cross-request. Verify в end-to-end test.
+- **R-5.** Worker lifecycle: ExpressionEngine cache (A-3 done) — request-scoped, не cross-request. Verify в end-to-end test.
 - **R-6.** Brownfield refactor (Phase B) — handler-by-handler с обновлением тестов. Если параллельная разработка касается одного handler — координация необходима.
 
 ---

@@ -8,12 +8,19 @@ use Fapost\Foundation\Flow\Enums\StateNamespace;
 
 final class SystemStateKeys
 {
-    public const string STARTED_AT_LEAF              = 'started_at';
-    public const string RETRY_COUNT_LEAF             = 'retry_count';
-    public const string SENT_MESSAGES                = StateNamespace::System->value . '.sent_messages';
-    public const string STARTED_AT                   = StateNamespace::System->value . '.started_at';
-    public const string RETRY_COUNT                  = StateNamespace::System->value . '.retry_count';
-    public const string DELAY_NODE_PREFIX            = StateNamespace::System->value . '.delay';
+    public const string STARTED_AT_LEAF   = 'started_at';
+    public const string RETRY_COUNT_LEAF  = 'retry_count';
+    public const string SENT_MESSAGES     = StateNamespace::System->value . '.sent_messages';
+    public const string STARTED_AT        = StateNamespace::System->value . '.started_at';
+    public const string RETRY_COUNT       = StateNamespace::System->value . '.retry_count';
+    public const string DELAY_NODE_PREFIX = StateNamespace::System->value . '.delay';
+    /**
+     * Channel identity projected at session start — see
+     * {@see ChannelStateProjector}. Read-only for flow
+     * authors: `system.channel.bot_username`, `.bot_handle`, `.link`, `.type`.
+     */
+    public const string CHANNEL_LEAF                 = 'channel';
+    public const string CHANNEL                      = StateNamespace::System->value . '.channel';
     public const string LANGUAGE                     = StateNamespace::System->value . '.language';
     public const string SEND_MESSAGE_TIMEOUT_PREFIX  = StateNamespace::System->value . '.send_message.timeout';
     public const string SEND_MESSAGE_RESPONSE_PREFIX = StateNamespace::System->value . '.send_message.response';
