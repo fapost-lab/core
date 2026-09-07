@@ -16,38 +16,14 @@ This repository contains the platform itself, without niche Solution packages.
 - `docs/INDEX.md` indexes the internal documentation under `docs/`.
 - `drafts/CURRENT_TASK.md` is the current operational focus and the only file `drafts/` may contain.
 
-## Stack
-
-- PHP 8.4, Laravel 12
-- PostgreSQL with landlord / tenant connections (schema per tenant)
-- Redis for cache, queues, locks and the hot-path registry
-- Horizon queues
-- Go webhook gateway (`gateway/`), an optional ingress in front of PHP
-- Filament admin
-- Inertia + Vue flow builder
-- PHPUnit 12, PHPat/PHPStan architecture checks
-
 ## Directory Boundaries
 
-```text
-app/
-  Domains/          Technical bounded contexts: Tenancy, Flow, Messaging, Contact, Assistant, Channels, Media, Conversation, Broadcasting, Staff.
-  Filament/         Admin UI.
-  Http/             Controllers, middleware, builder endpoints.
-  Jobs/             Cross-domain orchestration jobs.
-  Providers/        Laravel service providers.
-
-database/migrations/
-  landlord/         Platform / landlord schema.
-  tenant/           Tenant schema.
-
-packages/
-  fapost-foundation Public contracts and DTOs for Core/Solutions/Plugins (separate repository, git-ignored here).
-  fapost-support    Shared primitives (separate repository, git-ignored here).
-
-resources/js/builder/
-  Vue flow builder.
-```
+Two things about the layout are not visible from the tree itself:
+`packages/fapost-foundation` and `packages/fapost-support` are **separate
+repositories**, git-ignored here and consumed from Packagist — local checkouts
+are symlinked over `vendor/` by `composer dev:link`. And migrations are split by
+scope: `database/migrations/landlord/` is platform-wide, `tenant/` runs once per
+tenant schema.
 
 Do not create new base folders without an explicit decision. In particular,
 `app/Features` and Solution folders do not exist until they are actually added
