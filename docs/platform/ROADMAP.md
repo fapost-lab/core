@@ -3,6 +3,10 @@
 Product vision от текущего состояния до SaaS-оболочки, Solutions и Inbox.  
 Детализация по задачам — [[TASKS]]. Навигация по документам — [[INDEX]].
 
+> This file holds the engineering milestones and their history. The product decomposition of
+> the idea brief — destination, steps, dependency graph and execution waves — lives in
+> [`../roadmap.md`](../roadmap.md).
+
 > **Статусы:** ✅ завершено · 🔄 в работе / частично · ⏳ следующее · 📋 запланировано · 🧊 бэклог · 🔮 будущее
 
 ---

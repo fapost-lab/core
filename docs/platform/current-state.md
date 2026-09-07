@@ -13,6 +13,8 @@ The application is an active Laravel 12 Core implementation, not a starter scaff
 - a versioned Flow Engine with handlers, validation, publish flow, sessions, logs, concurrency primitives, and routing;
 - a Vue/Inertia builder under `resources/js/builder`;
 - Filament administration surfaces;
+- a Conversation Logging domain (transcript capture pipeline, Postgres store driver, operator inbox with reply);
+- a managed Broadcasting domain and Contact Segments, with their Filament resources;
 - local `fapost-foundation` and `fapost-support` packages;
 - PHPUnit tests and PHPat architecture rules executed through PHPStan.
 
@@ -32,9 +34,8 @@ These areas are planned or partial and should not be documented as finished prod
 
 - `app/Features/*` built-in feature lifecycle;
 - external Solution/Plugin lifecycle beyond current contracts and conventions;
-- Conversation Logging domain (`conversations`, `conversation_messages`, reader/store ports, capture pipeline);
-- managed Broadcasting entities (`broadcasts`, `broadcast_recipients`) and analytics UI;
-- Contact Segments (`contact_segments`, `ContactSegmentResolver`);
+- broadcast analytics beyond the aggregate counters on the broadcast list: no per-broadcast view page,
+  no `broadcast_recipients` drill-down, no dashboard widget;
 - Knowledge Base/RAG product layer (`knowledge_bases`, `knowledge_documents`, provider adapters, Filament resource);
 - full event-chain start pipeline after `emit_event`;
 - production WhatsApp adapter behavior;
@@ -48,6 +49,13 @@ These areas are planned or partial and should not be documented as finished prod
 - Loop runtime/builder work exists, including `loop_end` management and execution budget. Some array/property edge cases
   are still tracked in `docs/platform/TASKS.md`.
 - `BroadcastSendJob` exists as low-level fan-out plumbing; it is not the same as a complete managed Broadcast feature.
+- Conversation Logging is implemented end to end, but only the write side is a port: `ConversationStoreInterface`
+  (bound to `PostgresConversationStore` by driver config) covers `ensureConversation` / `appendMessage` /
+  `updateMessageMedia` / `updateStatus`. There is no reader port; the Filament inbox reads the `Conversation`
+  and `ConversationMessage` Eloquent models directly, so a second storage backend would need a read path first.
+- Managed Broadcasting is implemented (`broadcasts`, `broadcast_recipients`, `BroadcastDispatcher`,
+  `BroadcastRecipientResolver`, `RunBroadcastJob`, `SendBroadcastRecipientJob`, `BroadcastResource`). Its
+  reporting surface is limited to `sent_count`/`total_recipients` and `failed_count` columns on the list table.
 - PHPat architecture rules live under `tests/Architecture` and are executed by PHPStan. The default PHPUnit suite reaches
   them through `tests/Unit/Architecture/MigrationTest.php`; running `php artisan test tests/Architecture` directly is
   not the correct command.
