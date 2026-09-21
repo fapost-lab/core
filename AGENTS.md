@@ -188,6 +188,9 @@ label/content is.
 - `docs/platform/ROADMAP.md` describes future milestones and dependencies.
 - `docs/site/` holds the sources of the published site (Mintlify, docs.fapost.in). Anything described there is
   not duplicated under `docs/`; link to it instead.
+- A new page under `docs/site/` is published only when it is listed in `docs/site/docs.json` navigation; a
+  renamed or removed page is removed there too. Check with `cd docs/site && npx mint broken-links`, preview
+  with `make docs-dev`. The site is deployed by Mintlify from `main` after the merge, not from the pull request.
 - Active source-of-truth documentation is written in English. Archive files may keep their original language
   until deleted or rewritten.
 - `drafts/` contains only `CURRENT_TASK.md`.
