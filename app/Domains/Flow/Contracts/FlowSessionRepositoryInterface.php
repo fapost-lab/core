@@ -11,6 +11,8 @@ interface FlowSessionRepositoryInterface
 {
     public function findActiveForContact(Contact $contact, string $assistantId): ?FlowSession;
 
+    public function findById(string $sessionId): ?FlowSession;
+
     /**
      * @param  array<string, mixed>  $attributes
      */

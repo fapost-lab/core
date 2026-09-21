@@ -51,7 +51,9 @@ interface FlowEngineInterface
      * Drive the execution loop for an already-persisted session — used when
      * the engine itself spawned the session (e.g. as a subflow child) and
      * needs to walk it to its first wait point without going through the
-     * full {@see start()} bootstrap (no new row, no new analytics event).
+     * full {@see start()} bootstrap (no new row, no new analytics event),
+     * and to wake a session parked on a `delay` node, which has no inbound
+     * message to resume with.
      */
     public function runSession(FlowSession $session): FlowSession;
 

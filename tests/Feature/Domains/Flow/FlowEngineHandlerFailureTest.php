@@ -33,8 +33,8 @@ final class FlowEngineHandlerFailureTest extends FeatureTestCase
         parent::setUp();
 
         $registry = $this->app->make(NodeHandlerRegistry::class);
-        $registry->register(new ThrowingFlowTestHandler());
-        $registry->register(new ForbiddenNamespaceWriteTestHandler());
+        $registry->register(ThrowingFlowTestHandler::class);
+        $registry->register(ForbiddenNamespaceWriteTestHandler::class);
     }
 
     public function test_handler_exception_marks_session_failed_and_rethrows(): void

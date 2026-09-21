@@ -7,6 +7,7 @@ namespace Tests\Unit\Domains\Flow\State;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\State\Readers\ScopedStateReader;
+use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
 use Fapost\Foundation\Contracts\DataAccessorInterface;
 use Tests\TestCase;
 
@@ -116,12 +117,12 @@ final class ScopedStateReaderTest extends TestCase
         };
 
         // A stub rather than a mock: the test asserts on the value read, not on
-        // how the registry was called. willReturnMap keeps the namespace
-        // meaningful — any namespace other than `hr` falls through to the
+        // how the registry was called. willReturnMap keeps the prefix
+        // meaningful — any prefix other than `module.hr` falls through to the
         // return type's default.
         $registry = $this->createStub(DataAccessorRegistryInterface::class);
-        $registry->method('has')->willReturnMap([['hr', true]]);
-        $registry->method('resolve')->willReturnMap([['hr', $accessor]]);
+        $registry->method('has')->willReturnMap([['module.hr', true]]);
+        $registry->method('resolve')->willReturnMap([['module.hr', $accessor]]);
 
         $reader = new ScopedStateReader(
             sessionState: [],
@@ -130,6 +131,47 @@ final class ScopedStateReaderTest extends TestCase
         );
 
         $this->assertSame('department-department', $reader->read('module.hr.department'));
+    }
+
+    public function test_resolves_module_through_real_registry_by_module_prefix(): void
+    {
+        $accessor = new class () implements DataAccessorInterface {
+            /** @var list<array{key: string, contactId: string, tenantId: string}> */
+            public array $calls = [];
+
+            public function namespace(): string
+            {
+                return 'hr';
+            }
+
+            public function get(string $key, string $contactId, string $tenantId): mixed
+            {
+                $this->calls[] = ['key' => $key, 'contactId' => $contactId, 'tenantId' => $tenantId];
+
+                return 'logistics';
+            }
+
+            public function supportedKeys(): array
+            {
+                return ['department'];
+            }
+        };
+
+        $registry = new ModuleDataAccessorRegistry();
+        $registry->register('module.hr', $accessor);
+
+        $reader = new ScopedStateReader(
+            sessionState: [],
+            contact: $this->contact(),
+            accessors: $registry,
+        );
+
+        $this->assertSame('logistics', $reader->read('module.hr.department'));
+        $this->assertSame(
+            [['key' => 'department', 'contactId' => 'c-1', 'tenantId' => 't-1']],
+            $accessor->calls,
+        );
+        $this->assertNull($reader->read('module.crm.department'));
     }
 
     private function contact(): Contact

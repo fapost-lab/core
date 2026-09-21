@@ -1,3 +1,216 @@
+Context for Claude Code and other coding agents. Read before starting a task.
+
+This file is not a roadmap and does not track implementation status. It holds the
+durable rules of the codebase: architectural constraints, coding conventions, and
+where the authoritative documentation lives. Do not add checklists, plans, future
+tables or product promises here; a status change belongs in `docs/platform/`.
+
+## Project Context
+
+FaPost Core is the platform for conversational assistants and flow automation.
+This repository contains the platform itself, without niche Solution packages.
+
+- https://docs.fapost.in is the single source of truth. Sources are in `docs/site/`.
+- `docs/INDEX.md` indexes the internal documentation under `docs/`.
+- `drafts/CURRENT_TASK.md` is the current operational focus and the only file `drafts/` may contain.
+
+## Directory Boundaries
+
+Two things about the layout are not visible from the tree itself:
+`packages/fapost-foundation` and `packages/fapost-support` are **separate
+repositories**, git-ignored here and consumed from Packagist — local checkouts
+are symlinked over `vendor/` by `composer dev:link`. And migrations are split by
+scope: `database/migrations/landlord/` is platform-wide, `tenant/` runs once per
+tenant schema.
+
+Do not create new base folders without an explicit decision. In particular,
+`app/Features` and Solution folders do not exist until they are actually added
+to the code.
+
+## Workflow
+
+- `main` is the only long-lived branch. Work happens on short-lived branches (`feat/`, `fix/`, `chore/`, `docs/`,
+  `refactor/`) and reaches `main` through
+  a squash-merged pull request. Releases are `v*` tags on `main`.
+- Commit messages and pull request titles use Conventional Commits:
+  `type(scope): subject`. Full rules: https://docs.fapost.in/contributing/commits
+- Do not commit or push unless explicitly asked to.
+- Process documentation: `CONTRIBUTING.md` (short), `docs/site/contributing/` (full).
+
+## Laravel And PHP Rules
+
+- Follow the patterns of neighbouring files.
+- Every `.php` file starts with `declare(strict_types=1);`.
+- `final class` by default.
+- Constructor property promotion and explicit return types.
+- Enum cases in TitleCase.
+- PHPDoc for meaning, array shapes and generics; inline comments only for genuinely complex logic.
+- Prefer `php artisan make:* --no-interaction` for new Laravel artifacts where it applies.
+- Do not add dependencies without agreement.
+- After changing PHP, run `vendor/bin/pint --dirty --format agent`.
+- Cover every code change with a minimal relevant test and run that test.
+- Create documentation files only when the user explicitly asks.
+
+## Tenant-Aware Execution
+
+The tenant is the base coordinate of the runtime. Core runtime code must fail
+fast when a tenant context is required and not set.
+
+Forbidden:
+
+- Branching on the deployment shape inside Core runtime.
+- `if (isSingleTenant())` and similar checks.
+- Falling back to a "default tenant" instead of an explicit tenant context.
+- Direct landlord lookups from domains outside `Tenancy`.
+
+Allowed landlord access pattern: domains depend on a contract from
+`Tenancy/Contracts`; direct `DB::connection('landlord')` stays inside Tenancy
+infrastructure.
+
+## Migration Isolation
+
+A migration is a DDL operation. `up()` / `down()` must not depend on runtime state.
+
+Forbidden:
+
+- `app()`, `config()`, `env()` for runtime decisions.
+- `TenantContext::get()` and tenant-aware services.
+- Branching on feature/module activation.
+- Seed data that depends on runtime state.
+- `DB::table()` over another module's tables from a module's migration.
+
+The PHPat rules must match the text of this section. They run through
+`phpstan.neon`; the default PHPUnit run covers them via
+`tests/Unit/Architecture/MigrationTest.php`.
+
+## Long-Lived Worker Safety
+
+HTTP requests are served by PHP-FPM, where a process lives for one request.
+Horizon workers are long-lived: one process handles many jobs in a row, and any
+retained state leaks between them. In a multi-tenant system that leak means one
+tenant seeing another's data.
+
+Rules:
+
+- Do not hold the request, the config repository, the tenant context or the current assistant in a singleton
+  constructor.
+- Keep mutable request/job state in `scoped` bindings; they are rebuilt for every job.
+- Switch tenants through `TenantSwitcher::runForTenant()` with the restore in `finally`.
+- Do not write to static properties between jobs.
+
+## ID Strategy
+
+- Tenant-schema primary keys: ULID stored in a PostgreSQL `uuid` column.
+- Use `Fapost\Support\Concerns\HasUlidPrimaryKey` when a model follows this strategy.
+- Migrations: `$table->uuid('id')->primary()` without a database default.
+- Foreign keys: `foreignUuid(...)->constrained()->cascadeOnDelete()` or the local equivalent in the existing style.
+- Do not change special public identifiers such as the webhook public hash without a separate decision.
+
+## Dependency Direction
+
+`packages/fapost-foundation` and `packages/fapost-support` do not depend on Core.
+
+Forbidden:
+
+- `use App\...` inside foundation/support.
+- References from foundation/support to concrete Core domain classes.
+- Moving Core business logic into support.
+
+A contract needed by external Solutions/Plugins belongs in foundation. A pure
+reusable primitive with no Core dependency belongs in support. Anything used by
+one domain and carrying domain semantics stays in Core.
+
+## Domain Code Rules
+
+- Controllers and Jobs only orchestrate; business logic lives in services and domain classes.
+- Domain services do not use `app()`, `resolve()` or global Laravel helpers as hidden dependencies.
+- Use repositories/ports where a domain crosses a persistence boundary or another bounded context.
+- Facades are acceptable in the infrastructure layer: providers, jobs, controllers, migrations, framework adapters.
+- Eloquent models live in `Domains/{Domain}/Models`.
+- Relations stay on models when Eloquent query capabilities are needed.
+
+## Flow Engine Rules
+
+- A handler is resolved by `(type, version)` from the in-memory registry.
+- A handler is graph-unaware: it returns a `sourceHandle`, not the next node id.
+- A breaking change in a node contract requires a new handler version; existing flow definitions keep working.
+- A flow session snapshots its `flow_definition_id` until it completes.
+- A handler must be safe to retry; external side effects need an idempotency marker or equivalent protection.
+- State keys are namespaced. The canonical list is the enum `Fapost\Foundation\Flow\Enums\StateNamespace`:
+  `system`, `flow`, `rag`, `module`, `contact`, `call`. New namespaces go into the enum, not into individual nodes.
+- `module.*` is read-only and resolved through `DataAccessorInterface`; `contact.*` and `call.*` are derived
+  projections, neither stored in nor written to the session.
+- `system.*` writes are allowed only for explicitly whitelisted runtime handlers.
+- Do not return legacy `effects[]`; use the writer/port from the execution context.
+
+## Messaging And Queues
+
+Queues are not mixed by purpose:
+
+- `flow.execution` - inbound processing and the execution pipeline.
+- `messaging.transactional` - replies in an active dialogue.
+- `messaging.broadcast` - low-priority broadcasts / fan-out.
+- `messaging.system` - service notifications.
+- `messaging.logging` - conversation capture, written outside the delivery path.
+- `scheduled.triggers` - scheduled/event trigger fan-out.
+- `sync.external` - external synchronisations.
+
+Provider rate limits and backpressure are preventive, not only a reaction to a
+provider error.
+
+## Multilingual Rules
+
+Two language layers are kept apart:
+
+- Admin UI language - Laravel lang files, Filament/backend validation, staff UI.
+- Content language - runtime assistant messages to the end user.
+
+Runtime language resolution goes through `LanguageResolverInterface` and the
+content translator chain. Do not put user-facing, bot-facing literals directly
+into handlers or senders; such strings are system translation keys or flow
+content.
+
+A button/select `value` is language-agnostic and never translated; only the
+label/content is.
+
+## Frontend Builder Rules
+
+- The builder is driven by the registry/config schema and the existing overrides.
+- Use a bespoke override for core node-specific UI only when the schema-driven renderer is insufficient.
+- A plugin cannot ship Vue components without a frontend rebuild; extend the schema renderer in Core instead.
+- Solution/vendor components are allowed only through the agreed Vite glob/publish contract.
+- Do not add marketing landing surfaces to the builder/admin in place of working functionality.
+
+## Documentation Discipline
+
+- `docs/platform/current-state.md` describes fact, not intent.
+- `docs/platform/TASKS.md` may use `done / partial / pending` when one line covers both scaffolding and product feature.
+- `docs/platform/ROADMAP.md` describes future milestones and dependencies.
+- `docs/site/` holds the sources of the published site (Mintlify, docs.fapost.in). Anything described there is
+  not duplicated under `docs/`; link to it instead.
+- Active source-of-truth documentation is written in English. Archive files may keep their original language
+  until deleted or rewritten.
+- `drafts/` contains only `CURRENT_TASK.md`.
+- `CLAUDE.md` must not claim that tables, models, jobs or UI exist unless that is an architectural rule
+  confirmed by the code.
+- On a discrepancy between code and documentation, first establish which it is: stale documentation, a partial
+  feature, or a false positive in the code.
+
+## Verification
+
+- `composer test` / `php artisan test` runs the PHPUnit suites from `phpunit.xml` (SQLite in memory).
+- `composer run test:arch` runs the PHPat architecture rules through PHPStan.
+- PHPat rules live in `tests/Architecture`; the low-level command is
+  `vendor/bin/phpstan analyse --configuration phpstan.neon`.
+- The default PHPUnit run covers PHPat through `tests/Unit/Architecture/MigrationTest.php`, which runs phpstan.
+- Do not run `php artisan test tests/Architecture` as the PHPat check: those classes are not PHPUnit `TestCase`s
+  and the command reports success while verifying nothing.
+- `make` lists the wrapped commands; `CONTAINER` in `.make.local` routes them into a container.
+- CI (`.github/workflows/ci.yml`) runs the same checks on every pull request, plus `go test` for the gateway
+  and type-check/Vitest/build for the frontend. The PHPUnit suite runs twice there: on SQLite, as locally,
+  and on PostgreSQL 15, where schema switching, partitions and `uuid` columns are exercised for real.
+  How to run it on PostgreSQL locally: https://docs.fapost.in/contributing/testing
+
 <laravel-boost-guidelines>
 === foundation rules ===
 
@@ -217,3 +430,70 @@ Vue components must have a single root element.
 - IMPORTANT: Activate `inertia-vue-development` when working with Inertia Vue client-side patterns.
 
 </laravel-boost-guidelines>
+# Agent instructions
+
+This project uses Jig, a vendor-neutral agent SDLC framework. Project knowledge lives in
+`.ai/knowledge/`; the development process is provided by `jig-*` skills backed by
+deterministic scripts in `.ai/scripts/`.
+
+## Read first
+
+- `.ai/knowledge/GLOSSARY.md` — canonical terms; use them in code and docs.
+- `.ai/knowledge/RULES.md` — rules and invariants; never violate them.
+- `.ai/knowledge/ARCHITECTURE.md` — domains, boundaries, dependency directions.
+- `.ai/knowledge/adr/` — accepted decisions; propose a new ADR instead of silently
+  contradicting one.
+
+Do not read all of `.ai/knowledge/` up front. Ask the scripts for what is relevant:
+
+```
+.ai/scripts/jig context --files <changed files>
+```
+
+## Workflow
+
+Start work with the `jig-task` skill; it classifies the task by risk and names the route.
+Stage skills can also be used directly: `jig-analyze`, `jig-implement`, `jig-review`,
+`jig-verify`, `jig-consolidate`, `jig-architecture-review`.
+
+Two skills sit outside the task routes because they populate knowledge rather than change
+code: `jig-map` proposes per-domain knowledge, and `jig-accept` decides what is proposed.
+A proposed document is invisible to `jig context` until a human accepts it, so knowledge
+someone wrote but nobody agreed to reaches no agent — `jig status` reports the count on
+its `proposals:` line, and `jig knowledge proposed` lists it.
+
+| Class | Route |
+|---|---|
+| T0 trivial | implement, verify |
+| T1 local | analyze, implement, verify |
+| T2 structural | analyze, plan, implement, review, verify |
+| T3 architectural | discover, design, human gate, implement, architecture review, verify, consolidate |
+| T4 critical | discover, specify, alternatives, design, human gate, implement, independent review, verify, consolidate |
+
+Risk sets the floor: a one-line change to authentication is not trivial. When a task
+turns out bigger, re-classify with `jig task set <id> class Tn` and run the stages the
+new class requires.
+
+## Working rules
+
+- Code explains what; knowledge explains why. Put intent, constraints, trade-offs and
+  rejected alternatives into `.ai/knowledge/`, not into task notes.
+- Durable artifacts are written in **English**: knowledge documents, ADRs, code comments and
+  active documentation. Archive documents may keep their original language until they are
+  deleted or rewritten (see Documentation Discipline above).
+
+  Two things are deliberately outside that answer. The language an agent *speaks* in a
+  session is a personal preference: set it in your own runtime's local instruction file.
+  And **task artifacts under `.ai/workspace/tasks/` follow the same personal preference**,
+  not this rule — they are gitignored, they never leave the machine, and their reader is
+  the person at the human gate. A design nobody else will read is worth writing in the
+  language its reader thinks in.
+- Task-specific notes belong in `.ai/workspace/tasks/<id>/` (gitignored). They never
+  become repository documentation by themselves.
+- Completion is proven by evidence: run `.ai/scripts/jig verify` before declaring done.
+- Before finishing a task, decide what should survive it. Update `.ai/knowledge/`, or
+  state `NO_DURABLE_KNOWLEDGE`. Frontmatter is maintained by `jig knowledge new`,
+  `jig knowledge paths add|remove` and `jig knowledge reviewed`, never by hand.
+- Knowledge authority, highest first: human instruction, accepted ADR, architecture,
+  rules and invariants, conventions, glossary, feature knowledge, task context.
+  Escalate real conflicts to a human.

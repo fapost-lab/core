@@ -9,7 +9,6 @@ use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Flow\State\Variables\Variable;
 use InvalidArgumentException;
-use LogicException;
 use Throwable;
 
 final readonly class FlowDefinitionValidator
@@ -47,12 +46,9 @@ final readonly class FlowDefinitionValidator
             $type    = $this->stringField($node, 'type', "Node {$nodeId} must contain type.");
             $version = $this->intField($node, 'version', "Node {$nodeId} must contain integer version.");
 
-            try {
-                $this->registry->resolve($type, $version);
-            } catch (LogicException $exception) {
+            if (! $this->registry->has($type, $version)) {
                 throw $this->validationException(
                     "Node {$nodeId} references unknown handler version: {$type}@{$version}",
-                    $exception,
                 );
             }
 

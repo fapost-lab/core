@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Architecture;
 
+use Closure;
 use PHPat\Selector\Selector;
 use PHPat\Test\Builder\Rule;
 use PHPat\Test\PHPat;
@@ -42,6 +43,20 @@ final class FlowRuntimeIsolationTest
                 Selector::classname('Illuminate\\Foundation\\Application'),
             )
             ->because('Hidden container lookups bypass the tenant-scoped bindings the runtime is constructed with.');
+    }
+
+    /**
+     * The registry builds every handler in the scope it runs in, so a handler
+     * takes its collaborators as ordinary dependencies. A `Closure` in a handler
+     * signature is a hidden container lookup that hides what the handler needs.
+     */
+    public function test_node_handlers_do_not_take_resolver_closures(): Rule
+    {
+        return PHPat::rule()
+            ->classes(Selector::inNamespace('App\\Domains\\Flow\\Handlers'))
+            ->shouldNotDependOn()
+            ->classes(Selector::classname(Closure::class))
+            ->because('Handlers are built per resolve in the current scope; a resolver closure only hides the dependency.');
     }
 
     /**

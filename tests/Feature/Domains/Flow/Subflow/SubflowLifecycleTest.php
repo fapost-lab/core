@@ -52,7 +52,7 @@ final class SubflowLifecycleTest extends FeatureTestCase
         );
 
         $registry = $this->app->make(NodeHandlerRegistry::class);
-        $registry->register(new MarkerTestHandler());
+        $registry->register(MarkerTestHandler::class);
 
         $this->assistant = Assistant::factory()->create([
             'tenant_id'        => $this->tenantId,

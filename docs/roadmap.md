@@ -8,14 +8,14 @@ updated_at: "2026-09-07"
 > **A decomposition, not a promise.** The overall idea broken into incremental steps: what each
 > step is, where it comes from, how big it is — or that nobody has looked at it yet — and in which
 > order, and parallel lanes, we walk them. **No dates** (except shipped history), **no scores** —
-> order is the prioritization. The *solution* for any step lives in its `docs/features/<slug>/`
-> spec, not here.
+> order is the prioritization. The *solution* for any step is designed in the task that takes it on,
+> not here.
 
 > **Scope split.** This file is the product decomposition of [`idea-brief.md`](./idea-brief.md).
 > Engineering milestones, their history and their checkbox detail stay in
 > [`platform/ROADMAP.md`](./platform/ROADMAP.md) and [`platform/TASKS.md`](./platform/TASKS.md);
 > nothing here restates them. Zones below are verified against
-> [`architecture-map.md`](./architecture-map.md).
+> [`ARCHITECTURE.md`](../.ai/knowledge/ARCHITECTURE.md).
 
 ## Destination
 
@@ -64,8 +64,8 @@ A developer inside the Laravel ecosystem can stand up FaPost, extend it through 
 - The product decomposition lives here; engineering milestones and their history stay separate → [`platform/ROADMAP.md`](./platform/ROADMAP.md)
 - Positioning is a framework for developers in the Laravel ecosystem, built on three pillars, not another open bot constructor → [`idea-brief.md §7 Recommendation`](./idea-brief.md)
 - Multi-tenancy is closed automatically by the bounded context; the open distribution installs single-tenant and the multi-tenant shell stays a separate closed product → [`idea-brief.md §5 Out of scope`](./idea-brief.md)
-- The extension contracts live in their own repositories, absent from this working tree and symlinked in for local development → [`architecture-map.md`](./architecture-map.md)
-- The extension surface is partly built already: the action handler registry and the builder component publish contract exist, activation and manifest validation do not → [`architecture-map.md`](./architecture-map.md)
+- The extension contracts live in their own repositories, absent from this working tree and symlinked in for local development → [`ARCHITECTURE.md`](../.ai/knowledge/ARCHITECTURE.md)
+- The extension surface is partly built already: the action handler registry and the builder component publish contract exist, activation and manifest validation do not → [`ARCHITECTURE.md`](../.ai/knowledge/ARCHITECTURE.md)
 - The bet is tested on the owner's own client rollouts carried out through the public contracts, not on a showcase for buyers → [`idea-brief.md §7 Recommendation`](./idea-brief.md)
 
 ## Dependency graph

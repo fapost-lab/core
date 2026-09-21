@@ -8,12 +8,14 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use Fapost\Foundation\Contracts\DataAccessorInterface;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
@@ -25,7 +27,8 @@ use Tests\Feature\FeatureTestCase;
  * End-to-end coverage for the V1.x ExpressionEngine wiring: handlers can
  * now resolve template placeholders across the full state surface — not
  * only the session JSON ({@code flow.*}, {@code system.*}, {@code rag.*})
- * but also {@code contact.*} (canonical column + attributes) via the
+ * but also {@code contact.*} (canonical column + attributes) and
+ * {@code module.*} (registered DataAccessors) via the
  * {@code ScopedStateReader} the engine builds per node execution.
  *
  * The legacy session-only behaviour (TemplateResolver) had no way to read
@@ -57,7 +60,7 @@ final class CrossNamespaceTemplateTest extends FeatureTestCase
         // shared TemplateRenderer (engine-backed at runtime) and stores the
         // rendered string in flow.rendered for assertion.
         $this->app->make(NodeHandlerRegistry::class)
-            ->register(new TemplateRendererProbeHandler($this->app));
+            ->register(TemplateRendererProbeHandler::class);
 
         $definition = FlowDefinition::query()->create([
             'tenant_id' => $tenantId,
@@ -88,6 +91,92 @@ final class CrossNamespaceTemplateTest extends FeatureTestCase
 
         $this->assertSame(FlowSessionStatus::Completed, $session->status);
         $this->assertSame('Hi, Alice (es)', $session->state['flow']['rendered'] ?? null);
+    }
+
+    public function test_module_namespace_placeholders_resolve_through_registered_data_accessor(): void
+    {
+        $tenantId = (string) Str::uuid();
+        $this->app->make(TenantContextInterface::class)->set(
+            new RuntimeTenant(id: $tenantId, schemaName: 'main'),
+        );
+
+        $assistant = Assistant::factory()->create([
+            'tenant_id'        => $tenantId,
+            'default_language' => 'en',
+        ]);
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+        $contact = Contact::factory()->forTenant($tenantId)->create();
+
+        $accessor = new RecordingHrDataAccessor();
+        $this->app->make(MutableDataAccessorRegistryInterface::class)->register('module.hr', $accessor);
+
+        $this->app->make(NodeHandlerRegistry::class)
+            ->register(TemplateRendererProbeHandler::class);
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'module template test',
+            'nodes'     => [
+                [
+                    'id'      => 'p-1',
+                    'type'    => 'template_probe',
+                    'version' => 1,
+                    'config'  => [
+                        'template' => 'Department: {{module.hr.department}}',
+                    ],
+                ],
+            ],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        $this->app->make(FlowEngineInterface::class)->start($definition, $contact);
+
+        /** @var FlowSession $session */
+        $session = FlowSession::query()
+            ->where('contact_id', $contact->getKey())
+            ->latest('created_at')
+            ->first();
+
+        $this->assertSame(FlowSessionStatus::Completed, $session->status);
+        $this->assertSame('Department: logistics', $session->state['flow']['rendered'] ?? null);
+        $this->assertSame(
+            [['key' => 'department', 'contactId' => (string) $contact->getKey(), 'tenantId' => $tenantId]],
+            $accessor->calls,
+        );
+    }
+}
+
+/**
+ * Module data accessor that records every lookup, so the test can prove the
+ * contact and tenant coordinates reach the module.
+ */
+final class RecordingHrDataAccessor implements DataAccessorInterface
+{
+    /** @var list<array{key: string, contactId: string, tenantId: string}> */
+    public array $calls = [];
+
+    public function namespace(): string
+    {
+        return 'hr';
+    }
+
+    public function get(string $key, string $contactId, string $tenantId): mixed
+    {
+        $this->calls[] = ['key' => $key, 'contactId' => $contactId, 'tenantId' => $tenantId];
+
+        return 'department' === $key ? 'logistics' : null;
+    }
+
+    /**
+     * @return string[]
+     */
+    public function supportedKeys(): array
+    {
+        return ['department'];
     }
 }
 

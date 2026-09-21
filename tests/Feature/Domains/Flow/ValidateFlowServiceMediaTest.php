@@ -6,6 +6,7 @@ namespace Tests\Feature\Domains\Flow;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
+use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Services\ValidateFlowService;
@@ -98,8 +99,8 @@ final class ValidateFlowServiceMediaTest extends FeatureTestCase
 
     private function makeService(): ValidateFlowService
     {
-        $registry = new NodeHandlerRegistry();
-        $registry->register(new MediaValidationSendMessageStub());
+        $registry = new NodeHandlerRegistry($this->app->make(NodeHandlerFactoryInterface::class));
+        $registry->register(MediaValidationSendMessageStub::class);
 
         return new ValidateFlowService(
             registry: $registry,

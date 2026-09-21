@@ -29,7 +29,6 @@ Thumbs.db
 _ide_helper.php
 _ide_helper_models.php
 .phpstorm.meta.php
-/.ai
 /.codex
 /.cursor
 /.junie
@@ -50,3 +49,7 @@ CLAUDE.local.md
 
 # Local make overrides — CONTAINER, WORKDIR.
 .make.local
+.ai/workspace/
+.ai/runtime/
+.ai/mcp/
+.ai/config.local.yaml

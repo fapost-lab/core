@@ -31,6 +31,8 @@ entry pointing at a missing file fails the build.
 - [`platform/ROADMAP.md`](./platform/ROADMAP.md) — milestones and dependencies.
 - [`platform/current-state.md`](./platform/current-state.md) — what exists in code today.
 - [`platform/PROJECT.md`](./platform/PROJECT.md) — short project context.
+- [`idea-brief.md`](./idea-brief.md) — the owner's product brief: problem, users, scope, positioning.
+- [`roadmap.md`](./roadmap.md) — product decomposition of the brief: destination, steps, open decisions.
 - [`platform/plans`](./platform/plans) — implementation plans and brownfield audits.
 - [`../drafts/CURRENT_TASK.md`](../drafts/CURRENT_TASK.md) — current operational focus for agents.
 
@@ -39,6 +41,11 @@ entry pointing at a missing file fails the build.
 - [`platform/architecture/adr`](./platform/architecture/adr) — architecture decision records, including
   superseded ones. Internal: the constraints they impose are published on the site in their own words, the
   records themselves are not.
+
+### Agent knowledge
+
+- [`../.ai/knowledge`](../.ai/knowledge) — architecture, rules, glossary, per-domain packs and ADRs that coding
+  agents load through Jig (`.ai/scripts/jig context`). Written for implementers, not published.
 
 ### Specs and diagrams
 

@@ -24,7 +24,6 @@ use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Exception;
 use InvalidArgumentException;
-use LogicException;
 
 final readonly class ValidateFlowService
 {
@@ -145,9 +144,7 @@ final readonly class ValidateFlowService
             return;
         }
 
-        try {
-            $this->registry->resolve($type, $version);
-        } catch (LogicException) {
+        if (! $this->registry->has($type, $version)) {
             $errors[] = new FlowValidationErrorDto(
                 path: "{$path}.type",
                 code: 'unknown_node_type',
@@ -179,11 +176,11 @@ final readonly class ValidateFlowService
             return;
         }
 
-        try {
-            $handler = $this->registry->resolve($type, $version);
-        } catch (LogicException) {
+        if (! $this->registry->has($type, $version)) {
             return;
         }
+
+        $handler = $this->registry->resolve($type, $version);
 
         $requiredFields = [];
         $schema         = $handler->configSchema();

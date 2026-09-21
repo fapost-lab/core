@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Flow;
 
+use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Fapost\Foundation\DTO\NodeExecutionContext;
@@ -15,40 +16,40 @@ final class NodeHandlerRegistryTest extends TestCase
 {
     public function test_register_and_resolve_by_type_and_version(): void
     {
-        $registry = new NodeHandlerRegistry();
-        $handler  = new TestConditionNodeHandlerV2();
-
-        $registry->register($handler);
+        $registry = $this->makeRegistry();
+        $registry->register(TestConditionNodeHandlerV2::class);
 
         $resolved = $registry->resolve('condition', 2);
 
-        $this->assertSame($handler, $resolved);
+        $this->assertInstanceOf(TestConditionNodeHandlerV2::class, $resolved);
+        $this->assertSame('condition', $resolved->type());
+        $this->assertSame(2, $resolved->version());
     }
 
     public function test_register_fails_for_duplicate_type_version(): void
     {
-        $registry = new NodeHandlerRegistry();
-        $registry->register(new TestConditionNodeHandlerV2());
+        $registry = $this->makeRegistry();
+        $registry->register(TestConditionNodeHandlerV2::class);
 
         $this->expectException(LogicException::class);
         $this->expectExceptionMessage('Duplicate handler registration: condition@2');
 
-        $registry->register(new TestConditionNodeHandlerV2());
+        $registry->register(TestConditionNodeHandlerV2::class);
     }
 
     public function test_register_fails_when_supported_versions_does_not_include_handler_version(): void
     {
-        $registry = new NodeHandlerRegistry();
+        $registry = $this->makeRegistry();
 
         $this->expectException(LogicException::class);
         $this->expectExceptionMessage('must include own version in supportedVersions()');
 
-        $registry->register(new InvalidSupportedVersionsHandler());
+        $registry->register(InvalidSupportedVersionsHandler::class);
     }
 
     public function test_resolve_fails_when_handler_not_registered(): void
     {
-        $registry = new NodeHandlerRegistry();
+        $registry = $this->makeRegistry();
 
         $this->expectException(LogicException::class);
         $this->expectExceptionMessage('Handler not found: input@1');
@@ -56,28 +57,57 @@ final class NodeHandlerRegistryTest extends TestCase
         $registry->resolve('input', 1);
     }
 
+    public function test_has_reports_registration_by_type_and_version(): void
+    {
+        $registry = $this->makeRegistry();
+        $registry->register(TestConditionNodeHandlerV2::class);
+
+        $this->assertTrue($registry->has('condition', 2));
+        $this->assertFalse($registry->has('condition', 1));
+        $this->assertFalse($registry->has('input', 2));
+    }
+
     public function test_register_fails_after_registry_is_frozen(): void
     {
-        $registry = new NodeHandlerRegistry();
+        $registry = $this->makeRegistry();
         $registry->freeze();
 
         $this->expectException(LogicException::class);
         $this->expectExceptionMessage('Cannot register handlers after boot.');
 
-        $registry->register(new TestConditionNodeHandlerV2());
+        $registry->register(TestConditionNodeHandlerV2::class);
     }
 
     public function test_all_returns_latest_handler_version_per_type(): void
     {
-        $registry = new NodeHandlerRegistry();
-        $registry->register(new TestConditionNodeHandlerV1());
-        $registry->register(new TestConditionNodeHandlerV2());
+        $registry = $this->makeRegistry();
+        $registry->register(TestConditionNodeHandlerV1::class);
+        $registry->register(TestConditionNodeHandlerV2::class);
 
         $all = $registry->all();
 
         $this->assertCount(1, $all);
         $this->assertSame('condition', $all[0]->type());
         $this->assertSame(2, $all[0]->version());
+
+        // Like resolve(), all() builds fresh instances rather than handing out cached ones.
+        $this->assertNotSame($all[0], $registry->all()[0]);
+    }
+
+    public function test_resolve_builds_a_new_instance_on_every_call(): void
+    {
+        $registry = $this->makeRegistry();
+        $registry->register(TestConditionNodeHandlerV2::class);
+
+        $first  = $registry->resolve('condition', 2);
+        $second = $registry->resolve('condition', 2);
+
+        $this->assertNotSame($first, $second);
+    }
+
+    private function makeRegistry(): NodeHandlerRegistry
+    {
+        return new NodeHandlerRegistry($this->app->make(NodeHandlerFactoryInterface::class));
     }
 }
 

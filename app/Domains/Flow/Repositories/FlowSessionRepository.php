@@ -25,6 +25,11 @@ final class FlowSessionRepository implements FlowSessionRepositoryInterface
             ->first();
     }
 
+    public function findById(string $sessionId): ?FlowSession
+    {
+        return FlowSession::query()->find($sessionId);
+    }
+
     public function create(array $attributes): FlowSession
     {
         return FlowSession::query()->create($attributes);

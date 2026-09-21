@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Flow;
 
+use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
@@ -377,10 +378,10 @@ final class FlowDefinitionValidatorTest extends TestCase
 
     private function validator(): FlowDefinitionValidator
     {
-        $registry = new NodeHandlerRegistry();
-        $registry->register(new TestConditionHandlerV2());
-        $registry->register(new TestInputHandlerV1());
-        $registry->register(new TestSendMessageHandlerV1());
+        $registry = new NodeHandlerRegistry($this->app->make(NodeHandlerFactoryInterface::class));
+        $registry->register(TestConditionHandlerV2::class);
+        $registry->register(TestInputHandlerV1::class);
+        $registry->register(TestSendMessageHandlerV1::class);
         $registry->freeze();
 
         return new FlowDefinitionValidator($registry);
