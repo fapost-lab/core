@@ -17,6 +17,7 @@ paths:
   - "tests/Unit/Domains/Assistant/**"
   - "tests/Feature/Assistants/**"
   - tests/Feature/AssistantPanelTest.php
+reviewed_at: 2026-09-21
 ---
 # Assistant
 
@@ -38,8 +39,8 @@ runtime and jobs read.
   `StartFlowFromEventJob`), and a `TenantSwitcher` restore hook clears it.
 - The assistant panel (`/assistant/{id}`) uses Filament's native tenancy with `Assistant` as the
   tenant model; access goes through `User::canAccessTenant()` and `AssistantPolicy`.
-- ADR-02 describes a `?assistant=` query parameter and `ResolveAssistantMiddleware`. The code
-  uses a path segment instead, and that middleware is not registered.
+- ADR-02 describes a `?assistant=` query parameter and a `ResolveAssistantMiddleware`. The code
+  uses a path segment instead; that middleware was never registered and has been removed.
 - Consumers: Flow (`Assistant` model, `CurrentAssistantInterface`), Channels, Broadcasting,
   Contact, Staff, Webhook, `app/Infrastructure/Flow/CachedContentTranslator.php`.
 

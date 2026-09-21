@@ -14,7 +14,8 @@ use Illuminate\Foundation\Auth\User as AuthUser;
 /**
  * Authorization policy for {@see Channel}.
  *
- * Users can manage channels only when they manage assistants or are assigned to the channel's assistant.
+ * Users can manage channels only when they manage assistants and are assigned to the channel's assistant.
+ * Rotating the webhook hash is gated separately by {@see Permission::RotateChannelToken}.
  */
 final class ChannelPolicy
 {
@@ -71,11 +72,17 @@ final class ChannelPolicy
     }
 
     /**
-     * Whether the user can rotate webhook settings for a specific channel.
+     * Whether the user can rotate the webhook hash of a specific channel.
+     *
+     * Rotation needs the sensitive {@see Permission::RotateChannelToken}, not
+     * {@see Permission::ManageAssistants}: a role that manages channels does not
+     * get to cut the messenger off from the webhook unless it is granted this.
      */
     public function rotateWebhook(AuthUser $authUser, Channel $channel): bool
     {
-        return $this->canManageAssistants($authUser) && $this->canAccessAssistant($authUser, $channel->assistant);
+        return $authUser instanceof User
+               && $authUser->can(Permission::RotateChannelToken->value)
+               && $this->canAccessAssistant($authUser, $channel->assistant);
     }
 
     private function canManageAssistants(AuthUser $authUser): bool

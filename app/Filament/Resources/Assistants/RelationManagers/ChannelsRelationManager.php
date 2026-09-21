@@ -95,6 +95,7 @@ final class ChannelsRelationManager extends RelationManager
                 Action::make('rotateWebhookHash')
                     ->label(__('staff.channels.actions.rotate_webhook_hash'))
                     ->icon(Heroicon::OutlinedArrowPath)
+                    ->visible(static fn (Channel $record): bool => Gate::allows('rotateWebhook', $record))
                     ->requiresConfirmation()
                     ->modalHeading(__('staff.channels.actions.rotate_webhook_hash'))
                     ->modalDescription(__('staff.channels.actions.rotate_webhook_hash_description'))
