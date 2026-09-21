@@ -11,8 +11,16 @@ Every code change carries a minimal relevant test, and that test is run.
 composer test
 ```
 
-Runs the PHPUnit suites declared in `phpunit.xml`. `php artisan test` does the
-same; `--compact` is useful when you only care about failures.
+Runs the PHPUnit suites declared in `phpunit.xml` in parallel, one process per
+CPU core (`php artisan test --parallel`, backed by ParaTest). Plain
+`php artisan test` runs them in a single process, which is easier to read when
+one test fails; `--compact` is useful when you only care about failures.
+
+Under `--parallel` every process works on its own databases: Laravel creates a
+`<database>_test_<n>` copy of the default connection per process, and the test
+base classes do the same for the landlord connection. The copies survive between
+runs to save migration time — add `--recreate-databases` after changing a
+migration.
 
 ```bash
 composer run test:arch
@@ -85,13 +93,14 @@ Variables that already exist in the environment win over the SQLite values in
 DB_CONNECTION=pgsql DB_DATABASE=fapost_core_test \
 LANDLORD_DB_DRIVER=pgsql LANDLORD_DB_DATABASE=fapost_core_landlord_test \
 TENANT_DB_CONNECTION=pgsql \
-php artisan test --compact
+php artisan test --parallel --compact
 ```
 
 `DB_HOST`, `DB_USERNAME` and `DB_PASSWORD` come from `.env` unless you set
-them too. Both databases are dropped and re-migrated on every run: the tenant
-tables go into a schema named `main`, the schema of the tenant the suite runs
-as, and the landlord tables into `public` of the landlord database.
+them too, and the user needs the right to create databases: under `--parallel`
+each process migrates its own `_test_<n>` copies of both. The tenant tables go
+into a schema named `main`, the schema of the tenant the suite runs as, and the
+landlord tables into `public` of the landlord database.
 
 ## What the architecture rules enforce
 

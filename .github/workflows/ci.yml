@@ -139,7 +139,7 @@ jobs:
           # The service runs without requirepass; the literal null is what
           # Laravel reads as "no password" (.env.example ships a password).
           REDIS_PASSWORD: "null"
-        run: php artisan test --compact
+        run: php artisan test --parallel --compact
 
       - name: Architecture rules
         # Static analysis; the database it runs against is irrelevant.
