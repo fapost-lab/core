@@ -37,22 +37,24 @@ notes are generated from those titles.
 
 ## Writing the pull request
 
-The repository has a pull request template; fill it in rather than deleting it.
-A pull request answers three questions for a reviewer who has not seen the
-branch:
+The repository has a short pull request template; fill it in rather than
+deleting it. It asks two things of a reviewer who has not seen the branch:
 
-- **What** changed, in one or two sentences. Not a list of files.
-- **Why** — the bug, the missing behaviour, the issue it closes. Link the issue
-  with `Closes #123` so it closes on merge.
-- **How to check it** — the test that covers it, or the manual steps if the
+- **What and why** — what is different after the merge, in one or two
+  sentences rather than a list of files, and the bug, missing behaviour or
+  issue behind it. Link the issue with `Closes #123` so it closes on merge.
+- **How to check** — the test that covers it, or the manual steps if the
   change is visual or operational.
+
+Formatting, tests and architecture rules are not ticked off in the description:
+CI runs them on every pull request.
 
 One pull request carries one concern. A fix that was noticed while building a
 feature goes in its own pull request, so that it can be reviewed, released and,
 if needed, reverted on its own. If a change touches a public contract or needs
 an operator to do something on upgrade (a migration, a new environment
-variable), say so under its own heading — that paragraph is what ends up in the
-release notes.
+variable), add an **Upgrade notes** section — the template has it commented
+out — because that paragraph is what ends up in the release notes.
 
 Open the pull request as a draft if it is not ready for review; convert it when
 it is. A draft is a fine place to get early feedback on a direction.
