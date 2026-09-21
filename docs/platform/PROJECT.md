@@ -244,7 +244,7 @@ active / waiting_input → error (uncaught exception)
 
 | Где смотреть | Что там |
 |--------------|---------|
-| `../drafts/CURRENT_TASK.md` | Текущий операционный фокус |
+| `.ai/scripts/jig status` | Текущий операционный фокус: активные задачи Jig |
 | [[TASKS]] | Единственный детальный чеклист реализации |
 | [[ROADMAP]] | Milestone'ы, зависимости и production-ready критерии |
 | [[INDEX]] | Полная карта vault |

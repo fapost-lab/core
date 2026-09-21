@@ -9,6 +9,7 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -57,6 +58,7 @@ final class StartFlowFromEventJob implements ShouldQueue
         AssistantRepositoryInterface $assistants,
         CurrentAssistantInterface $currentAssistant,
         FlowEngineInterface $engine,
+        FlowExecutionGuardInterface $guard,
         LoggerInterface $logger,
     ): void {
         $tenant = $tenants->findById($this->tenantId);
@@ -71,6 +73,7 @@ final class StartFlowFromEventJob implements ShouldQueue
             $assistants,
             $currentAssistant,
             $engine,
+            $guard,
             $logger,
         ): void {
             $definition = $definitions->findLatestActiveByFlowId($this->flowId);
@@ -104,9 +107,16 @@ final class StartFlowFromEventJob implements ShouldQueue
 
             $currentAssistant->set($assistant);
 
-            $engine->start($definition, $contact, [
-                'flow' => ['event' => $this->payload],
-            ]);
+            // Outside the routing pipeline: claim the contact's session lock so the
+            // start cannot race an inbound message for the same contact and assistant.
+            $guard->run(
+                tenantId: (string)$contact->tenant_id,
+                contactId: (string)$contact->getKey(),
+                assistantId: $this->assistantId,
+                callback: fn () => $engine->start($definition, $contact, [
+                    'flow' => ['event' => $this->payload],
+                ]),
+            );
         });
     }
 }

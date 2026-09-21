@@ -34,7 +34,7 @@ entry pointing at a missing file fails the build.
 - [`idea-brief.md`](./idea-brief.md) — the owner's product brief: problem, users, scope, positioning.
 - [`roadmap.md`](./roadmap.md) — product decomposition of the brief: destination, steps, open decisions.
 - [`platform/plans`](./platform/plans) — implementation plans and brownfield audits.
-- [`../drafts/CURRENT_TASK.md`](../drafts/CURRENT_TASK.md) — current operational focus for agents.
+- `.ai/scripts/jig status` — the active Jig tasks: the current operational focus.
 
 ### Records
 
@@ -64,7 +64,6 @@ entry pointing at a missing file fails the build.
 - `platform/TASKS.md` is the only status tracker. No status tables anywhere else.
 - `platform/current-state.md` describes code reality, not intended architecture.
 - Published documentation is written in English. Working material and archive may be in any language.
-- `drafts/` contains only `CURRENT_TASK.md`.
 - `CLAUDE.md` holds agent rules and stable constraints; it is not roadmap documentation.
 - When code and a document disagree, verify against the code and fix the document.
 

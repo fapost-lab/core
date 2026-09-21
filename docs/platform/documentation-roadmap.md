@@ -7,7 +7,7 @@ This file defines how `docs/` should be maintained as the repository documentati
 - `docs/` - tracked developer documentation.
 - `docs/INDEX.md` - navigation source of truth for the full documentation set.
 - `docs/platform/TASKS.md` - only checkbox tracker for implementation status.
-- `drafts/CURRENT_TASK.md` - current operational focus for agents; the only file that remains in `drafts/`.
+- `.ai/scripts/jig status` - current operational focus: the active Jig tasks.
 - `CLAUDE.md` - agent rules and stable coding/architecture constraints, not roadmap/status documentation.
 
 ## Maintenance Rules
