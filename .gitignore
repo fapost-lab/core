@@ -24,12 +24,20 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
-/.claude
+# Agent runtimes: local settings stay private; only the Jig skills are shared,
+# so everyone who clones the project gets the same agent workflow.
+/.claude/*
+!/.claude/skills/
+/.claude/skills/*
+!/.claude/skills/jig-*/
 
 _ide_helper.php
 _ide_helper_models.php
 .phpstorm.meta.php
-/.codex
+/.codex/*
+!/.codex/skills/
+/.codex/skills/*
+!/.codex/skills/jig-*/
 /.cursor
 /.junie
 .mcp.json
