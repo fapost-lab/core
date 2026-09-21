@@ -31,10 +31,18 @@ short version of the rules that govern how code moves through the repository.
 - A change to a public contract carries its documentation change in the same
   pull request.
 - A first pull request accepts the [Contributor License Agreement](./CLA.md)
-  with one line in the description — see
-  [Pull requests](https://docs.fapost.in/contributing/pull-requests).
+  with a comment the CLA check asks for — see
+  [Licence, CLA and trademark](https://docs.fapost.in/contributing/legal).
 - Pull requests are squash-merged once CI is green and reviewed; the branch is
   deleted on merge.
+
+## Coding agents
+
+The project is developed with AI coding agents through
+[Jig](https://jig.fapost.in). `AGENTS.md` holds the rules every agent reads;
+`.ai/knowledge/` holds architecture, rules and per-domain knowledge, and a change
+that alters a rule updates it in the same pull request. An agent is optional —
+see [Coding agents and Jig](https://docs.fapost.in/contributing/coding-agents).
 
 ## Releases
 
