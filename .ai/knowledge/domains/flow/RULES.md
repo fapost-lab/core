@@ -17,7 +17,7 @@ paths:
   - "tests/*/Domains/Flow/**"
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
-reviewed_at: 2026-09-11
+reviewed_at: 2026-09-21
 ---
 # Flow rules
 
@@ -62,8 +62,11 @@ broken.
   retry. Check a marker before acting, and rely on a downstream idempotency key where one exists
   (`MessageSender`'s `msg:sent:*`). *(inferred from the code; proposed as a rule)*
 - **Running the engine outside `FlowOrchestrator` requires the session lock** through
-  `FlowExecutionGuard`. `StartFlowFromEventJob`, `ResumeTimedOutSendMessageNodeJob` and the
-  subflow sweeper call the engine directly today. *(proposed)*
+  `FlowExecutionGuard`, keyed like `MessageRouter` (`contact->tenant_id`, contact, assistant),
+  with the session re-read under the lock; a busy lock throws `SessionLockTimeoutException` and
+  the queue retries. `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob` and
+  `StartFlowFromEventJob` follow it (`tests/Feature/Redis`). The subflow timeout sweeper still
+  resumes the parent without the lock.
 - **New state namespaces go into the foundation `StateNamespace` enum.** Core keeps no enum of
   its own (ADR-0002). *(proposed)*
 - **A singleton in `FlowServiceProvider` must not receive a scoped service in its constructor.**

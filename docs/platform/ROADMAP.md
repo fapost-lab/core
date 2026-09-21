@@ -23,7 +23,7 @@ Product vision от текущего состояния до SaaS-оболочк
 
 Полный сьют — **936 зелёных**, 1 skipped (sqlite-ветка миграции); `composer run test:arch` — без ошибок.
 
-**Осталось до выкладки, вне трека:** Redis-integration suite (вся блокировка покрыта моками — см. § Milestone 2)
+**Осталось до выкладки, вне трека:** Redis-integration suite закрыт (см. § Milestone 2)
 и load test из критериев Production Ready.
 
 После выкладки: M13 (Audit Log) → M12 (MCP Server) → M7 (Solutions) → M11. M5 (RAG) — в бэклоге.
@@ -55,7 +55,7 @@ M9 (Multi-channel / WhatsApp) удалён из планов.
 
 > *Продакшн-готовность: полный pipeline обработки, конкурентность, CI-правила, loop завершение.*
 
-**Когда:** закрыт. Открытым остаётся только Redis-integration suite (см. ниже) — он не блокирует выкладку.
+**Когда:** закрыт, включая Redis-integration suite.
 
 ### Loop node — закрыт ✅
 - [x] 8.1 Reachability — `ValidateFlowService::validateLoopReachesLoopEnd`, publish-error `loop_missing_loop_end`  
@@ -105,12 +105,13 @@ M9 (Multi-channel / WhatsApp) удалён из планов.
 > Отдельный планировщик тиков не вводился. Horizon `timeout: 60` на очереди `flow.execution` при этом не конфликтует:
 > лок продлевается изнутри исполнения.
 
-### Осталось в M2 — интеграционные тесты на живом Redis
-- [ ] Инфраструктуры нет: в `phpunit.xml` два suite (`Unit`, `Feature`), `CACHE_STORE=array`,
-  `QUEUE_CONNECTION=sync`, переменных `REDIS_*` нет, `.env.testing` отсутствует. Нужен третий suite поверх
-  devilbox-Redis + flush-хук по аналогии с `RefreshDatabase`. Вся текущая блокировка покрыта моками.
-- [ ] Не покрыты пути в обход роутера: `ResumeTimedOutSendMessageNodeJob:48` входит в движок мимо `MessageRouter`
-  (guard берёт лок сам — поведение корректное, но без теста).
+### Интеграционные тесты на живом Redis — закрыт ✅
+- [x] `tests/Feature/Redis` (группа `redis`) в общем прогоне: `SessionLockManager`, `LockHeartbeat`,
+  `LockAcquisitionPolicy`, `FlowExecutionGuard` и потеря блокировки в `FlowEngine` — на настоящем Redis,
+  с префиксом ключей и Lua-скриптами. `composer run test:redis` — только эта группа.
+- [x] Пути в обход роутера берут блокировку сами: `ResumeTimedOutSendMessageNodeJob` и
+  `StartFlowFromEventJob` работают под `FlowExecutionGuard` и перечитывают сессию под ней
+  (до этого оба входили в движок без блокировки).
 
 ### Cleanup (Phase E)
 - [x] Удалить `effects[]` из `NodeExecutionResult`
@@ -593,8 +594,7 @@ Core в программируемую поверхность: «покажи, �
 
 - [x] Полный 6-шаговый routing pipeline end-to-end (D-1 + D-2)  
 - [x] Все диалоги логируются (inbound + outbound + notify + broadcast + медиа)  
-- [-] Concurrency тесты: distributed lock и optimistic retry покрыты; **heartbeat не подключён**, real-Redis
-  интеграции нет  
+- [x] Concurrency тесты: distributed lock, heartbeat и optimistic retry покрыты, в том числе на настоящем Redis  
 - [x] phpat CI правила enforced через `composer run test:arch`  
 - [x] GDPR cascade delete (contacts/assistants/channels → conversations)  
 - [ ] Load test: 100 concurrent sessions без state leakage (Horizon-воркеры)

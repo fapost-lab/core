@@ -196,7 +196,8 @@ label/content is.
 
 ## Verification
 
-- `composer test` / `php artisan test` runs the PHPUnit suites from `phpunit.xml` (SQLite in memory).
+- `composer test` / `php artisan test` runs the PHPUnit suites from `phpunit.xml` (SQLite in memory). The
+  `redis` group (`tests/Feature/Redis`) needs a reachable Redis from `.env`; `composer run test:redis` runs only it.
 - `composer run test:arch` runs the PHPat architecture rules through PHPStan.
 - PHPat rules live in `tests/Architecture`; the low-level command is
   `vendor/bin/phpstan analyse --configuration phpstan.neon`.
