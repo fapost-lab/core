@@ -38,7 +38,7 @@ final class FlowEngineSessionLockTest extends FeatureTestCase
     {
         parent::setUp();
 
-        $this->app->make(NodeHandlerRegistry::class)->register(new SessionLockTestHandler());
+        $this->app->make(NodeHandlerRegistry::class)->register(SessionLockTestHandler::class);
     }
 
     public function test_lost_session_lock_aborts_execution_before_the_node_runs(): void

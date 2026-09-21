@@ -4,38 +4,67 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Registry;
 
+use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use LogicException;
 
+/**
+ * Maps `type@version` to a handler class and builds the handler on every resolve.
+ *
+ * The registry is a worker-lifetime singleton, so it keeps classes rather than
+ * instances: an instance would pin the scoped collaborators of whichever job
+ * built it. Registration builds one throwaway instance only to read the handler's
+ * identity, because {@see NodeHandlerInterface} exposes it through instance methods.
+ */
 final class NodeHandlerRegistry implements NodeHandlerRegistryInterface
 {
     /**
-     * @var array<string, NodeHandlerInterface>
+     * @var array<string, class-string<NodeHandlerInterface>>
      */
     private array $handlers = [];
 
+    /**
+     * @var array<string, int>
+     */
+    private array $latestVersions = [];
+
     private bool $frozen = false;
 
-    public function register(NodeHandlerInterface $handler): void
+    public function __construct(
+        private readonly NodeHandlerFactoryInterface $factory,
+    ) {
+    }
+
+    public function register(string $handlerClass): void
     {
         if ($this->frozen) {
             throw new LogicException('Cannot register handlers after boot.');
         }
 
-        if (! in_array($handler->version(), $handler->supportedVersions(), true)) {
+        $handler = $this->factory->make($handlerClass);
+        $type    = $handler->type();
+        $version = $handler->version();
+
+        if (! in_array($version, $handler->supportedVersions(), true)) {
             throw new LogicException(
-                "Handler {$handler->type()}@{$handler->version()} must include own version in supportedVersions()."
+                "Handler {$type}@{$version} must include own version in supportedVersions()."
             );
         }
 
-        $key = $this->key($handler->type(), $handler->version());
+        $key = $this->key($type, $version);
 
         if (isset($this->handlers[$key])) {
             throw new LogicException("Duplicate handler registration: {$key}");
         }
 
-        $this->handlers[$key] = $handler;
+        $this->handlers[$key]        = $handlerClass;
+        $this->latestVersions[$type] = max($version, $this->latestVersions[$type] ?? $version);
+    }
+
+    public function has(string $type, int $version): bool
+    {
+        return isset($this->handlers[$this->key($type, $version)]);
     }
 
     public function resolve(string $type, int $version): NodeHandlerInterface
@@ -46,22 +75,18 @@ final class NodeHandlerRegistry implements NodeHandlerRegistryInterface
             throw new LogicException("Handler not found: {$key}");
         }
 
-        return $this->handlers[$key];
+        return $this->factory->make($this->handlers[$key]);
     }
 
     public function all(): array
     {
-        $latestByType = [];
+        $handlers = [];
 
-        foreach ($this->handlers as $handler) {
-            $type = $handler->type();
-
-            if (! isset($latestByType[$type]) || $handler->version() > $latestByType[$type]->version()) {
-                $latestByType[$type] = $handler;
-            }
+        foreach ($this->latestVersions as $type => $version) {
+            $handlers[] = $this->resolve($type, $version);
         }
 
-        return array_values($latestByType);
+        return $handlers;
     }
 
     public function freeze(): void

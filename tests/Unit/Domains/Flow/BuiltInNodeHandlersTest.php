@@ -7,6 +7,7 @@ namespace Tests\Unit\Domains\Flow;
 use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
 use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
@@ -28,6 +29,7 @@ use App\Domains\Flow\State\Variables\VariableResolver;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
 use App\Domains\Media\Contracts\MediaServiceInterface;
+use DateTimeInterface;
 use Fapost\Foundation\Contracts\DataAccessorInterface;
 use Fapost\Foundation\Contracts\RagAdapterInterface;
 use Fapost\Foundation\DTO\IncomingMessage;
@@ -509,20 +511,66 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame('yes', $result->sourceHandle);
     }
 
-    public function test_delay_is_idempotent_when_already_scheduled(): void
+    public function test_delay_schedules_resume_once_and_keeps_waiting_until_due(): void
     {
-        $handler = new DelayNodeHandler();
+        $this->travelTo('2026-01-01T00:00:00+00:00');
+
+        $scheduler = Mockery::mock(DelayResumeSchedulerInterface::class);
+        $scheduler->shouldReceive('schedule')
+            ->once()
+            ->withArgs(fn (string $tenantId, string $sessionId, string $nodeId, DateTimeInterface $resumeAt): bool => 'delay-1' === $nodeId
+                && '2026-01-01T00:00:15+00:00' === $resumeAt->format(DateTimeInterface::ATOM));
+
+        $handler = new DelayNodeHandler($scheduler);
         $node    = ['id' => 'delay-1', 'config' => ['seconds' => 15]];
 
-        $first  = $handler->execute($node, [], $this->context(nodeId: 'delay-1'));
-        $second = $handler->execute($node, [
-            StateNamespace::System->value => ['delay' => ['delay-1' => ['scheduled_at' => '2026-01-01T00:00:00+00:00']]],
-        ], $this->context(nodeId: 'delay-1'));
+        $first = $handler->execute($node, [], $this->context(nodeId: 'delay-1'));
 
         $this->assertSame(NodeExecutionStatus::Waiting, $first->status);
-        $this->assertNotEmpty($first->stateChanges);
+        $this->assertSame(
+            '2026-01-01T00:00:15+00:00',
+            $first->stateChanges[SystemStateKeys::DELAY_NODE_PREFIX . '.delay-1.resume_at'],
+        );
+
+        $this->travel(14)->seconds();
+
+        $second = $handler->execute($node, $this->delayState('delay-1', '2026-01-01T00:00:15+00:00'), $this->context(nodeId: 'delay-1'));
+
         $this->assertSame(NodeExecutionStatus::Waiting, $second->status);
         $this->assertSame([], $second->stateChanges);
+    }
+
+    public function test_delay_completes_through_default_and_clears_its_marker_once_due(): void
+    {
+        $this->travelTo('2026-01-01T00:00:15+00:00');
+
+        $scheduler = Mockery::mock(DelayResumeSchedulerInterface::class);
+        $scheduler->shouldNotReceive('schedule');
+
+        $result = (new DelayNodeHandler($scheduler))->execute(
+            ['id' => 'delay-1', 'config' => ['seconds' => 15]],
+            $this->delayState('delay-1', '2026-01-01T00:00:15+00:00'),
+            $this->context(nodeId: 'delay-1'),
+        );
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('default', $result->sourceHandle);
+        $this->assertSame([SystemStateKeys::DELAY_NODE_PREFIX . '.delay-1' => null], $result->stateChanges);
+    }
+
+    public function test_zero_second_delay_passes_straight_through(): void
+    {
+        $scheduler = Mockery::mock(DelayResumeSchedulerInterface::class);
+        $scheduler->shouldNotReceive('schedule');
+
+        $result = (new DelayNodeHandler($scheduler))->execute(
+            ['id' => 'delay-1', 'config' => ['seconds' => 0]],
+            [],
+            $this->context(nodeId: 'delay-1'),
+        );
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('default', $result->sourceHandle);
     }
 
     public function test_assign_writes_to_flow_state_or_contact_writer_by_target(): void
@@ -1464,6 +1512,17 @@ final class BuiltInNodeHandlersTest extends TestCase
             Mockery::mock(PersistentButtonRegistryInterface::class),
             new VariableResolver(),
         );
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function delayState(string $nodeId, string $resumeAt): array
+    {
+        return [StateNamespace::System->value => ['delay' => [$nodeId => [
+            'resume_at'    => $resumeAt,
+            'scheduled_at' => '2026-01-01T00:00:00+00:00',
+        ]]]];
     }
 
     private function context(

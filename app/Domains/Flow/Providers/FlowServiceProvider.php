@@ -21,6 +21,7 @@ use App\Domains\Flow\Contracts\AssistantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationServiceInterface;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
 use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
@@ -35,6 +36,7 @@ use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\LanguageResolverInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
 use App\Domains\Flow\Contracts\SystemTranslationCatalogInterface;
@@ -74,6 +76,7 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Flow\Models\FlowLog;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Orchestration\DelayedSessionResumer;
 use App\Domains\Flow\Orchestration\FlowOrchestrator;
 use App\Domains\Flow\Policies\FlowDraftPolicy;
 use App\Domains\Flow\Policies\FlowGroupPolicy;
@@ -107,12 +110,6 @@ use App\Domains\Flow\Services\Resolvers\ScheduleTriggerResolver;
 use App\Domains\Flow\Services\Resolvers\TriggerResolver;
 use App\Domains\Flow\Services\Resolvers\WebhookTriggerResolver;
 use App\Domains\Flow\Services\TenantTranslationService;
-use App\Domains\Flow\State\Resolvers\ModuleResolutionContext;
-use App\Domains\Flow\State\Resolvers\ModuleStateResolver;
-use App\Domains\Flow\State\Resolvers\NamespaceResolverRegistry;
-use App\Domains\Flow\State\Resolvers\RagStateResolver;
-use App\Domains\Flow\State\Resolvers\SessionStateResolver;
-use App\Domains\Flow\State\StateNamespace;
 use App\Domains\Flow\State\Variables\CacheBackedVariableSchemaRegistry;
 use App\Domains\Flow\State\Variables\VariableCoercer;
 use App\Domains\Flow\State\Variables\VariableResolver;
@@ -129,14 +126,14 @@ use App\Domains\Flow\Validation\AssistantCommandsValidator;
 use App\Domains\Flow\Validation\FlowDefinitionValidator;
 use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
-use App\Domains\Media\Contracts\MediaIngestorInterface;
-use App\Domains\Media\Contracts\MediaServiceInterface;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\ConnectionAfterCommitDispatcher;
+use App\Infrastructure\Flow\ContainerNodeHandlerFactory;
 use App\Infrastructure\Flow\FlowExecutionGuard;
+use App\Infrastructure\Flow\QueuedDelayResumeScheduler;
 use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Illuminate\Database\DatabaseManager;
@@ -177,40 +174,19 @@ final class FlowServiceProvider extends ServiceProvider
                 $this->app->make(ActionHandlerRegistry::class)->freeze();
                 $this->app->make(RagAdapterRegistry::class)->freeze();
             }
-
-            $this->app->make(NamespaceResolverRegistry::class)->freeze();
         });
     }
 
     public function register(): void
     {
-        // NOTE: ModuleResolutionContext is scoped (per-request), but NamespaceResolverRegistry
-        // is a singleton. This is safe because flow execution runs in queue workers, where
-        // the scoped context is rebuilt per job. If that changes — audit this binding.
-        $this->app->scoped(ModuleResolutionContext::class);
-        $this->app->singleton(NamespaceResolverRegistry::class, function ($app): NamespaceResolverRegistry {
-            $registry = new NamespaceResolverRegistry();
-
-            $registry->register(StateNamespace::System, new SessionStateResolver(StateNamespace::System));
-            $registry->register(StateNamespace::Flow, new SessionStateResolver(StateNamespace::Flow));
-            $registry->register(StateNamespace::Rag, new RagStateResolver());
-            $registry->register(
-                StateNamespace::Module,
-                new ModuleStateResolver(
-                    $app->make(DataAccessorRegistryInterface::class),
-                    $app->make(ModuleResolutionContext::class),
-                )
-            );
-
-            return $registry;
-        });
-
         // Registry contents are declared here (register phase, lazily executed
         // on first resolve) — boot() only freezes them. Solutions/Plugins add
-        // their own entries through CoreRegistrar before the freeze.
+        // their own entries through CoreRegistrar before the freeze. The registry
+        // keeps handler classes and builds each handler in the current scope.
+        $this->app->singleton(NodeHandlerFactoryInterface::class, ContainerNodeHandlerFactory::class);
         $this->app->singleton(NodeHandlerRegistry::class, function ($app): NodeHandlerRegistry {
-            $registry = new NodeHandlerRegistry();
-            $this->registerCoreNodeHandlers($registry, $app);
+            $registry = new NodeHandlerRegistry($app->make(NodeHandlerFactoryInterface::class));
+            $this->registerCoreNodeHandlers($registry);
 
             return $registry;
         });
@@ -231,13 +207,10 @@ final class FlowServiceProvider extends ServiceProvider
                 cache: $app->make('cache.store'),
             )
         );
-        $this->app->singleton(VariableResolverInterface::class, fn ($app): VariableResolver => new VariableResolver(
+        // Scoped: the schema registry belongs to the current tenant.
+        $this->app->scoped(VariableResolverInterface::class, fn ($app): VariableResolver => new VariableResolver(
             coercer: $app->make(VariableCoercerInterface::class),
-            // Pass as a resolver closure so the singleton does not capture a
-            // scoped instance — the registry is resolved lazily on each read().
-            schemaRegistryResolver: fn (): VariableSchemaRegistryInterface => $app->make(
-                VariableSchemaRegistryInterface::class
-            ),
+            schemaRegistry: $app->make(VariableSchemaRegistryInterface::class),
         ));
         $this->app->singleton(ModuleDataAccessorRegistry::class);
         $this->app->singleton(
@@ -270,6 +243,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->bind(AssistantTranslationRepositoryInterface::class, AssistantTranslationRepository::class);
         $this->app->bind(TenantEventRepositoryInterface::class, TenantEventRepository::class);
         $this->app->bind(FlowTriggerEventPublisherInterface::class, QueuedFlowTriggerEventPublisher::class);
+        $this->app->bind(DelayResumeSchedulerInterface::class, QueuedDelayResumeScheduler::class);
         $this->app->bind(
             SubflowResumerInterface::class,
             fn ($app): DefaultSubflowResumer => new DefaultSubflowResumer(
@@ -283,8 +257,9 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(SubflowStarterService::class, fn ($app): SubflowStarterService => new SubflowStarterService(
             definitions: $app->make(FlowDefinitionRepositoryInterface::class),
             sessions: $app->make(FlowSessionRepositoryInterface::class),
-            // Lazy: FlowEngine depends on the node-handler registry whose factory
-            // constructs this service — eager resolution would recurse.
+            // Lazy: registering the subflow handler builds this service inside the
+            // node-handler registry factory, and FlowEngine depends on that
+            // registry — eager resolution would recurse.
             engineResolver: fn (): FlowEngineInterface => $app->make(FlowEngineInterface::class),
             graphResolver: $app->make(FlowGraphResolver::class),
             connection: $app->make(\Illuminate\Database\ConnectionInterface::class),
@@ -405,6 +380,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->scoped(FlowOrchestratorInterface::class, FlowOrchestrator::class);
         // Scoped, not singleton: the guard reads the per-request lock registry.
         $this->app->scoped(FlowExecutionGuardInterface::class, FlowExecutionGuard::class);
+        $this->app->scoped(DelayedSessionResumer::class);
     }
 
     /**
@@ -412,94 +388,31 @@ final class FlowServiceProvider extends ServiceProvider
      * the {@see NodeHandlerRegistry} singleton factory so registration stays
      * declarative and runs lazily on first resolve.
      *
-     * @param  \Illuminate\Contracts\Foundation\Application  $app
+     * Handlers are registered by class and built by the container on every
+     * resolve, so their constructors take ordinary dependencies.
      */
-    private function registerCoreNodeHandlers(NodeHandlerRegistry $registry, $app): void
+    private function registerCoreNodeHandlers(NodeHandlerRegistry $registry): void
     {
-        $templates        = $app->make(TemplateRenderer::class);
-        $variableResolver = $app->make(VariableResolverInterface::class);
+        $handlers = [
+            SendMessageNodeHandler::class,
+            InputNodeHandler::class,
+            BranchNodeHandler::class,
+            DelayNodeHandler::class,
+            AssignNodeHandler::class,
+            CallNodeHandler::class,
+            EmitEventNodeHandler::class,
+            EndNodeHandler::class,
+            RagQueryNodeHandler::class,
+            SubflowNodeHandler::class,
+            SetTagNodeHandler::class,
+            NotifyNodeHandler::class,
+            AuthRequestNodeHandler::class,
+            LoopNodeHandler::class,
+            LoopEndNodeHandler::class,
+        ];
 
-        $registry->register(
-            new SendMessageNodeHandler(
-                $app->make(MessageSenderInterface::class),
-                $app->make(ContentTranslatorInterface::class),
-                $templates,
-                $app->make(InlineKeyboardEditorInterface::class),
-                $app->make(PersistentButtonRegistryInterface::class),
-                $variableResolver,
-            )
-        );
-        $registry->register(
-            new InputNodeHandler(
-                $app->make(MediaIngestorInterface::class),
-                $app->make(MediaServiceInterface::class),
-                $variableResolver,
-                $app->make(MessageSenderInterface::class),
-                $app->make(ContentTranslatorInterface::class),
-                $app->make(\App\Domains\Flow\Validation\InputValidatorInterface::class),
-            )
-        );
-        $registry->register(
-            new BranchNodeHandler(
-                $app->make(DataAccessorRegistryInterface::class),
-                $variableResolver,
-            )
-        );
-        $registry->register(new DelayNodeHandler());
-        $registry->register(new AssignNodeHandler($templates, $variableResolver));
-        $registry->register(new CallNodeHandler(
-            $app->make(CallTransportRegistry::class),
-            $templates,
-            $variableResolver,
-        ));
-        $registry->register(
-            new EmitEventNodeHandler(
-                $app->make(FlowTriggerEventPublisherInterface::class),
-                $templates,
-            )
-        );
-        $registry->register(new EndNodeHandler());
-        $registry->register(
-            new RagQueryNodeHandler(
-                $app->make(RagAdapterRegistry::class),
-                $templates,
-            )
-        );
-        $registry->register(
-            new SubflowNodeHandler(
-                $app->make(SubflowStarterService::class),
-                $app->make(FlowSessionRepositoryInterface::class),
-            )
-        );
-        $registry->register(
-            new SetTagNodeHandler(
-                $app->make(\App\Domains\Contact\Contracts\ContactTagRepositoryInterface::class),
-                $templates,
-            )
-        );
-        $registry->register(
-            new NotifyNodeHandler(
-                $app->make(\Illuminate\Contracts\Bus\Dispatcher::class),
-                $templates,
-                $app->make(\App\Domains\Staff\Notifications\StaffNotifierRegistry::class),
-            )
-        );
-        $registry->register(
-            new AuthRequestNodeHandler(
-                new \App\Domains\Flow\Handlers\Support\OperandResolver(
-                    $app->make(DataAccessorRegistryInterface::class),
-                    $variableResolver,
-                ),
-                new \App\Domains\Flow\Handlers\Support\OperatorComparator(),
-                $templates,
-            )
-        );
-        $registry->register(
-            new LoopNodeHandler(
-                $app->make(DataAccessorRegistryInterface::class),
-                $variableResolver,
-            )
-        );
-        $registry->register(new LoopEndNodeHandler());
+        foreach ($handlers as $handlerClass) {
+            $registry->register($handlerClass);
+        }
     }
 }

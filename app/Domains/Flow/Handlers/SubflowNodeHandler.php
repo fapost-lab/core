@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
-use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Subflow\SubflowStarterService;
@@ -41,7 +40,6 @@ final class SubflowNodeHandler extends AbstractVersionedHandler
 
     public function __construct(
         private readonly SubflowStarterService $starter,
-        private readonly FlowSessionRepositoryInterface $sessions,
     ) {
     }
 

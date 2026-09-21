@@ -6,6 +6,7 @@ namespace Tests\Unit\Domains\Flow;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
+use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Services\ValidateFlowService;
@@ -194,8 +195,8 @@ final class ValidateFlowServiceTest extends TestCase
 
     public function test_validate_reports_missing_required_config_field_from_handler_schema(): void
     {
-        $registry = new NodeHandlerRegistry();
-        $registry->register(new RequiredConfigTestHandler());
+        $registry = new NodeHandlerRegistry($this->app->make(NodeHandlerFactoryInterface::class));
+        $registry->register(RequiredConfigTestHandler::class);
 
         $service = new ValidateFlowService(
             registry: $registry,
@@ -706,8 +707,8 @@ final class ValidateFlowServiceTest extends TestCase
 
     private function makeServiceWithEmitEvent(): ValidateFlowService
     {
-        $registry = new NodeHandlerRegistry();
-        $registry->register(new EmitEventStubHandler());
+        $registry = new NodeHandlerRegistry($this->app->make(NodeHandlerFactoryInterface::class));
+        $registry->register(EmitEventStubHandler::class);
 
         return new ValidateFlowService(
             registry: $registry,
@@ -720,10 +721,10 @@ final class ValidateFlowServiceTest extends TestCase
 
     private function makeServiceWithLoop(): ValidateFlowService
     {
-        $registry = new NodeHandlerRegistry();
-        $registry->register(new LoopStubHandler());
-        $registry->register(new LoopEndStubHandler());
-        $registry->register(new SendMessageStubHandler());
+        $registry = new NodeHandlerRegistry($this->app->make(NodeHandlerFactoryInterface::class));
+        $registry->register(LoopStubHandler::class);
+        $registry->register(LoopEndStubHandler::class);
+        $registry->register(SendMessageStubHandler::class);
 
         return new ValidateFlowService(
             registry: $registry,
@@ -736,8 +737,8 @@ final class ValidateFlowServiceTest extends TestCase
 
     private function makeServiceWithSubflow(): ValidateFlowService
     {
-        $registry = new NodeHandlerRegistry();
-        $registry->register(new SubflowStubHandler());
+        $registry = new NodeHandlerRegistry($this->app->make(NodeHandlerFactoryInterface::class));
+        $registry->register(SubflowStubHandler::class);
 
         return new ValidateFlowService(
             registry: $registry,
@@ -750,8 +751,8 @@ final class ValidateFlowServiceTest extends TestCase
 
     private function makeServiceWithEnd(): ValidateFlowService
     {
-        $registry = new NodeHandlerRegistry();
-        $registry->register(new EndStubHandler());
+        $registry = new NodeHandlerRegistry($this->app->make(NodeHandlerFactoryInterface::class));
+        $registry->register(EndStubHandler::class);
 
         return new ValidateFlowService(
             registry: $registry,
@@ -764,8 +765,8 @@ final class ValidateFlowServiceTest extends TestCase
 
     private function makeServiceWithSendMessage(): ValidateFlowService
     {
-        $registry = new NodeHandlerRegistry();
-        $registry->register(new SendMessageStubHandler());
+        $registry = new NodeHandlerRegistry($this->app->make(NodeHandlerFactoryInterface::class));
+        $registry->register(SendMessageStubHandler::class);
 
         return new ValidateFlowService(
             registry: $registry,

@@ -719,6 +719,17 @@ CREATE INDEX idx_sessions_parent ON flow_sessions (parent_session_id)
 
 ---
 
+## Amendment · D-4 superseded (September 2026)
+
+D-4 is superseded by `.ai/knowledge/adr/0002-retire-core-state-primitives.md`. The adapter it
+planned was never built: `ScopedStateReader` reads state directly, and session and contact
+writes go through `FlowSessionPersister` and `ContactWriter`. The Core primitives it kept —
+`StateReader`, `StateWriter`, `NamespaceResolverRegistry` and its resolvers, `FlowState`,
+`StatePath`, `WriteContext`, `NamespaceWritePolicy` and the local `StateNamespace` enum — were
+unused and have been deleted. The rest of this ADR, including D-3, D-5 and D-6, stands.
+
+---
+
 ## Связано с
 
 - [[01-state-model]] — state model flow engine

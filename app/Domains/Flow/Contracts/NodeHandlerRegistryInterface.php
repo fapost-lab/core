@@ -8,8 +8,19 @@ use Fapost\Foundation\Contracts\NodeHandlerInterface;
 
 interface NodeHandlerRegistryInterface
 {
-    public function register(NodeHandlerInterface $handler): void;
+    /**
+     * @param  class-string<NodeHandlerInterface>  $handlerClass
+     */
+    public function register(string $handlerClass): void;
 
+    /**
+     * Whether a handler is registered under `type@version`, without building it.
+     */
+    public function has(string $type, int $version): bool;
+
+    /**
+     * Build the handler registered under `type@version` in the current scope.
+     */
     public function resolve(string $type, int $version): NodeHandlerInterface;
 
     /**

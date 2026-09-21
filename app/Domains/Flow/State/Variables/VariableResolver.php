@@ -7,7 +7,6 @@ namespace App\Domains\Flow\State\Variables;
 use App\Domains\Flow\Contracts\VariableCoercerInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
-use Closure;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
 use InvalidArgumentException;
@@ -17,27 +16,18 @@ use InvalidArgumentException;
  *
  * Reads raw values from the engine state and coerces them via the per-tenant
  * schema registry + VariableCoercer. Falls back to raw value when the variable's
- * type is unknown (legacy flow / no declaration). Bound as singleton in FlowServiceProvider.
- *
- * The schema registry is resolved lazily via a closure so the singleton does not
- * capture a scoped instance — important for long-lived queue worker processes.
+ * type is unknown (legacy flow / no declaration). Bound as scoped in FlowServiceProvider:
+ * the schema registry it reads belongs to the current tenant.
  */
 final class VariableResolver implements VariableResolverInterface
 {
     private readonly VariableCoercerInterface $coercer;
 
-    /** @var (Closure(): VariableSchemaRegistryInterface)|null */
-    private readonly ?Closure $schemaRegistryResolver;
-
-    /**
-     * @param  (Closure(): VariableSchemaRegistryInterface)|null  $schemaRegistryResolver
-     */
     public function __construct(
         ?VariableCoercerInterface $coercer = null,
-        ?Closure $schemaRegistryResolver = null,
+        private readonly ?VariableSchemaRegistryInterface $schemaRegistry = null,
     ) {
-        $this->coercer                = $coercer ?? new VariableCoercer();
-        $this->schemaRegistryResolver = $schemaRegistryResolver;
+        $this->coercer = $coercer ?? new VariableCoercer();
     }
 
     public function resolveTargetPath(Variable $variable): string
@@ -63,9 +53,8 @@ final class VariableResolver implements VariableResolverInterface
         // (e.g. when the variable is read from a different flow's saved data).
         $type = $variable->type;
 
-        if (null === $type && null !== $this->schemaRegistryResolver) {
-            $registry = ($this->schemaRegistryResolver)();
-            $type     = $registry->get(
+        if (null === $type && null !== $this->schemaRegistry) {
+            $type = $this->schemaRegistry->get(
                 $variable->storage->value,
                 $variable->group,
                 $variable->name,

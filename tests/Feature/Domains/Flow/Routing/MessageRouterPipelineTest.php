@@ -43,7 +43,7 @@ final class MessageRouterPipelineTest extends FeatureTestCase
 
         // A handler that only writes to flow.* state — no outbound channel needed.
         $registry = $this->app->make(NodeHandlerRegistry::class);
-        $registry->register(new RecordingTestHandler());
+        $registry->register(RecordingTestHandler::class);
     }
 
     public function test_unknown_message_starts_default_flow_and_runs_to_end_node(): void

@@ -39,10 +39,10 @@ final class FlowEngineTest extends FeatureTestCase
         parent::setUp();
 
         $registry = $this->app->make(NodeHandlerRegistry::class);
-        $registry->register(new SequentialFlowTestHandler());
-        $registry->register(new WaitingFlowTestHandler());
-        $registry->register(new InfiniteLoopFlowTestHandler());
-        $registry->register(new SetLanguageEffectTestHandler());
+        $registry->register(SequentialFlowTestHandler::class);
+        $registry->register(WaitingFlowTestHandler::class);
+        $registry->register(InfiniteLoopFlowTestHandler::class);
+        $registry->register(SetLanguageEffectTestHandler::class);
     }
 
     public function test_start_executes_linear_flow_until_finished(): void

@@ -19,7 +19,7 @@ use Fapost\Foundation\Flow\Contracts\ScopedStateReaderInterface;
  *  - contact.<key>            → Contact column (id/tenant_id/external_id/platform/language)
  *                               or attributes[<key>] JSONB leaf
  *  - contact.<group>.<key>    → attributes[<group>][<key>] JSONB nested
- *  - module.<name>.<...>      → DataAccessor.get(...) for module
+ *  - module.<name>.<...>      → DataAccessor registered under `module.<name>`, get(<...>)
  *  - flow|system|rag|call.*   → flow_sessions.state.<namespace>.<...>
  */
 final readonly class ScopedStateReader implements ScopedStateReaderInterface
@@ -92,14 +92,14 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
         }
 
         $segments = explode('.', $rest, 2);
-        $module   = $segments[0];
+        $prefix   = "module.{$segments[0]}";
         $key      = $segments[1] ?? null;
 
-        if (null === $key || ! $this->accessors->has($module)) {
+        if (null === $key || ! $this->accessors->has($prefix)) {
             return null;
         }
 
-        return $this->accessors->resolve($module)->get(
+        return $this->accessors->resolve($prefix)->get(
             key: $key,
             contactId: (string) $this->contact->getKey(),
             tenantId: (string) $this->contact->tenant_id,
