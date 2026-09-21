@@ -9,10 +9,12 @@ users, and it must be accepted before a contribution can be merged.
 This agreement does **not** transfer ownership of your work. You keep the copyright in everything you contribute and
 remain free to use it however you wish, including in other projects.
 
-You accept this agreement by submitting a pull request to a FaPost repository and stating in it:
+You accept this agreement by commenting on your pull request to a FaPost repository with exactly:
 
-> I have read the FaPost Contributor License Agreement (CLA.md) and I accept it.
-> Signed-off-by: Full Name \<email@example.com\>
+> I have read the CLA document and I hereby sign the CLA
+
+The CLA check on the pull request records the acceptance against your GitHub account, so it is given once and covers
+your later pull requests.
 
 If you contribute on behalf of an employer or another legal entity, see [Section 8](#8-contributions-on-behalf-of-an-entity).
 
