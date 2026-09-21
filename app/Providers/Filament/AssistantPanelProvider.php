@@ -37,8 +37,8 @@ use Illuminate\View\Middleware\ShareErrorsFromSession;
  *
  * HTTP stack order: base web middleware → {@see TenancyMiddleware} (platform tenant) → {@see Authenticate} →
  * {@see EnsureUserIsActive} → Filament {@see \Filament\Http\Middleware\IdentifyTenant} (resolves
- * {@code assistant/{tenant}}; requires an authenticated user). Same rule as legacy {@code ResolveAssistantMiddleware}:
- * authentication must run before assistant UI identity resolution.
+ * {@code assistant/{tenant}}; requires an authenticated user). Authentication must run before assistant UI
+ * identity resolution.
  */
 final class AssistantPanelProvider extends PanelProvider
 {

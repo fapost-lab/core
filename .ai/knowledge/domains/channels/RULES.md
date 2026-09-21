@@ -17,6 +17,7 @@ paths:
   - "tests/Unit/Domains/Messaging/**"
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
+reviewed_at: 2026-09-21
 ---
 # Channels rules
 
@@ -32,6 +33,11 @@ broken.
   run after commit** (`ChannelObserver`). Why: the provider must never deliver to a hash the
   registry does not know.
 - **The webhook public hash is rotated only through `ChannelService`.**
+- **Rotating the webhook hash needs `Permission::RotateChannelToken` and access to the channel's
+  assistant; `ManageAssistants` is not enough** (`ChannelPolicy::rotateWebhook`, admins through
+  `Gate::before`; `ChannelRotationAuthorizationTest`). Why: rotation drops the old hash from routing
+  at once, so deliveries fail until the provider is switched to the new URL; it is a separately
+  granted, sensitive permission — `content_manager` does not have it.
 
 ## Rules
 
