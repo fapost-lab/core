@@ -12,7 +12,6 @@ This repository contains the platform itself, without niche Solution packages.
 
 - https://docs.fapost.in is the single source of truth. Sources are in `docs/site/`.
 - `docs/INDEX.md` indexes the internal documentation under `docs/`.
-- `drafts/CURRENT_TASK.md` is the current operational focus and the only file `drafts/` may contain.
 
 ## Directory Boundaries
 
@@ -190,7 +189,6 @@ label/content is.
   not duplicated under `docs/`; link to it instead.
 - Active source-of-truth documentation is written in English. Archive files may keep their original language
   until deleted or rewritten.
-- `drafts/` contains only `CURRENT_TASK.md`.
 - `CLAUDE.md` must not claim that tables, models, jobs or UI exist unless that is an architectural rule
   confirmed by the code.
 - On a discrepancy between code and documentation, first establish which it is: stale documentation, a partial

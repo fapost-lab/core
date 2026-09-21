@@ -19,7 +19,7 @@ published and does not override the site. See [INDEX.md](./INDEX.md) for the ful
 | What is implemented so far? | [`platform/current-state.md`](./platform/current-state.md) |
 | What is planned, and in what order? | [`platform/ROADMAP.md`](./platform/ROADMAP.md) |
 | What is the checklist? | [`platform/TASKS.md`](./platform/TASKS.md) |
-| What are we doing right now? | [`../drafts/CURRENT_TASK.md`](../drafts/CURRENT_TASK.md) |
+| What are we doing right now? | `.ai/scripts/jig status` — the active Jig tasks |
 
 `platform/TASKS.md` is the only status tracker. If a status looks wrong, verify against the code first, then
 update `platform/current-state.md` and `platform/TASKS.md`.
