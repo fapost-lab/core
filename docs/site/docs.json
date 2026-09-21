@@ -137,7 +137,8 @@
               "contributing/local-setup",
               "contributing/local-webhooks",
               "contributing/repo-layout",
-              "contributing/conventions"
+              "contributing/conventions",
+              "contributing/coding-agents"
             ]
           },
           {

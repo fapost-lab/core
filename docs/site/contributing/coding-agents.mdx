@@ -1,0 +1,62 @@
+---
+title: "Coding agents and Jig"
+description: "How FaPost is developed with AI coding agents, and where their knowledge lives."
+---
+
+FaPost Core is developed with AI coding agents — Claude Code and Codex — working
+through [Jig](https://jig.fapost.in), an open framework that gives an agent a
+process to follow and a place to keep what the project knows. You do not need an
+agent to contribute; a pull request written by hand is reviewed the same way. If
+you do use one, this page is how it fits in.
+
+## What lives in the repository
+
+| Path | What it is |
+| ---- | ---------- |
+| `AGENTS.md` | The rules every agent reads first: tenancy, migrations, worker safety, ID strategy, queues. `CLAUDE.md` only points at it. |
+| `.ai/knowledge/` | Project knowledge for agents: `ARCHITECTURE.md`, `RULES.md`, `GLOSSARY.md`, a pack per domain, ADRs, and stubs that link the existing ADRs and specs under `docs/`. Written in English, reviewed like code. |
+| `.ai/scripts/jig` | Jig's command-line tool, vendored so nothing needs installing globally. |
+| `.ai/workspace/` | Per-task notes, plans and reviews. Git-ignored: they never leave your machine. |
+
+An agent does not read all of `.ai/knowledge/` up front. It asks Jig for what
+the files it is about to change require:
+
+```bash
+.ai/scripts/jig context --files app/Domains/Flow/Services/FlowEngine.php
+```
+
+## How a change is sized
+
+Jig classifies every task by risk before any code is written, and the class
+decides the route:
+
+| Class | Signals | Route |
+| ----- | ------- | ----- |
+| T0 trivial | a typo, wording, a version bump | implement, verify |
+| T1 local | a bug with a known cause inside one component | analyze, implement, verify |
+| T2 structural | several components move together, or an internal contract changes | analyze, plan, implement, review, verify |
+| T3 architectural | a new boundary, a data-shape change, a change to an invariant in `RULES.md` | design, human approval, implement, architecture review, verify |
+| T4 critical | authentication, authorization, secrets, migrations on live data | specification, alternatives, design, human approval, independent review, verify |
+
+Risk sets the floor: a one-line change to authentication is not trivial. Every
+route ends by deciding what the task leaves in `.ai/knowledge/` — or that it
+leaves nothing.
+
+## What this means for a pull request
+
+- **Knowledge travels with the code.** A change that alters a rule, a boundary
+  or a domain's behaviour updates the document in `.ai/knowledge/` that owns it,
+  in the same pull request.
+- **Knowledge is proposed, then accepted.** Anything an agent infers about the
+  codebase enters as `proposed` and reaches other agents only after a human
+  accepts it (`.ai/scripts/jig knowledge proposed` lists what is waiting).
+- **Checks are the same.** `composer test`, `composer run test:arch` and Pint
+  decide, whoever wrote the code.
+
+```bash
+.ai/scripts/jig status
+```
+
+Shows active tasks, knowledge awaiting a decision and anything out of date. How
+to install Jig and connect your agent to it:
+[jig.fapost.in](https://jig.fapost.in).
