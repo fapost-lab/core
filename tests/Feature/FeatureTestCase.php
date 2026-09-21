@@ -136,6 +136,36 @@ abstract class FeatureTestCase extends TestCase
     }
 
     /**
+     * Landlord databases this process has already made sure exist.
+     *
+     * @var array<string, true>
+     */
+    private static array $ensuredLandlordDatabases = [];
+
+    /**
+     * This class wipes and migrates the landlord tables itself ({@see migrateLandlord()}),
+     * recording the run on the landlord connection, so under `--parallel` it takes a
+     * landlord database of its own rather than the default one plain database tests
+     * share; its lifetime does not matter, as every fresh migration rebuilds it.
+     */
+    protected function parallelLandlordDatabase(string $landlordDatabase, string $defaultDatabase, string $token): string
+    {
+        $database = "{$landlordDatabase}_test_{$token}";
+
+        if (! isset(self::$ensuredLandlordDatabases[$database])) {
+            $landlord = DB::connection('landlord');
+
+            if (null === $landlord->selectOne('SELECT 1 FROM pg_database WHERE datname = ?', [$database])) {
+                $landlord->getSchemaBuilder()->createDatabase($database);
+            }
+
+            self::$ensuredLandlordDatabases[$database] = true;
+        }
+
+        return $database;
+    }
+
+    /**
      * `migrate:fresh` drops every table in the search_path but does not create
      * the schema the search_path names.
      */
