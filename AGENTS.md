@@ -36,6 +36,25 @@ to the code.
 - Do not commit or push unless explicitly asked to.
 - Process documentation: `CONTRIBUTING.md` (short), `docs/site/contributing/` (full).
 
+## Release Proposals
+
+The version lives only in the `v*` tag; the rules for choosing it are in
+https://docs.fapost.in/contributing/releases and the per-type effect in
+https://docs.fapost.in/contributing/commits.
+
+- After opening or merging a pull request, state its version effect (MINOR / PATCH / none) from its
+  Conventional Commits title and any `BREAKING CHANGE:` footer or `!`.
+- After a merge into `main`, compute the pending bump over every pull request in
+  `git log <latest tag>..origin/main` (`git describe --tags --abbrev=0 origin/main`). Take the pull request
+  numbers from the subjects (`Merge pull request #N` or a squash `(#N)`) and read their titles with
+  `gh pr view N`: a merge commit subject carries no type. Do not select by merge date; it misses by seconds.
+- Pre-1.0: any `feat` or breaking change raises MINOR; otherwise `fix` or `perf` raises PATCH; `refactor`,
+  `test`, `docs`, `chore`, `build`, `ci` alone raise nothing. A title outside Conventional Commits is
+  classified by reading the pull request's diff.
+- If the pending bump is not none, propose a release: the next tag, the pull requests that justify it, and
+  the commands from the releases page. If it is none, say nothing.
+- Never create or push a tag without an explicit instruction: a pushed tag publishes images and is not undone.
+
 ## Laravel And PHP Rules
 
 - Follow the patterns of neighbouring files.
