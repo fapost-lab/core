@@ -8,7 +8,8 @@ paths:
   - "app/Domains/Flow/Handlers/**"
 source: docs/site/extending/flow-nodes/handler-contract.mdx
 summary: The node handler contract an extension implements
-source_hash: 5f53d9e870285d30614fb641e6a5119c53185370
+source_hash: 96e3573c0947280fcb0f2d6f79aecf2b36da68c0
+reviewed_at: 2026-09-22
 ---
 # Handler contract
 

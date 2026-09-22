@@ -12,6 +12,7 @@ use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowExecutionLimitExceededException;
@@ -41,6 +42,7 @@ final class FlowEngineTest extends FeatureTestCase
         $registry = $this->app->make(NodeHandlerRegistry::class);
         $registry->register(SequentialFlowTestHandler::class);
         $registry->register(WaitingFlowTestHandler::class);
+        $registry->register(DelayedFlowTestHandler::class);
         $registry->register(InfiniteLoopFlowTestHandler::class);
         $registry->register(SetLanguageEffectTestHandler::class);
     }
@@ -128,6 +130,48 @@ final class FlowEngineTest extends FeatureTestCase
         );
 
         $session = $engine->resume($session, $message);
+
+        $this->assertSame(FlowSessionStatus::Completed, $session->status);
+    }
+
+    public function test_delayed_node_parks_like_waiting_so_the_next_message_resumes_it(): void
+    {
+        $tenantId  = (string) Str::uuid();
+        $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+        $contact   = Contact::factory()->forTenant($tenantId)->create();
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Delayed',
+            'nodes'     => [
+                ['id' => 'd1', 'type' => 'delayed_test', 'version' => 1, 'config' => []],
+            ],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        $engine  = $this->app->make(FlowEngineInterface::class);
+        $session = $engine->start($definition, $contact);
+
+        $this->assertSame(FlowSessionStatus::WaitingInput, $session->status);
+        $this->assertSame(
+            (string) $session->getKey(),
+            (string) $this->app->make(FlowSessionRepositoryInterface::class)
+                ->findActiveForContact($contact, (string) $assistant->getKey())?->getKey(),
+            'A delayed session must stay findable, or the next message starts the default flow instead.',
+        );
+
+        $session = $engine->resume($session, new IncomingMessage(
+            updateId: 'u-delayed',
+            externalUserId: 'ext',
+            externalChatId: 'chat',
+            text: 'hello',
+            type: IncomingMessageType::Text,
+            platform: 'telegram',
+        ));
 
         $this->assertSame(FlowSessionStatus::Completed, $session->status);
     }
@@ -584,6 +628,51 @@ final class SetLanguageEffectTestHandler implements NodeHandlerInterface
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         $context->contactWriter?->write('contact.language', 'es');
+
+        return NodeExecutionResult::executed();
+    }
+}
+
+final class DelayedFlowTestHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'delayed_test';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Delayed Test';
+    }
+
+    public function category(): string
+    {
+        return 'Test';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        if (null === $context->incoming) {
+            return NodeExecutionResult::delayed();
+        }
 
         return NodeExecutionResult::executed();
     }

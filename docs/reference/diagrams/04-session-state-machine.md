@@ -8,13 +8,13 @@ stateDiagram-v2
 
     pending --> active : Engine начинает выполнение\nflow_definition_id зафиксирован
 
-    active --> waiting_input : InputNodeHandler\nнода ждёт ответа пользователя
+    active --> waiting_input : Нода вернула waiting()\nили delayed() — ждёт\nследующего сообщения
 
     waiting_input --> active : Пришёл ответ контакта\n(MessageRouter роутит в сессию)
 
     waiting_input --> ended : Timeout (no_response)\nили превышен retry_limit
 
-    active --> paused : Нода вернула Delayed\n(например, delay-нода)
+    waiting_input --> cancelled : Нажата постоянная кнопка\nиз другой ветки (FlowOrchestrator:\nтекущая сессия отменяется)
 
     active --> paused_subflow : SubflowNodeHandler\nсоздана дочерняя сессия\nparent_session_id установлен в child
 
@@ -51,14 +51,12 @@ stateDiagram-v2
     terminated_by_user --> [*]
 ```
 
-> `cancelled` — статус есть в enum `FlowSessionStatus` и в CHECK-constraint'е `flow_sessions`,
-> задокументирован в `FlowSessionRepositoryInterface::cancel()` как предназначенный для
-> reset-команд, но на момент написания ни один вызывающий код в `app/` его не использует —
-> текущий `GlobalCommandExecutor` переводит сессию в `terminated_by_user`. Он не показан на
-> диаграмме, так как для него не найдено ни одного реального перехода в коде. `paused`
-> показан только со входящим переходом: код, который выводит сессию обратно из `paused`,
-> в `app/Domains/Flow` не найден с уверенностью — `DelayedSessionResumer` проверяет статус
-> `waiting_input`, а не `paused`, так что исходящий переход не подтверждён и не указан.
+> `cancelled` ставит `FlowOrchestrator` (`FlowSessionRepository::cancel()`), когда нажатие
+> постоянной кнопки запускает её ветку: текущая сессия контакта отменяется, чтобы не было двух
+> активных. `/reset` переводит сессию в `terminated_by_user`, а не в `cancelled`.
+> `paused` сейчас не выставляется: `NodeExecutionResult::delayed()` паркует сессию в
+> `waiting_input`, как `waiting()` (отложенное по времени возобновление — задача
+> `delayed-resume-contract`). Значение остаётся в enum и CHECK-constraint'е.
 
 ## Ключевые поля FlowSession
 
