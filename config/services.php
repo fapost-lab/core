@@ -37,6 +37,11 @@ return [
         ],
     ],
 
+    'telegram' => [
+        // Bot API origin. Only a load test points it elsewhere (tools/loadtest/telegram-stub.php).
+        'api_base_url' => env('TELEGRAM_API_BASE_URL', 'https://api.telegram.org'),
+    ],
+
     'hcaptcha' => [
         'site_key'   => env('HCAPTCHA_SITE_KEY', '10000000-ffff-ffff-ffff-000000000001'),
         'secret_key' => env('HCAPTCHA_SECRET_KEY', '0x0000000000000000000000000000000000000000'),

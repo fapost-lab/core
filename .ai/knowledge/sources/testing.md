@@ -8,7 +8,7 @@ paths:
   - phpunit.xml
 source: docs/site/contributing/testing.mdx
 summary: "How to run and write tests: PostgreSQL locally, CI jobs, gateway golden files"
-source_hash: d8f8e3d841f5271f09156243f7e56569ad600369
+source_hash: 9dc2f03842096ba4256e66783e5932f1493ff7e9
 reviewed_at: 2026-09-22
 ---
 # Testing and architecture checks

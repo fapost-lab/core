@@ -79,4 +79,25 @@ final class TenantRepository implements TenantRepositoryInterface
         $tenant->setConnection('landlord');
         $tenant->save();
     }
+
+    /**
+     * Tenants whose slug starts with the given prefix, in any status.
+     *
+     * @return list<TenantInterface>
+     */
+    public function findBySlugPrefix(string $prefix): array
+    {
+        return Tenant::on('landlord')
+            ->where('slug', 'like', addcslashes($prefix, '%_\\') . '%')
+            ->get()
+            ->all();
+    }
+
+    /**
+     * Delete the tenant's landlord row.
+     */
+    public function delete(TenantInterface $tenant): void
+    {
+        Tenant::on('landlord')->whereKey($tenant->getId())->delete();
+    }
 }
