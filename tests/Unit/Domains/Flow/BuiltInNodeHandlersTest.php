@@ -12,6 +12,7 @@ use App\Domains\Flow\Contracts\FlowTriggerEventPublisherInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
+use App\Domains\Flow\Contracts\SendMessageTimeoutSchedulerInterface;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\AssignNodeHandler;
 use App\Domains\Flow\Handlers\BranchNodeHandler;
@@ -214,6 +215,39 @@ final class BuiltInNodeHandlersTest extends TestCase
 
         $this->assertSame(NodeExecutionStatus::Waiting, $result->status);
         $this->assertSame([], $result->stateChanges);
+    }
+
+    public function test_send_message_inline_keyboard_with_timeout_schedules_it_through_the_port(): void
+    {
+        $sender = Mockery::mock(MessageSenderInterface::class);
+        $sender->shouldReceive('send')->once()->andReturn('ext-inline');
+
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $translator->shouldReceive('resolveField')->andReturn('Choose', 'Yes');
+
+        $timeouts = Mockery::mock(SendMessageTimeoutSchedulerInterface::class);
+        $timeouts->shouldReceive('schedule')->once()->withArgs(
+            fn (string $tenantId, string $sessionId, string $nodeId, string $platform, DateTimeInterface $at): bool => 'node-timed' === $nodeId
+                && 'telegram' === $platform
+                && abs($at->getTimestamp() - (time() + 60)) <= 2,
+        );
+
+        $handler = $this->makeHandler($sender, $translator, $timeouts);
+
+        $result = $handler->execute([
+            'id'     => 'node-timed',
+            'config' => [
+                'content_type'    => 'text_with_keyboard',
+                'keyboard_mode'   => 'inline',
+                'timeout_seconds' => 60,
+                'text'            => ['en' => 'Choose'],
+                'buttons'         => [
+                    ['id' => '11111111-1111-4111-8111-111111111111', 'label' => ['en' => 'Yes'], 'value' => 'yes', 'row' => 0, 'order' => 0],
+                ],
+            ],
+        ], [], $this->context(nodeId: 'node-timed'));
+
+        $this->assertSame(NodeExecutionStatus::Waiting, $result->status);
     }
 
     public function test_send_message_inline_timeout_routes_to_no_response(): void
@@ -887,6 +921,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             $keyboardEditor,
             Mockery::mock(PersistentButtonRegistryInterface::class),
             new VariableResolver(),
+            Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
         );
 
         $context = new NodeExecutionContext(
@@ -944,6 +979,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             $keyboardEditor,
             Mockery::mock(PersistentButtonRegistryInterface::class),
             new VariableResolver(),
+            Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
         );
 
         $context = new NodeExecutionContext(
@@ -1413,6 +1449,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             $keyboardEditor,
             Mockery::mock(PersistentButtonRegistryInterface::class),
             new VariableResolver(),
+            Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
         );
 
         $persistedButtons = [
@@ -1503,6 +1540,7 @@ final class BuiltInNodeHandlersTest extends TestCase
     private function makeHandler(
         MessageSenderInterface $sender,
         ContentTranslatorInterface $translator,
+        ?SendMessageTimeoutSchedulerInterface $timeouts = null,
     ): SendMessageNodeHandler {
         return new SendMessageNodeHandler(
             $sender,
@@ -1511,6 +1549,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             Mockery::mock(InlineKeyboardEditorInterface::class),
             Mockery::mock(PersistentButtonRegistryInterface::class),
             new VariableResolver(),
+            $timeouts ?? Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
         );
     }
 

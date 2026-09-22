@@ -16,15 +16,23 @@ use DateTimeInterface;
  * wraps the run in one. What keeps the job behind the marker is the delay itself
  * (at least a second) and the session lock the job takes, which the dispatching
  * run holds while it persists. A job that still arrives first finds no matching
- * marker and no-ops. A `sync` queue ignores the delay and cannot resume at all;
- * there the node only moves on with the next inbound message after `resume_at`.
+ * marker and no-ops. A `sync` queue cannot defer at all, so nothing is queued
+ * there ({@see DeferredResumeDispatcher}) and the node only moves on with the next
+ * inbound message after `resume_at`.
  */
 final readonly class QueuedDelayResumeScheduler implements DelayResumeSchedulerInterface
 {
+    public function __construct(
+        private DeferredResumeDispatcher $dispatcher,
+    ) {
+    }
+
     public function schedule(string $tenantId, string $sessionId, string $nodeId, DateTimeInterface $resumeAt): void
     {
-        ResumeDelayedFlowSessionJob::dispatch($tenantId, $sessionId, $nodeId, $resumeAt->format(DateTimeInterface::ATOM))
-            ->delay($resumeAt)
-            ->afterCommit();
+        $this->dispatcher->dispatch(
+            new ResumeDelayedFlowSessionJob($tenantId, $sessionId, $nodeId, $resumeAt->format(DateTimeInterface::ATOM)),
+            $resumeAt,
+            ['session_id' => $sessionId, 'node_id' => $nodeId],
+        );
     }
 }

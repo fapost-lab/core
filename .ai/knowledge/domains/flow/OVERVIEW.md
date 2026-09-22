@@ -25,7 +25,7 @@ paths:
   - "app/Filament/Assistant/Resources/FlowLogs/**"
   - app/Console/Commands/CreateNextFlowLogPartitionCommand.php
   - app/Console/Commands/PruneFlowLogsCommand.php
-reviewed_at: 2026-09-11
+reviewed_at: 2026-09-22
 ---
 # Flow
 
@@ -81,6 +81,12 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   and calls `FlowEngine::runSession()`. The node is clock-gated, so an inbound message after
   `resume_at` also moves it on; the session parks in `waiting_input`, not `paused` —
   `findActiveForContact()` does not return paused sessions.
+- `send_message` timeouts: the handler schedules `ResumeTimedOutSendMessageNodeJob` (queue
+  `flow.execution`) through `SendMessageTimeoutSchedulerInterface`; the job resumes the node on its
+  `no_response` handle under the session lock. Both deferred resumes go through
+  `app/Infrastructure/Flow/DeferredResumeDispatcher`, which queues nothing on a `sync` queue: it
+  cannot delay, and would re-enter the running engine. There a timeout never fires and a delay
+  moves on only with the next inbound message.
 - Console: `flow:sweep-subflow-timeouts` (every minute), `logs:prune-flow`, `logs:create-partition`
   (`routes/console.php`).
 - Bindings: `Providers/FlowServiceProvider.php`. Registries are singletons, frozen after boot
