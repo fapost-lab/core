@@ -1,5 +1,25 @@
 # 03 · NodeHandlerInterface & State Writers
 
+> Статус: **частично устарело** (сентябрь 2026).
+>
+> Часть этого документа расходится с текущей реализацией:
+> - §3.3 `NodeExecutionResult.effects[]` — поле `effects[]` полностью удалено из движка (здесь
+>   оно ещё описано как deprecated-but-supported); state-изменения идут только через
+>   `stateChanges`. См. `.ai/knowledge/adr/0002-retire-core-state-primitives.md`.
+> - §3.4.2 "Core implementation" (`StateReader`/`StateWriter`/`NamespaceResolverRegistry`/
+>   `FlowState`/`StatePath`/`WriteContext`/`NamespaceWritePolicy`) — весь этот Core-слой
+>   примитивов удалён; `ScopedStateReader`, `FlowSessionPersister`+`SystemStateNamespacePolicy`
+>   и `ContactWriter` — не адаптеры поверх него, а самостоятельная реализация. См.
+>   `.ai/knowledge/adr/0002-retire-core-state-primitives.md`.
+> - §3.4.3 "Engine flow", шаг "Apply legacy effects\[\] (deprecated path)" — этого пути больше
+>   нет, см. тот же ADR.
+> - §3.6 "Registration" — пример `$registry->register(new SendMessageNodeHandler(...))`
+>   (инстанс-based) устарел: registry хранит class-string и строит handler per-scope через
+>   `NodeHandlerFactoryInterface`. См. `.ai/knowledge/adr/0001-node-handlers-built-per-scope.md`.
+>
+> Текст ниже сохранён как исторический артефакт brownfield reconciliation и не переписан.
+> Актуальный порядок написания handler-а — `docs/platform/runtime/flow/06-node-development-guide.md`.
+
 > **Версия:** v1.3 (после brownfield reconciliation, см. [synthesis.md](../../../platform/plans/flow-engine/synthesis.md))
 >
 > Этот документ описывает **финальный** контракт после согласования ADR State Writer Semantics с реальной кодовой базой. Где в ADR были универсальные предложения — здесь фиксируется конкретная гибридная форма (см. D-1..D-6 в synthesis).

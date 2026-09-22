@@ -1,146 +1,111 @@
 # Node · `send_message`
 
-Отправляет сообщение в канал доставки.
+Sends content to the contact through the active channel, with optional inline/reply
+keyboards and dynamic keyboards built from state data.
 
 **Type:** `send_message`
 **Version:** 1
-**Idempotent:** в V1 ограниченно — distributed lock покрывает 99% случаев, см. ADR Message Routing & Concurrency Control. Полная Redis-based dedup — V1.x.
+**Category:** `Core`
+**Handler:** `App\Domains\Flow\Handlers\SendMessageNodeHandler`
 
 ## Config
 
 ```json
 {
-  "content_type": "text",
-  "text": "Привет, {{contact.first_name}}",
-  "media_url": null,
+  "content_type": "text_with_keyboard",
+  "text": "Choose one",
+  "media_file_id": null,
   "caption": null,
-  "keyboard": {
-    "type": "static",
-    "buttons": [
-      {"text": "Да", "value": "yes", "row": 0},
-      {"text": "Нет", "value": "no", "row": 0}
-    ]
-  }
-}
-```
-
-**Поля:**
-
-| Поле | Тип | Required | Описание |
-|------|-----|----------|----------|
-| `content_type` | enum | yes | text / image / document / video / voice |
-| `text` | Expression | conditional | Required если content_type=text. Подпись для media — в caption |
-| `media_url` | Expression\|null | conditional | Required если content_type != text |
-| `caption` | Expression\|null | no | Подпись к media |
-| `keyboard` | KeyboardSpec\|null | no | См. ниже |
-
-## KeyboardSpec — два режима
-
-### Static (литеральный список кнопок)
-
-```json
-{
-  "type": "static",
+  "keyboard_mode": "inline",
   "buttons": [
-    {"text": "Иванов", "value": "1", "row": 0},
-    {"text": "Петров", "value": "2", "row": 0},
-    {"text": "Отмена", "value": "cancel", "row": 1}
-  ]
+    {"id": "8f14e...-uuid", "label": "Yes", "value": "yes"},
+    {"id": "3a01c...-uuid", "label": "No", "value": "no"}
+  ],
+  "dynamic_buttons": null,
+  "save_to_variable": {"name": "answer", "storage": "session", "type": "text", "group": null},
+  "timeout_seconds": 60,
+  "remove_keyboard_after_press": true
 }
 ```
 
-### Dynamic (из коллекции в state)
+**Fields** (schema in `configSchema()`):
 
-```json
-{
-  "type": "dynamic",
-  "source": "{{flow.employees}}",
-  "item_template": {
-    "text": "{{item.name}}",
-    "value": "{{item.id}}"
-  },
-  "max_per_row": 2
-}
-```
-
-В dynamic режиме engine итерирует по resolved коллекции (массив объектов), для каждого item рендерит template.
-
-> **Patch v1.1:** `value` template **обязан** содержать placeholder `{{item.X}}`. Pure literal без placeholders — validation error при save flow_definition. Convention: использовать unique identifier (`{{item.id}}`, `{{item.key}}`) для надёжной идентификации выбора.
->
-> Engine не делает обратный mapping `value → item object`. Если нужен полный объект — пользователь сохраняет коллекцию в state и выполняет lookup через expression после Input.
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `content_type` | enum `SendMessageContentType` | yes | `text`, `text_with_keyboard`, `image`, `document`, `video`, `voice`. Default `text`. |
+| `text` | string/translatable | conditional | Required (key must be present) for `text` and `text_with_keyboard`. |
+| `media_file_id` | string | conditional | Required when `content_type` is `image`, `document`, `video` or `voice` (`SendMessageContentType::requiresMediaUrl()`). |
+| `caption` | string/translatable | no | Shown for `image`, `document`, `video`. |
+| `keyboard_mode` | enum `KeyboardMode` (`Fapost\Foundation\Flow\Enums\KeyboardMode`) | conditional | `inline` or `reply`. Required when `content_type = text_with_keyboard`. Default `inline`. |
+| `buttons` | list of `{id, label, value}` | conditional | Each `id` must be a valid UUID (`Ramsey\Uuid\Uuid::isValid`). Required (or `dynamic_buttons`) when `content_type = text_with_keyboard`. |
+| `dynamic_buttons` | object `{source, max_per_row, save_item_to}` | no | `source` is a non-empty state path (`StatePickerField`, namespaces `flow`/`contact`); `max_per_row` defaults to 2 (min 1); `save_item_to` is an optional `Variable` shape. |
+| `save_to` | string | no | Legacy scalar target path for a pressed static button's `value`. |
+| `save_to_variable` | object `{name, type, storage, group}` | no | Preferred target for a pressed static button's `value`; wins over `save_to`. |
+| `timeout_seconds` | int ≥ 1 | no | When set, schedules a timeout resume for inline keyboards. |
+| `remove_keyboard_after_press` | bool | no | Default `true`. |
 
 ## Output handles
 
-- `success` — сообщение отправлено
-- `error` — ошибка отправки (соединение, rate limit, channel limit и т.п.)
+- `error` — `MessageSenderInterface::send()` threw; metadata carries `error` and `error_type: 'send_failure'`.
+- `no_response` — an inline-keyboard prompt timed out without a button press.
+- The pressed button's handle when `content_type = text_with_keyboard` and `keyboard_mode = inline`:
+  - static keyboard — the button's own UUID `id` string;
+  - dynamic keyboard (`dynamic_buttons` set) — always `default`.
+- `default` — normal completion for every non-inline-keyboard payload (`NodeExecutionResult::executed()` default handle).
 
 ## Behavior
 
-> **Patch v1.2 (ADR Message Routing & Concurrency Control):** в V1 attempt-tracking + Redis SET NX dedup **не реализуется**. Distributed lock на `(tenant, contact, assistant)` обеспечивает что одна сессия не выполняется параллельно. Контракт `idempotencyKey` в `MessageSender.send()` сохранён для forward-compat — implementation просто passes значение в провайдер (HTTP — `Idempotency-Key` header), Redis dedup откладывается до V1.x.
+1. Idempotency gate: `state[system.sent_messages][nodeId]` records whether this node already sent its message.
+2. If the message was already sent, the content is `text_with_keyboard` + `keyboard_mode = inline`, and an incoming message is present, the handler resumes waiting for the button press (`resumeInlineKeyboard()`), reloading generated buttons from `system.send_message.dynamic_buttons.{nodeId}` when `dynamic_buttons` was configured.
+3. If already sent and no incoming to resume with: `NodeExecutionResult::waiting()` for inline keyboards, `NodeExecutionResult::executed()` otherwise.
+4. On the first pass: if `dynamic_buttons` is set, buttons are generated from the state collection at `source` (`generateDynamicButtons()` — see below); the payload's `text`/`caption`/button labels are resolved through `ContentTranslatorInterface::resolveField()` then rendered through `TemplateRenderer`, merging session state with a small `contact` context (`id`, `language`, `name`/`first_name`, `username`, `channel`).
+5. `MessageSenderInterface::send(tenantId, contactId, sessionId, payload)` is called. A thrown exception routes to `error`.
+6. `system.sent_messages.{nodeId}` is set to the returned external message id.
+7. For `text_with_keyboard` + `inline`:
+   - if dynamic, the generated buttons are persisted to `system.send_message.dynamic_buttons.{nodeId}` so a resume doesn't need to regenerate them;
+   - if `timeout_seconds` is set, `system.send_message.timeout.{nodeId}.at` is written and `ResumeTimedOutSendMessageNodeJob::dispatch(tenantId, sessionId, nodeId, platform)->delay($timeoutAt)->afterCommit()` is queued;
+   - if `remove_keyboard_after_press` is `false` and a message id was returned, each button is registered with `PersistentButtonRegistryInterface::register()` (best-effort — swallows any `Throwable`) so a press can be routed after the session has ended;
+   - result is `NodeExecutionResult::waiting()` with metadata `external_message_id`.
+8. For every other content type, result is `NodeExecutionResult::executed()` with metadata `external_message_id`.
 
-1. Handler рендерит все Expression поля относительно текущего state
-2. Handler формирует idempotency key: `idempotencyKey = "{session_id}:{node_id}:{attempt_number}"`. В V1 `attempt_number = 1` (статически — нет автоинкремента).
-3. Handler вызывает `MessageSender.send(message, idempotencyKey)`
-4. MessageSender:
-   - Если канал поддерживает (HTTP) — кладёт `idempotencyKey` в `Idempotency-Key` header
-   - Telegram игнорирует
-   - Возвращает `SentMessageResult{messageId, wasDeduplicated: false, providerMetadata}` (в V1 `wasDeduplicated` всегда `false`)
-5. Handler добавляет `message_id` в `system.sent_message_ids` (observability tracking)
+### Dynamic button generation (`generateDynamicButtons()`)
 
-### Known V1 limitation: worker crash mid-send
+Iterates the array at `dynamic_buttons.source`; items without a non-empty string `label` are skipped. Each button gets a deterministic id — `Uuid::uuid5(Uuid::NAMESPACE_OID, "{nodeId}:{index}")` — so ids stay stable across job retries, a `row` computed from `floor(index / max_per_row)`, and the full source `item` attached for later use by `save_item_to`.
 
-Если worker отправил сообщение провайдеру и упал перед `save session.version`, retry даст повторный send (новый worker не знает что предыдущий attempt уже выполнился). Окно crash window малое (~100ms между send и save), реальная frequency низкая.
+### Resuming an inline keyboard (`resumeInlineKeyboard()`)
 
-Полное решение — Redis SET NX dedup на стороне MessageSender — V1.x по first business need (broadcast, financial calls). См. ADR Message Routing & Concurrency Control, раздел "Failure Modes / Worker crash mid-execution".
+1. If `system.send_message.response.{nodeId}.handle` is already set and its stored `update_id` matches the current incoming `updateId`, the handler replays that handle without re-processing (`executed()` idempotency guard against duplicate deliveries of the same update).
+2. If the incoming payload carries `send_message_timeout: true` (set by the timeout job's resume), the keyboard is removed (when `remove_keyboard_after_press`) and the node exits through `no_response`, recording the response marker.
+3. Otherwise the incoming text is decoded as Telegram `callback_data` via `CallbackDataCodec::decode()`. A `session_id` mismatch (stale/foreign callback) triggers a best-effort hint message (`sendWaitingHint()`, itself swallowing `Throwable`) and `waiting()`.
+4. A missing/empty `button_id` in the decoded payload also yields `waiting()`.
+5. When a configured button matches the pressed id: the keyboard is removed if configured; the response marker (`handle`, `update_id`) is recorded; for a dynamic keyboard the full matched item is written to `save_item_to` (contact storage writes immediately via `ContactWriterInterface`, session storage goes into `stateChanges`), for a static keyboard the button's scalar `value` is written to the resolved save target (`save_to_variable` preferred, else legacy `save_to`). Result is `executed(sourceHandle: $handle, stateChanges)`.
+6. No matching button → `waiting()`.
 
-`system.sent_message_ids` остаётся append-only логом отправок для observability и отладки, **не используется для dedup**.
+## State written
 
-### MessageSender контракт
+- `system.sent_messages.{nodeId}` — external message id once sent (send idempotency).
+- `system.send_message.dynamic_buttons.{nodeId}` — generated dynamic buttons (dynamic keyboards only).
+- `system.send_message.timeout.{nodeId}.at` — ISO-8601 timeout instant (when `timeout_seconds` set).
+- `system.send_message.response.{nodeId}.handle` / `.update_id` — recorded once a button press or timeout has been processed (replay guard).
+- The configured `save_to`/`save_to_variable`/`save_item_to` target, for a pressed button (session storage only; contact storage is written immediately).
 
-```php
-interface MessageSenderInterface
-{
-    public function send(
-        OutgoingMessage $message,
-        string $idempotencyKey
-    ): SentMessageResult;
-}
+## Side effects
 
-final class SentMessageResult
-{
-    public function __construct(
-        public readonly string $messageId,
-        public readonly bool $wasDeduplicated,  // V1: всегда false (нет Redis dedup)
-        public readonly array $providerMetadata,
-    ) {}
-}
-```
+- `MessageSenderInterface::send()` — the outgoing message, and (best-effort) the "please press a button" hint sent when text arrives while waiting.
+- `ResumeTimedOutSendMessageNodeJob::dispatch()->delay($timeoutAt)->afterCommit()` when `timeout_seconds` is configured.
+- `InlineKeyboardEditorInterface::removeKeyboard()` when `remove_keyboard_after_press` is true and a press/timeout is processed.
+- `PersistentButtonRegistryInterface::register()` (best-effort) when `remove_keyboard_after_press` is `false`; skipped silently when `system.flow_definition_id` is absent from state.
 
-### Channel limits enforcement
+## Idempotency / replay
 
-> **Patch v1.1:** Channel-specific limits (Telegram: 100 buttons, 8 per row, button text 64 chars; WhatsApp: свои) enforce **на уровне ChannelAdapter**, не в SendMessageHandler. Handler — graph-aware, не знает channel-specific constraints.
+Sending is gated by `system.sent_messages.{nodeId}`, so a re-executed node never resends. Inline-keyboard resumption is gated by the stored `{handle, update_id}` pair, so replaying the same webhook update yields the same handle without re-applying the button's write.
 
-ChannelAdapter при send:
-- Validate against channel limits
-- При превышении → `ChannelMessageInvalidException`
-- В `CallResult.error_code` → `"channel_limit_exceeded"`
-- handle → `error`
+## Legacy config
 
-Пользователь получает: «message не отправлено, превышен limit». Может ветвить через branch для fallback.
+- `media_url` / `media_path`: if present, the handler tries to recover `media_file_id` from a `/media/files/{uuid}` URL path via regex, then discards both legacy keys.
+- `save_to` (plain state path string): used only when `save_to_variable` is absent, resolved through `VariableResolverInterface::fromLegacyPath()`.
 
-## Validation flow_definition
+## Related
 
-- `text` обязателен если `content_type=text`
-- `media_url` обязателен если `content_type != text`
-- В static keyboard — `text` и `value` непустые
-- В dynamic keyboard — `source` и `item_template` непустые
-- В dynamic keyboard — `value` template содержит хотя бы один placeholder `{{item.X}}` (не pure literal)
-
----
-
-## Связано с
-
-- [[README]] — nodes README
-- [[../../../plans/flow-engine/implementation-plan]] — план реализации
-- [[07-media-domain-asset-cache]] — медиа контент в сообщениях
-- [[15-multilingual]] — локализация текстов
+- [02-input.md](02-input.md) — shares the same keyboard/prompt payload shape.
+- [../../../../platform/runtime/flow/10-registered-nodes-catalog.md](../../../../platform/runtime/flow/10-registered-nodes-catalog.md) — full handler catalog.

@@ -1,7 +1,13 @@
 # ADR-02 — Assistant Panel: separate operational console
 
-> Зафиксировано: март 2026. Статус: **принято**.
-> 
+> Зафиксировано: март 2026. Статус: **заменено** (сентябрь 2026).
+>
+> Статичный prefix `/assistant` с `?assistant=uuid` и `ResolveAssistantMiddleware` заменены
+> Filament tenancy: роль tenant-модели играет `Assistant`, маршруты имеют вид `/assistant/{id}`,
+> panel настроен через `->tenant(Assistant::class, ...)` в
+> `app/Providers/Filament/AssistantPanelProvider.php`. `ResolveAssistantMiddleware` удалён из кодовой базы.
+>
+> Текст ниже сохранён как запись первоначального решения и его причин.
 
 ---
 

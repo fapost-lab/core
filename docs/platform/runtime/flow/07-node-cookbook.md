@@ -158,14 +158,21 @@
 
 ### Как делать корректно
 
-- по возможности отдавать `effects`, а не напрямую писать в модель в handler-е,
-- пусть engine применяет side-effect централизованно.
+- вызывай `ContactWriterInterface` (`context->contactWriter`) напрямую из handler-а - это
+  единственный канал для contact-мутаций, легаси `effects[]` удалён;
+- не пиши в модель `Contact` мимо writer-а и не имитируй его через прямые репозитории.
+
+### Пример
+
+`SetTagNodeHandler` (`app/Domains/Flow/Handlers/SetTagNodeHandler.php`) меняет теги контакта
+через `ContactTagRepositoryInterface`, а не через writer, потому что теги - отдельная таблица
+`contact_tags`, а не `contact.*` state; для `language`/`attributes` (полей самого Contact)
+используй `ContactWriterInterface`.
 
 ### Зачем
 
-- единое место применения побочных эффектов,
-- лучше предсказуемость и логирование,
-- проще тестировать отдельно handler и engine.
+- явная зависимость handler-а от writer-а видна в конструкторе/контексте,
+- проще тестировать: writer мокается напрямую, без промежуточного движка.
 
 ---
 
@@ -193,7 +200,7 @@
 - Какие `sourceHandle` она может вернуть?
 - Какие поля обязательны в `config`?
 - Что пишем в `stateChanges`?
-- Какие `effects` отдаём?
+- Нужны ли contact-мутации через `ContactWriter`?
 - Что произойдёт при retry того же сообщения/job?
 - Где негативный путь (error/invalid/timeout)?
 

@@ -1,5 +1,18 @@
 # 07 · Migration & Backward Compat
 
+> Статус: **частично устарело** (сентябрь 2026).
+>
+> §7.2 "Breaking changes" показывает регистрацию через инстансы (`registry->register(new
+> SendMessageHandlerV1())`, `registry->register(new SendMessageHandlerV2())`) — этот способ
+> устарел: registry хранит class-string и строит handler per-scope через
+> `NodeHandlerFactoryInterface` (`app/Domains/Flow/Contracts/NodeHandlerFactoryInterface.php`).
+> См. `.ai/knowledge/adr/0001-node-handlers-built-per-scope.md`.
+>
+> Остальной текст (резолв по `(type, version)`, `supportedVersions()`, правила удаления
+> deprecated handler-ов) актуален и сохранён без изменений. Актуальный порядок регистрации
+> handler-а — `docs/platform/runtime/flow/06-node-development-guide.md` (§3 "Как handler
+> попадает в runtime").
+
 ## 7.1 Версионирование
 
 Каждый node в snapshot содержит `version`. Engine резолвит handler по `(type, version)`:

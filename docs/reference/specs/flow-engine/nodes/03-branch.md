@@ -1,119 +1,94 @@
 # Node · `branch`
 
-Ветвление по условиям. Объединяет classic Condition (true/false) и Switch (множественные cases).
+Evaluates a list of rules against a resolved operand and selects the output handle of the
+first match, falling back to `default`.
 
 **Type:** `branch`
 **Version:** 1
-**Idempotent:** yes (чистое чтение state)
+**Category:** `Logic`
+**Handler:** `App\Domains\Flow\Handlers\BranchNodeHandler`
 
 ## Config
 
 ```json
 {
-  "cases": [
-    {
-      "left": {"source": "contact", "path": "form.input1"},
-      "operator": "eq",
-      "right": {"type": "literal", "value": 1},
-      "handle": "first"
-    },
-    {
-      "left": {"source": "contact", "path": "form.input1"},
-      "operator": "eq",
-      "right": {"type": "literal", "value": 2},
-      "handle": "second"
-    }
-  ],
-  "default_handle": "other"
+  "check": "flow.status",
+  "rules": [
+    {"handle": "approved", "operator": "eq", "value": "approved"},
+    {"handle": "rejected", "operator": "eq", "value": "rejected"}
+  ]
 }
 ```
 
-**Поля:**
-
-| Поле | Тип | Required | Описание |
-|------|-----|----------|----------|
-| `cases` | array | yes | Список условий, проверяются по порядку |
-| `default_handle` | string | yes | Handle когда ни один case не сматчился |
-
-**Case:**
-
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `left` | OperandRef | Левая часть |
-| `operator` | enum | Оператор сравнения |
-| `right` | OperandRef\|Literal | Правая часть (отсутствует для unary operators) |
-| `handle` | string | Имя handle для перехода |
-
-**OperandRef:**
+A rule may instead carry a structured operand under `left` (written by the builder's
+operand picker), resolved by the shared `OperandResolver`:
 
 ```json
-{"source": "contact",  "path": "form.input1"}
-{"source": "flow",     "path": "code"}
-{"source": "rag",      "path": "confidence"}
-{"source": "call",     "path": "response.status"}
-{"source": "module",   "path": "hr.department"}
+{
+  "left": {"ref": "user_variable", "variable": {"name": "status", "storage": "session"}},
+  "operator": "eq",
+  "value": "approved",
+  "handle": "approved"
+}
 ```
-
-**Literal:**
 
 ```json
-{"type": "literal", "value": 42}
-{"type": "literal", "value": "active"}
-{"type": "literal", "value": true}
-{"type": "literal", "value": null}
+{
+  "left": {"ref": "source", "source": "contact", "field": "form.input1"},
+  "operator": "eq",
+  "value": 1,
+  "handle": "first"
+}
 ```
 
-## Operators
+**Fields:**
 
-| Operator | Описание | Применимость | Arity |
-|----------|----------|--------------|-------|
-| `eq` | равно | любые типы | binary |
-| `neq` | не равно | любые | binary |
-| `gt` / `gte` | > / >= | numbers, dates | binary |
-| `lt` / `lte` | < / <= | numbers, dates | binary |
-| `contains` | содержит | strings, arrays | binary |
-| `not_contains` | не содержит | strings, arrays | binary |
-| `starts_with` / `ends_with` | начинается/заканчивается | strings | binary |
-| `in` / `not_in` | входит / не входит в массив | left = scalar, right = array | binary |
-| `is_empty` / `is_not_empty` | пусто / не пусто | unary, без `right` | **unary** |
-| `is_null` / `is_not_null` | null / не null | unary, без `right` | **unary** |
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `check` | string (state path) | no | Node-level default operand path, used by a rule that has no `left`. |
+| `rules` | list of `{handle, operator, value, left?}` | yes (at least one expected) | Evaluated in order; the first rule whose operator matches its resolved operand against `value` wins. |
+
+**Rule `left` shapes** (`OperandResolver::resolve()`):
+
+- absent / `left` is a non-empty string → treated as a legacy bare path (same resolution as `check`).
+- `{"ref": "user_variable", "variable": {...}}` (or flat `name`/`storage`/`group`) → resolved through `VariableResolverInterface`, honoring the session's `stateReader` when present.
+- `{"ref": "source", "source": "<namespace>", "field"|"path": "<field>"}` → resolved as `"<namespace>.<field>"` through the legacy-path resolver.
+- if `left` is absent/empty and the rule has no fallback, the node-level `check` (`$defaultPath`) is used; if that is also absent, `OperandResolver` throws `InvalidNodeConfigException`.
+
+**Legacy path resolution** (`resolveLegacyPath()`) accepts `module.<prefix>.<key>` (routed through `DataAccessorRegistryInterface`) and any path starting with `flow.`, `system.`, `rag.`, `contact.` or `call.` (read via `data_get()` against state). A path ending in `.length` whose direct value is absent falls back to `count()` of its parent array (the "`.length` pseudo-accessor"). Any other namespace throws `InvalidNodeConfigException`.
+
+## Operators (`BranchOperator`)
+
+`eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains` (`str_contains` on the string-cast value), `in` (`in_array` against an array `value`), `empty`, `not_empty` (PHP `empty()`/`!empty()`). All comparisons in `OperatorComparator::matches()`; an unknown/missing operator never matches.
 
 ## Output handles
 
-- Все handles из `cases[].handle` + `default_handle`
+- Each rule's own `handle` (defaults to `'default'` when a matched rule has no `handle` string).
+- `'default'` when no rule matches.
+
+There is no separate configured `default_handle` field — the handler always falls back to the literal string `'default'`.
 
 ## Behavior
 
-1. Для каждого case по порядку — резолвит left и right через resolvers
-2. Применяет operator
-3. Первый матч — выходит через `case.handle`
-4. Если ни один не сматчился — выходит через `default_handle`
+1. `check` (if a non-empty string) becomes the node-level `$defaultPath`.
+2. Rules are evaluated in array order (`evaluateRules()`): resolve the rule's operand via `OperandResolver::resolve($rule, $defaultPath, $state, $context)`; record `resolved[$path] = $value` when a path was produced; test `OperatorComparator::matches($value, $rule['operator'], $rule['value'])`.
+3. The first matching rule returns its `handle` (or `'default'`); non-array rule entries are skipped.
+4. No match → `'default'`. If `check` was configured and no `resolved` entries were collected (e.g. an empty `rules` list), `resolved[$defaultPath]` is additionally computed for log parity.
+5. Result is always `NodeExecutionStatus::Executed` (branch never waits) with `logResolved` = every operand path/value touched during evaluation, and `metadata.expression = {operand, operator, expected}` describing the matched (or attempted) rule.
 
-## Module accessor failures
+## State written
 
-> **Patch v1.1:** новый sub-block.
+None — `branch` only reads state; it never returns `stateChanges`.
 
-Branch reading через `module.*` operand:
-- Если accessor успешно вернул значение (включая null) → comparison выполняется штатно
-- Если accessor бросает (module degraded, missing capability, infrastructure error) → **session failed**
-- Fallback message из node config (если задан) отправляется контакту
-- См. Module Isolated Fail Strategy в Platform Architecture, раздел 12.3
+## Side effects
 
-Branch не получает специальный `module_error` handle. Это намеренно — инфраструктурные failures обрабатываются на уровне engine, не node logic.
+None beyond `module.*` operand reads through `DataAccessorRegistryInterface` (which may call out to an external data source registered for that module).
 
-## Validation flow_definition
+## Idempotency
 
-- Все handles в cases должны быть unique
-- `default_handle` не должен дублировать handle case
-- Edges из ноды должны покрывать все объявленные handles (warning при отсутствии edge — flow продолжает идти к default null transition)
-- **Unary operators** (`is_empty`, `is_not_empty`, `is_null`, `is_not_null`) — `right` **запрещён** в case
-- **Binary operators** (всё остальное) — `right` **обязателен**
+Pure function of state — reading the same state always yields the same handle.
 
----
+## Related
 
-## Связано с
-
-- [[README]] — nodes README
-- [[07-branch-source-picker]] — condition operand picker в builder
-- [[05-backend-contract]] — backend контракт для переменных
-- [[02-input]] — input часто предшествует branch
+- [02-input.md](02-input.md) — often precedes `branch` to route on a captured value.
+- [../../../../platform/runtime/flow/10-registered-nodes-catalog.md](../../../../platform/runtime/flow/10-registered-nodes-catalog.md) — full handler catalog.

@@ -66,24 +66,35 @@
 
 ### Разрешённые `status`
 
+Полный список — enum `App\Domains\Flow\Enums\FlowSessionStatus`, зеркалируется CHECK-constraint'ом
+на колонке `flow_sessions.status` (см. миграцию `2026_05_06_000003_extend_flow_sessions_status_constraint`):
+
 - `pending`
 - `active`
 - `waiting_input`
 - `paused`
+- `paused_subflow` (добавлен отдельной миграцией, subflow lifecycle)
 - `completed`
+- `ended` (добавлен отдельной миграцией, subflow lifecycle)
 - `failed`
 - `cancelled` (добавлен отдельной миграцией)
+- `expired` (добавлен отдельной миграцией, subflow lifecycle)
+- `terminated_by_user` (добавлен отдельной миграцией, subflow lifecycle)
 
 ### Где используются статусы
 
-| Статус          | Практический смысл                                  |
-|-----------------|-----------------------------------------------------|
-| `active`        | Движок выполняет граф или готов продолжать          |
-| `waiting_input` | Ждём ответ пользователя                             |
-| `paused`        | Ждём таймер/внешнее событие                         |
-| `completed`     | Сессия завершена                                    |
-| `failed`        | Ошибка выполнения                                   |
-| `cancelled`     | Ручной reset-командой (`/start`, `/reset`, `/stop`) |
+| Статус                | Практический смысл                                                                                                         |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------|
+| `active`               | Движок выполняет граф или готов продолжать                                                                                  |
+| `waiting_input`        | Ждём ответ пользователя                                                                                                     |
+| `paused`               | Нода вернула `Delayed` (например, `delay`-нода) — сессия ждёт таймер                                                        |
+| `paused_subflow`       | Родительская сессия приостановлена, пока выполняется дочерний subflow (`SubflowStarterService`)                            |
+| `completed`            | Граф исчерпан без явной `end`-ноды (`NodeExecutionStatus::Finished`, включая resume родителя после subflow без узла-продолжения) |
+| `ended`                | Сессия завершена явной `end`-нодой; финальный исход хранится в `end_status` (`success`/`cancelled`/`failed`)               |
+| `failed`               | Ошибка выполнения ноды/движка (`NodeExecutionStatus::Failed`)                                                               |
+| `cancelled`            | Есть в enum и в CHECK-constraint'е, задокументирован в `FlowSessionRepositoryInterface::cancel()` как статус reset-команд, но на момент написания ни один вызывающий код в `app/` его не использует — фактические reset-команды (`GlobalCommandExecutor`) переводят сессию в `terminated_by_user` |
+| `expired`              | `SubflowTimeoutSweeper` пометил осиротевшего родителя (в `paused_subflow`, `expires_at` истёк, живого child нет)            |
+| `terminated_by_user`   | Принудительно завершена глобальной командой (`/reset`-подобные) через `GlobalCommandExecutor::markTerminated`              |
 
 ## `flow_triggers`
 

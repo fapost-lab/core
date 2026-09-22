@@ -1,5 +1,20 @@
 # 10 · Связанные документы и Future ADR
 
+> Статус: **частично устарело** (сентябрь 2026).
+>
+> Раздел §10.2 "ADR State Writer Semantics ✓ Accepted" описывает решение D-4
+> (`ScopedStateWriterInterface`/`SessionStateWriter`/Core-примитивы `StateReader`/`StateWriter`)
+> как принятое — это решение отменено: Core-слой state-примитивов (`StateReader`/`StateWriter`/
+> `NamespaceResolverRegistry` и связанные классы) удалён, а `ScopedStateReader` +
+> `FlowSessionPersister`/`SystemStateNamespacePolicy` + `ContactWriter` — самостоятельная
+> реализация, а не адаптеры поверх него. См. `.ai/knowledge/adr/0002-retire-core-state-primitives.md`
+> (supersedes D-4 из `docs/platform/architecture/adr/10-state-writer-semantics.md`).
+>
+> Остальные подразделы §10.2 (Subflow Composition, Message Routing & Concurrency, Expression
+> Language) актуальны и сохранены без изменений. Актуальный порядок написания handler-а,
+> включая регистрацию (см. также `.ai/knowledge/adr/0001-node-handlers-built-per-scope.md`) —
+> `docs/platform/runtime/flow/06-node-development-guide.md`.
+
 ## 10.1 Существующие документы
 
 - `Platform Architecture v2.2` — раздел 3.4 Flow Engine, раздел 5 Concurrency

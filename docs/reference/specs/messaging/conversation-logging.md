@@ -1,11 +1,22 @@
 # Conversation Logging — система хранения диалогов
 
-**Статус:** Draft (дизайн, не реализовано)
+**Статус:** Реализовано (домен `app/Domains/Conversation/`). Этот документ — исходная дизайн-спека;
+актуальное описание домена — [`.ai/knowledge/domains/conversation/OVERVIEW.md`](/.ai/knowledge/domains/conversation/OVERVIEW.md).
 **Дата:** Июнь 2026
 **Контекст:** FaPost Core — продуктовый транскрипт переписки контакта с ассистентом.
 **Связанные документы:** `docs/platform/architecture/adr/09-message-routing-concurrency.md`,
 `docs/platform/runtime/flow/04-data-model-reference.md`,
 `docs/platform/architecture/platform/10-message-pipeline.md`.
+
+**Известные расхождения реализации со спекой ниже:**
+
+- `ConversationReaderInterface` (§4, §10) не реализован — read-порта нет. Filament-инбокс
+  (`app/Filament/Assistant/Resources/Conversations`) читает Eloquent-модели `Conversation` /
+  `ConversationMessage` напрямую, минуя порт.
+- Дедуп-индекс из §5 (`unique(conversation_id, direction, idempotency_key) where idempotency_key is not null`)
+  реализован как `conversation_messages_idem_unique` на
+  `(conversation_id, direction, idempotency_key, created_at)` — с `created_at`, потому что Postgres требует
+  включать ключ партиционирования в уникальный индекс партиционированной таблицы; не частичный (`where`) индекс.
 
 ---
 

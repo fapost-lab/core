@@ -32,35 +32,36 @@ sequenceDiagram
     J->>J: TenantContext::set(tenant_id)
     J->>J: switch DB schema
 
-    J->>MR: route(incomingMessage)
+    Note over J: Idempotency dedup уже прошёл в WebhookController,<br/>до dispatch job (processed:{idempotency_key})
 
-    Note over MR: 1. Idempotency check
-    MR->>RD: SET NX processed:{update_id} EX 86400
-    alt уже обработано
-        RD-->>MR: 0 (exists)
-        MR-->>J: skip (duplicate)
-    end
+    J->>MR: route(contact, incomingMessage, assistant, channel)
 
-    Note over MR: 2. Command match
+    Note over MR: 1. Command match (pre-lock, synchronous)
     MR->>MR: CommandMatcher.match(/reset, /cancel)
     alt команда найдена
         MR->>MS: send(system response)
         MS->>TG: ответ команды
+        MR-->>J: commandHandled (без lock)
     end
 
-    Note over MR: 3. Distributed lock
-    MR->>RD: LOCK session:{tenant}:{contact}:{assistant} TTL=30s
-    alt lock занят
+    Note over MR: 2. Typing indicator start
+    MR->>TG: indicateProcessing(chatId)
+
+    Note over MR: 3. Lock acquisition (backoff retry: 3×2s)
+    MR->>RD: LOCK session_lock:{tenant}:{contact}:{assistant} TTL=30s
+    alt lock занят после всех попыток
         MR->>MS: send(busy_message)
         MS->>TG: «занят»
+        MR-->>J: dropped(lock_timeout) — job не ретраится
     end
 
-    Note over MR: 4. Route по состоянию сессии
+    Note over MR: 4. Route по состоянию сессии<br/>(staff takeover check, затем SessionStateRouter)
     MR->>FO: orchestrate(session, message)
 
     FO->>FE: execute(session, flowDefinition)
 
     loop Execution loop
+        FE->>FE: refresh lock TTL (heartbeat, before each node)
         FE->>FE: resolve NodeHandler(type, version)
         FE->>NH: execute(nodeConfig, state, context)
         NH-->>FE: NodeExecutionResult<br/>{status, sourceHandle, stateChanges}
@@ -72,7 +73,9 @@ sequenceDiagram
 
     FE-->>FO: session завершена / ожидает ввода
 
+    Note over MR: 5-6. Execute done, cleanup
     MR->>RD: RELEASE lock (Lua token check)
+    MR->>TG: stopProcessing (typing)
 ```
 
 ## Ключевые классы
@@ -81,7 +84,7 @@ sequenceDiagram
 |-------|------|------|
 | `WebhookController` | `Http/Controllers/Webhook/` | Быстрый ack, dispatch job |
 | `IncomingMessageJob` | `Jobs/` | Tenant setup, вызов MessageRouter |
-| `MessageRouter` | `Domains/Flow/Routing/` | 6-шаговый pipeline (⏳ Phase D) |
+| `MessageRouter` | `Domains/Flow/Routing/` | 6-шаговый pipeline: commands → typing → lock → state → execute → cleanup |
 | `FlowOrchestrator` | `Domains/Flow/Services/` | Сессия + запуск engine |
 | `FlowEngine` | `Domains/Flow/Services/` | Execution loop, handler registry |
 | `MessageSender` | `Domains/Messaging/Services/` | Отправка через channel adapter |
@@ -90,7 +93,12 @@ sequenceDiagram
 
 - **Ingress stateless** (ADR-01, отменён): без БД, только Redis и dispatch — поэтому его можно вынести за пределы PHP. Роль быстрого ingress выполняет опциональный Go-гейтвей (`gateway/`); без него те же запросы обслуживает PHP-FPM
 - `public_hash` → Redis — landlord DB не участвует в hot path
-- Lock не получен → **busy notice**, не дроп: job уходит в backoff очередь
+- Session lock — один на triple (tenant, contact, assistant), ключ
+  `session_lock:{tenant}:{contact}:{assistant}` (`LockScope::key()`)
+- Lock не получен после retry (3×2s) → **busy notice** + `dropped(lock_timeout)`,
+  job **не** ретраится. Backoff-очередь (1, 2, 5, 10 сек) срабатывает только
+  когда `MessageRouter` ловит `engine_lock_timeout` (lock потерян во время
+  исполнения, а не при первичном acquire)
 - Optimistic lock: `flow_sessions.version` — `UPDATE WHERE version = N`
 
 ## Связано с

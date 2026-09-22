@@ -54,12 +54,43 @@
 
 ## 3) Как handler попадает в runtime
 
-Регистрация выполняется в `FlowServiceProvider::boot()`:
+`NodeHandlerRegistry` — синглтон на весь Horizon worker, поэтому он хранит не инстансы
+handler-ов, а **class-string**: инстанс закреплял бы за собой scoped-зависимости той job-ы,
+которая первой построила registry, и это была бы утечка между тенантами (см. ADR-0001,
+`.ai/knowledge/adr/0001-node-handlers-built-per-scope.md`).
 
-- `NodeHandlerRegistryInterface->register(new YourNodeHandler(...))`
-- после boot registry freeze-ится (`freeze()`), поздняя регистрация запрещена.
+Core handler-ы перечисляются в `FlowServiceProvider::registerCoreNodeHandlers()`:
 
-`NodeHandlerRegistry` дополнительно проверяет:
+```php
+private function registerCoreNodeHandlers(NodeHandlerRegistry $registry): void
+{
+    $handlers = [
+        SendMessageNodeHandler::class,
+        InputNodeHandler::class,
+        // ...
+        SetTagNodeHandler::class,
+    ];
+
+    foreach ($handlers as $handlerClass) {
+        $registry->register($handlerClass);
+    }
+}
+```
+
+- `register(class-string)` строит одноразовый инстанс только чтобы прочитать `type()`/`version()`,
+  а хранит только класс.
+- `resolve()` и `all()` строят новый инстанс на **каждый вызов** через порт
+  `NodeHandlerFactoryInterface` (`app/Domains/Flow/Contracts/NodeHandlerFactoryInterface.php`).
+  Реализация — `ContainerNodeHandlerFactory` (`app/Infrastructure/Flow/ContainerNodeHandlerFactory.php`) —
+  резолвит через контейнер, а значит всегда попадает на scoped-биндинги job-ы, которая выполняется
+  прямо сейчас.
+- Handler получает коллабораторов как обычные constructor-зависимости — никаких resolver-closures
+  в сигнатуре конструктора (это запрещено архитектурным тестом
+  `FlowRuntimeIsolationTest::test_node_handlers_do_not_take_resolver_closures`).
+- После boot (`FlowServiceProvider::boot()`) registry freeze-ится (`freeze()`), поздняя регистрация
+  запрещена.
+
+`NodeHandlerRegistry::register()` дополнительно проверяет:
 
 - у handler-а нет дубликата ключа `type@version`,
 - `version()` входит в `supportedVersions()`.
@@ -132,10 +163,13 @@
 Дополнительные данные:
 
 - `sourceHandle` - выбор ребра перехода.
-- `stateChanges` - flat map для записи в state (`flow.x`, `system.y`).
-- `effects` - side-effects (например, обновить contact language/attribute).
+- `stateChanges` - flat map для записи в session state (`flow.x`, `system.y`).
 - `metadata` - техническая инфа для логов/диагностики.
 - `logResolved` - какие значения реально прочитали при вычислении.
+
+Мутации вне session state (contact attributes, contact language и т.п.) handler выполняет
+напрямую через `ContactWriterInterface`, доступный из `NodeExecutionContext->contactWriter`
+(см. §9). Легаси-массив `effects[]` был удалён — `NodeExecutionResult` его больше не содержит.
 
 ---
 
@@ -172,10 +206,19 @@ Builder берёт `config_schema` из registry и рисует форму.
 
 ### Допустимые namespace-ы (архитектурно)
 
-- `system.*`
-- `flow.*`
-- `rag.*`
-- `module.*` (обычно read via accessor, не прямые записи в Core)
+Канонический список - enum `Fapost\Foundation\Flow\Enums\StateNamespace`: `system`, `flow`, `rag`,
+`module`, `contact`, `call`. Новый namespace добавляется только в этот enum, не в отдельные ноды.
+
+- `flow.*`, `call.*` - открыты для записи любым handler-ом (пользовательские переменные).
+- `system.*`, `rag.*` - пишут только whitelisted типы нод; whitelist -
+  `SystemStateNamespacePolicy` (`app/Domains/Flow/State/SystemStateNamespacePolicy.php`),
+  применяется в `FlowSessionPersister`. Сейчас `system.*`: `send_message`, `input`, `delay`,
+  `notify`, `set_tag`; `rag.*`: `rag_query`. Добавление нового писателя - это осознанная
+  правка whitelist-а.
+- `module.*` - read-only, читается через `DataAccessorInterface`; в `stateChanges` никогда не
+  попадает.
+- `contact.*` - производная проекция, в `stateChanges` тоже не пишется: contact-мутации идут
+  через `ContactWriter` (см. §9).
 
 ### Практика
 
@@ -188,12 +231,17 @@ Builder берёт `config_schema` из registry и рисует форму.
 
 Handler должен быть по возможности детерминированным.
 
-Когда нужен побочный эффект:
+Мутации session state - через `stateChanges` (см. §8), они проходят `FlowSessionPersister` и
+whitelist `SystemStateNamespacePolicy`.
 
-- верни `effects` (например `set_contact_attribute`, `set_contact_language`),
-- а уже `FlowEngine::applyEffects()` применит это в доменные сервисы.
+Мутации вне session state (contact attributes, contact language и т.п.) handler выполняет
+**напрямую**, вызывая `ContactWriterInterface`, который приходит через
+`NodeExecutionContext->contactWriter` (`Fapost\Foundation\Flow\Contracts\ContactWriterInterface`).
+Легаси-подход с массивом `effects[]`, которые центральный `FlowEngine::applyEffects()` разбирал
+и применял, был удалён - в `NodeExecutionResult` такого поля больше нет.
 
-Плюс такого подхода: меньше жёсткой связки handler <-> конкретные репозитории/модели.
+Плюс такого подхода: сам handler явно объявляет свою зависимость от `ContactWriter`, а не
+полагается на скрытую интерпретацию строкового `type` эффекта где-то в движке.
 
 ---
 
@@ -256,8 +304,11 @@ Handler должен быть по возможности детерминиро
 3. В builder добавить конфиг-компонент (или использовать дефолтный рендерер).
 4. Обновить node-card preview (если нужно).
 
-Сейчас в `NodeConfigForm.vue` есть map override для некоторых типов (`condition`, `send_message`), остальные падают в
-`DefaultConfig`.
+Сейчас в `ConfigPanel.vue` (`resources/js/builder/components/editor/ConfigPanel.vue`) есть
+`OVERRIDES` map с Core-компонентами для части типов (`send_message`, `input`, `condition`/`branch`,
+`assign`, `call`, `set_tag`, `notify`, `auth_request`, `loop`, `loop_end`). Порядок резолва -
+Core override → vendor override (`vendorConfigs`, Solution-компоненты через Vite glob) → дженерик
+`SchemaConfigRenderer`, который рисует форму по `configSchema()`.
 
 Рекомендация:
 
@@ -278,7 +329,7 @@ Handler должен быть по возможности детерминиро
     - unit на handler (happy path + invalid config + edge cases),
     - unit/feature на validator и execution path.
 8. Проверить поведение при retry/повторном запуске (идемпотентность).
-9. Зафиксировать документацию: expected config, outputs, state/effects.
+9. Зафиксировать документацию: expected config, outputs, stateChanges, contact-мутации через `ContactWriter`.
 
 ---
 
@@ -295,6 +346,10 @@ Handler должен быть по возможности детерминиро
 
 ## 16) Быстрый шаблон новой ноды
 
+`configSchema()` собирается через fluent Builder API из `Fapost\Support\Builder\Schema`
+(`Schema`/`Section`/`Fields\*`), а не через сырые массивы - см. §7 в `09-node-config-conventions.md`
+и реальный пример в `SetTagNodeHandler` (`app/Domains/Flow/Handlers/SetTagNodeHandler.php`).
+
 ```php
 final class MyCustomNodeHandler extends AbstractVersionedHandler
 {
@@ -310,15 +365,22 @@ final class MyCustomNodeHandler extends AbstractVersionedHandler
         return 'Custom';
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function configSchema(): array
     {
-        return [
-            'value' => [
-                'type' => 'text',
-                'label' => 'Value',
-                'required' => true,
-            ],
-        ];
+        return Schema::make()
+            ->required(['value'])
+            ->section(
+                Section::make('main', 'My Custom Node')
+                    ->fields([
+                        TextField::make('value')
+                            ->label('Value')
+                            ->required(),
+                    ]),
+            )
+            ->toArray();
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
