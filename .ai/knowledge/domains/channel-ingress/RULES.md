@@ -32,7 +32,7 @@ broken.
   gateway releases the key if the queue push fails.
 - **PHP and Go verification behave identically.** Enforced: `IngressSpecGoldenTest`,
   `gateway/internal/spec/golden_test.go`, `TelegramIngressSpecParityTest`.
-- **Inbound deliveries go to `flow.execution`.** Source: AGENTS.md.
+- **Inbound deliveries go to `flow.execution`.** Source: `conventions/queues.md`.
 
 ## Rules
 

@@ -1,11 +1,10 @@
 # FaPost Core — Дорожная карта
 
-Product vision от текущего состояния до SaaS-оболочки, Solutions и Inbox.  
-Детализация по задачам — [[TASKS]]. Навигация по документам — [[INDEX]].
+История инженерных майлстоунов: что было сделано и чем закрыто. Навигация по документам — [[INDEX]].
 
-> This file holds the engineering milestones and their history. The product decomposition of
-> the idea brief — destination, steps, dependency graph and execution waves — lives in
-> [`../roadmap.md`](../roadmap.md).
+> **Этот файл — запись прошлого, а не план.** Открытые направления живут в спеках Jig под
+> `.ai/specs/` (`.ai/scripts/jig spec list`); каждый незакрытый майлстоун ниже сведён к абзацу со
+> ссылкой на свою спеку. Продуктовая декомпозиция идеи — [`../roadmap.md`](../roadmap.md).
 
 > **Статусы:** ✅ завершено · 🔄 в работе / частично · ⏳ следующее · 📋 запланировано · 🧊 бэклог · 🔮 будущее
 
@@ -26,8 +25,8 @@ Product vision от текущего состояния до SaaS-оболочк
 **Вне трека:** Redis-integration suite (см. § Milestone 2) и load test из критериев Production Ready
 закрыты — все критерии Production Ready выполнены.
 
-После выкладки: M13 (Audit Log) → M12 (MCP Server) → M7 (Solutions) → M11. M5 (RAG) — в бэклоге.
-M9 (Multi-channel / WhatsApp) удалён из планов.
+Что дальше — больше не решается здесь: порядок работ после выкладки задаётся шагами в
+[`../roadmap.md`](../roadmap.md) и спеками под `.ai/specs/`. M9 (Multi-channel / WhatsApp) удалён из планов.
 
 ---
 
@@ -296,67 +295,12 @@ M9 (Multi-channel / WhatsApp) удалён из планов.
 > *Сбор структурированных данных через веб-форму (Telegram Mini App или hosted-страница) вместо цепочки
 > `input`-нод в чате.*
 
-**Когда:** после выкладки релизного трека, параллельно M12. Не блокирует релиз.
+Направление перенесено в спеку **`.ai/specs/forms-data-collection/`**: там идея, границы Core/Solution,
+восемь архитектурных решений, четыре фазы и открытые вопросы. Здесь остаётся только запись, что
+направление существует; чекбоксов и статусов по нему тут больше нет.
 
-**Почему важно:** цепочка `input`-нод собирает анкету по одному полю за сообщение. Это долго для контакта,
-громоздко в builder'е и ограничено валидацией «одно поле за раз». Форма закрывает тот же сценарий одним экраном:
-нормальные контролы, клиентская и серверная валидация по одной схеме, правки до отправки, приемлемый внешний вид.
-
-**Решение о границах: Core, не Solution.** Форма это новая нода flow engine, новый путь возобновления сессии
-по внешнему событию и bespoke override в builder'е. Всё три вещи доступны только Core: Solution регистрирует
-`ActionHandler` для `call`-ноды, а не новые типы нод, Vue-компоненты Solution'ов требуют M7 publish contract,
-которого ещё нет. Solution'ы поверх M9 остаются возможными: готовые шаблоны форм и маппинг ответов в свои
-данные (`hr.*`, `crm.*`).
-
-**Что уже есть в коде:** каркас TMA (`routes/tma.php`, `resources/js/tma` с роутером и `TmaFormRenderer`),
-`InputExpectedType` как словарь типов полей, `MediaIngestor` для файлов, `ContactWriterInterface` для записи в
-контакт. `TmaFormController` и `TmaAuthMiddleware` пока заглушки: контроллер отдаёт захардкоженную анкету,
-middleware вне `local` отвечает 401.
-
-### Архитектурные решения (нужен ADR перед кодом)
-
-1. **Хранение.** Домен `Forms` в tenant schema: `forms` (ULID, `schema` JSON, `version`, `assistant_id`).
-   Сессия snapshot'ит `form_version` при отправке ссылки, как делает `flow_version`. Одна форма переиспользуется
-   в разных flow.
-2. **Нода `form`.** Handler отправляет сообщение с кнопкой: `web_app` для Telegram, обычная ссылка на
-   hosted-страницу для WhatsApp и остальных. Сессия переходит в `waiting_input`, но ждёт не текст, а внешнее
-   событие. Ответы сохраняются в переменную типа `json` по `save_to`, дополнительно опциональный маппинг
-   поле → `contact.*` через `ContactWriterInterface`. Handles: `submitted`, `timeout`.
-3. **Возобновление сессии.** Отдельный вход в `FlowEngine` по submission, не синтетическое `IncomingMessage`
-   через `MessageRouter`: роутер классифицирует по тексту и командам, форме там делать нечего. Тот же lock
-   `(tenant, contact, assistant)`, что и у входящих. Submission id как idempotency-маркер: повторная отправка
-   не двигает сессию дважды.
-4. **Токен ссылки.** Подписанный, привязан к `(tenant, session, node, form_version)`, с TTL. Для Telegram
-   дополнительно initData HMAC и проверка, что telegram id совпадает с контактом сессии. Для hosted-страницы
-   токен единственная защита, поэтому одноразовый.
-5. **Валидация.** Одна схема, две проверки: renderer на клиенте, Laravel rules на сервере по той же схеме.
-   Ответ сервера с ошибками по полям, клиент их показывает. Серверная проверка обязательна, клиентская
-   удобство.
-6. **Мультиязычность.** Label, placeholder и текст ошибок идут через content translator chain как flow content;
-   `value` у select/checkbox language-agnostic, как у кнопок.
-7. **Конструктор.** Редактор схемы в Filament (`FormResource`), в builder'е только выбор формы в конфиге ноды.
-   Встраивать готовый open-source редактор, а не писать свой. Зависимость нужно согласовать отдельно и
-   отфильтровать по лицензии: репозиторий Apache-2.0, AGPL-компоненты (Formbricks, OpnForm, HeyForm, Typebot)
-   не подходят. Кандидаты под MIT: `@bpmn-io/form-js` (editor + viewer, JSON schema, framework-agnostic),
-   `@formio/js` (builder + renderer, есть Vue wrapper). SurveyJS: renderer MIT, Creator коммерческий.
-8. **Таймаут и брошенные формы.** Форма не заполнена в TTL токена → sweeper переводит сессию по handle
-   `timeout`. Механику взять по образцу `SubflowTimeoutSweeper`.
-
-### Фазы
-
-- **Фаза 1, фундамент:** initData HMAC в `TmaAuthMiddleware`, домен `Forms` с миграцией и моделью, подписанный
-  токен, серверная валидация по схеме.
-- **Фаза 2, runtime:** `FormNodeHandler` v1, submission endpoint, resume path с idempotency, sweeper таймаута,
-  `TmaFormRenderer` на реальную схему вместо заглушки, hosted-страница для не-Telegram каналов.
-- **Фаза 3, авторинг:** `FormResource` в Filament с встроенным редактором, `FormConfig.vue` override в builder,
-  палитра и валидация publish (нода ссылается на существующую форму).
-- **Фаза 4, данные:** маппинг ответов в `contact.*`, файлы через Media, ответы в транскрипте как системное
-  сообщение, экспорт ответов.
-
-**Открытые вопросы:**
-- Версионирование схемы формы при уже разосланных ссылках: старые ссылки открывают snapshot или актуальную?
-- Черновики: сохранять частично заполненную форму между открытиями Mini App?
-- Нужен ли `form` как trigger (форма открыта вне flow, submission стартует flow) по аналогии с `emit_event`?
+Продуктовый роадмап держит эту фичу вне приоритета — обоснование в [`../roadmap.md`](../roadmap.md)
+§ Out of scope.
 
 ---
 
@@ -364,19 +308,16 @@ middleware вне `local` отвечает 401.
 
 > *Механизм расширения платформы внешними пакетами (Solutions).*
 
-**Когда:** после M8. Перенесён вниз осознанно: до первого реального Solution под разработку каркас расширения
-не окупается, а релиз в тестирование он не блокирует.
+Разнесён на две спеки по продуктовым шагам 4 и 6:
 
-Документ: [[architecture/adr/05-foundation-contract-package]], [[architecture/platform/12-solutions-modules]]
+- **`.ai/specs/solution-activation-lifecycle/`** — манифест и его валидация, хранилище активаций и
+  реестр, Core-реализация `CoreRegistrarInterface`, экран активации, lifecycle-тесты
+  install → activate → handler available.
+- **`.ai/specs/first-solution/`** — первый Solution (FaPost HR, `hr.sync_employee`,
+  `hr.create_assessment`), собранный строго через публичные контракты, в собственном репозитории.
 
-**Что предстоит:**
-- [ ] `AbstractSolutionServiceProvider` lifecycle test suite  
-- [ ] `SolutionManifest` validation при `platform:update`  
-- [ ] `vendor:publish` для Solution Vue компонентов + `npm run build` шаг  
-- [ ] `ActionHandlerRegistry` — регистрация `hr.*`, `crm.*` handler'ов  
-- [ ] Первый Solution: **FaPost HR** (`hr.sync_employee`, `hr.create_assessment`)  
-- [ ] Filament: Solution activation UI (install/activate/deactivate)  
-- [ ] E2E тест: Solution installs → handler available → call node executes
+Документы, на которых они стоят: [[architecture/adr/05-foundation-contract-package]],
+[[architecture/platform/12-solutions-modules]].
 
 ---
 
@@ -404,16 +345,13 @@ middleware вне `local` отвечает 401.
 
 > *Сторонние плагины без пересборки платформы.*
 
-**Когда:** после M7 (Solutions framework)
+Перенесён в спеку **`.ai/specs/ecosystem-distribution/`** (продуктовый шаг 8). Там зафиксировано,
+что вопрос сознательно не открывается до тех пор, пока первый Solution не собран через публичные
+контракты: именно та сборка показывает, каких контрактов касается внешний автор. Концепты этого
+майлстоуна (`PluginRegistry`, runtime install, store UI, sandbox, SDK) перенесены туда как кандидаты,
+а не как решения.
 
-Документ: [[architecture/adr/06-frontend-extension-boundary]]
-
-**Ключевые концепты:**
-- `PluginRegistry` (отдельный от `ActivationRegistry`)  
-- Runtime install без deploy: JSON flow templates, `DataAccessorInterface`, queue jobs  
-- Plugin store UI: browse → install → activate per tenant  
-- Sandbox: plugins не получают доступ к landlord DB, не регистрируют worker pools  
-- Developer SDK документация + примеры
+Документ: [[architecture/adr/06-frontend-extension-boundary]].
 
 ---
 
@@ -421,120 +359,28 @@ middleware вне `local` отвечает 401.
 
 > *Журнал действий персонала: кто, когда и что изменил в панели арендатора.*
 
-**Когда:** после выкладки релизного трека. Не блокирует релиз, но блокирует продажу арендаторам, у которых
-несколько сотрудников в одной панели.
+Перенесён в спеку **`.ai/specs/audit-log/`**: границы «пишем / не пишем», хранение в tenant-схеме,
+ретенция и открытые вопросы по UI и видимости журнала — там.
 
-**Почему важно:** сейчас в панели работают несколько ролей (`Staff`, политики, `spatie/laravel-permission`),
-и ни одно их действие не оставляет следа. Кто отключил канал, кто отредактировал опубликованный flow, кто
-выгрузил контакты — узнать нельзя. Это одновременно вопрос доверия арендатора и вопрос разбора инцидента:
-при жалобе «бот перестал отвечать» первым делом нужен ответ, менялось ли что-то и кем.
-
-**Что уже есть:** `spatie/laravel-activitylog` в зависимостях (v5), но ни одна модель его не использует и
-таблица не заведена. Диалоги контактов логируются отдельным механизмом (M3, `conversation-logging`) — это
-другой слой и смешивать их не нужно: там переписка с контактом, здесь действия сотрудника над конфигурацией.
-
-**Границы:**
-
-- **Пишем:** create/update/delete над `Assistant`, `Channel`, `Flow` (включая публикацию версии), `Contact`
-  и сегментами, `Broadcast`, `User`/`Role`, изменения настроек арендатора. Вход и выход сотрудника.
-- **Не пишем:** runtime-события flow-сессий, доставку сообщений, webhook-трафик — у них свои журналы.
-- **Хранение:** таблица в tenant-схеме, не в landlord: журнал принадлежит арендатору и удаляется вместе с ним.
-- **Ретенция:** срок хранения настраиваемый, с командой очистки по расписанию; иначе таблица растёт без предела.
-
-**Открытые вопросы:**
-- Нужен ли UI: отдельный ресурс Filament со списком и фильтрами, или вкладка «История» на каждой записи?
-- Пишем ли diff значений (`old`/`new`) целиком, и как при этом не утащить в журнал секреты каналов.
-- Кто видит журнал: только владелец арендатора или любая роль с отдельным permission.
-- Попадают ли туда действия платформенного администратора над арендатором.
+Продуктовый роадмап держит это вне приоритета — обоснование в [`../roadmap.md`](../roadmap.md)
+§ Out of scope.
 
 ---
 
 ## 📋 Milestone 12 — MCP Server
 
-> *FaPost как surface для AI-агентов: внешний агент (Claude, ChatGPT, собственный агент арендатора)
-> читает и управляет платформой через Model Context Protocol.*
+> *FaPost как surface для AI-агентов: внешний агент читает и управляет платформой через
+> Model Context Protocol.*
 
-**Когда:** после M2; растёт вместе с M3/M4 (транскрипты и рассылки — основной материал для tool'ов)
+Перенесён в спеку **`.ai/specs/mcp-server/`**: восемь архитектурных решений (домен, транспорт,
+tenant scoping, авторизация через существующие Policy, реестр tool'ов, stateless ingress, read-first,
+аудит и лимиты), пять фаз и открытые вопросы — там. Несогласованная зависимость `laravel/mcp`
+и выбор модели токенов зафиксированы в спеке как нерешённые.
 
-**Почему важно:** у платформы уже есть всё, что интересно агенту — ассистенты, flow-определения, контакты и
-сегменты, транскрипты диалогов, рассылки. Сейчас это доступно только через Filament руками. MCP-сервер превращает
-Core в программируемую поверхность: «покажи, почему сессия застряла», «собери сегмент по описанию», «подготовь
-черновик рассылки» — без отдельного REST API и без ручной работы в админке.
+Вне скоупа и там, и здесь: MCP *client* — вызов внешних MCP-серверов изнутри flow.
 
-### Архитектурные решения (нужен ADR перед кодом)
-
-1. **Границы кода.** Новый домен `app/Domains/Mcp` (`Server`, `Tools/{Domain}`, `Resources`, `Prompts`, `Registry`,
-   `Auth`, `Audit`). Base folder `app/Mcp`, который по умолчанию генерирует `laravel/mcp`, не заводим — это отдельное
-   решение (см. правило Directory Boundaries в `CLAUDE.md`).
-2. **Transport.** Streamable HTTP: `Mcp::web('/mcp', …)` в отдельном route-файле. Local/stdio-сервер — только для
-   dev-инструментов, не для арендаторов.
-3. **Tenant scoping.** Токен резолвит tenant → `TenantSwitcher::runForTenant()` с restore в `finally`. Без tenant
-   context — fail fast, никакого «default tenant». Ни один tool не ходит в landlord напрямую (только контракты
-   `Tenancy/Contracts`).
-4. **Авторизация.** Переиспользуем `Permission` enum и существующие Policy-классы: токен несёт набор permissions,
-   tool спрашивает `Gate`, а не изобретает свою проверку. `Permission::isSensitive()` → отдельный scope на токене.
-5. **Расширяемость.** `McpToolRegistry` по аналогии с `ActionHandlerRegistry` / `RagAdapterRegistry`; контракт
-   `McpToolInterface` живёт в `packages/fapost-foundation`. Core не знает про `hr.*` — Solutions регистрируют свои
-   tool'ы сами (связь с M7).
-6. **Ingress.** MCP-ingress stateless наравне с webhook: tenant context и текущий сервер —
-   только в `scoped` bindings, никаких static между запросами.
-7. **Безопасность операций.** v1 — read-first. Разрушающие операции (delete, publish, send) за отдельным scope, с
-   `destructiveHint` / `readOnlyHint` в аннотациях tool'а и с idempotency-маркером на write-пути.
-8. **Аудит и лимиты.** Каждый вызов пишется в `mcp_audit_log` (tenant, token, tool, hash аргументов, исход,
-   длительность); rate limit per token.
-
-### Фаза 1 — Фундамент
-
-- [ ] ADR: MCP surface (transport, домен, auth-модель, scopes, аудит)
-- [ ] Решение по зависимости: `laravel/mcp` vs собственная JSON-RPC реализация (требует согласования)
-- [ ] Домен `Domains/Mcp` + service provider + route-группа `/mcp`
-- [ ] Token model: миграция `mcp_tokens` (hash, scopes, last_used_at) + issue/revoke; в проекте сейчас нет Sanctum —
-      выбор между Sanctum и собственными токенами делается в ADR
-- [ ] Middleware `mcp.auth` + `mcp.tenant` (fail fast без tenant context)
-- [ ] `McpToolInterface` в foundation + `McpToolRegistry` в Core
-- [ ] `mcp_audit_log` + rate limiting per token
-- [ ] Тестовый харнес для tool'ов + phpat-правило: tool не обращается к landlord и не тянет Filament
-
-### Фаза 2 — Read-инструменты (v1)
-
-- [ ] Assistants: `assistants.list`, `assistants.get`
-- [ ] Flows: `flows.list`, `flows.get` (definition JSON), `flows.validate` (через `ValidateFlowService`)
-- [ ] Contacts: `contacts.search`, `contacts.get`, `segments.list`, `segments.preview` (через `ContactSegmentResolver`)
-- [ ] Conversations: `conversations.search`, `conversations.transcript`
-- [ ] Broadcasting: `broadcasts.list`, `broadcasts.stats`
-- [ ] Runtime-диагностика: `flow_sessions.inspect`, `flow_logs.tail`
-
-### Фаза 3 — Write-инструменты (gated)
-
-- [ ] `contacts.set_tag`, `contacts.update_attributes`
-- [ ] `segments.create` / `segments.update` + recount
-- [ ] `broadcasts.create_draft`; отправка — только со scope `broadcast:send`
-- [ ] `flows.publish` через `PublishFlowService` (scope `flow:publish`, публикация только валидного графа)
-- [ ] `messages.send` в существующий диалог — `origin=mcp`, обязательно логируется в транскрипт
-- [ ] Идемпотентность и audit-запись на каждом write-пути
-
-### Фаза 4 — Resources и Prompts
-
-- [ ] Resources: `flow://{id}/definition`, `conversation://{id}/transcript`, `schema://variables`, `docs://node/{type}`
-- [ ] Resource templates + пагинация больших выборок
-- [ ] Prompts: разбор застрявшей сессии, сборка сегмента по описанию, черновик flow по описанию
-- [ ] Медиа: решение blob vs signed URL
-
-### Фаза 5 — Расширяемость и UI
-
-- [ ] Регистрация tool'ов из Solutions/Plugins через `McpToolRegistry` (E2E: Solution ставится → tool доступен)
-- [ ] Filament: MCP Tokens resource (issue/revoke/scopes/last used) + просмотр audit log
-- [ ] Онбординг: генерация client-конфига (URL + заголовки) для подключения агента
-- [ ] `developers/` HTML-страница: как написать MCP tool в Solution
-
-### Открытые вопросы
-
-- Один сервер на платформу с tenant-скоупом по токену или отдельный URL на арендатора
-- Нужен ли OAuth 2.1 до маркетплейса плагинов, или bearer-токенов достаточно
-- Нужны ли MCP Apps (интерактивные HTML-панели в клиенте) — риск дублирования Filament
-
-> **Вне скоупа этого блока:** MCP *client* — вызов внешних MCP-серверов изнутри flow (нода `mcp_call` или новый
-> транспорт для `call`). Это отдельное направление, завязанное на AI-слой и M5.
+Продуктовый роадмап держит это вне приоритета — обоснование в [`../roadmap.md`](../roadmap.md)
+§ Out of scope.
 
 ---
 
@@ -546,47 +392,24 @@ Core в программируемую поверхность: «покажи, �
 
 > *Интеграция с базами знаний: поиск по документам внутри flow.*
 
-**Когда:** после M12 (MCP Server). Раньше стоял сразу после M2 — перенесён в бэклог осознанно.
+Перенесён в спеку **`.ai/specs/rag-knowledge-bases/`**. Состояние на входе: runtime-часть в коде
+(`RagAdapterRegistry`, `RagQueryNodeHandler`, RAG-валидация в `ValidateFlowService`), нода `rag_query`
+остаётся в палитре и падает на runtime guard'е — осознанный документированный долг. Блокер не
+технический, а решенческий: не выбран провайдер эмбеддингов и хранилище векторов.
 
-**Почему перенесён:** runtime-часть уже в коде (`RagQueryNodeHandler`, `RagAdapterRegistry`, валидация), но нода
-нерабочая до тех пор, пока нет storage, адаптера и UI. Основной блокер не технический, а решенческий — не выбран
-провайдер (собственный pgvector vs внешний сервис), и цена ошибки здесь выше, чем польза от быстрого запуска.
-До тех пор `rag_query` остаётся в палитре и падает на runtime guard'е — это осознанный, а не забытый долг.
-
-Спека: [[specs/flow-engine/nodes/09-rag-query]]
-
-**Что уже есть:**
-- [x] `RagAdapterRegistry` (plug-in адаптеры провайдеров)
-- [x] `RagQueryNodeHandler` (type `rag_query`) — пишет `rag.*` в state
-- [x] RAG validation в `ValidateFlowService` (config shape / runtime guard провайдера)
-
-**Что предстоит:**
-- [ ] Решение по провайдеру эмбеддингов и хранилищу векторов
-- [ ] `knowledge_bases` таблица + миграция + Filament resource
-- [ ] `StructuredRagResult` DTO (found, confidence, answer, intent, metadata)
-- [ ] Первый адаптер + проверка `knowledge_base` в `ValidateFlowService` (сейчас ждёт storage)
+Спека ноды: [[specs/flow-engine/nodes/09-rag-query]].
 
 ---
 
 ## Зависимости между milestone'ами
 
-```
-Релизный трек «до тестирования»:
+Закрытые основания: M1 ✅, M2 ✅, M3 ✅ (транскрипты — фундамент для M8), M4 ✅, M6 ✅, M8 ✅.
 
-    M2 🔄 ──► M4 🔄 ──► M8 🔄 ──► ▶ выкладка на сервер, передача в тестирование
+Порядок незакрытых направлений больше не ведётся здесь: он задаётся порядком шагов в
+[`../roadmap.md`](../roadmap.md) и волнами внутри каждой спеки. Прогресс по спеке читается
+командой `.ai/scripts/jig spec list`, а не отсюда.
 
-Далее:
-
-    ▶ ──► M12 (MCP Server) ──► M7 (Solutions) ──► M11 (Plugins)
-     │                              │
-     │                              └──► M10 (SaaS) ─ отдельный репо
-     │
-     └──► M9 (Forms) — параллельно M12, Core; шаблоны форм от Solution'ов после M7
-
-    M5 (RAG) — 🧊 бэклог, после M12
-```
-
-Закрытые основания: M1 ✅, M3 ✅ (транскрипты — фундамент для M8), M6 ✅.
+M10 (SaaS Shell) остаётся вне этого репозитория и вне спек — это отдельный закрытый продукт.
 
 ---
 
@@ -603,7 +426,8 @@ Core в программируемую поверхность: «покажи, �
 
 ## Связано с
 
-- [[TASKS]] — детальные задачи реализации
+- `.ai/specs/` — открытые направления как спеки Jig (`.ai/scripts/jig spec list`)
+- [[TASKS]] — история реализованного по разделам
 - [[INDEX]] — навигация по документам
 - [[PROJECT]] — описание проекта
 - [[plans/flow-engine/implementation-plan]] — план реализации flow engine

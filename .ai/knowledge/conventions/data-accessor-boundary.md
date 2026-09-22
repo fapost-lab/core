@@ -30,6 +30,6 @@ registered accessor and never stores the answer in the session.
 
 ## Rationale
 
-`module.*` is a read-only projection (`AGENTS.md`, Flow Engine Rules). A write through an
+`module.*` is a read-only projection (`domains/flow/RULES.md`). A write through an
 accessor would bypass the engine's transaction and retry, and a value that changes inside a
 step makes a branch and the node after it disagree.

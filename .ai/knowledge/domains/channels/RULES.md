@@ -28,7 +28,7 @@ broken.
 
 - **`MessageSender` reserves the idempotency key and applies the per-chat rate limit before
   calling the provider.** Why: provider limits are handled preventively, not after a provider
-  error (AGENTS.md).
+  error (`conventions/queues.md`).
 - **On channel save, the Redis routing write happens before the provider webhook sync, and both
   run after commit** (`ChannelObserver`). Why: the provider must never deliver to a hash the
   registry does not know.
@@ -56,4 +56,4 @@ broken.
   `Telegram/TelegramChannelServiceProvider.php` is the model. Review only. *(proposed)*
 - **Pick the queue by purpose:** replies in an active dialogue `messaging.transactional`,
   broadcasts `messaging.broadcast`, service and lifecycle work `messaging.system`. Source:
-  AGENTS.md.
+  `conventions/queues.md`.

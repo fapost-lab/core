@@ -25,16 +25,22 @@ entry pointing at a missing file fails the build.
 
 ## Working material — stays here
 
-### Status and planning
+### Planning — what is still to be done
 
-- [`platform/TASKS.md`](./platform/TASKS.md) — the only implementation checkbox tracker.
-- [`platform/ROADMAP.md`](./platform/ROADMAP.md) — milestones and dependencies.
-- [`platform/current-state.md`](./platform/current-state.md) — what exists in code today.
-- [`platform/PROJECT.md`](./platform/PROJECT.md) — short project context.
+- [`../.ai/specs`](../.ai/specs) — **the plans.** One spec per step or direction: idea, decisions, open
+  questions and a roadmap of phases. Listed with `.ai/scripts/jig spec list`.
 - [`idea-brief.md`](./idea-brief.md) — the owner's product brief: problem, users, scope, positioning.
-- [`roadmap.md`](./roadmap.md) — product decomposition of the brief: destination, steps, open decisions.
-- [`platform/plans`](./platform/plans) — implementation plans and brownfield audits.
+- [`roadmap.md`](./roadmap.md) — product decomposition of the brief: which steps exist, in which order,
+  and which spec carries each one.
 - `.ai/scripts/jig status` — the active Jig tasks: the current operational focus.
+
+### Records — what was already done
+
+- [`platform/current-state.md`](./platform/current-state.md) — what exists in code today.
+- [`platform/ROADMAP.md`](./platform/ROADMAP.md) — history of the engineering milestones.
+- [`platform/TASKS.md`](./platform/TASKS.md) — what was implemented, by area.
+- [`platform/PROJECT.md`](./platform/PROJECT.md) — short project context.
+- [`platform/plans`](./platform/plans) — implementation plans and brownfield audits.
 
 ### Records
 
@@ -61,7 +67,8 @@ entry pointing at a missing file fails the build.
 ## Rules
 
 - If a subject is on the site, do not restate it here — link to it.
-- `platform/TASKS.md` is the only status tracker. No status tables anywhere else.
+- Open work is planned in `.ai/specs/` and tracked as Jig tasks, nowhere else. `platform/ROADMAP.md`
+  and `platform/TASKS.md` are records of what was done; do not add plans or new checkboxes to them.
 - `platform/current-state.md` describes code reality, not intended architecture.
 - Published documentation is written in English. Working material and archive may be in any language.
 - `CLAUDE.md` holds agent rules and stable constraints; it is not roadmap documentation.

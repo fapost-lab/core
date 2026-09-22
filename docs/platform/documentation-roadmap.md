@@ -6,14 +6,16 @@ This file defines how `docs/` should be maintained as the repository documentati
 
 - `docs/` - tracked developer documentation.
 - `docs/INDEX.md` - navigation source of truth for the full documentation set.
-- `docs/platform/TASKS.md` - only checkbox tracker for implementation status.
+- `docs/platform/TASKS.md` - record of what was implemented, by area; not a plan.
+- `.ai/specs/` - the plans for open work, one spec per step or direction.
 - `.ai/scripts/jig status` - current operational focus: the active Jig tasks.
 - `CLAUDE.md` - agent rules and stable coding/architecture constraints, not roadmap/status documentation.
 
 ## Maintenance Rules
 
 1. Keep `docs/platform/current-state.md` aligned with code, especially when a task moves from planned to partial or done.
-2. Keep detailed checklists in `docs/platform/TASKS.md`; do not duplicate status tables elsewhere.
+2. Keep open work in `.ai/specs/` and in Jig tasks; `docs/platform/TASKS.md` records what landed and
+   does not grow new checkboxes.
 3. When a stable architecture rule changes, update both `docs/platform/architecture/*` and the relevant ADR/platform file.
 4. If a spec is still exploratory, mark that status in the spec and link it from `docs/INDEX.md`.
 5. Keep active source-of-truth documentation in English. Archive files may keep their original language until deleted or

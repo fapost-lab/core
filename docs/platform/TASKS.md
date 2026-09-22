@@ -1,8 +1,12 @@
 # FaPost Core — Задачи
 
-Единый трекер статусов реализации. Для навигации по документам — [[INDEX]].
+Запись того, что уже реализовано, по разделам. Для навигации по документам — [[INDEX]].
 
-> **Легенда:** `- [x]` реализовано · `- [-]` частично / 🚧 · `- [ ]` предстоит
+> **Не трекер предстоящего.** Открытые направления ведутся спеками Jig под `.ai/specs/`
+> (`.ai/scripts/jig spec list`), отдельные мелкие работы — задачами (`.ai/scripts/jig task list --all`).
+> Оставшиеся здесь `- [ ]` — это ссылки на ту спеку или задачу, где пункт живёт на самом деле.
+
+> **Легенда:** `- [x]` реализовано · `- [-]` частично / 🚧 · `- [ ]` ведётся в Jig, ссылка в строке
 
 ---
 
@@ -88,10 +92,10 @@
   - Остаток (V1.x, warning-only): 8.5 (while condition не меняется), 8.7 (static number check), UI редактирования `max_size`, `{{…length}}` в TemplateEngine
 - [x] `emit_event` — event-chain start завершён: `DispatchFlowTriggerEventJob` теперь фанит `StartFlowFromEventJob` на каждый подписанный event-триггер (было — только лог); flow стартует для emitting-контакта, payload доступен как `flow.event.*`; выровнен формат имени события (trigger `event_name` теперь принимает dotted/mixed-case как emit `event_type`) — [[specs/flow-engine/nodes/07-emit-event]]
 - [-] `rag_query` — handler/registry/validation готовы; Feature: RAG ещё предстоит — [[specs/flow-engine/nodes/09-rag-query]]
-- [ ] `form` — сбор данных через веб-форму (TMA / hosted) вместо цепочки `input` — см. § Forms (M9)
+- [ ] `form` — сбор данных через веб-форму (TMA / hosted) вместо цепочки `input` — спека `.ai/specs/forms-data-collection/`
 
 ### P3
-- [-] `comment` (builder-only аннотация): backend готов — палитра (`NodeTypesController`), skip в валидации, strip-at-publish (`AnnotationNodeTypes`); остаётся Vue-рендеринг ноды на канвасе
+- [-] `comment` (builder-only аннотация): backend готов — палитра (`NodeTypesController`), skip в валидации, strip-at-publish (`AnnotationNodeTypes`); остаётся Vue-рендеринг ноды на канвасе — задача Jig `comment-node-canvas`
 
 ---
 
@@ -131,7 +135,7 @@
 - [x] `useInsertAtCursor` в TextField / Textarea / StatePickerField
 - [x] End node color-coding (success → зелёный, cancelled → амбер, failed → красный)
 - [x] Flow Content Manager (многоязычный редактор контента, отдельная вкладка)
-- [-] `comment` нода на канвасе (P3) — backend-энейблмент готов (палитра/валидация/strip); Vue-карточка на канвасе ещё предстоит
+- [-] `comment` нода на канвасе (P3) — backend-энейблмент готов (палитра/валидация/strip); Vue-карточка на канвасе — задача Jig `comment-node-canvas`
 
 ---
 
@@ -186,7 +190,7 @@
 - [x] **Фаза 7 — Filament chat viewer** (assistant-панель, read-only): `ConversationResource` + `ConversationsTable` (inbox-лента) + `ViewConversation` (custom Page, blade-пузыри inbound/outbound, media/keyboard/delivery-status); lang en/ru/uk; scope по `assistant_id`
 - [x] **Фаза 4a — inbound media**: `FetchConversationMediaJob` (queue `messaging.logging`) поверх `MediaIngestor::ingestFromChannel(..., source: Conversation)`; сообщение пишется сразу с media-дескриптором `status:pending`, джоба досоздаёт `media_file_id` (`status:ready`) либо `status:failed` с сохранением `provider_file_id`; `MediaSource::Conversation` + фильтр в `MediaService::listFolderContents` (не засоряет медиа-библиотеку); `appendMessage` возвращает id, `updateMessageMedia()` в store
 - [x] Outbound media через upload-as-send (`FlowMessageSender` `alreadyDelivered`) теперь логируется — `buildOutboundMessage()` + `captureOutbound()` в самом `FlowMessageSender` (единственный путь мимо `MessageSender`)
-- [ ] `ConversationReaderInterface` (Фаза 8, при переходе на ClickHouse; сейчас Filament читает Postgres-Eloquent — документированный trade-off §10)
+- [ ] `ConversationReaderInterface` (Фаза 8, при переходе на ClickHouse; сейчас Filament читает Postgres-Eloquent — документированный trade-off §10) — задача Jig `conversation-reader-interface`
 
 > **Вне скоупа (отдельная фаза после запуска продукта):** delivery-status (read-receipts). Provider-agnostic плумбинг
 > `updateDeliveryStatus` → `UpdateConversationDeliveryStatusJob` → `store.updateStatus` уже есть и покрыт тестами, но
@@ -225,34 +229,9 @@
 
 ## 📝 Forms / Data Collection (M9)
 
-Решения и обоснования — [[ROADMAP]] § Milestone 9. Границы: Core, не Solution. Перед кодом нужен ADR.
-
-### Фаза 1 — Фундамент
-- [ ] `TmaAuthMiddleware`: реальная HMAC-верификация Telegram initData вместо заглушки «401 вне local»
-- [ ] Домен `Forms`: миграция `forms` (ULID, `schema` JSON, `version`, `assistant_id`), модель, репозиторий
-- [ ] Подписанный токен ссылки `(tenant, session, node, form_version)` + TTL; для hosted-страницы одноразовый
-- [ ] Серверная валидация ответов по схеме формы (schema → Laravel rules), ошибки по полям
-- [ ] Согласовать open-source редактор схемы: только MIT-совместимые (`@bpmn-io/form-js`, `@formio/js`); AGPL исключены
-
-### Фаза 2 — Runtime
-- [ ] `FormNodeHandler` v1: `web_app`-кнопка для Telegram, ссылка для остальных каналов; `save_to` типа `json`; handles `submitted` / `timeout`
-- [ ] Submission endpoint + отдельный resume path в `FlowEngine` (не через `MessageRouter`), тот же lock `(tenant, contact, assistant)`
-- [ ] Idempotency по submission id: повторная отправка не двигает сессию дважды
-- [ ] Sweeper таймаута по образцу `SubflowTimeoutSweeper` → handle `timeout`
-- [ ] `TmaFormRenderer` на реальную схему; проверка, что telegram id initData совпадает с контактом сессии
-- [ ] Hosted-страница формы для не-Telegram каналов (WhatsApp)
-- [ ] Label / placeholder / ошибки через content translator chain; `value` language-agnostic
-
-### Фаза 3 — Авторинг
-- [ ] Filament `FormResource` со встроенным редактором схемы, `FormPolicy` + `Permission`
-- [ ] Builder: `FormConfig.vue` override (выбор формы, `save_to`, маппинг), палитра, `NodeIcon`
-- [ ] Publish-валидация: нода ссылается на существующую форму того же assistant
-
-### Фаза 4 — Данные
-- [ ] Маппинг ответов поле → `contact.*` через `ContactWriterInterface`
-- [ ] Файлы в форме через `MediaIngestor`
-- [ ] Submission в транскрипте как системное сообщение
-- [ ] Экспорт ответов формы
+Перенесено в спеку **`.ai/specs/forms-data-collection/`**: решения, четыре фазы и открытые вопросы
+живут там, чекбоксов по этому направлению здесь больше нет. В коде пока только каркас TMA
+(`routes/tma.php`, `resources/js/tma`), `TmaFormController` и `TmaAuthMiddleware` — заглушки.
 
 ---
 
@@ -270,17 +249,13 @@
 
 ---
 
-## 🧊 RAG (Feature) — бэклог, после M12
+## 🧊 RAG (Feature) — бэклог
 
-Перенесён в бэклог: runtime-часть в коде, но нода нерабочая до выбора провайдера. См. [[ROADMAP]] § Бэклог.
+Перенесено в спеку **`.ai/specs/rag-knowledge-bases/`**.
 
-- [ ] Решение по провайдеру эмбеддингов / хранилищу векторов (блокер)
-- [ ] `knowledge_bases` table + миграция
-- [x] `RagAdapterRegistry`
-- [x] `RagQueryNodeHandler` — [[specs/flow-engine/nodes/09-rag-query]]
-- [x] RAG validation в `ValidateFlowService`
-- [ ] RAG provider adapter registration
-- [ ] Filament UI: Knowledge Bases resource
+Что уже в коде: `RagAdapterRegistry`, `RagQueryNodeHandler` ([[specs/flow-engine/nodes/09-rag-query]])
+и RAG-валидация в `ValidateFlowService`. Нода `rag_query` остаётся в палитре и падает на runtime
+guard'е — осознанный долг до выбора провайдера эмбеддингов и хранилища векторов.
 
 ---
 
@@ -302,58 +277,15 @@
 
 ## 🔌 MCP Server (M12)
 
-Дорожная карта и архитектурные решения: [[ROADMAP]] § Milestone 12.
-
-Ничего из блока пока не реализовано — в коде нет ни домена `Mcp`, ни token-инфраструктуры (Sanctum не установлен).
-
-### Фаза 1 — Фундамент
-- [ ] ADR: MCP surface (transport, домен, auth-модель, scopes, аудит)
-- [ ] Решение по зависимости `laravel/mcp` (требует согласования — правило «не добавлять зависимости»)
-- [ ] Домен `Domains/Mcp` + service provider + route-группа `/mcp` (Streamable HTTP)
-- [ ] `mcp_tokens`: миграция + модель + issue/revoke + hashing
-- [ ] Middleware `mcp.auth` + `mcp.tenant` (резолв tenant по токену, fail fast без context)
-- [ ] `McpToolInterface` (foundation) + `McpToolRegistry` (Core)
-- [ ] `mcp_audit_log` + rate limit per token
-- [ ] Тестовый харнес для tool'ов + phpat-правило (tool не ходит в landlord / Filament)
-
-### Фаза 2 — Read-инструменты
-- [ ] `assistants.list` / `assistants.get`
-- [ ] `flows.list` / `flows.get` / `flows.validate` (через `ValidateFlowService`)
-- [ ] `contacts.search` / `contacts.get`
-- [ ] `segments.list` / `segments.preview` (через `ContactSegmentResolver`)
-- [ ] `conversations.search` / `conversations.transcript`
-- [ ] `broadcasts.list` / `broadcasts.stats`
-- [ ] `flow_sessions.inspect` / `flow_logs.tail`
-
-### Фаза 3 — Write-инструменты (за scope'ами)
-- [ ] `contacts.set_tag` / `contacts.update_attributes`
-- [ ] `segments.create` / `segments.update` + recount
-- [ ] `broadcasts.create_draft`; отправка — только со scope `broadcast:send`
-- [ ] `flows.publish` через `PublishFlowService` (scope `flow:publish`)
-- [ ] `messages.send` в существующий диалог (`origin=mcp`, пишется в транскрипт)
-- [ ] Идемпотентность + audit на каждом write
-
-### Фаза 4 — Resources и Prompts
-- [ ] Resources: `flow://{id}/definition`, `conversation://{id}/transcript`, `schema://variables`, `docs://node/{type}`
-- [ ] Resource templates + пагинация
-- [ ] Prompts: разбор застрявшей сессии, сегмент по описанию, черновик flow
-- [ ] Медиа в ответах: blob vs signed URL
-
-### Фаза 5 — Расширяемость и UI
-- [ ] Регистрация tool'ов из Solutions/Plugins (E2E: Solution ставится → tool доступен)
-- [ ] Filament: MCP Tokens resource + просмотр audit log
-- [ ] Генерация client-конфига для подключения агента
-- [ ] `developers/` HTML: как написать MCP tool в Solution
-
-> **Вне скоупа:** MCP *client* (вызов внешних MCP-серверов из flow — нода `mcp_call` / транспорт для `call`).
-> Отдельное направление, зависит от AI-слоя и RAG.
+Перенесено в спеку **`.ai/specs/mcp-server/`**: пять фаз, архитектурные решения и открытые вопросы —
+там. В коде нет ни домена `Mcp`, ни token-инфраструктуры (Sanctum не установлен).
 
 ---
 
 ## 🔧 Infrastructure / Tech Debt
 
 - [x] phpat enforcement (`composer run test:arch`; rules exist under `tests/Architecture` and run via PHPStan)
-- [ ] `flow_active_node_stats` — статистика активных нод для safe handler removal — [[specs/flow-engine/node-usage-statistics]]
+- [ ] `flow_active_node_stats` — статистика активных нод для safe handler removal — задача Jig `flow-active-node-stats`, черновик спеки [[specs/flow-engine/node-usage-statistics]]
 - [x] End-to-end integration тесты: subflow lifecycle — success/failed (были) + **cancelled** (добавлен, `SubflowLifecycleTest`); timeout покрыт `SubflowTimeoutSweeperTest` (нет отдельного `timeout`-статуса — таймаут = child `failed` + parent `failed`/`expired`)
 - [x] Concurrency hardening тесты: **optimistic-lock retry** (`FlowOrchestratorRetryTest`) + **engine_lock_timeout** drop-outcome (`MessageRouterTest`) добавлены; distributed lock покрыт unit-тестами (`FlowExecutionGuardTest`, `SessionLockManagerTest`, `LockAcquisitionPolicyTest`). Real-Redis integration и heartbeat — в `tests/Feature/Redis` (группа `redis`)
 - [x] **Консолидация блокировок + heartbeat (ADR-09).** Один lock на `(tenant, contact, assistant)` вместо двух вложенных с разными ключами. Новый `SessionLockRegistry` (scoped) — слот текущего захвата; `FlowExecutionGuard` переписан на `SessionLockManager`, стал ре-энтрантным и возвращает слот внешнему владельцу при вложенном вызове на другой scope; `FlowEngine::executeLoop()` продлевает TTL перед каждой нодой, при потере владения бросает `SessionLockLostException` → роутер отдаёт `dropped('lock_lost')`; параметры вынесены в `config/flow.php` (`lock.*`), пять хардкодов `30` убраны; удалены мёртвые `MessageRouter::tickHeartbeat()` и `buildLockKey()`. Тесты: `LockHeartbeatTest`, `SessionLockRegistryTest`, `FlowEngineSessionLockTest` + расширены `FlowExecutionGuardTest` / `MessageRouterTest`
@@ -365,6 +297,7 @@
 
 ## Связано с
 
-- [[ROADMAP]] — дорожная карта платформы
+- `.ai/specs/` — открытые направления как спеки Jig (`.ai/scripts/jig spec list`)
+- [[ROADMAP]] — история инженерных майлстоунов
 - [[INDEX]] — навигация по документам
 - [[PROJECT]] — описание проекта
