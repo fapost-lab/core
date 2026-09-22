@@ -52,10 +52,15 @@ interface FlowEngineInterface
      * the engine itself spawned the session (e.g. as a subflow child) and
      * needs to walk it to its first wait point without going through the
      * full {@see start()} bootstrap (no new row, no new analytics event),
-     * and to wake a session parked on a `delay` node, which has no inbound
+     * and to wake a session parked on a `delay` node or on `paused` (a
+     * `delayed(resumeAt: ...)` result), neither of which has an inbound
      * message to resume with.
+     *
+     * @param  bool  $resumedAfterDelay  Passed to the first node's
+     *   {@see \Fapost\Foundation\DTO\NodeExecutionContext::$resumedAfterDelay}
+     *   only — set when this run wakes a `paused` session at its `resumeAt`.
      */
-    public function runSession(FlowSession $session): FlowSession;
+    public function runSession(FlowSession $session, bool $resumedAfterDelay = false): FlowSession;
 
     /**
      * Resume a parent session after its subflow child reached an end node.

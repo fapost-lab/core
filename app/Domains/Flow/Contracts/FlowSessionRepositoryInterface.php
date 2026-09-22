@@ -9,6 +9,11 @@ use App\Domains\Flow\Models\FlowSession;
 
 interface FlowSessionRepositoryInterface
 {
+    /**
+     * The session a new inbound message should be routed against: `active`,
+     * `waiting_input`, or `paused` (a `delayed(resumeAt: ...)` park — the
+     * routing pipeline decides whether that's still busy or due to wake).
+     */
     public function findActiveForContact(Contact $contact, string $assistantId): ?FlowSession;
 
     public function findById(string $sessionId): ?FlowSession;

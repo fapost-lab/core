@@ -23,6 +23,7 @@ use Fapost\Foundation\DTO\IncomingMessageType;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
 
@@ -44,6 +45,7 @@ final class MessageRouterPipelineTest extends FeatureTestCase
         // A handler that only writes to flow.* state — no outbound channel needed.
         $registry = $this->app->make(NodeHandlerRegistry::class);
         $registry->register(RecordingTestHandler::class);
+        $registry->register(DelayedResumeTestHandler::class);
     }
 
     public function test_unknown_message_starts_default_flow_and_runs_to_end_node(): void
@@ -127,6 +129,52 @@ final class MessageRouterPipelineTest extends FeatureTestCase
         $this->assertNull($session->current_node_id);
     }
 
+    public function test_global_reset_command_terminates_a_paused_session_too(): void
+    {
+        [$tenantId, $assistant, $contact, $channel] = $this->seedTenantWithFlow(
+            nodes: [
+                ['id' => 'd1',    'type' => 'delayed_resume_test', 'version' => 1, 'config' => ['seconds' => 60]],
+                ['id' => 'end-1', 'type' => 'end',                 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [
+                ['id' => 'e1', 'from' => 'd1', 'to' => 'end-1', 'handle' => 'default'],
+            ],
+        );
+
+        // Parked on `paused` with a `resume_at` far in the future — /reset must
+        // still be able to break in, even though the routing pipeline itself
+        // would answer any ordinary message with a busy notice.
+        $session = FlowSession::query()->create([
+            'tenant_id'          => $tenantId,
+            'assistant_id'       => $assistant->getKey(),
+            'contact_id'         => $contact->getKey(),
+            'flow_definition_id' => FlowDefinition::query()->where('tenant_id', $tenantId)->value('id'),
+            'flow_version'       => 1,
+            'current_node_id'    => 'd1',
+            'state'              => [
+                'system' => ['delayed' => ['d1' => ['resume_at' => now()->addHour()->toAtomString()]]],
+            ],
+            'status'  => FlowSessionStatus::Paused,
+            'version' => 1,
+        ]);
+
+        $router = $this->app->make(MessageRouter::class);
+
+        $outcome = $router->route(
+            contact: $contact,
+            message: $this->incoming('/reset'),
+            assistant: $assistant,
+            channel: $channel,
+        );
+
+        $this->assertSame('command', $outcome->kind);
+        $this->assertSame('/reset', $outcome->command);
+
+        $session->refresh();
+        $this->assertSame(FlowSessionStatus::TerminatedByUser, $session->status);
+        $this->assertNull($session->current_node_id);
+    }
+
     public function test_active_session_race_drops_silently_and_does_not_advance(): void
     {
         // Two workers may briefly observe an Active session right after a peer
@@ -171,6 +219,119 @@ final class MessageRouterPipelineTest extends FeatureTestCase
         $session->refresh();
         $this->assertSame(FlowSessionStatus::Active, $session->status);
         $this->assertSame('rec-1', $session->current_node_id);
+    }
+
+    public function test_paused_session_before_resume_at_drops_busy_and_does_not_wake_the_node(): void
+    {
+        [$tenantId, $assistant, $contact, $channel] = $this->seedTenantWithFlow(
+            nodes: [
+                ['id' => 'd1',     'type' => 'delayed_resume_test', 'version' => 1, 'config' => ['seconds' => 60]],
+                ['id' => 'end-1', 'type' => 'end',                 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [
+                ['id' => 'e1', 'from' => 'd1', 'to' => 'end-1', 'handle' => 'default'],
+            ],
+        );
+
+        $router = $this->app->make(MessageRouter::class);
+
+        $router->route(
+            contact: $contact,
+            message: $this->incoming('start'),
+            assistant: $assistant,
+            channel: $channel,
+        );
+
+        $session = FlowSession::query()
+            ->where('tenant_id', $tenantId)
+            ->where('contact_id', $contact->getKey())
+            ->latest('created_at')
+            ->firstOrFail();
+
+        $this->assertSame(FlowSessionStatus::Paused, $session->status);
+        $this->assertSame('d1', $session->current_node_id);
+        $resumeAt = $session->state['system']['delayed']['d1']['resume_at'] ?? null;
+        $this->assertNotNull($resumeAt, 'The engine-owned resume marker must be set.');
+
+        // Second message arrives well before resume_at — the busy reply must
+        // fire and the node must not be woken or the flow re-routed.
+        $outcome = $router->route(
+            contact: $contact,
+            message: $this->incoming('hello'),
+            assistant: $assistant,
+            channel: $channel,
+        );
+
+        $this->assertTrue($outcome->wasDropped());
+        $this->assertSame('drop_busy', $outcome->reason);
+
+        $session->refresh();
+        $this->assertSame(FlowSessionStatus::Paused, $session->status);
+        $this->assertSame('d1', $session->current_node_id);
+        $this->assertSame($resumeAt, $session->state['system']['delayed']['d1']['resume_at'] ?? null);
+
+        $this->assertSame(
+            1,
+            FlowSession::query()->where('tenant_id', $tenantId)->where('contact_id', $contact->getKey())->count(),
+            'A busy drop must not start a second session for the same contact.',
+        );
+    }
+
+    public function test_paused_session_after_resume_at_wakes_the_node_then_routes_the_message(): void
+    {
+        [$tenantId, $assistant, $contact, $channel] = $this->seedTenantWithFlow(
+            nodes: [
+                ['id' => 'd1',    'type' => 'delayed_resume_test', 'version' => 1, 'config' => ['seconds' => 60]],
+                ['id' => 'end-1', 'type' => 'end',                 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [
+                ['id' => 'e1', 'from' => 'd1', 'to' => 'end-1', 'handle' => 'default'],
+            ],
+        );
+
+        $router = $this->app->make(MessageRouter::class);
+
+        $router->route(
+            contact: $contact,
+            message: $this->incoming('start'),
+            assistant: $assistant,
+            channel: $channel,
+        );
+
+        $session = FlowSession::query()
+            ->where('tenant_id', $tenantId)
+            ->where('contact_id', $contact->getKey())
+            ->latest('created_at')
+            ->firstOrFail();
+
+        $this->assertSame(FlowSessionStatus::Paused, $session->status);
+
+        $this->travel(61)->seconds();
+
+        // resume_at has passed: the router must wake d1 inline (resumedAfterDelay
+        // parks it back on waiting_input without consuming this message) and then
+        // route this very message against the woken session's new state.
+        $outcome = $router->route(
+            contact: $contact,
+            message: $this->incoming('hello'),
+            assistant: $assistant,
+            channel: $channel,
+        );
+
+        $this->assertSame('executed', $outcome->kind);
+
+        $session->refresh();
+        $this->assertSame(FlowSessionStatus::Ended, $session->status);
+        $this->assertSame(EndStatus::Success->value, $session->end_status);
+        $this->assertNull($session->current_node_id);
+        // The marker written for d1 must be cleared once it completed.
+        $this->assertNull($session->state['system']['delayed']['d1'] ?? null);
+
+        $this->assertSame(
+            1,
+            FlowSession::query()->where('tenant_id', $tenantId)->where('contact_id', $contact->getKey())->count(),
+            'Waking the node and routing the message must not start a second session.',
+        );
     }
 
     /**
@@ -288,5 +449,61 @@ final class RecordingTestHandler implements NodeHandlerInterface
             sourceHandle: 'default',
             stateChanges: $changes,
         );
+    }
+}
+
+/**
+ * Test double for the `delayed(resumeAt: ...)` contract: on a first visit it
+ * parks with a timed resume; once the engine wakes it
+ * ({@see NodeExecutionContext::$resumedAfterDelay}) it parks like `waiting()`
+ * instead of consuming the incoming message itself — matching the routing
+ * pipeline's "wake, then route" sequencing — so the actual inbound message
+ * that triggered the wake-up is the one that advances it to `default`.
+ */
+final class DelayedResumeTestHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'delayed_resume_test';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Delayed Resume Test';
+    }
+
+    public function category(): string
+    {
+        return 'Test';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        if ($context->resumedAfterDelay) {
+            return NodeExecutionResult::waiting();
+        }
+
+        if (null !== $context->incoming) {
+            return NodeExecutionResult::executed();
+        }
+
+        $seconds = (int) ($nodeConfig['config']['seconds'] ?? 60);
+
+        return NodeExecutionResult::delayed(resumeAt: Carbon::now()->addSeconds($seconds));
     }
 }

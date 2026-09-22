@@ -20,6 +20,7 @@ final class FlowSessionRepository implements FlowSessionRepositoryInterface
             ->whereIn('status', [
                 FlowSessionStatus::Active,
                 FlowSessionStatus::WaitingInput,
+                FlowSessionStatus::Paused,
             ])
             ->latest('updated_at')
             ->first();

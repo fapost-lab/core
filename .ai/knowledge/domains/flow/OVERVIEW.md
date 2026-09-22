@@ -80,10 +80,21 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   through `DelayResumeSchedulerInterface` → `DelayedSessionResumer`, which takes the session lock
   and calls `FlowEngine::runSession()`. The node is clock-gated, so an inbound message after
   `resume_at` also moves it on; the session parks in `waiting_input`, not `paused` —
-  `findActiveForContact()` does not return paused sessions.
-- `NodeExecutionResult::delayed()` (Foundation) parks the session in `waiting_input` exactly like
-  `waiting()`: the next inbound message re-runs the node. Nothing produces `paused` today; a real
-  timed resume for `delayed()` needs a Foundation release (task `delayed-resume-contract`).
+  `findActiveForContact()` does return `paused` sessions too (next bullet), but the `delay` node's
+  own marker (`system.delay.{nodeId}`) is unrelated to that status.
+- `NodeExecutionResult::delayed()` (Foundation) has two forms. Without `resumeAt` it parks the
+  session in `waiting_input` exactly like `waiting()`: the next inbound message re-runs the node.
+  With `resumeAt` the engine — not the handler — parks the session on `paused` and writes
+  `system.delayed.{nodeId}.resume_at` (`FlowSessionPersister`), then schedules the wake-up through
+  the same `DelayResumeSchedulerInterface` → `DelayedSessionResumer` path as the `delay` node;
+  `DelayedSessionResumer` tells the two forms apart by marker prefix and status, and runs the
+  woken node with `NodeExecutionContext::$resumedAfterDelay = true`. `findActiveForContact()`
+  returns `paused` sessions so the routing pipeline can see them: `MessageRouter` answers busy
+  while `resume_at` is still in the future, and wakes the node inline
+  (`DelayedSessionResumer::wakeIfDue()`, under the lock it already holds) before routing the
+  message once `resume_at` has passed — a message during the pause is never queued for the node,
+  only the busy reply is sent. `GlobalCommandExecutor` (`/reset`) can terminate a `paused` session
+  the same way it terminates any other active one.
 - `send_message` timeouts: the handler schedules `ResumeTimedOutSendMessageNodeJob` (queue
   `flow.execution`) through `SendMessageTimeoutSchedulerInterface`; the job resumes the node on its
   `no_response` handle under the session lock. Both deferred resumes go through
