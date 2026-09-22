@@ -10,6 +10,6 @@ if [ "$is_branch_checkout" != "1" ]; then
     exit 0
 fi
 
-script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
 exec "$script_dir/check-migration-changes.sh" "$previous_ref" "$current_ref"
