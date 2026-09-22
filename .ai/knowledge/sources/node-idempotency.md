@@ -8,7 +8,8 @@ paths:
   - "app/Domains/Flow/Handlers/**"
 source: docs/site/extending/flow-nodes/idempotency.mdx
 summary: "Making a node handler safe to retry: idempotency key patterns"
-source_hash: f4c680db06a4288fb3f7fe2e04a5979a815783a9
+source_hash: e8628064bed6bc56ba0feef8f075350a589843c4
+reviewed_at: 2026-09-22
 ---
 # Idempotency and retries
 

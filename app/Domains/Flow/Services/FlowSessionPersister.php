@@ -141,11 +141,12 @@ final class FlowSessionPersister
     {
         return match ($result->status) {
             NodeExecutionStatus::Executed => $this->patchForCompleted($nextNodeId),
-            NodeExecutionStatus::Waiting  => [
-                'status' => FlowSessionStatus::WaitingInput,
-            ],
+            // `delayed()` has no resume time to act on yet, so it parks like `waiting()`:
+            // the next inbound message re-runs the node, which decides whether to move
+            // on. A `paused` session would never be resumed and never be found again.
+            NodeExecutionStatus::Waiting,
             NodeExecutionStatus::Delayed => [
-                'status' => FlowSessionStatus::Paused,
+                'status' => FlowSessionStatus::WaitingInput,
             ],
             NodeExecutionStatus::Failed => [
                 'status' => FlowSessionStatus::Failed,

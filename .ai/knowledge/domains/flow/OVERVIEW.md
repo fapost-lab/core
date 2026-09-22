@@ -81,6 +81,9 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   and calls `FlowEngine::runSession()`. The node is clock-gated, so an inbound message after
   `resume_at` also moves it on; the session parks in `waiting_input`, not `paused` —
   `findActiveForContact()` does not return paused sessions.
+- `NodeExecutionResult::delayed()` (Foundation) parks the session in `waiting_input` exactly like
+  `waiting()`: the next inbound message re-runs the node. Nothing produces `paused` today; a real
+  timed resume for `delayed()` needs a Foundation release (task `delayed-resume-contract`).
 - `send_message` timeouts: the handler schedules `ResumeTimedOutSendMessageNodeJob` (queue
   `flow.execution`) through `SendMessageTimeoutSchedulerInterface`; the job resumes the node on its
   `no_response` handle under the session lock. Both deferred resumes go through

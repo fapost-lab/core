@@ -52,6 +52,8 @@ which is precisely the case the key exists to catch.
 ## Waiting is not failing
 
 A handler that needs to pause returns `NodeExecutionResult::waiting()` or
-`::delayed()`. That is a normal outcome, not an error, and it does not re-run the
-work the handler already did. Reach for it instead of throwing when the flow
-simply is not ready to continue.
+`::delayed()` — for now the two behave the same: the contact's next message runs
+the handler again. That is a normal outcome, not an error. Because the handler
+runs again, mark the work it already did (see above) so the next run does not
+repeat it. Reach for it instead of throwing when the flow simply is not ready to
+continue.

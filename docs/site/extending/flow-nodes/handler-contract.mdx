@@ -61,8 +61,13 @@ NodeExecutionResult::executed(sourceHandle: 'default', stateChanges: [
 ]);
 
 NodeExecutionResult::waiting();   // the flow pauses for input
-NodeExecutionResult::delayed();   // the flow resumes later
+NodeExecutionResult::delayed();   // same as waiting(), for now — see below
 ```
+
+`delayed()` does not yet take a time to resume at. The session waits exactly as
+after `waiting()`: the contact's next message runs your handler again, and the
+handler decides whether it is time to move on — the built-in `delay` node works
+this way. Nothing wakes the node without an inbound message.
 
 ## The handler must be graph-unaware
 
