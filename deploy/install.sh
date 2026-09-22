@@ -20,7 +20,8 @@
 
 set -euo pipefail
 
-readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+readonly ROOT
 readonly MIN_PHP="8.4"
 readonly MIN_NODE="20"
 
@@ -93,6 +94,9 @@ check_extensions() {
     # with slightly different flag semantics reports extensions as missing that
     # are plainly loaded — a false failure that blocks a perfectly good host.
     local report
+    # The PHP snippet is single-quoted on purpose: $missing and $argv are PHP
+    # variables, not shell ones.
+    # shellcheck disable=SC2016
     report="$(php -r '
         $missing = [];
         foreach (array_slice($argv, 1) as $extension) {

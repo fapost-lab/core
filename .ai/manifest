@@ -1,8 +1,8 @@
 # jig manifest. Do not edit by hand; maintained by `jig init` and `jig upgrade`.
 jig.version: 0.14.0
-jig.source: /Users/bpartner/Projects/bpai
+jig.source: /Users/bpartner/.local/share/jig
 jig.mode: copy
-installed_at: 2026-09-21
+installed_at: 2026-09-22
 adapters: [claude, codex]
 ---
 1de091366a5c4e8848df96b8d617ee7bedd9b25f .ai/profiles/generic/profile.yaml

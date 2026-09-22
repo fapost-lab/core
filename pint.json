@@ -87,6 +87,7 @@
   },
   "exclude": [
     "vendor",
+    "packages",
     "tools",
     "database",
     "bootstrap",

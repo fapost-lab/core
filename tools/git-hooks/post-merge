@@ -2,7 +2,7 @@
 
 set -eu
 
-script_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+script_dir="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 current_ref="$(git rev-parse HEAD 2>/dev/null || true)"
 previous_ref=""
 
