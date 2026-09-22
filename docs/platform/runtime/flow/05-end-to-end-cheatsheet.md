@@ -11,13 +11,21 @@
 5. Кладёт `IncomingMessageJob` в `flow.execution`.
 6. Worker переключается в tenant schema (`TenantSwitcher`).
 7. Адаптер нормализует payload -> `IncomingMessage`.
-8. Берётся lock `session_lock:*`.
-9. `ContactService` находит/создаёт контакт и channel-contact связь.
-10. `FlowSessionRepository` ищет активную сессию.
-11. Если reset-команда - текущая сессия получает `status=cancelled`.
-12. Если сессии нет - `TriggerResolver` ищет trigger; иначе идём в resume.
-13. `FlowOrchestrator` запускает `FlowEngine::start` или `FlowEngine::resume`.
-14. `SendMessageNodeHandler` -> `FlowMessageSender` -> провайдер.
+8. `ContactService` находит/создаёт контакт и channel-contact связь - это происходит
+   до lock, ещё в `IncomingMessageJob`.
+9. `MessageRouter::route(...)` матчит global command (`/reset`, `/cancel`) -
+   если найдена, выполняется без lock и pipeline на этом заканчивается
+   (сессия помечается `terminated_by_user`, а не `cancelled`).
+10. Иначе - typing indicator, затем `MessageRouter` берёт lock
+    `session_lock:{tenant}:{contact}:{assistant}`.
+11. `FlowSessionRepository` ищет активную сессию; `SessionStateRouter` решает
+    resume / start / drop по её статусу.
+12. Если сессии нет (или она в terminal-статусе) - `TriggerResolver` ищет trigger;
+    иначе идём в resume.
+13. `FlowOrchestrator` запускает `FlowEngine::start` или `FlowEngine::resume`;
+    `FlowEngine` продлевает lock TTL перед каждой нодой (`refreshSessionLock()`).
+14. `SendMessageNodeHandler` -> `FlowMessageSender` -> провайдер; на выходе из
+    `MessageRouter` lock освобождается.
 
 ## Где чаще всего "ломается"
 

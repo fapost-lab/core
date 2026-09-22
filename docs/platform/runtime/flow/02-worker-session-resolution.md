@@ -4,33 +4,80 @@
 
 ## Последовательность выполнения
 
-Порядок в `IncomingMessageJob::handle()` строгий и важный:
+Порядок в `IncomingMessageJob::handle()` строгий и важный (докблок класса,
+`app/Domains/Webhook/Jobs/IncomingMessageJob.php:24-36`):
 
-1. Создаётся `RuntimeTenant` из envelope (`tenantId`, `schema`).
+1. Создаётся `RuntimeTenant` из payload (`tenantId`, `schema`).
 2. `TenantSwitcher::runForTenant(...)` переключает tenant schema.
 3. `ChannelAdapterResolver` нормализует raw payload -> `IncomingMessage`.
-4. Берётся distributed lock на ключ:
-   `session_lock:{tenantId}:{platform}:{externalUserId}:{assistantId}`.
-5. `ContactService::findOrCreate(...)` ищет/создаёт контакт.
-6. `findOrCreateChannelContact(...)` привязывает контакт к каналу.
-7. `FlowSessionRepository::findActiveForContact(...)` ищет активную сессию.
-8. Если сообщение `/start|/reset|/stop` и сессия есть - `cancel(...)`.
-9. Если активной сессии нет - `TriggerResolver::resolve(...)` ищет message trigger.
-10. `FlowOrchestrator::handle(...)` решает: `resume`, `start`, или fallback-message.
+4. Резолвятся assistant (`AssistantRepositoryInterface::findById`), контакт
+   (`ContactService::findOrCreate`), channel-contact связь
+   (`findOrCreateChannelContact`) и канал (`Channel::findOrFail`).
+5. Входящее сообщение пишется в transcript (`ConversationLoggerInterface::log`) -
+   до роутинга, чтобы сообщения, задропленные дальше под конкурентностью, всё
+   равно попадали в историю.
+6. Весь дальнейший pipeline - global commands, typing indicator, **lock**,
+   session state, запуск flow, cleanup - делегируется в `MessageRouter::route(...)`.
+7. Если `MessageRouter` вернул outcome `engine_lock_timeout` - job делает
+   `release(...)` с backoff (1, 2, 5, 10 сек) (`IncomingMessageJob.php:122-145`).
+   Остальные "dropped"-исходы (`lock_timeout`, `drop_busy`, `drop_silent`,
+   `staff_handled`, `lock_lost`) не ретраятся: юзер либо уже получил busy-notice,
+   либо дроп намеренно молчаливый.
 
-## Зачем lock и почему два слоя
+`IncomingMessageJob` сам никакого lock не берёт - это устаревшее описание. Session
+lock целиком живёт внутри `MessageRouter` (и `FlowExecutionGuard` для entry points
+вне роутера, см. ниже).
 
-Есть два lock-слоя:
+### Что делает MessageRouter::route(...) (шаг 6)
 
-1. В `IncomingMessageJob` (до DB writes, ключ включает platform + externalUserId).
-2. В `FlowExecutionGuard` (tenant/contact/assistant lock вокруг orchestration).
+`MessageRouter` (`app/Domains/Flow/Routing/MessageRouter.php:32-53`) выполняет
+6-шаговый pipeline:
 
-Практически это защищает от race-condition, когда несколько событий одного контакта приходят почти одновременно.
+1. Global command match - без lock, синхронно (`/reset`, `/cancel` built-in +
+   tenant `assistant.commands`, `CommandMatcher::match`).
+2. Typing indicator start.
+3. **Lock acquisition** с backoff retry (`LockAcquisitionPolicy::acquireWithRetry`,
+   3 попытки × 2s).
+4. Session state classification: сначала staff-takeover check, потом
+   `SessionStateRouter::decide(...)`.
+5. Flow execution через `FlowOrchestratorInterface::handle(...)`.
+6. Cleanup: release lock, stop typing.
 
-Если lock не получен:
+## Зачем lock и что его держит
 
-- job делает `release(...)` с backoff (1, 2, 5, 10 сек),
-- событие не теряется.
+Lock один - на triple (tenant, contact, assistant). Никаких "двух слоёв" в смысле
+двух независимых lock'ов за один прогон нет. Ключ:
+
+```
+session_lock:{tenantId}:{contactId}:{assistantId}
+```
+
+(`LockScope::key()`, `app/Domains/Flow/Concurrency/LockScope.php:23-26`) - берётся
+один раз за обработку входящего сообщения.
+
+- **Основной держатель - `MessageRouter`**, на шаге 3 своего pipeline. Полученный
+  `LockHandle` публикуется в `SessionLockRegistry`, поэтому:
+  - `FlowExecutionGuard` (`app/Infrastructure/Flow/FlowExecutionGuard.php`),
+    вызываемый глубже по стеку внутри orchestration, видит через
+    `SessionLockRegistry::holds()`, что lock уже держит этот же worker, и просто
+    выполняет callback без повторного acquire (`FlowExecutionGuard.php:49-52`) -
+    он re-entrant, а не второй независимый слой;
+  - `FlowEngine` продлевает TTL перед каждой нодой: `refreshSessionLock()` ->
+    `LockHeartbeat::extend(...)` (`app/Domains/Flow/Services/FlowEngine.php:655-668`,
+    вызывается из `executeLoop()` на :389, до `$handler->execute(...)`).
+- **Для entry points, которые не идут через `MessageRouter`** -
+  `FlowExecutionGuard::run(...)` сам берёт этот же lock scope с нуля (registry
+  там пуст, повторного входа нет). Такие entry points: `DelayedSessionResumer`
+  (`app/Domains/Flow/Orchestration/DelayedSessionResumer.php`),
+  `ResumeTimedOutSendMessageNodeJob` и `StartFlowFromEventJob`
+  (`app/Jobs/Flow/`).
+
+Если lock не получен на шаге 3 `MessageRouter` - `DropPolicy::applyBusy(...)`,
+outcome `lock_timeout` (busy-notice юзеру, ретрая нет). Если lock теряется во
+время исполнения (heartbeat не смог продлить TTL) - `SessionLockLostException` /
+`SessionLockTimeoutException`, outcome `lock_lost` / `engine_lock_timeout`
+(`MessageRouter::route()`, :160-183); только `engine_lock_timeout` ретраится
+джобой (см. выше).
 
 ## Поиск активной сессии
 
@@ -64,11 +111,12 @@
 
 ## Ключевые классы
 
-| Класс                    | Метод                            | Роль                                                 |
-|--------------------------|----------------------------------|------------------------------------------------------|
-| `IncomingMessageJob`     | `handle`                         | Главный worker pipeline                              |
-| `FlowSessionRepository`  | `findActiveForContact`, `cancel` | Поиск/отмена сессии                                  |
-| `TriggerResolver`        | `resolve`                        | Делегирует в `message/schedule/webhook/api` resolver |
-| `MessageTriggerResolver` | `resolve`                        | Ищет лучший keyword/phrase trigger                   |
-| `FlowOrchestrator`       | `handle`                         | Выбор ветки `resume/start/fallback`                  |
-| `FlowExecutionGuard`     | `run`                            | Distributed lock вокруг orchestration                |
+| Класс                    | Метод                             | Роль                                                                                             |
+|--------------------------|------------------------------------|---------------------------------------------------------------------------------------------------|
+| `IncomingMessageJob`     | `handle`                           | Transport-level шаги (tenant/contact/channel), делегирует в `MessageRouter`                      |
+| `MessageRouter`          | `route`                            | 6-шаговый pipeline: commands → typing → **lock** → session state → execute → cleanup             |
+| `FlowSessionRepository`  | `findActiveForContact`, `cancel`   | Поиск/отмена сессии                                                                                |
+| `TriggerResolver`        | `resolve`                          | Делегирует в `message/schedule/webhook/api` resolver                                              |
+| `MessageTriggerResolver` | `resolve`                          | Ищет лучший keyword/phrase trigger                                                                 |
+| `FlowOrchestrator`       | `handle`                           | Выбор ветки `resume/start/fallback`                                                                |
+| `FlowExecutionGuard`     | `run`                              | Тот же session lock для entry points вне `MessageRouter`; re-entrant passthrough, если lock уже держит текущий worker |

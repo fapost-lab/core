@@ -66,27 +66,50 @@
 
 ## 3) `configSchema()` конвенции
 
-`configSchema()` - это контракт между backend и builder.
+`configSchema()` - это контракт между backend и builder. Собирается через fluent Builder API
+`Fapost\Support\Builder\Schema` (`Schema`/`Section`/`Fields\*`), а не через сырые массивы;
+`Schema::toArray()` строит ровно тот wire-формат, который понимает Vue-рендерер. Пример реального
+handler-а - `SetTagNodeHandler` (`app/Domains/Flow/Handlers/SetTagNodeHandler.php`):
 
-Для каждого поля в schema указывай минимум:
+```php
+return Schema::make()
+    ->required(['action'])
+    ->section(
+        Section::make('action', (string) __('builder.nodes.set_tag.section'))
+            ->icon('tag')
+            ->fields([
+                SelectField::make('action')
+                    ->label((string) __('builder.nodes.set_tag.action'))
+                    ->required()
+                    ->default(TagAction::Add->value)
+                    ->options(TagAction::options()),
+                ArrayField::make('tags')
+                    ->label((string) __('builder.nodes.set_tag.tags'))
+                    ->help((string) __('builder.nodes.set_tag.tags_help')),
+            ]),
+    )
+    ->toArray();
+```
 
-- `type`
-- `label`
-- `required` (true/false)
+Для каждого поля указывай минимум:
+
+- имя (`Field::make('name')`),
+- `->label(...)`,
+- `->required()`, если поле обязательно.
 
 Если уместно, добавляй:
 
-- `default`
-- `placeholder`
-- `options` (для select-like полей)
+- `->default(...)`
+- `->placeholder(...)`
+- `->options([...])` (для select-like полей)
 
-### Рекомендуемые типы (по текущему builder-подходу)
+### Доступные типы полей (`Fapost\Support\Builder\Schema\Fields`)
 
-- `text`
-- `number`
-- `state-picker`
-- `repeater`
-- специализированные типы через кастомные override-компоненты
+`TextField`, `TextareaField`, `NumberField`, `ToggleField`, `SelectField`, `ArrayField`,
+`ObjectField`, `ObjectArrayField`, `KeyValueField`, `JsonField`, `DurationField`,
+`StatePickerField`, `FlowPickerField`, `EnumCardsField` - специализированный UI (клавиатуры,
+мультиязычность и т.п.) всё ещё требует кастомного override-компонента в builder (см.
+`06-node-development-guide.md` §13).
 
 ---
 
@@ -115,15 +138,21 @@
 
 ---
 
-## 5) Conventions для `effects`
+## 5) Conventions для contact-мутаций
 
-`effects` - для побочных изменений вне state.
+Для изменений вне session state (contact attributes, canonical language и т.п.) используется
+`ContactWriterInterface->write(string $path, mixed $value)`, доступный через
+`context->contactWriter`. Легаси-механизм `effects[]`, который движок разбирал централизованно,
+удалён - `NodeExecutionResult` такого поля не содержит.
 
 Рекомендации:
 
-- `type` всегда строковый и стабильный (`set_contact_language`, `set_contact_attribute`).
-- обязательные поля эффекта документируй в PHPDoc/доках ноды.
-- не добавляй "одноразовые" effect-типы без явного потребителя в engine.
+- `path` всегда начинается с `contact.` и обязан соответствовать contract writer-а (один уровень
+  группировки: `contact.<group>.<field>`; зарезервированные ключи `id`, `tenant_id`, `channel_id`,
+  `channel`, `meta.*` кидают `LogicException`).
+- каждый write коммитится немедленно в своей транзакции - handler не должен полагаться на
+  атомарность вместе с сохранением session state.
+- документируй, какие `contact.*` пути пишет нода, в PHPDoc/доках ноды.
 
 ---
 
@@ -197,7 +226,7 @@
 - структура `config` (поля + типы + required)
 - список возможных `sourceHandle`
 - какие `stateChanges` пишет
-- какие `effects` возвращает
+- какие `contact.*` пути пишет через `ContactWriter` (если пишет)
 - retry/idempotency стратегия
 
 Это резко упрощает ревью и поддержку.
@@ -207,7 +236,7 @@
 ## 10) Мини-checklist перед merge
 
 - [ ] `config` поля именованы по snake_case и понятны по смыслу.
-- [ ] `configSchema()` содержит `type/label/required`.
+- [ ] `configSchema()` собран через fluent `Schema`/`Section`/`Fields\*` API, поля помечены `->label()`/`->required()`.
 - [ ] `sourceHandle` стабильные и документированы.
 - [ ] `system.*` ключи идут через константы.
 - [ ] Ошибки валидации в едином формате `<node_type>: <reason>`.

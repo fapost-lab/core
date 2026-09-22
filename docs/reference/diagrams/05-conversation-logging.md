@@ -1,6 +1,17 @@
 # Conversation Logging — pipeline хранения диалогов
 
-Асинхронный pipeline логирования входящих и исходящих сообщений через сменный backend-драйвер. Домен ещё не реализован (статус: Draft).
+**Статус: реализовано.** Асинхронный pipeline логирования входящих и исходящих сообщений через сменный
+backend-драйвер, домен `app/Domains/Conversation/`. Актуальное описание домена —
+[`.ai/knowledge/domains/conversation/OVERVIEW.md`](/.ai/knowledge/domains/conversation/OVERVIEW.md).
+
+Два известных расхождения с диаграммой/спекой ниже (зафиксированы как trade-off, не как баг):
+
+- `ConversationReaderInterface` не реализован — read-порта нет. Filament-инбокс
+  (`app/Filament/Assistant/Resources/Conversations`) читает Eloquent-модели `Conversation` /
+  `ConversationMessage` напрямую.
+- Дедуп-индекс `conversation_messages_idem_unique` включает `created_at` как колонку partition-key
+  (Postgres требует это для уникального индекса на партиционированной таблице):
+  `(conversation_id, direction, idempotency_key, created_at)`.
 
 ```mermaid
 flowchart TD
@@ -40,14 +51,11 @@ flowchart TD
         Note1["media ссылки — в jsonb поле\nconversation_messages.media"]
     end
 
-    subgraph READ["Read path (будущий Inbox / Filament)"]
-        READER[ConversationReaderInterface::list\nConversationReaderInterface::get]
-        READER --> ELOQUENT
-        READER -.->|"по конфигу"| CLICKHOUSE
-        FILAMENT[Filament ContactResource\nвкладка История переписки]
-        INBOX[Inbox / Live-chat\nбудущий UI]
-        READER --> FILAMENT
-        READER --> INBOX
+    subgraph READ["Read path"]
+        INBOX[Filament ConversationResource\nинбокс оператора]
+        INBOX -->|"Eloquent напрямую"| ELOQUENT
+        READER["ConversationReaderInterface\n(не реализован)"]
+        READER -.->|"нужен до второго backend"| CLICKHOUSE
     end
 ```
 
@@ -57,12 +65,12 @@ flowchart TD
 |-----------|---------------|-----------|
 | `ConversationLoggerInterface` | Capture-сайты: `IncomingMessageJob`, `MessageSender` | Write-порт: принимает `MessageLogEntry`, **fire-and-forget** |
 | `ConversationStoreInterface` | `PersistConversationMessageJob` | Backend-порт: `ensureConversation()`, `append()`, `updateStatus()` |
-| `ConversationReaderInterface` | Filament, будущий Inbox | Read-порт: `list()`, `get()`, `findConversation()` |
+| `ConversationReaderInterface` | — | **Не реализован.** Задуманный read-порт (`list()`, `get()`, `findConversation()`); инбокс читает Eloquent-модели напрямую |
 
 ## Важные инварианты
 
 - **Non-blocking capture:** `ConversationLogger::log()` только диспатчит job — никогда не блокирует hot path
-- **Eloquent-связи запрещены:** ни один контроллер/ресурс не делает `$contact->conversations()` — только через `ConversationReaderInterface`
+- **Чтение идёт через Eloquent:** read-порта нет, `ConversationResource` читает `Conversation` / `ConversationMessage` напрямую. Порт записи сменный, порт чтения — нет: второй backend (ClickHouse) потребует сначала read-порт
 - **Capture-порядок:** inbound логируется ДО `MessageRouter`, outbound — ПОСЛЕ получения `DeliveryResult` (успех/провал фиксируется)
 - **Один тред = Conversation:** агрегат по ключу `(tenant_id, assistant_id, contact_id, channel_id)` создаётся один раз, сообщения добавляются в него
 - **ClickHouse-ready:** PostgreSQL driver — дефолт, ClickHouse добавляется сменой binding без изменения capture-кода
