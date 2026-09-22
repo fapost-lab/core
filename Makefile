@@ -44,7 +44,8 @@ TUNNEL_HOST ?=
 
 .PHONY: help setup dev test test-filter test-arch stan lint fix \
         hooks-install dev-link ngrok tunnel docs-build docs-dev artisan shell \
-        horizon queue-restart fresh
+        horizon queue-restart fresh \
+        loadtest loadtest-stub-start loadtest-stub-stop loadtest-workers-start loadtest-workers-stop
 
 # Prints each target with its description and the command that will actually
 # run. The command is not written out here but asked of make itself, so it
@@ -142,6 +143,86 @@ ngrok: ## Expose the local site through ngrok
 
 tunnel: ## Cloudflare tunnel to the local site — TUNNEL_HOST=<name> keeps the address
 	tools/cf-tunnel $(SITE) $(TUNNEL_HOST)
+
+# ─── Load testing ────────────────────────────────────────────────────────────
+#
+# Drives the flow engine under real concurrency — several tenants and
+# contacts, real queue workers, real Redis locks — against a local Telegram
+# Bot API stub, so it never reaches the real Telegram origin. See
+# .ai/workspace/tasks/load-test/design.md for the design and
+# docs/platform/ROADMAP.md for the "100 concurrent sessions" criterion this
+# closes out.
+#
+# Tunable via make variables, e.g.:
+#     make loadtest TENANTS=2 CONTACTS=10 MESSAGES=2 WORKERS=2
+
+LOADTEST_PORT     ?= 8099
+TENANTS           ?= 3
+CONTACTS          ?= 100
+MESSAGES          ?= 3
+WORKERS           ?= 4
+LOADTEST_URL      ?= http://127.0.0.1:$(LOADTEST_PORT)
+LOADTEST_STUB_LOG ?= storage/logs/loadtest-stub.jsonl
+LOADTEST_PID_DIR  ?= storage/app/loadtest
+
+# Same $(EXEC) split as everywhere else, plus the two env vars every
+# artisan/worker process in this run needs: TELEGRAM_API_BASE_URL so the
+# Telegram client talks to the stub instead of the real API, and
+# LOADTEST_STUB_LOG so the stub and `loadtest:run`/`loadtest:verify` agree on
+# where outbound messages were logged.
+LOADTEST_ENV := $(if $(CONTAINER),\
+	docker exec -e TELEGRAM_API_BASE_URL=$(LOADTEST_URL) -e LOADTEST_STUB_LOG=$(LOADTEST_STUB_LOG) -w $(WORKDIR) $(CONTAINER),\
+	env TELEGRAM_API_BASE_URL=$(LOADTEST_URL) LOADTEST_STUB_LOG=$(LOADTEST_STUB_LOG))
+
+# One shell block, so the stub is stopped and the run is cleaned up whatever
+# fails. A failed seed cleans with --all: a tenant that broke inside
+# provisioning is not in the state file yet. Do not "dry run" this target with
+# `make -n`: GNU Make still executes recipe lines that invoke $(MAKE).
+loadtest: ## Full load-test run: stub, seed, workers, traffic, verify, clean (TENANTS/CONTACTS/MESSAGES/WORKERS)
+	@STATUS=0; CLEAN=; \
+	$(MAKE) loadtest-stub-start || exit $$?; \
+	if $(LOADTEST_ENV) php artisan loadtest:seed --tenants=$(TENANTS) --contacts=$(CONTACTS); then \
+		if $(MAKE) loadtest-workers-start; then \
+			$(LOADTEST_ENV) php artisan loadtest:run --messages=$(MESSAGES) || STATUS=$$?; \
+			if [ $$STATUS -eq 0 ]; then $(LOADTEST_ENV) php artisan loadtest:verify || STATUS=$$?; fi; \
+		else STATUS=1; fi; \
+		$(MAKE) loadtest-workers-stop; \
+	else STATUS=1; CLEAN=--all; fi; \
+	$(MAKE) loadtest-stub-stop; \
+	$(EXEC) php artisan loadtest:clean $$CLEAN; \
+	exit $$STATUS
+
+# `php -S` is single-threaded per request unless PHP_CLI_SERVER_WORKERS asks
+# for prefork workers — without it, concurrent seed/run traffic would queue
+# up behind one PHP process. Backgrounded with nohup so it survives past this
+# one `docker exec`/shell invocation; its pid is tracked for loadtest-stub-stop.
+loadtest-stub-start:
+	$(EXEC) sh -c 'mkdir -p $(LOADTEST_PID_DIR) $(dir $(LOADTEST_STUB_LOG)); \
+		rm -f $(LOADTEST_STUB_LOG); \
+		PHP_CLI_SERVER_WORKERS=4 LOADTEST_STUB_LOG=$(LOADTEST_STUB_LOG) \
+			nohup php -S 127.0.0.1:$(LOADTEST_PORT) tools/loadtest/telegram-stub.php \
+			> storage/logs/loadtest-stub-server.log 2>&1 & \
+		echo $$! > $(LOADTEST_PID_DIR)/stub.pid'
+
+# PHP_CLI_SERVER_WORKERS preforks: killing only the master pid captured by
+# loadtest-stub-start leaves its worker children running (they inherit the
+# listening socket and keep serving on their own). pkill -f matches the
+# whole process family by command line instead of chasing pids.
+loadtest-stub-stop:
+	-$(EXEC) pkill -f 'php -S 127.0.0.1:$(LOADTEST_PORT) tools/loadtest/telegram-stub.php'
+	-$(EXEC) rm -f $(LOADTEST_PID_DIR)/stub.pid
+
+loadtest-workers-start:
+	$(LOADTEST_ENV) sh -c 'mkdir -p $(LOADTEST_PID_DIR) && rm -f $(LOADTEST_PID_DIR)/worker-*.pid && \
+		i=0; while [ $$i -lt $(WORKERS) ]; do \
+			nohup php artisan queue:work redis --queue=flow.execution,messaging.transactional,messaging.logging \
+				> storage/logs/loadtest-worker-$$i.log 2>&1 & \
+			echo $$! > $(LOADTEST_PID_DIR)/worker-$$i.pid; \
+			i=$$((i+1)); \
+		done'
+
+loadtest-workers-stop:
+	-$(EXEC) sh -c 'for f in $(LOADTEST_PID_DIR)/worker-*.pid; do [ -f "$$f" ] && kill $$(cat "$$f") 2>/dev/null; done; rm -f $(LOADTEST_PID_DIR)/worker-*.pid'
 
 # ─── Documentation ───────────────────────────────────────────────────────────
 

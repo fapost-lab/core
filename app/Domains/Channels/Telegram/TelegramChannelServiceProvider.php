@@ -20,7 +20,9 @@ final class TelegramChannelServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(TelegramBotApiClientFactory::class);
+        $this->app->bind(TelegramBotApiClientFactory::class, fn ($app): TelegramBotApiClientFactory => new TelegramBotApiClientFactory(
+            (string) $app->make('config')->get('services.telegram.api_base_url', 'https://api.telegram.org'),
+        ));
         $this->app->bind(TelegramBotIdentityStoreInterface::class, TelegramBotIdentityStore::class);
         $this->app->bind(
             TelegramDeliveryResolver::class,

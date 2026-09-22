@@ -18,6 +18,12 @@ interface WebhookRegistryWriterInterface
     public function delete(string $publicHash): void;
 
     /**
+     * Remove every registry entry of a tenant, from the landlord table and the
+     * Redis cache. Returns how many were removed.
+     */
+    public function deleteForTenant(string $tenantId): int;
+
+    /**
      * Record which ingress host this webhook was actually registered against.
      *
      * Called only after the provider has accepted the URL, so the stored value

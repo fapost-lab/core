@@ -16,6 +16,7 @@ paths:
   - "tests/Unit/Domains/Tenancy/**"
   - "tests/Feature/Tenancy/**"
   - "app/Console/Commands/Ops/Tenants*"
+reviewed_at: 2026-09-22
 ---
 # Tenancy
 
@@ -53,6 +54,9 @@ Not to be confused with the *assistant panel's* Filament "tenant", which is an `
   Filament panel stacks). The tenant comes from `Services/ConfigTenantResolver`, which resolves
   `tenancy.default_tenant_slug` — not the request host.
 - Workers: `TenantSwitcher::runForTenant()`.
+- Lifecycle: `Services/TenantProvisioningService` creates a tenant; `Services/TenantDecommissioner`
+  removes one (webhook registry entries, then schema, then landlord row) — irreversible, used only
+  by the load-test harness for the throwaway tenants it provisioned.
 - Console: `app/Console/Commands/Ops/Tenants*Command.php`, `WebhookRegistryHealthCommand`,
   `app/Console/Commands/Platform/Install*Command.php`.
 - Schema: `database/migrations/landlord/` is platform-wide; `database/migrations/tenant/` runs

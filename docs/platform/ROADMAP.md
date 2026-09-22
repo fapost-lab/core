@@ -23,8 +23,8 @@ Product vision от текущего состояния до SaaS-оболочк
 
 Полный сьют — **936 зелёных**, 1 skipped (sqlite-ветка миграции); `composer run test:arch` — без ошибок.
 
-**Осталось до выкладки, вне трека:** Redis-integration suite закрыт (см. § Milestone 2)
-и load test из критериев Production Ready.
+**Вне трека:** Redis-integration suite (см. § Milestone 2) и load test из критериев Production Ready
+закрыты — все критерии Production Ready выполнены.
 
 После выкладки: M13 (Audit Log) → M12 (MCP Server) → M7 (Solutions) → M11. M5 (RAG) — в бэклоге.
 M9 (Multi-channel / WhatsApp) удалён из планов.
@@ -597,7 +597,7 @@ Core в программируемую поверхность: «покажи, �
 - [x] Concurrency тесты: distributed lock, heartbeat и optimistic retry покрыты, в том числе на настоящем Redis  
 - [x] phpat CI правила enforced через `composer run test:arch`  
 - [x] GDPR cascade delete (contacts/assistants/channels → conversations)  
-- [ ] Load test: 100 concurrent sessions без state leakage (Horizon-воркеры)
+- [x] Load test: 100 concurrent sessions без state leakage — `make loadtest` (3 тенанта × 100 контактов × 3 сообщения, 4 воркера, 2026-09-22): 0 утечек, 0 межтенантных строк, 0 дропов, 0 failed jobs
 
 ---
 

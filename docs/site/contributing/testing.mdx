@@ -59,6 +59,20 @@ composer run test:redis
 
 Runs only that group.
 
+### Load test
+
+```bash
+make loadtest TENANTS=3 CONTACTS=100 MESSAGES=3 WORKERS=4
+```
+
+Runs the real pipeline — webhook HTTP, Redis, PostgreSQL tenant schemas, queue
+workers — against throwaway tenants and a local stand-in for the Telegram Bot API
+(`tools/loadtest/telegram-stub.php`, so nothing reaches Telegram), then checks that
+no contact or tenant ended up with another's data and removes everything it
+created. It is not part of `composer test` or CI; run it before a release or after
+a change to tenancy, locking or the flow runtime. Do not try `make -n loadtest`:
+GNU Make still executes the recipe lines that call `$(MAKE)`.
+
 ## Continuous integration
 
 The same checks run in GitHub Actions (`.github/workflows/ci.yml`) on every

@@ -23,9 +23,11 @@ final readonly class TelegramBotApiClient
 {
     /**
      * @param  string  $token  Bot token used to build authenticated Telegram API URLs.
+     * @param  string  $apiBaseUrl  Bot API origin; a local stub replaces it in load tests.
      */
     public function __construct(
         private string $token,
+        private string $apiBaseUrl = 'https://api.telegram.org',
     ) {
     }
 
@@ -230,7 +232,7 @@ final readonly class TelegramBotApiClient
                 },
             )
                 ->withOptions(['stream' => true])
-                ->get(sprintf('https://api.telegram.org/file/bot%s/%s', $this->token, $filePath))
+                ->get(sprintf('%s/file/bot%s/%s', $this->apiBaseUrl, $this->token, $filePath))
                 ->throw();
         } catch (Throwable $exception) {
             throw new TelegramApiException($exception->getMessage(), (int)$exception->getCode(), $exception);
@@ -272,7 +274,7 @@ final readonly class TelegramBotApiClient
             )
                 ->asJson()
                 ->post(
-                    "https://api.telegram.org/bot{$this->token}/{$method}",
+                    "{$this->apiBaseUrl}/bot{$this->token}/{$method}",
                     $payload,
                 )
                 ->throw();
@@ -329,7 +331,7 @@ final readonly class TelegramBotApiClient
         try {
             $response = $request
                 ->post(
-                    sprintf('https://api.telegram.org/bot%s/%s', $this->token, $method),
+                    sprintf('%s/bot%s/%s', $this->apiBaseUrl, $this->token, $method),
                     array_filter([
                         'chat_id' => $chatId,
                         'caption' => $caption,

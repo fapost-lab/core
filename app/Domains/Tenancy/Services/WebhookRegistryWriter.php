@@ -85,6 +85,19 @@ final class WebhookRegistryWriter implements WebhookRegistryWriterInterface
             ->delete();
     }
 
+    public function deleteForTenant(string $tenantId): int
+    {
+        $hashes = DB::connection('landlord')->table('webhook_registry')
+            ->where('tenant_id', $tenantId)
+            ->pluck('webhook_public_hash');
+
+        foreach ($hashes as $hash) {
+            $this->delete((string) $hash);
+        }
+
+        return $hashes->count();
+    }
+
     private function key(string $publicHash): string
     {
         return 'webhook:' . $publicHash;

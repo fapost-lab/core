@@ -24,5 +24,18 @@ interface TenantRepositoryInterface
      */
     public function findAllActive(): array;
 
+    /**
+     * Tenants whose slug starts with the given prefix, in any status.
+     *
+     * @return list<TenantInterface>
+     */
+    public function findBySlugPrefix(string $prefix): array;
+
     public function save(TenantInterface $tenant): void;
+
+    /**
+     * Delete the landlord row. The caller has already removed the tenant's
+     * schema and webhook registry entries ({@see \App\Domains\Tenancy\Services\TenantDecommissioner}).
+     */
+    public function delete(TenantInterface $tenant): void;
 }
