@@ -39,6 +39,7 @@ use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
+use App\Domains\Flow\Contracts\SendMessageTimeoutSchedulerInterface;
 use App\Domains\Flow\Contracts\SystemTranslationCatalogInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationRepositoryInterface;
@@ -134,6 +135,7 @@ use App\Infrastructure\Flow\ConnectionAfterCommitDispatcher;
 use App\Infrastructure\Flow\ContainerNodeHandlerFactory;
 use App\Infrastructure\Flow\FlowExecutionGuard;
 use App\Infrastructure\Flow\QueuedDelayResumeScheduler;
+use App\Infrastructure\Flow\QueuedSendMessageTimeoutScheduler;
 use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Illuminate\Database\DatabaseManager;
@@ -244,6 +246,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->bind(TenantEventRepositoryInterface::class, TenantEventRepository::class);
         $this->app->bind(FlowTriggerEventPublisherInterface::class, QueuedFlowTriggerEventPublisher::class);
         $this->app->bind(DelayResumeSchedulerInterface::class, QueuedDelayResumeScheduler::class);
+        $this->app->bind(SendMessageTimeoutSchedulerInterface::class, QueuedSendMessageTimeoutScheduler::class);
         $this->app->bind(
             SubflowResumerInterface::class,
             fn ($app): DefaultSubflowResumer => new DefaultSubflowResumer(

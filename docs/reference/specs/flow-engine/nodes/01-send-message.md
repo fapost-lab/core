@@ -63,7 +63,7 @@ keyboards and dynamic keyboards built from state data.
 6. `system.sent_messages.{nodeId}` is set to the returned external message id.
 7. For `text_with_keyboard` + `inline`:
    - if dynamic, the generated buttons are persisted to `system.send_message.dynamic_buttons.{nodeId}` so a resume doesn't need to regenerate them;
-   - if `timeout_seconds` is set, `system.send_message.timeout.{nodeId}.at` is written and `ResumeTimedOutSendMessageNodeJob::dispatch(tenantId, sessionId, nodeId, platform)->delay($timeoutAt)->afterCommit()` is queued;
+   - if `timeout_seconds` is set, `system.send_message.timeout.{nodeId}.at` is written and the timeout is scheduled through `SendMessageTimeoutSchedulerInterface` (`ResumeTimedOutSendMessageNodeJob` on `flow.execution`, delayed to `$timeoutAt`; not queued at all on a `sync` queue, where the timeout never fires);
    - if `remove_keyboard_after_press` is `false` and a message id was returned, each button is registered with `PersistentButtonRegistryInterface::register()` (best-effort — swallows any `Throwable`) so a press can be routed after the session has ended;
    - result is `NodeExecutionResult::waiting()` with metadata `external_message_id`.
 8. For every other content type, result is `NodeExecutionResult::executed()` with metadata `external_message_id`.
@@ -92,7 +92,7 @@ Iterates the array at `dynamic_buttons.source`; items without a non-empty string
 ## Side effects
 
 - `MessageSenderInterface::send()` — the outgoing message, and (best-effort) the "please press a button" hint sent when text arrives while waiting.
-- `ResumeTimedOutSendMessageNodeJob::dispatch()->delay($timeoutAt)->afterCommit()` when `timeout_seconds` is configured.
+- `SendMessageTimeoutSchedulerInterface::schedule()` when `timeout_seconds` is configured (a delayed `ResumeTimedOutSendMessageNodeJob`; skipped on a `sync` queue).
 - `InlineKeyboardEditorInterface::removeKeyboard()` when `remove_keyboard_after_press` is true and a press/timeout is processed.
 - `PersistentButtonRegistryInterface::register()` (best-effort) when `remove_keyboard_after_press` is `false`; skipped silently when `system.flow_definition_id` is absent from state.
 

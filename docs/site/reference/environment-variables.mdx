@@ -55,7 +55,7 @@ connections both depend on it. The database user needs the `CREATE` privilege; s
 | `REDIS_HOST` | `127.0.0.1` | |
 | `REDIS_PORT` | `6379` | |
 | `REDIS_PASSWORD` | `null` | Set one on any non-local install |
-| `QUEUE_CONNECTION` | `redis` | |
+| `QUEUE_CONNECTION` | `redis` | Must be an asynchronous queue: on `sync`, `delay` nodes wait for the next inbound message and `send_message` timeouts never fire |
 | `CACHE_STORE` | `redis` | |
 | `SESSION_DRIVER` | `redis` | |
 | `SESSION_LIFETIME` | `120` | Minutes |

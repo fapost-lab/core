@@ -9,6 +9,7 @@ use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
+use App\Domains\Flow\Contracts\SendMessageTimeoutSchedulerInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
@@ -17,7 +18,6 @@ use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableStorage;
 use App\Domains\Flow\Support\CallbackDataCodec;
-use App\Jobs\Flow\ResumeTimedOutSendMessageNodeJob;
 use Carbon\Carbon;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
@@ -52,6 +52,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
         private readonly InlineKeyboardEditorInterface $keyboardEditor,
         private readonly PersistentButtonRegistryInterface $persistentButtonRegistry,
         private readonly VariableResolverInterface $variableResolver,
+        private readonly SendMessageTimeoutSchedulerInterface $timeoutScheduler,
     ) {
     }
 
@@ -260,12 +261,13 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                 $stateChanges[SystemStateKeys::SEND_MESSAGE_TIMEOUT_PREFIX
                               . ".{$nodeId}.at"] = $timeoutAt->toIso8601String();
 
-                ResumeTimedOutSendMessageNodeJob::dispatch(
+                $this->timeoutScheduler->schedule(
                     tenantId: $context->tenantId,
                     sessionId: $context->sessionId,
                     nodeId: $nodeId,
                     platform: $context->platform,
-                )->delay($timeoutAt)->afterCommit();
+                    timeoutAt: $timeoutAt,
+                );
             }
 
             // Register persistent button entries so the orchestrator can re-enter this branch

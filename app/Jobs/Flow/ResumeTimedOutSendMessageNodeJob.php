@@ -35,6 +35,7 @@ final class ResumeTimedOutSendMessageNodeJob implements ShouldQueue
         public readonly string $nodeId,
         public readonly string $platform,
     ) {
+        $this->onQueue('flow.execution');
     }
 
     public function handle(
