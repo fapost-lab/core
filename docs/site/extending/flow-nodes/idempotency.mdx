@@ -52,8 +52,17 @@ which is precisely the case the key exists to catch.
 ## Waiting is not failing
 
 A handler that needs to pause returns `NodeExecutionResult::waiting()` or
-`::delayed()` — for now the two behave the same: the contact's next message runs
-the handler again. That is a normal outcome, not an error. Because the handler
-runs again, mark the work it already did (see above) so the next run does not
-repeat it. Reach for it instead of throwing when the flow simply is not ready to
-continue.
+`::delayed()`. That is a normal outcome, not an error. Reach for it instead of
+throwing when the flow simply is not ready to continue.
+
+`waiting()` and plain `delayed()` behave the same: the contact's next message
+runs the handler again, so mark the work it already did (see above) so that
+run does not repeat it.
+
+`delayed(resumeAt: $when)` runs the handler again too — at `$when`, with
+`NodeExecutionContext::$resumedAfterDelay` set — but retries are still in
+play: the queued wake-up is safe to fire more than once for the same
+`resumeAt` (a duplicated or re-scheduled job), and a message arriving right
+around `$when` can also land the node back here through the ordinary routing
+path. Guard any external side effect the same way you would for a first-run
+handler — the `resumedAfterDelay` run is not exempt from this page's rules.

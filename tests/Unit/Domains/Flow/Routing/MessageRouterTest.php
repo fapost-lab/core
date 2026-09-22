@@ -16,12 +16,16 @@ use App\Domains\Flow\Commands\GlobalCommandExecutorInterface;
 use App\Domains\Flow\Concurrency\LockAcquisitionPolicy;
 use App\Domains\Flow\Concurrency\SessionLockManager;
 use App\Domains\Flow\Concurrency\SessionLockRegistry;
+use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
+use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\SessionLockLostException;
 use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Orchestration\DelayedSessionResumer;
 use App\Domains\Flow\Routing\DropPolicyInterface;
 use App\Domains\Flow\Routing\MessageRouter;
 use App\Domains\Flow\Routing\SessionStateRouter;
@@ -132,6 +136,57 @@ final class MessageRouterTest extends TestCase
             sessions: $sessions,
             dropPolicy: $dropPolicy,
             orchestrator: $orchestrator,
+        );
+
+        $outcome = $router->route(
+            contact: $this->contact(),
+            message: $this->message('hello'),
+            assistant: $this->assistant(),
+            channel: $this->channel(),
+        );
+
+        $this->assertTrue($outcome->wasDropped());
+        $this->assertSame('drop_busy', $outcome->reason);
+    }
+
+    public function test_paused_session_before_resume_at_drops_with_busy_notice_and_is_never_woken(): void
+    {
+        $session                  = $this->makeSession(FlowSessionStatus::Paused);
+        $session->current_node_id = 'd1';
+        $session->state           = [
+            'system' => [
+                'delayed' => [
+                    'd1' => ['resume_at' => now()->addMinute()->toAtomString()],
+                ],
+            ],
+        ];
+
+        $sessions = Mockery::mock(FlowSessionRepositoryInterface::class);
+        $sessions->shouldReceive('findActiveForContact')->once()->andReturn($session);
+
+        $dropPolicy = Mockery::mock(DropPolicyInterface::class);
+        $dropPolicy->shouldReceive('applyBusy')->once();
+
+        $orchestrator = Mockery::mock(FlowOrchestratorInterface::class);
+        $orchestrator->shouldNotReceive('handle');
+
+        // The engine must never be touched — resume_at hasn't arrived, so
+        // wakeIfDue() must return before it ever calls the guard.
+        $engine = Mockery::mock(FlowEngineInterface::class);
+        $engine->shouldNotReceive('runSession');
+
+        $delayedResumer = new DelayedSessionResumer(
+            sessions: Mockery::mock(FlowSessionRepositoryInterface::class)->shouldIgnoreMissing(),
+            guard: Mockery::mock(FlowExecutionGuardInterface::class)->shouldIgnoreMissing(),
+            engine: $engine,
+            scheduler: Mockery::mock(DelayResumeSchedulerInterface::class)->shouldIgnoreMissing(),
+        );
+
+        $router = $this->router(
+            sessions: $sessions,
+            dropPolicy: $dropPolicy,
+            orchestrator: $orchestrator,
+            delayedResumer: $delayedResumer,
         );
 
         $outcome = $router->route(
@@ -359,6 +414,7 @@ final class MessageRouterTest extends TestCase
         ?SessionLockManager $lockManager = null,
         ?SessionLockRegistry $lockRegistry = null,
         ?ConversationOwnershipInterface $ownership = null,
+        ?DelayedSessionResumer $delayedResumer = null,
     ): MessageRouter {
         // Use real CommandMatcher (final class). Built-ins include /reset and
         // /cancel — assistant.commands stays empty so no tenant overrides apply.
@@ -380,6 +436,23 @@ final class MessageRouterTest extends TestCase
             lockRegistry: $lockRegistry ?? new SessionLockRegistry(),
             ownership: $ownership ?? $this->notHandledByStaff(),
             typingHeartbeat: new TypingHeartbeatRegistry(),
+            delayedResumer: $delayedResumer ?? $this->noOpDelayedResumer(),
+        );
+    }
+
+    /**
+     * A real {@see DelayedSessionResumer} whose dependencies are never
+     * touched — the default for tests whose session either isn't `paused` or
+     * carries no `system.delayed.*` marker, so {@see DelayedSessionResumer::wakeIfDue()}
+     * returns early without reaching the guard/engine/scheduler at all.
+     */
+    private function noOpDelayedResumer(): DelayedSessionResumer
+    {
+        return new DelayedSessionResumer(
+            sessions: Mockery::mock(FlowSessionRepositoryInterface::class)->shouldIgnoreMissing(),
+            guard: Mockery::mock(FlowExecutionGuardInterface::class)->shouldIgnoreMissing(),
+            engine: Mockery::mock(FlowEngineInterface::class)->shouldIgnoreMissing(),
+            scheduler: Mockery::mock(DelayResumeSchedulerInterface::class)->shouldIgnoreMissing(),
         );
     }
 

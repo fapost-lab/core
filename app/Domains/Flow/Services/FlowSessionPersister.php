@@ -9,9 +9,12 @@ use App\Domains\Flow\Exceptions\FlowConcurrencyException;
 use App\Domains\Flow\Exceptions\OptimisticLockConflictException;
 use App\Domains\Flow\Exceptions\StateNamespaceViolationException;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\SystemStateNamespacePolicy;
+use DateTimeInterface;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
+use Fapost\Foundation\Flow\Enums\StateNamespace;
 
 /**
  * Persists session state and column updates. Navigation position is authoritative on
@@ -39,8 +42,10 @@ final class FlowSessionPersister
         NodeExecutionResult $result,
         string $endStatus,
         string $nodeType,
+        string $nodeId,
     ): void {
         $state = $this->applyStateChanges($session->state ?? [], $result->stateChanges, $nodeType);
+        $state = $this->clearDelayedMarker($state, $nodeId);
 
         try {
             $session->saveWithOptimisticLock([
@@ -59,8 +64,13 @@ final class FlowSessionPersister
         NodeExecutionResult $result,
         ?string $nextNodeId,
         string $nodeType,
+        string $nodeId,
     ): void {
         $state = $this->applyStateChanges($session->state ?? [], $result->stateChanges, $nodeType);
+
+        $state = NodeExecutionStatus::Delayed === $result->status && null !== $result->resumeAt
+            ? $this->setDelayedMarker($state, $nodeId, $result->resumeAt)
+            : $this->clearDelayedMarker($state, $nodeId);
 
         $columnPatch = $this->resolveColumnPatch($result, $nextNodeId);
 
@@ -141,12 +151,17 @@ final class FlowSessionPersister
     {
         return match ($result->status) {
             NodeExecutionStatus::Executed => $this->patchForCompleted($nextNodeId),
-            // `delayed()` has no resume time to act on yet, so it parks like `waiting()`:
-            // the next inbound message re-runs the node, which decides whether to move
-            // on. A `paused` session would never be resumed and never be found again.
-            NodeExecutionStatus::Waiting,
-            NodeExecutionStatus::Delayed => [
+            NodeExecutionStatus::Waiting  => [
                 'status' => FlowSessionStatus::WaitingInput,
+            ],
+            // `delayed()` without a `resumeAt` has no resume time to act on, so it
+            // parks like `waiting()`: the next inbound message re-runs the node,
+            // which decides whether to move on. With a `resumeAt` the session
+            // parks on `paused` instead — see {@see setDelayedMarker()} for the
+            // marker that {@see \App\Domains\Flow\Orchestration\DelayedSessionResumer}
+            // and the routing pipeline key off to wake it.
+            NodeExecutionStatus::Delayed => [
+                'status' => null !== $result->resumeAt ? FlowSessionStatus::Paused : FlowSessionStatus::WaitingInput,
             ],
             NodeExecutionStatus::Failed => [
                 'status' => FlowSessionStatus::Failed,
@@ -156,6 +171,49 @@ final class FlowSessionPersister
                 'status'          => FlowSessionStatus::Completed,
             ],
         };
+    }
+
+    /**
+     * Writes the engine-owned `system.delayed.{nodeId}.resume_at` marker
+     * directly into the state array — bypassing {@see applyStateChanges()}
+     * and the {@see SystemStateNamespacePolicy} allowlist it enforces, since
+     * this key is never part of a handler's `stateChanges`.
+     *
+     * @param  array<string, mixed>  $state
+     *
+     * @return array<string, mixed>
+     */
+    private function setDelayedMarker(array $state, string $nodeId, DateTimeInterface $resumeAt): array
+    {
+        return $this->setNamespacedPath(
+            $state,
+            StateNamespace::System->value,
+            "delayed.{$nodeId}.resume_at",
+            $resumeAt->format(DateTimeInterface::ATOM),
+        );
+    }
+
+    /**
+     * Clears the marker set by {@see setDelayedMarker()} once the node
+     * returns anything other than `delayed(resumeAt: ...)` — a no-op when no
+     * marker was set for this node.
+     *
+     * @param  array<string, mixed>  $state
+     *
+     * @return array<string, mixed>
+     */
+    private function clearDelayedMarker(array $state, string $nodeId): array
+    {
+        if (null === data_get($state, SystemStateKeys::DELAYED_RESULT_PREFIX . ".{$nodeId}")) {
+            return $state;
+        }
+
+        return $this->setNamespacedPath(
+            $state,
+            StateNamespace::System->value,
+            "delayed.{$nodeId}",
+            null,
+        );
     }
 
     /**

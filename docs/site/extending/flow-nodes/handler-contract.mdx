@@ -61,13 +61,46 @@ NodeExecutionResult::executed(sourceHandle: 'default', stateChanges: [
 ]);
 
 NodeExecutionResult::waiting();   // the flow pauses for input
-NodeExecutionResult::delayed();   // same as waiting(), for now — see below
+NodeExecutionResult::delayed();   // pauses like waiting() — see below
+NodeExecutionResult::delayed(resumeAt: $when);   // pauses until a specific time
 ```
 
-`delayed()` does not yet take a time to resume at. The session waits exactly as
-after `waiting()`: the contact's next message runs your handler again, and the
-handler decides whether it is time to move on — the built-in `delay` node works
-this way. Nothing wakes the node without an inbound message.
+`delayed()` has two forms:
+
+| Call | Session | Contact message meanwhile | When the handler runs again |
+|---|---|---|---|
+| `delayed()` | `waiting_input`, same as `waiting()` | runs your handler again | with the next inbound message |
+| `delayed(resumeAt: $when)` | `paused` | answered with the assistant's busy notice, not delivered to your handler | at `$when` (a queued wake-up), or with the first message after it |
+
+Without `resumeAt`, the session waits exactly as after `waiting()`: the
+contact's next message runs your handler again, and the handler decides
+whether it is time to move on — the built-in `delay` node works this way.
+Nothing wakes the node without an inbound message.
+
+With `resumeAt`, nothing the contact sends reaches your handler until that
+time: the engine wakes the node itself, and only then does the flow resume.
+Your handler tells the two situations apart through
+`NodeExecutionContext::$resumedAfterDelay` — `true` only on the run the engine
+triggered for this `resumeAt`, `false` on every other call, including the one
+that first asked for it:
+
+```php
+public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+{
+    if ($context->resumedAfterDelay) {
+        // The engine woke this node at the time it asked for — move on.
+        return NodeExecutionResult::executed();
+    }
+
+    return NodeExecutionResult::delayed(resumeAt: now()->addHour());
+}
+```
+
+<Warning>
+  Do not read the `resume_at` you asked for back out of `$state`. The marker
+  the engine uses to schedule and match the wake-up is an internal detail, not
+  part of the handler contract, and may change — rely on `$resumedAfterDelay`.
+</Warning>
 
 ## The handler must be graph-unaware
 

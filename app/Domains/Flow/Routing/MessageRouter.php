@@ -17,9 +17,11 @@ use App\Domains\Flow\Concurrency\SessionLockManager;
 use App\Domains\Flow\Concurrency\SessionLockRegistry;
 use App\Domains\Flow\Contracts\FlowOrchestratorInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
+use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Exceptions\SessionLockLostException;
 use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
+use App\Domains\Flow\Orchestration\DelayedSessionResumer;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
 use Fapost\Foundation\DTO\IncomingMessage;
@@ -67,6 +69,7 @@ final readonly class MessageRouter
         private SessionLockRegistry $lockRegistry,
         private ConversationOwnershipInterface $ownership,
         private TypingHeartbeatRegistry $typingHeartbeat,
+        private DelayedSessionResumer $delayedResumer,
         private LoggerInterface $logger = new NullLogger(),
     ) {
     }
@@ -136,8 +139,19 @@ final readonly class MessageRouter
                     return RoutingOutcome::dropped('staff_handled');
                 }
 
-                // Step 4b: classify by session state.
-                $session  = $this->sessions->findActiveForContact($contact, $assistantId);
+                // Step 4b: classify by session state. A `paused` session whose
+                // `resume_at` has already passed is woken inline — under the lock
+                // just acquired above — so the decision below, and the execution
+                // in step 5, see its post-wake state rather than a stale `paused`
+                // that would otherwise read as busy forever. A `paused` session
+                // still before its `resume_at` (or with no marker — a legacy row)
+                // is untouched and falls through to the ordinary DropBusy below.
+                $session = $this->sessions->findActiveForContact($contact, $assistantId);
+
+                if (null !== $session && FlowSessionStatus::Paused === $session->status) {
+                    $session = $this->delayedResumer->wakeIfDue($session);
+                }
+
                 $decision = $this->stateRouter->decide($session);
 
                 if (SessionRoutingDecision::DropBusy === $decision) {

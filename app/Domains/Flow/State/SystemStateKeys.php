@@ -14,6 +14,17 @@ final class SystemStateKeys
     public const string STARTED_AT        = StateNamespace::System->value . '.started_at';
     public const string RETRY_COUNT       = StateNamespace::System->value . '.retry_count';
     public const string DELAY_NODE_PREFIX = StateNamespace::System->value . '.delay';
+
+    /**
+     * Prefix for the per-node marker written when a handler returns
+     * {@see \Fapost\Foundation\DTO\NodeExecutionResult::delayed()} with a
+     * `resumeAt`. Full path: `system.delayed.{nodeId}.resume_at` (ISO-8601).
+     * Written directly by {@see \App\Domains\Flow\Services\FlowSessionPersister}
+     * — never through handler `stateChanges` — so the
+     * {@see SystemStateNamespacePolicy} allowlist does not need to open up for
+     * it. Cleared once that node returns a non-`Delayed` result.
+     */
+    public const string DELAYED_RESULT_PREFIX = StateNamespace::System->value . '.delayed';
     /**
      * Channel identity projected at session start — see
      * {@see ChannelStateProjector}. Read-only for flow

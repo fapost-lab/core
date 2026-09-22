@@ -11,6 +11,7 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
@@ -20,12 +21,14 @@ use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use DateTimeInterface;
 use Fapost\Foundation\Contracts\DataAccessorInterface;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Fapost\Foundation\DTO\IncomingMessage;
 use Fapost\Foundation\DTO\IncomingMessageType;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -43,6 +46,7 @@ final class FlowEngineTest extends FeatureTestCase
         $registry->register(SequentialFlowTestHandler::class);
         $registry->register(WaitingFlowTestHandler::class);
         $registry->register(DelayedFlowTestHandler::class);
+        $registry->register(DelayedWithResumeAtFlowTestHandler::class);
         $registry->register(InfiniteLoopFlowTestHandler::class);
         $registry->register(SetLanguageEffectTestHandler::class);
     }
@@ -174,6 +178,91 @@ final class FlowEngineTest extends FeatureTestCase
         ));
 
         $this->assertSame(FlowSessionStatus::Completed, $session->status);
+    }
+
+    public function test_delayed_with_resume_at_pauses_and_schedules_the_wake_up(): void
+    {
+        $tenantId  = (string) Str::uuid();
+        $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+        $contact   = Contact::factory()->forTenant($tenantId)->create();
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+        /** @var list<array{0: string, 1: string, 2: string, 3: DateTimeInterface}> $calls */
+        $calls = [];
+        $this->app->instance(DelayResumeSchedulerInterface::class, new class ($calls) implements DelayResumeSchedulerInterface {
+            /** @param  list<array{0: string, 1: string, 2: string, 3: DateTimeInterface}>  $calls */
+            public function __construct(private array &$calls)
+            {
+            }
+
+            public function schedule(string $tenantId, string $sessionId, string $nodeId, DateTimeInterface $resumeAt): void
+            {
+                $this->calls[] = [$tenantId, $sessionId, $nodeId, $resumeAt];
+            }
+        });
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Delayed Resume At',
+            'nodes'     => [
+                ['id' => 'd1', 'type' => 'delayed_resume_at_test', 'version' => 1, 'config' => []],
+            ],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        $engine  = $this->app->make(FlowEngineInterface::class);
+        $session = $engine->start($definition, $contact);
+
+        $this->assertSame(FlowSessionStatus::Paused, $session->status);
+        $this->assertSame('d1', $session->current_node_id);
+        $this->assertNotNull($session->state['system']['delayed']['d1']['resume_at'] ?? null);
+
+        $this->assertCount(1, $calls, 'delayed(resumeAt: ...) must schedule exactly one wake-up.');
+        $this->assertSame($tenantId, $calls[0][0]);
+        $this->assertSame((string) $session->getKey(), $calls[0][1]);
+        $this->assertSame('d1', $calls[0][2]);
+    }
+
+    public function test_plain_delayed_does_not_schedule_a_wake_up(): void
+    {
+        $tenantId  = (string) Str::uuid();
+        $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+        $contact   = Contact::factory()->forTenant($tenantId)->create();
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+        $calls = [];
+        $this->app->instance(DelayResumeSchedulerInterface::class, new class ($calls) implements DelayResumeSchedulerInterface {
+            /** @param  list<mixed>  $calls */
+            public function __construct(private array &$calls)
+            {
+            }
+
+            public function schedule(string $tenantId, string $sessionId, string $nodeId, DateTimeInterface $resumeAt): void
+            {
+                $this->calls[] = func_get_args();
+            }
+        });
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Delayed',
+            'nodes'     => [
+                ['id' => 'd1', 'type' => 'delayed_test', 'version' => 1, 'config' => []],
+            ],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        $engine  = $this->app->make(FlowEngineInterface::class);
+        $session = $engine->start($definition, $contact);
+
+        $this->assertSame(FlowSessionStatus::WaitingInput, $session->status);
+        $this->assertCount(0, $calls, 'delayed() without resumeAt must not schedule any wake-up.');
     }
 
     public function test_max_iterations_fails_session_and_throws(): void
@@ -675,5 +764,53 @@ final class DelayedFlowTestHandler implements NodeHandlerInterface
         }
 
         return NodeExecutionResult::executed();
+    }
+}
+
+/**
+ * The timed form of {@see NodeExecutionResult::delayed()}: always asks to be
+ * resumed at a fixed point in time, regardless of any inbound message —
+ * exercises {@see \App\Domains\Flow\Services\FlowSessionPersister}'s `paused`
+ * branch and {@see \App\Domains\Flow\Services\FlowEngine} scheduling the
+ * wake-up.
+ */
+final class DelayedWithResumeAtFlowTestHandler implements NodeHandlerInterface
+{
+    public function type(): string
+    {
+        return 'delayed_resume_at_test';
+    }
+
+    public function version(): int
+    {
+        return 1;
+    }
+
+    /**
+     * @return list<int>
+     */
+    public function supportedVersions(): array
+    {
+        return [1];
+    }
+
+    public function label(): string
+    {
+        return 'Delayed With Resume At Test';
+    }
+
+    public function category(): string
+    {
+        return 'Test';
+    }
+
+    public function configSchema(): array
+    {
+        return [];
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return NodeExecutionResult::delayed(resumeAt: Carbon::now()->addMinute());
     }
 }

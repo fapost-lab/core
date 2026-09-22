@@ -8,9 +8,15 @@ stateDiagram-v2
 
     pending --> active : Engine начинает выполнение\nflow_definition_id зафиксирован
 
-    active --> waiting_input : Нода вернула waiting()\nили delayed() — ждёт\nследующего сообщения
+    active --> waiting_input : Нода вернула waiting()\nили delayed() без resumeAt —\nждёт следующего сообщения
 
     waiting_input --> active : Пришёл ответ контакта\n(MessageRouter роутит в сессию)
+
+    active --> paused : Нода вернула delayed(resumeAt)\nFlowSessionPersister пишет\nsystem.delayed.{node}.resume_at\nи планирует пробуждение
+
+    paused --> active : resume_at наступил —\nDelayedSessionResumer\n(задание или MessageRouter\nинлайн под блокировкой)\nбудит ноду, resumedAfterDelay=true
+
+    paused --> terminated_by_user : GlobalCommandExecutor\n(/reset-подобная команда)
 
     waiting_input --> ended : Timeout (no_response)\nили превышен retry_limit
 
@@ -53,10 +59,14 @@ stateDiagram-v2
 
 > `cancelled` ставит `FlowOrchestrator` (`FlowSessionRepository::cancel()`), когда нажатие
 > постоянной кнопки запускает её ветку: текущая сессия контакта отменяется, чтобы не было двух
-> активных. `/reset` переводит сессию в `terminated_by_user`, а не в `cancelled`.
-> `paused` сейчас не выставляется: `NodeExecutionResult::delayed()` паркует сессию в
-> `waiting_input`, как `waiting()` (отложенное по времени возобновление — задача
-> `delayed-resume-contract`). Значение остаётся в enum и CHECK-constraint'е.
+> активных. `/reset` переводит сессию в `terminated_by_user`, а не в `cancelled` — это верно и для
+> `paused`.
+> `paused` выставляется только для timed-формы `delayed(resumeAt)`; plain `delayed()` по-прежнему
+> паркует в `waiting_input`, как `waiting()`. `findActiveForContact()` возвращает и `paused` —
+> сообщение, пришедшее до `resume_at`, получает "занято" и не сохраняется для ноды; после
+> `resume_at` `MessageRouter` сперва будит ноду инлайн под уже взятой блокировкой
+> (`DelayedSessionResumer::wakeIfDue()`), затем маршрутизирует то же сообщение по новому
+> состоянию сессии.
 
 ## Ключевые поля FlowSession
 

@@ -8,6 +8,7 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
+use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
@@ -72,6 +73,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         private \App\Domains\Flow\Concurrency\SessionLockRegistry $sessionLock,
         private \App\Domains\Flow\Concurrency\LockHeartbeat $lockHeartbeat,
         private \App\Domains\Flow\State\ChannelStateProjector $channelProjector,
+        private DelayResumeSchedulerInterface $delayResumeScheduler,
     ) {
     }
 
@@ -182,14 +184,14 @@ final readonly class FlowEngine implements FlowEngineInterface
         return $session;
     }
 
-    public function runSession(FlowSession $session): FlowSession
+    public function runSession(FlowSession $session, bool $resumedAfterDelay = false): FlowSession
     {
         $session->refresh();
 
         $definition = $this->definitions->findById($session->flow_definition_id);
         $contact    = $this->contactService->findById($session->contact_id);
 
-        $this->executeLoop($definition, $session, null, $contact);
+        $this->executeLoop($definition, $session, null, $contact, $resumedAfterDelay);
         $session->refresh();
 
         return $session;
@@ -274,10 +276,12 @@ final readonly class FlowEngine implements FlowEngineInterface
         FlowSession $session,
         ?IncomingMessage $incoming,
         Contact $contact,
+        bool $resumedAfterDelay = false,
     ): void {
-        $maxIterations = (int)$this->config->get("flow.execution.max_iterations", 100);
-        $iterations    = 0;
-        $incomingStep  = $incoming;
+        $maxIterations         = (int)$this->config->get("flow.execution.max_iterations", 100);
+        $iterations            = 0;
+        $incomingStep          = $incoming;
+        $resumedAfterDelayStep = $resumedAfterDelay;
 
         while (true) {
             if (++$iterations > $maxIterations) {
@@ -375,6 +379,7 @@ final readonly class FlowEngine implements FlowEngineInterface
                 stateReader: $stateReader,
                 contactWriter: $contactWriter,
                 expressionEngine: $expressionEngine,
+                resumedAfterDelay: $resumedAfterDelayStep,
             );
 
             // Keep the user-visible "typing…" indicator alive across multi-node
@@ -439,13 +444,26 @@ final readonly class FlowEngine implements FlowEngineInterface
                 }
             }
 
-            $this->connection->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type): void {
+            $this->connection->transaction(function () use ($session, $result, $nextNodeId, $endStatus, $skipPersist, $type, $nodeId): void {
                 if ($skipPersist) {
                     // No-op: state already reflects the most recent write.
                 } elseif (null !== $endStatus) {
-                    $this->persister->persistEnd($session, $result, $endStatus, $type);
+                    $this->persister->persistEnd($session, $result, $endStatus, $type, $nodeId);
                 } else {
-                    $this->persister->persist($session, $result, $nextNodeId, $type);
+                    $this->persister->persist($session, $result, $nextNodeId, $type, $nodeId);
+
+                    // Same path the `delay` node uses (§ same sync-queue refusal):
+                    // the job is dispatched with `->afterCommit()`, so calling this
+                    // inside the transaction is safe — it only fires once the
+                    // `paused` marker just written by persist() above is durable.
+                    if (NodeExecutionStatus::Delayed === $result->status && null !== $result->resumeAt) {
+                        $this->delayResumeScheduler->schedule(
+                            (string)$session->tenant_id,
+                            (string)$session->getKey(),
+                            $nodeId,
+                            $result->resumeAt,
+                        );
+                    }
                 }
 
                 $analyticsEventType = $this->resolveAnalyticsEventType($result, $nextNodeId, $endStatus);
@@ -473,7 +491,8 @@ final readonly class FlowEngine implements FlowEngineInterface
                 $this->subflowResumer->resumeIfChild($session, $endStatus);
             }
 
-            $incomingStep = null;
+            $incomingStep          = null;
+            $resumedAfterDelayStep = false;
 
             if (in_array($result->status, [
                 NodeExecutionStatus::Waiting,
