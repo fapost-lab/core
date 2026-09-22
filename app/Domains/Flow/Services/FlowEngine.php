@@ -649,8 +649,9 @@ final readonly class FlowEngine implements FlowEngineInterface
      * ADR Message Routing & Concurrency Control requires abandoning the run at
      * that point: continuing would race the new owner over session state.
      *
-     * No-op when nothing is registered — sweepers and timeout resume jobs that
-     * enter the engine outside a routing pipeline hold no handle.
+     * Entry points outside the routing pipeline (timeout and delay resumes,
+     * event starts, the subflow sweeper) register their handle through
+     * `FlowExecutionGuard`; a no-op only when an engine call holds no lock.
      */
     private function refreshSessionLock(): void
     {
