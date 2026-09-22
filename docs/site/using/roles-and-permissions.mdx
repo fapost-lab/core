@@ -10,8 +10,8 @@ no per-user override: to give someone a different set, make a role for it.
 
 | Role | Permissions | For |
 |---|---|---|
-| `admin` | 21 | Full access, including roles and settings |
-| `content_manager` | 12 | Building and running assistants, without platform administration |
+| `admin` | 23 | Full access, including roles and settings |
+| `content_manager` | 16 | Building and running assistants, without platform administration |
 | `analyst` | 3 | Reading — analytics and reports |
 
 All three are marked **System**. They exist on every tenant and are the sensible
@@ -26,7 +26,7 @@ and **Deselect all** so a whole area can be granted or withheld at once.
 
 | Group | Covers |
 |---|---|
-| **Assistants** | Creating and configuring assistants, and connecting channels |
+| **Assistants** | Creating and configuring assistants, and connecting channels — a separate permission: managing assistants alone gives no access to channels |
 | **Content** | Flows, translations, broadcasts, knowledge base, and the media library |
 | **Users** | Inviting people, and defining roles |
 | **Contacts** | Reading and editing the contact base |

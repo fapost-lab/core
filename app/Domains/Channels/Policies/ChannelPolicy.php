@@ -14,8 +14,10 @@ use Illuminate\Foundation\Auth\User as AuthUser;
 /**
  * Authorization policy for {@see Channel}.
  *
- * Users can manage channels only when they manage assistants and are assigned to the channel's assistant.
- * Rotating the webhook hash is gated separately by {@see Permission::RotateChannelToken}.
+ * Users can manage channels only when they hold {@see Permission::ManageChannels} and are assigned to the
+ * channel's assistant. {@see Permission::ManageAssistants} alone grants no channel access: a channel carries
+ * the messenger's credentials. Rotating the webhook hash is gated separately by
+ * {@see Permission::RotateChannelToken}.
  */
 final class ChannelPolicy
 {
@@ -26,7 +28,7 @@ final class ChannelPolicy
      */
     public function viewAny(AuthUser $authUser): bool
     {
-        return $this->canManageAssistants($authUser);
+        return $this->canManageChannels($authUser);
     }
 
     /**
@@ -34,17 +36,17 @@ final class ChannelPolicy
      */
     public function view(AuthUser $authUser, Channel $channel): bool
     {
-        return $this->canManageAssistants($authUser) && $this->canAccessAssistant($authUser, $channel->assistant);
+        return $this->canManageChannels($authUser) && $this->canAccessAssistant($authUser, $channel->assistant);
     }
 
     /**
      * Create channel: when the second argument is omitted (e.g. generic Gate checks), only
-     * {@see Permission::ManageAssistants} applies. When an {@see Assistant} is passed (nested
+     * {@see Permission::ManageChannels} applies. When an {@see Assistant} is passed (nested
      * authorization), assignment must match {@see view()} / API expectations.
      */
     public function create(AuthUser $authUser, ?Assistant $assistant = null): bool
     {
-        if (! $this->canManageAssistants($authUser)) {
+        if (! $this->canManageChannels($authUser)) {
             return false;
         }
 
@@ -60,7 +62,7 @@ final class ChannelPolicy
      */
     public function update(AuthUser $authUser, Channel $channel): bool
     {
-        return $this->canManageAssistants($authUser) && $this->canAccessAssistant($authUser, $channel->assistant);
+        return $this->canManageChannels($authUser) && $this->canAccessAssistant($authUser, $channel->assistant);
     }
 
     /**
@@ -68,14 +70,14 @@ final class ChannelPolicy
      */
     public function delete(AuthUser $authUser, Channel $channel): bool
     {
-        return $this->canManageAssistants($authUser) && $this->canAccessAssistant($authUser, $channel->assistant);
+        return $this->canManageChannels($authUser) && $this->canAccessAssistant($authUser, $channel->assistant);
     }
 
     /**
      * Whether the user can rotate the webhook hash of a specific channel.
      *
      * Rotation needs the sensitive {@see Permission::RotateChannelToken}, not
-     * {@see Permission::ManageAssistants}: a role that manages channels does not
+     * {@see Permission::ManageChannels}: a role that manages channels does not
      * get to cut the messenger off from the webhook unless it is granted this.
      */
     public function rotateWebhook(AuthUser $authUser, Channel $channel): bool
@@ -85,10 +87,10 @@ final class ChannelPolicy
                && $this->canAccessAssistant($authUser, $channel->assistant);
     }
 
-    private function canManageAssistants(AuthUser $authUser): bool
+    private function canManageChannels(AuthUser $authUser): bool
     {
         return $authUser instanceof User
-               && $authUser->can(Permission::ManageAssistants->value);
+               && $authUser->can(Permission::ManageChannels->value);
     }
 
     private function canAccessAssistant(AuthUser $authUser, ?Assistant $assistant): bool

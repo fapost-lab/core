@@ -17,7 +17,7 @@ paths:
   - "tests/Unit/Domains/Messaging/**"
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
-reviewed_at: 2026-09-21
+reviewed_at: 2026-09-22
 ---
 # Channels rules
 
@@ -38,6 +38,10 @@ broken.
   `Gate::before`; `ChannelRotationAuthorizationTest`). Why: rotation drops the old hash from routing
   at once, so deliveries fail until the provider is switched to the new URL; it is a separately
   granted, sensitive permission — `content_manager` does not have it.
+- **Viewing, creating, editing and deleting channels needs `Permission::ManageChannels` and access to
+  the channel's assistant; `ManageAssistants` gives no channel access** (`ChannelPolicy`,
+  `ChannelPolicyTest`). Why: a channel holds the messenger's credentials, so a role can build
+  assistants and flows without seeing bot tokens. `content_manager` has both permissions.
 
 ## Rules
 

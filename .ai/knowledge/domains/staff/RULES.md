@@ -15,6 +15,7 @@ paths:
   - "app/Filament/Resources/Roles/**"
   - database/seeders/RoleSeeder.php
   - "tests/*/Domains/Staff/**"
+reviewed_at: 2026-09-22
 ---
 # Staff rules
 
@@ -38,3 +39,8 @@ broken.
   every domain. Review only.
 - **Role priority decides who may assign which role** (`CreatePendingUserService`). New role
   flows must use it.
+- **A change to a system role's permissions in `RoleEnum` needs a tenant migration.** `RoleSeeder`
+  runs only at provisioning and through the manual `ops:tenants-seed-acl`, never on deploy, so
+  existing tenants keep the old set. The migration hard-codes the `web` guard (migrations may not
+  read config) and leaves custom roles alone; see
+  `2026_09_22_000001_grant_manage_channels_to_content_manager.php`. Review only.
