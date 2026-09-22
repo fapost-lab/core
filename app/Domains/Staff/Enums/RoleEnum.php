@@ -40,6 +40,7 @@ enum RoleEnum: string
 
             self::ContentManager => [
                 Permission::ManageAssistants,
+                Permission::ManageChannels,
                 Permission::ManageAssistantSettings,
                 // Flow / content
                 Permission::ManageFlowDefinitions,

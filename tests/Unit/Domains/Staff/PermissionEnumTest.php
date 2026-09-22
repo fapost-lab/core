@@ -93,6 +93,11 @@ final class PermissionEnumTest extends TestCase
         $this->assertContains(Permission::PublishFlow, RoleEnum::ContentManager->permissions());
     }
 
+    public function test_content_manager_has_manage_channels(): void
+    {
+        $this->assertContains(Permission::ManageChannels, RoleEnum::ContentManager->permissions());
+    }
+
     public function test_analyst_has_view_flow_sessions_and_view_contacts(): void
     {
         $analystPerms = RoleEnum::Analyst->permissions();
