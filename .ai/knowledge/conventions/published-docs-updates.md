@@ -25,9 +25,12 @@ behaviour, tests, `.ai/knowledge`, `docs/platform` status. Do not reword, restyl
 a page the task did not make wrong.
 
 Update only the sentences the change made false or incomplete, in the same pull request,
-and keep `docs.json` navigation in step (see `AGENTS.md`, Documentation Discipline). Record
-the decision in `task.md` as one line: `Docs: updated <page> — <why>` or
-`Docs: not needed — <why>`.
+and keep the navigation in step: a new page under `docs/site/` is published only when it is
+listed in `docs/site/docs.json`, and a renamed or removed page is removed from it too. Check
+with `cd docs/site && npx mint broken-links`, preview with `make docs-dev`. Mintlify deploys
+from `main` after the merge, not from the pull request, so a broken navigation entry fails the
+build after the change has already landed. Record the decision in `task.md` as one line:
+`Docs: updated <page> — <why>` or `Docs: not needed — <why>`.
 
 ## Example
 

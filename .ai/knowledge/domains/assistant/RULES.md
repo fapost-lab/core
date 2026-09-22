@@ -39,6 +39,6 @@ broken.
 - **Change `is_active` through `AssistantService`,** never by updating the model. Why: only the
   service cascades to channels. The admin toggle and `AssistantSettings` bypass it today.
   *(proposed)*
-- **Never capture `CurrentAssistantInterface` in a singleton.** Source: AGENTS.md. A known
+- **Never capture `CurrentAssistantInterface` in a singleton.** Source: `conventions/worker-safety.md`. A known
   violation exists: `CachedContentTranslator` holds it and is built inside the singleton
   `NodeHandlerRegistry`.

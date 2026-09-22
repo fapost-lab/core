@@ -1,9 +1,12 @@
 Context for Claude Code and other coding agents. Read before starting a task.
 
-This file is not a roadmap and does not track implementation status. It holds the
-durable rules of the codebase: architectural constraints, coding conventions, and
-where the authoritative documentation lives. Do not add checklists, plans, future
-tables or product promises here; a status change belongs in `docs/platform/`.
+This file holds only what an agent needs *before* it knows which files it will touch. Everything
+else — coding conventions, domain rules, invariants — lives in `.ai/knowledge/` and is loaded for
+the paths and domains a task actually touches (`.ai/scripts/jig context`). Do not copy those rules
+back here: a rule kept in two places drifts, and the copy an agent happens to read first wins.
+
+This file is not a roadmap and does not track implementation status. Plans live in `.ai/specs/`,
+records of what was built in `docs/platform/`.
 
 ## Project Context
 
@@ -34,205 +37,35 @@ to the code.
 - Commit messages and pull request titles use Conventional Commits:
   `type(scope): subject`. Full rules: https://docs.fapost.in/contributing/commits
 - Do not commit or push unless explicitly asked to.
+- Never create or push a tag without an explicit instruction: a pushed tag publishes images and is
+  not undone. How a release is proposed: `.ai/knowledge/conventions/release-proposals.md`.
+- Do not add dependencies without agreement.
 - Process documentation: `CONTRIBUTING.md` (short), `docs/site/contributing/` (full).
 
-## Release Proposals
+## Where The Rest Of The Rules Live
 
-The version lives only in the `v*` tag; the rules for choosing it are in
-https://docs.fapost.in/contributing/releases and the per-type effect in
-https://docs.fapost.in/contributing/commits.
+Everything below is in `.ai/knowledge/` and reaches a task through `jig context`, by the paths it
+touches or the stage it is in. Read the document, not a summary of it.
 
-- After opening or merging a pull request, state its version effect (MINOR / PATCH / none) from its
-  Conventional Commits title and any `BREAKING CHANGE:` footer or `!`.
-- After a merge into `main`, compute the pending bump over every pull request in
-  `git log <latest tag>..origin/main` (`git describe --tags --abbrev=0 origin/main`). Take the pull request
-  numbers from the subjects (`Merge pull request #N` or a squash `(#N)`) and read their titles with
-  `gh pr view N`: a merge commit subject carries no type. Do not select by merge date; it misses by seconds.
-- Pre-1.0: any `feat` or breaking change raises MINOR; otherwise `fix` or `perf` raises PATCH; `refactor`,
-  `test`, `docs`, `chore`, `build`, `ci` alone raise nothing. A title outside Conventional Commits is
-  classified by reading the pull request's diff.
-- If the pending bump is not none, propose a release: the next tag, the pull requests that justify it, and
-  the commands from the releases page. If it is none, say nothing.
-- Never create or push a tag without an explicit instruction: a pushed tag publishes images and is not undone.
+| Subject | Document |
+|---|---|
+| PHP and Laravel style: `strict_types`, `final`, promotion, return types, Pint | `conventions/php-style.md` |
+| Migrations are pure DDL, and the PHPat rules that enforce it | `conventions/migration-isolation.md` |
+| ULID keys in `uuid` columns | `conventions/id-strategy.md` |
+| Controllers and jobs orchestrate; services hold the logic | `conventions/domain-code.md` |
+| Nothing survives a queue job: scoped bindings, tenant switching, no static state | `conventions/worker-safety.md` |
+| Named queues by purpose, rate limits and backpressure | `conventions/queues.md` |
+| Admin UI language versus content language | `conventions/multilingual.md` |
+| Where documentation lives and what is a record rather than a plan | `conventions/docs-layout.md` |
+| When a change must update docs.fapost.in | `conventions/published-docs-updates.md` |
+| How the project is verified, and the PHPat trap | `conventions/verification.md` (stage: verify) |
+| Proposing a release after a merge | `conventions/release-proposals.md` (stage: consolidate) |
+| Explicit tenant context, landlord access only through Tenancy | `domains/tenancy/RULES.md` |
+| Flow runtime isolation, handler registry and versioning, state namespaces | `domains/flow/RULES.md` |
+| Builder: schema-driven rendering, overrides, vendor components | `domains/flow-builder/RULES.md` |
+| Domains, boundaries and dependency direction, including the extension packages | `ARCHITECTURE.md` |
+| What holds system-wide and what enforces each rule | `RULES.md` |
 
-## Laravel And PHP Rules
-
-- Follow the patterns of neighbouring files.
-- Every `.php` file starts with `declare(strict_types=1);`.
-- `final class` by default.
-- Constructor property promotion and explicit return types.
-- Enum cases in TitleCase.
-- PHPDoc for meaning, array shapes and generics; inline comments only for genuinely complex logic.
-- Prefer `php artisan make:* --no-interaction` for new Laravel artifacts where it applies.
-- Do not add dependencies without agreement.
-- After changing PHP, run `vendor/bin/pint --dirty --format agent`.
-- Cover every code change with a minimal relevant test and run that test.
-- Create documentation files only when the user explicitly asks.
-
-## Tenant-Aware Execution
-
-The tenant is the base coordinate of the runtime. Core runtime code must fail
-fast when a tenant context is required and not set.
-
-Forbidden:
-
-- Branching on the deployment shape inside Core runtime.
-- `if (isSingleTenant())` and similar checks.
-- Falling back to a "default tenant" instead of an explicit tenant context.
-- Direct landlord lookups from domains outside `Tenancy`.
-
-Allowed landlord access pattern: domains depend on a contract from
-`Tenancy/Contracts`; direct `DB::connection('landlord')` stays inside Tenancy
-infrastructure.
-
-## Migration Isolation
-
-A migration is a DDL operation. `up()` / `down()` must not depend on runtime state.
-
-Forbidden:
-
-- `app()`, `config()`, `env()` for runtime decisions.
-- `TenantContext::get()` and tenant-aware services.
-- Branching on feature/module activation.
-- Seed data that depends on runtime state.
-- `DB::table()` over another module's tables from a module's migration.
-
-The PHPat rules must match the text of this section. They run through
-`phpstan.neon`; the default PHPUnit run covers them via
-`tests/Unit/Architecture/MigrationTest.php`.
-
-## Long-Lived Worker Safety
-
-HTTP requests are served by PHP-FPM, where a process lives for one request.
-Horizon workers are long-lived: one process handles many jobs in a row, and any
-retained state leaks between them. In a multi-tenant system that leak means one
-tenant seeing another's data.
-
-Rules:
-
-- Do not hold the request, the config repository, the tenant context or the current assistant in a singleton
-  constructor.
-- Keep mutable request/job state in `scoped` bindings; they are rebuilt for every job.
-- Switch tenants through `TenantSwitcher::runForTenant()` with the restore in `finally`.
-- Do not write to static properties between jobs.
-
-## ID Strategy
-
-- Tenant-schema primary keys: ULID stored in a PostgreSQL `uuid` column.
-- Use `Fapost\Support\Concerns\HasUlidPrimaryKey` when a model follows this strategy.
-- Migrations: `$table->uuid('id')->primary()` without a database default.
-- Foreign keys: `foreignUuid(...)->constrained()->cascadeOnDelete()` or the local equivalent in the existing style.
-- Do not change special public identifiers such as the webhook public hash without a separate decision.
-
-## Dependency Direction
-
-`packages/fapost-foundation` and `packages/fapost-support` do not depend on Core.
-
-Forbidden:
-
-- `use App\...` inside foundation/support.
-- References from foundation/support to concrete Core domain classes.
-- Moving Core business logic into support.
-
-A contract needed by external Solutions/Plugins belongs in foundation. A pure
-reusable primitive with no Core dependency belongs in support. Anything used by
-one domain and carrying domain semantics stays in Core.
-
-## Domain Code Rules
-
-- Controllers and Jobs only orchestrate; business logic lives in services and domain classes.
-- Domain services do not use `app()`, `resolve()` or global Laravel helpers as hidden dependencies.
-- Use repositories/ports where a domain crosses a persistence boundary or another bounded context.
-- Facades are acceptable in the infrastructure layer: providers, jobs, controllers, migrations, framework adapters.
-- Eloquent models live in `Domains/{Domain}/Models`.
-- Relations stay on models when Eloquent query capabilities are needed.
-
-## Flow Engine Rules
-
-- A handler is resolved by `(type, version)` from the in-memory registry.
-- A handler is graph-unaware: it returns a `sourceHandle`, not the next node id.
-- A breaking change in a node contract requires a new handler version; existing flow definitions keep working.
-- A flow session snapshots its `flow_definition_id` until it completes.
-- A handler must be safe to retry; external side effects need an idempotency marker or equivalent protection.
-- State keys are namespaced. The canonical list is the enum `Fapost\Foundation\Flow\Enums\StateNamespace`:
-  `system`, `flow`, `rag`, `module`, `contact`, `call`. New namespaces go into the enum, not into individual nodes.
-- `module.*` is read-only and resolved through `DataAccessorInterface`; `contact.*` and `call.*` are derived
-  projections, neither stored in nor written to the session.
-- `system.*` writes are allowed only for explicitly whitelisted runtime handlers.
-- Do not return legacy `effects[]`; use the writer/port from the execution context.
-
-## Messaging And Queues
-
-Queues are not mixed by purpose:
-
-- `flow.execution` - inbound processing and the execution pipeline.
-- `messaging.transactional` - replies in an active dialogue.
-- `messaging.broadcast` - low-priority broadcasts / fan-out.
-- `messaging.system` - service notifications.
-- `messaging.logging` - conversation capture, written outside the delivery path.
-- `scheduled.triggers` - scheduled/event trigger fan-out.
-- `sync.external` - external synchronisations.
-
-Provider rate limits and backpressure are preventive, not only a reaction to a
-provider error.
-
-## Multilingual Rules
-
-Two language layers are kept apart:
-
-- Admin UI language - Laravel lang files, Filament/backend validation, staff UI.
-- Content language - runtime assistant messages to the end user.
-
-Runtime language resolution goes through `LanguageResolverInterface` and the
-content translator chain. Do not put user-facing, bot-facing literals directly
-into handlers or senders; such strings are system translation keys or flow
-content.
-
-A button/select `value` is language-agnostic and never translated; only the
-label/content is.
-
-## Frontend Builder Rules
-
-- The builder is driven by the registry/config schema and the existing overrides.
-- Use a bespoke override for core node-specific UI only when the schema-driven renderer is insufficient.
-- A plugin cannot ship Vue components without a frontend rebuild; extend the schema renderer in Core instead.
-- Solution/vendor components are allowed only through the agreed Vite glob/publish contract.
-- Do not add marketing landing surfaces to the builder/admin in place of working functionality.
-
-## Documentation Discipline
-
-- `docs/platform/current-state.md` describes fact, not intent.
-- Open work is planned in `.ai/specs/` (one spec per step or direction) and tracked as Jig tasks.
-- `docs/platform/TASKS.md` and `docs/platform/ROADMAP.md` are records of what was already built; do not
-  add plans, milestones or new checkboxes to them.
-- `docs/site/` holds the sources of the published site (Mintlify, docs.fapost.in). Anything described there is
-  not duplicated under `docs/`; link to it instead.
-- A new page under `docs/site/` is published only when it is listed in `docs/site/docs.json` navigation; a
-  renamed or removed page is removed there too. Check with `cd docs/site && npx mint broken-links`, preview
-  with `make docs-dev`. The site is deployed by Mintlify from `main` after the merge, not from the pull request.
-- Active source-of-truth documentation is written in English. Archive files may keep their original language
-  until deleted or rewritten.
-- `CLAUDE.md` must not claim that tables, models, jobs or UI exist unless that is an architectural rule
-  confirmed by the code.
-- On a discrepancy between code and documentation, first establish which it is: stale documentation, a partial
-  feature, or a false positive in the code.
-
-## Verification
-
-- `composer test` runs the PHPUnit suites from `phpunit.xml` in parallel (`php artisan test --parallel`, SQLite in
-  memory); plain `php artisan test` runs them in one process. Add `--recreate-databases` after changing a migration. The
-  `redis` group (`tests/Feature/Redis`) needs a reachable Redis from `.env`; `composer run test:redis` runs only it.
-- `composer run test:arch` runs the PHPat architecture rules through PHPStan.
-- PHPat rules live in `tests/Architecture`; the low-level command is
-  `vendor/bin/phpstan analyse --configuration phpstan.neon`.
-- The default PHPUnit run covers PHPat through `tests/Unit/Architecture/MigrationTest.php`, which runs phpstan.
-- Do not run `php artisan test tests/Architecture` as the PHPat check: those classes are not PHPUnit `TestCase`s
-  and the command reports success while verifying nothing.
-- `make` lists the wrapped commands; `CONTAINER` in `.make.local` routes them into a container.
-- CI (`.github/workflows/ci.yml`) runs the same checks on every pull request, plus `go test` for the gateway
-  and type-check/Vitest/build for the frontend. The PHPUnit suite runs twice there: on SQLite, as locally,
-  and on PostgreSQL 15, where schema switching, partitions and `uuid` columns are exercised for real.
-  How to run it on PostgreSQL locally: https://docs.fapost.in/contributing/testing
 
 <!-- The block below is generated by Laravel Boost (`php artisan boost:update`) and replaced on every update. Put project rules outside it. -->
 <laravel-boost-guidelines>

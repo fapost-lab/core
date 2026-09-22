@@ -40,10 +40,10 @@ broken.
 
 - **A new node's UI starts as `configSchema()` on its handler.** Add a core override only when
   the schema renderer cannot express the UI, by adding a key to the map in `ConfigPanel.vue`.
-  Source: AGENTS.md. Review only.
+  Review only.
 - **A new schema field type needs a `FIELD_COMPONENTS` entry.** An unknown type silently renders
   as a text field. Review only. *(proposed)*
 - **Plugins cannot ship Vue components at runtime** — only through the vendor glob and a
-  rebuild. Source: AGENTS.md, ADR-06.
+  rebuild. Source: ADR-06.
 - **A button or select `value` is language-agnostic; only its label is translated.** Source:
-  AGENTS.md. Review only.
+  `conventions/multilingual.md`. Review only.
