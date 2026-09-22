@@ -6,8 +6,9 @@ This section is for developers changing FaPost Core itself.
 
 - [current-state.md](./current-state.md) — what exists in the repository today.
 - [PROJECT.md](./PROJECT.md) — product, architecture, layers, and domain context.
-- [ROADMAP.md](./ROADMAP.md) — milestone roadmap.
-- [TASKS.md](./TASKS.md) — implementation checklist and partial/done status.
+- [ROADMAP.md](./ROADMAP.md) — history of the engineering milestones.
+- [TASKS.md](./TASKS.md) — what was implemented, by area.
+- [`../../.ai/specs`](../../.ai/specs) — the plans for what is still to be done (`.ai/scripts/jig spec list`).
 - [getting-started.md](https://docs.fapost.in/contributing/local-setup) — local setup and commands.
 
 ## Architecture And Runtime
@@ -21,6 +22,6 @@ and [Repository layout](https://docs.fapost.in/contributing/repo-layout).
 
 ## Rules
 
-- Keep implementation status in [TASKS.md](./TASKS.md), not scattered across specs.
+- Plan open work in `.ai/specs/` and track it as Jig tasks; this folder records what was done.
 - Keep code reality in [current-state.md](./current-state.md).
 - Move stable low-level contracts to [../reference](../reference) when they are useful outside platform development.

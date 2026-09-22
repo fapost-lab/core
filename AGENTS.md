@@ -202,8 +202,9 @@ label/content is.
 ## Documentation Discipline
 
 - `docs/platform/current-state.md` describes fact, not intent.
-- `docs/platform/TASKS.md` may use `done / partial / pending` when one line covers both scaffolding and product feature.
-- `docs/platform/ROADMAP.md` describes future milestones and dependencies.
+- Open work is planned in `.ai/specs/` (one spec per step or direction) and tracked as Jig tasks.
+- `docs/platform/TASKS.md` and `docs/platform/ROADMAP.md` are records of what was already built; do not
+  add plans, milestones or new checkboxes to them.
 - `docs/site/` holds the sources of the published site (Mintlify, docs.fapost.in). Anything described there is
   not duplicated under `docs/`; link to it instead.
 - A new page under `docs/site/` is published only when it is listed in `docs/site/docs.json` navigation; a

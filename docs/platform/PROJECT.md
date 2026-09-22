@@ -245,8 +245,9 @@ active / waiting_input → error (uncaught exception)
 | Где смотреть | Что там |
 |--------------|---------|
 | `.ai/scripts/jig status` | Текущий операционный фокус: активные задачи Jig |
-| [[TASKS]] | Единственный детальный чеклист реализации |
-| [[ROADMAP]] | Milestone'ы, зависимости и production-ready критерии |
+| `.ai/specs/` | Планы открытых направлений (`.ai/scripts/jig spec list`) |
+| [[TASKS]] | Что уже реализовано, по разделам |
+| [[ROADMAP]] | История майлстоунов и production-ready критерии |
 | [[INDEX]] | Полная карта vault |
 | `../CLAUDE.md` | Правила для агентов, кодовые конвенции, архитектурные ограничения |
 
@@ -255,8 +256,8 @@ active / waiting_input → error (uncaught exception)
 ## Связано с
 
 - [[INDEX]] — навигационный индекс всех документов
-- [[ROADMAP]] — дорожная карта (расширенная версия)
-- [[TASKS]] — детальный чеклист задач
+- [[ROADMAP]] — история инженерных майлстоунов
+- [[TASKS]] — что уже реализовано, по разделам
 - [[diagrams/README]] — все диаграммы
 - [[specs/flow-engine/README]] — спека Flow Engine
 - [[specs/messaging/conversation-logging]] — спека логирования диалогов

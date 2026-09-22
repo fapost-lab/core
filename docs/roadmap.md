@@ -1,6 +1,6 @@
 ---
 status: living
-updated_at: "2026-09-07"
+updated_at: "2026-09-22"
 ---
 
 # Roadmap — fapost-core
@@ -11,11 +11,11 @@ updated_at: "2026-09-07"
 > order is the prioritization. The *solution* for any step is designed in the task that takes it on,
 > not here.
 
-> **Scope split.** This file is the product decomposition of [`idea-brief.md`](./idea-brief.md).
-> Engineering milestones, their history and their checkbox detail stay in
-> [`platform/ROADMAP.md`](./platform/ROADMAP.md) and [`platform/TASKS.md`](./platform/TASKS.md);
-> nothing here restates them. Zones below are verified against
-> [`ARCHITECTURE.md`](../.ai/knowledge/ARCHITECTURE.md).
+> **Scope split.** This file is the product decomposition of [`idea-brief.md`](./idea-brief.md): it
+> says which steps exist and in which order. Each step's own plan — phases, decisions, open
+> questions — lives in its spec under `.ai/specs/`, and what was already built is recorded in
+> [`platform/ROADMAP.md`](./platform/ROADMAP.md) and [`platform/TASKS.md`](./platform/TASKS.md).
+> Zones below are verified against [`ARCHITECTURE.md`](../.ai/knowledge/ARCHITECTURE.md).
 
 ## Destination
 
@@ -23,16 +23,17 @@ A developer inside the Laravel ecosystem can stand up FaPost, extend it through 
 
 ## Steps
 
-| # | Step | Source | Size | Status |
+| # | Step | Source | Size | Where it is tracked |
 |---|---|---|:---:|---|
-| 1 | Ship the replacement — close the remaining production-readiness criteria, including the concurrency suite that today runs against mocks only, and put the platform under real client rollouts | idea-brief.md §4 Why now | M | idea |
-| 2 | First-contact path — installation, a seeded demo assistant and self-hosting docs, with a named target time from install to a working assistant | idea-brief.md §6 Risks | M | idea |
-| 3 | Positioning rewrite — project description and landing rebuilt on the three pillars, so the difference reads to someone who already uses an open constructor | idea-brief.md §7 Recommendation | S | idea |
-| 4 | Solution activation lifecycle — manifest validation, activation storage and registry, the activation screen, and the lifecycle tests that prove install → activate → handler available | idea-brief.md §7 Recommendation | M | idea |
-| 5 | UI foundation for extenders — one token source shared by the operator-facing surfaces and the small set of primitives an extension actually composes against | idea-brief.md §6 Risks | M | idea |
-| 6 | First solution built through the public contracts only — no privileged access into the core, as an outsider would build it | idea-brief.md §7 Recommendation | L | idea |
-| 7 | Extension documentation for outsiders — the Extending section rewritten against contracts that survived a real build | idea-brief.md §3 Users | M | idea |
-| 8 | Ecosystem distribution → see [Not yet specified](#not-yet-specified) | idea-brief.md §7 Recommendation | fog | idea |
+| 2 | First-contact path — installation, a seeded demo assistant and self-hosting docs, with a named target time from install to a working assistant | idea-brief.md §6 Risks | M | spec `.ai/specs/first-contact-path/` |
+| 3 | Positioning rewrite — project description and landing rebuilt on the three pillars, so the difference reads to someone who already uses an open constructor | idea-brief.md §7 Recommendation | S | task `positioning-rewrite` (blocked on D1) |
+| 4 | Solution activation lifecycle — manifest validation, activation storage and registry, the activation screen, and the lifecycle tests that prove install → activate → handler available | idea-brief.md §7 Recommendation | M | spec `.ai/specs/solution-activation-lifecycle/` |
+| 5 | UI foundation for extenders — one token source shared by the operator-facing surfaces and the small set of primitives an extension actually composes against | idea-brief.md §6 Risks | M | spec `.ai/specs/ui-foundation/` |
+| 6 | First solution built through the public contracts only — no privileged access into the core, as an outsider would build it | idea-brief.md §7 Recommendation | L | spec `.ai/specs/first-solution/` |
+| 7 | Extension documentation for outsiders — the Extending section rewritten against contracts that survived a real build | idea-brief.md §3 Users | M | spec `.ai/specs/extension-docs/` |
+| 8 | Ecosystem distribution → see [Not yet specified](#not-yet-specified) | idea-brief.md §7 Recommendation | fog | spec `.ai/specs/ecosystem-distribution/` |
+
+Step progress is read from the specs themselves: `.ai/scripts/jig spec list`. Nothing tracks status here.
 
 ## Not yet specified
 
@@ -42,9 +43,9 @@ A developer inside the Laravel ecosystem can stand up FaPost, extend it through 
 
 ## Out of scope
 
-- **Staff activity log** — no section of the brief justifies it; its stated purpose is selling to tenants with several staff, and earning money is explicitly not this stage's goal. Detail stays in [`platform/ROADMAP.md`](./platform/ROADMAP.md).
-- **Model-integration server surface** — no section of the brief justifies it; it closes none of the three positioning pillars. Detail stays in [`platform/ROADMAP.md`](./platform/ROADMAP.md).
-- **Web forms data collection** — a product feature with no anchor in the brief; it neither tests extensibility nor shortens the first-contact path. Detail stays in [`platform/ROADMAP.md`](./platform/ROADMAP.md).
+- **Staff activity log** — no section of the brief justifies it; its stated purpose is selling to tenants with several staff, and earning money is explicitly not this stage's goal. Detail is kept in the spec `.ai/specs/audit-log/`, outside the product order.
+- **Model-integration server surface** — no section of the brief justifies it; it closes none of the three positioning pillars. Detail is kept in the spec `.ai/specs/mcp-server/`, outside the product order.
+- **Web forms data collection** — a product feature with no anchor in the brief; it neither tests extensibility nor shortens the first-contact path. Detail is kept in the spec `.ai/specs/forms-data-collection/`, outside the product order.
 - **Multi-tenant shell and billing** — the owner's separate closed product, not part of the open distribution (idea-brief.md §5 Out of scope).
 - **Additional messenger channels** — channel swappability is architectural, but no further channel is promised to a date; they follow demand (idea-brief.md §5 Out of scope).
 - **Monetising the core** — not a goal of this stage; the goal is core quality and ease of extension (idea-brief.md §5 Out of scope).
@@ -72,7 +73,6 @@ A developer inside the Laravel ecosystem can stand up FaPost, extend it through 
 
 ```mermaid
 flowchart LR
-  s1["1 · Ship the replacement"]
   s2["2 · First-contact path"]
   s3["3 · Positioning rewrite"]
   s4["4 · Activation lifecycle"]
@@ -90,7 +90,7 @@ flowchart LR
 
 | Wave | Steps | Zone per step (why parallel-safe) | Unlocks |
 |:---:|---|---|---|
-| 1 | 1 ∥ 2 ∥ 3 | 1: `tests/` · 2: `docs/site/self-hosting/` · 3: `README.md` (disjoint) | — |
+| 1 | 2 ∥ 3 | 2: `docs/site/self-hosting/` · 3: `README.md` (disjoint) | — |
 | 2 | 4 ∥ 5 | 4: `app/Domains/Tenancy` + `app/Filament` · 5: `resources/css` + `resources/js/shared` (disjoint) | 6 |
 | 3 | 6 | 6: `(new)` solution package repository | 7 |
 | 4 | 7 | 7: `docs/site/extending/` | — |
@@ -101,3 +101,4 @@ Contract edits that step 4 or step 6 turn out to need happen in the foundation p
 
 | Step | Shipped | Link |
 |---|---|---|
+| 1 · Ship the replacement | 2026-09-22 | Every production-readiness criterion closed, the concurrency suite running against real Redis and a load test of 100 concurrent sessions with no state leakage — [`platform/ROADMAP.md`](./platform/ROADMAP.md) § Критерии «Production Ready». Rolling the platform out to real clients is operational work and carries no spec. |
