@@ -95,7 +95,7 @@
 - [ ] `form` — сбор данных через веб-форму (TMA / hosted) вместо цепочки `input` — спека `.ai/specs/forms-data-collection/`
 
 ### P3
-- [-] `comment` (builder-only аннотация): backend готов — палитра (`NodeTypesController`), skip в валидации, strip-at-publish (`AnnotationNodeTypes`); остаётся Vue-рендеринг ноды на канвасе — задача Jig `comment-node-canvas`
+- [x] `comment` (builder-only аннотация): палитра (`NodeTypesController`), skip в валидации, strip-at-publish с перебросом edges (`AnnotationNodeTypes`, `PublishFlowService::stripAnnotationNodes`); карточка на канвасе, текст заметки с переносами строк, заголовок в outline-панели, редактирование через generic `SchemaConfigRenderer` (`FlowNodeCard.vue`, `FlowStructureNode.vue`, `nodeColors.ts`)
 
 ---
 
