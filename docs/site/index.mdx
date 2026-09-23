@@ -11,12 +11,41 @@ description: "What FaPost Core is, and who each part of this documentation is fo
   follows once each screen can be walked through.
 </Note>
 
-**FaPost Core is a platform for building conversational assistants.** An assistant
-connects to messaging channels such as Telegram and WhatsApp, holds conversations
-with contacts, and runs them through flows designed on a visual canvas — with
-contacts, segments, broadcasts, and conversation history around it.
+**FaPost Core is an Apache-2.0 framework for conversational assistants, for
+developers in the Laravel ecosystem.** Build your own product on top of it, keep
+your code closed, ship it to your clients and charge for it. The licence covers
+Core and both extension packages; the only thing it holds back is the name.
+
+An assistant connects to messaging channels such as Telegram and WhatsApp, holds
+conversations with contacts, and runs them through flows designed on a visual
+canvas — with contacts, segments, broadcasts, and conversation history around it.
 
 This repository is Core: the platform itself, without vertical product packages.
+
+## Why FaPost, and not another open constructor
+
+Open flow constructors exist and have communities of their own. Three things here
+are different.
+
+**The licence lets you build a business on top.** Apache 2.0 applies to Core and to
+`fapost/foundation` and `fapost/support`, the packages an extension actually depends
+on. A Solution you write stays yours, under whatever licence you choose, and can be
+sold. There is no copyleft obligation to negotiate away. Only the FaPost name is
+reserved, by the [Trademark Policy](https://github.com/fapost-lab/fapost-core/blob/main/TRADEMARK.md).
+
+**Conversation is the unit of work, not a workflow run.** A session belongs to one
+contact, waits for a reply for as long as the reply takes, keeps what it has
+collected, and resumes exactly where it stopped. Contacts, segments, conversation
+history and broadcasts are part of the platform rather than storage you wire up
+yourself — a general-purpose automation tool models an execution, not a person
+mid-conversation.
+
+**You extend it in Laravel, not in a plugin language.** A node type is a PHP class
+registered by a service provider; the admin panel is Filament, the builder is
+Inertia and Vue, the queues are Horizon. An extension is a Composer package that
+depends on `fapost/foundation` and never on `App\…`. There is no bespoke runtime,
+DSL or plugin SDK between you and the code — see
+[the extension model](/extending/extension-model) for what that looks like.
 
 <Accordion title="What is a flow?">
   A flow is a directed graph, stored as JSON, that describes a conversation. Each

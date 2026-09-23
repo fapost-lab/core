@@ -1,6 +1,6 @@
 ---
 status: living
-updated_at: "2026-09-22"
+updated_at: "2026-09-23"
 ---
 
 # Roadmap — fapost-core
@@ -26,7 +26,7 @@ A developer inside the Laravel ecosystem can stand up FaPost, extend it through 
 | # | Step | Source | Size | Where it is tracked |
 |---|---|---|:---:|---|
 | 2 | First-contact path — installation, a seeded demo assistant and self-hosting docs, with a named target time from install to a working assistant | idea-brief.md §6 Risks | M | spec `.ai/specs/first-contact-path/` |
-| 3 | Positioning rewrite — project description and landing rebuilt on the three pillars, so the difference reads to someone who already uses an open constructor | idea-brief.md §7 Recommendation | S | task `positioning-rewrite` (blocked on D1) |
+| 3 | Positioning rewrite — project description and landing rebuilt on the three pillars, so the difference reads to someone who already uses an open constructor | idea-brief.md §7 Recommendation | S | task `positioning-rewrite` |
 | 4 | Solution activation lifecycle — manifest validation, activation storage and registry, the activation screen, and the lifecycle tests that prove install → activate → handler available | idea-brief.md §7 Recommendation | M | spec `.ai/specs/solution-activation-lifecycle/` |
 | 5 | UI foundation for extenders — one token source shared by the operator-facing surfaces and the small set of primitives an extension actually composes against | idea-brief.md §6 Risks | M | spec `.ai/specs/ui-foundation/` |
 | 6 | First solution built through the public contracts only — no privileged access into the core, as an outsider would build it | idea-brief.md §7 Recommendation | L | spec `.ai/specs/first-solution/` |
@@ -54,7 +54,6 @@ Step progress is read from the specs themselves: `.ai/scripts/jig spec list`. No
 
 | # | Question | Type | Owner | Blocks |
 |---|---|:---:|:---:|:---:|
-| D1 | Which of the three pillars — permissive licence, conversation as a first-class object, native stack — carries the first sentence of the project description and the landing page | grilling | human | 3 |
 | D2 | What is the target time from a fresh installation to a first working assistant, as a number we are willing to be measured against | grilling | human | 2 |
 | D3 | How does "not earning money right now" reconcile with a shell, billing and a marketplace remaining in the plans — which of the two signals leads | grilling | human | 8 |
 | D4 | Does an installed solution have to be rebuilt into the front-end bundle before its overrides appear, and is there a path that avoids it | research | agent | 4 |
@@ -62,6 +61,7 @@ Step progress is read from the specs themselves: `.ai/scripts/jig spec list`. No
 
 ## Decisions so far
 
+- **D1** — the permissive licence carries the first sentence of the project description and the landing page; conversation as a first-class object and the native stack follow it, in that order → `README.md`, [`site/index.mdx`](./site/index.mdx)
 - The product decomposition lives here; engineering milestones and their history stay separate → [`platform/ROADMAP.md`](./platform/ROADMAP.md)
 - Positioning is a framework for developers in the Laravel ecosystem, built on three pillars, not another open bot constructor → [`idea-brief.md §7 Recommendation`](./idea-brief.md)
 - Multi-tenancy is closed automatically by the bounded context; the open distribution installs single-tenant and the multi-tenant shell stays a separate closed product → [`idea-brief.md §5 Out of scope`](./idea-brief.md)

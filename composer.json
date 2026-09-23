@@ -1,7 +1,7 @@
 {
     "name": "fapost/core",
     "type": "project",
-    "description": "FaPost Core — platform for building conversational bots in Telegram and WhatsApp.",
+    "description": "FaPost Core — an Apache-2.0 framework for conversational assistants, built on Laravel.",
     "keywords": [
         "fapost",
         "chatbot",
