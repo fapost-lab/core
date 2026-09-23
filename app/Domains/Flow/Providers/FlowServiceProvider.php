@@ -38,6 +38,7 @@ use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Contracts\NodeUsageStatisticsInterface;
 use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
 use App\Domains\Flow\Contracts\SendMessageTimeoutSchedulerInterface;
 use App\Domains\Flow\Contracts\SystemTranslationCatalogInterface;
@@ -114,6 +115,7 @@ use App\Domains\Flow\Services\TenantTranslationService;
 use App\Domains\Flow\State\Variables\CacheBackedVariableSchemaRegistry;
 use App\Domains\Flow\State\Variables\VariableCoercer;
 use App\Domains\Flow\State\Variables\VariableResolver;
+use App\Domains\Flow\Statistics\NodeUsageStatisticsService;
 use App\Domains\Flow\Subflow\CallGraphRepository;
 use App\Domains\Flow\Subflow\CallGraphValidator;
 use App\Domains\Flow\Subflow\DefaultSubflowResumer;
@@ -247,6 +249,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->bind(FlowTriggerEventPublisherInterface::class, QueuedFlowTriggerEventPublisher::class);
         $this->app->bind(DelayResumeSchedulerInterface::class, QueuedDelayResumeScheduler::class);
         $this->app->bind(SendMessageTimeoutSchedulerInterface::class, QueuedSendMessageTimeoutScheduler::class);
+        $this->app->bind(NodeUsageStatisticsInterface::class, NodeUsageStatisticsService::class);
         $this->app->bind(
             SubflowResumerInterface::class,
             fn ($app): DefaultSubflowResumer => new DefaultSubflowResumer(

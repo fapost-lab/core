@@ -1,120 +1,159 @@
-# Node Usage Statistics — Draft для доработки
+# Node Usage Statistics
 
-**Документ:** Observability нод Flow Engine (static + runtime usage)
-**Статус:** Черновик, требует доработки. Вынесен из addendum Loop-ноды (`flow-engine-v1/nodes/11-loop.md`), июнь 2026.
-**Контекст:** независимая фича — не привязана к loop, полезна для всех node types.
-
----
-
-## Связано с
-
-- [[11-loop]] — loop нода и её usage statistics
-- [[nodes/README]] — каталог нод
-- [[06-flow-engine]] — flow engine архитектура
+**Document:** Flow Engine node observability (static + runtime usage)
+**Status:** Resolved and implemented. Supersedes the June 2026 draft extracted from the Loop
+addendum (`flow-engine-v1/nodes/11-loop.md`), whose open questions are settled below.
+**Context:** independent feature — not tied to loop, useful for every node type.
 
 ---
 
-## 1. Цель
+## Related
 
-Ответить на два вопроса per tenant:
-
-1. **Static:** какие node types и как часто используются в активных flow (определениях)?
-2. **Runtime:** как часто и как успешно каждый node type реально исполняется?
+- [[11-loop]] — loop node, the original context
+- [[nodes/README]] — node catalogue
+- [[06-flow-engine]] — flow engine architecture
 
 ---
 
-## 2. Static analysis — готово к реализации
+## 1. Goal
 
-SQL view на `flow_definitions.nodes` (jsonb):
+Answer, for a given tenant and for the platform as a whole:
 
-```sql
-CREATE VIEW node_type_usage_static AS
-SELECT
-    fd.tenant_id,
-    node->>'type' AS node_type,
-    COUNT(*) AS usage_count
-FROM flow_definitions fd,
-     jsonb_array_elements(fd.nodes) AS node
-WHERE fd.is_active = true
-GROUP BY fd.tenant_id, node_type;
+1. **Static:** which node types are present in active flow definitions, and how often?
+2. **Runtime:** how often, and how successfully, does each node type actually execute?
+
+The consumer is **safe handler removal**: deciding whether a handler can be dropped or a
+version retired.
+
+## 2. The unit is `type@version`, not `type`
+
+`NodeHandlerRegistry` resolves handlers by `type@version`, and old versions must stay
+registered because existing definitions keep their node versions forever. A report keyed by
+bare type therefore cannot answer the question that motivates it — "may I retire
+`send_message@1`?" — so both slices are keyed by the pair.
+
+Both sides carry the version already:
+
+- `flow_definitions.nodes[].version` (optional; the engine defaults a missing value to `1`)
+- `flow_logs.node_version` (`integer NOT NULL`, written by `FlowLogWriter`)
+
+The static slice mirrors `FlowEngine::resolveNodeVersion()` exactly, so a node that omits
+`version` lands on the same key as the rows the engine logged for it.
+
+## 3. Static slice
+
+Source: `flow_definitions` where `is_active = true`, expanding the `nodes` jsonb.
+
+Aggregated **in PHP**, not in SQL. Expanding jsonb in the database needs
+`jsonb_array_elements` on PostgreSQL and `json_each` on SQLite, so a single statement is not
+portable — and the test suite runs on SQLite while production runs on PostgreSQL, meaning the
+tests would exercise a different statement than the one that ships. Active definitions are
+bounded (the partial unique index `flow_definitions_active_unique` permits one per flow), so
+counting them in PHP is cheap and keeps one code path on both drivers.
+
+### Why not the SQL view the draft proposed
+
+The draft proposed a `node_type_usage_static` view over `jsonb_array_elements`. Rejected:
+
+1. Not portable in one statement (above), so the view would be driver-branched and its
+   PostgreSQL form would be covered only by the CI matrix.
+2. A view is a schema object in every tenant schema: it must be created at provisioning,
+   migrated when the node shape changes and dropped at decommission. The repository contains
+   no view at all today, so this would be a new class of object to maintain.
+3. It answers only within one schema. "Does *any* tenant still use X" still requires walking
+   tenants, which is where the answer actually has to be assembled.
+
+Also note the draft's `GROUP BY fd.tenant_id` is redundant: `flow_definitions` lives in the
+tenant schema, so every row in scope already belongs to one tenant.
+
+## 4. Runtime slice
+
+Source: `flow_logs`, grouped by `node_type, node_version` over a time window.
+
+The SQL is plain aggregation — `COUNT(*)`, `SUM(CASE WHEN status = 'failed' …)`,
+`MAX(created_at)` — with no JSON functions and no `AT TIME ZONE`, so it is identical on both
+drivers. Partitioning is transparent to reads through the `flow_logs` root.
+
+`failures` counts `status = 'failed'` only. `terminal` is a normal end and `conflict` is never
+written by any code path today.
+
+### Corrections to the draft's "open problem"
+
+The draft treated runtime tracking as unsolved and proposed Redis counters to work around
+gaps. Those gaps do not exist:
+
+- **`logging_enabled` does not gate `flow_logs`.** It selects `DefaultHistoryWriter` versus
+  `NoOpHistoryWriter` for `flow_session_history` (`HistoryWriterFactory`). `FlowEngine` writes
+  a flow log for every node it executes regardless of the flag.
+- **Delay executions are logged.** `ResumeDelayedFlowSessionJob` → `DelayedSessionResumer` →
+  `FlowEngine::runSession()` goes through the normal loop. Parking a node is logged too: a
+  `Delayed`/`Waiting` result falls through to `executed`. The resumer's early returns (stale
+  resume, marker mismatch, fired early) never run the engine at all, so no execution is missed.
+- **Idempotency hits are logged.** Deduplication lives in delivery (`MessageSender` returns
+  `DeliveryResult(duplicate: true)`); `SendMessageNodeHandler` does not branch on it and
+  returns a normal `executed` result.
+- **Broadcasts do not execute nodes**, so they are not a flow-log gap.
+
+The single genuine omission is a failure of the write itself, which `writeLogSafely()`
+swallows by design — flow logs are observability, not state.
+
+**The real limit is retention.** `logs:prune-flow` drops partitions older than 30 days, so the
+runtime slice cannot look further back than that. The static slice has no window, which is why
+it, not the runtime one, is the authoritative answer to "is this node still in use".
+
+## 5. Registry cross-reference
+
+The report marks each observed pair with `NodeHandlerRegistryInterface::has($type, $version)`:
+
+- **Used but not registered** — a node sits in an active definition with no handler for its
+  version. The flow is already broken and fails when execution reaches that node.
+- **Registered but unused** — reported at type granularity, because `all()` exposes only the
+  latest version of each type. Across tenants this is an *intersection*: a type still used by
+  one tenant is not retirable however many others have dropped it.
+
+## 6. What was built
+
+| Piece | Where |
+|---|---|
+| Report DTOs | `app/Domains/Flow/Statistics/NodeTypeUsage.php`, `NodeUsageReport.php` |
+| Aggregation | `app/Domains/Flow/Statistics/NodeUsageStatisticsService.php` |
+| Contract | `app/Domains/Flow/Contracts/NodeUsageStatisticsInterface.php` |
+| Console entry point | `app/Console/Commands/Flow/NodeUsageCommand.php` (`flow:node-usage`) |
+
+```
+php artisan flow:node-usage [--days=30] [--tenant=slug] [--type=send_message] [--json]
 ```
 
-Дешёво, без записи в runtime. Спорных вопросов нет.
+The command walks active tenants through `TenantSwitcher::runForTenant()` — both tables live
+in the tenant schema, so the platform-wide answer only exists once every tenant has been
+visited — and prints a per-tenant table plus a platform summary. No DDL, no new table, no new
+column.
 
----
+The retention boundary is stated in the output rather than left implicit: every run says which
+columns are windowed and which are not, and a `--days` larger than the 30-day retention prints
+a warning that executions beyond it were pruned and cannot be counted. `--json` carries the
+same facts as `runtime_window_days`, `log_retention_days` and `window_exceeds_retention`,
+because a machine consumer never sees the printed warning. The window is never silently
+shrunk to retention: if a deployment changes the prune cutoff, a hard cap would lie.
 
-## 3. Runtime tracking — открытая проблема
+## 7. Deliberately not built
 
-### 3.1 Исходное предложение (отклонено)
+- **`node_usage_daily` rollup.** The only way to keep history beyond the 30-day retention, and
+  a new tenant table, so it is a separate architectural decision. Its value is limited while
+  the static slice — which has no window — already answers the retirement question.
+- **Redis counters.** Motivated by the `logging_enabled` gap that does not exist.
+- **`duration_ms`.** A profiling need, not a usage-statistics one; it would be a raw-level
+  column on `flow_logs`.
+- **UI.** SQL and the console command for now; a Filament page can follow if asked for.
 
-Изначальный вариант — событие `node_executed` в `analytics_events`:
+## 8. Known defect found nearby, not addressed
 
-```json
-{
-  "event_type": "node_executed",
-  "tenant_id": "...", "flow_id": "...", "session_id": "...",
-  "node_id": "...", "node_type": "loop",
-  "duration_ms": 145, "outcome": "success"
-}
-```
+`app/Filament/Widgets/FlowActivityChart.php` aggregates `flow_logs` with
+`DATE(created_at AT TIME ZONE 'UTC')`, which is PostgreSQL-only, and counts everything that is
+not `executed` as failed — including `terminal`, a normal completion.
 
-**Почему отклонено:** противоречит retention-модели CLAUDE.md. `analytics_events` — только
-агрегированные бизнес-события (flow_started/completed/failed, …), хранятся **вечно**.
-Per-node события — это raw-уровень: объём = каждая нода каждой сессии, на рассылках — миллионы
-строк, которые нельзя будет дёшево чистить (DELETE по retention на тяжёлой таблице запрещён
-дизайном; партиционирования у `analytics_events` нет).
+## 9. Related documents
 
-### 3.2 Текущий interim-вариант
-
-Агрегаты по существующей таблице `flow_logs` (partitioned monthly, retention 30 дней;
-есть колонки `node_type`, `session_id`, `status`, `created_at`):
-
-```sql
-SELECT node_type, COUNT(*) AS executions
-FROM flow_logs
-WHERE created_at > now() - interval '30 days'
-GROUP BY node_type;
-```
-
-**Ограничения interim-варианта (предмет доработки):**
-
-- Окно ограничено retention (30 дней) — истории дольше нет.
-- Flows с `logging_enabled = false` в выборку не попадают → статистика неполная и смещённая.
-- `duration_ms` в `flow_logs` нет.
-- `flow_logs` не пишет часть исполнений by design (delay executions при рассылках,
-  idempotency-хиты) — см. CLAUDE.md § Логирование.
-
----
-
-## 4. Направления доработки (решить до реализации)
-
-1. **Агрегационная модель.** Кандидат: periodic rollup job `flow_logs` → компактная таблица
-   `node_usage_daily (tenant_id, flow_id, node_type, date, executions, failures, avg_duration_ms)`.
-   Переживает retention raw-логов, дёшево хранится вечно, согласуется с законом
-   «analytics — агрегаты».
-2. **Полнота vs `logging_enabled`.** Варианты: (а) принять неполноту, документировать;
-   (б) лёгкие Redis-счётчики `INCR node_exec:{tenant}:{type}:{date}` независимо от flow_logs +
-   nightly flush в rollup-таблицу; (в) всегда писать минимальную счётную запись. Вариант (б)
-   выглядит дешевле всего для hot path.
-3. **duration_ms.** Если нужен — добавлять колонку в `flow_logs` (raw-уровень), не в analytics.
-   Оценить ценность: проблемные ноды (call/rag) и так логируют метаданные.
-4. **Volume / backpressure.** Synchronous запись на каждую ноду неприемлема для broadcast-нагрузки;
-   любой вариант записи — batched/async.
-5. **UI.** V1 — без UI (SQL / Filament resource при необходимости). V1.x — dashboard
-   «Node Usage» в admin panel.
-
----
-
-## 5. Тесты (когда определится модель)
-
-- Static SQL view возвращает корректные counts.
-- Rollup/счётчики корректно агрегируют (включая flows с выключенным логированием — по выбранному варианту).
-- Aggregation queries работают на партиционированных данных.
-
----
-
-## 6. Связанные документы
-
-- `flow-engine-v1/nodes/11-loop.md` — исходный контекст (Loop addendum)
-- CLAUDE.md § «Логирование и retention» — ограничения raw/aggregate уровней
+- `flow-engine-v1/nodes/11-loop.md` — original context (Loop addendum)
+- `.ai/knowledge/domains/flow/RULES.md` — handler registry and versioning rules
 - `flow-engine-v1/09-out-of-scope-and-open-questions.md` — V1.x backlog

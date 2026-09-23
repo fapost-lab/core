@@ -50,6 +50,18 @@ webhooks are not arriving — see [Webhook gateway](/self-hosting/gateway).
 | Command | Does |
 |---|---|
 | `flow:sweep-subflow-timeouts` | Force-fail subflow children whose parent has expired, and resume the parent through its failed handle |
+| `flow:node-usage` | Report which node types and versions are still in use, per tenant and across the platform |
+
+Run `flow:node-usage` before you remove a node handler or retire a handler version.
+For each `type@version` it reports how many active flow definitions contain the node
+and how often it executed recently, then names the nodes that have no registered
+handler and the handler types no tenant uses at all.
+
+The definition counts are the authoritative answer — a node in an active definition
+runs sooner or later — while the execution counts reach back only as far as
+`flow_logs` retention, which `logs:prune-flow` caps at 30 days. The command says so
+on every run. Options: `--days` for the runtime window, `--tenant` for a single slug,
+`--type` for a single node type, and `--json`.
 
 ## Log partitions
 
