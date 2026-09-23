@@ -6,11 +6,35 @@
 [![Docs](https://img.shields.io/badge/docs-docs.fapost.in-5a6e58.svg)](https://docs.fapost.in)
 [![Status: active development](https://img.shields.io/badge/status-active%20development-b07c2c.svg)](https://docs.fapost.in)
 
-**A platform for building conversational assistants.** An assistant connects to messaging channels such as
-Telegram and WhatsApp, holds conversations with contacts, and runs them through flows designed on a visual
-canvas — with contacts, segments, broadcasts, and conversation history around it.
+**An Apache-2.0 framework for conversational assistants, for developers in the Laravel ecosystem.**
+Build your own product on top of it, keep your code closed, ship it to your clients and charge for it.
+The licence covers Core and both extension packages; the only thing it holds back is the name.
+
+An assistant connects to messaging channels such as Telegram and WhatsApp, holds conversations with
+contacts, and runs them through flows designed on a visual canvas — with contacts, segments, broadcasts,
+and conversation history around it.
 
 📖 **[docs.fapost.in](https://docs.fapost.in)** — full documentation · [fapost.in](https://fapost.in) — project site
+
+## Why this, and not another open constructor
+
+Open flow constructors exist and have communities of their own. Three things here are different.
+
+**The licence lets you build a business on top.** Apache 2.0 applies to Core and to `fapost/foundation`
+and `fapost/support` — the packages an extension actually depends on. A Solution you write stays yours,
+under whatever licence you choose, and can be sold. There is no copyleft obligation to negotiate away, and no edition of Core is
+held back behind a licence key. Only the FaPost name is reserved, by the
+[Trademark Policy](./TRADEMARK.md).
+
+**Conversation is the unit of work, not a workflow run.** A session belongs to one contact, waits for a
+reply for as long as the reply takes, keeps what it has collected, and resumes exactly where it stopped.
+Contacts, segments, conversation history and broadcasts are part of the platform rather than storage you
+wire up yourself — a general-purpose automation tool models an execution, not a person mid-conversation.
+
+**You extend it in Laravel, not in a plugin language.** A node type is a PHP class registered by a service
+provider; the admin panel is Filament, the builder is Inertia and Vue, the queues are Horizon. An
+extension is a Composer package that depends on `fapost/foundation` and never on `App\…`. There is no
+bespoke runtime, DSL or plugin SDK between you and the code.
 
 ## What it does
 
