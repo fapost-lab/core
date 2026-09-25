@@ -27,8 +27,19 @@ export JIG_SELF JIG_LIB
 . "$JIG_LIB/version.sh"
 # shellcheck source=lib/common.sh
 . "$JIG_LIB/common.sh"
+
+# Before anything reads a repository: the process decides which checkout it is
+# in from where it was started, not from what it was told. jig_require_repo
+# clears these too, but it runs inside cmd_<command>, and the checkout recorder
+# sourced below resolves the root before any command does — the one component
+# whose whole job is to describe its own surroundings would otherwise have been
+# the last to stop taking them on hearsay.
+jig_clear_git_location_env
+
 # shellcheck source=lib/config.sh
 . "$JIG_LIB/config.sh"
+# shellcheck source=lib/checkout.sh
+. "$JIG_LIB/checkout.sh"
 
 jig_usage() {
   cat <<EOF
@@ -60,7 +71,7 @@ Usage: jig <command> [args]
   context resolve [...]          required documents; --stage, --no-task, --catalog
   context pending|guard [...]    knowledge required but not yet acknowledged
   context acknowledge [...]      record documents as read
-  verify                         run active profiles' checks
+  verify                         run active profiles' checks (or preview with --explain)
   knowledge check                validate .ai/knowledge
   knowledge new <type> <slug>    create a knowledge document (jig knowledge for types)
   knowledge paths [...]          report or maintain documents' paths coverage
@@ -91,6 +102,8 @@ Usage: jig <command> [args]
                                  ones no reader answers from
   config show --local            print .ai/config.local.yaml and the keys in it
                                  that no reader answers from
+  config keys                    every key jig reads, its default, which file
+                                 answers for it, and what .ai/config.yaml omits
   measure                        knowledge quality, process weight, change size
   doctor                         check the local environment jig runs in
   self-update                    move the global framework checkout to the newest release
@@ -108,6 +121,15 @@ main() {
       if [ ! -f "$JIG_LIB/$cmd.sh" ]; then
         jig_die "command '$cmd' is not available in jig $JIG_VERSION"
       fi
+      # Say that a session is working here, before the command runs: HEAD must
+      # be read before `task start` moves it. `help` and `version` are not work
+      # and leave nothing behind
+      # (adr-20260924-a-checkout-records-what-is-happening-in-it).
+      jig_checkout_record "$cmd" "$@"
+      # And tell this session when HEAD moved under it since it last looked.
+      # Only the commands a session orients itself with print it; which those
+      # are is checkout.sh's to know, not the dispatcher's.
+      jig_checkout_notice "$cmd" "$@"
       # shellcheck disable=SC1090
       . "$JIG_LIB/$cmd.sh"
       "cmd_$cmd" "$@"

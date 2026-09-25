@@ -321,12 +321,20 @@ _doctor_check_session_hooks() {
 # adapter answers, as for the session hook. A warn, not a fail: jig itself
 # works, but the agent will not follow its routes until the section is merged.
 _doctor_check_instructions() {
-  local source a adir hint file
+  local source a adir hint file recorded section
   source=$(manifest_source 2>/dev/null) || return 0
   [ -n "$source" ] || return 0
   [ -d "$source/adapters" ] || return 0
   # shellcheck source=lib/profiles.sh
   . "$JIG_LIB/profiles.sh"
+  # shellcheck source=lib/section.sh
+  . "$JIG_LIB/section.sh"
+
+  # The same answer `jig status` prints, from the same function: a section
+  # jig cannot reach is as much a problem as no section at all, and the two
+  # reports may not disagree about which it is.
+  recorded=$(manifest_instructions_section 2>/dev/null) || recorded=""
+  section=$(jig_section_report_state "$JIG_PROJECT/AGENTS.md" "$recorded")
 
   for a in $(_doctor_bracket_list "$(manifest_header_get adapters)"); do
     adir=$(adapters_dir "$source/adapters" "$a") || continue
@@ -339,8 +347,13 @@ _doctor_check_instructions() {
       file=$("adapter_${a}_instructions_file")
       _doctor_warn "instructions ($a)" "no Jig section in $file" \
         "run the jig-init skill, which merges the section with your consent"
+    elif [ "$section" = unmarked ]; then
+      _doctor_warn "instructions ($a)" "Jig section in AGENTS.md is not marked, so upgrades cannot reach it" \
+        "run the jig-init skill, which adds the markers with your consent"
+    elif [ "$section" = modified ]; then
+      _doctor_ok "instructions ($a)" "Jig section changed here; upgrades keep your text"
     else
-      _doctor_ok "instructions ($a)" "Jig section present"
+      _doctor_ok "instructions ($a)" "Jig section present and kept current"
     fi
   done
 }
@@ -355,6 +368,40 @@ _doctor_check_config_local() {
     _doctor_ok "config.local" "ignored by git"
   else
     _doctor_warn "config.local" "not ignored by git, can be committed" "jig init"
+  fi
+}
+
+# Whether .ai/config.yaml still describes the set of keys this version reads.
+# Not a fault, and never a fail: an absent key takes its default and
+# everything works, which is the design (schemas/config.md). But that file is
+# also the only place a person ever sees which keys exist, and an upgrade does
+# not touch it (ADR-0024) — so after one it keeps describing the version it
+# was written for, and a key added since is a capability nobody was told
+# about. That is an environment fact, which is doctor's question, and not
+# anything a task is waiting on, which is why it is not a `status` line.
+#
+# It is also the other half of a question doctor already half-answers:
+# _doctor_check_agent_git below reports a local-only key written into
+# .ai/config.yaml, where nothing reads it. One command answers both.
+#
+# Silent when there is nothing to say, like _doctor_check_config_local above
+# and the two jig.cmd checks: a report printed on every run is a report that
+# stops being read. config.sh decides what counts (jig_config_unmentioned
+# leaves out the local-only keys, and counts a commented line as a mention).
+_doctor_check_config_keys() {
+  local unmentioned unknown n
+  unmentioned=$(jig_config_unmentioned | tr '\n' ' ' | sed 's/ $//')
+  unknown=$(jig_config_unknown | tr '\n' ' ' | sed 's/ $//')
+  if [ -n "$unmentioned" ]; then
+    n=$(printf '%s\n' "$unmentioned" | wc -w | tr -d ' ')
+    unmentioned=$(printf '%s\n' "$unmentioned" | sed 's/ /, /g')
+    _doctor_ok "config keys" \
+      "$n not mentioned in $JIG_AI_DIR/config.yaml, each on its default: $unmentioned (jig config keys)"
+  fi
+  if [ -n "$unknown" ]; then
+    _doctor_warn "config keys" \
+      "$JIG_AI_DIR/config.yaml sets keys jig does not read: $(printf '%s\n' "$unknown" | sed 's/ /, /g')" \
+      "correct the spelling, or remove the lines (jig config keys lists every key)"
   fi
 }
 
@@ -417,6 +464,7 @@ cmd_doctor() {
       _doctor_check_session_hooks
       _doctor_check_instructions
       _doctor_check_config_local
+      _doctor_check_config_keys
       _doctor_check_agent_git
     else
       _doctor_warn "project" "not initialised" "jig init"

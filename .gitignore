@@ -61,3 +61,6 @@ CLAUDE.local.md
 .ai/runtime/
 .ai/mcp/
 .ai/config.local.yaml
+.ai/workspace
+.ai/runtime
+.claude/worktrees/

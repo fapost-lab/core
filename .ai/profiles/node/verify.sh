@@ -74,7 +74,13 @@ _node_dep_present() {
 _node_pm() {
   local field
   if [ -f package.json ]; then
-    field=$(grep -oE '"packageManager"[[:space:]]*:[[:space:]]*"[a-zA-Z0-9._-]+@[^"]+"' package.json | head -n1)
+    # grep reads the file itself and stops at the first hit. Piping it into
+    # `head` instead puts a writer in front of a reader that quits early, and
+    # under pipefail a writer still writing when that happens turns a found
+    # value into an empty one (conventions/shell.md). One `packageManager`
+    # line never grew far enough for that, but how big someone else's
+    # package.json gets is not a thing this function should have to know.
+    field=$(grep -m 1 -oE '"packageManager"[[:space:]]*:[[:space:]]*"[a-zA-Z0-9._-]+@[^"]+"' package.json)
     case "$field" in
       *pnpm@*) printf 'pnpm\n'; return 0 ;;
       *yarn@*) printf 'yarn\n'; return 0 ;;
@@ -116,7 +122,7 @@ _node_local_bin() {
 _node_lint_uses_eslint() {
   local script
   [ -f package.json ] || return 1
-  script=$(grep -oE '"lint"[[:space:]]*:[[:space:]]*"[^"]*"' package.json | head -n1)
+  script=$(grep -m 1 -oE '"lint"[[:space:]]*:[[:space:]]*"[^"]*"' package.json)
   case "$script" in
     *eslint*) return 0 ;;
   esac
@@ -332,6 +338,72 @@ _node_test_via_vitest() {
   fi
   jp_run "$TEST_LABEL" "$v, scope: vitest related, $# files" "$vitest" run "$@"
 }
+
+if [ "${JIG_VERIFY_EXPLAIN:-}" = 1 ]; then
+  if ! _node_has_script test || [ -z "$MGR_BIN" ]; then
+    jp_plan "$TEST_LABEL" skip "no test script or $MGR not found"
+  elif ! jp_scoped; then
+    jp_plan "$TEST_LABEL" full "full scope"
+  else
+    runner=$(_node_test_runner)
+    runner_bin=""
+    if [ -n "$runner" ]; then runner_bin=$(_node_local_bin "$runner"); fi
+    if [ -z "$runner_bin" ]; then
+      jp_plan "$TEST_LABEL" full "no local supported runner for narrowing"
+    elif [ "$runner" = jest ]; then
+      filters=$(jp_decide _node_builtin_jest)
+      if [ -n "$filters" ] && [ "$filters" != ALL ]; then
+        while IFS= read -r f; do
+          [ -n "$f" ] || continue
+          if [ ! -e "$f" ]; then filters=ALL; break; fi
+        done <<EOF
+$filters
+EOF
+      fi
+      if [ -n "$filters" ] && [ "$filters" != ALL ]; then
+        jp_plan "$TEST_LABEL" conditional "related tests for $(printf '%s\n' "$filters" | paste -sd, -) require jest --listTests; full set possible"
+      else
+        jp_plan_selection "$TEST_LABEL" "$filters" "test files"
+      fi
+    else
+      filters=$(jp_decide _node_builtin_vitest)
+      if [ -n "$filters" ] && [ "$filters" != ALL ]; then
+        while IFS= read -r f; do
+          [ -n "$f" ] || continue
+          if [ ! -e "$f" ]; then filters=ALL; break; fi
+        done <<EOF
+$filters
+EOF
+      fi
+      jp_plan_selection "$TEST_LABEL" "$filters" "test files"
+    fi
+  fi
+
+  if ! _node_has_script lint || [ -z "$MGR_BIN" ]; then
+    jp_plan "$LINT_LABEL" skip "no lint script or $MGR not found"
+  else
+    eslint_bin=""
+    if _node_lint_uses_eslint; then eslint_bin=$(_node_local_bin eslint); fi
+    if [ -z "$eslint_bin" ] || ! jp_scoped || _node_all_glob_changed; then
+      jp_plan "$LINT_LABEL" full "lint script or project configuration requires full set"
+    else
+      # shellcheck disable=SC2086
+      files=$(jp_changed $NODE_TEST_EXTS)
+      if [ -z "$files" ]; then
+        jp_plan "$LINT_LABEL" skip "no changed lintable files"
+      else
+        jp_plan "$LINT_LABEL" filtered "eslint files: $(printf '%s\n' "$files" | paste -sd, -)"
+      fi
+    fi
+  fi
+
+  if ! _node_has_script typecheck || [ -z "$MGR_BIN" ]; then
+    jp_plan "$TYPECHECK_LABEL" skip "no typecheck script or $MGR not found"
+  else
+    jp_plan "$TYPECHECK_LABEL" full "typecheck cannot narrow by file"
+  fi
+  exit 0
+fi
 
 if ! _node_has_script test || [ -z "$MGR_BIN" ]; then
   jp_skip "$TEST_LABEL" "no test script or $MGR not found"

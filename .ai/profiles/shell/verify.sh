@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Verification for the shell profile. Called by `jig verify` from the
 # repository root. Exit 0 = pass, 1 = fail, 2 = skip (no shellcheck and no
-# tests/run.sh — nothing applicable was found). Prints one line per check:
-# "shell: <check>: pass|fail|skip (<reason>)".
+# tests/run.sh — nothing applicable was found), 3 = a check started and did
+# not finish (adr-20260925-one-test-run-per-clone-and-a-dead-run-is-not-a-pass).
+# Prints one line per check:
+# "shell: <check>: pass|fail|skip|incomplete (<reason>)".
 #
 # Scope (ADR-0013): when JIG_VERIFY_SCOPE=changed, JIG_VERIFY_FILES names a
 # file listing the repo-relative paths that changed. shellcheck then lints
@@ -19,6 +21,33 @@ set -o pipefail
 
 status=0
 ran_any=0
+incomplete=0
+
+# _shell_tests_verdict <rc> <note> — read one tests/run.sh exit code.
+#
+# 3 is the runner saying a test was killed rather than failing; 128+N is the
+# runner itself killed by signal N, which is how `Killed: 9` reaches a caller.
+# Neither is a verdict on the code, and reading one as a failure is what cost
+# four investigations in one night. Sets `incomplete` or `status`; never both.
+_shell_tests_verdict() {
+  local rc="$1" note="$2"
+  if [ "$rc" -eq 0 ]; then
+    echo "shell: tests/run.sh: pass${note:+ ($note)}"
+    return 0
+  fi
+  if [ "$rc" -eq 3 ] || [ "$rc" -ge 128 ]; then
+    incomplete=1
+    if [ "$rc" -ge 128 ]; then
+      echo "shell: tests/run.sh: incomplete (killed by signal $((rc - 128))${note:+, $note})"
+    else
+      echo "shell: tests/run.sh: incomplete (a test did not finish${note:+, $note})"
+    fi
+    return 0
+  fi
+  echo "shell: tests/run.sh: fail${note:+ ($note)}"
+  status=1
+  return 0
+}
 
 scoped=0
 if [ "${JIG_VERIFY_SCOPE:-}" = "changed" ] && [ -n "${JIG_VERIFY_FILES:-}" ] \
@@ -178,6 +207,59 @@ _shell_test_names() {
 
 # --- shellcheck --------------------------------------------------------------
 
+if [ "${JIG_VERIFY_EXPLAIN:-}" = 1 ]; then
+  # shell is older than the shared profile library. Source it only for the
+  # new plan format; the ordinary verification path keeps its own verdicts.
+  # shellcheck source=../../scripts/lib/profile.sh
+  . "$(dirname "$0")/../../scripts/lib/profile.sh"
+  jp_begin shell
+
+  if ! command -v shellcheck >/dev/null 2>&1; then
+    jp_plan shellcheck skip "shellcheck not found"
+  elif [ "$scoped" = 1 ] && grep -qE '(^|/)\.shellcheckrc$' "$JIG_VERIFY_FILES"; then
+    scripts=$(_shell_all_scripts)
+    if [ -z "$scripts" ]; then
+      jp_plan shellcheck skip "no shell scripts found"
+    else
+      jp_plan shellcheck full ".shellcheckrc changed; whole script set"
+    fi
+  elif [ "$scoped" = 1 ]; then
+    scripts=$(_shell_changed_scripts)
+    if [ -z "$scripts" ]; then
+      jp_plan shellcheck skip "no changed shell scripts"
+    else
+      jp_plan shellcheck filtered "changed scripts: $(printf '%s\n' "$scripts" | paste -sd, -)"
+    fi
+  else
+    scripts=$(_shell_all_scripts)
+    if [ -z "$scripts" ]; then
+      jp_plan shellcheck skip "no shell scripts found"
+    else
+      jp_plan shellcheck full "full script set"
+    fi
+  fi
+
+  if [ ! -x tests/run.sh ]; then
+    jp_plan tests/run.sh skip "not found or not executable"
+  elif [ "$scoped" = 0 ]; then
+    jp_plan tests/run.sh full "full scope"
+  else
+    filters=$(_shell_test_filters | LC_ALL=C sort -u)
+    case $'\n'"$filters"$'\n' in *$'\n'ALL$'\n'*) filters=ALL ;; esac
+    if [ -n "$filters" ] && [ "$filters" != ALL ]; then
+      names=$(_shell_test_names)
+      while IFS= read -r filter; do
+        [ -n "$filter" ] || continue
+        case "$names" in *"$filter"*) ;; *) filters=ALL; break ;; esac
+      done <<EOF
+$filters
+EOF
+    fi
+    jp_plan_selection tests/run.sh "$filters" "test filters"
+  fi
+  exit 0
+fi
+
 if command -v shellcheck >/dev/null 2>&1; then
   # Every shellcheck verdict names the version that produced it. Rule sets
   # move between releases — SC2015 fires in 0.10.0 and not in 0.11.0 — so the
@@ -287,45 +369,46 @@ EOF
 
     if [ "$filters" = ALL ] || [ "$has_all" = 1 ]; then
       ran_any=1
-      if tests/run.sh; then
-        echo "shell: tests/run.sh: pass (scope: $reason, ran full set)"
-      else
-        echo "shell: tests/run.sh: fail (scope: $reason, ran full set)"
-        status=1
-      fi
+      t_rc=0
+      tests/run.sh || t_rc=$?
+      _shell_tests_verdict "$t_rc" "scope: $reason, ran full set"
     elif [ -z "$filters" ]; then
       echo "shell: tests/run.sh: skip (scope: no changed file maps to a test)"
     else
       ran_any=1
-      t_failed=0
+      t_worst=0
       t_count=0
       while IFS= read -r filter; do
         [ -n "$filter" ] || continue
         t_count=$((t_count + 1))
-        tests/run.sh "$filter" || t_failed=1
+        t_rc=0
+        tests/run.sh "$filter" || t_rc=$?
+        # The worst answer of the filters decides, and "did not finish" is
+        # worse than "failed": one filter killed makes the whole narrowed run
+        # unfinished, whatever the others said.
+        if [ "$t_rc" -ge 128 ] || [ "$t_rc" -eq 3 ]; then
+          t_worst="$t_rc"
+        elif [ "$t_rc" -ne 0 ] && [ "$t_worst" -eq 0 ]; then
+          t_worst=1
+        fi
       done <<EOF
 $filters
 EOF
-      if [ "$t_failed" = 1 ]; then
-        echo "shell: tests/run.sh: fail (scope: $t_count filters)"
-        status=1
-      else
-        echo "shell: tests/run.sh: pass (scope: $t_count filters)"
-      fi
+      _shell_tests_verdict "$t_worst" "scope: $t_count filters"
     fi
   else
     ran_any=1
-    if tests/run.sh; then
-      echo "shell: tests/run.sh: pass"
-    else
-      echo "shell: tests/run.sh: fail"
-      status=1
-    fi
+    t_rc=0
+    tests/run.sh || t_rc=$?
+    _shell_tests_verdict "$t_rc" ""
   fi
 else
   echo "shell: tests/run.sh: skip (not found or not executable)"
 fi
 
+if [ "$incomplete" -eq 1 ]; then
+  exit 3
+fi
 if [ "$ran_any" -eq 0 ]; then
   exit 2
 fi
