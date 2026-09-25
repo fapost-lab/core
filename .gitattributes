@@ -9,3 +9,5 @@
 /.github export-ignore
 CHANGELOG.md export-ignore
 .styleci.yml export-ignore
+.ai/scripts/** text eol=lf
+.ai/profiles/**/*.sh text eol=lf

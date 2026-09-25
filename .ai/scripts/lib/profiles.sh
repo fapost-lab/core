@@ -59,6 +59,26 @@ _profiles_dedup() {
   printf '%s\n' "${result# }"
 }
 
+# profiles_is_fallback <profile-dir> — true when the profile declares that it
+# claims nothing about the code: `verifies: nothing` in its profile.yaml.
+#
+# **Declared, never inferred, and in particular never read off `detect`.**
+# `detect` answers when a profile *applies*; this answers what it *asserts*.
+# They coincide in `generic` and nowhere else by necessity: a secret scanner or
+# a licence-header check is exactly the kind of profile that should apply
+# everywhere and does make a claim about the code. Reading `detect: always` as
+# "claims nothing" would put such a profile in the wrong bucket, and the day its
+# tool was missing it would report that nothing checks the project and ship
+# unverified — the very inversion this distinction exists to prevent.
+#
+# Absence means the profile verifies something, which is the cautious default:
+# a profile written before this field existed keeps refusing when its checks all
+# skip, rather than quietly becoming unverifiable
+# (adr-20260925-one-test-run-per-clone-and-a-dead-run-is-not-a-pass).
+profiles_is_fallback() {
+  [ "$(profile_get "$1" verifies)" = "nothing" ]
+}
+
 # profiles_supports <profile-dir> <capability> — true when the profile's
 # profile.yaml lists <capability> under `scope`. Support is declared, never
 # inferred: profiles are copied into projects (ADR-0003) and `upgrade` keeps
@@ -267,4 +287,54 @@ profiles_check_requires() {
     done < <(_profiles_list_lines "$p" requires)
   done
   return 0
+}
+
+# --- worktree bootstrap declarations -----------------------------------------
+# A task worktree starts as a git checkout, so it holds nothing git does not
+# track: no vendor/, no node_modules/, no .env. A profile declares what its
+# stack keeps outside git, and `jig task start --worktree` carries it over
+# from the owning checkout (adr-20260924-a-worktree-carries-what-git-does-not).
+
+# _profiles_declared <key> — `<profile><TAB><item>` for every item the active
+# profiles declare under <key>, first-occurrence order, an item never repeated
+# whichever profile named it first. Reads the profiles installed in this
+# project: those are the ones it actually runs, and `upgrade` keeps a copy a
+# user edited (ADR-0003).
+_profiles_declared() {
+  local key="$1" root name dir item seen=""
+  root=$(profiles_installed_dir)
+  while IFS= read -r name; do
+    [ -n "$name" ] || continue
+    dir=$(profiles_dir "$root" "$name") || return 1
+    [ -d "$dir" ] || continue
+    while IFS= read -r item; do
+      [ -n "$item" ] || continue
+      case "$seen" in
+        *"<$item>"*) continue ;;
+      esac
+      seen="$seen<$item>"
+      printf '%s\t%s\n' "$name" "$item"
+    done < <(_profiles_list_lines "$dir" "$key")
+  done < <(profiles_active | tr ' ' '\n')
+  return 0
+}
+
+# profiles_carry — `<profile><TAB><path>` for each path the active profiles
+# declare as derived state to copy into a new task worktree.
+profiles_carry() { _profiles_declared carry; }
+
+# profiles_lock — `<profile><TAB><path>` for each lock file the active
+# profiles name. A lock file that differs between the owning checkout and the
+# worktree means carried state is stale, not wrong.
+profiles_lock() { _profiles_declared lock; }
+
+# profiles_install <profile> — the command that installs <profile>'s
+# dependencies from the network, or nothing. It is printed for a human to run,
+# never executed: `task start` is not a build command, the agent's sandbox may
+# hold no network, and the case this whole mechanism exists for is a host with
+# no toolchain at all, where running it could not work anyway (adr-20260924-a-worktree-carries-what-git-does-not).
+profiles_install() {
+  local dir
+  dir=$(profiles_dir "$(profiles_installed_dir)" "$1") || return 0
+  profile_get "$dir" install
 }

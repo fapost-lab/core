@@ -24,6 +24,7 @@ cmd_task() {
     new) task_new "$@" ;;
     set) task_set "$@" ;;
     start) task_start "$@" ;;
+    bootstrap) task_bootstrap "$@" ;;
     abandon) task_abandon "$@" ;;
     pause) task_pause "$@" ;;
     resume) task_resume "$@" ;;
@@ -32,6 +33,7 @@ cmd_task() {
     current) task_current "$@" ;;
     changes) task_changes "$@" ;;
     artifacts) task_artifacts "$@" ;;
+    artifact) task_artifact "$@" ;;
     finding) task_finding "$@" ;;
     findings) task_findings "$@" ;;
     receipt) task_receipt "$@" ;;
@@ -51,9 +53,10 @@ cmd_task() {
 # one source for both `--help` and the usage errors the subcommands die with.
 _task_usage() {
   case "${1:-}" in
-    '') printf 'usage: jig task new|start|set|abandon|pause|resume|list|show|current|changes|artifacts|finding|findings|receipt|ship|autopilot|gate ...\n' ;;
+    '') printf 'usage: jig task new|start|bootstrap|set|abandon|pause|resume|list|show|current|changes|artifacts|artifact|finding|findings|receipt|ship|autopilot|gate ...\n' ;;
     new) printf 'usage: jig task new <id> [--class T0..T4] [--domains a,b] [--from <file>]\n' ;;
-    start) printf 'usage: jig task start <id> [--worktree]\n' ;;
+    start) printf 'usage: jig task start <id> [--worktree] [--no-bootstrap]\n' ;;
+    bootstrap) printf 'usage: jig task bootstrap <id>\n' ;;
     set) printf 'usage: jig task set <id> <key> <value>\n' ;;
     abandon) printf 'usage: jig task abandon <id>\n' ;;
     pause) printf 'usage: jig task pause <id> [--reason <text>] [--stash]\n' ;;
@@ -63,6 +66,11 @@ _task_usage() {
     current) printf 'usage: jig task current\n' ;;
     changes) printf 'usage: jig task changes <id> --base <ref> [--files <list>|-] [--format report|paths]\n' ;;
     artifacts) printf 'usage: jig task artifacts <id> [--provided discovery,design,...]\n' ;;
+    artifact)
+      printf 'usage: jig task artifact write <id> <kind> [--from <file>|-]\n'
+      printf '       jig task artifact append <id> <kind> [--from <file>|-]\n'
+      printf '       <kind>: task discovery spec alternatives design plan review verification handoff\n'
+      ;;
     finding)
       printf 'usage: jig task finding add <id> --severity P0|P1|P2|P3 --where <path[:line]|-> --summary <text>\n'
       printf '       jig task finding set <id> <F-id> open|fixed|closed|dismissed [--reason <text>]\n'
@@ -256,12 +264,88 @@ _task_worktree_note() {
   printf 'worktree=%s uncommitted=%s\n' "$1" "$n"
 }
 
+# _task_borrowed_tasks_root — the physical path of `.ai/workspace/tasks` when
+# this checkout borrows the whole directory from another worktree of this
+# repository. Non-zero for a directory of its own, and for any other link,
+# which could point anywhere.
+_task_borrowed_tasks_root() {
+  local link real list p
+  link="$JIG_PROJECT/$JIG_AI_DIR/workspace/tasks"
+  [ -L "$link" ] || return 1
+  real=$(cd -P "$link" 2>/dev/null && pwd -P) || return 1
+  list=$(git -C "$JIG_PROJECT" worktree list --porcelain 2>/dev/null) || return 1
+  while IFS= read -r p; do
+    case "$p" in
+      "worktree "*) p=${p#worktree } ;;
+      *) continue ;;
+    esac
+    p=$(cd -P "$p" 2>/dev/null && pwd -P) || continue
+    if [ "$real" = "$p/$JIG_AI_DIR/workspace/tasks" ]; then
+      printf '%s\n' "$real"
+      return 0
+    fi
+  done < <(printf '%s\n' "$list")
+  return 1
+}
+
+# _task_link_workspace <owner-task-dir> <tree> <id> — give <tree> the task
+# workspaces of the checkout that owns <id>. Non-zero when no link could be
+# made; the caller undoes the start.
+#
+# The whole `tasks/` directory, not the one task (ADR-0029 as amended). A task
+# filed from inside the worktree then lands where every other one is, instead
+# of in a directory that is gitignored, invisible to the checkout that keeps
+# the queue, and deleted without a word when the tree goes; and a task filed
+# outside is visible here, so an agent can confirm one exists before filing a
+# duplicate. The link is still given at creation, never looked up, so
+# ADR-0008's rule stands.
+#
+# What keeps ownership of the lifecycle where it was is `find`: housekeeping
+# walks `find "$tasks_dir" -mindepth 2`, and find does not descend a symlink
+# named as its own starting point, so a borrowing checkout finds no task to
+# purge or retire. The globs the reporting commands use do follow it, and that
+# asymmetry is exactly the split this change wants. It turns on the absence of
+# a trailing slash in those two find calls, which is why they carry a comment
+# saying so.
+#
+# The fallback to ADR-0029's single-task link is not a nicety. A path git does
+# not ignore reads as untracked, and `git worktree remove` without --force --
+# the only removal jig performs -- then refuses that worktree for the rest of
+# its life. A rule ending in `/` matches only a directory, so a project that
+# ignores `.ai/workspace/tasks/` would earn exactly that. Being blind is the
+# lesser harm, so git is asked first and the old shape taken when it says no.
+_task_link_workspace() {
+  local owner="$1" tree="$2" id="$3" tasks rel
+  rel="$JIG_AI_DIR/workspace/tasks"
+  tasks="$tree/$rel"
+  mkdir -p "$tree/$JIG_AI_DIR/workspace" 2>/dev/null || return 1
+  if git -C "$tree" check-ignore -q "$rel" 2>/dev/null; then
+    rmdir "$tasks" 2>/dev/null || true
+    if [ ! -e "$tasks" ] && [ ! -L "$tasks" ]; then
+      jig_link_dir "$(dirname "$owner")" "$tasks" && return 0
+    fi
+  fi
+  mkdir -p "$tasks" 2>/dev/null || return 1
+  jig_link_dir "$owner" "$tasks/$id"
+}
+
 # _task_borrowed_workspace <id> — the physical path of this task's workspace
-# when it is the link `task start --worktree` made: a symlink to the same
-# task's workspace in another worktree of this repository. Non-zero for any
-# other link, which could point anywhere.
+# when it is reached through the link `task start --worktree` made. Two shapes
+# are accepted, because both exist on disk: the whole `tasks/` directory
+# borrowed from another worktree of this repository (what a start makes now),
+# and a symlink to this same task's workspace inside a directory of this
+# checkout's own (what a start made before, and what a project whose gitignore
+# cannot carry a directory link still gets). Non-zero for any other link, which
+# could point anywhere.
 _task_borrowed_workspace() {
-  local id="$1" link real list p
+  local id="$1" link real list p root
+  # The whole directory borrowed: every task under it is the owner's, and this
+  # task's workspace is simply the one named after it.
+  if root=$(_task_borrowed_tasks_root); then
+    [ -d "$root/$id" ] || return 1
+    printf '%s\n' "$root/$id"
+    return 0
+  fi
   link=$(task_dir "$id")
   [ -L "$link" ] || return 1
   real=$(cd -P "$link" 2>/dev/null && pwd -P) || return 1
@@ -444,6 +528,27 @@ _task_rewrite_state_remove() {
   jig_status_page_dirty
 }
 
+# _task_touch_state <dir> — refresh `updated_at` and mark the status page,
+# for a write that changed a workspace without changing a key. Rewriting an
+# artifact is such a write: state carries no artifact field, but a task whose
+# plan was rewritten today is not a task last touched last week, and a status
+# page that still shows the old date says the task is untouched (ADR-0008:
+# the page never shows less than the files do). Same atomic write as
+# _task_rewrite_state, and a no-op when the state file is gone.
+_task_touch_state() {
+  local dir="$1" file tmp today
+  file="$dir/state"
+  [ -f "$file" ] || return 0
+  tmp="$dir/state.tmp.$$"
+  today=$(jig_today)
+  awk -v today="$today" '
+    /^updated_at:/ { print "updated_at: " today; next }
+    { print }
+  ' "$file" > "$tmp"
+  mv "$tmp" "$file"
+  jig_status_page_dirty
+}
+
 # --- pause / resume helpers (design §4, §5) --------------------------------------
 
 # Whole days between <date> (YYYY-MM-DD) and today; 0 when <date> is empty or
@@ -542,6 +647,21 @@ task_new() {
 
   _task_valid_id "$id" || jig_die "task new: invalid task id: $id"
 
+  # A task filed in a worktree that keeps a task directory of its own dies with
+  # that worktree: the directory is gitignored, the checkout holding the queue
+  # never sees it, and `git worktree remove` deletes ignored files without a
+  # word. Three statements written by agents at the end of their own work were
+  # nearly lost that way in one shift. A worktree from `jig task start
+  # --worktree` borrows the owner's directory whole and files the task with
+  # every other one, so it never reaches this check; any other worktree is told
+  # where the task belongs instead of losing it quietly.
+  local clone_root
+  if ! _task_borrowed_tasks_root >/dev/null 2>&1; then
+    clone_root=$(jig_config_clone_root)
+    [ "$clone_root" = "$JIG_PROJECT" ] \
+      || jig_die "task new: this worktree keeps a $JIG_AI_DIR/workspace/tasks/ of its own, so a task filed here would be invisible to $clone_root and would go when the worktree goes; file it in $clone_root"
+  fi
+
   local dir
   dir=$(task_dir "$id")
   [ -e "$dir" ] && jig_die "task new: task already exists: $id"
@@ -604,14 +724,17 @@ task_new() {
 task_start() {
   jig_require_init
   [ $# -ge 1 ] || jig_die "$(_task_usage start)"
-  local id="$1" worktree=0
+  local id="$1" worktree=0 bootstrap=1
   shift
   while [ $# -gt 0 ]; do
     case "$1" in
       --worktree) worktree=1; shift ;;
+      --no-bootstrap) bootstrap=0; shift ;;
       *) jig_die "task start: unknown argument: $1" ;;
     esac
   done
+  [ "$bootstrap" = 1 ] || [ "$worktree" = 1 ] \
+    || jig_die "task start: --no-bootstrap says what not to carry into a worktree; it needs --worktree"
   local dir
   dir=$(task_dir "$id")
   [ -f "$dir/state" ] || jig_die "task start: unknown task: $id"
@@ -642,7 +765,7 @@ task_start() {
     || jig_die "task start: the repository has no commits yet; commit something first (even a README), then start the task"
 
   if [ "$worktree" -eq 1 ]; then
-    _task_start_in_worktree "$id" "$dir" "$base"
+    _task_start_in_worktree "$id" "$dir" "$base" "$bootstrap"
     return 0
   fi
 
@@ -676,11 +799,13 @@ task_start() {
 # _task_start_in_worktree <id> <dir> — start the task on its own branch in a
 # new worktree, leaving this checkout exactly as it was (ADR-0029).
 #
-# The workspace does not move. The worktree gets one link to it, so the
-# checkout the task was filed in keeps seeing every task, and the workspace's
-# lifecycle — housekeeping, trash — stays in one place. The link is absolute
-# because git keeps worktree paths absolute too; moving the repository breaks
-# both alike, and `git worktree repair` is the answer to that.
+# The workspace does not move. The worktree gets one link to the owner's whole
+# `tasks/` directory (_task_link_workspace), so the checkout the task was filed
+# in keeps seeing every task — including the ones filed from inside the
+# worktree, which a link to this one task alone left stranded — and the
+# workspace's lifecycle — housekeeping, trash — stays in one place. The link is
+# absolute because git keeps worktree paths absolute too; moving the repository
+# breaks both alike, and `git worktree repair` is the answer to that.
 #
 # No dirty-tree check: nothing uncommitted here can reach a tree cut fresh
 # from the base. The command prints the path and stops there: a script cannot
@@ -688,7 +813,7 @@ task_start() {
 # switching one there, where the runtime allows it, or opening a new one — is
 # the agent's and the human's step, not jig's (ADR-0029 as amended).
 _task_start_in_worktree() {
-  local id="$1" dir="$2" base="$3" branch path owner base_commit
+  local id="$1" dir="$2" base="$3" bootstrap="${4:-1}" branch path owner base_commit
   cfg_bool git.branch_per_task true \
     || jig_die "task start: --worktree needs git.branch_per_task: true (one branch cannot be checked out in two worktrees)"
   branch=$(_task_branch_name "$id")
@@ -713,8 +838,7 @@ _task_start_in_worktree() {
     _task_undo_worktree_start "$branch" "$path" "$base_commit"
     jig_die "task start: could not create worktree $path"
   fi
-  if ! mkdir -p "$path/$JIG_AI_DIR/workspace/tasks" 2>/dev/null \
-     || ! jig_link_dir "$owner" "$path/$JIG_AI_DIR/workspace/tasks/$id"; then
+  if ! _task_link_workspace "$owner" "$path" "$id"; then
     _task_undo_worktree_start "$branch" "$path" "$base_commit"
     jig_die "task start: could not link the workspace of $id into $path"
   fi
@@ -723,10 +847,77 @@ _task_start_in_worktree() {
   _task_rewrite_state "$dir" branch "$branch"
   _task_rewrite_state "$dir" base_commit "$base_commit"
   _task_rewrite_state "$dir" base_branch "$base"
+
+  # Only now, with the task started and its workspace linked, is the state git
+  # does not track carried over. Last, and never fatal: a tree missing a
+  # dependency is not a broken task, and what a failed carry leaves behind --
+  # the tree and the branch -- is exactly what `jig task bootstrap` needs to
+  # try again (adr-20260924-a-worktree-carries-what-git-does-not).
+  if [ "$bootstrap" = 1 ]; then
+    _task_carry_into "$JIG_PROJECT" "$path" "task start"
+  fi
+
   _task_base_hint "$id" "$base"
   _task_paused_hint "$id" " there"
   jig_info "task start: $id is on $branch in its own worktree; open a new agent session in $path"
   printf '%s\n' "$path"
+}
+
+# _task_carry_into <owner-abs> <tree-abs> <verb> — load the bootstrap library
+# and carry the declared state into a task worktree. A wrapper so that
+# `task start --worktree` and `task bootstrap` load the same two libraries the
+# same way, and so that every other task command pays for neither (verify.sh
+# sources profiles.sh on the same terms).
+_task_carry_into() {
+  # shellcheck source=lib/profiles.sh
+  . "$JIG_LIB/profiles.sh"
+  # shellcheck source=lib/bootstrap.sh
+  . "$JIG_LIB/bootstrap.sh"
+  jig_bootstrap_worktree "$1" "$2" "$3"
+}
+
+# task_bootstrap <id> — carry the declared state into the task's existing
+# worktree again.
+#
+# It exists because the carry is deliberately the last and least important
+# step of `task start --worktree`: when it fails halfway — no disk left, a
+# path declared wrong — the worktree and the branch are fine and must not be
+# rolled back, but a second `task start` refuses on the path that now exists.
+# Without this verb the only repair is by hand, which is the cleanup by manual
+# discipline RULES.md rejects (adr-20260924-a-worktree-carries-what-git-does-not).
+#
+# Idempotent by construction: it carries only what the worktree does not have,
+# the same rule `task start` uses, so running it twice changes nothing.
+#
+# It works from either side. Run in the owning checkout, git says where the
+# task's branch is checked out; run inside the task's own worktree, the
+# borrowed workspace link says which checkout owns it.
+task_bootstrap() {
+  jig_require_init
+  [ $# -ge 1 ] || jig_die "$(_task_usage bootstrap)"
+  local id="$1" dir branch tree owner workspace
+  shift
+  [ $# -eq 0 ] || jig_die "task bootstrap: unknown argument: $1"
+
+  dir=$(task_dir "$id")
+  [ -f "$dir/state" ] || jig_die "task bootstrap: unknown task: $id"
+  branch=$(task_state_get "$id" branch)
+  [ -n "$branch" ] || jig_die "task bootstrap: $id has not been started yet"
+
+  if workspace=$(_task_borrowed_workspace "$id"); then
+    tree=$(cd -P "$JIG_PROJECT" && pwd -P) \
+      || jig_die "task bootstrap: cannot resolve this checkout"
+    owner=${workspace%"/$JIG_AI_DIR/workspace/tasks/$id"}
+  else
+    owner=$(cd -P "$JIG_PROJECT" && pwd -P) \
+      || jig_die "task bootstrap: cannot resolve this checkout"
+    tree=$(_task_worktree_for "$branch" "$(_task_worktrees)")
+    [ -n "$tree" ] || jig_die "task bootstrap: $id has no worktree of its own"
+  fi
+  [ -d "$owner" ] || jig_die "task bootstrap: cannot find the checkout that owns $id"
+  [ "$owner" != "$tree" ] || jig_die "task bootstrap: $id is not in a worktree of its own"
+
+  _task_carry_into "$owner" "$tree" "task bootstrap"
 }
 
 # _task_base_hint <id> <base> — a task cut from anything but the project's base
@@ -1826,7 +2017,7 @@ task_receipt_check() {
   return 1
 }
 
-# --- the human gate (adr-20260922-the-status-page-stays-current-without-a-server)
+# --- the human gate (adr-20260924-the-status-page-keeps-the-readers-place)
 #
 # A T3/T4 design is approved by a human in conversation, and the jig-task
 # skill writes the decision into task.md in prose (ADR-0031). `jig task gate`
@@ -2207,6 +2398,39 @@ task_changes() {
   fi
 }
 
+# _task_workspace_root <id> <command> — the physical directory holding this
+# task's artifacts and `state`, with the one path check every command that
+# reads or writes an artifact must pass (RULES.md: the check lives at a single
+# function, not once per caller).
+#
+# A linked task directory can point outside the validated checkout workspace,
+# and only one of the two shapes is checked here. A symlink at the task's own
+# path goes through `_task_borrowed_workspace`, which confirms the target is
+# this task's workspace in another worktree of this repository. A link at the
+# parent -- the whole `tasks/` directory, which `task start --worktree` now
+# makes the usual shape -- does not reach that check: `-L` asks about the last
+# component only, so this falls to the comparison below, where both sides
+# resolve through the same link and it cannot fail. That gap is older than the
+# borrowed directory (the body of this function is unchanged by the change
+# that introduced it) and belongs to task
+# `artifact-write-trusts-a-borrowed-directory-link`; it is not a property to
+# rely on. <command> names the caller in the refusals, so the message still
+# says which verb refused.
+_task_workspace_root() {
+  local id="$1" cmd="$2" root tasks_root
+  root=$(task_dir "$id") || return 1
+  [ -f "$root/state" ] || jig_die "$cmd: unknown task: $id"
+  if [ -L "$root" ]; then
+    _task_borrowed_workspace "$id" \
+      || jig_die "$cmd: linked task workspace is unsupported unless it is this task's workspace in another worktree"
+    return 0
+  fi
+  root=$(cd -P "$root" && pwd -P) || jig_die "$cmd: cannot inspect workspace"
+  tasks_root=$(cd -P "$JIG_PROJECT/$JIG_AI_DIR/workspace/tasks" && pwd -P) || return 1
+  case "$root" in "$tasks_root"/"$id") ;; *) jig_die "$cmd: workspace outside task root" ;; esac
+  printf '%s\n' "$root"
+}
+
 _task_artifact_kind() {
   case "$1" in discovery | spec | alternatives | design | plan | review | verification | handoff) return 0 ;; *) return 1 ;; esac
 }
@@ -2249,20 +2473,7 @@ task_artifacts() {
   [ $# -ge 1 ] || jig_die "$(_task_usage artifacts)"
   local id="$1" root class provided="" seen=0 kinds kind fact stage inputs semantic availability facts="" t
   shift
-  root=$(task_dir "$id") || return 1
-  [ -f "$root/state" ] || jig_die "task artifacts: unknown task: $id"
-  # A linked task directory can point outside the validated checkout
-  # workspace. The one link accepted is the one `task start --worktree` makes:
-  # to this same task's workspace in another worktree of this repository.
-  if [ -L "$root" ]; then
-    root=$(_task_borrowed_workspace "$id") \
-      || jig_die "task artifacts: linked task workspace is unsupported unless it is this task's workspace in another worktree"
-  else
-    root=$(cd -P "$root" && pwd -P) || jig_die "task artifacts: cannot inspect workspace"
-    local tasks_root
-    tasks_root=$(cd -P "$JIG_PROJECT/$JIG_AI_DIR/workspace/tasks" && pwd -P) || return 1
-    case "$root" in "$tasks_root"/"$id") ;; *) jig_die "task artifacts: workspace outside task root" ;; esac
-  fi
+  root=$(_task_workspace_root "$id" "task artifacts") || return 1
   class=$(task_state_get "$id" class)
   _task_valid_class "$class" || jig_die "task artifacts: invalid or missing class: $class"
   while [ $# -gt 0 ]; do
@@ -2302,6 +2513,132 @@ task_artifacts() {
   printf 'Presence and provided claims do not prove approval, quality or completion; state unchanged.\n'
 }
 
+# --- artifact writes (ADR-0029: a worktree never writes through the link) ----
+
+# The kinds `task artifact` will write. One wider than _task_artifact_kind
+# above, which serves `--provided` and has no use for `task`: `task.md` is
+# where jig-analyze puts its analysis and where an unattended run records the
+# gate it approved, so it is the most edited document of all. The two
+# predicates stay separate on purpose — widening the `--provided` vocabulary
+# would let a caller claim an input that is never an input.
+_task_artifact_writable_kind() {
+  case "$1" in task | discovery | spec | alternatives | design | plan | review | verification | handoff) return 0 ;; *) return 1 ;; esac
+}
+
+# task_artifact write|append <id> <kind> [--from <file>|-]
+#
+# Writes one of a task's artifacts, so that nothing but jig needs to know
+# where a task's workspace physically is. That is the point of the verb: in a
+# task worktree the workspace is reached through a link (ADR-0029), an agent's
+# editing tools refuse a path that resolves outside their sandbox, and the
+# workaround — writing the link with plain shell — is a rule against the
+# tool's own default, which is the class of rule agents break.
+#
+# Four things a shell redirection does not do:
+#   1. resolves the workspace through _task_workspace_root, accepting exactly
+#      the borrowed link and no other;
+#   2. writes atomically (tmp + mv), so an interrupted write leaves the old
+#      document whole rather than half a new one;
+#   3. takes a closed vocabulary of kinds, so a misspelt name cannot become a
+#      file `task artifacts` will never look at;
+#   4. refreshes `updated_at` and redraws the status page, so a rewritten plan
+#      does not leave the task looking untouched from outside.
+#
+# Content comes from the caller: `--from <file>`, or stdin with `--from -` or
+# with no --from at all. In a worktree that file is inside the worktree, which
+# is inside the sandbox, so the agent writes it with its ordinary tools and
+# hands jig the path.
+#
+# No {{TASK_ID}} substitution happens here, unlike `task new --from`: that one
+# seeds a template, this one stores a document its author already finished,
+# where a `{{TASK_ID}}` is text and not a placeholder. The duplication between
+# the two is one `mv`, and deliberate.
+task_artifact() {
+  jig_require_init
+  [ $# -ge 1 ] || jig_die "$(_task_usage artifact)"
+  local mode="$1"
+  shift
+  case "$mode" in
+    write | append) ;;
+    *) jig_die "$(_task_usage artifact)" ;;
+  esac
+  [ $# -ge 2 ] || jig_die "$(_task_usage artifact)"
+  local id="$1" kind="$2" from="" seen=0
+  shift 2
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --from)
+        [ $# -ge 2 ] || jig_die "task artifact: --from requires a value"
+        [ "$seen" -eq 0 ] || jig_die "task artifact: duplicate --from"
+        seen=1
+        from="$2"
+        shift 2 ;;
+      *) jig_die "task artifact: unknown argument: $1" ;;
+    esac
+  done
+  _task_artifact_writable_kind "$kind" \
+    || jig_die "task artifact: unknown kind: $kind (one of: task discovery spec alternatives design plan review verification handoff)"
+
+  # Validated before the workspace is touched, so an unreadable source never
+  # gets as far as the temporary file (task_new --from does the same).
+  if [ -n "$from" ] && [ "$from" != "-" ]; then
+    [ -e "$from" ] || jig_die "task artifact: --from: no such file: $from"
+    [ -f "$from" ] || jig_die "task artifact: --from: not a regular file: $from"
+    [ -r "$from" ] || jig_die "task artifact: --from: file not readable: $from"
+  fi
+
+  local root dest tmp
+  root=$(_task_workspace_root "$id" "task artifact") || return 1
+  dest="$root/$kind.md"
+  tmp="$dest.tmp.$$"
+  # A link is refused rather than resolved. `mv` would replace it and `append`
+  # would read through it, out of the workspace and back in — and
+  # `task artifacts` already treats an artifact that leaves the workspace as
+  # unavailable. Whoever put the link there gets to say what happens to it.
+  if [ -L "$dest" ]; then
+    jig_die "task artifact: $kind.md is a link; remove it first if this document should live in the workspace"
+  fi
+
+  # The new content is captured first, whole, and only then is anything in the
+  # workspace touched. An empty capture is refused rather than written: a
+  # `write` fed the output of a command that failed would otherwise blank the
+  # document, and blanking a plan is the one destructive act this verb can
+  # perform. `task artifacts` would report the result as `unavailable
+  # (empty)` — true, and too late.
+  if [ -z "$from" ] || [ "$from" = "-" ]; then
+    cat > "$tmp"
+  else
+    cat "$from" > "$tmp"
+  fi
+  if [ ! -s "$tmp" ]; then
+    # The one path this command removes: the temporary file it created itself,
+    # this run, inside the workspace directory _task_workspace_root validated
+    # (RULES.md wants the path validated to be inside `.ai/` and shaped like a
+    # workspace entry before a script deletes it; this one is both).
+    rm -f "$tmp"
+    jig_die "task artifact: refusing to write an empty $kind: nothing on the input"
+  fi
+
+  if [ "$mode" = "append" ] && [ -s "$dest" ]; then
+    local joined="$dest.join.$$"
+    # A document that does not end in a newline would otherwise run into the
+    # one appended after it, silently joining a heading to the line above.
+    {
+      cat "$dest"
+      if [ -n "$(tail -c 1 "$dest")" ]; then printf '\n'; fi
+      cat "$tmp"
+    } > "$joined"
+    mv "$joined" "$tmp"
+  fi
+
+  mv "$tmp" "$dest"
+  _task_touch_state "$root"
+  # An absolute path when the workspace is borrowed: it is in another
+  # worktree, and a relative one would be read against the wrong root
+  # (ADR-0029: paths in reports are absolute).
+  jig_relpath "$dest" "$JIG_PROJECT"
+}
+
 # --- ship (agent git rights: design.md, .ai/specs/autopilot/) ----------------
 #
 # The git steps themselves are shared with `jig spec ship` (jig_ship_*,
@@ -2318,6 +2655,37 @@ task_artifacts() {
 # a merge that did not happen, ends in a plain status line, not an error:
 # "none" is the one outcome a caller must tell apart from every other exit,
 # which is why it alone is exit 3.
+# _task_ship_unverified_notice — say, at the moment the change leaves the
+# machine, that nothing verifies this project.
+#
+# The person hears it here rather than only in a `jig verify` ten minutes
+# earlier, because here is where it has consequences. It is deliberately not a
+# refusal: when no profile covers the project there is nothing to install and
+# nothing to wait for, so refusing would stop work over a state nobody can
+# resolve. A stack profile whose tools are missing is the other case entirely
+# — there `jig verify` refuses, because something could have been checked and
+# was not (adr-20260925-one-test-run-per-clone-and-a-dead-run-is-not-a-pass).
+#
+# Nothing here may fail the ship: every path that cannot answer gives up.
+_task_ship_unverified_notice() {
+  local installed p pdir covered=0
+  # shellcheck source=lib/profiles.sh
+  . "$JIG_LIB/profiles.sh" 2>/dev/null || return 0
+  installed=$(profiles_installed_dir 2>/dev/null) || return 0
+  [ -n "$installed" ] || return 0
+  for p in $(profiles_active 2>/dev/null); do
+    pdir=$(profiles_dir "$installed" "$p" 2>/dev/null) || continue
+    [ -d "$pdir" ] || continue
+    if ! profiles_is_fallback "$pdir"; then
+      covered=1
+      break
+    fi
+  done
+  [ "$covered" = 0 ] || return 0
+  printf 'task ship: no profile covers this project, so nothing verifies it; this ships unverified\n'
+  return 0
+}
+
 task_ship() {
   jig_require_init
   [ $# -ge 1 ] || jig_die "$(_task_usage ship)"
@@ -2396,8 +2764,17 @@ task_ship() {
   [ "$cur" = "$branch" ] || jig_die "task ship: current branch is $cur, but $id is on $branch; switch branches first"
   [ "$branch" != "$base" ] || jig_die "task ship: $id's branch is its own base ($base); nothing task-specific to ship"
 
+  _task_ship_unverified_notice
+
   jig_ship_check_staged "task ship"
   jig_ship_commit "task ship" "$message_file"
+
+  # Before the first step that leaves this machine (common.sh, "what a ship
+  # may send out"). Asked here rather than just before the push: "this branch
+  # carries no work" is the same answer at every level, and at `commit` the
+  # human is the one who pushes next — telling them now is what stops the
+  # empty branch one step later.
+  jig_ship_require_commits "task ship" "$branch" "$base"
 
   if [ "$level" = commit ]; then
     printf "stopped at commit: push is the human's\n"

@@ -2,7 +2,7 @@
 # proposals, active tasks, housekeeping age (ARCHITECTURE.md, Scripts layout). Sourced by
 # scripts/jig; defines cmd_status.
 # Read-only, with two exceptions, both in .ai/runtime/ and both about the
-# status page (adr-20260922-the-status-page-stays-current-without-a-server):
+# status page (adr-20260924-the-status-page-keeps-the-readers-place):
 # the page itself, .ai/runtime/status.html (`--html`, `--open`, `--refresh`),
 # and the counts it reuses between full runs, .ai/runtime/status-counts
 # (_status_counts_save).
@@ -292,9 +292,11 @@ EOF
   [ "$_STATUS_FINISHED" -gt 0 ] && printf '(%d finished; jig task list --all)\n' "$_STATUS_FINISHED"
 
   printf 'current task: %s\n' "${_STATUS_CURRENT:-$(_status_current_task)}"
+  _status_checkout
   printf 'housekeeping: %s\n' "$(_status_housekeeping_age)"
 
-  # Tasks the last housekeeping run flagged (_status_hk_count).
+  # Tasks a housekeeping flag still stands for (_status_hk_count): flagged by
+  # the last run, and not disproved since by this disk.
   local nc kept wrong
   nc=$(_status_hk_count needs-consolidation)
   if [ "$nc" != "0" ]; then
@@ -440,6 +442,35 @@ _status_current_task() {
   rm -f "$cur_err_file"
 }
 
+# _status_checkout — other work going on in this checkout, one line each
+# (checkout.sh). Silent when there is none, like the housekeeping flags below:
+# a checkout with one session in it has nothing to report.
+#
+# The task whose branch is checked out here is left out — the reader is
+# sitting on it. A record named by a session id rather than a task is shown as
+# "another session": the id names a runtime's session, which means nothing to
+# a person, and the fact they need is that somebody else is here.
+_status_checkout() {
+  local here name age cmd label
+  here=$(jig_checkout_here_task)
+  while read -r name age cmd; do
+    [ -n "$name" ] || continue
+    if [ -f "$JIG_PROJECT/$JIG_AI_DIR/workspace/tasks/$name/state" ]; then
+      label="task $name"
+    else
+      label="another session"
+    fi
+    printf 'working here: %s (jig %s, %s ago)\n' "$label" "$cmd" "$(jig_checkout_ago "$age")"
+  done < <(jig_checkout_busy "$here")
+
+  # A reader told nothing cannot tell "nobody else is here" from "there is no
+  # way to see anybody", so the second case says so — as the session hook's
+  # line already does for the same exit 2 (ADR-0024).
+  local problem
+  problem=$(jig_checkout_session_problem)
+  [ -z "$problem" ] || printf 'sessions: not observable (%s)\n' "$problem"
+}
+
 # _status_housekeeping_age — "<n> days ago" since the last housekeeping run,
 # or "never".
 _status_housekeeping_age() {
@@ -451,38 +482,38 @@ _status_housekeeping_age() {
   fi
 }
 
-# _status_hk_count <flag> — distinct tasks the last housekeeping run flagged
-# with <flag>, 0 when housekeeping has never logged. Housekeeping exits 3 for
-# these, but nothing keeps that exit code around, and a flag nobody sees is the
-# manual discipline the framework exists to remove (RULES.md, Scope invariants).
+# _status_hk_count <flag> — how many tasks <flag> still stands for, 0 when
+# housekeeping has never logged. Housekeeping exits 3 for these, but nothing
+# keeps that exit code around, and a flag nobody sees is the manual discipline
+# the framework exists to remove (RULES.md, Scope invariants).
 #
-# Counted from the last `--- run` marker onwards, and by distinct task id.
-# Both halves matter: the log is append-only, so scanning all of it reports
-# a task flagged on three consecutive days as three tasks, and keeps
-# reporting one that was consolidated months ago.
+# Counted from _status_flagged_ids, so this line and the page's cards name the
+# same tasks: a count that said two while the cards showed one would send the
+# reader looking for a task that is not there.
 _status_hk_count() {
-  local hk_log="$JIG_PROJECT/$JIG_AI_DIR/runtime/housekeeping.log"
-  if [ -f "$hk_log" ]; then
-    _status_flagged "$hk_log" "$1"
-  else
-    printf '0\n'
-  fi
+  _status_flagged_ids "$1" | grep -c . || true
 }
 
 # --- the status page (`jig status --html | --open`) ------------------------------
 #
 # One self-contained HTML file for a person who does not live in a terminal
-# (.ai/specs/autopilot/, Phase 5; adr-20260922-the-status-page-stays-current-without-a-server):
-# inline CSS, no script, no external asset, so it opens from disk with the
-# network off, and it follows the reader's light or dark preference. It
+# (.ai/specs/autopilot/, Phase 5; adr-20260924-the-status-page-keeps-the-readers-place):
+# inline CSS and one static inline script, no external asset, so it opens
+# from disk with the network off, and it follows the reader's light or dark
+# preference. It
 # answers, in this order, what needs the reader, what is running, how far the
 # specifications are, and then everything `jig status` prints.
 #
-# It stays current without a server: a `<meta http-equiv="refresh">` reloads it
-# every 10 seconds, and the commands that change a task, a spec or a
-# housekeeping result redraw it (jig_status_page_touch, common.sh). One page
-# per clone, in the main checkout: a task worktree sees one task, and a reader
-# watching one tab should see them all.
+# It stays current without a server: the commands that change a task, a spec
+# or a housekeeping result redraw it (jig_status_page_touch, common.sh), and
+# the open page reloads itself every 10 seconds. The script does the reloading
+# (adr-20260924-the-status-page-keeps-the-readers-place): it waits while the
+# reader is busy, keeps their scroll position and open <details> across the
+# reload in sessionStorage, and offers a pause. Without JavaScript the
+# `<meta http-equiv="refresh">` in <noscript> reloads it as before. One page
+# per clone, in the main checkout: the page belongs to the checkout that owns
+# the workspaces, and a worktree hands every mode to the main checkout's own
+# jig (`_status_page`, below).
 #
 # Everything on it is an answer this report already consumes — the same
 # helpers the text report and the completion gates call — and every value is
@@ -669,8 +700,9 @@ _status_ago() {
 
 # _status_hk_ids <regex> — the tasks whose line in the last housekeeping run
 # matches <regex>, distinct and in log order; nothing when housekeeping has
-# never logged. The one reader of the log's task lines here: the counts the
-# text report prints come from it too (_status_flagged).
+# never logged. The one reader of the log's task lines here; what the log said
+# is where a flag starts, not where it ends -- _status_flagged_ids asks this
+# disk whether the flag still stands.
 _status_hk_ids() {
   local hk_log="$JIG_PROJECT/$JIG_AI_DIR/runtime/housekeeping.log"
   [ -f "$hk_log" ] || return 0
@@ -757,7 +789,7 @@ _status_html_page() {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 HTML
-  printf '<meta http-equiv="refresh" content="%s">\n' "$_STATUS_REFRESH"
+  printf '<noscript><meta http-equiv="refresh" content="%s"></noscript>\n' "$_STATUS_REFRESH"
   printf '<title>Jig status: %s</title>\n' "$(_status_h "$project")"
   cat <<'HTML'
 <style>
@@ -776,7 +808,7 @@ HTML
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg);
   font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 48px; }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px 80px; }
 h1 { font-size: 1.6rem; margin: 0 0 4px; }
 h2 { font-size: 1.15rem; margin: 32px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
 h3 { font-size: 1rem; margin: 20px 0 8px; }
@@ -817,6 +849,14 @@ ul.findings li { color: var(--bad-fg); }
 details { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-top: 10px; }
 summary { cursor: pointer; }
 pre { margin: 10px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.autorefresh { position: fixed; right: 16px; bottom: 16px; display: flex; gap: 8px; align-items: center;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 4px 6px 4px 14px;
+  font-size: 0.85rem; color: var(--muted); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); }
+.autorefresh[hidden] { display: none; }
+.autorefresh.paused { background: var(--warn-bg); border-color: var(--warn-fg); color: var(--warn-fg); }
+.autorefresh button { font: inherit; font-weight: 600; color: var(--accent); background: transparent;
+  border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; cursor: pointer; }
+.autorefresh.paused button { color: var(--warn-fg); border-color: var(--warn-fg); }
 </style>
 </head>
 <body>
@@ -836,9 +876,93 @@ HTML
   _status_html_summary
 
   printf '<section id="report">\n<h2>Full report</h2>\n'
-  printf '<details><summary>What <code>jig status</code> prints</summary>\n<pre>%s</pre>\n</details>\n</section>\n' \
+  printf '<details id="full-report"><summary>What <code>jig status</code> prints</summary>\n<pre>%s</pre>\n</details>\n</section>\n' \
     "$(_status_h "$report")"
-  printf '</main>\n</body>\n</html>\n'
+  printf '</main>\n'
+  _status_html_autorefresh
+  printf '</body>\n</html>\n'
+}
+
+# _status_html_autorefresh — the pause control and the one inline script
+# (adr-20260924-the-status-page-keeps-the-readers-place). The control stays
+# hidden unless the script runs. The script is static: the reload interval is
+# the only value in it, and it writes to the page through textContent only.
+# It reloads once _STATUS_REFRESH seconds have passed, but not while the tab
+# is hidden, text is selected, the reader acted in the last 3 seconds or the
+# reader paused it; the open <details> (by id), the scroll position (as an
+# offset into the nearest <section>) and the pause survive the reload in
+# sessionStorage. Every storage access may throw, and then the page only
+# forgets them.
+_status_html_autorefresh() {
+  printf '<div id="autorefresh" class="autorefresh" hidden><span id="autorefresh-text"></span>'
+  printf '<button type="button" id="autorefresh-toggle"></button></div>\n'
+  printf '<script>\n(function () {\n'
+  printf "try { history.scrollRestoration = 'manual'; } catch (e) {}\\n"
+  printf 'var every = %s * 1000, quiet = 3000;\n' "$_STATUS_REFRESH"
+  cat <<'HTML'
+var key = 'jig-status:' + location.pathname, loaded = Date.now(), acted = 0, state = {};
+var bar = document.getElementById('autorefresh');
+var text = document.getElementById('autorefresh-text');
+var toggle = document.getElementById('autorefresh-toggle');
+try { state = JSON.parse(sessionStorage.getItem(key)) || {}; } catch (e) { state = {}; }
+function save() {
+  var open = [], at = null, off = 0, i, all, top;
+  all = document.querySelectorAll('details[id]');
+  for (i = 0; i < all.length; i++) { if (all[i].open) open.push(all[i].id); }
+  all = document.querySelectorAll('section[id]');
+  for (i = 0; i < all.length; i++) {
+    top = all[i].getBoundingClientRect().top;
+    if (top <= 1) { at = all[i].id; off = -top; }
+  }
+  try {
+    sessionStorage.setItem(key, JSON.stringify({ paused: !!state.paused, open: open,
+      at: at, off: off, y: window.scrollY }));
+  } catch (e) {}
+}
+function restore() {
+  var i, el, y;
+  if (state.open) {
+    for (i = 0; i < state.open.length; i++) {
+      el = document.getElementById(state.open[i]);
+      if (el && el.tagName === 'DETAILS') el.open = true;
+    }
+  }
+  el = state.at ? document.getElementById(state.at) : null;
+  y = el ? el.getBoundingClientRect().top + window.scrollY + (state.off || 0) : state.y;
+  if (y > 0) window.scrollTo(0, y);
+}
+function show() {
+  bar.className = state.paused ? 'autorefresh paused' : 'autorefresh';
+  text.textContent = state.paused ? 'Auto-refresh paused'
+    : 'Auto-refresh every ' + every / 1000 + ' s · keeps your place';
+  toggle.textContent = state.paused ? 'Resume' : 'Pause';
+  bar.hidden = false;
+}
+function busy() {
+  var sel = window.getSelection ? window.getSelection() : null;
+  return document.hidden || Date.now() - acted < quiet || (sel && !sel.isCollapsed && String(sel) !== '');
+}
+function tick() {
+  if (state.paused || Date.now() - loaded < every || busy()) return;
+  save();
+  location.reload();
+}
+toggle.addEventListener('click', function () {
+  state.paused = !state.paused;
+  save();
+  if (state.paused) show(); else location.reload();
+});
+['scroll', 'wheel', 'keydown', 'pointerdown', 'touchstart'].forEach(function (name) {
+  window.addEventListener(name, function () { acted = Date.now(); }, { passive: true });
+});
+document.addEventListener('visibilitychange', tick);
+window.addEventListener('pagehide', save);
+restore();
+show();
+setInterval(tick, 1000);
+})();
+</script>
+HTML
 }
 
 # _status_html_freshness — how old the two borrowed kinds of data are: pull
@@ -887,7 +1011,7 @@ _status_card() {
 # that landed wrong or was left in a worktree, knowledge to decide. Each card
 # says in plain words what to do. Nothing to do is said out loud too.
 _status_html_needs() {
-  local cards="" stopped="" gates="" git_steps="" rec id stop_reason stop_at ago level queue url hk_note pr_ids=""
+  local cards="" stopped="" gates="" git_steps="" rec id stop_reason stop_at ago level queue url live hk_note pr_ids=""
   local nc wrong kept closed open settled phase phase_stops=""
   hk_note=""
   [ -z "$_STATUS_HK_AT" ] || hk_note="housekeeping at $_STATUS_HK_WHEN"
@@ -897,6 +1021,15 @@ _status_html_needs() {
   while IFS= read -r rec; do
     [ -n "$rec" ] || continue
     _status_rec "$rec"
+    # A pull request jig opened, unless housekeeping already saw it settled.
+    # Collected before anything below, because the branches that follow end
+    # the iteration: a task whose autopilot stopped is exactly the one that
+    # has just been shipped, and its pull request was the card most likely to
+    # be missing.
+    if [ -n "$_ST_PR_URL" ] && ! _status_in "$_ST_ID" "$settled"; then
+      pr_ids="$pr_ids$_ST_ID
+"
+    fi
     # 1. A stopped autopilot run waits on an answer (its journal's last stop).
     if [ "$_ST_AUTOPILOT" = stopped ]; then
       stop_reason=$(printf '%s\n' "$_ST_APFACTS" | cut -f 5)
@@ -904,12 +1037,18 @@ _status_html_needs() {
       if [ -z "$stop_reason" ] || [ "$stop_reason" = "-" ]; then
         stop_reason="no reason recorded"
       fi
+      # The reason was written once, when the run stopped, and nothing
+      # rechecks it: it is prose, and the task moves on without it. So the
+      # card quotes it as what was said then -- the age leads, and the reason
+      # follows a colon -- instead of appending the age to a sentence that
+      # then reads as true now. What is true now the page derives itself, in
+      # the cards around this one.
       ago=""
       [ -z "$stop_at" ] || [ "$stop_at" = "-" ] || ago=$(_status_ago "$stop_at")
       case "$ago" in
-        '') ;;
-        "just now") stop_reason="$stop_reason (just now)" ;;
-        *) stop_reason="$stop_reason ($ago ago)" ;;
+        '') stop_reason="stopped: $stop_reason" ;;
+        "just now") stop_reason="stopped just now: $stop_reason" ;;
+        *) stop_reason="stopped $ago ago: $stop_reason" ;;
       esac
       # A task of a phase run has no session of its own to answer in: its
       # agent was started by a coordinator, which is where the question
@@ -952,11 +1091,6 @@ _status_html_needs() {
       [ -z "$queue" ] || git_steps="$git_steps$(_status_card "Ready for your step in git" "$_ST_ID" "agent.git: $level" "$queue")
 "
     fi
-    # A pull request jig opened, unless housekeeping already saw it settled.
-    if [ -n "$_ST_PR_URL" ] && ! _status_in "$_ST_ID" "$settled"; then
-      pr_ids="$pr_ids$_ST_ID
-"
-    fi
   done <<EOF
 $_STATUS_LIVE
 EOF
@@ -966,6 +1100,16 @@ EOF
 
   # 4. A pull request waits for review or merge: one jig opened (pr_url), or
   # one the last housekeeping run saw open (a closed task's too).
+  #
+  # Deliberately outside _status_flagged_ids, and "a closed task's too" is the
+  # reason: closing a task does not merge its pull request, so a consolidated
+  # task with `remote=open` contradicts nothing and this card still asks for
+  # something real. Only the forge can answer whether it is open, which is why
+  # it is worded in the past tense and asks for a refresh first.
+  #
+  # One live answer does reach it, in the loop below: a task the person
+  # abandoned. That disproves no flag either -- it makes the card's ask wrong,
+  # so the card changes what it asks instead of disappearing.
   open=$(_status_hk_ids ' remote=open ')
   while IFS= read -r id; do
     [ -n "$id" ] || continue
@@ -976,10 +1120,39 @@ $open
 EOF
   while IFS= read -r id; do
     [ -n "$id" ] || continue
-    url=$(task_state_get "$id" pr_url)
-    if _status_in "$id" "$open"; then
-      cards="$cards$(_status_card "A pull request is waiting for review or merge" "$id" "open as of $hk_note" \
-        "Review it and merge it; jig merges one itself only at agent.git: merge, on green CI." "$url")
+    # Guarded for the same reason as in _status_hk_recheck: these ids include
+    # the log's, and a malformed one would take task_dir into jig_die, which
+    # redraws the page being drawn.
+    url="" live=""
+    if jig_valid_id "$id"; then
+      url=$(task_state_get "$id" pr_url)
+      live=$(task_state_get "$id" status)
+    fi
+    if [ "$live" = abandoned ]; then
+      # `task abandon` never touches the forge, so a task the person gave up
+      # on keeps its pull request. The flag stands -- only the forge knows
+      # whether it is still open -- but the ask does not: work nobody wants is
+      # not work to merge. So this card keeps the borrowed fact and changes
+      # what it asks for, which is the one thing the local answer is good for
+      # here. `consolidated` is deliberately not treated this way: a closed
+      # task with an open pull request is worth looking at, and merging it is
+      # still the right move.
+      #
+      # Borrowed exactly as much as the card below it, and worded the same
+      # way: past tense, and a refresh asked for first. Only what the task's
+      # own state says -- that it was abandoned -- is present tense here. A
+      # change about cards claiming more than they know may not add one.
+      cards="$cards$(_status_card "A pull request was open for a task you abandoned" "$id" \
+        "${hk_note:+open as of $hk_note}" \
+        "It may have been closed or merged since: jig last asked the forge then. Run jig housekeeping to refresh, then close on the forge what is still open, or reopen the task. Nothing here will merge it." "$url")
+"
+    elif _status_in "$id" "$open"; then
+      # Borrowed knowledge: housekeeping asks the forge once a cadence, so this
+      # one may have been merged since. Past tense, and the first thing asked
+      # for is a refresh -- the imperative below it is the one the reader acts
+      # on, so it must not tell them to merge what may already be merged.
+      cards="$cards$(_status_card "A pull request was open at the last housekeeping run" "$id" "open as of $hk_note" \
+        "It may have been merged since: jig last asked the forge then. Run jig housekeeping to refresh, then review and merge what is still open." "$url")
 "
     else
       cards="$cards$(_status_card "A pull request is waiting for review or merge" "$id" "opened by jig task ship" \
@@ -993,10 +1166,14 @@ EOF
   # 5. Merged and ready to close (needs-consolidation, ADR-0030). 6. Work that
   # landed elsewhere, a pull request closed unmerged, a worktree left behind:
   # kept, and only a person can say what happens next.
-  nc=$(_status_hk_ids 'flags=[^ ]*needs-consolidation')
-  wrong=$(_status_hk_ids 'flags=[^ ]*wrong-base')
-  closed=$(_status_hk_ids 'flags=[^ ]*abandoned[?]')
-  kept=$(_status_hk_ids 'flags=[^ ]*worktree-kept')
+  #
+  # Through _status_flagged_ids, so a flag this disk already disproves -- a
+  # task closed since the run, a worktree removed since it -- builds no card,
+  # and the same four answers reach the counts.
+  nc=$(_status_flagged_ids needs-consolidation)
+  wrong=$(_status_flagged_ids wrong-base)
+  closed=$(_status_flagged_ids 'abandoned?')
+  kept=$(_status_flagged_ids worktree-kept)
   cards="$cards$(_status_cards "$nc" "Merged: the task can be closed" "$hk_note" \
     "Tell the agent to close this task (jig-consolidate).")"
   cards="$cards$(_status_cards "$wrong" "The work landed on a different branch than planned" "$hk_note" \
@@ -1229,7 +1406,7 @@ EOF
     printf '<p class="empty">Nothing is running.</p>\n'
   fi
   if [ -n "$paused_rows" ]; then
-    printf '<details><summary>Paused</summary>\n'
+    printf '<details id="paused"><summary>Paused</summary>\n'
     _status_html_task_table "$paused_rows"
     printf '</details>\n'
   fi
@@ -1456,10 +1633,116 @@ _status_framework_versions() {
   printf '%s\n' "hint: run \`jig self-update\`, then \`jig upgrade --dry-run\`"
 }
 
-# _status_flagged <log> <flag> — how many distinct tasks the last housekeeping
-# run flagged with <flag>; the same reader the page's cards use.
-_status_flagged() {
-  _status_hk_ids_in "$1" "flags=[^ ]*$2" | grep -c . || true
+# _status_flagged_ids <flag> — the tasks <flag> still stands for: the ones the
+# last housekeeping run flagged with it, minus the ones a fact read from this
+# disk already contradicts. The one place that answer is decided; the page's
+# cards and the counts in both reports call it, so they cannot disagree.
+#
+# The cut is the cost of asking again, not the kind of card. What a task's own
+# state file says, and whether a worktree is still on disk, are read here for
+# nothing, and the page is redrawn after every command -- so a card those
+# facts contradict is not built at all. What the forge saw (merged, closed,
+# open, work that landed on another branch) costs a network request, which
+# this page never makes on the write path
+# (adr-20260924-the-status-page-keeps-the-readers-place): those stay borrowed
+# and keep saying "as of" the run that saw them.
+_status_flagged_ids() {
+  local flag="$1" re
+  case "$flag" in
+    # The one flag whose name is not a literal regex.
+    'abandoned?') re='flags=[^ ]*abandoned[?]' ;;
+    *) re="flags=[^ ]*$flag" ;;
+  esac
+  _status_hk_recheck "$flag" "$(_status_hk_ids "$re")"
+}
+
+# _status_hk_recheck <flag> <ids> — <ids> without those the live answer
+# contradicts.
+#
+# A recheck may only contradict, never invent. A task with no state file, and
+# a kept worktree the log recorded no path for, keep their card: absence of an
+# answer is not an answer, and a page that hid cards because it failed to look
+# would be worse than one a run behind.
+_status_hk_recheck() {
+  local flag="$1" id
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
+    # The log is a file, and a line edited by hand can carry an id no command
+    # would accept. Asking a peer about one dies in `task_dir` -- inside a
+    # report, which may not fail on a peer's data, and by way of `jig_die`,
+    # which redraws the very page being drawn. So it is not asked: an id
+    # there is no way to check keeps its card, like every other answer the
+    # page does not have.
+    jig_valid_id "$id" || { printf '%s\n' "$id"; continue; }
+    case "$flag" in
+      needs-consolidation)
+        # "Merged" is borrowed and stays so; "nobody has closed it yet" is
+        # free to ask again, and closing the task is exactly what the card
+        # asks for (ADR-0030).
+        case "$(task_state_get "$id" status)" in
+          consolidated | abandoned) continue ;;
+        esac
+        ;;
+      'abandoned?')
+        # housekeeping_decide drops this flag for a task already abandoned
+        # (abandoned:closed). The page says the same thing a run earlier,
+        # instead of asking a question that has been answered.
+        [ "$(task_state_get "$id" status)" != abandoned ] || continue
+        ;;
+      worktree-kept)
+        _status_worktree_kept "$id" || continue
+        ;;
+      # wrong-base and anything new: only the forge and the history know, so
+      # the flag stands until the next run.
+    esac
+    printf '%s\n' "$id"
+  done <<EOF
+$2
+EOF
+}
+
+# _status_worktree_kept <id> — false when the worktree housekeeping kept for
+# <id> is gone from disk.
+#
+# The path comes from housekeeping's own `worktree=<path> action=keep` line,
+# not from the task's branch. The flag has two shapes -- a worktree of its own
+# and this checkout with the branch in it (_hk_checkout_keep) -- and a branch
+# lookup sees neither the second nor a worktree the page is being drawn
+# inside, since _task_worktrees leaves out the current checkout.
+_status_worktree_kept() {
+  local path
+  path=$(_status_hk_worktree "$1")
+  # Nothing recorded (an older log, or the checkout shape before it was
+  # logged): no contradiction, so the card stands.
+  [ -n "$path" ] || return 0
+  [ -d "$path" ]
+}
+
+# _status_hk_worktree <id> — the path of the worktree the last housekeeping run
+# kept for <id>, from its `action=keep` line; nothing when there is none.
+#
+# The task id is matched on the whole `task=` field, never as a substring:
+# `task=wk` must not answer for `task=wk2`. The path is cut between
+# ` worktree=` and the ` action=keep` that follows it rather than read as a
+# field, because the log writes it unquoted and a worktree path may hold
+# spaces; read field-wise it would come back truncated, and a truncated path
+# is not a directory, which would drop exactly the card this function is
+# meant to keep.
+_status_hk_worktree() {
+  local hk_log="$JIG_PROJECT/$JIG_AI_DIR/runtime/housekeeping.log"
+  [ -f "$hk_log" ] || return 0
+  JIG_HK_ID="$1" awk '
+    /^--- run / { p = ""; next }
+    {
+      id = ""
+      for (i = 1; i <= NF; i++) if ($i ~ /^task=/) id = substr($i, 6)
+      if (id != ENVIRON["JIG_HK_ID"]) next
+      a = index($0, " worktree=")
+      b = index($0, " action=keep")
+      if (a > 0 && b > a) p = substr($0, a + 10, b - a - 10)
+    }
+    END { if (p != "") print p }
+  ' "$hk_log"
 }
 
 # What .ai/config.local.yaml changes, and why a value in it does nothing
@@ -1564,13 +1847,23 @@ _status_session_hook() {
 # is how that stops being silent. The adapter answers (an empty hint means
 # connected), for the same reason as the session hook line above, and the line
 # is omitted when the source checkout holding the adapters is gone.
+#
+# Connected is not the whole answer, because a section nothing updates goes
+# stale where nobody looks: the marked-section state is reported too, and it
+# is the same for every runtime — the section lives in AGENTS.md whatever
+# reads it (adr-20260924-jig-owns-a-marked-section-of-the-instructions).
 _status_instructions() {
-  local source a adir hint file
+  local source a adir hint file recorded section
   source=$(manifest_source 2>/dev/null) || return 0
   [ -n "$source" ] || return 0
   [ -d "$source/adapters" ] || return 0
   # shellcheck source=lib/profiles.sh
   . "$JIG_LIB/profiles.sh"
+  # shellcheck source=lib/section.sh
+  . "$JIG_LIB/section.sh"
+
+  recorded=$(manifest_instructions_section 2>/dev/null) || recorded=""
+  section=$(jig_section_report_state "$JIG_PROJECT/AGENTS.md" "$recorded")
 
   for a in $(cfg_list adapters "claude codex"); do
     adir=$(adapters_dir "$source/adapters" "$a") || continue
@@ -1582,6 +1875,10 @@ _status_instructions() {
     if [ -n "$hint" ]; then
       file=$("adapter_${a}_instructions_file")
       printf 'instructions (%s): no Jig section in %s (run the jig-init skill)\n' "$a" "$file"
+    elif [ "$section" = unmarked ]; then
+      printf 'instructions (%s): Jig section in AGENTS.md is not marked — upgrades cannot reach it (run the jig-init skill)\n' "$a"
+    elif [ "$section" = modified ]; then
+      printf 'instructions (%s): Jig section in AGENTS.md was changed here; upgrades keep your text\n' "$a"
     else
       printf 'instructions (%s): ok\n' "$a"
     fi

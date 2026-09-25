@@ -1232,6 +1232,10 @@ spec_ship_removed_src() {
 spec_ship_steps() {
   local level="$1" branch="$2" base="$3" message_file="$4" title="$5" body_file="$6" draft="${7:-0}"
   jig_ship_commit "spec ship" "$message_file"
+  # The same order as `task ship` (common.sh, "what a ship may send out"):
+  # a declaration and a final pull request both carry commits, and both are
+  # refused here rather than on the forge.
+  jig_ship_require_commits "spec ship" "$branch" "$base"
   if [ "$level" = commit ]; then
     printf "stopped at commit: push is the human's\n"
     return 0
@@ -1296,6 +1300,10 @@ spec_ship_epic() {
     printf "stopped at commit: pushing %s is the human's\n" "$branch"
     return 0
   fi
+  # The one ship that sends no commit and means to: an epic is pushed so that
+  # it exists on the forge for its tasks to target, and one cut an hour ago
+  # has nothing of its own yet (common.sh, "what a ship may send out").
+  jig_ship_sends_no_commit "an epic branch is pushed to exist, not to carry a change"
   jig_ship_push "spec ship" "$branch"
 }
 
@@ -1744,7 +1752,19 @@ spec_remove() {
   # Collect every decision before changing anything.
   local tasks_root d tid link lrc st branch base plan="" local_ids=""
   tasks_root="$JIG_PROJECT/$JIG_AI_DIR/workspace/tasks"
+  # A checkout whose task directory is itself a link owns none of the tasks
+  # under it: the link leads into the checkout that filed them, and unlinking
+  # a spec here would rewrite another checkout's `task.md` from a branch it
+  # knows nothing about. Per task that refusal is the `[ ! -L "$d" ]` skip
+  # below; for a borrowed directory the answer is the same for every task at
+  # once, and is said rather than left to look like an empty queue.
+  local borrowed=0
+  if [ -L "$tasks_root" ]; then
+    borrowed=1
+    jig_warn "spec remove: this checkout borrows its task workspaces, so no task is unlinked here; run it in the checkout that owns them"
+  fi
   for d in "$tasks_root"/*/; do
+    [ "$borrowed" = 0 ] || break
     d=${d%/}
     [ -d "$d" ] || continue
     [ ! -L "$d" ] || continue

@@ -32,6 +32,11 @@ stands, and continue from there instead of creating a second workspace. A task l
 with `worktree=<path>` continues in that worktree, not in this checkout; §3 says how to
 get there.
 
+If either command prints `checkout: HEAD here moved <a> -> <b> since you were told`,
+another session checked a branch out here while you were working. **Do not switch the
+branch back** — that pulls the tree out from under whoever started work on it. Say what
+happened, and give the task that arrived a worktree of its own instead.
+
 `task current` exiting 2 means several tasks are live on this branch. It prints them;
 ask the user which one, and never pick for them. Suggest pausing the other:
 
@@ -56,8 +61,10 @@ close without asking, and do not hold up the work the user came for while waitin
 
 ## 2. Classify
 
-Read `references/classification.md` and pick T0–T4 from the signals. State the class and
-the one signal that decided it, in a single sentence. Do not narrate the rubric.
+Read `references/classification.md`, answer its risk test — what a mistake would cost and
+what takes it back — and pick T0–T4 from that answer, never from whichever example reads
+closest. State the class and the answer that decided it, in a single sentence. Do not
+narrate the rubric.
 
 If the description is too vague to classify, ask one question. One, not a list.
 
@@ -90,18 +97,37 @@ said and ask. Never edit the `Spec:` line or create the branch just to get past 
 costs nothing and does not need a pause to stay out of the way. Pause means "was being
 worked on, set aside" — do not use it to mean "not begun".
 
-**When `task start` refuses a dirty tree**, the changes belong to other work — never work
-around it. Ask the user which road: pause the task that owns them
-(`jig task pause <owner> --stash`), or start this one in a worktree of its own:
+**A worktree is not only what a refusal pushes you towards.** `task start` moves this
+checkout's HEAD, and a checkout that looks free may not be: `jig status` prints
+`working here: …` for work another live session is doing **in this checkout**. A task that
+lives in its own worktree is not listed there — it shows as `worktree=<path>` instead, and
+is no reason to go anywhere. When `working here:` names anything, or when the user is
+working in this checkout themselves, start in a worktree without being asked to:
 
 ```
 .ai/scripts/jig task start <id> --worktree
 ```
 
-It prints a path and leaves this checkout alone. From then on the task is worked on from
+**When `task start` refuses a dirty tree**, the changes belong to other work — never work
+around it. Ask the user which road: pause the task that owns them
+(`jig task pause <owner> --stash`), or start this one in a worktree, as above.
+
+Either way it prints a path and leaves this checkout alone. From then on the task is worked on from
 that path only. If your runtime can switch this session into an existing worktree, switch
 and run every command from there; otherwise tell the user to open a new agent session in
 that path. Either way, do not continue the task from here.
+
+Write the task's own documents through jig, there and everywhere else — never with your
+editing tools, and never with a shell redirection:
+
+```
+.ai/scripts/jig task artifact write <id> plan --from <file>
+.ai/scripts/jig task artifact append <id> task --from -
+```
+
+`<kind>` is `task`, `discovery`, `spec`, `alternatives`, `design`, `plan`, `review`,
+`verification` or `handoff`, and the content comes from a file you wrote or from stdin.
+In a worktree the workspace is only borrowed, and jig is what knows where it really is.
 
 When the user already wrote the task as a document, take it from disk instead of
 retyping it, and split it as §"When the task arrives written" says:
