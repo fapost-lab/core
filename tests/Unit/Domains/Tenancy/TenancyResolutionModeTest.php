@@ -56,8 +56,19 @@ final class TenancyResolutionModeTest extends TestCase
     public function test_unknown_mode_does_not_stop_the_application_from_booting(): void
     {
         // `config:clear` and `package:discover` boot the application; a bad value must
-        // leave them working so that it can be fixed.
-        Env::getRepository()->set('TENANCY_RESOLUTION', 'subdomain');
+        // leave them working so that it can be fixed. The value is set as a real process
+        // variable: the .env loader is immutable, so it cannot override it even when .env
+        // defines TENANCY_RESOLUTION itself (it does on CI, copied from .env.example).
+        $previous = [
+            'env'    => $_ENV['TENANCY_RESOLUTION'] ?? null,
+            'server' => $_SERVER['TENANCY_RESOLUTION'] ?? null,
+            'getenv' => getenv('TENANCY_RESOLUTION'),
+        ];
+        // Forget the value the loader wrote itself on boot, so the one below counts as
+        // externally defined and survives the reload.
+        Env::getRepository()->clear('TENANCY_RESOLUTION');
+        $_ENV['TENANCY_RESOLUTION'] = $_SERVER['TENANCY_RESOLUTION'] = 'subdomain';
+        putenv('TENANCY_RESOLUTION=subdomain');
 
         try {
             $this->refreshApplication();
@@ -65,7 +76,9 @@ final class TenancyResolutionModeTest extends TestCase
             $this->assertSame('subdomain', config('tenancy.resolution'));
             $this->assertSame(0, Artisan::call('config:clear'));
         } finally {
-            Env::getRepository()->clear('TENANCY_RESOLUTION');
+            $this->restoreVariable('env', $previous['env']);
+            $this->restoreVariable('server', $previous['server']);
+            putenv(false === $previous['getenv'] ? 'TENANCY_RESOLUTION' : 'TENANCY_RESOLUTION=' . $previous['getenv']);
         }
     }
 
@@ -121,5 +134,24 @@ final class TenancyResolutionModeTest extends TestCase
         config(['tenancy.resolution' => 'single', 'tenancy.base_domain' => 'fapost.test']);
 
         $this->assertSame([], TenantHost::trustedHostPatterns());
+    }
+
+    private function restoreVariable(string $store, ?string $value): void
+    {
+        if ('env' === $store) {
+            if (null === $value) {
+                unset($_ENV['TENANCY_RESOLUTION']);
+            } else {
+                $_ENV['TENANCY_RESOLUTION'] = $value;
+            }
+
+            return;
+        }
+
+        if (null === $value) {
+            unset($_SERVER['TENANCY_RESOLUTION']);
+        } else {
+            $_SERVER['TENANCY_RESOLUTION'] = $value;
+        }
     }
 }
