@@ -95,8 +95,9 @@ From an independent failure hunt (2026-10-05), sharpest first.
   tenant panels at `<slug>.<base_domain>` and reserves the base domain for a control plane) and a
   single webhook ingress for all tenants (`webhook_registry` maps the hash to the tenant). What is
   missing is resolving any tenant from the request host instead of the one slug in env, panels on
-  `{tenant}.<base_domain>`, and a session cookie per tenant host. The single-slug mode stays for
-  self-hosted installs. — rejected: a resolver in the shell, because the panels, sessions and
+  `{tenant}.<base_domain>`, and a session cookie per tenant host. Resolution by host is the
+  default; binding to one slug from env is an explicit mode for self-hosted installs only, never
+  the platform's behaviour. — rejected: a resolver in the shell, because the panels, sessions and
   builder it touches are Core's and the shell would reach into them.
 - The shell owns its own landlord tables (subscriptions, usage counters) through its own
   migrations, and creates tenants through Core's provisioning. — rejected: `tenants.config` jsonb,

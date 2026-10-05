@@ -12,7 +12,7 @@ from their own hosts on one deployment, and a `call` node aimed at a private, lo
 address fails in both.
 
 - [ ] Egress guard — the `call` node refuses private, loopback, link-local and metadata addresses after DNS resolution and on every redirect, for every install
-- [ ] Host-based tenant resolution — any active tenant is resolved from `<slug>.<base_domain>`, panels and builder answer on every tenant host with a per-host session; the single-slug mode stays for self-hosted installs
+- [ ] Host-based tenant resolution — any active tenant is resolved from `<slug>.<base_domain>`, panels and builder answer on every tenant host with a per-host session; host is the default, the env-bound single slug is an explicit self-hosted mode only
 
 ## Phase 2 — Quota seams
 
