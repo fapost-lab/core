@@ -21,8 +21,8 @@ What to watch:
 
 - **Wait time on `flow.execution`** — this is how long a contact waits before the
   assistant even begins. It should be near zero.
-- **Failed jobs** — a rising count on `messaging.transactional` means replies
-  are not reaching people.
+- **Failed jobs** — a rising count on `flow.execution` means inbound messages are
+  not being answered: replies are sent from inside that job.
 - **Throughput on `messaging.broadcast`** — expected to spike; it is the one
   queue whose depth is not alarming.
 

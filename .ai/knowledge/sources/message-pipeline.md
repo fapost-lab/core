@@ -8,7 +8,7 @@ paths:
   - "app/Domains/Webhook/Jobs/**"
 source: docs/platform/architecture/platform/10-message-pipeline.md
 summary: Inbound webhook to worker pipeline steps and queue isolation by purpose
-source_hash: f08bcfc667c87defa70ed9a8d2494a781e153ba7
+source_hash: ca4ea3e53ba8a936991a97715b4243b35fb69dab
 reviewed_at: 2026-10-05
 ---
 # 10 — Message Pipeline
