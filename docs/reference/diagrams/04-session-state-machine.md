@@ -73,8 +73,8 @@ stateDiagram-v2
   sets `terminated_by_user` (and clears `current_node_id`), not `cancelled`.
 - **Parent of a subflow is `paused_subflow`.** Such a parent is not returned by
   `findActiveForContact()`; the live child (`active` / `waiting_input`) is, so the contact's
-  messages land in the child. The `RouteToSubflowChild` branch in `SessionStateRouter` is therefore
-  not reached through the normal lookup.
+  messages land in the child through `ResumeWaiting`. `SessionStateRouter` maps `paused_subflow` to
+  `DropBusy` only as a defensive answer, so a parent that leaks through never starts a parallel session.
 - **`completed` vs `ended`.** `ended` (with `end_status`) is written only by `persistEnd` for an
   `end` node. `completed` is the plain "ran out of graph" outcome.
 - `expired` is set only by `SubflowTimeoutSweeper` for orphaned parents. A parent whose child is

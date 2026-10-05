@@ -1,10 +1,14 @@
 # ADR-11 — Subflow Composition
 
-> **Superseded in part (2026-10).** The four rule classes named in the validation section (`SubflowCycleRule`,
-> `SubflowSameAssistantRule`, `SubflowDepthRule`, `SubflowTargetExistsRule`) do not exist. The checks are implemented by
-> `CallGraphValidator` (cycle and depth, pure function over the edge set) and `CallGraphRepository` (the
-> `flow_callgraph_edges` reverse index) in `app/Domains/Flow/Subflow/`; the same-assistant check lives in
-> `PublishFlowService`.
+> **Superseded in part (2026-10).** Differences between this ADR and the code:
+>
+> - The four rule classes named in the validation section (`SubflowCycleRule`,
+>   `SubflowSameAssistantRule`, `SubflowDepthRule`, `SubflowTargetExistsRule`) do not exist. The checks are implemented by
+>   `CallGraphValidator` (cycle and depth, pure function over the edge set) and `CallGraphRepository` (the
+>   `flow_callgraph_edges` reverse index) in `app/Domains/Flow/Subflow/`; the same-assistant check lives in
+>   `PublishFlowService`.
+> - The routing rule "`paused_subflow` → route to child" is realised by the child being the selected active session. The
+>   explicit `RouteToSubflowChild` branch was removed (2026-10); `paused_subflow` maps to `DropBusy` defensively.
 
 **Status:** Accepted
 **Date:** Апрель 2026

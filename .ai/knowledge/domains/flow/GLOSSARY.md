@@ -70,7 +70,8 @@ A Redis lock `session_lock:<tenant>:<contact>:<assistant>` with a heartbeat, tak
 ## Routing decision
 
 The outcome of `SessionStateRouter` for an inbound message: `StartViaTrigger`, `ResumeWaiting`,
-`RouteToSubflowChild`, `DropBusy`, `DropSilent`.
+`DropBusy`, `DropSilent`. A subflow parent (`paused_subflow`) is never selected: its waiting child is, and
+the message resumes the child (`ResumeWaiting`).
 
 ## Trigger
 
