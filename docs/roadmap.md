@@ -51,9 +51,7 @@ collected. It runs in the gaps between product steps, never ahead of them, and i
 | B5 | RAG knowledge bases — provider and storage decision, then a real adapter | `rag_query` is in the palette and always fails at its runtime guard | M | spec `.ai/specs/rag-knowledge-bases/` |
 
 Defects found while reconciling the documentation with the code (2026-10-05), filed as Jig tasks and
-taken whenever a lane is free: `fix-create-assistant-guard` (the create page requires an admin while
-the policy allows `ManageAssistants`), `translations-assistant-scope` (translation pages do not check
-the assigned assistant), `remove-dead-transactional-job` (`messaging.transactional` has no producer),
+taken whenever a lane is free: `remove-dead-transactional-job` (`messaging.transactional` has no producer),
 `fix-migration-rule-reason` (a PHPat rule cites a section of `CLAUDE.md` that no longer exists),
 `wire-flow-definition-validator` (the structural graph validator is registered but never called),
 `subflow-child-routing` (the `paused_subflow` routing branch is unreachable and
