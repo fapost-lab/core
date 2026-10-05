@@ -30,6 +30,13 @@ node_modules/
 # replacing released packages with whatever happened to be checked out.
 packages/
 
+# Composer overlay files. A local overlay usually points a path repository at
+# packages/, which is not in the build context, so shipping these would break
+# the image build. Derived images create their own overlay instead.
+/composer.overlay.json
+/composer.local.json
+/composer.local.lock
+
 # Build output — regenerated inside the image
 public/build/
 public/hot

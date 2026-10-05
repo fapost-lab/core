@@ -190,6 +190,12 @@ Targets that run host tools stay on the host regardless of `CONTAINER`:
 `make dev` (Vite needs the host's Node), `make docs-dev` (Mintlify), the tunnel
 targets. `make` shows which is which.
 
+## Adding packages on top of Core
+
+To work against a package Core does not require — a Solution, a Plugin or a private extension —
+without touching Core's `composer.json`, use a composer overlay. See
+[Development setup → Packages Core does not require](/extending/development-setup#packages-core-does-not-require).
+
 ## Checks
 
 ```bash

@@ -4,9 +4,9 @@ description: "Working on packages locally against a Core checkout."
 ---
 
 `fapost/foundation` and `fapost/support` — and any Solution or Plugin you build —
-live in their own git repositories and are consumed by Core as versioned Composer
-dependencies. This page explains the two-lane setup and how to add a new package
-to it.
+live in their own git repositories. This page explains how a package is developed
+against a Core checkout, and the two ways it reaches an install: as a dependency
+Core itself declares, or as an overlay Core never names.
 
 The Core-owned shared packages use the `fapost/*` vendor and live under the
 [fapost-lab](https://github.com/fapost-lab) organization. A Solution or Plugin you
@@ -65,10 +65,21 @@ From here, edits inside `packages/fapost-foundation` are picked up instantly —
 `composer update` needed. The checkout is a normal git repository: branch, commit,
 and push it independently of Core.
 
-## Add a new package
+## Which lane a package takes
 
-Assume a new package `<vendor>/<name>`. For a Solution or Plugin this is your own
-vendor, not `fapost`. The steps are vendor- and host-agnostic.
+| Package | How it reaches an install |
+|---|---|
+| Required by Core itself — `fapost/foundation`, `fapost/support` | Declared in Core's `composer.json` and pinned in its `composer.lock`. [Add a package Core requires](#add-a-package-core-requires). |
+| Not required by Core — your Solution or Plugin, a private or paid extension | Never named in Core's files. Added on top of Core with a composer overlay. [Packages Core does not require](#packages-core-does-not-require). |
+
+Core's `composer.json` lists only what Core needs to run. An extension that would be
+written into it would ship to every install and every fork; an overlay keeps it where
+it is wanted.
+
+## Add a package Core requires
+
+This lane is for packages Core itself depends on. Assume a new package
+`<vendor>/<name>`; the steps are vendor- and host-agnostic.
 
 <Steps>
   <Step title="Create the package repository">
@@ -94,8 +105,8 @@ vendor, not `fapost`. The steps are vendor- and host-agnostic.
   </Step>
 
   <Step title="Declare it in the root composer.json">
-    Add a VCS repository and a version constraint. This is the only manual edit in
-    Core, and it is what production resolves against:
+    Add a VCS repository and a version constraint. This is what production resolves
+    against:
 
     ```json
     "repositories": [
@@ -126,6 +137,116 @@ vendor, not `fapost`. The steps are vendor- and host-agnostic.
   </Step>
 </Steps>
 
+## Packages Core does not require
+
+A Solution, a Plugin or a private extension is added on top of Core with a
+**composer overlay**: Core's `composer.json` and `composer.lock` stay untouched,
+the package is installed against Core's locked versions, and the same mechanism
+serves local development, your extension's CI and an image built from Core.
+
+### The overlay file
+
+Describe the package in `composer.overlay.json` at Core's root. The file is
+git-ignored, and only `repositories` and `require` are accepted:
+
+```json
+{
+  "repositories": [{ "type": "path", "url": "packages/my-extension" }],
+  "require": { "acme/my-extension": "@dev" }
+}
+```
+
+For local development point a `path` repository at your checkout under
+`packages/`; in CI or an image use your package's VCS repository and a version
+constraint instead.
+
+### Install it
+
+```bash
+composer overlay
+```
+
+The script writes `composer.local.json` (Core's manifest plus the overlay) and
+`composer.local.lock` (a copy of Core's lock), both git-ignored, then installs the
+overlay packages against them. A package Core already requires or locks, directly
+or transitively, is rejected: an overlay adds packages, it never overrides or
+moves Core's versions. If your package needs a newer version of something Core
+locks, the install fails instead of upgrading Core underneath it.
+
+`post-update-cmd` runs `dev:link`, so a checkout under `packages/` is symlinked into
+`vendor/` exactly as in the Core-required lane.
+
+Options reach the script after `--`, because Composer strips the first `--` and
+drops options it does not know before it:
+
+| Command | Effect |
+|---|---|
+| `composer overlay -- --dry-run` | Writes the two files, installs nothing. |
+| `composer overlay -- --require-overlay` | A missing `composer.overlay.json` is an error instead of a no-op — use it in CI and images. |
+| `composer overlay -- --no-dev` | Anything else after `--` is passed to `composer update`. |
+
+### Working with an overlay
+
+Run further Composer commands with `COMPOSER=composer.local.json`, so they read the
+overlaid manifest:
+
+```bash
+COMPOSER=composer.local.json composer dump-autoload
+```
+
+A plain `composer install` or `composer update` goes back to Core alone and
+uninstalls the overlay package from Composer's point of view — a quick way to
+check that Core still runs without your extension. Run `composer overlay` again to
+bring it back. `dev:link` may still leave a symlink under `vendor/` for a
+`packages/*` checkout; it is harmless, because the package is neither autoloaded nor
+discovered.
+
+<Warning>
+  The overlay changes nothing in Core's repository, so your extension must work
+  through public contracts only. Core never checks whether an extension is
+  installed; it binds its own defaults for every contract, and your service provider
+  replaces them through package discovery.
+</Warning>
+
+### In your extension's CI
+
+Check out Core, place your package under `packages/`, write an overlay with a
+`path` repository to it, and run:
+
+```bash
+composer overlay -- --require-overlay
+```
+
+Then run your package's tests inside the Core application. Testing against the real
+Core, rather than a stand-in framework, catches contract drift as soon as Core
+changes.
+
+### In an image built from Core
+
+An image that adds an extension on top of the Core image runs the script directly:
+passing `--no-scripts` to `composer overlay` would disable the `overlay` script
+itself, because Composer scans all raw arguments. The Core image removes Composer
+and runs as `www-data`, so switch to `root` for the build step, copy Composer back,
+and hand the results back to `www-data`:
+
+```dockerfile
+FROM ghcr.io/fapost-lab/core:<version>
+
+USER root
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY --chown=www-data:www-data composer.overlay.json ./
+
+RUN php tools/composer-overlay.php --require-overlay -- --no-dev --no-scripts --optimize-autoloader \
+    && COMPOSER=composer.local.json composer run-script post-autoload-dump --no-interaction \
+    && chown -R www-data:www-data vendor bootstrap/cache composer.local.json composer.local.lock \
+    && rm -f /usr/bin/composer
+USER www-data
+```
+
+`post-autoload-dump` runs package discovery, so your service provider is found.
+A private package repository needs Composer credentials at build time; pass them as
+a build secret (`COMPOSER_AUTH`), never as a file copied into the image.
+
 ## Publish a new version
 
 Package changes reach production through tags, not the local checkout:
@@ -141,6 +262,9 @@ git tag v0.2.0 && git push origin v0.2.0
 # in Core — raise the constraint if the minor changed, then re-resolve
 composer update <vendor>/<name>
 ```
+
+For a package added through an overlay, raise the constraint in
+`composer.overlay.json` and run `composer overlay` again instead.
 
 With `0.x` versions, `^0.1` accepts `0.1.*` only; bump the constraint to `^0.2` to
 adopt a new minor. Until you re-run `composer update`, Core keeps the version
@@ -163,3 +287,5 @@ not change what production installs.
 | `require` in the root `composer.json` | Version constraint per package, for example `^0.1`. |
 | `composer.lock` | Pins the exact commit of each tagged version. Always the VCS lane, so it is safe to commit. |
 | `tools/dev-link-packages.php` / `composer dev:link` | Symlinks `vendor/<name>` to the local checkout. Runs on install and update; a no-op without `packages/`. |
+| `composer.overlay.json` | Packages Core does not require: `repositories` and `require` only. Git-ignored. |
+| `tools/composer-overlay.php` / `composer overlay` | Writes `composer.local.json` and `composer.local.lock` and installs the overlay against Core's lock. |
