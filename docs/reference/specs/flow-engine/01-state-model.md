@@ -1,72 +1,117 @@
-# 01 · State Model
+# 01. State Model
 
-## 1.1 Namespaces в JSON snapshot и runtime
+## 1.1 Namespaces in the session snapshot and at runtime
 
-Все nodes пишут и читают через единый набор namespace. Эти namespace **не показываются** пользователю в UI.
+Every node reads and writes through one set of namespaces. The canonical list is the enum
+`Fapost\Foundation\Flow\Enums\StateNamespace` (see `.ai/knowledge/adr/0002-retire-core-state-primitives.md`).
+Namespaces are **not shown** to the end user in the UI.
 
-| Namespace | Владелец | Persistence | Назначение |
-|-----------|----------|-------------|------------|
-| `system.*` | Engine | session JSON | started_at, retry_count, current_node, node_attempts |
-| `flow.*` | Compiler-generated nodes | session JSON | session-scoped scratchpad для runtime данных |
-| `rag.*` | rag_query node | session JSON | found, confidence, answer, intent последнего запроса |
-| `call.*` | call node | session JSON | response payload последнего вызова |
-| `contact.*` | resolver через Contact модель | persistent (Contact) | Свойства контакта |
-| `module.<name>.*` | DataAccessor | external (модуль) | Канонические данные модуля |
+| Namespace | Owner | Persistence | Purpose |
+|-----------|-------|-------------|---------|
+| `system.*` | Engine and whitelisted nodes | session JSON | engine markers and platform facts, see 1.5 |
+| `flow.*` | any node (user variables, `session` storage) | session JSON | session-scoped scratchpad |
+| `rag.*` | `rag_query` node | session JSON | found, confidence, answer, intent of the last query |
+| `call.*` | any node (the `call` node's response) | session JSON | response of the last call |
+| `contact.*` | Contact model, through `ContactWriter` | persistent (Contact) | contact properties |
+| `module.<name>.*` | `DataAccessorInterface` | external (module) | canonical module data, read-only |
 
-`flow_sessions.state` JSON содержит только `system`, `flow`, `rag`, `call`. `contact.*` и `module.*` резолвятся через accessors при чтении и записываются через writers — не дублируются в session state.
+`flow_sessions.state` holds only `system`, `flow`, `rag` and `call`. `contact.*` and `module.*` are
+resolved through the reader when read and, for `contact.*`, written through `ContactWriter`; they are
+never duplicated into session state.
 
-**Persistence model (см. ADR State Writer Semantics):** writes immediate. `contact.*` коммитится в свою BEGIN-UPDATE-COMMIT транзакцию per write. Session-state (`flow.*`, `system.*`, `rag.*`, `call.*`) мутирует in-memory `FlowSession` объект, persist одним `UPDATE flow_sessions` в конце выполнения ноды (с optimistic-lock версионированием). Подробнее — [03-node-handler-interface.md](03-node-handler-interface.md), раздел ScopedStateWriter.
+**Persistence model (see ADR-0002):**
+
+- Reads: `App\Domains\Flow\State\Readers\ScopedStateReader`, built per node execution over the
+  in-memory session state, the `Contact` and the data accessor registry. An unknown path reads as
+  `null`.
+- Session writes: a handler returns flat `stateChanges` (`flow.x`, `system.y`);
+  `FlowSessionPersister` validates the namespace against `SystemStateNamespacePolicy` and persists the
+  state in one `UPDATE flow_sessions` per node, with optimistic-lock versioning.
+- Contact writes: the handler calls `ContactWriterInterface::write()`; each write commits
+  immediately in its own transaction.
+- The earlier `ScopedStateWriter` / `StateWriter` layer was retired by ADR-0002 and no longer exists.
 
 ## 1.2 Contact namespace
 
-Плоская адресация в expression и save_to:
+Flat addressing in expressions and variable targets:
 
 ```
-contact.<key>                    — leaf поле в attributes
-contact.<group>.<key>            — nested JSON в attributes
-contact.meta.<key>               — данные платформы (read-only для пользователя)
+contact.<key>                    - a leaf in attributes (or a canonical column)
+contact.<group>.<key>            - nested JSON in attributes
+contact.meta.<key>               - platform data (read-only for flows)
 ```
 
-Resolver при чтении `contact.<key>`:
+Reading `contact.<key>` (`ScopedStateReader::readContact`):
 
-1. Если `<key>` — известное поле модели (id, channel_id, channel) → колонка модели
-2. Иначе walk по `attributes` JSON path
-3. Если на пути встречается non-object value на промежуточном сегменте → null
-4. Если ключ не найден → null
+1. If `<key>` is a canonical column (`id`, `tenant_id`, `external_id`, `platform`, `language`,
+   `is_authenticated`) and there is no tail, return the model column.
+2. Otherwise walk the `attributes` JSON path.
+3. A non-object value on an intermediate segment gives `null`.
+4. A missing key gives `null`.
 
-Resolver при записи `contact.<key>` (assign/input):
+Writing `contact.<key>` (`ContactWriter::write`, called by `assign`, `input`, `auth_request`, ...):
 
-1. Если `<key>` — reserved (id, channel_id, channel, meta.*) → validation error при сохранении flow_definition
-2. Иначе walk по path в `attributes`, создавая объекты по дороге
-3. Если на пути встречается non-object value на промежуточном сегменте → runtime error, session failed
+1. The path must start with `contact.`; depth is `contact.<key>` or `contact.<group>.<key>`. Violations
+   throw `InvalidArgumentException`.
+2. Reserved keys (`id`, `tenant_id`, `external_id`, `platform`) and the group `meta` throw
+   `ReservedContactPathException` (a `RuntimeException`).
+3. `language` and `is_authenticated` are writable canonical columns and take no nested group.
+4. Anything else is written into `attributes`, creating the group on the way.
+5. A leaf and a group on the same path throw `StructuralPathConflictException` (a `RuntimeException`).
+6. Array-typed variables append, with a circular buffer, instead of replacing.
 
-## 1.3 Глубина вложенности
+These are **runtime guards in `ContactWriter`**. They are not checked when the flow is saved; a
+violation surfaces when the node runs and, being an exception from a handler, fails the session.
 
-Группы — максимум 1 уровень: `contact.<group>.<field>`.
+## 1.3 Nesting depth
+
+Groups are one level deep at most: `contact.<group>.<field>`.
 
 ```
-contact.name                ✓
-contact.form.input1         ✓
-contact.form.address.city   ✗ слишком глубоко
+contact.name                OK
+contact.form.input1         OK
+contact.form.address.city   too deep (InvalidArgumentException from ContactWriter)
 ```
 
-Validator при сохранении flow_definition проверяет `save_to` на максимум 1 точку после `contact.`.
+Session variables (`flow.*`) cannot use a group at all: a `Variable` with `session` storage and a
+group is rejected when it is constructed.
 
 ## 1.4 Reserved keys
 
-**Reserved для contact:**
-- Поля модели: `id`, `tenant_id`, `channel_id`, `channel`
-- Группа: `meta` (owned by webhook ingress — username, first_name из платформы)
+**For `contact` (ContactWriter):**
 
-Список фиксируется в коде. Validator проверяет на сохранении.
+- Identity columns: `id`, `tenant_id`, `external_id`, `platform` (`RESERVED_COLUMNS`).
+- Group: `meta` (owned by the webhook ingress: username, first name from the platform).
+- Writable canonical columns: `language`, `is_authenticated`.
+
+**For variable names (`Variable::RESERVED_NAMES`):** `id`, `channel_id`, `tenant_id`, `external_id`,
+`meta`, `language`, `is_blocked`, `created_at`, `updated_at`. The reserved group is `meta`. A
+user-defined variable cannot take these names.
+
+## 1.5 `system.*` keys
+
+Keys are constants in `App\Domains\Flow\State\SystemStateKeys`; which node types may write
+`system.*` is `SystemStateNamespacePolicy` (`send_message`, `input`, `delay`, `notify`, `set_tag`).
+
+| Key | Written by |
+|-----|-----------|
+| `system.started_at`, `system.retry_count`, `system.flow_definition_id`, `system.contact_id` | engine, at session start |
+| `system.channel.*` (`id`, `type`, `bot_username`, `bot_handle`, `link`) | engine at session start, projected by `ChannelStateProjector` from the contact's most recently used active channel of the assistant; absent when no channel can be resolved |
+| `system.language` | read by `LanguageResolver` as a session-level language override; the engine does not seed it |
+| `system.sent_messages` | `send_message` (idempotency markers) |
+| `system.send_message.timeout.*`, `.response.*`, `.dynamic_buttons` | `send_message` |
+| `system.input.{nodeId}.retry_count` | `input` |
+| `system.delay.{nodeId}.*` | `delay` |
+| `system.delayed.{nodeId}.resume_at` | `FlowSessionPersister` (a `delayed(resumeAt)` result), outside the whitelist |
+| `system.staff_notified.{nodeId}`, `system.contacts_notified.{nodeId}` | `notify` |
+| `system.set_tag.{nodeId}` | `set_tag` |
+
+Channel data is therefore read as `{{system.channel.bot_handle}}`, not through the `contact` namespace.
 
 ---
 
-## Связано с
+## Related
 
-- [[00-overview]] — обзор flow engine
-- [[10-state-writer-semantics]] — семантика state writer
-- [[04-session-state-machine]] — диаграмма state machine
-- [[05-group-storage]] — group storage
-- [[specs/flow-engine/05-group-storage]] — group storage спека
-- [[diagrams/04-session-state-machine]] — диаграмма state machine
+- [02-common-concepts.md](02-common-concepts.md)
+- [../../diagrams/04-session-state-machine.md](../../diagrams/04-session-state-machine.md)
+- `.ai/knowledge/adr/0002-retire-core-state-primitives.md`

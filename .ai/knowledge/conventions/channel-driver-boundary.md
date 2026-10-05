@@ -9,6 +9,7 @@ paths:
   - "app/Domains/Channels/WhatsApp/**"
   - app/Domains/Webhook/Contracts/ChannelAdapterInterface.php
 summary: Channel drivers are reached only through MessageSenderInterface and throw on unsupported methods
+reviewed_at: 2026-10-05
 ---
 # Channel driver boundary
 

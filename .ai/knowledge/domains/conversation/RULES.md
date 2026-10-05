@@ -14,6 +14,7 @@ paths:
   - "app/Filament/Assistant/Resources/Conversations/**"
   - "database/migrations/tenant/*conversation*"
   - "tests/*/Domains/Conversation/**"
+reviewed_at: 2026-10-05
 ---
 # Conversation rules
 

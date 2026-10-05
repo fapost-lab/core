@@ -7,8 +7,8 @@ paths:
   - "app/Domains/**"
   - "app/Http/Controllers/**"
   - "app/Jobs/**"
-  - "app/Services/**"
 summary: Controllers/jobs orchestrate; domain services take collaborators via constructor, not app()/resolve()
+reviewed_at: 2026-10-05
 ---
 # Domain code boundaries
 

@@ -9,6 +9,7 @@ paths:
 source: docs/reference/specs/flow-engine/nodes/04-delay.md
 summary: "delay node: seconds, resume scheduling and the clock-gated re-entry"
 source_hash: b9d0a49ae88401c379b2f08d9b0ab61fbf2eae55
+reviewed_at: 2026-10-05
 ---
 # Node · `delay`
 

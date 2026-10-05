@@ -16,6 +16,9 @@ paths:
   - config/tenancy.php
   - "tests/Unit/Domains/Tenancy/**"
   - "tests/Feature/Tenancy/**"
+  - "tests/Feature/Domains/Tenancy/**"
+  - tests/Unit/Architecture/WebhookArchitectureTest.php
+reviewed_at: 2026-10-05
 ---
 # Tenancy rules
 
@@ -45,9 +48,16 @@ broken.
 
 - **Open the `landlord` connection only inside `app/Domains/Tenancy`.** Other domains depend on
   a `Tenancy/Contracts` interface. Why: tenant isolation stays auditable in one place.
-  Review only — no PHPat rule covers it. Known exception: `InstallPlatformCommand`.
+  Review only — no PHPat rule covers it. Known exceptions: the install and
+  migrate console commands (`InstallPlatformCommand`, `InstallCommand`, `MigrateSmartCommand`) open
+  the connection to run landlord migrations, and `AppServiceProvider` loads
+  `database/migrations/landlord`.
 - **In workers, change tenant only through `TenantSwitcher::runForTenant()`**; never set
   `search_path` or the context directly. Review only.
+- **Core is not the control plane.** No SaaS logic, billing or onboarding belongs in Core, and
+  self-hosted and SaaS must not produce two different core architectures. Source: the vision note
+  `docs/platform/architecture/vision.md` (deleted in 2026-10, reachable only through git history), and `docs/idea-brief.md` §5 (the multi-tenant shell is
+  the owner's separate closed product). Review only. *(proposed)*
 - **Do not add outward dependencies to Tenancy.** `TenantProvisioningService` is the only class
   allowed to reach into other domains (Staff, Channels), and it is the source of both import
   cycles; new needs go through a contract the other domain implements. *(proposed)*

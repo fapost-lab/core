@@ -118,14 +118,22 @@ landlord tables into `public` of the landlord database.
 
 ## What the architecture rules enforce
 
-They are the executable form of the boundaries described in this section:
+They are the executable form of some of the boundaries described in this section.
+The rule classes are `FlowRuntimeIsolationTest`, `HandlerVersionContractTest`,
+`IdStrategyTest`, `MessagingBoundariesTest` and `MigrationTest`:
 
-- [Dependency direction](/contributing/dependency-direction) — `foundation` and
-  `support` must not reference `App\…`
 - [Migration isolation](/contributing/migration-isolation) — no runtime state in
   `up()` or `down()`
-- [Tenant-aware execution](/contributing/tenant-aware-execution) — no landlord
-  access from domains outside `Tenancy`
+- Flow runtime isolation, handler versioning, ULID key strategy and messaging
+  boundaries
+
+Two boundaries have no PHPat rule and are not checked by it:
+
+- [Dependency direction](/contributing/dependency-direction) — `foundation` and
+  `support` are separate repositories with their own Composer requirements, so
+  an `App\…` import in them cannot autoload; no rule in this repository checks it
+- [Tenant-aware execution](/contributing/tenant-aware-execution) — landlord
+  access from domains outside `Tenancy` is caught in review only
 
 <Note>
   The PHPat rules and the prose describing them are expected to agree. If you

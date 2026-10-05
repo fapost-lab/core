@@ -1,5 +1,17 @@
 # ADR-05: fapost/foundation — публичный контрактный пакет для extension boundary
 
+> **Superseded in part (2026-10).** What changed since this ADR was written:
+>
+> - `ChannelAdapterInterface` is **not** a foundation contract: it lives in Core (`app/Domains/Webhook/Contracts`).
+>   Foundation carries the channel-ingress contracts under `Fapost\Foundation\Channel\` instead.
+> - The `App\Domains\Shared\Concerns\*` and `BaseModel` shell classes are gone; models use `Fapost\Support\*` directly.
+>   Only `app/Domains/Shared/Infrastructure/ModelAttributeRegistry.php` remains in Core.
+> - `ModuleNamespaceRegistry` does not exist.
+> - Packages are not consumed through path repositories: `composer.json` points at VCS repositories
+>   (`fapost-lab/foundation`, `fapost-lab/support`) and local checkouts are symlinked over `vendor/` by
+>   `composer dev:link` (`tools/dev-link-packages.php`).
+> - Module registration goes through `App\Providers\ModuleRegistrarInterface`.
+
 ## Контекст
 
 Внешние пакеты (Solutions, Plugins) должны знать публичные контракты платформы, но не должны зависеть от полного `fapost/core` runtime.

@@ -1,5 +1,21 @@
 # ADR-09 — Message Routing & Concurrency Control
 
+> **Superseded in part (2026-10).** Differences between this ADR and the code:
+>
+> - The lock heartbeat is **not a timer or background task**. It is a per-node tick inside `FlowEngine::executeLoop`
+>   (`refreshSessionLock()` calls `LockHeartbeat::extend()` before each node), so the TTL only has to cover the slowest
+>   single node. A failed extend raises `SessionLockLostException` and the run is abandoned.
+> - `MessageRouter` has an extra step the ADR does not list: a staff-ownership check (`isHandledByStaff` through
+>   `ConversationOwnershipInterface`). A conversation held by an operator is dropped from the flow engine
+>   (`staff_handled`) before session state is classified.
+> - The typing methods (`indicateProcessing` / `refreshProcessing` / `stopProcessing`) live on the foundation contract
+>   `Fapost\Foundation\Messaging\TypingCapableProviderInterface`, not on `ChannelAdapterInterface`. They are driven by
+>   `TypingIndicatorService` and `TypingHeartbeatRegistry` in `app/Domains/Messaging/Typing/`.
+> - A lock miss is **not** requeued to a backoff queue. `MessageRouter` returns `dropped('lock_timeout')`, and
+>   `IncomingMessageJob::shouldRetry` retries only `engine_lock_timeout`.
+> - Outbound dedup **does exist**: `MessageSender` reserves the idempotency key with Redis `SET NX` (24h TTL), contrary to
+>   the "no dedup in V1" amendment near the end of this ADR.
+
 **Status:** Accepted
 **Date:** Апрель 2026
 **Контекст:** FaPost Phase 2 — Flow Engine
@@ -773,4 +789,4 @@ ADR применяется как написано. Уточнения по фа
 - **Idempotency contract minimal в V1** — `idempotencyKey` присутствует в interface, но **не используется** для dedup. `attempt_number` статически = 1. Полная Redis SET NX dedup откладывается на V1.x по first business need.
 - **assistants.commands / busy_message** — добавлены в migration `2026_05_06_000006` (Phase A-2 ✓). Status enum extension (`paused_subflow`, `terminated_by_user`, `expired`, `ended`) — migration `2026_05_06_000003` ✓.
 
-См. `docs/plans/flow-engine/synthesis.md` D-8 для полной reconciliation matrix.
+См. `docs/archive/platform/plans/flow-engine/synthesis.md` D-8 для полной reconciliation matrix.

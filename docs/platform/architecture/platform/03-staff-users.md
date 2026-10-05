@@ -1,51 +1,68 @@
-# 03 — Пользователи (Staff)
+# 03 — Staff Users
 
-## Описание
+## Description
 
-**Staff** — люди, которые логинятся в панель управления. Не путать с **Contact** (сотрудники, общающиеся с ботом через мессенджер).
+**Staff** are the people who log in to the admin panels. Not to be confused with **Contact** (end users who talk to an
+assistant through a messenger).
+
+Staff accounts are tenant-scoped: the table lives in the tenant schema, so it has no `tenant_id` column (isolation is
+the schema itself).
 
 ---
 
-## Схема
+## Schema
 
-| Компонент | Описание |
+Tables live in the tenant schema (`database/migrations/tenant/`). Roles and permissions use the `spatie/laravel-permission`
+tables (`HasRoles` on the `User` model); the platform adds columns to them.
+
+| Table | Notes |
 | --- | --- |
-| **users** | email, password, tenant_id |
-| **roles** | name, priority, is_system |
-| **permissions** | Укрупнённые блоки: manage_*, view_* |
-| **user_roles** | Pivot: user ↔ role |
+| `users` (migration `create_staff_users_table`) | `name`, `email`, `phone`, `password` (nullable until activation), `status` (`pending` / `active` / `suspended`, `UserStatus`), `is_active` |
+| `roles` | Spatie table plus `display_name`, `priority`, `is_system` |
+| `permissions` | Spatie table; names come from the `Permission` enum (`manage_*`, `view_*`, `reply_conversations`) |
+| `model_has_roles`, `role_has_permissions`, `model_has_permissions` | Spatie pivots |
+| `user_assistants` | Which assistants a staff user can open in the assistant panel |
+| `user_activation_tokens` | Invitation flow: a pending user receives an activation mail and sets a password |
 
 ---
 
-## Системные роли
+## System roles
 
-| Роль | Priority | Scope |
+| Role | Priority | Scope |
 | --- | --- | --- |
-| `admin` | 100 | Полный доступ |
-| `content_manager` | 50 | Flow, broadcast, RAG, контакты (без мета) |
-| `analyst` | 30 | Аналитика — read-only |
+| `admin` | 100 | Every permission |
+| `content_manager` | 50 | Assistants, channels, flows (including publish), flow groups, translations, broadcasts, RAG, media, contacts (view only), conversations (`ViewConversations` and `ReplyConversations`), analytics |
+| `analyst` | 30 | Read-only: analytics, flow sessions, contacts |
 
 ---
 
-## Иерархия ролей
+## Role source of truth
 
-`RoleEnum` — единственный источник истины для системных ролей. `RoleSeeder` читает через `CoreRegistrar::getRoles()` — в Фазе 1 возвращает `RoleEnum::cases()`, в Фазе 4 — + роли модулей.
+`RoleEnum` is the single source of truth for system roles: name, priority and permission set.
+`RoleSeeder` iterates `RoleEnum::cases()`, creates every `Permission` case, then creates or syncs each system role
+(`is_system = true`) and its permissions. It is idempotent, so adding a role means adding an enum case only.
 
-Нельзя назначить роль с priority ≥ своего. Себе роль нельзя менять никогда.
+The seeder is reached through `TenantAclSeeder`, `AclBootstrapService` (a thin proxy used by tenant provisioning) and the
+`ops:tenants-seed-acl` command for existing tenants.
+
+A role priority hierarchy applies (`UserPolicy`): a user cannot assign a role whose priority is greater than or equal
+to their own maximum, and cannot change their own roles at all. Custom roles created in the UI must have a priority
+strictly below the creator's. System roles cannot be deleted.
 
 ---
 
-## Деактивация (is_active)
+## Deactivation (`is_active`)
 
-- `is_active = false` → немедленная инвалидация сессии
-- `EnsureUserIsActive` middleware на каждый запрос — 401 даже с живым токеном
-- Нельзя деактивировать единственного admin и себя
+- `is_active = false` ends the user's sessions at once: `UserService::deactivate()` clears the remember token and deletes
+  the user's rows from `sessions`.
+- The `EnsureUserIsActive` middleware runs on every authenticated panel request: a deactivated user is logged out and gets
+  401 even with a live session.
+- A user cannot deactivate themselves, and the last active admin cannot be deactivated.
+- Only an admin holding `manage_users` can deactivate or reactivate; a reactivated user must log in again.
 
 ---
 
-## Связано с
+## Related
 
-- [[04-assistant-domain]] — Assistants, к которым привязаны staff
-- [[00-overview]] — auth specs (права доступа)
-- [[notify]] — Staff как получатели notify ноды
-- [[02-assistant-panel-console]] — ADR панели ассистента
+- [04-assistant-domain](04-assistant-domain.md) — assistants that staff are attached to
+- `notify` node — staff are recipients of `notify` (`StaffRecipientResolver`)

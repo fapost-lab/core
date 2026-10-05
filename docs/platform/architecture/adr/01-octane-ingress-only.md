@@ -1,5 +1,10 @@
 # ADR-01 — Octane: ingress-only
 
+> **Superseded in part (2026-10).** Octane is gone. The webhook route is `POST /webhook/{channel}/{hash}`
+> (not `/webhooks/*`), served by PHP-FPM, with an optional Go gateway in `gateway/` taking over ingress. The worker-safety
+> rules cited below now live in `.ai/knowledge/conventions/worker-safety.md` (the old "CLAUDE.md Long-Lived Worker
+> Safety" section no longer exists).
+
 > Зафиксировано: март 2026. Статус: **отменено** (август 2026).
 >
 > Octane удалён из проекта: пакет `laravel/octane`, `config/octane.php` и переменная
@@ -8,8 +13,8 @@
 >
 > Текст ниже сохранён как запись решения и его причин. Ограничения на singleton-состояние,
 > `scoped` bindings и восстановление tenant context в `finally` остаются в силе —
-> они относятся к долгоживущим Horizon-воркерам, а не к Octane. См. `CLAUDE.md`
-> § Long-Lived Worker Safety.
+> они относятся к долгоживущим Horizon-воркерам, а не к Octane. См.
+> `.ai/knowledge/conventions/worker-safety.md`.
 
 ---
 

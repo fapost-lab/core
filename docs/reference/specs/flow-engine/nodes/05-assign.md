@@ -1,10 +1,9 @@
-# Node · `assign`
+# Node: `assign`
 
-Запись значений. Объединяет SetAttribute и Transform.
+Writes values into session or contact state.
 
-**Type:** `assign`
-**Version:** 1
-**Idempotent:** yes
+**Type:** `assign` · **Version:** 1 · **Category:** `Data`
+**Class:** `app/Domains/Flow/Handlers/AssignNodeHandler.php`
 
 ## Config
 
@@ -12,97 +11,80 @@
 {
   "operations": [
     {
-      "target": "contact.full_name",
+      "variable": {"name": "full_name", "storage": "contact"},
       "value": "{{contact.first_name}} {{contact.last_name}}"
     },
     {
-      "target": "flow.code_attempts",
-      "value": "{{flow.code_attempts}} + 1"
+      "variable": {"name": "reason", "storage": "session"},
+      "value": "vip"
     },
     {
-      "target": "contact.form.completed_at",
-      "value": "{{system.now}}"
+      "variable": {"name": "completed_at", "storage": "contact", "group": "form"},
+      "value": "{{flow.finished_at}}"
     }
   ]
 }
 ```
 
-**Поля:**
-
-| Поле | Тип | Required | Описание |
-|------|-----|----------|----------|
-| `operations` | array (>=1) | yes | Список операций, выполняются по порядку |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `operations` | list | yes (new form) | Operations, run in order |
 
 **Operation:**
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `target` | **literal string** | Полный path куда писать (`contact.X`, `contact.group.X`, `flow.X`). **Не Expression**, без `{{...}}`. |
-| `value` | Expression | Выражение для вычисления значения |
+| Field | Type | Description |
+|-------|------|-------------|
+| `variable` | Variable | The target: `{name, storage, group?, type?, properties?}` (see [../02-common-concepts.md](../02-common-concepts.md)). A static structure, never a template, so the target is known statically |
+| `value` | template | Rendered by `TemplateRenderer` against the live state. This is placeholder substitution; there is no arithmetic (`{{x}} + 1` is not evaluated) |
 
-> **Patch v1.1:** `target` — литеральная строка, не Expression. Это инвариант для:
-> - Validation (path известен на save time)
-> - Group discovery (cache корректно инвалидируется, см. [05-group-storage.md](../05-group-storage.md))
-> - Refactoring (статический анализ возможен)
->
-> Динамический выбор target достигается через branch + multiple assign nodes.
+The path is resolved by `VariableResolver::resolveTargetPath()`: `contact` storage gives `contact.<name>` or
+`contact.<group>.<name>`; `session` storage gives `flow.<name>`.
+
+### Legacy form
+
+A node without `operations` is read as the legacy single write `{target: "flow" | "contact", key, value}` (and
+`configSchema()` still declares only this form). `target` is an `AssignTarget`. For `contact`, the key
+`language` (or `contact.language`) aliases the canonical language column; any other key is a contact attribute.
+A missing target or key throws `InvalidNodeConfigException`. Legacy snapshots keep executing identically.
 
 ## Output handles
 
-- `success`
-
-> **Patch v1.1:** только `success`. `assign` не имеет `error` handle. Все failures (structural conflict, reserved key violation, type mismatch) приводят к **session failed**. Инвариант: assign безопасен, если flow_definition прошёл validation. См. [06-validation.md](../06-validation.md), раздел 6.5.
+- `default`: always. There is no `success` or `error` handle; every failure throws and fails the session.
 
 ## Behavior
 
-> **Patch v1.3 (brownfield reconciliation D-3):** session-state мутации возвращаются через `result.stateChanges` (handler — pure function, engine применяет атомарно). Только `contact.*` writes идут immediate через ContactWriter.
+For each operation, in order:
 
-1. Build local `$delta = []` (path => resolved value).
-2. Для каждой operation по порядку:
-   - Resolve `value` Expression через `$context->expressionEngine` + `$context->stateReader`
-   - Routing по target prefix:
-     - `flow.*` / `system.*` (whitelisted) / `rag.*` / `call.*` → добавляется в `$delta`. Handler делает `data_set($delta, $target, $value)` локально для read-after-write в рамках текущего execute.
-     - `contact.*` → `$context->contactWriter->write($target, $value)` — immediate write в Contact (включая structural validation: reserved keys, leaf vs group conflict, depth ≤ 1)
-   - Если writer/resolver бросает (тип несовместим, structural conflict, reserved key) → exception → session failed
-3. Return `NodeExecutionResult::executed(sourceHandle: 'success', stateChanges: $delta)`.
-4. Engine применяет `stateChanges` к `FlowSession.state` JSON и делает `UPDATE flow_sessions ... WHERE version = ?` в одной транзакции с version++. Optimistic-lock conflict → engine retries (handler идемпотентен — повторная запись того же значения = тот же state).
+1. The operation must be an object with a complete `variable` (name and storage); otherwise
+   `InvalidNodeConfigException` is thrown.
+2. Render `value`.
+3. Resolve the target path and write by storage:
+   - **contact:** `ContactWriterInterface::write($path, $value)`, an immediate write that commits in its own
+     transaction. The writer enforces the contact rules (reserved keys, depth, leaf-vs-group conflict; see
+     [../01-state-model.md](../01-state-model.md), 1.2 and 1.4). A violation throws, which fails the session. If no
+     writer is available, `InvalidNodeConfigException`.
+   - **session, type `array`:** append the value to the current list (the new list goes into `stateChanges`).
+   - **session, otherwise:** `stateChanges[$path] = $value`.
+4. Return `Executed` with `default`, the collected `stateChanges` and metadata `paths` (the applied paths).
 
-History instrumentation (state_change events) выполняется engine после применения `stateChanges` + ContactWriter — handler не вызывает logger напрямую (D-6).
+Session writes land in `FlowSession.state` through `FlowSessionPersister`, which also bumps the version under the
+optimistic lock. A re-run writes the same value, so the node is idempotent, except for an array target, which
+appends again.
 
-### Read-after-write semantics
+There is no read-after-write inside one node: `value` is rendered against the state as it was when the node
+started, so two operations on the same variable do not see each other's session writes.
 
-Sequential operations внутри одной ноды видят результаты предыдущих ops:
+## Validation
 
-```json
-{
-  "operations": [
-    {"target": "flow.counter", "value": "{{flow.counter}} + 1"},
-    {"target": "flow.counter", "value": "{{flow.counter}} + 1"}
-  ]
-}
-```
-
-Outcome (если `flow.counter` был 0):
-- Op 1: handler `read('flow.counter')` через reader → 0; computes 1; `data_set($delta, 'flow.counter', 1)` локально
-- Op 2: handler resolve `{{flow.counter}}` смотрит сначала в `$delta` → 1; computes 2; `$delta['flow.counter'] = 2`
-- Result.stateChanges = `['flow.counter' => 2]`
-- Engine применяет → `session.state.flow.counter = 2`
-
-Для `contact.*`: первый write коммитит в БД (через ContactWriter), второй read через `stateReader` возвращает свежий committed value (Contact модель refreshes).
-
-## Validation flow_definition
-
-- `target` — литеральная строка, **не содержит** `{{...}}` placeholders
-- `target` начинается с `contact.` или `flow.` (другие namespaces — read-only для пользователя)
-- `target` не нарушает reserved keys (см. [01-state-model.md](../01-state-model.md), раздел 1.4)
-- `target` не превышает глубину 1 уровень группы для contact
-- Path uniqueness across flow — см. [06-validation.md](../06-validation.md), раздел 6.5
+`ValidateFlowService` has no assign-specific rule. Contact path rules are runtime guards in `ContactWriter`.
+`FlowDefinitionValidator` (not wired into the save / publish pipeline) additionally checks that the new and legacy
+shapes do not coexist and that `operations[]` address unique `(storage, group, name)` triples. Publish collects
+the declared variables into the tenant variable schema and rejects cross-flow type conflicts (see
+[../06-validation.md](../06-validation.md)).
 
 ---
 
-## Связано с
+## Related
 
-- [[README]] — nodes README
-- [[04-assign-node-migration]] — миграция assign ноды в builder
-- [[10-state-writer-semantics]] — семантика записи в state
-- [[05-backend-contract]] — backend контракт переменных
+- [../01-state-model.md](../01-state-model.md), [../02-common-concepts.md](../02-common-concepts.md)
+- [11-loop.md](11-loop.md) - appending to array variables

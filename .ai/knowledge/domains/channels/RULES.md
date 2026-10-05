@@ -17,7 +17,7 @@ paths:
   - "tests/Unit/Domains/Messaging/**"
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
-reviewed_at: 2026-09-22
+reviewed_at: 2026-10-05
 ---
 # Channels rules
 

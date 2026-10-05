@@ -1,16 +1,17 @@
 # Specs
 
-Реализационные спеки и runtime-контракты.
+Design specs and runtime contracts that stay useful after the code exists. The ones an agent needs
+are linked into `.ai/knowledge/` (see `.ai/knowledge/sources/`) and reach a task through
+`jig context`.
 
-## Разделы
+## Sections
 
-- `auth/` — авторизация, permissions, policies, roles UI.
-- `builder/` — Vue builder, schema renderer, variable storage.
-- `flow-engine/` — state model, handler contracts, validation, versioning, per-node specs.
-- `messaging/` — messaging pipeline и conversation logging.
+- `builder/storage/` - builder variable storage, pickers and coercion.
+- `flow-engine/` - state model, common concepts, call transport, validation, per-node specs.
+- `messaging/` - conversation logging.
 
-## Правило
+## Rule
 
-Спека описывает ожидаемое поведение и контракты. Прогресс реализации и чекбоксы живут в
-[`../../platform/TASKS.md`](../../platform/TASKS.md), а поэтапные планы и brownfield-аудиты — в
-[`../../platform/plans`](../../platform/plans).
+Plans, roadmaps and progress live in `.ai/specs/` (see `.ai/knowledge/conventions/docs-layout.md`),
+not here. This folder holds design specs that describe how a built part behaves. Superseded
+material is moved to `docs/archive/`.

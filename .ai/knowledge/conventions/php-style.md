@@ -6,6 +6,7 @@ domains: []
 paths:
   - "**/*.php"
 summary: Strict types, final classes, PHPDoc and Pint as the mechanical half of PHP style
+reviewed_at: 2026-10-05
 ---
 # PHP style and Laravel conventions
 
@@ -41,8 +42,8 @@ preset and turns on `declare_strict_types` and `final_class` among its rules, an
 `vendor/bin/pint --dirty --format agent` applies them to every changed file — so
 `declare(strict_types=1)` and `final` are not stylistic preferences, they fail
 formatting if skipped. `pint.json` also excludes `database`, `tests`, `routes`,
-`config`, `resources`, `bootstrap`, `storage`, `public`, `docs`, `packages`, `tools`
-and `vendor`, so Pint only actually checks `app/` and sibling top-level PHP;
+`config`, `resources`, `bootstrap`, `storage`, `public`, `docs`, `drafts`, `packages`,
+`tools` and `vendor`, so Pint only actually checks `app/` and sibling top-level PHP;
 everything outside that, and everything Pint cannot express — constructor
 promotion, explicit return types, PHPDoc quality, enum casing, dependency
 approval, test coverage, doc-file restraint — holds on review only. Shared style

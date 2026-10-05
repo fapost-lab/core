@@ -10,6 +10,7 @@ paths:
   - "app/Domains/Broadcasting/**"
   - "app/Domains/Messaging/**"
 summary: Queues are split by purpose (flow.execution, messaging.*, scheduled.triggers, sync.external); rate limits and backpressure are preventive, not reactive.
+reviewed_at: 2026-10-05
 ---
 # Messaging and queues
 
@@ -46,14 +47,21 @@ Queue assignment by purpose, as it exists in the codebase today:
 
 - `flow.execution`: `app/Jobs/Flow/ResumeDelayedFlowSessionJob.php`,
   `app/Jobs/Flow/ResumeTimedOutSendMessageNodeJob.php`, and the webhook controller's initial
-  dispatch (`app/Domains/Webhook/Http/WebhookController.php`).
-- `messaging.transactional`: `app/Jobs/Messaging/SendTransactionalMessageJob.php`.
-- `messaging.broadcast`: `app/Domains/Broadcasting/Jobs/RunBroadcastJob.php` and
-  `SendBroadcastRecipientJob.php`.
-- `messaging.system`: `app/Domains/Staff/Jobs/SendStaffNotificationJob.php`,
+  dispatch (`app/Domains/Webhook/Http/WebhookController.php`). Flow replies are sent inline inside
+  these jobs, not through a separate queue.
+- `messaging.transactional`: `app/Jobs/Messaging/SendTransactionalMessageJob.php` — reserved like
+  `sync.external`: nothing dispatches it, only tests exercise it.
+- `messaging.broadcast`: `app/Domains/Broadcasting/Jobs/RunBroadcastJob.php`,
+  `SendBroadcastRecipientJob.php`, `app/Jobs/Messaging/BroadcastSendJob.php`, and, as a deviation,
+  `app/Domains/Contact/Jobs/SendContactNotificationJob.php` (line 61): it is a service
+  notification that runs on the low-priority broadcast queue.
+- `messaging.system`: `app/Jobs/Messaging/SyncChannelWebhookJob.php`,
+  `app/Domains/Staff/Jobs/SendStaffNotificationJob.php`,
   `app/Jobs/Media/CleanupSoftDeletedMediaJob.php`.
-- `messaging.logging`: `app/Domains/Conversation/Jobs/PersistConversationMessageJob.php`.
-- `scheduled.triggers`: `app/Jobs/Flow/StartFlowFromEventJob.php`.
+- `messaging.logging`: `app/Domains/Conversation/Jobs/PersistConversationMessageJob.php`,
+  `FetchConversationMediaJob.php`, `UpdateConversationDeliveryStatusJob.php`.
+- `scheduled.triggers`: `app/Jobs/Flow/StartFlowFromEventJob.php` and `DispatchFlowTriggerEventJob`
+  (queued through `app/Domains/Flow/Events/QueuedFlowTriggerEventPublisher.php`).
 
 Preventive backpressure: `RunBroadcastJob` counts the depth of `messaging.broadcast`
 (`Queue::size()`) before creating any recipient rows and, above

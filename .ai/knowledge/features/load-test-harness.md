@@ -10,7 +10,10 @@ paths:
   - "tools/loadtest/**"
   - "app/Domains/Channels/Telegram/TelegramBotApiClient*.php"
   - app/Domains/Tenancy/Services/TenantDecommissioner.php
+  - Makefile
+  - "tests/Unit/Console/Commands/Ops/LoadTest/**"
 summary: Throwaway-tenant load test of the flow pipeline against a local Telegram stub; tells lock-contention drops from real leaks
+reviewed_at: 2026-10-05
 ---
 # Load-test harness
 

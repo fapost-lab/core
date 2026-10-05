@@ -1,5 +1,10 @@
 # ADR-07 — Media Domain & Channel Asset Cache
 
+> **Superseded in part (2026-10).** `MediaSource` has a fourth case, `Conversation`
+> (`app/Domains/Media/Enums/MediaSource.php`): files ingested from the conversation transcript (inbound media captured by
+> `FetchConversationMediaJob`). Such files are filtered out of the media library listing
+> (`MediaService::listFolderContents`). The source enum below is therefore `upload | input_node | api | conversation`.
+
 ## Status
 
 Accepted · Апрель 2026

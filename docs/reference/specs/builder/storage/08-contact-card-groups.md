@@ -1,108 +1,42 @@
-# 08 · Contact card — отображение групп секциями
+# 08 · Contact card — attribute groups as sections
 
-**Зависит от:** 05 (резолвер пишет в `contact.attributes.{group}.{name}` структуру)
-**Блокирует:** —
-**Слой:** Filament admin (PHP)
+**Layer:** Filament admin (PHP), assistant panel
+**Depends on:** 05 (the resolver writes `contact.attributes.{group}.{name}`)
 
-## Цель
+## Purpose
 
-Соответствует п.7 спеки. В Filament admin → Contacts → конкретный контакт показывать `attributes` группами:
-- Корневые поля (без группы) — секция «Profile»
-- Группы — отдельные коллапсируемые секции с пометкой «(N fields)»
-- Платформенные данные (`meta.*`) — отдельная секция «From platform»
-- Temporary поля (session) — НЕ показываются (они в session, не в Contact)
+The read-only contact card in the assistant panel (Contacts → a contact) renders `attributes` as
+sections instead of one raw JSON blob. Implemented.
 
-## Текущее состояние
+## Layout
 
-Полностью отсутствует — Contact resource пока не реализован в Filament (см. CLAUDE.local.md backlog: V1.x backlog mentions FlowSession Inspector, но не Contact viewer).
+- **Header** — identity: platform, external id, language, optional `meta.username`, the contact's tags
+  and groups (contact groups, a separate concept from attribute groups).
+- **Profile** — root-level scalar attributes; shown only when there are any.
+- **One collapsible section per attribute group** (a nested object), titled `<group> (N fields)`.
+- **From platform** — collapsed section with the `meta` JSON; shown only when `meta` is not empty.
+- Temporary (`session`) variables never appear: they live in the flow session, not on the contact.
 
-Эта задача может потребовать сначала создать `ContactResource` в admin panel — оценить scope в начале реализации. Если окажется большой — выделить под-задачу `08a-contact-resource-foundation.md`.
+Profile and group sections start expanded when the contact has at most 3 groups
+(`GROUP_EXPAND_THRESHOLD`), collapsed otherwise.
 
-## UI макет
+## Value rendering
 
-```
-📇 Иван Петров
-  Channel:    Telegram
-  Channel ID: 123456789
-  Username:   @ivanov
+Each field is a `TextEntry` with a formatted state. The declared `VariableType` comes from the tenant
+schema registry (`VariableSchemaRegistryInterface::get('contact', $group, $name)`):
+`number` is number-formatted, `date` is localised (`d M Y`), `json` is pretty-printed, `confirm`
+renders Yes/No. Fields without a registry entry (legacy) or of other types render as plain strings.
+The view is read-only.
 
-  ─── Profile ───
-  name:     Иван
-  phone:    +7 999 123 4567
-  email:    ivan@example.com
+## Files
 
-  ─── ▼ survey_q1_2026 (3 fields) ───
-  overall_score:    8
-  recommendation:   yes
-  comment:          Отлично
-
-  ─── ▼ address (2 fields) ───
-  city:             Москва
-  street:           Ленина 1
-
-  ─── from platform ───
-  username (Telegram): @ivanov
-  channel_user_id:     123456789
-```
-
-Группы collapsible, по умолчанию развёрнуты при ≤ 3 групп; свёрнуты иначе.
-
-## Filament implementation
-
-`ContactResource::view` использует Filament Infolist:
-
-```php
-Infolist::make()
-    ->schema([
-        Section::make('Profile')
-            ->schema(self::rootAttributeFields($contact)),
-
-        ...self::groupSections($contact),
-
-        Section::make('from platform')
-            ->collapsible()
-            ->collapsed()
-            ->schema(self::metaFields($contact)),
-    ]);
-```
-
-Helper `groupSections()` итерирует по `contact.attributes`, собирает все ключи второго уровня в группы, рендерит каждую как `Section::make($group)->collapsible()` с `TextEntry` per поле.
-
-## Field rendering
-
-`TextEntry::make("attributes.{$group}.{$name}")` для каждого поля. Тип отображения по `Variable::type` (если разработана задача 05) — number с форматом, date через Carbon, boolean через `Yes/No`, etc.
-
-Если `Variable::type` ещё не доступно (задача 05 не сделана для всех handlers) — fallback: тип определяется по PHP `gettype()`.
-
-## Что НЕ показываем
-
-- `flow_sessions.state` — это runtime данные, не профиль контакта.
-- Reserved system keys (`id`, `tenant_id`, `external_id`, …) — уже отдельные колонки контакта.
-- Группа `meta` идёт в отдельную секцию «from platform» — не смешиваем с user-контентом.
-
-## Файлы
-
-- `app/Filament/Resources/Contacts/ContactResource.php` — может потребовать создания (зависит от текущего состояния)
-- `app/Filament/Resources/Contacts/Schemas/ContactInfolistSchema.php` — рендер групп
-- `app/Filament/Resources/Contacts/Pages/ViewContact.php`
-- `lang/{en,ru,uk}/contact.php` — переводы заголовков секций
-
-## Acceptance
-
-- Контакт с `attributes = { name: 'X', survey_q1: { score: 8 } }` отображается в двух секциях: Profile (name) и survey_q1 (score).
-- Все группы collapsible независимо.
-- При пустых attributes показывается только секция «from platform» если есть meta.
-- Sensitive поля (`meta.username`, etc.) не редактируются прямо из этой view (read-only).
+- `app/Filament/Assistant/Resources/Contacts/ContactResource.php`
+- `app/Filament/Assistant/Resources/Contacts/Schemas/ContactInfolistSchema.php` — section rendering
+- `app/Filament/Assistant/Resources/Contacts/Pages/ViewContact.php`
+- `lang/{en,ru,uk}/contact.php` — section titles, field labels, Yes/No values
 
 ## Out of scope
 
-- Edit attributes inline (требует отдельного UX про permissions)
-- Bulk export по группе (V1.x backlog item — см. п.4 спеки про аналитику)
-
----
-
-## Связано с
-
-- [[05-contacts]] — Contact Domain
-- [[00-overview]] — overview storage
-- Drag-reorder секций (V1.x)
+- Inline editing of attributes (needs its own permission UX).
+- Bulk export by group.
+- Drag-reordering of sections.

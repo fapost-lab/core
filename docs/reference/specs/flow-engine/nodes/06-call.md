@@ -1,10 +1,11 @@
-# Node · `call`
+# Node: `call`
 
-Вызов внешнего или внутреннего сервиса. Объединяет Integration (HTTP) и Action (in-process).
+Calls an external or internal service. Combines Integration (HTTP) and Action (in-process).
 
 **Type:** `call`
 **Version:** 1
-**Idempotent:** yes (через `CallContext.idempotencyKey`)
+**Class:** `app/Domains/Flow/Handlers/CallNodeHandler.php` (category `Integration`)
+**Idempotent:** the call carries a stable idempotency key `{sessionId}:{nodeId}`
 
 ## Config
 
@@ -15,160 +16,153 @@
   "parameters": {
     "body.first_name": "{{contact.first_name}}",
     "body.email":      "{{contact.email}}",
-    "auth.bearer":     "{{system.secrets.api_token}}"
+    "auth.bearer":     "{{flow.api_token}}"
   },
   "transport_options": {
     "timeout": 30,
-    "headers": {
-      "Content-Type": "application/json"
-    },
-    "success_when": "2xx",
-    "retry": {
-      "max_attempts": 3,
-      "backoff": "exponential"
-    }
+    "headers": { "X-Source": "fapost" },
+    "success_when": "2xx"
   },
-  "result_mapping": {
-    "flow.created_user_id": "payload.data.id",
-    "flow.last_call_status": "metadata.status_code"
-  }
+  "save_to_variable": { "name": "last_response", "storage": "session" },
+  "result_mapping": [
+    { "from": "body.data.id", "to": { "name": "created_user_id", "storage": "session" } },
+    { "from": "status",       "to": { "name": "last_call_status", "storage": "session" } }
+  ]
 }
 ```
 
-**Поля:**
+**Fields:**
 
-| Поле | Тип | Required | Описание |
-|------|-----|----------|----------|
-| `transport` | string | yes | ID транспорта в `CallTransportRegistry`. Built-in: `http`, `handler`. **Literal**, не Expression. |
-| `target` | Expression | yes | Семантика target зависит от транспорта |
-| `parameters` | object | no | Map: `<key> → Expression`. Resolved при выполнении |
-| `transport_options` | object | no | Transport-specific опции (raw passthrough) |
-| `result_mapping` | object | no | Map: `target_path → result_path`. Куда положить результат в state |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `transport` | string | no | Transport id in `CallTransportRegistry`. Built-in: `http` (default), `handler`. A literal, not an expression |
+| `target` | template string | yes | Meaning depends on the transport; rendered against the live state |
+| `parameters` | object | no | Map `<key> -> template`; every value is rendered recursively |
+| `transport_options` | object | no | Transport options, rendered, then passed through (`timeout`, `headers`, `success_when`, `body_raw`) |
+| `save_to_variable` | Variable | no | Writes the whole response object `{status, body, headers}` to one variable |
+| `result_mapping` | list of `{from, to}` | no | Each entry copies one response path into a `Variable` (`to`) |
 
-## Семантика target по транспорту
+A node with neither `transport` nor `target` is a **legacy** node and runs through `executeLegacy()`:
+it POSTs `url` through the `http` transport with `{session_id, contact_id, state}` from
+`include_state`, and saves the body to `save_to_variable` or the legacy `save_response_to` path.
+
+## Target by transport
 
 | Transport | target |
 |-----------|--------|
-| `http` | `<METHOD> <URL>`, например `POST https://api.example.com/users` |
-| `handler` | ID action handler в `ActionHandlerRegistry`, например `crm.sync_contact` |
+| `http` | `<METHOD> <URL>`, for example `POST https://api.example.com/users` |
+| `handler` | an action id in `ActionHandlerRegistry`, for example `crm.sync_contact` |
 
 ## Output handles
 
-- `success` — вызов выполнен успешно (по `success_when` policy)
-- `error` — ошибка транспорта или action handler
+- `success`: the call succeeded (by the `success_when` policy for HTTP)
+- `error`: transport error, action exception, or an unknown transport id
 
-## success_when policy (HTTP transport)
+The node always returns `Executed`; a failed call does not fail the session, it takes `error`.
+Metadata carries `status_code`, `error_code` and `idempotency_key` when present.
 
-> **Patch v1.1:** новая опция в `transport_options`.
+## `success_when` policy (HTTP transport)
 
-`success_when` определяет, какой HTTP response код считается success:
+`transport_options.success_when` decides which HTTP responses count as success:
 
-| Value | Поведение |
+| Value | Behaviour |
 |-------|-----------|
-| `"2xx"` (default) | 200-299 → `success`. Остальное → `error` |
-| `"any_response"` | Любой HTTP response (включая 4xx, 5xx) → `success`. Только transport failure → `error` |
-| `"2xx_or_4xx"` | 2xx и 4xx → `success` (для API где 4xx — бизнес-смысл). 5xx → `error` |
-
-> **Уточнение для ADR Idempotency Strategy:** обобщить до generic формы вроде `success_statuses: [200, 201, 404]` или `success_status_classes: ["2xx"]` — см. [09-out-of-scope-and-open-questions.md](../09-out-of-scope-and-open-questions.md), раздел 9.3.
+| `"2xx"` (default) | 200-299 -> `success`; everything else -> `error` |
+| `"any_response"` | any HTTP response, including 4xx and 5xx -> `success`; only a transport failure -> `error` |
+| `"2xx_or_4xx"` | 2xx and 4xx -> `success` (for APIs where 4xx is business meaning); 5xx -> `error` |
 
 ### Failure boundary
 
-| Тип | Handle |
-|-----|--------|
-| Transport-level failure (DNS, connection refused, timeout, TLS) | **`error` всегда** |
-| HTTP response получен (любой код) | по `success_when` policy |
+| Kind | Handle |
+|------|--------|
+| Transport-level failure (DNS, connection refused, timeout, TLS) | **always `error`** (`error_code = transport_failure`) |
+| An HTTP response was received (any code) | per the `success_when` policy |
 
-`CallResult.metadata.status_code` всегда содержит фактический HTTP код (для всех режимов). При `success_when="any_response"` с non-2xx — `CallResult.error_code` = `"http_4xx"` или `"http_5xx"` (для downstream branch).
+The actual HTTP status is always in the result metadata (`status_code`). For a response that the policy
+does not accept, the error code is `http_4xx`, `http_5xx` or `http_other`, usable by a downstream branch.
 
-### Аналог для других транспортов
-
-`handler` transport: ActionHandler возвращает результат → `success`. ActionHandler бросает exception → `error`. Без конфигурации — действия идемпотентны и предсказуемы.
-
-Custom transports могут вводить свои `success_when`-like опции через `transport_options` (transport-specific passthrough).
+For the `handler` transport: an action that returns is `success`; an action that throws becomes
+`error_code = action_exception` and takes `error`.
 
 ## Behavior
 
-1. Resolve `transport` (literal, не Expression — выбор транспорта runtime запрещён)
-2. Получить транспорт из `CallTransportRegistry`. Если нет — session failed
-3. Resolve `target` через Expression
-4. Resolve `parameters` (recursively, каждое значение)
-5. Построить `CallRequest{target, parameters, options=transport_options}`
-6. Построить `CallContext{tenant, session, idempotencyKey = "{session.id}:{node.id}:{attempt_number}"}`. В V1 `attempt_number = 1` (статически, без автоинкремента — см. ADR Message Routing & Concurrency Control). Идемпотентность вызова обеспечивается distributed lock на сессии; Redis-based dedup outbound — V1.x.
-7. Вызвать `transport.execute(request, context)` — возвращает `CallResult`
-8. Apply success policy:
-   - HTTP transport: matches `success_when` → `result.success = true`
-   - Handler transport: returned without exception → `result.success = true`
-9. Если `result.success && result_mapping задан` — apply mapping:
-   - Для каждой пары `target_path → result_path`:
-     - Извлечь значение из CallResult по `result_path` (например, `payload.data.id` → `result.payload['data']['id']`)
-     - Если path не существует → записать null + warning в logs (не fail). См. ниже.
-     - Записать в state:
-       - `flow.*` / `call.*` / `rag.*` target → попадает в `result.stateChanges`
-       - `contact.*` target → handler вызывает `$context->contactWriter->write(...)` immediate
-10. Сохранить session с version bump
-11. Переход:
-    - `success` если `result.success`
-    - `error` иначе (включая исключения транспорта)
+1. Detect legacy shape (no `transport` and no `target`) and run `executeLegacy()`.
+2. Read `transport` (default `http`). If it is not registered, return `Executed` with the `error`
+   handle and metadata `error_type = unknown_transport`. The session is not failed.
+3. Render `target`, `parameters` and `transport_options` through `TemplateRenderer` against the live
+   state.
+4. Build `CallRequest{target, parameters, options}` and `CallContext{tenantId, contactId, sessionId,
+   nodeId, idempotencyKey = "{sessionId}:{nodeId}"}`. The key is static per node: there is no attempt
+   counter, because the node is never retried by the engine. Idempotency of the session run comes from
+   the session lock; remote de-duplication is up to the receiver through the `Idempotency-Key` header.
+5. Call `transport->execute()`; it returns a `CallResult`.
+6. Apply the response (see below), always, success or error.
+7. Return `Executed` with `success` or `error`.
 
-### result_mapping с missing path
+**There is no retry.** The `transport_options.retry` block seen in older drafts is not implemented; a
+failed call goes to `error` and the flow decides what to do.
 
-> **Patch v1.1:** missing path → null + warning, не fail.
+## Response handling
 
-API responses часто варьируются (пустой `data`, optional fields). Hard fail на missing path делает flows fragile. Null в state — обрабатываемо в downstream branch через `is_null` operator.
+Both layers are optional and apply on success **and** on error (the error body is often what the
+author wants to branch on).
 
-```json
-{
-  "result_mapping": {
-    "flow.user_id": "payload.data.id"
-  }
-}
+A response bag is built for `result_mapping.from` paths:
+
+```
+{ status, headers, body, payload, metadata }
 ```
 
-Если `payload = {error: "not found"}`:
-- `flow.user_id = null`
-- `flow_logs` warning: `"Path 'payload.data.id' not found in CallResult, mapped to null"`
-- Continue execution через `success` handle (если HTTP 2xx)
+`status` is `metadata.status_code`, `headers` and `body` are the response headers and parsed body;
+`payload` and `metadata` are the raw `CallResult` fields (`body` and `payload` are the same value).
+`from` is read with `data_get`, so `body.data.id` works.
+
+- `save_to_variable` writes `{status, body, headers}` as one value.
+- Each `result_mapping` entry writes `data_get($bag, from)` into the variable `to`.
+- A missing path writes `null`; it never fails the node.
+- A `session` variable lands in `stateChanges` (`flow.<name>`). A `contact` variable is written
+  immediately through `ContactWriterInterface`; if the writer is unavailable the node throws
+  `InvalidNodeConfigException`.
 
 Downstream pattern:
 
 ```
-call → success
-  ↓
-branch:
-  flow.user_id is_null → handle "user_not_created" → error path
-  default → continue
+call -> success
+  branch:
+    flow.created_user_id is_null -> handle "user_not_created"
+    default -> continue
 ```
 
-`strict_mapping: true` (hard fail при missing path) — V1.x, см. [09-out-of-scope-and-open-questions.md](../09-out-of-scope-and-open-questions.md).
+A strict mode that fails on a missing path is not built.
 
-## Built-in транспорты
+## Built-in transports
 
-См. [04-call-transport-layer.md](../04-call-transport-layer.md), раздел 4.3.
+See [04-call-transport-layer.md](../04-call-transport-layer.md), section 4.3.
 
 `http`:
-- Methods: GET, POST, PUT, DELETE, PATCH
-- parameters keys: `body.*`, `query.*`, `headers.*`, `auth.bearer`, `auth.basic.username`, `auth.basic.password`
-- Response в `CallResult.payload` (parsed JSON если `Content-Type=application/json`, иначе raw string)
-- Idempotency key пишется в header `Idempotency-Key`
+- methods GET, POST, PUT, DELETE, PATCH
+- parameter keys: `body.*`, `query.*`, `headers.*`, `auth.bearer`, `auth.basic.username`, `auth.basic.password`
+- the response goes to `CallResult.payload` (parsed JSON for a JSON `Content-Type`, otherwise raw text)
+- the idempotency key goes into the `Idempotency-Key` header
 
 `handler`:
-- target = action ID
-- parameters передаются как массив в `ActionHandlerInterface::handle($parameters, $context)`
-- Возврат action handler → `CallResult.payload`
-- Idempotency key передаётся через `CallContext`
+- `target` is an action id
+- `parameters` are passed as an array to `ActionHandlerInterface::handle($parameters, $context)`
+- the return value becomes `CallResult.payload`
 
-## Validation flow_definition
+## Validation
 
-- `transport` ∈ ids зарегистрированных транспортов
-- `target` формат соответствует транспорту (для http — VALID METHOD + URL pattern)
-- `result_mapping` `target_path` начинается с `flow.` или `contact.`
-- `success_when` (если задан) ∈ `{"2xx", "any_response", "2xx_or_4xx"}`
+`ValidateFlowService` has no call-specific rules beyond the schema (no required fields are declared).
+An unknown transport, a malformed target or an invalid `success_when` surfaces at runtime as the
+`error` handle. There is a builder "test call" endpoint (`CallTestController`, `CallTester`) for
+trying a request before publishing.
+
+Tests: `tests/Unit/Domains/Flow/BuiltInNodeHandlersTest.php`,
+`tests/Unit/Domains/Flow/Call/HandlerTransportTest.php`,
+`tests/Feature/Domains/Flow/Call/HttpTransportTest.php`, `CallTesterTest.php`.
 
 ---
 
-## Связано с
+## Related
 
-- [[README]] — nodes README
-- [[04-call-transport-layer]] — transport layer для call ноды
-- [[10-state-writer-semantics]] — семантика state writer
-- [[12-solutions-modules]] — Solutions регистрируют handlers
+- [04-call-transport-layer.md](../04-call-transport-layer.md) - the transport layer behind the call node

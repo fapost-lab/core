@@ -4,10 +4,12 @@ type: adr
 status: accepted
 domains:
   - flow
-paths: []
+paths:
+  - "app/Domains/Flow/Expression/**"
 source: docs/platform/architecture/adr/08-expression-language.md
 summary: Pluggable expression engine snapshotted per flow definition; V1 ships the template engine only
-source_hash: 676d565eb967db7c730924dff0e3fa2e21acae92
+source_hash: b87dd2862d335c0822aeeca2c57498aa0c4789e5
+reviewed_at: 2026-10-05
 ---
 # ADR-08 — Expression Language Pluggability
 

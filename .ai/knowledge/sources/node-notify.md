@@ -7,10 +7,11 @@ domains:
 paths:
   - app/Domains/Flow/Handlers/NotifyNodeHandler.php
 source: docs/reference/specs/flow-engine/nodes/notify.md
-summary: notify node in staff and contact modes; only the status note at the top is current
-source_hash: e79652946077eee7210ec180dc7f7ad8f9dbc9f3
+summary: "notify node: staff and contacts modes, queues, idempotency markers"
+source_hash: 24fb096b5605dc29f08c15c2769d5171721ac56d
+reviewed_at: 2026-10-05
 ---
-# Нода `notify_staff` → `notify` (Core, P1)
+# Node: `notify`
 
 Linked source: [docs/reference/specs/flow-engine/nodes/notify.md](../../../docs/reference/specs/flow-engine/nodes/notify.md). The source owns its rules; this document only says when an agent
 must read it.

@@ -18,6 +18,7 @@ paths:
   - app/Domains/Flow/Services/ValidateFlowService.php
   - app/Domains/Flow/Services/LoadBuilderFlowService.php
   - "app/Domains/Flow/Validation/**"
+reviewed_at: 2026-10-05
 ---
 # Flow builder glossary
 

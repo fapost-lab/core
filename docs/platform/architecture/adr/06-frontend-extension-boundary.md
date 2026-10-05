@@ -1,5 +1,15 @@
 # ADR-06 — Frontend Extension Boundary: Plugin vs Solution
 
+> **Superseded in part (2026-10).** Two things this ADR describes are not built:
+>
+> - The `platform:update` command (Task 25) does not exist; the `Platform` commands are `InstallCommand`,
+>   `InstallGatewayCommand` and `InstallPlatformCommand`. The "run `npm run build` after installing a Solution" step is a
+>   manual deploy step today.
+> - Runtime plugin installation from a zip in the admin panel is not implemented either; the Plugin rows describe a target.
+>
+> The vendor glob for Solution Vue components is implemented in `resources/js/builder/utils/vendorComponents.ts` (static,
+> eager `import.meta.glob`; it resolves to empty maps when no Solution is installed).
+
 ## Статус
 
 Принято · Апрель 2026

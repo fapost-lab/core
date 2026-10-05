@@ -19,6 +19,7 @@ paths:
   - config/media.php
   - "database/migrations/tenant/*media*"
   - "tests/*/Domains/Media/**"
+reviewed_at: 2026-10-05
 ---
 # Media rules
 

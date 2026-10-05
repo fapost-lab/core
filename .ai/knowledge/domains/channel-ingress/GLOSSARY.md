@@ -13,6 +13,7 @@ paths:
   - "contracts/ingress/**"
   - config/webhook.php
   - "tests/Unit/Domains/Webhook/**"
+reviewed_at: 2026-10-05
 ---
 # Channel ingress glossary
 

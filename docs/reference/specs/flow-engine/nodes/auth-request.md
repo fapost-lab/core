@@ -1,112 +1,86 @@
-# Нода `auth_request` (Core, P1)
+# Node: `auth_request`
 
-> **Статус: РЕАЛИЗОВАНО (2026-06-05) — Core flag-setter.** По решению заказчика нода реализована как
-> **Core-узел** (а не Feature-level), без bootstrap'а Feature-механики. Нода **challenge-типизирована**
-> (`AuthMethod`): сейчас реализован тип `basic` — сравнение переменной с ожидаемым значением (расширенный набор
-> операторов через общий `BranchOperator`: eq/neq/gt/gte/lt/lte/contains/in/empty/not_empty). При совпадении
-> поднимается **каноничный флаг** `contact.is_authenticated` (новая boolean-колонка, как `language`, не в
-> `attributes`). Запись флага идемпотентна (safe to retry).
-> - **Не ветвитель.** Финальный дизайн: один выход `default` — нода ставит флаг и идёт дальше. Прежние выходы
->   `authenticated`/`failed` убраны (они и не имели портов на канве). Проверка auth — gate при старте flow
->   (`FlowAccessPolicy` + `flow_definitions.is_public`) и нода `branch` по `contact.is_authenticated`.
-> - **UI:** override `AuthRequestConfig.vue` — `ConditionOperandPicker` (как у branch) + локализованные операторы
->   (`builder.operators.*`), без блока выходов.
-> - Логика операнда и сравнения вынесена в общие `Handlers/Support/OperandResolver` + `OperatorComparator`
->   (переиспользуются `BranchNodeHandler` и `AuthRequestNodeHandler`).
-> - Инфраструктура: миграция `add_is_authenticated_to_contacts_table`, `Contact` cast/fillable,
->   `ContactWriter::WRITABLE_COLUMNS += is_authenticated`. Регистрация в `FlowServiceProvider`.
-> - Тесты: `tests/Feature/Domains/Flow/AuthRequestNodeHandlerTest.php` + canonical-column кейс в `ContactWriterTest`.
->
-> **Отложено (будущие `AuthMethod`-типы):** `phone` (contact share), `sms_code`, `email_code` — добавляются как
-> новые case'ы enum без изменения выходов. Полноценная Feature-механика (ActivationRegistry / TenantActivationRuntime)
-> и фильтрация ноды по активации — **не вводились**; нода доступна на Core-уровне всегда. Спека ниже (Path 2 поверх
-> `auth.*` примитивов) сохранена как ориентир для расширения.
->
-> ## Две части механизма auth (2026-06-05)
-> 1. **Установка флага** — нода `auth_request` (выше): проверяет признак и поднимает `contact.is_authenticated`.
-> 2. **Проверка флага** — отдельной ноды не вводили: достаточно ноды `branch` с операндом `user_variable`
->    (storage=contact, name=`is_authenticated`). Для этого `is_authenticated` добавлен в whitelist каноничных колонок
->    `ScopedStateReader` — иначе branch читал бы из JSONB и получал null.
-> 3. **Доступность flow (gate)** — флаг `flow_definitions.is_public` (mirror `flow_drafts.is_public`, default true).
->    `FlowAccessPolicy::canStart(definition, contact)` = `is_public || contact.is_authenticated` (fail-open для
->    null/legacy). Применяется в `FlowOrchestrator` на старте новой сессии: приватный flow для неаутентифицированного
->    контакта **не стартует** — падает в обычный fallback (как «нет доступного flow»). Resume существующей сессии,
->    subflow и persistent-button re-entry не гейтятся (это внутренняя композиция / уже начатый диалог).
->    Публикация переносит `is_public` из draft в definition (`PublishFlowService`). UI-тоггл уже был в Filament
->    `FlowFormSchema`. Тесты: `FlowAccessPolicyTest`, кейсы в `FlowOrchestratorTest` / `PublishFlowServiceTest` /
->    `ScopedStateReaderTest`.
+A Core flag-setter that marks the contact authenticated inside a flow.
 
-**Слой:** Feature: AccessControl (node + auth handlers) · **Уровень:** Feature · **P3**
+**Type:** `auth_request` · **Version:** 1 · **Category:** `Contact`
+**Class:** `app/Domains/Flow/Handlers/AuthRequestNodeHandler.php`
 
-## Зачем
-Аутентификация конечного пользователя внутри flow перед доступом к защищённому контенту: подтверждение телефона,
-SMS/email-код и т.п. Ветвит flow по результату.
+It is a Core node, not a Feature-level one: there is no `app/Features/` and no activation machinery for it.
+The node is **not a brancher**: it has a single `default` output, sets the flag when the check passes and
+continues either way.
 
-## Связь с Handler Registry (CLAUDE.md § Handler Registry)
-AccessControl владеет namespace `auth.*`: `auth.phone_button`, `auth.code_sms`. CLAUDE.md фиксирует, что
-`auth.phone_button` + `input(expected_type: contact)` уже дают полный сценарий аутентификации по телефону на
-**примитивах**. Поэтому `auth_request` — это **высокоуровневая нода-оркестратор** поверх этих примитивов: один узел
-вместо ручной связки phone_button → input → проверка → branch. Архитектурное решение для старта:
-- **Path 1 (минимум):** не вводить отдельную ноду; документировать рецепт из примитивов (`auth.phone_button` +
-  `input(contact)` + `branch`). Тогда `auth_request` остаётся в taxonomy как «зонтичный» сценарий, без своего handler'а.
-- **Path 2 (полноценная нода):** `AuthRequestNodeHandler` инкапсулирует challenge + verify + отметку контакта.
-Рекомендация: при реализации AccessControl выбрать осознанно. Ниже — спека для **Path 2**.
+## Challenge types (`AuthMethod`)
 
-## configSchema (Path 2)
-```php
-Schema::make()
-    ->required(['method'])
-    ->section(
-        Section::make('challenge', 'Authentication')->icon('shield-check')->fields([
-            SelectField::make('method')->label('Method')
-                ->options(['phone' => 'Phone (contact share)', 'sms_code' => 'SMS code', 'email_code' => 'Email code'])
-                ->default('phone')->required(),
-            NumberField::make('max_attempts')->label('Max attempts')->default(3)->min(1)->max(10),
-            // sms/email-specific поля через visibleWhen(['method' => 'sms_code']) и т.п.
-        ]),
-    )
-    ->toArray();
+The node is challenge-typed through the `AuthMethod` enum (`app/Domains/Flow/Enums/AuthMethod.php`). Only
+`basic` exists. A missing or unknown `method` falls back to `basic`.
+
+`basic` compares a variable against an expected value with the shared operator set (`BranchOperator`:
+`eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `in`, `empty`, `not_empty`). On a match the node raises the
+canonical flag **`contacts.is_authenticated`**.
+
+## Config
+
+```json
+{
+  "method": "basic",
+  "variable": "flow.code",
+  "operator": "eq",
+  "value": "1234"
+}
 ```
 
-## Outputs (CLAUDE.md § Outputs)
-- `authenticated` — успех; контакт помечен как аутентифицированный.
-- `failed` — превышены попытки / отказ / таймаут.
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `method` | enum | yes | `basic` (default and only value) |
+| `variable` | state path | for `basic` | The operand to check, for example `flow.code`. A structured `left` (the operand picker format used by `branch`) wins when present |
+| `operator` | enum | no | `BranchOperator`, default `eq` |
+| `value` | template string | no | Expected value, rendered through `TemplateRenderer` |
 
-## Runtime
-- `AuthRequestNodeHandler` (`type()='auth_request'`, `version()=1`), регистрируется **только когда Feature
-  AccessControl активирован** для tenant (`TenantActivationRuntime` фильтрует доступные node-handlers по owner_level/owner_id).
-- Внутри — оркестрация `auth.*` handler'ов (phone_button / code_sms) + `input`.
-- Отметка результата: контакт-level auth state (где хранить — решается вместе с AccessControl; кандидаты:
-  `contacts.attributes` платформенной нодой запрещены для модулей, но AccessControl — Feature Core-уровня, может иметь
-  свою таблицу `contact_auth` или canonical-поле; **решить при дизайне Feature**).
-- **Идемпотентность / waiting-state:** auth — многошаговый (challenge → ждём ввод → verify). Сессия уходит в `waiting`,
-  как `input`. Handler safe to retry, шаги фиксируются в `system.*`/feature-state.
+The UI is the override `AuthRequestConfig.vue`: `ConditionOperandPicker` (as in `branch`) plus localised
+operators (`builder.operators.*`). Operand and comparison logic is shared with `branch` through
+`Handlers/Support/OperandResolver` and `OperatorComparator`.
 
-## Инфраструктура (нужно создать) — БОЛЬШОЙ объём
-1. **Bootstrap Feature-механики** (если ещё нет): `app/Features/`, `ActivatableInterface`, `ActivationRegistry`,
-   `FeatureServiceProvider`, `tenant_activations` runtime (CLAUDE.md § Единая модель активации). Это предусловие, шире
-   одной ноды.
-2. `app/Features/AccessControl/` — провайдер, регистрация node-handler + `auth.*` handler'ов через `CoreRegistrar`.
-3. Хранилище состояния аутентификации контакта (дизайн-решение).
-4. SMS/email-код провайдеры (для `sms_code`/`email_code`) — внешние интеграции.
+## Output handles
 
-## Acceptance (Path 2)
-- При активном AccessControl нода доступна в палитре; при неактивном — скрыта (`TenantActivationRuntime`).
-- method=phone: связка challenge→input(contact)→verify; успех → `authenticated`, отказ/лимит → `failed`.
-- Сессия корректно входит в `waiting` и возобновляется.
-- Feature/unit тесты на оба выхода + лимит попыток + фильтрацию по активации.
+- `default`: always. The node returns `Executed` with the `default` handle whether the check passed or not.
 
-## Риски / зависимости
-- **Заблокировано bootstrap'ом Feature-механики** — это P3 и самый дальний пункт; не начинать раньше, чем появится
-  первый Feature (RAG — тоже Feature, может проложить дорогу).
-- Дизайн хранения auth-state контакта — отдельное решение, влияет на runtime resolution.
-- Path 1 vs Path 2 — выбрать до кодинга, чтобы не плодить дублирующую механику поверх `auth.*` примитивов.
+Metadata: `method` and `authenticated` (whether the check passed). `logResolved` holds the resolved operand.
 
----
+## Behavior
 
-## Связано с
+1. Resolve the operand (structured `left`, else the `variable` path).
+2. Render the expected `value` and compare it with the operator.
+3. If it passed, write `contact.is_authenticated = true` through `ContactWriterInterface`. Writing `true`
+   twice is a no-op, so the node is safe to retry. If no writer is available the node throws
+   `InvalidNodeConfigException`.
+4. Return `Executed` with `default`.
 
-- [[README]] — nodes README
-- [[00-overview]] — auth specs overview
-- [[03-branch]] — gate проверки через branch
-- [[05-contacts]] — canonical contact.is_authenticated поле
+Infrastructure: the migration `add_is_authenticated_to_contacts_table` (a boolean column on `contacts`, like
+`language`, not inside `attributes`), the `Contact` cast, `ContactWriter::WRITABLE_COLUMNS` including
+`is_authenticated`, and `is_authenticated` in the canonical column list of `ScopedStateReader`, so a `branch`
+reading it does not look into the JSONB and get `null`.
+
+## The auth mechanism has three parts
+
+1. **Setting the flag:** this node.
+2. **Checking the flag:** no dedicated node; use `branch` with a `user_variable` operand (storage `contact`,
+   name `is_authenticated`).
+3. **Flow availability (the gate):** `flow_definitions.is_public` (a mirror of `flow_drafts.is_public`, default
+   true; `PublishFlowService` copies it from the draft; the UI toggle is in the Filament flow form).
+   `FlowAccessPolicy::canStart(definition, contact)` is `is_public || contact.is_authenticated`, and fails open
+   for a `null` value. `FlowOrchestrator` applies it when it would start a **new** session: a private flow for an
+   unauthenticated contact does not start and falls through to the normal fallback, as with "no flow available".
+   Resuming an existing session, subflows and persistent-button re-entry are not gated.
+
+## Tests
+
+`tests/Feature/Domains/Flow/AuthRequestNodeHandlerTest.php`, `tests/Unit/Domains/Flow/FlowAccessPolicyTest.php`,
+the `ContactWriterTest` canonical-column case, and `ScopedStateReaderTest`.
+
+## Not built
+
+- Further `AuthMethod` types: `phone` (contact share), `sms_code`, `email_code`. They would be new enum cases;
+  the single `default` output does not change.
+- Max-attempts handling and an `authenticated` / `failed` output pair (the earlier design); a failed check simply
+  leaves the flag unset.
+- Gating by feature activation; the node is always available.

@@ -12,6 +12,7 @@ paths:
   - "app/Filament/Assistant/Resources/Contact*/**"
   - "database/migrations/tenant/*contact*"
   - "tests/*/Domains/Contact/**"
+reviewed_at: 2026-10-05
 ---
 # Contact glossary
 

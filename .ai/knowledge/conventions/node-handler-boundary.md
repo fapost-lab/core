@@ -7,6 +7,7 @@ domains:
 paths:
   - "app/Domains/Flow/Handlers/**"
 summary: "What a node handler may and must never do: persistence, transactions, system.*, own state"
+reviewed_at: 2026-10-05
 ---
 # Node handler boundary
 

@@ -41,7 +41,12 @@ matter how many domains call it.
 
 ## How it is checked
 
-PHPat rules, run through PHPStan:
+No PHPat rule checks the dependency direction itself. `foundation` and `support` are
+separate repositories with their own Composer requirements, so an `App\…` import in
+them cannot autoload, and reviewers catch the rest.
+
+Core's own PHPat rules (flow runtime isolation, handler versioning, ID strategy,
+messaging boundaries, migrations) run through PHPStan:
 
 ```bash
 composer run test:arch

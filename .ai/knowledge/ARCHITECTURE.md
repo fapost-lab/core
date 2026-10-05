@@ -7,7 +7,9 @@ system is in `docs/idea-brief.md`.
 
 ## System
 
-FaPost Core is a platform for conversational assistants in messengers. Staff build flows in a
+FaPost Core is the runtime and domain platform for conversational assistants in messengers. It is
+the shared execution kernel: solutions live in separate repositories, and a SaaS control plane
+(billing, onboarding) is a separate repository on top of Core, never part of it. Staff build flows in a
 visual builder; contacts talk to an assistant on a channel, and the flow engine runs their
 sessions. The platform is extended from outside through public contracts, not by editing Core.
 
@@ -52,7 +54,7 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   Foundation, a primitive with no domain meaning into Support, anything with one domain's meaning
   stays in Core (ADR-05).
 - **The extension packages are separate repositories.** Core consumes them through VCS
-  repositories at `^0.2`; they are absent from this working tree and, for local development,
+  repositories (`fapost/foundation ^0.3`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
   symlinked over `vendor/` by `composer dev:link` (`tools/dev-link-packages.php`).
 - **The extension surface is partly built.** Present: the action handler registry
   (`Flow/Action/ActionHandlerRegistry`) and the builder's vendor-component contract, a static Vite
@@ -62,8 +64,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
 - **Landlord data is reached only through Tenancy.** Other domains depend on
   `Tenancy/Contracts`; the `landlord` connection is opened only inside Tenancy infrastructure.
 - **Cross-domain asynchronous work goes through named queues** separated by purpose:
-  `flow.execution`, `messaging.transactional`, `messaging.broadcast`, `messaging.system`,
-  `messaging.logging`, `scheduled.triggers`.
+  `flow.execution`, `messaging.broadcast`, `messaging.system`, `messaging.logging`,
+  `scheduled.triggers`; `messaging.transactional` and `sync.external` are reserved and have no
+  producer today.
 - **The Flow runtime is constructed, not looked up.** The engine, handlers, orchestration, registry,
   routing, state and subflow code receive collaborators through constructors; node handlers are
   registered by class and built per resolve in the current scope (ADR-0001). Build-time Flow code
@@ -78,8 +81,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
    rate-limits, deduplicates and enqueues it, or to `POST /webhook/{channel}/{hash}`
    (`WebhookController`). A job on `flow.execution` runs `MessageRouter` → `FlowOrchestrator` →
    `FlowEngine`, which takes the session lock and runs handlers resolved by `(type, version)`.
-   Replies leave through the Channels message sender on `messaging.transactional`; the transcript
-   is persisted on `messaging.logging`.
+   Replies are sent inline: `FlowMessageSender` → `MessageSender::send()` runs inside the
+   `flow.execution` job (`SendTransactionalMessageJob` on `messaging.transactional` is never
+   dispatched); the transcript is persisted on `messaging.logging`.
 2. **Triggers and wake-ups.** Scheduled and event triggers start sessions from jobs on
    `scheduled.triggers`; a `delay` node wakes its session through `ResumeDelayedFlowSessionJob`
    on `flow.execution`, and send-message timeouts through `ResumeTimedOutSendMessageNodeJob`.

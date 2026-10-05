@@ -7,6 +7,7 @@ paths: []
 stages:
   - verify
 summary: Which composer/make commands run the PHPUnit and PHPat suites, and why php artisan test tests/Architecture verifies nothing
+reviewed_at: 2026-10-05
 ---
 # Verification commands
 

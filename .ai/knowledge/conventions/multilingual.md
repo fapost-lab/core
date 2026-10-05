@@ -10,6 +10,7 @@ paths:
   - "lang/**"
   - "app/Domains/Assistant/**"
 summary: Admin UI language and content language stay separate; content resolves via LanguageResolverInterface, and a button/select value is never translated
+reviewed_at: 2026-10-05
 ---
 # Multilingual layers
 
@@ -37,7 +38,7 @@ A flow button node stores its option as `{"label": {"en": "Confirm", "es":
 "Confirmar"}, "value": "confirm"}`. The handler compares against `value`, which
 stays `"confirm"` in every locale; only `label` goes through the content translator
 chain. A validation message shown to a Filament staff user, by contrast, comes from
-`resources/lang/{locale}` and never touches `LanguageResolverInterface` — it belongs
+`lang/{locale}` (only `lang/en` exists) and never touches `LanguageResolverInterface` — it belongs
 to the admin UI layer, not the content one.
 
 ## Rationale

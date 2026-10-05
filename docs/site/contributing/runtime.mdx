@@ -22,9 +22,13 @@ sequenceDiagram
     U->>TG: sends a message
     TG->>WC: POST /webhook/{channel}/{public_hash}
 
-    WC->>RD: GET webhook_registry:{hash}
+    WC->>RD: GET webhook:{hash}
     RD-->>WC: tenant, assistant, channel, secret
     WC->>WC: verify signature
+    WC->>RD: SET NX processed:{update_id} EX 86400
+    alt already processed
+        RD-->>WC: 0 — duplicate, ack and skip
+    end
     WC->>Q: dispatch IncomingMessageJob
     WC-->>TG: 200 OK (fast ack)
 
@@ -34,22 +38,19 @@ sequenceDiagram
     J->>J: set tenant context, switch schema
     J->>MR: route(incomingMessage)
 
-    Note over MR: 1. idempotency
-    MR->>RD: SET NX processed:{update_id} EX 86400
-    alt already processed
-        RD-->>MR: 0 — duplicate, skip
-    end
-
-    Note over MR: 2. command match
+    Note over MR: 1. command match (no lock)
     MR->>MR: match /reset, /cancel
 
+    Note over MR: 2. typing indicator
+    MR->>MS: start typing
+
     Note over MR: 3. distributed lock
-    MR->>RD: LOCK session:{tenant}:{contact}:{assistant} TTL 30s
-    alt lock held
-        MR->>MS: busy notice
+    MR->>RD: LOCK session_lock:{tenant}:{contact}:{assistant} TTL 30s
+    alt lock not acquired after 3 attempts, 2s apart
+        MR->>MS: busy notice, message dropped
     end
 
-    Note over MR: 4. route on session state
+    Note over MR: 4. staff-ownership check, then session classification
     MR->>FO: orchestrate(session, message)
     FO->>FE: execute(session, flowDefinition)
 
@@ -100,18 +101,23 @@ failures:
 | Distributed lock on the session | Two messages from one contact racing each other |
 | Optimistic lock on `flow_sessions.version` | A concurrent write landing between read and update |
 
-A lock that cannot be acquired produces a **busy notice**, not a dropped message —
-the job goes to a backoff queue.
+A lock that cannot be acquired (three attempts, two seconds apart) produces a
+**busy notice**, and the message is dropped — it is reported as
+`lock_timeout`, and there is no backoff queue behind it.
 
 ## Webhook routing
 
 The URL is `/webhook/{channel}/{public_hash}`, and `public_hash` resolves through
-Redis.
+Redis (`webhook:{hash}`). The `processed:{id}` idempotency key is set by the
+webhook controller before the job is dispatched.
 
 <Warning>
   The landlord database must not participate in a routing hot path. Resolution is
   a Redis lookup precisely so that inbound traffic never waits on platform-level
-  storage.
+  storage. The one exception is a registry miss: every request that misses
+  reads the landlord database. A short `warming:{hash}` leader lock only decides
+  which request writes the entry back to Redis; it does not stop the others from
+  querying.
 </Warning>
 
 Inbound messages are handed to `IncomingMessageJob` and resolved through the

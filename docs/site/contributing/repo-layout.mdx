@@ -63,7 +63,9 @@ references to concrete Core classes. See
 **Migrations do not depend on runtime state.** See
 [Migration isolation](/contributing/migration-isolation).
 
-All three are checked by PHPat rules rather than by reviewers remembering them.
+Only migration isolation has a PHPat rule. The other two are not checked
+mechanically: `foundation` and `support` cannot import `App\…` because it would not
+autoload outside Core, and landlord access is caught in review only.
 
 ## Where a piece of code belongs
 

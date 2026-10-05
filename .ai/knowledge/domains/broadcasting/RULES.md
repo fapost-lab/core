@@ -13,6 +13,7 @@ paths:
   - "app/Filament/Assistant/Resources/Broadcasts/**"
   - "database/migrations/tenant/*broadcast*"
   - "tests/Feature/Domains/Broadcasting/**"
+reviewed_at: 2026-10-05
 ---
 # Broadcasting rules
 

@@ -16,7 +16,7 @@ The canonical list is the `StateNamespace` enum in
 | `rag` | Retrieval results | `rag_query` |
 | `module` | Canonical data owned by a module | **Nobody** — read-only, resolved lazily through a data accessor |
 | `contact` | The contact profile | A derived projection, not stored in the session |
-| `call` | The last HTTP call response | A derived projection, not stored in the session |
+| `call` | Values from HTTP call nodes | Any handler; stored in the session state |
 
 <Note>
   New top-level namespaces are added to the enum, never invented per node. A
@@ -60,11 +60,17 @@ to fix it. Resolving on read keeps the module the single source of truth.
 
 See [Data accessors](/extending/data-accessors) for exposing your own data here.
 
-## `contact` and `call` are projections
+## `contact` is a projection
 
-Neither is stored in session state. They are derived views — the contact profile,
-and the response from the most recent HTTP call — addressable with the same dotted
-path notation in templates, branch conditions, and state pickers.
+`contact` is not stored in session state. It is a derived view of the contact
+profile, addressable with the same dotted path notation in templates, branch
+conditions, and state pickers.
 
-Treat them as read-only. To change a contact, use the writer on
+Treat it as read-only. To change a contact, use the writer on
 `NodeExecutionContext`, not a state write.
+
+## `call` is open
+
+Unlike `contact` and `module`, `call` lives in `flow_sessions.state` and accepts
+writes from any handler, like `flow`. Nothing fills it automatically: the call
+node writes to the variables it is configured with.

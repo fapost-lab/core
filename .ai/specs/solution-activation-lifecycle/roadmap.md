@@ -38,11 +38,24 @@ permission activates and deactivates a Solution for their tenant and sees the re
       the rebuild requirement either removed or stated on the screen (after: D4 in `spec.md` — the
       answer decides whether this is a publish step or a build step)
 
+## Phase 4 — An update cannot take the install down
+
+Goal: a broken or failing Solution degrades only itself. Done when: a Solution whose boot throws
+leaves the install serving every other flow, and a Solution migration that fails during
+`platform:update` is rolled back alone while the platform migrations stay applied.
+
+- [ ] Failure isolation at boot: a Solution that fails to boot is marked degraded, new sessions of
+      its flows do not start, running ones finish (after: activation storage — degraded is a state
+      of an activation)
+- [ ] `platform:update` with per-phase rollback: validate, migrate platform, migrate each Solution
+      separately, boot validation, activate (after: the manifest — phase 1 validates it)
+
 ## Waves
 
-1. The manifest and its validation
-2. Activation storage and registry; the Core registrar and the lifecycle suite
-3. The activation screen; the builder-component publish path
+1. A Solution declares its identity, its Foundation constraint and what it registers in a manifest that is validated at `platform:update`
+2. Per-tenant activation storage and registry: a Solution is on or off for one tenant, and the state survives a worker restart without leaking between tenants
+3. Core implementation of `CoreRegistrarInterface`: an activated Solution's action handlers resolve in the flow runtime, and a name collision with Core fails at registration instead of overwriting; Filament activation screen: install state, activate, deactivate, and what the Solution registers; `platform:update` with per-phase rollback: validate, migrate platform, migrate each Solution separately, boot validation, activate
+4. A Solution's builder components reach the builder through the agreed publish contract, with the rebuild requirement either removed or stated on the screen; Failure isolation at boot: a Solution that fails to boot is marked degraded, new sessions of its flows do not start, running ones finish; Lifecycle test suite over the whole chain: install → activate → handler available → deactivate → gone, with the tenant boundary asserted
 
 <!--
 Rules (jig-idea §8):

@@ -8,7 +8,8 @@ paths:
   - "app/Domains/Flow/History/**"
 source: docs/reference/specs/builder/storage/09-flow-logging-flag.md
 summary: Per-flow history logging flag, independent for every subflow
-source_hash: f8f888c0f84dcb5b574d8d8d5678ac473f247c02
+source_hash: 644908d57e2fccd3bd2757f11242ba7e404deac2
+reviewed_at: 2026-10-05
 ---
 # 09 · Flow `logging_enabled` flag + per-session history
 

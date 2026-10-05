@@ -7,6 +7,7 @@ paths: []
 stages:
   - consolidate
 summary: How to compute the pending semver bump from merged PR titles pre-1.0, and that a v* tag is only ever pushed on explicit instruction
+reviewed_at: 2026-10-05
 ---
 # Release proposals
 

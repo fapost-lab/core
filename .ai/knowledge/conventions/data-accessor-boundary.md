@@ -9,6 +9,7 @@ paths:
   - app/Domains/Flow/Contracts/DataAccessorRegistryInterface.php
   - app/Domains/Flow/Contracts/MutableDataAccessorRegistryInterface.php
 summary: Data accessors behind module.* are read-only and deterministic within one engine step
+reviewed_at: 2026-10-05
 ---
 # Data accessor boundary
 

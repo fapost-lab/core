@@ -1,207 +1,214 @@
-# 07. Node Cookbook (практические рецепты)
+# 07. Node Cookbook (practical recipes)
 
-Этот файл - про "как делать", а не только "как устроено".
-
----
-
-## Рецепт A: Простая sync-нода (transform/set)
-
-### Когда использовать
-
-- нужно вычислить значение и записать в `flow.*`,
-- нет внешних HTTP вызовов,
-- нет ожидания входящего события.
-
-### Поведение
-
-- `execute()` всегда завершает ноду за один проход,
-- возвращает `NodeExecutionResult::executed(sourceHandle: 'default')`.
-
-### Минимальный контракт
-
-- вход из `state`/`config`,
-- выход в `stateChanges`,
-- deterministic result (один и тот же input -> один и тот же output).
-
-### Пример use-case
-
-- `set_variable`
-- `normalize_phone`
-- `format_date`
+This file is about "how to do it", not only "how it works". Each recipe names the closest
+**registered** Core node to read as a real example. Registered types are listed in
+[10-registered-nodes-catalog.md](10-registered-nodes-catalog.md); any other type name below is a
+hypothetical vendor node and is marked so.
 
 ---
 
-## Рецепт B: Input-like нода (ожидание пользовательского ответа)
+## Recipe A: A simple sync node (transform / set)
 
-### Когда использовать
+### When to use
 
-- нужно "остановить" flow и ждать сообщение от пользователя.
+- compute a value and write it to `flow.*` or the contact,
+- no external HTTP calls,
+- no waiting for an inbound event.
 
-### Поведение
+### Behaviour
 
-1. Если `context->incoming` пустой -> вернуть `Waiting`.
-2. Если вход есть -> провалидировать/нормализовать.
-3. Вернуть `Executed` и `sourceHandle` (`default`/`invalid`/`timeout` по модели ноды).
+- `execute()` always finishes the node in one pass,
+- returns `NodeExecutionResult::executed(sourceHandle: 'default')`.
 
-### Обязательные нюансы
+### Minimal contract
 
-- Если нода допускает повторное получение того же update, должна быть защита от дублей.
-- Если есть retry-limit, отражай это в state (`system.*` или `flow.*`).
+- input from `state` / `config`,
+- output in `stateChanges` (or through `ContactWriter`),
+- deterministic: the same input gives the same output.
 
-### Пример use-case
+### Real example
 
-- `input` (text/phone/email)
-- шаг подтверждения через callback/reply
-
----
-
-## Рецепт C: Branch-нода (condition/switch)
-
-### Когда использовать
-
-- нужно выбрать одну из нескольких веток по правилам.
-
-### Поведение
-
-- вычисляет operand,
-- сопоставляет с rules,
-- возвращает нужный handle (`true`, `false`, `default`, `my_case_*`).
-
-### Рекомендации по дизайну
-
-- Всегда имей fallback-handle (`default`), чтобы flow не обрывался молча.
-- Пиши в `logResolved` фактические значения, по которым принималось решение.
-
-### Пример use-case
-
-- `condition`
-- `switch`
+`AssignNodeHandler` (`assign`): evaluates its `operations[]` and writes each into session state or,
+for the contact storage, through `ContactWriter`. Hypothetical vendor examples of the same shape:
+`format_date`, `normalize_phone` (not registered).
 
 ---
 
-## Рецепт D: External call нода (webhook/API)
+## Recipe B: An input-like node (wait for the user's reply)
 
-### Когда использовать
+### When to use
 
-- нужно сходить во внешний сервис синхронно.
+- stop the flow and wait for a message from the user.
 
-### Поведение
+### Behaviour
 
-- на успехе: `Executed` + `sourceHandle='success'` (или `default`),
-- на контролируемой ошибке: `Executed` + `sourceHandle='error'` (если бизнес-ветка),
-- на неконтролируемой ошибке: `Failed` или exception (зависит от контракта ноды).
+1. If `context->incoming` is empty, return `Waiting`.
+2. If there is input, validate and normalise it.
+3. Return `Executed` with a `sourceHandle` (`default` / `invalid` per the node's model).
 
-### Обязательные guardrails
+### Notes
 
-- timeout на HTTP,
-- внятная обработка не-2xx,
-- идемпотентность внешнего вызова (ключи, dedup, безопасные повторы).
+- If the node can receive the same update twice, guard against duplicates.
+- If there is a retry limit, keep the counter in state (`system.*`; `input` uses
+  `SystemStateKeys::INPUT_RETRY_PREFIX`).
 
-### Пример use-case
+### Real example
 
-- `webhook`
-- `crm_create_lead`
-
----
-
-## Рецепт E: Async-like нода (delay/pause/resume)
-
-### Когда использовать
-
-- нужно поставить паузу/таймер и продолжить позже.
-
-### Поведение
-
-1. Первая итерация: фиксирует schedule в state, возвращает `Waiting`/`Delayed`.
-2. Повторная итерация: если уже scheduled, не планирует заново.
-3. Продолжение запускается внешним job/event.
-
-### Ключевые риски
-
-- двойное планирование таймера,
-- бесконечное ожидание без resume механизма,
-- гонки при одновременных retries.
-
-### Пример use-case
-
-- `delay`
-- timeout-переходы в `send_message`.
+`InputNodeHandler` (`input`). A confirmation step through a callback button is `send_message` with
+inline buttons, where each button id is a handle.
 
 ---
 
-## Рецепт F: Message sender нода (как `send_message`)
+## Recipe C: A branch node
 
-### Когда использовать
+### When to use
 
-- нода отправляет контент пользователю.
+- pick one of several branches by rules.
 
-### Поведение
+### Behaviour
 
-- генерирует payload из config/state/language,
-- отправляет через `MessageSenderInterface`,
-- фиксирует маркер отправки в `system.sent_messages`,
-- при повторе проверяет marker и не отправляет повторно.
+- resolve the operand,
+- match it against the rules in order,
+- return the matching rule's handle, otherwise `default`.
 
-### Обязательные элементы
+### Design advice
 
-- стабильный idempotency key,
-- поддержка мультиязычности (если текст/labels локализуемые),
-- разделение "построить payload" и "отправить".
+- Always keep a fallback handle (`default`) so the flow does not stop silently.
+- Put the actual values used for the decision into `logResolved`.
+- A branch handler must not touch the database layer; read `module.*` through the data accessor
+  (enforced by `HandlerVersionContractTest`).
 
----
+### Real example
 
-## Рецепт G: Нода, которая меняет contact
-
-### Когда использовать
-
-- нужно изменить canonical данные контакта (`language`, `attributes`, tags и т.д.).
-
-### Как делать корректно
-
-- вызывай `ContactWriterInterface` (`context->contactWriter`) напрямую из handler-а - это
-  единственный канал для contact-мутаций, легаси `effects[]` удалён;
-- не пиши в модель `Contact` мимо writer-а и не имитируй его через прямые репозитории.
-
-### Пример
-
-`SetTagNodeHandler` (`app/Domains/Flow/Handlers/SetTagNodeHandler.php`) меняет теги контакта
-через `ContactTagRepositoryInterface`, а не через writer, потому что теги - отдельная таблица
-`contact_tags`, а не `contact.*` state; для `language`/`attributes` (полей самого Contact)
-используй `ContactWriterInterface`.
-
-### Зачем
-
-- явная зависимость handler-а от writer-а видна в конструкторе/контексте,
-- проще тестировать: writer мокается напрямую, без промежуточного движка.
+`BranchNodeHandler` (`branch`). The legacy `condition` and `switch` types are not registered.
 
 ---
 
-## Рецепт H: Миграция ноды v1 -> v2
+## Recipe D: An external call node
 
-### Когда делать v2
+### When to use
 
-- меняется смысл `config`,
-- меняются handles/контракт переходов,
-- старые flow могут повести себя иначе.
+- call an external service synchronously.
 
-### Практический план
+### Behaviour
 
-1. Оставить v1 handler в registry.
-2. Добавить v2 handler (тот же `type`, другая `version`).
-3. В builder новые ноды создавать с v2.
-4. Старые definition не трогать автоматически.
-5. Отдельно подготовить миграцию/инструмент обновления flow (если нужен).
+- on success: `Executed` with `sourceHandle = 'success'`,
+- on a controlled error: `Executed` with `sourceHandle = 'error'` (the business branch),
+- on an uncontrolled error: an exception, which the engine turns into a failed session.
+
+### Guardrails
+
+- a timeout on the HTTP request,
+- explicit handling of non-2xx responses,
+- an idempotent external call (the engine-provided key, safe retries).
+
+### Real example
+
+`CallNodeHandler` (`call`) over a pluggable transport (`http` or `handler`); it routes on `success` /
+`error`. A CRM-specific call such as `crm_create_lead` would be a hypothetical vendor node (not
+registered) built as a `call` action rather than a new transport.
 
 ---
 
-## Быстрый шаблон проверки дизайна ноды (перед кодом)
+## Recipe E: An async node (delay / pause / resume)
 
-- Какой `type` и какая ответственность ноды?
-- Какие `sourceHandle` она может вернуть?
-- Какие поля обязательны в `config`?
-- Что пишем в `stateChanges`?
-- Нужны ли contact-мутации через `ContactWriter`?
-- Что произойдёт при retry того же сообщения/job?
-- Где негативный путь (error/invalid/timeout)?
+### When to use
 
-Если на все пункты есть ответ до реализации - нода обычно встраивается без боли.
+- pause for a timer and continue later.
+
+### Behaviour
+
+1. First run: record the schedule in state, schedule the resume, return `Waiting` (or
+   `Delayed` with `resumeAt`; see section 6 of the development guide).
+2. Re-run: if already scheduled, do not schedule again; return `Waiting` until the time is up.
+3. The continuation is triggered by an external job or event.
+
+### Key risks
+
+- double scheduling,
+- endless waiting without a resume mechanism,
+- races between concurrent retries.
+
+### Real example
+
+`DelayNodeHandler` (`delay`) with `ResumeDelayedFlowSessionJob` and `DelayedSessionResumer`. A
+`send_message` timeout transition is the same pattern through `SendMessageTimeoutSchedulerInterface`.
+
+---
+
+## Recipe F: A message-sender node (like `send_message`)
+
+### When to use
+
+- the node sends content to the user.
+
+### Behaviour
+
+- builds the payload from config, state and language,
+- sends through `MessageSenderInterface`,
+- records a sent marker in `system.sent_messages`,
+- on a re-run checks the marker and does not send again.
+
+### Required
+
+- a stable idempotency key,
+- multilingual support when text or labels are localisable,
+- separate "build payload" from "send".
+
+---
+
+## Recipe G: A node that changes the contact
+
+### When to use
+
+- change canonical contact data (`language`, attributes, tags).
+
+### Do it right
+
+- call `ContactWriterInterface` (`context->contactWriter`) directly from the handler. It is the
+  single channel for `contact.*` mutations; the legacy `effects[]` is gone.
+- do not write to the `Contact` model around the writer.
+
+### Examples
+
+- `AssignNodeHandler` and `AuthRequestNodeHandler` write contact fields through the writer
+  (`auth_request` raises `contacts.is_authenticated`).
+- `SetTagNodeHandler` changes tags through `ContactTagRepositoryInterface`, because tags live in a
+  separate table rather than in `contact.*`.
+
+### Why
+
+- the handler's dependency on the writer is explicit in its context,
+- easy to test: fake the writer directly.
+
+---
+
+## Recipe H: Migrating a node from v1 to v2
+
+### When to make v2
+
+- the meaning of `config` changes,
+- handles or the transition contract change,
+- old flows might behave differently.
+
+### Plan
+
+1. Keep the v1 handler in the registry.
+2. Add a v2 handler (same `type`, different `version`) and register it too.
+3. The builder creates new nodes with v2 (`NodeHandlerRegistry::all()` returns the latest version).
+4. Do not touch old definitions automatically.
+5. Prepare a flow migration tool separately if needed.
+
+---
+
+## A pre-code design checklist
+
+- What are the `type` and the node's responsibility?
+- Which `sourceHandle`s can it return?
+- Which `config` fields are required?
+- What goes into `stateChanges`?
+- Are contact mutations needed through `ContactWriter`?
+- What happens on a retry of the same message or job?
+- Where is the negative path (error / invalid / timeout)?
+
+With an answer to each before implementation, a node usually fits in without pain.

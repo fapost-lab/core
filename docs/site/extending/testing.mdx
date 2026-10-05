@@ -22,10 +22,10 @@ composer run test:arch
 
 ## The architecture check
 
-`composer run test:arch` runs the PHPat rules through PHPStan. These are the rules
-that enforce the boundaries this section describes — dependency direction,
-migration isolation, tenant-aware execution — so an extension that violates one
-fails here rather than in review.
+`composer run test:arch` runs the PHPat rules through PHPStan. These cover flow
+runtime isolation, handler versioning, ID strategy, messaging boundaries and
+migration isolation. Dependency direction and tenant-aware execution have no PHPat
+rule, so they are checked in review.
 
 <Warning>
   Do not run `php artisan test tests/Architecture` as the architecture check.

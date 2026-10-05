@@ -1,82 +1,73 @@
-# Tenant Context — установка контекста и переключение схемы
+# Tenant Context: setting the context and switching the schema
 
-Два пути инициализации tenant-контекста: HTTP webhook запрос (ingress) и Queue Job (Horizon worker).
+Tenant context is established in the **worker**, not at the ingress. The webhook ingress resolves the
+channel from Redis and dispatches a job; the queue job switches the tenant.
 
 ```mermaid
 sequenceDiagram
     participant TG as Telegram API
-    participant OC as Ingress
-    participant TC as TenantContext<br/>(scoped)
-    participant TS as TenantSwitcher
-    participant DB as PostgreSQL<br/>tenant_{slug}
+    participant OC as Ingress<br/>(Go gateway or WebhookController)
+    participant RD as Redis
     participant Q as Queue<br/>flow.execution
-    participant JW as Horizon Worker
-    participant TC2 as TenantContext<br/>(scoped, новый экземпляр)
+    participant JW as Horizon worker<br/>IncomingMessageJob
+    participant TS as TenantSwitcher<br/>(scoped)
+    participant TC as TenantContext<br/>(scoped)
+    participant DM as TenantDatabaseManager<br/>(scoped)
+    participant DB as PostgreSQL<br/>tenant schema
 
-    Note over TG,DB: Путь 1 — HTTP Webhook Request
+    Note over TG,RD: Path 1: HTTP webhook (no tenant context)
 
-    TG->>OC: POST /webhook/telegram/{hash}
-    Note over OC: WebhookController (PHP-FPM ingress)
-
-    OC->>TS: runForTenant(tenant_id, callable)
-    activate TS
-    Note over TS: Оборачивает в try/finally
-
-    TS->>TC: set(tenant)
-    activate TC
-    Note over TC: scoped binding —<br/>новый экземпляр на каждый запрос
-
-    TC->>DB: SET search_path = tenant_{slug}
-    Note over DB: PostgreSQL schema switch
-
-    TS->>OC: callable() → обработка запроса
-    OC->>Q: dispatch IncomingMessageJob(tenant_id, payload)
+    TG->>OC: POST /webhook/{channel}/{hash}
+    OC->>RD: GET webhook:{hash}
+    RD-->>OC: {tenant_id, schema, assistant_id, ...}
+    Note over OC: No Eloquent, no TenantContext,<br/>no TenantSwitcher: the entry is a plain value object
+    OC->>Q: dispatch IncomingMessageJob(tenant_id, schema, rawPayload)
     OC-->>TG: 200 OK
 
-    TS-->>TC: finally: restore(previous_tenant)
-    deactivate TC
+    Note over Q,DB: Path 2: queue job (Horizon worker)
+
+    Q->>JW: handle(InboundWebhookPayload)
+    JW->>TS: runForTenant(RuntimeTenant(id, schema), callback)
+    activate TS
+    TS->>TC: set(tenant)
+    TS->>DM: switchTo(tenant)
+    DM->>DB: set search_path = tenant schema<br/>default connection = tenant connection
+    TS->>JW: callback(): normalise, resolve contact,<br/>MessageRouter, FlowOrchestrator, FlowEngine
+    JW-->>TS: returns or throws
+    TS->>DM: finally: restore() (pop the connection stack)
+    TS->>TC: finally: restore previous tenant, or reset()
     deactivate TS
-    Note over TC: Изоляция между запросами<br/>и между job в воркере
-
-    Note over Q,DB: Путь 2 — Queue Job (Horizon Worker)
-
-    Q->>JW: process IncomingMessageJob
-    Note over JW: Отдельный process,<br/>свой DI-контейнер
-
-    JW->>TC2: set(tenant_id)
-    activate TC2
-    Note over TC2: scoped binding —<br/>новый экземпляр per-job
-
-    TC2->>DB: SET search_path = tenant_{slug}
-    Note over DB: PostgreSQL schema switch
-
-    JW->>JW: обработка сообщения<br/>FlowOrchestrator, Engine...
-
-    JW-->>TC2: job завершён (implicit cleanup)
-    deactivate TC2
-    Note over TC2: Process recycled by Horizon,<br/>контекст не вытекает
 ```
 
-## Ключевые классы
+## Key classes
 
-| Класс | Путь | Роль |
+| Class | Path | Role |
 |-------|------|------|
-| `TenantContextInterface` | `Domains/Tenancy/Contracts/` | Scoped binding — хранит текущий tenant per-request/job |
-| `TenantSwitcher` | `Domains/Tenancy/Services/` | `runForTenant(callable)` с `finally restore()` — обязателен для долгоживущих воркеров |
-| `TenantDatabaseManager` | `Domains/Tenancy/Services/` | Переключение PostgreSQL search_path на schema tenant |
-| `IncomingMessageJob` | `Jobs/` | `TenantContext::set()` в начале handle(), перед любой бизнес-логикой |
+| `TenantContextInterface` / `TenantContext` | `app/Domains/Tenancy/Contracts/`, `app/Domains/Tenancy/Services/TenantContext.php` | Holds the current tenant; `get()` throws `TenantNotResolvedException` when unset |
+| `TenantSwitcher` | `app/Domains/Tenancy/Services/TenantSwitcher.php` | `runForTenant(tenant, callback)` with a `finally` restore; nested calls restore the outer tenant; also resets cached permissions and runs restore hooks (for example `CurrentAssistant`) |
+| `TenantDatabaseManager` | `app/Domains/Tenancy/Database/TenantDatabaseManager.php` | `switchTo()` / `restore()`: pushes the previous connection on a stack, sets the tenant connection's PostgreSQL `search_path` to the tenant schema |
+| `TenantPostgresConnection` | `app/Domains/Tenancy/Database/TenantPostgresConnection.php` | pgsql connection class that lets `search_path` move while the connection stays open (no dropped transaction) |
+| `IncomingMessageJob` | `app/Domains/Webhook/Jobs/IncomingMessageJob.php` | Wraps all domain work in `TenantSwitcher::runForTenant()` |
 
-## Важные инварианты
+## Important invariants
 
-- **Scoped, не Singleton:** `TenantContext` зарегистрирован как `scoped` — новый экземпляр на каждый HTTP-запрос и Job, нет state leakage
-- **Restore обязателен** — один Horizon-воркер обрабатывает много job подряд, и незакрытый tenant context утёк бы в следующую
-- **Hard fail без контекста:** `TenantContext::get()` бросает исключение если tenant не установлен — никаких fallback к default tenant
-- **Landlord DB не в hot path:** tenant резолвится из Redis по `public_hash`, `landlord` БД не участвует при обработке webhook
+- **Scoped, not singleton:** `TenantContextInterface`, `TenantDatabaseManagerInterface` and
+  `TenantSwitcher` are registered with `scoped()` in `DomainServiceProvider`, so a Horizon job gets
+  a fresh instance and the scope is flushed between jobs. Nothing tenant-specific may live in a
+  singleton or in static state (see the worker-safety convention).
+- **Restore is mandatory:** one Horizon worker runs many jobs in a row; a tenant left set would leak
+  into the next job. `runForTenant()` always restores in `finally`, even when the callback throws or
+  the restore itself fails.
+- **Hard fail without context:** `TenantContext::get()` throws when no tenant is set. There is no
+  fallback to a default tenant on the worker path.
+- **The landlord database is not on the webhook hot path:** the channel resolves from Redis by
+  `hash`; only a Redis miss falls back to the landlord `webhook_registry` table (through the Tenancy
+  domain's reader).
+- The webhook controller never switches the tenant. Schema switching happens only inside jobs,
+  console commands and HTTP requests that go through the tenancy middleware.
 
-## Связано с
-- [[01-octane-ingress-only|ADR-01]] — отменён; сохранён как запись решения
-- [[architecture/platform/01-overview-layers|Platform: Overview]]
-- [[01-webhook-pipeline]]
-- [[01-overview-layers]] — архитектура платформы
-- [[08-concurrency-idempotency]] — concurrency
-- [[diagrams/01-webhook-pipeline]] — диаграмма webhook pipeline
+## Related
+
+- [01-webhook-pipeline.md](01-webhook-pipeline.md)
+- `.ai/knowledge/domains/tenancy/OVERVIEW.md`, `.ai/knowledge/domains/tenancy/RULES.md`
+- `.ai/knowledge/conventions/worker-safety.md`
