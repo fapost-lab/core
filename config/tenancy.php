@@ -16,6 +16,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Tenant resolution
+    |--------------------------------------------------------------------------
+    |
+    | single - one tenant per deployment, taken from TENANT_SLUG; the request
+    |          host is not read.
+    | host   - the tenant is named by the request host, <slug>.<base_domain>.
+    |          The base domain itself serves platform pages without a tenant,
+    |          and any other host is answered with 404.
+    |
+    | Any other value fails at boot.
+    |
+    */
+    'resolution' => env('TENANCY_RESOLUTION', 'single'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Reserved tenant slugs
     |--------------------------------------------------------------------------
     |

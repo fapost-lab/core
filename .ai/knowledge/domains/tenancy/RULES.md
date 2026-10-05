@@ -18,6 +18,7 @@ paths:
   - "tests/Feature/Tenancy/**"
   - "tests/Feature/Domains/Tenancy/**"
   - tests/Unit/Architecture/WebhookArchitectureTest.php
+  - app/Http/Middleware/ResolveTenantContext.php
 reviewed_at: 2026-10-05
 ---
 # Tenancy rules
@@ -30,6 +31,16 @@ broken.
 - **A missing tenant context fails fast.** `TenantContext::get()` throws
   `TenantNotResolvedException`; there is no default-tenant fallback in the context itself.
   Enforced: code, `TenantContextTest`.
+- **The tenant is resolved before the session starts.** Session, password-reset and activation
+  tables live in tenant schemas, so a request must be in its tenant before `StartSession`:
+  `ResolveTenantContext` is first in `web`, and `TenancyMiddleware` is prepended to the
+  middleware priority list before `EncryptCookies`. Why: with the database session driver a
+  session read outside the tenant fails or reads another schema. Enforced:
+  `TenantMiddlewareOrderTest`.
+- **In `host` mode only `<slug>.<base_domain>` reaches a tenant.** The base domain runs with no
+  tenant; any other host, an unknown, inactive or reserved slug is a 404, and the default-slug
+  exemption from the reserved list applies only in `single` mode. Enforced:
+  `RequestHostClassifierTest`, `HostTenantResolverTest`, `HostResolutionTest`.
 - **A tenant switch always restores.** `runForTenant()` restores the connection, resets the
   context, runs restore hooks and clears the permission cache even when the database restore
   itself throws. A restore without a matching switch throws `ConnectionStackEmptyException`.

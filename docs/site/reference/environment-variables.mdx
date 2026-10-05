@@ -21,6 +21,8 @@ to FaPost, and the Laravel ones whose value matters here.
 | Variable | Default | Notes |
 |---|---|---|
 | `TENANCY_BASE_DOMAIN` | `localhost` | Base domain tenant hosts are derived from |
+| `TENANCY_RESOLUTION` | `single` | `single`: one tenant, named by `TENANT_SLUG`. `host`: the tenant is taken from the request host `<slug>.<TENANCY_BASE_DOMAIN>`, so one install serves many tenants; unknown hosts get 404 |
+| `TENANT_SLUG` | `app` | The tenant served in `single` mode; ignored in `host` mode |
 | `WEBHOOK_BASE_URL` | `${APP_URL}` | The base providers will call back on |
 | `WEBHOOK_INGRESS_DRIVER` | `laravel` | `laravel` or `gateway` |
 | `WEBHOOK_GATEWAY_URL` | *empty* | Required when the driver is `gateway` |

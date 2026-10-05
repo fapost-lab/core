@@ -18,10 +18,13 @@ use App\Domains\Tenancy\Repositories\TenantRepository;
 use App\Domains\Tenancy\Services\ConfigTenantResolver;
 use App\Domains\Tenancy\Services\CoreBootstrap;
 use App\Domains\Tenancy\Services\DomainBootstrapper;
+use App\Domains\Tenancy\Services\HostTenantResolver;
+use App\Domains\Tenancy\Services\RequestHostClassifier;
 use App\Domains\Tenancy\Services\TenantContext;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Services\WebhookRegistryWriter;
+use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Database\Connection;
 use Illuminate\Support\ServiceProvider;
@@ -59,7 +62,18 @@ final class DomainServiceProvider extends ServiceProvider
             TenantRepository::class,
         );
 
-        $this->app->bind(TenantResolverInterface::class, ConfigTenantResolver::class);
+        // The mode is read (and validated) when the resolver is built, not at boot: a bad value must
+        // fail the first tenant use, but must not stop `config:clear` from fixing it.
+        $this->app->bind(TenantResolverInterface::class, fn ($app): TenantResolverInterface => match (TenancyResolutionMode::fromConfig()) {
+            TenancyResolutionMode::Single => $app->make(ConfigTenantResolver::class),
+            TenancyResolutionMode::Host   => $app->make(HostTenantResolver::class),
+        });
+        $this->app->bind(RequestHostClassifier::class, fn ($app): RequestHostClassifier => new RequestHostClassifier(
+            TenancyResolutionMode::fromConfig(),
+            (string) $app['config']->get('tenancy.base_domain'),
+            $app['config']->get('tenancy.default_tenant_slug'),
+            $app->make(TenantSlugPolicy::class),
+        ));
         $this->app->when(ConfigTenantResolver::class)
             ->needs('$defaultTenantSlug')
             ->giveConfig('tenancy.default_tenant_slug');
@@ -105,9 +119,12 @@ final class DomainServiceProvider extends ServiceProvider
             $reserved[] = $label;
         }
 
-        // The stock installation provisions the default tenant, so its own slug
-        // must stay assignable even when the list would otherwise claim it.
-        $default = mb_strtolower((string) $config->get('tenancy.default_tenant_slug'));
+        // The stock single-tenant installation provisions the default tenant, so its own slug
+        // must stay assignable even when the list would otherwise claim it. With one tenant per
+        // host there is no default tenant, and `app.<base>` is as reserved as any other name.
+        $default = TenancyResolutionMode::Host === TenancyResolutionMode::tryFrom((string) $config->get('tenancy.resolution'))
+            ? ''
+            : mb_strtolower((string) $config->get('tenancy.default_tenant_slug'));
 
         return array_values(array_filter(
             array_unique($reserved),
