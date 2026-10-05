@@ -32,6 +32,7 @@ A developer inside the Laravel ecosystem can stand up FaPost, extend it through 
 | 6 | First solution built through the public contracts only — no privileged access into the core, as an outsider would build it | idea-brief.md §7 Recommendation | L | spec `.ai/specs/first-solution/` |
 | 7 | Extension documentation for outsiders — the Extending section rewritten against contracts that survived a real build | idea-brief.md §3 Users | M | spec `.ai/specs/extension-docs/` |
 | 8 | Ecosystem distribution → see [Not yet specified](#not-yet-specified) | idea-brief.md §7 Recommendation | fog | spec `.ai/specs/ecosystem-distribution/` |
+| 9 | Tenant quotas — limited test and trial tenants: host-based tenant resolution, Foundation quota and operator contracts with allow-everything Core defaults, an egress guard, and a runtime-stopped read-only tenant; a self-hosted install sees no difference | owner, 2026-10 (put Core online for testers; the SaaS trial tier) | L | spec `.ai/specs/tenant-quotas/` |
 
 Step progress is read from the specs themselves: `.ai/scripts/jig spec list`. Nothing tracks status here.
 
@@ -102,10 +103,12 @@ flowchart LR
   s6["6 · First solution"]
   s7["7 · Extension docs"]
   s8["8 · Ecosystem distribution"]
+  s9["9 · Tenant quotas"]
   s4 -->|"a solution cannot be installed or activated before the lifecycle exists"| s6
   s5 -->|"a solution that ships an interface has nothing to compose against until one exists"| s6
   s6 -->|"documenting contracts that never survived a real build would fix the mistakes in writing"| s7
   s4 -->|"the sandbox boundary is only askable once the activation surface is fixed"| s8
+  s4 -->|"its Solution entitlement seam extends the activation screen"| s9
 ```
 
 ## Execution path
@@ -120,6 +123,10 @@ flowchart LR
 The backlog lane runs beside the product waves, one direction at a time in the order B1 → B5; a
 backlog item never holds up a product step, and B2's Solution-registered commands wait for step 4.
 The defect tasks need no wave — each is one small pull request.
+
+Step 9 has no wave yet: most of its first phase waits on the design of the owner's closed SaaS shell,
+which lives outside this repository. Once that design exists, its Core seams (host resolution,
+the quota and operator contracts) touch `app/Domains/Tenancy` and so cannot run beside step 4.
 
 Contract edits that step 4 or step 6 turn out to need happen in the foundation package's own repository, which is `(new)` ground from this working tree's point of view — it is absent here and symlinked in for local development, so it can never conflict with a lane in this repo.
 
