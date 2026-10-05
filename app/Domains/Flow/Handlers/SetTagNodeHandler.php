@@ -24,7 +24,7 @@ use Fapost\Support\Builder\Schema\Section;
  * its single `default` output continues the flow. Retry safety is guaranteed by a
  * per-node state marker (`system.set_tag.{nodeId}`): `add`/`remove` are naturally
  * idempotent, but `toggle` flips on every run, so a re-execution under the session
- * lock must skip the mutations entirely (see CLAUDE.md § Concurrency).
+ * lock must skip the mutations entirely (see .ai/knowledge/conventions/node-handler-boundary.md).
  */
 final class SetTagNodeHandler extends AbstractVersionedHandler
 {

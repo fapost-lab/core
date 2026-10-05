@@ -9,7 +9,7 @@ use Fapost\Foundation\Flow\Enums\StateNamespace;
 
 /**
  * Runtime authority over which node types may write into which top-level
- * namespaces of {@code flow_sessions.state} (CLAUDE.md § State namespaces).
+ * namespaces of {@code flow_sessions.state} (.ai/knowledge/domains/flow/RULES.md, state namespaces).
  *
  * The `system.*` and `rag.*` namespaces are guarded by explicit per-type
  * whitelists; `flow.*` and `call.*` accept writes from any handler (they hold
