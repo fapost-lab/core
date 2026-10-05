@@ -9,7 +9,7 @@ Goal: an install can run for a year without manual cleanup. Done when: scheduled
 conversation messages, session history and old flow versions, and next month's message partition
 exists before the first write of the month.
 
-- [ ] Conversation retention: `retention_days` read and enforced by a scheduled prune
+- [ ] `conversation-retention` — Conversation retention: `retention_days` read and enforced by a scheduled prune
 - [ ] Message partitions pre-created ahead of writes
 - [ ] `flow_session_history` retention
 - [ ] Keep the last N published flow versions
@@ -28,14 +28,14 @@ contact, no message, media file or history row of theirs remains, as the erasure
 Goal: transcripts can move off PostgreSQL without touching the panels. Done when: the inbox reads
 through `ConversationReaderInterface` and a second store passes the same tests.
 
-- [ ] `conversation-reader-interface` — transcript read port (after: the second-store decision — the owner tied the port to the store change)
+- [ ] Transcript read port (after: the second-store decision — the owner tied the port to the store change)
 - [ ] fog: ClickHouse (or another) transcript store — no store has been chosen
 
 ## Waves
 
-1. Conversation retention: `retention_days` read and enforced by a scheduled prune; Message partitions pre-created ahead of writes; `flow_session_history` retention; Keep the last N published flow versions
+1. `conversation-retention`; Message partitions pre-created ahead of writes; `flow_session_history` retention; Keep the last N published flow versions
 2. Erasure of a contact's, assistant's and channel's messages and media; PII redaction hook before a message is persisted; Delivery status ingestion for outbound messages
-3. `conversation-reader-interface`
+3. Transcript read port
 
 <!--
 Rules (jig-idea §8):

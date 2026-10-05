@@ -106,6 +106,9 @@ A column-store driver may buffer and batch inside the driver; the port does not 
   sqlite tests).
 - Capture on inbound (`IncomingMessageJob`) and outbound (`MessageSender`, with flow and broadcast
   metadata); media fetch via the Media domain; `messaging.logging` queue in Horizon.
+- Retention: the daily `conversations:prune` command (`app/Console/Commands/PruneConversationMessagesCommand.php`)
+  drops whole monthly partitions older than `conversation.retention_days` (env `CONVERSATION_RETENTION_DAYS`,
+  per install, unset = keep forever). Threads and media are not pruned.
 - Filament `ConversationResource` (list and view) with operator reply and ownership handover; the router
   skips the flow engine for staff-owned threads.
 
@@ -118,9 +121,8 @@ A column-store driver may buffer and batch inside the driver; the port does not 
 
 **Not built (moved to the spec `.ai/specs/data-lifecycle/`):**
 
-- Read port `ConversationReaderInterface` and a ClickHouse driver (the Jig task `conversation-reader-interface`
-  covers the reader port).
-- Retention: `conversation.retention_days` exists but nothing reads it; there is no partition pruning.
+- Read port `ConversationReaderInterface` and a ClickHouse driver (see the spec item "Transcript read port"
+  in `.ai/specs/data-lifecycle/`).
 - Partitions are created on write (`ensureMonthlyPartition` per insert) plus the three created by the
   migration; there is no scheduled pre-creation.
 - PII redaction hook (`PiiRedactorInterface`); text is stored verbatim.

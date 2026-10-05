@@ -9,7 +9,8 @@ paths:
   - config/conversation.php
 source: docs/reference/specs/messaging/conversation-logging.md
 summary: "Why the conversation transcript is a separate port-backed domain: invariants, channel-scoped threads, queue, partitioning, takeover, and what is not built"
-source_hash: fe84d2fc2072f7bd6d90cb07b5c2ff85fe5c01fb
+source_hash: f6387f409289e4bbaa741b24f094ee7763022e79
+reviewed_at: 2026-10-05
 ---
 # Conversation Transcript: Design Decisions
 

@@ -46,14 +46,14 @@ not do.
     has a producer;
   - flow history: retention for `flow_session_history` (ADR-10; only `flow_logs` is pruned today);
   - flow versions: keep the last N published versions (the notes said N = 50; nothing prunes today);
-  - the transcript read port and a second store: `ConversationReaderInterface` (Jig task
-    `conversation-reader-interface`, paused until the store changes) and a ClickHouse store.
+  - the transcript read port and a second store: `ConversationReaderInterface` (built together
+    with the store change; its earlier Jig task was closed unbuilt) and a ClickHouse store.
 - Not doing: analytics retention and aggregation (spec `operator-insights`).
 
 ## Decisions
 
 - Transcripts stay in PostgreSQL until a second store is chosen — owner's decision of 2026-09-23,
-  recorded on task `conversation-reader-interface`; the reader port is built together with the
+  first recorded on the since-closed task `conversation-reader-interface`; the reader port is built together with the
   store change, not before.
 
 ## Open questions
