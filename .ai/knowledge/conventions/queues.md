@@ -49,8 +49,8 @@ Queue assignment by purpose, as it exists in the codebase today:
   `app/Jobs/Flow/ResumeTimedOutSendMessageNodeJob.php`, and the webhook controller's initial
   dispatch (`app/Domains/Webhook/Http/WebhookController.php`). Flow replies are sent inline inside
   these jobs, not through a separate queue.
-- `messaging.transactional`: `app/Jobs/Messaging/SendTransactionalMessageJob.php` — reserved like
-  `sync.external`: nothing dispatches it, only tests exercise it.
+- `messaging.transactional`: reserved like `sync.external` — no job targets it. A reply delivered
+  out of band (outside the `flow.execution` job that produced it) is what it is kept for.
 - `messaging.broadcast`: `app/Domains/Broadcasting/Jobs/RunBroadcastJob.php`,
   `SendBroadcastRecipientJob.php`, `app/Jobs/Messaging/BroadcastSendJob.php`, and, as a deviation,
   `app/Domains/Contact/Jobs/SendContactNotificationJob.php` (line 61): it is a service

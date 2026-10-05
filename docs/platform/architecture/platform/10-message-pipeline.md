@@ -29,7 +29,7 @@ lock timeout (`engine_lock_timeout`) is retried by `IncomingMessageJob`.
 | Queue | Used by |
 | --- | --- |
 | `flow.execution` | `IncomingMessageJob`, `ResumeDelayedFlowSessionJob`, `ResumeTimedOutSendMessageNodeJob` |
-| `messaging.transactional` | `SendTransactionalMessageJob`; supervised together with `flow.execution` |
+| `messaging.transactional` | Reserved, no job; supervised together with `flow.execution` |
 | `messaging.broadcast` | `RunBroadcastJob`, `SendBroadcastRecipientJob`, `BroadcastSendJob` (also used by contact notifications) |
 | `messaging.system` | Staff notifications, channel webhook sync, media cleanup |
 | `messaging.logging` | Conversation transcript jobs (`PersistConversationMessageJob`, `UpdateConversationDeliveryStatusJob`, `FetchConversationMediaJob`) |

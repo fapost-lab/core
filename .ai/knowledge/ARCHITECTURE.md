@@ -88,8 +88,7 @@ Assistant and Media models directly, and import cycles exist (for example Contac
    (`WebhookController`). A job on `flow.execution` runs `MessageRouter` → `FlowOrchestrator` →
    `FlowEngine`, which takes the session lock and runs handlers resolved by `(type, version)`.
    Replies are sent inline: `FlowMessageSender` → `MessageSender::send()` runs inside the
-   `flow.execution` job (`SendTransactionalMessageJob` on `messaging.transactional` is never
-   dispatched); the transcript is persisted on `messaging.logging`.
+   `flow.execution` job (`messaging.transactional` is reserved and has no job); the transcript is persisted on `messaging.logging`.
 2. **Triggers and wake-ups.** Scheduled and event triggers start sessions from jobs on
    `scheduled.triggers`; a `delay` node wakes its session through `ResumeDelayedFlowSessionJob`
    on `flow.execution`, and send-message timeouts through `ResumeTimedOutSendMessageNodeJob`.

@@ -6,7 +6,7 @@ description: "Every queue, what belongs on it, and why they stay separate."
 | Queue | Carries |
 |---|---|
 | `flow.execution` | Inbound message handling and the execution pipeline |
-| `messaging.transactional` | Replies inside an active conversation |
+| `messaging.transactional` | Reserved for replies delivered out of band; nothing dispatches to it today |
 | `messaging.broadcast` | Low-priority fan-out for broadcasts |
 | `messaging.system` | Service notifications |
 | `scheduled.triggers` | Scheduled and event trigger fan-out |
@@ -24,10 +24,11 @@ unimportant work. A reply to someone who just asked a question is a single piece
 work that is urgent by definition — a person is watching a chat window. Put them on
 one queue and the broadcast is in front, and every reply waits behind it.
 
-The same argument separates `flow.execution` from `messaging.transactional`:
+The same argument is why `messaging.transactional` exists beside `flow.execution`:
 inbound processing can be slow, because a flow may make an HTTP call or a retrieval
-query. Delivering the reply it produces should not queue behind the next contact's
-inbound message.
+query, and a reply should not queue behind the next contact's inbound message. Today
+replies are sent from inside the `flow.execution` job that produced them, so the queue
+is reserved and Horizon only keeps a worker on it.
 
 `sync.external` is isolated for a different reason: it depends on systems whose
 availability is not ours. When a third party is down and its jobs are retrying with
