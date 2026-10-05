@@ -41,9 +41,8 @@ framework tables.
 
 Keep the PHPat rule's `->because()` text and this document in sync — the rule exists to
 enforce what this convention describes, and a passing PHPat run is only meaningful evidence
-for the parts of this list it actually encodes. Known drift: the `->because()` in
-`tests/Architecture/MigrationTest.php` still points to a "Migration Isolation Contract in CLAUDE.md"
-that no longer exists; a code fix is tracked separately.
+for the parts of this list it actually encodes. The `->because()` in
+`tests/Architecture/MigrationTest.php` points back to this document.
 
 ## Example
 

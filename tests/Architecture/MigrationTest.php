@@ -23,7 +23,7 @@ final class MigrationTest
             )
             ->because(
                 'Migrations are pure DDL. They must not depend on application services, ' .
-                'tenant context, or module state. See: Migration Isolation Contract in CLAUDE.md'
+                'tenant context, or module state. See: .ai/knowledge/conventions/migration-isolation.md'
             );
     }
 }
