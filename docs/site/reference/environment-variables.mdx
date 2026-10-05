@@ -14,7 +14,7 @@ to FaPost, and the Laravel ones whose value matters here.
 | `APP_ENV` | `local` | `production` in a deployment |
 | `APP_KEY` | *empty* | Generate with `php artisan key:generate`; never reuse across installations |
 | `APP_DEBUG` | `true` | **Must be `false` in production** |
-| `APP_URL` | `http://localhost` | Used to build webhook URLs |
+| `APP_URL` | `http://localhost` | Used to build webhook URLs; in `host` mode its scheme and port also shape the tenant links sent by mail (`https://<slug>.<TENANCY_BASE_DOMAIN>`) |
 
 ## Tenancy and webhooks
 

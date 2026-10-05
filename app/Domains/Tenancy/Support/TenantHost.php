@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Tenancy\Support;
 
+use App\Domains\Tenancy\Contracts\TenantInterface;
+
 /**
  * Where a tenant's own surfaces are served.
  *
@@ -36,6 +38,31 @@ final class TenantHost
         }
 
         return $slug . '.' . $base;
+    }
+
+    /**
+     * Absolute URL of a path on a tenant's own host, for places that have no request to borrow a host from.
+     *
+     * Mail and queued jobs build URLs outside a request, where `url()` falls back to `APP_URL` and so
+     * to the base domain. In `host` mode the tenant is named by its host, so the URL is spelled out:
+     * the scheme and port of `APP_URL`, then `<slug>.<base_domain>`. In `single` mode the host selects nothing
+     * and `url()` is what it always was.
+     *
+     * @param  string  $path  Path with query; a missing leading slash is added.
+     */
+    public static function urlFor(TenantInterface $tenant, string $path): string
+    {
+        if (TenancyResolutionMode::Host !== TenancyResolutionMode::tryFrom((string) config('tenancy.resolution'))) {
+            return url($path);
+        }
+
+        $appUrl = (string) config('app.url');
+        $scheme = parse_url($appUrl, PHP_URL_SCHEME);
+        $scheme = is_string($scheme) && '' !== $scheme ? $scheme : 'https';
+        $port   = parse_url($appUrl, PHP_URL_PORT);
+        $port   = is_int($port) ? ':' . $port : '';
+
+        return $scheme . '://' . $tenant->getSlug() . '.' . config('tenancy.base_domain') . $port . '/' . mb_ltrim($path, '/');
     }
 
     /**

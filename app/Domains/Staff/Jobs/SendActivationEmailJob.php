@@ -8,6 +8,7 @@ use App\Domains\Staff\Mail\ActivationMail;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use App\Domains\Tenancy\Support\TenantHost;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Mail;
@@ -33,10 +34,13 @@ final class SendActivationEmailJob implements ShouldQueue
     {
         $tenant = $tenantRepository->getById($this->tenantId);
 
-        $tenantSwitcher->runForTenant($tenant, function (): void {
+        $tenantSwitcher->runForTenant($tenant, function () use ($tenant): void {
             $user = User::query()->findOrFail($this->userId);
 
-            Mail::to($user->email)->send(new ActivationMail($user, $this->plainToken));
+            // A queued job has no request, so the link must name the tenant host itself.
+            $activationUrl = TenantHost::urlFor($tenant, '/activate?token=' . urlencode($this->plainToken));
+
+            Mail::to($user->email)->send(new ActivationMail($user, $activationUrl));
         });
     }
 }

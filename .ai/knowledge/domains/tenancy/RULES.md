@@ -46,8 +46,9 @@ broken.
   every host; `TenancyMiddleware` first in each panel's middleware — and persistent, so Livewire
   updates replay it — is what turns the base domain and foreign hosts into 404. Never remove it or
   move it after the session stack. URLs built inside a request follow the current host; URLs built
-  outside one (mail, queued jobs) must name the tenant host explicitly. Enforced:
-  `HostModePanelsTest`, `TenantMiddlewareOrderTest` (every `filament.*` route).
+  outside one (mail, queued jobs) must name the tenant host explicitly — through
+  `TenantHost::urlFor()`, as the staff activation mail does. Enforced: `HostModePanelsTest`,
+  `TenantMiddlewareOrderTest` (every `filament.*` route), `ActivationHostModeTest`.
 - **A tenant switch always restores.** `runForTenant()` restores the connection, resets the
   context, runs restore hooks and points the permission registrar back at the outer cache key even
   when the database restore itself throws. A restore without a matching switch throws `ConnectionStackEmptyException`.
