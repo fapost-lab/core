@@ -10,7 +10,7 @@
     <div class="w-full max-w-md space-y-4 text-center">
         <h1 class="text-xl font-semibold">{{ __('This activation link has expired') }}</h1>
         <p class="text-sm text-zinc-400">{{ __('Ask an administrator to resend the invitation.') }}</p>
-        <a href="{{ route('landing') }}" class="inline-block text-amber-400 hover:underline">{{ __('Back') }}</a>
+        <a href="{{ url('/') }}" class="inline-block text-amber-400 hover:underline">{{ __('Back') }}</a>
     </div>
 </body>
 </html>

@@ -21,11 +21,11 @@ final class ActivationController extends Controller
     ) {
     }
 
-    public function show(Request $request): View|RedirectResponse
+    public function show(Request $request): View
     {
         $token = (string)$request->query('token', '');
         if ('' === $token) {
-            return redirect()->route('landing')->withErrors(['token' => __('Missing activation token.')]);
+            return view('staff.activation-expired');
         }
 
         $user = $this->activationTokenService->findValidUserByPlainToken($token);

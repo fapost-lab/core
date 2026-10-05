@@ -22,7 +22,12 @@ Route::domain((string) config('tenancy.base_domain'))->group(function (): void {
         ]);
     })->name('welcome');
     Route::post('/presale', [PreSaleController::class, 'store'])->name('presale.store');
+});
 
+// Activation needs a tenant: its tokens live in the tenant schema. In `host` mode only a tenant host
+// reaches it and the base domain answers 404; in `single` mode the default tenant serves any host,
+// so links issued before the move to the tenant host keep working.
+Route::middleware('tenant')->group(function (): void {
     Route::get('/activate', [ActivationController::class, 'show'])->name('activate.show');
     Route::post('/activate', [ActivationController::class, 'store'])->name('activate.store');
 });
