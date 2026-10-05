@@ -235,7 +235,6 @@ In those cases bump `version`.
 If the node needs specific outputs, record them:
 
 - in the node's documentation,
-- in the definition through `required_transitions` (read only by `FlowDefinitionValidator`),
 - in validator tests.
 
 ### Practice

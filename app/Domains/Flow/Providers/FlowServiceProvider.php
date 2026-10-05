@@ -126,7 +126,6 @@ use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
 use App\Domains\Flow\Translations\CoreSystemTranslations;
 use App\Domains\Flow\Translations\InMemorySystemTranslationCatalog;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
-use App\Domains\Flow\Validation\FlowDefinitionValidator;
 use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
@@ -198,7 +197,6 @@ final class FlowServiceProvider extends ServiceProvider
             NodeHandlerRegistryInterface::class,
             fn ($app): NodeHandlerRegistry => $app->make(NodeHandlerRegistry::class)
         );
-        $this->app->singleton(FlowDefinitionValidator::class);
         $this->app->singleton(VariableCoercerInterface::class, VariableCoercer::class);
         $this->app->singleton(
             \App\Domains\Flow\Validation\InputValidatorInterface::class,

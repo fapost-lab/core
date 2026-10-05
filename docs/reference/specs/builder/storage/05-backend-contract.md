@@ -59,7 +59,7 @@ A group on a session variable is rejected.
 
 ## Validation
 
-`FlowDefinitionValidator::validateVariableContract()` checks `input`, `send_message` and `assign` configs:
+`FlowGraphStructureValidator` (audit only for now) checks `input`, `send_message` and `assign` configs:
 
 - the new shape (`variable` / `save_to_variable` / `operations`) and the legacy shape (`save_to`, `target`+`key`)
   cannot be defined together;
@@ -83,7 +83,7 @@ migration is needed; a legacy snapshot is rewritten to the new shape on the next
 - `app/Domains/Flow/State/Variables/{Variable,VariableStorage,VariableType,VariableResolver}.php`
 - `app/Domains/Flow/Contracts/VariableResolverInterface.php`
 - `app/Domains/Flow/Providers/FlowServiceProvider.php` — bindings
-- `app/Domains/Flow/Validation/FlowDefinitionValidator.php`
+- `app/Domains/Flow/Validation/FlowGraphStructureValidator.php`
 - `app/Domains/Flow/Handlers/{Input,SendMessage,Assign,Call}NodeHandler.php`
 - Tests: `tests/Unit/Domains/Flow/State/Variables/VariableResolverTest.php`
 

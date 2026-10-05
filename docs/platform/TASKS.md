@@ -95,7 +95,7 @@
 - [ ] `form` — сбор данных через веб-форму (TMA / hosted) вместо цепочки `input` — спека `.ai/specs/forms-data-collection/`
 
 ### P3
-- [x] `comment` (builder-only аннотация): палитра (`NodeTypesController`), skip в валидации, strip-at-publish с перебросом edges (`AnnotationNodeTypes`, `PublishFlowService::stripAnnotationNodes`); карточка на канвасе, текст заметки с переносами строк, заголовок в outline-панели, редактирование через generic `SchemaConfigRenderer` (`FlowNodeCard.vue`, `FlowStructureNode.vue`, `nodeColors.ts`)
+- [x] `comment` (builder-only аннотация): палитра (`NodeTypesController`), skip в валидации, strip-at-publish с перебросом edges (`AnnotationNodeTypes`, `AnnotationNodeTypes::strip()`); карточка на канвасе, текст заметки с переносами строк, заголовок в outline-панели, редактирование через generic `SchemaConfigRenderer` (`FlowNodeCard.vue`, `FlowStructureNode.vue`, `nodeColors.ts`)
 
 ---
 
