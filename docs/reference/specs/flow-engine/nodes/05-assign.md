@@ -77,7 +77,7 @@ started, so two operations on the same variable do not see each other's session 
 ## Validation
 
 `ValidateFlowService` has no assign-specific rule. Contact path rules are runtime guards in `ContactWriter`.
-`FlowDefinitionValidator` (not wired into the save / publish pipeline) additionally checks that the new and legacy
+`FlowGraphStructureValidator` (not wired into the save / publish pipeline; run by `flow:audit-graph`) additionally checks that the new and legacy
 shapes do not coexist and that `operations[]` address unique `(storage, group, name)` triples. Publish collects
 the declared variables into the tenant variable schema and rejects cross-flow type conflicts (see
 [../06-validation.md](../06-validation.md)).

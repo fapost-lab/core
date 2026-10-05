@@ -105,7 +105,7 @@ Fields the runtime actually uses:
 Optional:
 
 - `label` (UI),
-- `required_transitions` (read only by `FlowDefinitionValidator`),
+- `required_transitions` (no longer read by anything: the validator that did was removed),
 - any UI-only fields the engine ignores.
 
 ### Example
@@ -306,12 +306,11 @@ media, module references), and across the graph: terminal `end` nodes, nested lo
 `send_message` terminal rules, button edges and the subflow call graph. Save-draft does **not**
 validate; validation runs on an explicit validate request and atomically on publish.
 
-**`FlowDefinitionValidator`** is a structural validator that **throws** `FlowValidationException` on
-the first problem: nodes have `id/type/version`, the handler is registered, no duplicate nodes, edges
-point at existing nodes, no duplicate transitions, exactly one derived entry node, no orphans,
-`required_transitions` present, the reply-keyboard and inline-button terminal rule, and the variable
-contract. It is registered in the container and unit-tested, but the save / validate / publish
-pipeline does not call it.
+**`FlowGraphStructureValidator`** is a structural validator that returns the same
+`FlowValidationErrorDto` list and never throws: no duplicate node ids, edges point at existing nodes,
+no duplicate handle on one node, exactly one derived entry node, no orphans, and the variable contract
+(`variable_contract_*`, `branch_rules_*`). The save / validate / publish pipeline does not call it yet;
+only `php artisan flow:audit-graph` does. See `docs/reference/specs/flow-engine/06-validation.md`.
 
 Neither validates "at least one `end` node".
 

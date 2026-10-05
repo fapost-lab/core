@@ -75,7 +75,7 @@ public function configSchema(): array
 The schema is serialized into the node-handler registry payload, sent to the builder on flow load, and rendered through
 the Vue components in `resources/js/builder/components/editor/config/`. There is no separate JSON-schema validator —
 the renderer is permissive and falls back to `TextField` for unknown types, the backend validator
-(`FlowDefinitionValidator`) is the contract for runtime correctness.
+(`ValidateFlowService`) is the contract for runtime correctness.
 
 ---
 
@@ -449,7 +449,7 @@ evaluate as `undefined` (so `equals` only matches if `value` itself is `undefine
 
 ## 6. Field-level validators
 
-Inline-only — backend `FlowDefinitionValidator` remains the source of truth for what blocks Publish.
+Inline-only — backend `ValidateFlowService` remains the source of truth for what blocks Publish.
 
 | Type     | Props                    | Behaviour                                                           |
 |----------|--------------------------|---------------------------------------------------------------------|
