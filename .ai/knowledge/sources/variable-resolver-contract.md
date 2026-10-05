@@ -1,7 +1,7 @@
 ---
 id: feature-variable-resolver-contract
 type: feature
-status: proposed
+status: active
 domains:
   - flow
 paths:
@@ -9,6 +9,7 @@ paths:
   - app/Domains/Flow/Contracts/VariableResolverInterface.php
 source: docs/reference/specs/builder/storage/05-backend-contract.md
 summary: How a user variable maps to a state path, reserved names, and the read-time coercion entry point
+source_hash: 12496c3ba8f5c4768f63dee9ec46d0b0ae6c395d
 ---
 # 05 · Backend variable contract and resolver
 

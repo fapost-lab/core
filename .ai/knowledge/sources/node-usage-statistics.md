@@ -1,7 +1,7 @@
 ---
 id: feature-node-usage-statistics
 type: feature
-status: proposed
+status: active
 domains:
   - flow
 paths:

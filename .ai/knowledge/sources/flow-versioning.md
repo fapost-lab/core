@@ -1,7 +1,7 @@
 ---
 id: feature-flow-versioning
 type: feature
-status: proposed
+status: active
 domains:
   - flow
 paths:

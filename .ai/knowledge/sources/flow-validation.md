@@ -1,7 +1,7 @@
 ---
 id: feature-flow-validation
 type: feature
-status: proposed
+status: active
 domains:
   - flow-builder
   - flow

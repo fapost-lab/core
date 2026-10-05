@@ -1,7 +1,7 @@
 ---
 id: adr-conversation-transcript-design
 type: adr
-status: proposed
+status: accepted
 domains:
   - conversation
 paths:
@@ -9,6 +9,7 @@ paths:
   - config/conversation.php
 source: docs/reference/specs/messaging/conversation-logging.md
 summary: "Why the conversation transcript is a separate port-backed domain: invariants, channel-scoped threads, queue, partitioning, takeover, and what is not built"
+source_hash: fe84d2fc2072f7bd6d90cb07b5c2ff85fe5c01fb
 ---
 # Conversation Transcript: Design Decisions
 
