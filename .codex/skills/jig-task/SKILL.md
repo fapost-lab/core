@@ -108,9 +108,16 @@ working in this checkout themselves, start in a worktree without being asked to:
 .ai/scripts/jig task start <id> --worktree
 ```
 
+**When `task start` refuses an occupied checkout** (`this checkout is in use: …`), it names
+the record it went by. Take the worktree road it offers. Delete that record only when you
+know the session behind it is over; there is no override.
+
 **When `task start` refuses a dirty tree**, the changes belong to other work — never work
 around it. Ask the user which road: pause the task that owns them
-(`jig task pause <owner> --stash`), or start this one in a worktree, as above.
+(`jig task pause <owner> --stash`), or start this one in a worktree, as above. When the
+refusal names `jig spec ship <id>` instead, the dirty tree is a spec `jig-idea` left
+mid-session, not another task's work — run it and try again; there is no question here for
+the user, Jig already answered it.
 
 Either way it prints a path and leaves this checkout alone. From then on the task is worked on from
 that path only. If your runtime can switch this session into an existing worktree, switch
@@ -126,7 +133,7 @@ editing tools, and never with a shell redirection:
 ```
 
 `<kind>` is `task`, `discovery`, `spec`, `alternatives`, `design`, `plan`, `review`,
-`verification` or `handoff`, and the content comes from a file you wrote or from stdin.
+`verification`, `handoff`, `knowledge-map`, `commit-message` or `pr-body`, and the content comes from a file you wrote or from stdin.
 In a worktree the workspace is only borrowed, and jig is what knows where it really is.
 
 When the user already wrote the task as a document, take it from disk instead of
@@ -159,6 +166,20 @@ Announce the route, then start the first stage. Each stage is its own skill:
 | T2 | jig-analyze → plan → jig-implement → jig-review → jig-verify → jig-consolidate |
 | T3 | discover → design → **human gate** → jig-implement → jig-architecture-review → jig-verify → jig-consolidate |
 | T4 | discover → specify → alternatives → design → **human gate** → jig-implement → independent jig-review → jig-verify → jig-consolidate |
+
+**Depth.** The class sets the floor; the person may want no more than that. A personal
+`route.depth: lean`, or `jig task new <id> --lean` for one task, asks for a lighter route.
+Add `--lean` only when the person asked for it for this task. Name the route from the script,
+not from the table above:
+
+```
+.ai/scripts/jig task route <id>
+```
+
+Announce and run the `route:` it prints; its `lean:` line says what is trimmed — at T1 the
+analysis is a few lines in `task.md`, at T2 the plan is part of the analysis, from T2 up one
+review round. Lean never trims tests on changed files, CI before a merge, consolidation, the
+gate or architecture review of T3/T4, or the class itself.
 
 Every route ends in `jig-consolidate`, even when nothing durable came out of the task: it
 records the knowledge decision before the commit and, once the change has landed, closes
@@ -193,7 +214,7 @@ alternatives — verbatim, with your objections after it, as
 [show the document](references/show-the-document.md) says. What changes, which
 alternatives lost and why, and what it costs to undo belong in the document itself; if
 they are missing, the document is not ready for the gate. Wait for the human to approve,
-change or reject it, and record the decision in `task.md`. Do not start implementing while
+change or reject it, and record the decision in `task.md` (`jig task artifact append <id> task --from <file>`). Do not start implementing while
 waiting, and do not treat silence or a general "ok, go on" from an earlier message as
 approval.
 

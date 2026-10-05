@@ -73,15 +73,17 @@ An agent that reports "done" while the ledger has an open P0/P1, or the receipt 
 not done: send it back. Attended, questions accumulate: when no agent of the wave is still
 working (or sooner, if the person is there), send **one** message with every question, each
 carrying its document whole, plus the pull requests that are ready and their CI state.
-An answer goes back as `jig task autopilot <id> resume` and an agent — the same one, or a new
+An answer goes back as `jig task autopilot <id> resume --answer "<the person's answer>"` and an agent — the same one, or a new
 one told to continue task X from stage Y.
 
 **5. Ship, one at a time.** Tasks with `knowledge_consolidated: true` queue in the order they
 became ready. For the head of the queue, from its worktree:
 
 ```
-.ai/scripts/jig task ship <id> --message-file .ai/workspace/tasks/<id>/commit-message
+.ai/scripts/jig task ship <id> --message-file .ai/workspace/tasks/<id>/commit-message.md [--body-file .ai/workspace/tasks/<id>/pr-body.md]
 ```
+
+Pass `--body-file` when the task agent wrote a `pr-body.md`; without it the body is the rest of the commit message.
 
 - `agent.git: pr` — the pull request is open. Wait for CI (`gh pr checks`) and only with it
   green tell the person it is ready. They merge, in any order; you see it by `git fetch`.
@@ -113,6 +115,11 @@ drafts). Only then:
 
 Never in the middle of a wave: it touches what is still being worked on.
 
+**Never push the epic yourself.** Where `epic/*` is protected like the default branch, a direct
+push goes through only as an administrator's bypass. Every commit of yours on the epic — the
+wave's filing, the checkmarks — stays local and reaches `origin` inside the next pull request into
+it; the last ones travel in the final pull request, which `jig spec ship` opens from `finish/<id>`.
+
 **8. Round again**, from step 1. A stop in wave N with no answer yet holds wave N+1: say so and
 wait. Phase done — report it. Finishing the epic itself is `jig-idea` §11, not this loop.
 
@@ -129,16 +136,18 @@ rules verbatim:
   `... repair --reason "<what you are fixing>"` before every repair (exit 3 means stop and
   report), `... stop --reason "<question>"` at a stop; a gate is `jig task gate`.
 - Follow the class's route as `jig-autopilot` §2–3 says (§5 when the run is unattended). Review
-  and architecture review go to a subagent in a fresh context; after its report, check the
+  and architecture review go to a subagent in a fresh context, implement and review on the model
+  a `delegate:` line of `jig task route <id>` names
+  ([delegation](../../jig-task/references/delegation.md)); after its report, check the
   ledger with `jig task findings <id>` — only the ledger closes a finding.
 - Run only the tests that cover the changed files, and `shellcheck` at the version CI uses.
   `jig verify` without flags is right — it narrows itself to the project's setting. `--full`
   and the raw runner over everything are not: CI runs the full set
   ([what a reviewer runs](../../jig-review/references/what-to-run.md)).
 - End at consolidation: the knowledge decision recorded
-  (`jig task set <id> knowledge_consolidated true`), the change staged, the commit message in
-  `.ai/workspace/tasks/<id>/commit-message` and the pull request body — with
-  `jig task autopilot <id> report`'s blocks — in `pr-body`.
+  (`jig task set <id> knowledge_consolidated true`), the change staged, the commit message written
+  with `jig task artifact write <id> commit-message --from <file>` and the pull request body —
+  with `jig task autopilot <id> report`'s blocks — with `jig task artifact write <id> pr-body --from <file>`.
 - **Do not run `jig task ship` or `jig task autopilot end`.** Those are the coordinator's.
 - Report back: one line of outcome, the paths, the ledger and receipt state, and what is left.
 

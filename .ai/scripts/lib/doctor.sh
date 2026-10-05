@@ -154,6 +154,70 @@ _doctor_check_jigcmd_global() {
   fi
 }
 
+# Newest published release, asked of the global checkout's own origin — the
+# same channel `jig self-update` moves along (self-update.sh), but read-only:
+# `git ls-remote --tags origin` never touches the checkout, matching the rest
+# of doctor (file header: "a reporting command ... it never writes
+# anything"). Distinct from _doctor_check_framework_version above, which only
+# compares the project's manifest against whatever `jig` PATH selects and can
+# read "current" when both are simply stale together — it never asks
+# upstream. The owner's request was exactly this gap: "add a request to git
+# and check the latest version" (task doctor-says-a-newer-jig-exists).
+#
+# The check itself — `git ls-remote --tags` bounded by a manual poll-and-kill
+# timeout — is `jig_check_newest_release` (common.sh): housekeeping's own
+# daily release check (housekeeping.sh, task status-says-a-newer-jig-exists)
+# asks the same question of the same kind of checkout, and a second
+# implementation here would be the one this file's own header warns against
+# elsewhere in the codebase. This function is doctor's wording on top of it.
+#
+# Three outcomes, kept distinct on purpose: newer available, this is the
+# newest, or the answer could not be obtained — the third is never folded
+# into the second (an absent answer is not a good answer, ADR-0017's "unknown
+# is not zero").
+
+# _doctor_check_newest_release <global_exe> — nothing to check without a
+# global jig (_doctor_check_global_jig above already warned about that) or
+# without a readable declared version (it already warned "version
+# unreadable" too; a second, contradictory-sounding line here would not help
+# the reader).
+_doctor_check_newest_release() {
+  local exe="$1" root current rc best best_v
+  [ -n "$exe" ] || return 0
+  root="${exe%/scripts/jig}"
+  current=$(jig_declared_version "$root") || return 0
+  rc=0
+  best=$(jig_check_newest_release "$root" "$_JIG_RELEASE_CHECK_TIMEOUT") || rc=$?
+  case "$rc" in
+    0) ;;
+    1)
+      _doctor_warn "latest release" "could not check: no origin remote at $root"
+      return 0
+      ;;
+    3)
+      _doctor_warn "latest release" \
+        "could not check: origin did not answer within ${_JIG_RELEASE_CHECK_TIMEOUT}s"
+      return 0
+      ;;
+    4)
+      _doctor_warn "latest release" "could not check: origin has no release tag"
+      return 0
+      ;;
+    *)
+      _doctor_warn "latest release" "could not check: git ls-remote origin failed" \
+        "check network access and the origin remote at $root"
+      return 0
+      ;;
+  esac
+  best_v=$(jig_release_version "$best")
+  if jig_version_lt "$current" "$best_v"; then
+    _doctor_warn "latest release" "$best available (this checkout: v$current)" \
+      "jig self-update, then jig upgrade"
+  else
+    _doctor_ok "latest release" "up to date (v$current)"
+  fi
+}
+
 # --- project checks (initialised project only) -------------------------------
 
 # Reuses status.sh's own comparison rather than a second one: _status_
@@ -427,6 +491,33 @@ _doctor_check_agent_git() {
   fi
 }
 
+# Whether the runtime the project's checks would meet on this machine is one
+# the project asks for (hostruntime.sh answers, from composer.json,
+# package.json and .python-version). Asked only where the checks run on the
+# host: with an environment prefix the host's PHP is not the one that runs.
+# Silent when the project states no requirement, and when verify would refuse
+# to run at all (that is verify's message to give).
+_doctor_check_host_runtime() {
+  local state rt text
+  # shellcheck source=lib/runenv.sh
+  . "$JIG_LIB/runenv.sh"
+  # shellcheck source=lib/hostruntime.sh
+  . "$JIG_LIB/hostruntime.sh"
+  runenv_resolve
+  if [ -n "$RUNENV_REFUSAL" ] || [ -n "$RUNENV_EXEC" ]; then return 0; fi
+  while IFS=$'\t' read -r state rt text; do
+    [ -n "$state" ] || continue
+    case "$state" in
+      ok) _doctor_ok "host $rt" "$text" ;;
+      mismatch)
+        _doctor_warn "host $rt" "$text" \
+          "run the checks where the project runs (jig config set run.exec '<prefix>' --local, or ask the jig-setup skill), or switch this machine's $rt to the project's version"
+        ;;
+      *) _doctor_warn "host $rt" "$text" "compare the versions by hand" ;;
+    esac
+  done < <(hostruntime_report)
+}
+
 # --- cmd_doctor ---------------------------------------------------------------
 
 cmd_doctor() {
@@ -443,6 +534,7 @@ cmd_doctor() {
   _doctor_check_global_jig "$global_exe"
   _doctor_check_link_kind
   _doctor_check_jigcmd_global "$global_exe"
+  _doctor_check_newest_release "$global_exe"
 
   local repo=""
   repo=$(jig_repo_root) || repo=""
@@ -466,6 +558,7 @@ cmd_doctor() {
       _doctor_check_config_local
       _doctor_check_config_keys
       _doctor_check_agent_git
+      _doctor_check_host_runtime
     else
       _doctor_warn "project" "not initialised" "jig init"
     fi

@@ -161,6 +161,61 @@ _upgrade_config_note() {
   _upgrade_out 'hint: `jig config keys` lists them; that file is yours to change or leave as it is'
 }
 
+# _upgrade_self_check <dry-run> — after a real run, ask the install that now
+# exists whether anything is still not installed, and name it.
+#
+# The predicate is not a new one: it is `upgrade_pending`, the same question
+# `jig doctor` and `jig status` ask. What this adds is the moment. Until now an
+# unfinished run said nothing, and the leftover surfaced whenever somebody
+# happened to run another command — the reported case was a run that printed
+# "55 placed, 49 kept, 2 removed; manifest updated" and left
+# `.ai/templates/AGENTS.md` unplaced, found a day later in `jig doctor` as
+# "1 pending item(s) although the version is the same".
+#
+# It runs the project's own dispatcher as a subprocess, and that is the point,
+# not an implementation detail: an upgrade is carried out by the code of the
+# version being replaced. The run that left that template behind was 0.15.1
+# doing the work, and 0.15.1 does not stage `.ai/templates/AGENTS.md` at all —
+# the line that copies it arrived in 0.16.0. Worse, the template was in the
+# manifest and not in its stage, so the old code deleted it. Asking
+# `upgrade_pending` in this process would ask the old decision table, which is
+# satisfied by construction: it would stay silent in exactly the case this
+# check exists for. Only the newly installed code knows what it wants.
+#
+# Never on a dry run — `status`, `verify` and `doctor` each run one on every
+# invocation (ADR-0017), and a self-check there would double their cost and
+# recurse. A real upgrade pays one extra dry run (0.78 s against 0.88 s for the
+# run itself, on 97 files), for a command that runs once per release.
+#
+# It never fails the upgrade it follows: that upgrade already happened, and a
+# check that cannot answer says so instead of turning a success into an error
+# (ADR-0017's "unknown is not zero"). `bash "$jig"`, not `"$jig"`, for the
+# reason jig_status_page_touch uses it: Windows has no execute bit.
+#
+# Its status is what a copy-mode run commits on (_upgrade_finish): 0 the
+# install is complete, 1 something is still not installed, 2 the check could
+# not answer. A caller that only reports ignores it.
+_upgrade_self_check() {
+  [ "$1" != 1 ] || return 0
+  local jig="$JIG_PROJECT/$JIG_AI_DIR/scripts/jig" out rc=0 n
+  [ -f "$jig" ] || return 0
+  out=$( (cd "$JIG_PROJECT" && bash "$jig" upgrade --dry-run) </dev/null 2>&1 ) || rc=$?
+  if [ "$rc" != 0 ]; then
+    _upgrade_out "could not confirm this install is complete; run \`jig doctor\`"
+    return 2
+  fi
+  out=$(printf '%s\n' "$out" | grep -E '^(install|link|replace) ' || true)
+  [ -n "$out" ] || return 0
+  n=$(printf '%s\n' "$out" | grep -c . || true)
+  _upgrade_out "$n item(s) still not installed; run \`jig upgrade\` again"
+  # Indented, the way every other note under a report line is: these are
+  # another run's words quoted back, and unindented they would be
+  # indistinguishable from this run's own `install`/`replace` lines — to a
+  # reader, and to anything that reads the report by its line starts.
+  _upgrade_out "$(printf '%s\n' "$out" | sed 's/^/  /')"
+  return 1
+}
+
 # --- decision table (domains/install) ---------------------------------------------
 
 # _upgrade_place <staged-abs> <local-abs> — copy one staged file into the
@@ -178,6 +233,7 @@ _upgrade_config_note() {
 # lives in the destination's directory so the rename stays on one filesystem.
 _upgrade_place() {
   local staged_abs="$1" local_abs="$2" tmp="$2.tmp.$$"
+  jig_cleanup_add "$tmp"
   mkdir -p "$(dirname "$local_abs")"
   cp -p "$staged_abs" "$tmp" || jig_die "upgrade: could not write $local_abs"
   mv -f "$tmp" "$local_abs" || jig_die "upgrade: could not write $local_abs"
@@ -189,7 +245,8 @@ _upgrade_place() {
 # path and appends the resulting manifest line ("<hash> <path>") to the
 # caller's `new_entries` variable (dynamic scope; cmd_upgrade declares it
 # local, along with the placed_count/kept_count/removed_count/conflict_count
-# tally this function keeps for the run summary). Prints one report line per
+# tally this function keeps for the run summary, and reconciled_count, which
+# decides whether the manifest is rewritten at all). Prints one report line per
 # non-trivial action.
 #
 # The three hashes come precomputed from _upgrade_hash_table, empty when the
@@ -205,7 +262,22 @@ _upgrade_process_path() {
   local_abs="$JIG_PROJECT/$rel"
   if [ -n "$local_hash" ]; then local_exists=1; else local_exists=0; fi
 
-  if [ "$staged_exists" = 1 ] && [ "$in_manifest" = 1 ]; then
+  # The third comparison, and the first question asked: is the file already
+  # exactly what this run would install? Then it is placed, whoever placed it,
+  # and the only thing left to do is to say so in the manifest.
+  #
+  # Without it an interrupted run can never be repeated. Files are placed one
+  # at a time and the manifest is written once at the end, so an interruption
+  # leaves new bytes on disk against an old recorded hash — which the branches
+  # below read as "the user edited this file" (`keep-modified`, or
+  # `keep-conflict` for a path the manifest does not know yet) and never
+  # reconsider. The content is the one predicate that cannot be lost, go stale
+  # or arrive from somebody else's clone, so the repeat needs no journal
+  # (adr-20260926-an-interrupted-upgrade-is-repeated-not-rolled-back).
+  if [ "$staged_exists" = 1 ] && [ "$local_exists" = 1 ] \
+     && [ "$local_hash" = "$staged_hash" ]; then
+    action=already-placed
+  elif [ "$staged_exists" = 1 ] && [ "$in_manifest" = 1 ]; then
     if [ "$local_exists" = 0 ]; then
       action=install # tracked but missing locally: reinstall
     elif [ "$local_hash" = "$manifest_hash" ]; then
@@ -230,16 +302,30 @@ _upgrade_process_path() {
   fi
 
   case "$action" in
-    replace)
-      if [ "$staged_hash" != "$local_hash" ]; then
-        if [ "$dry_run" != 1 ]; then
-          _upgrade_place "$staged_abs" "$local_abs"
-        fi
-        _upgrade_out "replace $rel"
-        placed_count=$((placed_count + 1))
-      else
-        kept_count=$((kept_count + 1))
+    already-placed)
+      # Reported only when the manifest did not already say so, which is
+      # exactly when this run reconciled something: the ordinary case where
+      # manifest, disk and stage all agree is the quiet majority of every run
+      # and stays silent. Counted in `kept`, like every other outcome that
+      # writes no file, and deliberately not one of upgrade_pending's verbs —
+      # the file is current. `reconciled_count` is counted separately because
+      # it decides whether the manifest is rewritten at all, below.
+      if [ "$manifest_hash" != "$staged_hash" ]; then
+        _upgrade_out "already-placed $rel"
+        reconciled_count=$((reconciled_count + 1))
       fi
+      kept_count=$((kept_count + 1))
+      new_entries="$new_entries
+$staged_hash $rel"
+      ;;
+    replace)
+      # A file that already carries the staged bytes is `already-placed` above,
+      # so reaching here means the two differ and the file is written.
+      if [ "$dry_run" != 1 ]; then
+        _upgrade_place "$staged_abs" "$local_abs"
+      fi
+      _upgrade_out "replace $rel"
+      placed_count=$((placed_count + 1))
       new_entries="$new_entries
 $staged_hash $rel"
       ;;
@@ -320,7 +406,8 @@ _UPGRADE_SECTION_TMP=""
 # | no     | malformed |                     | keep-malformed |
 # | yes    | ok        | = record, = source  | (silent)       |
 # | yes    | ok        | = record, ≠ source  | replace        |
-# | yes    | ok        | ≠ record            | keep-modified  |
+# | yes    | ok        | ≠ record, = source  | already-placed |
+# | yes    | ok        | ≠ record, ≠ source  | keep-modified  |
 # | yes    | none      | the section removed | keep-modified  |
 # | yes    | malformed |                     | keep-malformed |
 _upgrade_section() {
@@ -379,19 +466,35 @@ _upgrade_section() {
   fi
 
   cur_hash=$(jig_section_hash "$file")
+  new_hash=$(jig_section_hash "$template")
+
+  # The file table's third comparison, applied to the region: the section has
+  # the same hole, because its record lives in the manifest header and the
+  # header is written at the end of the run. Replace the section, die before
+  # the manifest, and the region is the source's text against an older
+  # recorded hash — read below as an edit, and so never replaced again.
+  #
+  # ADR-20260924's invariants are untouched. Reaching here means a record
+  # exists, so a human already consented to jig owning this region; the text
+  # is not changed by a byte, only the hash the manifest remembers of it.
+  if [ "$cur_hash" = "$new_hash" ]; then
+    if [ "$cur_hash" != "$rec_hash" ]; then
+      _UPGRADE_SECTION_ACTION=already-placed
+      _UPGRADE_SECTION_RECORD="$new_hash AGENTS.md"
+      _upgrade_out "already-placed AGENTS.md (Jig section)"
+    fi
+    return 0 # already current, and silent like every other unchanged path
+  fi
+
   if [ "$cur_hash" != "$rec_hash" ]; then
     _UPGRADE_SECTION_ACTION=keep-modified
     _upgrade_out "keep-modified AGENTS.md (Jig section)"
     return 0
   fi
 
-  new_hash=$(jig_section_hash "$template")
-  if [ "$new_hash" = "$cur_hash" ]; then
-    return 0 # already current, and silent like every other unchanged path
-  fi
-
   if [ "$dry_run" != 1 ]; then
     _UPGRADE_SECTION_TMP=$(mktemp "${TMPDIR:-/tmp}/jig-upgrade-section.XXXXXX")
+    jig_cleanup_add "$_UPGRADE_SECTION_TMP"
     jig_section_read "$template" > "$_UPGRADE_SECTION_TMP"
     jig_section_write "$file" "$_UPGRADE_SECTION_TMP" \
       || jig_die "upgrade: could not replace the Jig section of AGENTS.md"
@@ -502,7 +605,7 @@ _upgrade_link() {
   # never reads the list back — _upgrade_link_one already reports each
   # conflict immediately, one line per path, as it happens.
   # shellcheck disable=SC2034
-  local created_count=0 kept_count=0 conflict_count=0 conflict_paths=""
+  local created_count=0 kept_count=0 conflict_count=0 conflict_paths="" reconciled_count=0
   local p a skill_dir sname sdir pdir adir dest_pdir
 
   _upgrade_link_one "$(cd "$source/scripts" && pwd)" "$JIG_PROJECT/.ai/scripts" "$dry_run"
@@ -542,6 +645,7 @@ _upgrade_link() {
   _upgrade_section "$source" "$dry_run"
   case "$_UPGRADE_SECTION_ACTION" in
     replace) created_count=$((created_count + 1)) ;;
+    already-placed) kept_count=$((kept_count + 1)); reconciled_count=$((reconciled_count + 1)) ;;
     keep-modified | keep-malformed | keep-unmarked) kept_count=$((kept_count + 1)) ;;
     keep-conflict) conflict_count=$((conflict_count + 1)) ;;
   esac
@@ -555,25 +659,415 @@ _upgrade_link() {
   # no manifest body to keep either. So an upgrade whose every path was a
   # conflict leaves the file exactly as it was, source and version included
   # (adr-20260922-upgrade-records-the-source-it-installed-from).
+  #
+  # The one thing in between after all: the marked section's record lives in
+  # the header, which link mode does write, so a run whose only work was
+  # reconciling that record has something to save. Dropped, the section stays
+  # unreplaceable for ever — the state this change ends
+  # (adr-20260926-an-interrupted-upgrade-is-repeated-not-rolled-back).
+  #
+  # But it does not earn <source> the header. Where copy mode may name the
+  # checkout it reconciled from — every reconciled path holds that checkout's
+  # bytes — a link-mode run that created no link leaves the project running the
+  # scripts it ran before, and naming another checkout would send the next plain
+  # `jig upgrade` to read from it (adr-20260922). So the record is kept and the
+  # source is not moved: the two decisions are separate here.
+  local record_source=""
   if _upgrade_records_source "$source" "$created_count"; then
+    record_source="$source"
+  elif [ "$reconciled_count" != 0 ]; then
+    record_source=$(manifest_source)
+  fi
+
+  if [ -n "$record_source" ]; then
     local version adapters_manifest
-    version=$(_upgrade_source_version "$source")
+    version=$(_upgrade_source_version "$record_source")
     adapters_manifest=$(_upgrade_csv "$active_adapters")
-    manifest_write_entries "$version" "$source" "$adapters_manifest" "link" \
+    manifest_write_entries "$version" "$record_source" "$adapters_manifest" "link" \
       "$_UPGRADE_SECTION_RECORD" < /dev/null
     _upgrade_summary "$created_count" "$kept_count" 0 "$conflict_count" "updated"
+    if [ "$record_source" != "$source" ]; then
+      _upgrade_kept_source_note "$source" "link"
+    fi
   else
     _upgrade_summary "$created_count" "$kept_count" 0 "$conflict_count" "unchanged"
     _upgrade_kept_source_note "$source" "link"
   fi
 }
 
+# --- the upgrade as a unit of work -------------------------------------------
+#
+# A real copy-mode run checks that it may start, is carried out by the newest
+# code it can reach, works on a branch of its own cut from the base branch,
+# confirms the install is complete, and only then commits — one commit, shipped
+# as far as `agent.git` allows, by the same steps `jig task ship` takes
+# (adr-20260930-an-upgrade-is-a-unit-of-work). Link mode is left out: there the
+# scripts are the source itself, and an upgrade is a development step taken on
+# a tree that is dirty by design.
+
+# The branches this command cuts, and recognises as its own on a repeat.
+_UPGRADE_BRANCH_PREFIX="jig/upgrade-"
+# Set by _upgrade_open_branch: the branch the run works on (empty when it
+# works on no branch of its own), the branch it was started from, and whether
+# this run created the branch.
+_UPGRADE_BRANCH=""
+_UPGRADE_PREV=""
+_UPGRADE_CREATED=0
+
+# _upgrade_current_branch — the checked-out branch, empty when detached.
+_upgrade_current_branch() {
+  git -C "$JIG_PROJECT" symbolic-ref --quiet --short HEAD 2>/dev/null || true
+}
+
+# _upgrade_handoff <source> — when the code running this command is older than
+# the source it upgrades from, give the whole run to the source's own
+# dispatcher, and never return.
+#
+# Every upgrade incident of 2026-09-26..29 was the version being replaced
+# doing the replacing: an old decision table deleting a template the new
+# version ships, an old copy replacing its entry point but not its libraries.
+# Only the new code knows what the new install is. The limit is honest: this
+# protects only from the first version that has it.
+#
+# The marker stops a loop: a handed-off run that is somehow still older than
+# its source has nowhere better to go, and the way out is the global tool.
+_upgrade_handoff() {
+  local source="$1" to q=""
+  to=$(_upgrade_source_version "$source")
+  jig_version_newer "$to" "$JIG_VERSION" || return 0
+  if [ -n "${JIG_UPGRADE_HANDED_OFF:-}" ]; then
+    jig_die "upgrade: this jig is $JIG_VERSION and $source holds $to; nothing was changed. Run \`jig self-update\`, then \`jig upgrade\`"
+  fi
+  if [ "${quiet:-0}" = 1 ]; then q="--quiet"; fi
+  _upgrade_out "upgrade: this jig is $JIG_VERSION; handing the upgrade to $to from $source"
+  cd "$JIG_PROJECT" || jig_die "upgrade: cannot enter $JIG_PROJECT"
+  # bash, not the file itself: Windows has no execute bit.
+  JIG_UPGRADE_HANDED_OFF="$JIG_VERSION" exec bash "$source/scripts/jig" upgrade --from "$source" $q
+}
+
+# _upgrade_stop_reasons <source> — why a real run must not start here, one
+# reason per line; nothing when it may. Asked before anything is touched.
+_upgrade_stop_reasons() {
+  local source="$1" cur tracked eol lines here name age cmd ttl dir holder checkout
+
+  # 1. Uncommitted work: the rule of `task start` — tracked changes block,
+  #    untracked files do not. A repeat on the upgrade's own branch is the
+  #    exception: its changes are the interrupted run's, and repeating it is
+  #    how that run is finished (adr-20260926-an-interrupted-upgrade-is-
+  #    repeated-not-rolled-back).
+  cur=$(_upgrade_current_branch)
+  case "$cur" in
+    "$_UPGRADE_BRANCH_PREFIX"*) ;;
+    *)
+      tracked=$(git -C "$JIG_PROJECT" status --porcelain 2>/dev/null | grep -v '^??' || true)
+      if [ -n "$tracked" ]; then
+        printf '%s\n' "the working tree has uncommitted changes; commit them, stash them (\`git stash\`), or finish the task they belong to, then run \`jig upgrade\` again"
+      fi
+      ;;
+  esac
+
+  # 2. Line endings: with core.autocrlf=true and nothing pinning Jig's files to
+  #    LF, a clone checks them out with CRLF, and every hash in the manifest
+  #    stops meaning anything — invisibly, `jig status` still says drift 0.
+  #    The manifest itself is the path that matters: a CRLF `.ai/manifest`
+  #    parses as empty (manifest.sh's `---` separator never matches with a
+  #    trailing \r), which is the failure this stop exists to prevent. Older
+  #    templates pinned `.ai/scripts/**` alone, so checking a script's eol
+  #    here would already read `lf` on every one of those installs and never
+  #    fire for the bug it is meant to catch.
+  if [ "$(git -C "$JIG_PROJECT" config --bool --get core.autocrlf 2>/dev/null || true)" = true ]; then
+    eol=$(git -C "$JIG_PROJECT" check-attr eol -- "$JIG_AI_DIR/manifest" 2>/dev/null | sed 's/.*: eol: //')
+    if [ "$eol" != lf ]; then
+      lines=$(sed '/^#/d; /^$/d' "$source/templates/gitattributes" 2>/dev/null | tr '\n' ';' | sed 's/;$//; s/;/; /g')
+      printf '%s\n' "core.autocrlf is true here and Jig's files are not pinned to LF, so they would be checked out with CRLF; add these lines to .gitattributes, commit, and run again: $lines"
+    fi
+  fi
+
+  # 3. A live session in this checkout (adr-20260924-a-checkout-records-what-
+  #    is-happening-in-it): switching its branch and replacing its scripts
+  #    under it is exactly what that record exists to prevent. The task whose
+  #    branch is checked out here is the reader's own, as in `jig status`.
+  here=$(jig_checkout_here_task)
+  while read -r name age cmd; do
+    [ -n "$name" ] || continue
+    printf '%s\n' "a session is working in this checkout ($name ran \`jig $cmd\` $(jig_checkout_ago "$age") ago); run the upgrade when it has finished"
+  done < <(jig_checkout_busy "$here")
+
+  # 4. A `jig verify` running in this checkout: replacing the scripts it is
+  #    executing turned one run into 34 false failures on 2026-09-26. A run
+  #    in another worktree of the clone executes its own files, not these.
+  ttl=$(jig_verify_busy_ttl)
+  if [ "$ttl" -gt 0 ] && dir=$(jig_verify_busy_dir) && [ -n "$dir" ]; then
+    holder=$(jig_verify_busy_holder "$dir" "$ttl") || holder=""
+    if [ -n "$holder" ]; then
+      checkout=${holder#* }
+      if _upgrade_same_dir "$checkout" "$JIG_PROJECT"; then
+        printf '%s\n' "\`jig verify\` is running in this checkout (for $(jig_checkout_ago "${holder%% *}")); run the upgrade when it has finished"
+      fi
+    fi
+  fi
+  return 0
+}
+
+# _upgrade_preflight <source> <dry-run> — refuse a real run, changing nothing,
+# for every reason above at once; on a dry run only say what a real one would
+# do. A dry run is read-only and `status`, `verify` and `doctor` rely on it
+# (ADR-0017), so it never refuses.
+_upgrade_preflight() {
+  local reasons r
+  reasons=$(_upgrade_stop_reasons "$1")
+  [ -n "$reasons" ] || return 0
+  if [ "$2" = 1 ]; then
+    while IFS= read -r r; do
+      _upgrade_out "note: a real upgrade would stop: $r"
+    done <<EOF
+$reasons
+EOF
+    return 0
+  fi
+  jig_die "upgrade: nothing was changed:
+$(printf '%s\n' "$reasons" | sed 's/^/  - /')"
+}
+
+# _upgrade_open_branch <to-version> — put the run on a branch of its own.
+#
+# Cut from the base branch, never from the current one: standing on a task's
+# branch, an upgrade cut from it would ride into that task's pull request. The
+# base is freshened and chosen the way `task start` chooses it. Already on an
+# upgrade branch, the run stays there. No branch at all when the project works
+# on one branch by choice (`git.branch_per_task: false`) or has no commit yet.
+_upgrade_open_branch() {
+  local to="$1" base start name based n=2
+  _UPGRADE_PREV=$(_upgrade_current_branch)
+  [ -n "$_UPGRADE_PREV" ] || _UPGRADE_PREV=$(git -C "$JIG_PROJECT" rev-parse --short HEAD 2>/dev/null || true)
+  case "$_UPGRADE_PREV" in
+    "$_UPGRADE_BRANCH_PREFIX"*) _UPGRADE_BRANCH="$_UPGRADE_PREV"; return 0 ;;
+  esac
+  cfg_bool git.branch_per_task true || return 0
+  git -C "$JIG_PROJECT" rev-parse --verify --quiet HEAD >/dev/null 2>&1 || return 0
+  base=$(cfg git.base_branch main)
+  jig_fetch_branches "upgrade" "$base"
+  start=$(jig_fresh_base_ref "$base" "upgrade") || exit 1
+  # jig_fresh_base_ref falls back to HEAD when the base exists nowhere, and
+  # HEAD is the one place an upgrade must not be cut from.
+  if [ "$start" = HEAD ]; then
+    jig_die "upgrade: no branch $base here or on origin to cut the upgrade from; set git.base_branch to your main branch. Nothing was changed"
+  fi
+  # An upgrade to this version already on a branch that has not landed is the
+  # same upgrade: a second branch could only become a second pull request for
+  # it, or an empty one. A landed one is history, and a new name is fine.
+  # Landed is read two ways, because ancestry alone misses the common case: a
+  # pull request squashed or rebased by the forge leaves the local branch
+  # behind as no ancestor of the base. A base whose manifest already records
+  # <to> carries that upgrade whichever way it arrived.
+  based=$(jig_git_show_path "$start" "$JIG_AI_DIR/manifest" 2>/dev/null \
+    | sed -n 's/^jig\.version:[[:space:]]*//p' | head -n 1) || based=""
+  name="$_UPGRADE_BRANCH_PREFIX$to"
+  while git -C "$JIG_PROJECT" show-ref --verify --quiet "refs/heads/$name"; do
+    if [ "$based" != "$to" ] \
+      && ! git -C "$JIG_PROJECT" merge-base --is-ancestor "refs/heads/$name" "$start" 2>/dev/null; then
+      jig_die "upgrade: the upgrade to $to is already on branch $name, which has not been merged into $base yet. Merge it, or \`git checkout $name\` and run \`jig upgrade\` there to carry it on. Nothing was changed"
+    fi
+    name="$_UPGRADE_BRANCH_PREFIX$to-$n"
+    n=$((n + 1))
+  done
+  git -C "$JIG_PROJECT" checkout -q -b "$name" "$start" \
+    || jig_die "upgrade: could not create branch $name from $base; nothing was changed"
+  _UPGRADE_BRANCH="$name"
+  _UPGRADE_CREATED=1
+  _upgrade_out "upgrade: working on branch $name, cut from $base"
+}
+
+# _upgrade_stage_change — stage what this run changed and nothing else. The
+# tree held no tracked change when the run started, so every tracked change is
+# the run's own; of the untracked files, only the ones the install owns.
+_upgrade_stage_change() {
+  local ours untracked p
+  git -C "$JIG_PROJECT" add -u || jig_die "upgrade: git add failed"
+  ours=$( { manifest_paths; printf '%s\n' "$JIG_AI_DIR/manifest" AGENTS.md; } | sed '/^$/d' | sort -u)
+  untracked=$(git -C "$JIG_PROJECT" ls-files --others --exclude-standard 2>/dev/null \
+    | grep -Fx -f <(printf '%s\n' "$ours") || true)
+  [ -n "$untracked" ] || return 0
+  while IFS= read -r p; do
+    git -C "$JIG_PROJECT" add -- "$p" || jig_die "upgrade: git add failed: $p"
+  done <<EOF
+$untracked
+EOF
+}
+
+# _upgrade_custom_profiles — active profile names (profiles_active) that are
+# not part of the project's recorded source (manifest_source): a profile
+# somebody wrote themselves rather than one the framework ships. `generic` is
+# never included: it is the framework's own fallback and already declares
+# `verifies: nothing`. Silent (prints nothing) when the source cannot be
+# read, rather than guessing.
+_upgrade_custom_profiles() {
+  local source p
+  source=$(manifest_source 2>/dev/null) || source=""
+  [ -n "$source" ] || return 0
+  for p in $(profiles_active); do
+    [ "$p" != generic ] || continue
+    [ -f "$source/profiles/$p/profile.yaml" ] && continue
+    printf '%s\n' "$p"
+  done
+}
+
+# _upgrade_manual_steps <from> <to> — the steps a person still has to take by
+# hand, as the commit and the pull request carry them (the one place both
+# read from). All three below arrived in 0.16.0 (docs/changelog.mdx,
+# docs/upgrading.mdx#from-015-to-016); nothing is printed once <from> is
+# 0.16.0 or newer.
+#
+# The first has a real predicate — jig_section_report_state, the same one
+# `jig doctor`'s instructions check reads, so the two can never disagree
+# about it (doctor.sh's own comment says so) — and is skipped once satisfied.
+# `jig doctor` is where it can be checked again later; nothing new needed
+# there.
+#
+# The other two are advisory text, not a tracked done/not-done step:
+#
+#   - Whether the project's verification tools are installed cannot be
+#     answered here without running them, which is exactly what `jig verify`
+#     exists to do, on its own busy-record and narrowing
+#     (adr-20260925-one-test-run-per-clone-and-a-dead-run-is-not-a-pass). Its
+#     own exit code (0 or 3) is the predicate; running it as a side effect of
+#     every upgrade would mean paying for a full run here or contending with
+#     one already in flight. Always shown, unconditionally, once <from>
+#     predates 0.16.0.
+#   - Whether a self-written profile needs `verifies: nothing` has no correct
+#     yes/no answer from the filesystem alone: a custom profile with real
+#     checks correctly has no `verifies` key, and nothing distinguishes that
+#     from one with none short of running its checks and reading why they
+#     skipped. Per this task's own rule, a step with no predicate is not
+#     filed as one; this stays a named pointer at whichever custom profiles
+#     the project actually has, so a project with none sees nothing.
+_upgrade_manual_steps() {
+  local from="$1" state custom
+  jig_version_lt "$from" 0.16.0 || return 0
+
+  state=$(jig_section_report_state "$JIG_PROJECT/AGENTS.md" "$(manifest_instructions_section 2>/dev/null)")
+  if [ "$state" = unmarked ]; then
+    # shellcheck disable=SC2016
+    printf -- '- Run the jig-init skill, so upgrades can reach your AGENTS.md. It adds the markers and records Jig'\''s claim to that section, with your consent; without that claim `jig upgrade` reports `keep-unmarked AGENTS.md` and never touches it, however well-formed the markers are.\n'
+  fi
+
+  # shellcheck disable=SC2016
+  printf -- '- Install the tools your project'\''s checks need. `jig verify` now refuses (exit 3, nothing was checked) when a profile for your stack is active and its tools are missing; `jig verify --list` shows which profiles are installed.\n'
+
+  custom=$(_upgrade_custom_profiles | tr '\n' ' ' | sed 's/ $//')
+  if [ -n "$custom" ]; then
+    # shellcheck disable=SC2016
+    printf -- '- If %s checks nothing by design, add `verifies: nothing` to its profile.yaml. Absence means the profile claims it verifies something, and it will refuse once its checks all skip.\n' "$custom"
+  fi
+}
+
+# _upgrade_message <file> <from> <to> <summary> — the one commit's message.
+_upgrade_message() {
+  local file="$1" from="$2" to="$3" summary="$4"
+  [ -n "$from" ] || from="unknown"
+  {
+    printf 'Upgrade Jig %s -> %s\n\n' "$from" "$to"
+    printf '%s\n\n' "$summary"
+    printf 'Manual steps:\n'
+    _upgrade_manual_steps "$from" "$to"
+    printf '\nUpgrading: https://jig.fapost.in/upgrading\n'
+  } > "$file"
+}
+
+# _upgrade_finish <from> <to> <summary> — the end of a real copy-mode run: the
+# self-check, then one commit and whatever `agent.git` allows beyond it. Never
+# commits an install the self-check did not confirm.
+_upgrade_finish() {
+  local from="$1" to="$2" summary="$3" level rc=0 base msg rel
+  level=$(jig_agent_git) || level=none
+  _upgrade_self_check 0 || rc=$?
+  _upgrade_config_note 0
+  if [ "$rc" != 0 ]; then
+    _upgrade_out "upgrade: not committed, because the install is not complete; run \`jig upgrade\` again${_UPGRADE_BRANCH:+ on $_UPGRADE_BRANCH}"
+    return 0
+  fi
+  git -C "$JIG_PROJECT" rev-parse --verify --quiet HEAD >/dev/null 2>&1 || {
+    _upgrade_out "upgrade: this repository has no commit yet; the change is left for you to commit"
+    return 0
+  }
+
+  _upgrade_stage_change
+  if [ -z "$(jig_ship_staged)" ]; then
+    if [ "$_UPGRADE_CREATED" = 1 ]; then
+      # The branch was cut by this run and holds no commit of its own, so
+      # `branch -d` loses nothing; it refuses anything else by itself.
+      if git -C "$JIG_PROJECT" checkout -q "$_UPGRADE_PREV" 2>/dev/null; then
+        git -C "$JIG_PROJECT" branch -q -d "$_UPGRADE_BRANCH" 2>/dev/null || true
+        _upgrade_out "upgrade: nothing changed; back on $_UPGRADE_PREV"
+        # The base is already current, so a branch still asking for an
+        # upgrade (`jig verify` refuses there) gets it from the base, not from
+        # another run of this command.
+        base=$(cfg git.base_branch main)
+        if [ "$_UPGRADE_PREV" != "$base" ]; then
+          _upgrade_out "next: $base already has this version; if $_UPGRADE_PREV still asks for an upgrade, bring it in with \`git merge $base\`"
+        fi
+      else
+        _upgrade_out "upgrade: nothing changed; you are on $_UPGRADE_BRANCH"
+      fi
+    else
+      _upgrade_out "upgrade: nothing changed"
+    fi
+    return 0
+  fi
+
+  rel="$JIG_AI_DIR/runtime/upgrade/message"
+  msg="$JIG_PROJECT/$rel"
+  mkdir -p "$(dirname "$msg")" || jig_die "upgrade: cannot create $(dirname "$msg")"
+  _upgrade_message "$msg" "$from" "$to" "$summary"
+
+  if [ "$level" = none ]; then
+    _upgrade_out "upgrade: the change is staged; commit it with \`git commit -F $rel\`"
+    _upgrade_next
+    return 0
+  fi
+  jig_ship_check_staged "upgrade"
+  jig_ship_commit "upgrade" "$msg"
+  if [ -z "$_UPGRADE_BRANCH" ] || [ "$level" = commit ]; then
+    _upgrade_next
+    return 0
+  fi
+
+  if ! git -C "$JIG_PROJECT" remote get-url origin >/dev/null 2>&1; then
+    _upgrade_out "upgrade: no remote named origin, so nothing is pushed"
+    _upgrade_next
+    return 0
+  fi
+  base=$(cfg git.base_branch main)
+  jig_ship_require_commits "upgrade" "$_UPGRADE_BRANCH" "$base"
+  jig_ship_push "upgrade" "$_UPGRADE_BRANCH"
+  if [ "$level" = push ]; then
+    _upgrade_next
+    return 0
+  fi
+  # jig_ship_pr registers the body it cuts with the same exit cleanup.
+  jig_ship_pr "upgrade" "$_UPGRADE_BRANCH" "$base" "$msg"
+  if [ "$level" = merge ] && [ -n "$JIG_SHIP_URL" ]; then
+    jig_ship_merge "upgrade" "$JIG_SHIP_URL" "$(git -C "$JIG_PROJECT" rev-parse HEAD)" any
+  fi
+  _upgrade_next
+}
+
+# _upgrade_next — where the person stands now, and the way back, in words: a
+# branch and a pull request must not become a new dead end for somebody who
+# has never used git beyond what jig does for them.
+_upgrade_next() {
+  [ -n "$_UPGRADE_BRANCH" ] || return 0
+  _upgrade_out "next: this upgrade is on branch $_UPGRADE_BRANCH; once it is merged into $(cfg git.base_branch main), merge that into the branches still in progress"
+  if [ -n "$_UPGRADE_PREV" ] && [ "$_UPGRADE_PREV" != "$_UPGRADE_BRANCH" ]; then
+    _upgrade_out "next: to go back to what you were doing: \`git checkout $_UPGRADE_PREV\`"
+  fi
+}
+
 # --- cmd_upgrade -------------------------------------------------------------
 
 # Staging directory / union-of-paths temp file / hash-table work directory for
-# the current cmd_upgrade run. Script-global (not `local`) so the EXIT/INT/TERM cleanup trap below
-# still sees them if the process dies mid-run — same pattern as
-# scripts/lib/knowledge.sh's KM_*_FILE variables.
+# the current cmd_upgrade run. Script-global (not `local`), registered with jig_cleanup_add
+# (common.sh) so an interrupted run still removes them.
 _UPGRADE_STAGE=""
 _UPGRADE_UNION_FILE=""
 _UPGRADE_WORK=""
@@ -582,7 +1076,7 @@ _UPGRADE_WORK=""
 _UPGRADE_DELETE_ROOTS=""
 
 cmd_upgrade() {
-  local from="" dry_run=0 quiet=0
+  local from="" dry_run=0 quiet=0 level=none
   while [ $# -gt 0 ]; do
     case "$1" in
       --from) [ $# -ge 2 ] || jig_die "upgrade: --from requires a value"; from="$2"; shift 2 ;;
@@ -598,11 +1092,6 @@ cmd_upgrade() {
   . "$JIG_LIB/profiles.sh"
   # shellcheck source=lib/section.sh
   . "$JIG_LIB/section.sh"
-
-  trap '[ -n "$_UPGRADE_STAGE" ] && rm -rf "$_UPGRADE_STAGE"
-        [ -n "$_UPGRADE_UNION_FILE" ] && rm -f "$_UPGRADE_UNION_FILE"
-        [ -n "$_UPGRADE_SECTION_TMP" ] && rm -f "$_UPGRADE_SECTION_TMP"
-        [ -n "$_UPGRADE_WORK" ] && rm -rf "$_UPGRADE_WORK"' EXIT INT TERM
 
   local source
   if [ -n "$from" ]; then
@@ -647,22 +1136,46 @@ cmd_upgrade() {
     [ "$_JIG_LINK_KIND" = symlink ] \
       || jig_die "upgrade: this project is installed in link mode, which needs symbolic links, and they cannot be made here"
     _upgrade_link "$source" "$active_profiles" "$active_adapters" "$dry_run"
+    _upgrade_self_check "$dry_run" || true
     _upgrade_config_note "$dry_run"
     return 0
   fi
 
+  # Copy mode is a unit of work (adr-20260930-an-upgrade-is-a-unit-of-work):
+  # the newest code, the checks, then a branch of its own — all before the
+  # first file is touched. upgrade_pending skips the checks: it runs on every
+  # `status` and `verify`, and reads only the per-path lines.
+  local from_version to_version
+  if [ "$dry_run" != 1 ]; then
+    _upgrade_handoff "$source"
+    level=$(jig_agent_git) \
+      || jig_die "upgrade: invalid agent.git: $level (expected none|commit|push|pr|merge); nothing was changed"
+  fi
+  [ "${_upgrade_skip_preflight:-0}" = 1 ] || _upgrade_preflight "$source" "$dry_run"
+  to_version=$(_upgrade_source_version "$source")
+  if [ "$dry_run" != 1 ]; then
+    _upgrade_open_branch "$to_version"
+    # The branch may hold another config; read what this run installs there.
+    active_profiles=$(cfg_list profiles generic)
+    active_adapters=$(cfg_list adapters "claude codex")
+  fi
+  from_version=$(manifest_header_get jig.version)
+
   _UPGRADE_STAGE=$(mktemp -d "${TMPDIR:-/tmp}/jig-upgrade-stage.XXXXXX")
+  jig_cleanup_add -d "$_UPGRADE_STAGE"
   _upgrade_build_staged "$source" "$_UPGRADE_STAGE" "$active_profiles" "$active_adapters"
 
   _UPGRADE_UNION_FILE=$(mktemp "${TMPDIR:-/tmp}/jig-upgrade-union.XXXXXX")
+  jig_cleanup_add "$_UPGRADE_UNION_FILE"
   { (cd "$_UPGRADE_STAGE" && find . -type f | sed 's|^\./||'); manifest_paths; } | sort -u > "$_UPGRADE_UNION_FILE"
 
   _UPGRADE_WORK=$(mktemp -d "${TMPDIR:-/tmp}/jig-upgrade-work.XXXXXX")
+  jig_cleanup_add -d "$_UPGRADE_WORK"
   _upgrade_hash_table "$_UPGRADE_UNION_FILE" "$_UPGRADE_STAGE" "$_UPGRADE_WORK" \
     > "$_UPGRADE_WORK/table"
 
   local new_entries="" rel mhash lhash shash t
-  local placed_count=0 kept_count=0 removed_count=0 conflict_count=0
+  local placed_count=0 kept_count=0 removed_count=0 conflict_count=0 reconciled_count=0
   t=$(printf '\t')
   while IFS="$t" read -r rel mhash lhash shash; do
     [ -n "$rel" ] || continue
@@ -681,6 +1194,7 @@ cmd_upgrade() {
   _upgrade_section "$source" "$dry_run"
   case "$_UPGRADE_SECTION_ACTION" in
     replace) placed_count=$((placed_count + 1)) ;;
+    already-placed) kept_count=$((kept_count + 1)); reconciled_count=$((reconciled_count + 1)) ;;
     keep-modified | keep-malformed | keep-unmarked) kept_count=$((kept_count + 1)) ;;
     keep-conflict) conflict_count=$((conflict_count + 1)) ;;
   esac
@@ -697,19 +1211,31 @@ cmd_upgrade() {
   # install, replace or delete, every entry it would write is the one the
   # manifest already holds (keep-modified and keep-outside carry the recorded
   # hash forward verbatim).
-  if _upgrade_records_source "$source" "$((placed_count + removed_count))"; then
+  #
+  # A reconciliation counts as applied, and it has to. It is the one outcome
+  # that changes the body while writing no file: the entry it carries forward
+  # is the staged hash, not the recorded one. Left out of this count, a repeat
+  # of a run interrupted after its last placement would find every path already
+  # placed, write nothing, and report "manifest unchanged" — the state this
+  # whole change exists to end, reached by the fix itself. Naming <source> in
+  # the header is right in that case too: every reconciled path holds that
+  # checkout's bytes, so the project is an install of it, and the interrupted
+  # run only failed to say so.
+  local manifest_state=unchanged
+  if _upgrade_records_source "$source" \
+       "$((placed_count + removed_count + reconciled_count))"; then
     local version adapters_manifest
     version=$(_upgrade_source_version "$source")
     adapters_manifest=$(_upgrade_csv "$active_adapters")
     printf '%s\n' "$new_entries" | sed '/^$/d' \
       | manifest_write_entries "$version" "$source" "$adapters_manifest" "copy" \
           "$_UPGRADE_SECTION_RECORD"
-    _upgrade_summary "$placed_count" "$kept_count" "$removed_count" "$conflict_count" "updated"
-  else
-    _upgrade_summary "$placed_count" "$kept_count" "$removed_count" "$conflict_count" "unchanged"
-    _upgrade_kept_source_note "$source" "copy"
+    manifest_state=updated
   fi
-  _upgrade_config_note "$dry_run"
+  _upgrade_summary "$placed_count" "$kept_count" "$removed_count" "$conflict_count" "$manifest_state"
+  [ "$manifest_state" = updated ] || _upgrade_kept_source_note "$source" "copy"
+  _upgrade_finish "$from_version" "$to_version" \
+    "$(quiet=0; _upgrade_summary "$placed_count" "$kept_count" "$removed_count" "$conflict_count" "$manifest_state")"
 }
 
 # --- upgrade_pending ---------------------------------------------------------
@@ -720,7 +1246,7 @@ cmd_upgrade() {
 # mutates the project. Built on top of --dry-run rather than duplicating the
 # staging/decision-table logic — `cmd_upgrade --dry-run` already computes
 # exactly this, and command substitution already runs it in a subshell, so
-# its own EXIT/INT/TERM trap and locals never touch the caller's.
+# its own exit cleanup (common.sh) and locals never touch the caller's.
 #
 # Callers: `jig status` (drift's pending count) and `jig verify` (refuse to
 # run on a stale install). Precondition: the project is initialised
@@ -743,7 +1269,7 @@ cmd_upgrade() {
 #      hard failure for status/verify — the caller's own subsequent logic
 #      (e.g. verify's profile-name validation) surfaces the real error.
 upgrade_pending() {
-  local out rc=0
+  local out rc=0 _upgrade_skip_preflight=1
   out=$(cmd_upgrade --dry-run 2>&1) || rc=$?
   [ "$rc" = 0 ] || return 3
 

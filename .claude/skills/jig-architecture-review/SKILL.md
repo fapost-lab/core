@@ -6,17 +6,19 @@ description: Review a Jig task against the system's architecture — boundaries,
 # jig-architecture-review — does the system still hold its shape
 
 Code review asks whether the change is correct. This asks whether the system is still the
-system its documentation describes.
+system its documentation describes. When `jig task route <id>` prints `delegate: review`, this
+review goes to a helper on that model ([delegation](../jig-task/references/delegation.md)).
 
 ## 1. Load the shape
 
 ```
 .ai/scripts/jig task changes <id> --base <ref>
-.ai/scripts/jig context resolve --task <id> --stage architecture-review --files - < <workspace>/review-files
-.ai/scripts/jig context guard --task <id> --stage architecture-review --files - < <workspace>/review-files
+files=$(.ai/scripts/jig task changes <id> --base <ref> --format paths)
+printf '%s\n' "$files" | .ai/scripts/jig context resolve --task <id> --stage architecture-review --files -
+printf '%s\n' "$files" | .ai/scripts/jig context guard --task <id> --stage architecture-review --files -
 ```
 
-Create review-files and inspect all change layers via the same
+Keep the paths in a shell variable, not in a file, and inspect all change layers via the same
 [scope reference](../jig-review/references/change-scope.md) used by code review. Read and
 acknowledge pending knowledge before the guard. Check the acceptance map for omitted
 requirements too. Use a separate `jig context --task <id> --all` inspection when historical

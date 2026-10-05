@@ -99,6 +99,7 @@ _status_counts_save() {
   local dir="$JIG_PROJECT/$JIG_AI_DIR/runtime" file tmp
   file="$dir/status-counts"
   tmp="$file.tmp.$$"
+  jig_cleanup_add "$tmp"
   mkdir -p "$dir" || return 1
   {
     printf 'at: %s\n' "$_SC_AT"
@@ -147,6 +148,7 @@ _status_report() {
   else
     printf '%s\n' "manifest: missing"
   fi
+  _status_new_release_hint
 
   # Drift: one pass over the manifest, then one git process for every file
   # still on disk (jig_hash_list). A manifest_hash_of and a jig_hash per path
@@ -154,6 +156,7 @@ _status_report() {
   # a git startup for every hash. Both lists stay in manifest order.
   local modified="" missing="" mcount=0 xcount=0 line rel mhash lhash drift_tmp
   drift_tmp=$(mktemp -d "${TMPDIR:-/tmp}/jig-status-drift.XXXXXX")
+  jig_cleanup_add -d "$drift_tmp"
   : > "$drift_tmp/present"
   : > "$drift_tmp/rel"
   while IFS= read -r line; do
@@ -248,6 +251,13 @@ $rel"
     _status_rec "$rec"
     found=1
     line="task $_ST_ID class=$_ST_CLASS status=$_ST_STATUS"
+    # A lighter route than the class's own is worth a word; `full`, the
+    # default, adds none (adr-20261002-route-depth-is-a-personal-choice).
+    [ "$_ST_DEPTH" != lean ] || line="$line depth=lean"
+    # A class lowered mid-route shows where the class does, so a lowering is
+    # never quieter than the gate it may have skipped
+    # (adr-20261004-a-route-stage-is-proven-by-its-record).
+    [ -z "$_ST_LOWERED" ] || line="$line lowered=$_ST_LOWERED"
     [ -z "$_ST_WT" ] || line="$line $_ST_WT_NOTE"
     # Same rule as `jig task list`: the base only where it is not the project's.
     if [ -n "$_ST_BASE" ] && [ "$_ST_BASE" != "$default_base" ]; then
@@ -269,7 +279,7 @@ $rel"
       [ "$bcount" -eq 0 ] || line="$line blocking=$bcount"
     fi
     # The answer `jig task receipt --check` gives (task_receipt_check,
-    # task.sh), read once per task in _status_live_collect: a receipt that
+    # task.sh, asked `cheap`), read once per task in _status_live_collect: a receipt that
     # exists but no longer matches the reviewed state. A task with no receipt
     # at all is not flagged here — that is "not reviewed yet", not "stale".
     case "$_ST_RECEIPT" in
@@ -337,7 +347,7 @@ _STATUS_US=$(printf '\037')
 # sed per key per task: the page is redrawn after every task command, and a
 # process per value made ten tasks cost seconds. One line per state file,
 # <task_id> <class> <status> <paused> <paused_reason> <branch> <base_branch>
-# <autopilot> <pr_url> <knowledge_consolidated>, joined by \037; each value is
+# <autopilot> <pr_url> <knowledge_consolidated> <route_depth> <class_lowered_from>, joined by \037; each value is
 # what `sed -n 's/^<key>:[[:space:]]*//p' | head -n 1` gave, the first match.
 _status_task_rows() {
   local f
@@ -349,9 +359,10 @@ _status_task_rows() {
   awk '
     function out() {
       if (have)
-        printf "%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\n",
+        printf "%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\037%s\n",
           v["task_id"], v["class"], v["status"], v["paused"], v["paused_reason"],
-          v["branch"], v["base_branch"], v["autopilot"], v["pr_url"], v["knowledge_consolidated"]
+          v["branch"], v["base_branch"], v["autopilot"], v["pr_url"], v["knowledge_consolidated"],
+          v["route_depth"], v["class_lowered_from"]
     }
     FNR == 1 { out(); split("", v); split("", seen); have = 1 }
     /^[^:]+:/ {
@@ -366,19 +377,22 @@ _status_task_rows() {
 # _status_live_collect [page] — fill _STATUS_LIVE, _STATUS_FINISHED and
 # _STATUS_WORKTREES. Per live task it asks the peers once: where its branch is
 # checked out (git's own list, ADR-0029) and how many files wait there, and
-# the receipt line `jig task receipt --check` prints (task_receipt_check). With
+# the receipt line `jig task receipt --check` prints (task_receipt_check, asked
+# `cheap`: no `jig context` process per task, so "not checked", not "current",
+# when the diff has not moved). With
 # `page`, also the answers only the page shows: the gate of a T3/T4 design
 # (_task_gate_state) and the autopilot run (_task_autopilot_facts).
 _status_live_collect() {
-  local page="${1:-}" row id class status paused reason branch base autopilot pr_url kc
-  local wt wt_note receipt gate facts us="$_STATUS_US"
+  local page="${1:-}" row id class status paused reason branch base autopilot pr_url kc own_depth lowered
+  local wt wt_note receipt gate facts depth setting us="$_STATUS_US"
   _STATUS_FINISHED=0
   _STATUS_LIVE=""
   _STATUS_WORKTREES=$(_task_worktrees)
   _STATUS_DEFAULT_BASE=$(cfg git.base_branch main)
+  setting=$(_task_route_setting)
   while IFS= read -r row; do
     [ -n "$row" ] || continue
-    IFS="$us" read -r id class status paused reason branch base autopilot pr_url kc <<EOF
+    IFS="$us" read -r id class status paused reason branch base autopilot pr_url kc own_depth lowered <<EOF
 $row
 EOF
     case "$status" in
@@ -393,7 +407,7 @@ EOF
     fi
     # task_receipt_check exits 1 for stale and for a T4 with none; its line
     # is the answer either way.
-    receipt=$(task_receipt_check "$id" || true)
+    receipt=$(task_receipt_check "$id" cheap || true)
     gate="" facts=""
     if [ "$page" = page ]; then
       case "$class" in
@@ -401,7 +415,12 @@ EOF
       esac
       [ -z "$autopilot" ] || facts=$(_task_autopilot_facts "$id")
     fi
-    _STATUS_LIVE="$_STATUS_LIVE$id$us$class$us$status$us$paused$us$reason$us$branch$us$base$us$autopilot$us$pr_url$us$kc$us$wt$us$wt_note$us$receipt$us$gate$us$facts
+    # The task's route depth, as task.sh's rule answers it
+    # (_task_route_depth_of) for the key the state row already holds and the
+    # person's route.depth, read once above.
+    depth=$(_task_route_depth_of "$own_depth" "$setting")
+    depth=${depth%%$'\t'*}
+    _STATUS_LIVE="$_STATUS_LIVE$id$us$class$us$status$us$paused$us$reason$us$branch$us$base$us$autopilot$us$pr_url$us$kc$us$wt$us$wt_note$us$receipt$us$gate$us$depth$us$lowered$us$facts
 "
   done <<EOF
 $(_status_task_rows)
@@ -410,10 +429,13 @@ EOF
 }
 
 # _status_rec <record> — one _STATUS_LIVE record into the _ST_* globals.
-# _ST_APFACTS is _task_autopilot_facts' line, tab-separated, or empty.
+# _ST_APFACTS is _task_autopilot_facts' line, tab-separated, or empty; it is
+# the last field because it is the one holding tabs. _ST_DEPTH is the task's
+# route depth (_task_route_depth): `full` or `lean`. _ST_LOWERED is the class
+# the task was lowered from (`class_lowered_from`), empty when it never was.
 _status_rec() {
   IFS="$_STATUS_US" read -r _ST_ID _ST_CLASS _ST_STATUS _ST_PAUSED _ST_REASON _ST_BRANCH _ST_BASE \
-    _ST_AUTOPILOT _ST_PR_URL _ST_KC _ST_WT _ST_WT_NOTE _ST_RECEIPT _ST_GATE _ST_APFACTS <<EOF
+    _ST_AUTOPILOT _ST_PR_URL _ST_KC _ST_WT _ST_WT_NOTE _ST_RECEIPT _ST_GATE _ST_DEPTH _ST_LOWERED _ST_APFACTS <<EOF
 $1
 EOF
 }
@@ -426,6 +448,7 @@ EOF
 _status_current_task() {
   local current cur_rc=0 cur_err_file ids
   cur_err_file=$(mktemp "${TMPDIR:-/tmp}/jig-status-current.XXXXXX")
+  jig_cleanup_add "$cur_err_file"
   current=$(task_current 2>"$cur_err_file") || cur_rc=$?
   case "$cur_rc" in
     0)
@@ -574,7 +597,7 @@ _status_html() {
   out="$dir/status.html"
   mkdir -p "$dir" || jig_die "status --html: cannot create $dir"
   _STATUS_HTML_TMP="$out.tmp.$$"
-  trap 'if [ -n "${_STATUS_HTML_TMP:-}" ]; then rm -f "$_STATUS_HTML_TMP"; fi' EXIT INT TERM
+  jig_cleanup_add "$_STATUS_HTML_TMP"
   _status_html_page > "$_STATUS_HTML_TMP"
   mv "$_STATUS_HTML_TMP" "$out" || jig_die "status --html: cannot write $out"
   _STATUS_HTML_TMP=""
@@ -1018,6 +1041,21 @@ _status_html_needs() {
   level=$(jig_agent_git 2>/dev/null) || level=none
   settled=$(_status_hk_ids ' remote=(merged|closed) ')
 
+  # 0. A new jig release is out (task status-says-a-newer-jig-exists): the
+  # one card here that is about the framework itself rather than any task,
+  # so it leads, first of all — a person who never runs `jig doctor` learns
+  # of it only from this page and the plain-text hint (_status_new_release_hint).
+  # Kept in its own variable, not folded into $cards yet: the reassignment
+  # below ("cards="$(_status_phase_stop_cards ...)$stopped$gates$git_steps"")
+  # replaces $cards wholesale rather than appending to it, and a card built
+  # before that line would be silently dropped.
+  local release_card=""
+  local latest_release
+  if latest_release=$(_status_latest_release_available); then
+    release_card=$(_status_card "jig v$latest_release is out" "" "" \
+      "jig self-update, then jig upgrade")
+  fi
+
   while IFS= read -r rec; do
     [ -n "$rec" ] || continue
     _status_rec "$rec"
@@ -1095,8 +1133,9 @@ _status_html_needs() {
 $_STATUS_LIVE
 EOF
   # Most urgent first, whatever order the workspaces came in; a phase run's
-  # stops come first of all, as one card per phase.
-  cards="$(_status_phase_stop_cards "$phase_stops")$stopped$gates$git_steps"
+  # stops come first of all, as one card per phase — but a new release leads
+  # even that, since it is not about any task.
+  cards="$release_card$(_status_phase_stop_cards "$phase_stops")$stopped$gates$git_steps"
 
   # 4. A pull request waits for review or merge: one jig opened (pr_url), or
   # one the last housekeeping run saw open (a closed task's too).
@@ -1427,8 +1466,11 @@ _status_html_task_table() {
 # line.
 _status_html_task_row() {
   local blocking bline receipt cls
-  printf '<tr><td class="id"><code>%s</code></td><td>%s</td><td>%s' \
-    "$(_status_h "$_ST_ID")" "$(_status_h "${_ST_CLASS:--}")" "$(_status_h "$_ST_STATUS")"
+  printf '<tr><td class="id"><code>%s</code></td><td>%s' \
+    "$(_status_h "$_ST_ID")" "$(_status_h "${_ST_CLASS:--}")"
+  [ "$_ST_DEPTH" != lean ] || printf ' <span class="badge">lean</span>'
+  [ -z "$_ST_LOWERED" ] || printf ' <span class="badge warn">lowered from %s</span>' "$(_status_h "$_ST_LOWERED")"
+  printf '</td><td>%s' "$(_status_h "$_ST_STATUS")"
   if [ "$_ST_PAUSED" = "true" ]; then
     printf ' <span class="badge warn">paused</span>'
     [ -z "$_ST_REASON" ] || printf ' <span class="muted">%s</span>' "$(_status_h "$_ST_REASON")"
@@ -1631,6 +1673,47 @@ _status_framework_versions() {
   # Not both orderable as release versions (e.g. a "dev" branch checkout), or
   # some other non-directional disagreement: no basis to name a direction.
   printf '%s\n' "hint: run \`jig self-update\`, then \`jig upgrade --dry-run\`"
+}
+
+# _status_latest_release_available — the version housekeeping's daily
+# release check (.ai/runtime/latest-release, _hk_check_latest_release in
+# housekeeping.sh) found strictly newer than the global framework this
+# checkout uses, printed on success. Fails, printing nothing, on every other
+# outcome — no file yet, the recorded check "failed", or the recorded
+# version is not newer — since none of those is "you are current": task
+# status-says-a-newer-jig-exists is explicit that this reads "нет файла / не
+# удалось / не новее — ничего, никогда «у вас последняя»".
+#
+# Offline and read-only, unlike _status_framework_versions above: the
+# network call already happened in housekeeping, at most once a cadence: this
+# only reads its answer and jig_declared_version's (no execution, same
+# reason jig_global_executable/jig_declared_version are used everywhere else
+# in this file rather than running the global `jig`).
+_status_latest_release_available() {
+  local file="$JIG_PROJECT/$JIG_AI_DIR/runtime/latest-release" latest="" global_exe global tok
+  [ -f "$file" ] || return 1
+  while IFS= read -r tok; do
+    case "$tok" in
+      latest=*) latest=${tok#latest=} ;;
+    esac
+  done < <(tr ' ' '\n' < "$file")
+  [ -n "$latest" ] || return 1
+  global_exe=$(jig_global_executable) || return 1
+  global=$(jig_declared_version "${global_exe%/scripts/jig}") || return 1
+  jig_release_version "v$latest" >/dev/null 2>&1 || return 1
+  jig_release_version "v$global" >/dev/null 2>&1 || return 1
+  jig_version_newer "$latest" "$global" || return 1
+  printf '%s\n' "$latest"
+}
+
+# _status_new_release_hint — the one line the plain-text report shows when
+# _status_latest_release_available found something; nothing otherwise
+# (task status-says-a-newer-jig-exists). The HTML page's own card
+# (_status_html_needs) reads the same answer, so the two never disagree.
+_status_new_release_hint() {
+  local latest
+  latest=$(_status_latest_release_available) || return 0
+  printf '%s\n' "hint: jig v$latest is out; run \`jig self-update\`, then \`jig upgrade\`"
 }
 
 # _status_flagged_ids <flag> — the tasks <flag> still stands for: the ones the
