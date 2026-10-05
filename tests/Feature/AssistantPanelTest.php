@@ -98,9 +98,62 @@ final class AssistantPanelTest extends FeatureTestCase
         $this->assertStringNotContainsString('assistant=', $url);
     }
 
+    public function test_assigned_user_with_translations_permission_can_open_assistant_translations(): void
+    {
+        $this->seedTenantAcl();
+
+        $assistant = Assistant::factory()->create();
+        $user      = User::factory()->create();
+        $user->givePermissionTo(Permission::ManageAssistants->value, Permission::ManageTranslations->value);
+        $user->assistants()->attach($assistant);
+
+        $this->actingAs($user);
+
+        $this->get($this->assistantTranslationsUrl($assistant))->assertOk();
+    }
+
+    /**
+     * The translations page checks only the permission; the assistant it edits is guarded by the
+     * panel's tenancy (`User::canAccessTenant()` → `AssistantPolicy::view`), so a user holding the
+     * permission still cannot reach the translations of an assistant they are not assigned to.
+     */
+    public function test_translations_permission_does_not_open_an_unassigned_assistant(): void
+    {
+        $this->seedTenantAcl();
+
+        $assigned   = Assistant::factory()->create();
+        $unassigned = Assistant::factory()->create();
+        $user       = User::factory()->create();
+        $user->givePermissionTo(Permission::ManageAssistants->value, Permission::ManageTranslations->value);
+        $user->assistants()->attach($assigned);
+
+        $this->actingAs($user);
+
+        $this->get($this->assistantTranslationsUrl($unassigned))->assertNotFound();
+    }
+
+    public function test_assigned_user_without_translations_permission_cannot_open_assistant_translations(): void
+    {
+        $this->seedTenantAcl();
+
+        $assistant = Assistant::factory()->create();
+        $user      = User::factory()->create();
+        $user->givePermissionTo(Permission::ManageAssistants->value);
+        $user->assistants()->attach($assistant);
+
+        $this->actingAs($user);
+
+        $this->get($this->assistantTranslationsUrl($assistant))->assertForbidden();
+    }
+
     private function seedTenantAcl(): void
     {
         $this->seed(TenantAclSeeder::class);
+    }
+
+    private function assistantTranslationsUrl(Assistant $assistant): string
+    {
+        return route('filament.assistant.pages.translations', ['tenant' => $assistant]);
     }
 
     private function assistantPanelUrl(Assistant $assistant): string
