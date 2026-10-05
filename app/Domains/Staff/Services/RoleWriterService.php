@@ -9,10 +9,15 @@ use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Persists staff roles and syncs Spatie permissions from grouped Filament form state.
  * Only permission names defined in {@see Permission} may be synced.
+ *
+ * Spatie flushes the permission cache inside the transaction, before the commit: a request of the
+ * same tenant in between would cache the old grants under the tenant's key until it expires. The
+ * cache is flushed once more after the commit, so the new grants are what the next load reads.
  */
 final class RoleWriterService
 {
@@ -20,6 +25,7 @@ final class RoleWriterService
      * @param  string  $guard  Auth guard roles are scoped to (config `auth.defaults.guard`), bound in StaffServiceProvider.
      */
     public function __construct(
+        private readonly PermissionRegistrar $permissionRegistrar,
         private readonly string $guard = 'web',
     ) {
     }
@@ -44,6 +50,7 @@ final class RoleWriterService
                 'is_system'    => false,
             ]);
             $role->syncPermissions($permissions);
+            $this->forgetPermissionCacheAfterCommit();
 
             return $role;
         });
@@ -93,8 +100,16 @@ final class RoleWriterService
             ]);
             $role->save();
             $role->syncPermissions($permissions);
+            $this->forgetPermissionCacheAfterCommit();
 
             return $role->refresh();
+        });
+    }
+
+    private function forgetPermissionCacheAfterCommit(): void
+    {
+        DB::afterCommit(function (): void {
+            $this->permissionRegistrar->forgetCachedPermissions();
         });
     }
 

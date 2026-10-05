@@ -21,16 +21,16 @@ final class TenantSwitcherTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_flushes_permission_cache_after_switch_and_after_restore(): void
+    public function test_drops_loaded_permissions_after_switch_and_after_restore(): void
     {
-        $tenant              = Mockery::mock(TenantInterface::class);
+        $tenant              = $this->tenant('t1');
         $dbManager           = Mockery::mock(TenantDatabaseManagerInterface::class);
         $permissionRegistrar = Mockery::mock(PermissionRegistrar::class);
         $context             = new TenantContext();
 
         $dbManager->shouldReceive('switchTo')->once()->with($tenant);
         $dbManager->shouldReceive('restore')->once();
-        $permissionRegistrar->shouldReceive('forgetCachedPermissions')->twice();
+        $permissionRegistrar->shouldReceive('clearPermissionsCollection')->twice();
 
         $switcher = new TenantSwitcher($context, $dbManager, $permissionRegistrar);
 
@@ -39,29 +39,36 @@ final class TenantSwitcherTest extends TestCase
         $this->assertEquals('ok', $result);
     }
 
-    public function test_flushes_permission_cache_even_when_callback_throws(): void
+    public function test_drops_loaded_permissions_even_when_callback_throws(): void
     {
-        $tenant              = Mockery::mock(TenantInterface::class);
+        $tenant              = $this->tenant('t1');
         $dbManager           = Mockery::mock(TenantDatabaseManagerInterface::class);
         $permissionRegistrar = Mockery::mock(PermissionRegistrar::class);
         $context             = new TenantContext();
 
         $dbManager->shouldReceive('switchTo')->once()->with($tenant);
         $dbManager->shouldReceive('restore')->once();
-        $permissionRegistrar->shouldReceive('forgetCachedPermissions')->twice();
+        $permissionRegistrar->shouldReceive('clearPermissionsCollection')->twice();
 
-        $switcher = new TenantSwitcher($context, $dbManager, $permissionRegistrar);
+        $switcher = new TenantSwitcher($context, $dbManager, $permissionRegistrar, 'perm');
 
-        $this->expectException(RuntimeException::class);
+        try {
+            $switcher->runForTenant($tenant, function () use ($permissionRegistrar): never {
+                $this->assertSame('perm.tenant.t1', $permissionRegistrar->cacheKey);
 
-        $switcher->runForTenant($tenant, function (): never {
-            throw new RuntimeException('fail');
-        });
+                throw new RuntimeException('fail');
+            });
+            $this->fail('The callback failure must propagate.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('fail', $exception->getMessage());
+        }
+
+        $this->assertSame('perm', $permissionRegistrar->cacheKey);
     }
 
     public function test_resets_tenant_context_and_runs_hooks_even_when_restore_throws(): void
     {
-        $tenant              = Mockery::mock(TenantInterface::class);
+        $tenant              = $this->tenant('t1');
         $dbManager           = Mockery::mock(TenantDatabaseManagerInterface::class);
         $permissionRegistrar = Mockery::mock(PermissionRegistrar::class);
         $context             = new TenantContext();
@@ -69,7 +76,7 @@ final class TenantSwitcherTest extends TestCase
 
         $dbManager->shouldReceive('switchTo')->once()->with($tenant);
         $dbManager->shouldReceive('restore')->once()->andThrow(new RuntimeException('database went away'));
-        $permissionRegistrar->shouldReceive('forgetCachedPermissions')->twice();
+        $permissionRegistrar->shouldReceive('clearPermissionsCollection')->twice();
 
         $switcher = new TenantSwitcher($context, $dbManager, $permissionRegistrar);
         $switcher->registerRestoreHook(function () use (&$hookRan): void {
@@ -89,15 +96,15 @@ final class TenantSwitcherTest extends TestCase
 
     public function test_restores_previous_tenant_context(): void
     {
-        $outerTenant         = Mockery::mock(TenantInterface::class);
-        $innerTenant         = Mockery::mock(TenantInterface::class);
+        $outerTenant         = $this->tenant('outer');
+        $innerTenant         = $this->tenant('inner');
         $dbManager           = Mockery::mock(TenantDatabaseManagerInterface::class);
         $permissionRegistrar = Mockery::mock(PermissionRegistrar::class);
         $context             = new TenantContext();
 
         $dbManager->shouldReceive('switchTo')->twice();
         $dbManager->shouldReceive('restore')->twice();
-        $permissionRegistrar->shouldReceive('forgetCachedPermissions');
+        $permissionRegistrar->shouldReceive('clearPermissionsCollection');
 
         $switcher = new TenantSwitcher($context, $dbManager, $permissionRegistrar);
 
@@ -110,5 +117,44 @@ final class TenantSwitcherTest extends TestCase
         });
 
         $this->assertFalse($context->isResolved());
+    }
+
+    public function test_each_tenant_reads_permissions_under_its_own_cache_key(): void
+    {
+        $outerTenant         = $this->tenant('outer');
+        $innerTenant         = $this->tenant('inner');
+        $dbManager           = Mockery::mock(TenantDatabaseManagerInterface::class);
+        $permissionRegistrar = Mockery::mock(PermissionRegistrar::class);
+        $context             = new TenantContext();
+        $keys                = [];
+
+        $dbManager->shouldReceive('switchTo');
+        $dbManager->shouldReceive('restore');
+        $permissionRegistrar->shouldReceive('clearPermissionsCollection');
+        $permissionRegistrar->shouldNotReceive('forgetCachedPermissions');
+
+        $switcher = new TenantSwitcher($context, $dbManager, $permissionRegistrar, 'perm');
+
+        $switcher->runForTenant($outerTenant, function () use ($switcher, $innerTenant, $permissionRegistrar, &$keys): void {
+            $keys[] = $permissionRegistrar->cacheKey;
+
+            $switcher->runForTenant($innerTenant, function () use ($permissionRegistrar, &$keys): void {
+                $keys[] = $permissionRegistrar->cacheKey;
+            });
+
+            $keys[] = $permissionRegistrar->cacheKey;
+        });
+
+        $keys[] = $permissionRegistrar->cacheKey;
+
+        $this->assertSame(['perm.tenant.outer', 'perm.tenant.inner', 'perm.tenant.outer', 'perm'], $keys);
+    }
+
+    private function tenant(string $id): TenantInterface
+    {
+        $tenant = Mockery::mock(TenantInterface::class);
+        $tenant->shouldReceive('getId')->andReturn($id);
+
+        return $tenant;
     }
 }

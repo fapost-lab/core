@@ -118,7 +118,7 @@ final class PruneFlowLogsCommandTest extends TestCase
         });
 
         $permissions = Mockery::mock(PermissionRegistrar::class);
-        $permissions->shouldReceive('forgetCachedPermissions');
+        $permissions->shouldReceive('clearPermissionsCollection');
 
         $switcher = new TenantSwitcher(new TenantContext(), $tenantDatabase, $permissions);
 
@@ -159,6 +159,7 @@ final class PruneFlowLogsCommandTest extends TestCase
     {
         $tenant = Mockery::mock(TenantInterface::class);
         $tenant->shouldReceive('getSlug')->andReturn($slug);
+        $tenant->shouldReceive('getId')->andReturn($slug);
 
         return $tenant;
     }

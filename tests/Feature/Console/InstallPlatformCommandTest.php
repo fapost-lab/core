@@ -10,13 +10,16 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
+use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Services\TenantProvisioningService;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Mockery;
 use Spatie\Permission\PermissionRegistrar;
 use stdClass;
@@ -237,7 +240,12 @@ final class InstallPlatformCommandTest extends FeatureTestCase
     private function bindProvisioningServiceThatSucceeds(): void
     {
         $tenantRepository = Mockery::mock(TenantRepositoryInterface::class);
-        $tenantRepository->shouldReceive('save')->twice();
+        $tenantRepository->shouldReceive('save')->twice()->andReturnUsing(static function (TenantInterface $tenant): void {
+            // The mocked repository persists nothing, so give the tenant the id a real save would assign.
+            if ($tenant instanceof Tenant && null === $tenant->id) {
+                $tenant->id = (string) Str::ulid();
+            }
+        });
 
         $databaseManager = Mockery::mock(TenantDatabaseManagerInterface::class);
         $databaseManager->shouldReceive('schemaExists')->once()->andReturn(false);
@@ -252,7 +260,7 @@ final class InstallPlatformCommandTest extends FeatureTestCase
         $tenantContext->shouldReceive('reset')->once();
 
         $permissionRegistrar = Mockery::mock(PermissionRegistrar::class);
-        $permissionRegistrar->shouldReceive('forgetCachedPermissions')->twice();
+        $permissionRegistrar->shouldReceive('clearPermissionsCollection')->twice();
 
         $channelWebhookRegistry = Mockery::mock(ChannelWebhookRegistryInterface::class);
         $channelWebhookRegistry->shouldReceive('warmup')->once();

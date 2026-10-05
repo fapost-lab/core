@@ -28,6 +28,7 @@ use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Database\Connection;
 use Illuminate\Support\ServiceProvider;
+use Spatie\Permission\PermissionRegistrar;
 
 /**
  * Tenancy domain provider.
@@ -86,7 +87,12 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->scoped(CoreBootstrap::class);
         $this->app->scoped(CoreBootstrapInterface::class, fn ($app): CoreBootstrap => $app->make(CoreBootstrap::class));
         $this->app->scoped(DomainBootstrapper::class);
-        $this->app->scoped(TenantSwitcher::class);
+        $this->app->scoped(TenantSwitcher::class, fn ($app): TenantSwitcher => new TenantSwitcher(
+            $app->make(TenantContextInterface::class),
+            $app->make(TenantDatabaseManagerInterface::class),
+            $app->make(PermissionRegistrar::class),
+            (string) config('permission.cache.key'),
+        ));
         $this->app->singleton(WebhookRegistryWriterInterface::class, WebhookRegistryWriter::class);
         $this->app->singleton(WebhookRegistryReaderInterface::class, EloquentWebhookRegistryReader::class);
 
