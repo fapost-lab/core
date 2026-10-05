@@ -147,7 +147,7 @@ QUEUE_CONNECTION=redis
 ## 5. Install the application
 
 ```bash
-php artisan migrate --database=landlord --path=database/migrations/landlord --force
+php artisan migrate --database=landlord --force
 php artisan platform:install
 ```
 
@@ -212,7 +212,7 @@ git pull
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build
 
-php artisan migrate --database=landlord --path=database/migrations/landlord --force
+php artisan migrate --database=landlord --force
 php artisan ops:tenants-migrate
 
 php artisan horizon:terminate      # workers pick up the new code on restart

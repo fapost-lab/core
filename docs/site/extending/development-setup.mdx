@@ -278,6 +278,24 @@ not change what production installs.
   private hosts, before running `composer update`.
 </Note>
 
+## Landlord tables of a package
+
+An extension may keep platform-level data of its own, for example plans or usage per
+tenant, in the `landlord` database. The rules:
+
+- Name every table with the package's own prefix, such as `saas_`.
+- Never write Core's landlord tables (`tenants`, `webhook_registry`) and never put a
+  foreign key on them. Refer to a tenant by its id and clean up your own rows yourself.
+- Deliver the migrations with `loadMigrationsFrom()` in the package's service provider.
+- Declare `protected $connection = 'landlord';` in each migration, and keep it pure DDL.
+
+The platform migrate command applies them together with Core's own, so no extra deploy
+step is needed:
+
+```bash
+php artisan migrate --database=landlord --force
+```
+
 ## Reference
 
 | Piece | Role |

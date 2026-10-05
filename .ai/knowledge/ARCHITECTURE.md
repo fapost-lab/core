@@ -68,7 +68,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   `CoreRegistrarInterface`, Solution activation, and manifest validation. The registered
   `HrSolutionServiceProvider` is an empty stub on the framework's own provider.
 - **Landlord data is reached only through Tenancy.** Other domains depend on
-  `Tenancy/Contracts`; the `landlord` connection is opened only inside Tenancy infrastructure.
+  `Tenancy/Contracts`; the `landlord` connection is opened only inside Tenancy infrastructure. An extension package may
+  open it for its own prefixed tables, never for Core's
+  (`adr-20261005-extension-packages-own-landlord-tables`).
 - **Cross-domain asynchronous work goes through named queues** separated by purpose:
   `flow.execution`, `messaging.broadcast`, `messaging.system`, `messaging.logging`,
   `scheduled.triggers`; `messaging.transactional` and `sync.external` are reserved and have no

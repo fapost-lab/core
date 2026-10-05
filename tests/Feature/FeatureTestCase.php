@@ -8,6 +8,7 @@ use App\Domains\Tenancy\Support\TenantHost;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Foundation\Testing\RefreshDatabaseState;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -44,6 +45,13 @@ abstract class FeatureTestCase extends TestCase
      * Migration signature this process last migrated for, or null before the first run.
      */
     private static ?string $migratedSignature = null;
+
+    /**
+     * Landlord databases this process has already made sure exist.
+     *
+     * @var array<string, true>
+     */
+    private static array $ensuredLandlordDatabases = [];
 
     /**
      * Both connections are transacted so writes to landlord (extra tenants, status
@@ -117,32 +125,6 @@ abstract class FeatureTestCase extends TestCase
     }
 
     /**
-     * The application, and with it the config, is rebuilt for every test, so
-     * the search_path is set again each time, before the transaction starts.
-     * A connection opened during boot would still carry the old search_path;
-     * purging it is safe here because nothing has been written on it yet.
-     * SQLite has no schemas, and purging an :memory: database destroys it.
-     */
-    private function pointDefaultConnectionAtTenantSchema(): void
-    {
-        if (! $this->usingPostgres()) {
-            return;
-        }
-
-        $default = (string) config('database.default');
-
-        config(["database.connections.{$default}.search_path" => self::TENANT_SCHEMA]);
-        DB::purge($default);
-    }
-
-    /**
-     * Landlord databases this process has already made sure exist.
-     *
-     * @var array<string, true>
-     */
-    private static array $ensuredLandlordDatabases = [];
-
-    /**
      * This class wipes and migrates the landlord tables itself ({@see migrateLandlord()}),
      * recording the run on the landlord connection, so under `--parallel` it takes a
      * landlord database of its own rather than the default one plain database tests
@@ -163,6 +145,25 @@ abstract class FeatureTestCase extends TestCase
         }
 
         return $database;
+    }
+
+    /**
+     * The application, and with it the config, is rebuilt for every test, so
+     * the search_path is set again each time, before the transaction starts.
+     * A connection opened during boot would still carry the old search_path;
+     * purging it is safe here because nothing has been written on it yet.
+     * SQLite has no schemas, and purging an :memory: database destroys it.
+     */
+    private function pointDefaultConnectionAtTenantSchema(): void
+    {
+        if (! $this->usingPostgres()) {
+            return;
+        }
+
+        $default = (string) config('database.default');
+
+        config(["database.connections.{$default}.search_path" => self::TENANT_SCHEMA]);
+        DB::purge($default);
     }
 
     /**
@@ -208,8 +209,15 @@ abstract class FeatureTestCase extends TestCase
     {
         DB::connection('landlord')->getSchemaBuilder()->dropAllTables();
 
+        // Telescope's migration targets the default connection, not the one being migrated, so a
+        // test that already migrated the root migrations there would make it fail with "exists".
+        // A separate-landlord-database install hits the same trap on upgrade; see the ADR
+        // `extension-packages-own-landlord-tables`.
+        foreach (['telescope_entries_tags', 'telescope_entries', 'telescope_monitoring'] as $table) {
+            Schema::dropIfExists($table);
+        }
+
         $this->artisan('migrate', [
-            '--path'     => 'database/migrations/landlord',
             '--database' => 'landlord',
             '--force'    => true,
         ]);

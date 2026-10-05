@@ -61,7 +61,7 @@ final class InstallPlatformCommandTest extends FeatureTestCase
 
         Artisan::shouldReceive('call')
             ->once()
-            ->with('migrate', Mockery::on(fn (array $arguments): bool => 'database/migrations/landlord' === $arguments['--path']
+            ->with('migrate', Mockery::on(fn (array $arguments): bool => ! array_key_exists('--path', $arguments)
                     && 'landlord' === $arguments['--database']
                     && true === $arguments['--force']))
             ->andReturn(1);
@@ -76,7 +76,7 @@ final class InstallPlatformCommandTest extends FeatureTestCase
 
         self::assertSame(InstallPlatformCommand::FAILURE, $exitCode);
         self::assertStringContainsString(
-            'Landlord migrations failed. Installation aborted.',
+            'Platform migrations failed. Installation aborted.',
             $this->lastCommandDisplay,
         );
     }
@@ -88,7 +88,7 @@ final class InstallPlatformCommandTest extends FeatureTestCase
 
         Artisan::shouldReceive('call')
             ->once()
-            ->with('migrate', Mockery::on(fn (array $arguments): bool => 'database/migrations/landlord' === $arguments['--path']
+            ->with('migrate', Mockery::on(fn (array $arguments): bool => ! array_key_exists('--path', $arguments)
                     && 'landlord' === $arguments['--database']
                     && true === $arguments['--force']))
             ->andReturn(InstallPlatformCommand::SUCCESS);
