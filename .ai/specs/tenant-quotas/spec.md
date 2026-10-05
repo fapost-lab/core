@@ -126,6 +126,13 @@ From an independent failure hunt (2026-10-05), sharpest first.
   read-only" tenant state. Plans, plan assignment, usage counters, the trial term and tester
   provisioning live in the shell. — rejected: plans and trials in Core, because open-source Core
   would carry the commercial model and every self-hosted install would carry its code.
+- Invariant: Core works both without the shell and with it. Without it, Core binds its own default
+  implementation of every operator contract (allow everything, provisioning through Core's
+  console commands) and behaves exactly as today; with it, the shell's service provider replaces
+  those bindings through Laravel package discovery, and Core never checks whether the shell is
+  installed. Core's CI runs without the shell; the shell's CI runs against a released Core. —
+  rejected: a `saas` flag or `class_exists` checks in Core, because Core would then know the shell
+  exists. Candidate for `RULES.md` when the first seam lands.
 - Shell first, contracts on demand: the shell is designed first (its own spec, in its repository);
   then the shell and Core are built in parallel, and each Core seam and Foundation contract is
   added when the shell needs it. The first slice is a walking skeleton: the shell provisions a
