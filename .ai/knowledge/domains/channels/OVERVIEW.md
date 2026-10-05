@@ -18,6 +18,7 @@ paths:
   - tests/Architecture/MessagingBoundariesTest.php
   - "database/migrations/tenant/*channels*"
   - "app/Filament/Assistant/Resources/Channels/**"
+reviewed_at: 2026-10-05
 ---
 # Channels
 
@@ -30,10 +31,11 @@ the provider modules (`Telegram/`, `WhatsApp/`), and outbound delivery: `Message
 (idempotency, per-chat rate limit, provider sender lookup, outbound transcript), typing
 indicators, and the messaging jobs.
 
-This domain covers two folders, `app/Domains/Channels` and `app/Domains/Messaging`. *(inferred:
-Messaging is three classes whose only foreign dependency is `ChannelRegistry::sender()`; the
-Telegram code used to live under Messaging, and its tests still use the
-`Tests\Unit\Domains\Messaging\Telegram` namespace)*
+This domain covers two folders, `app/Domains/Channels` and `app/Domains/Messaging`. Messaging
+holds `MessageSender`, `Typing/` (`TypingIndicatorService`, `TypingSession`,
+`TypingHeartbeatRegistry`), `Exceptions/` and `Providers/MessageSenderServiceProvider`. *(inferred:
+its only foreign dependency is `ChannelRegistry::sender()`; the Telegram code used to live under
+Messaging, and its tests still use the `Tests\Unit\Domains\Messaging\Telegram` namespace)*
 
 ## Boundaries
 
@@ -54,5 +56,7 @@ Telegram code used to live under Messaging, and its tests still use the
   `channels.telegram_delivery`, `media.channel.uploader`, `media.channel.downloader`.
 - `Services/ChannelService.php`, `Observers/ChannelObserver.php`.
 - `app/Domains/Messaging/MessageSender.php`, `app/Domains/Messaging/Typing/`.
-- Jobs in `app/Jobs/Messaging/`: `SendTransactionalMessageJob` (`messaging.transactional`),
-  `BroadcastSendJob` (`messaging.broadcast`), `SyncChannelWebhookJob` (`messaging.system`).
+- Jobs in `app/Jobs/Messaging/`: `BroadcastSendJob` (`messaging.broadcast`), `SyncChannelWebhookJob`
+  (`messaging.system`), and `SendTransactionalMessageJob` (`messaging.transactional`), which is
+  reserved: nothing dispatches it, only tests exercise it. Flow replies are sent inline by
+  `FlowMessageSender` → `MessageSender::send()` inside the `flow.execution` job.

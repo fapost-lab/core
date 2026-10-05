@@ -6,9 +6,11 @@ domains:
   - flow
 paths:
   - "app/Domains/Flow/State/**"
+  - app/Domains/Flow/Support/ModuleDataAccessorRegistry.php
 source: docs/site/extending/data-accessors.mdx
 summary: The DataAccessor contract behind read-only module.* state
-source_hash: 3d6d2c441605d7e3f70abf5bff0ac83ae1400466
+source_hash: 4a78db86a1ca6a58c38f6e9b5ba8847a188bb932
+reviewed_at: 2026-10-05
 ---
 # Data accessors
 

@@ -1,10 +1,11 @@
-# Node · `subflow`
+# Node: `subflow`
 
-Вызов другого flow с приостановкой parent до завершения child.
+Calls another flow and pauses the parent until the child finishes.
 
 **Type:** `subflow`
 **Version:** 1
-**Idempotent:** complex (см. behavior)
+**Class:** `app/Domains/Flow/Handlers/SubflowNodeHandler.php` (category `Logic`)
+**Idempotent:** the handler returns `Waiting` without starting a second child while one is live
 
 ## Config (V1)
 
@@ -15,214 +16,145 @@
 }
 ```
 
-**Поля:**
+**Fields:**
 
-| Поле | Тип | Required | Описание |
-|------|-----|----------|----------|
-| `flow_id` | string | yes | ULID logical flow id (НЕ flow_definition_id). Resolves к **latest active** version в runtime |
-| `timeout` | string | yes | ISO 8601 duration. По истечении child force-failed |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `flow_id` | string | yes | Logical flow id (**not** a flow definition id), a literal. Resolved to the **latest active** definition at runtime |
+| `timeout` | string | yes | ISO 8601 duration (default `PT24H`). When it passes, the child is force-failed |
 
-> **Patch v1.2 (ADR Subflow Composition):** поле `flow_version` удалено из V1 config. Pin specific version не поддерживается в V1 (latest active always). Если понадобится — добавится как опциональное поле в V1.x по first business need.
-
-### V1.1 reserved fields (forward compatibility)
-
-Snapshot структура готова к extension:
-
-```json
-{
-  "config": {
-    "flow_id": "...",
-    "timeout": "PT24H",
-    "input_mapping": {                    // V1.1 — V1 ignores
-      "user_id": "{{flow.target_user_id}}"
-    },
-    "output_mapping": {                   // V1.1 — V1 ignores
-      "flow.calculated_price": "result.price"
-    }
-  }
-}
-```
-
-V1 implementation **игнорирует** `input_mapping` / `output_mapping` если присутствуют. V1 координация parent ↔ child — через `contact.attributes` (с временными `_tmp_*` префиксами). См. [`../11-subflow-composition.md`](../../../architecture/adr/11-subflow-composition.md) "Migration Path V1 → V1.1".
+Pinning a specific version is not supported. `input_mapping` / `output_mapping` do not exist: the node
+ignores any such keys. Coordination between parent and child goes through `contact.*` or module data.
 
 ## Output handles
 
-- `success` — child завершён через end node со status=success
-- `cancelled` — child завершён через end со status=cancelled
-- `failed` — child failed unexpectedly, либо timeout, либо end со status=failed
+- `success`: the child ended through an `end` node with status `success`
+- `cancelled`: the child ended with status `cancelled`
+- `failed`: the child ended with status `failed`, or timed out, or the target flow is not active
 
-## V1 ограничения
+The mapping from the child's `end_status` to the handle is 1:1 (`DefaultSubflowResumer::handleFor`).
 
-- **Без параметров:** parent НЕ передаёт child input. Child НЕ возвращает parent output. Координация — через `contact.*` или модульные данные.
-- **Один child за раз:** parent в `paused_subflow` не может вызвать ещё один subflow параллельно. Subflow всегда sequential.
-- **Глубина max 3:** depth = длина цепочки flows. A → B → C допустимо (depth 3). Глубже refuse при сохранении flow_definition.
-- **Direct и indirect recursion запрещены:** flow A → A или A → B → A — refuse при сохранении.
-- **Wait mode only:** fire-and-forget делается через `emit_event`, не subflow.
-- **Без cross-assistant:** child наследует `assistant_id` parent immutably. Cross-assistant subflow — V2, отдельный ADR.
+## V1 limits
+
+- **No parameters:** the parent passes nothing to the child and receives nothing back.
+- **One child at a time.**
+- **Depth at most 3:** a chain `A -> B -> C` is allowed (depth counts flows, caller included);
+  `A -> B -> C -> D` is rejected (`CallGraphValidator::MAX_DEPTH`).
+- **No direct or indirect recursion:** `A -> A` (`subflow_direct_recursion`) and `A -> B -> A`
+  (`subflow_indirect_recursion`) are rejected.
+- **Wait mode only:** fire-and-forget is `emit_event`.
+- **No cross-assistant calls:** the child inherits the parent's `assistant_id`; `PublishFlowService`
+  rejects a callee owned by another assistant (`subflow_cross_assistant`).
 
 ## Behavior
 
-1. Resolve `flow_id` → находит **latest active** flow_definition (pin version не поддерживается в V1). Если active version не найден → session failed с error «Subflow target not active».
-2. INSERT child flow_session:
-   - `id` = generated ULID
-   - `tenant_id` = `parent.tenant_id` (inherited)
-   - `contact_id` = `parent.contact_id` (inherited)
-   - `assistant_id` = `parent.assistant_id` (inherited, **immutable**)
-   - `parent_session_id` = `parent.id`
-   - `parent_resume_node_id` = subflow node id
-   - `flow_definition_id` = резолвленный snapshot id
-   - `state.flow` = {} (пустой)
-   - `state.system.started_at` = `now()`
-   - `expires_at` = `now() + timeout`
-   - `status` = `active`
-3. **Parent expiry extension:** если `parent.expires_at < child.expires_at` → расширить `parent.expires_at = child.expires_at + 1h` (buffer для resume operation).
-4. UPDATE parent_session:
-   - `status` = `paused_subflow`
-   - `expires_at` = (extended если шаг 3)
-   - `version` = `version + 1`
-5. Distributed lock остаётся на `(tenant, contact, assistant)` — семантически "владеет" child пока parent paused. Технически lock тот же ключ Redis, нет физической передачи — логически "владение" переходит между sessions.
-6. Запустить child через FlowEngine с `child.session_id`
+`SubflowNodeHandler::execute()`:
 
-> **Patch v1.1:** явная inheritance `tenant_id`/`contact_id`/`assistant_id` от parent (раздел 2). Sub-block "Parent expiry extension" (раздел 3) — parent не должен умирать пока child жив.
+1. Validate config: an empty `flow_id` or an invalid ISO 8601 `timeout` throws `InvalidNodeConfigException`.
+2. Load the parent session. If it is missing, return `Failed` with `error_type = subflow_parent_missing`.
+3. If the parent already has a live child (a child session not in a terminal status), return `Waiting`
+   with `reason = child_already_running`. No second child is created.
+4. `SubflowStarterService::start()` (see below). If the target flow has no active definition, the node
+   returns `Failed` with `error_type = subflow_target_inactive`.
+5. Return `Waiting` with metadata `{flow_id, child_id, timeout}`.
 
-## Routing инвариант
+`SubflowStarterService::start()` (`app/Domains/Flow/Subflow/`):
 
-Когда incoming message приходит от contact — engine `findActiveSession(tenant, contact, assistant)`:
-- Если найдена session со status=`paused_subflow` — найти её child (status IN (`active`, `waiting_input`)) — message отправляется child
-- Иначе — top-level session
+1. Resolve `flow_id` to the latest active `flow_definition`.
+2. In one transaction: pause the parent first (`status = paused_subflow`) and, when the parent's
+   `expires_at` is empty or earlier than the child's, set it to the child's `expires_at + 1h`; then
+   create the child session with:
+   - `tenant_id`, `contact_id`, `assistant_id` inherited from the parent (the assistant is immutable),
+   - `parent_session_id` = the parent id,
+   - `parent_resume_node_id` = the subflow node id,
+   - `flow_definition_id` / `flow_version` of the resolved definition,
+   - `current_node_id` = the derived entry node, `state = []`, `status = active`,
+   - `expires_at` = now + `timeout`.
+3. Record a `SubflowStarted` history event on the parent (when the parent flow has history logging on).
+4. Run the child synchronously: `FlowEngine::runSession($child)`.
 
-## Завершение child
+Because the starter has already moved the parent (version bump), the engine skips persisting the
+handler's stale `Waiting` result for the parent (see the loop diagram).
 
-Когда child достигает `end` node — EndNodeHandler выполняет sub-flow specific logic:
+The session lock stays on the same `(tenant, contact, assistant)` key throughout; there is no physical
+hand-over.
 
-1. UPDATE child SET `status = 'ended'`, `ended_at = now()`
-2. Если `child.parent_session_id != null`:
-   - LOAD parent session FOR UPDATE
-   - Проверка `parent.status == 'paused_subflow'`. Если нет → log inconsistency, child всё равно ends.
-   - UPDATE parent:
-     - `status` = `active`
-     - `current_node_id` = `parent_resume_node_id`
-     - `version` = `version + 1`
-   - Resume parent через handle:
-     - `end.status=success` → `success`
-     - `end.status=cancelled` → `cancelled`
-     - `end.status=failed` → `failed`
+## Routing invariant
+
+An inbound message looks up the contact's active session with `findActiveForContact()`, which returns
+`active`, `waiting_input` and `paused` sessions. A `paused_subflow` parent is not among them, so the
+message goes to the live child.
+
+## Child completion
+
+The `end` node handler only returns `Finished` with `end_status` in metadata. The **engine** persists
+the end (`FlowSessionPersister::persistEnd`: `status = ended`, `end_status`, `current_node_id = null`;
+there is no `ended_at` column) and then calls `SubflowResumerInterface::resumeIfChild($child, $endStatus)`.
+
+`DefaultSubflowResumer::resumeIfChild()`:
+
+1. Do nothing for a top-level session (no `parent_session_id`).
+2. Load the parent. If it is missing, log `flow.subflow.resume.parent_missing` and stop. If it is not
+   `paused_subflow`, log `parent_not_paused` and continue anyway.
+3. Record a `SubflowReturned` history event on the parent.
+4. Call `FlowEngine::resumeAfterSubflow($parent, $handle)`: resolve the next node from the parent's
+   current node (still the subflow node) and the handle, set the parent `active` (or `completed` when
+   there is no edge for that handle) and run the parent's loop, synchronously.
+
+An inconsistent state never throws: the child is already terminal.
 
 ## Timeout handling
 
-Scheduled job `flow.subflow.timeout` каждую минуту проверяет sessions со status=`paused_subflow` где `expires_at < now()`:
+The command `flow:sweep-subflow-timeouts` (`SweepSubflowTimeoutsCommand`) runs every minute
+(`routes/console.php`, `withoutOverlapping`) and calls `SubflowTimeoutSweeper::sweep()` for each
+active tenant. For every parent in `paused_subflow` whose `expires_at` has passed, under the parent's
+session lock and after re-reading it:
 
-```sql
-SELECT * FROM flow_sessions
-WHERE status = 'paused_subflow'
-  AND expires_at < now()
-  AND id IN (
-    SELECT parent_session_id FROM flow_sessions
-    WHERE status IN ('active', 'waiting_input')
-      AND parent_session_id IS NOT NULL
-  );
-```
-
-Если parent expired И child still running:
-- Force-end child со `status=failed`
-- Resume parent через `failed` handle
-- Log inconsistency (этого не должно быть если parent expiry extension работает правильно)
+- **A live child exists** (`active` or `waiting_input`): force-end the child as `ended` with
+  `end_status = failed`, then `resumeIfChild($child, 'failed')`, so the parent continues on `failed`.
+- **No live child (an orphan parent):** mark the parent `expired` with `current_node_id = null`. This
+  should not happen because the starter extends the parent's expiry past the child's, but the sweeper
+  recovers if the invariant breaks.
+- A parent whose lock is busy is skipped and retried on the next sweep.
 
 ## Cycle prevention
 
-> **Patch v1.1:** referential integrity через reverse-index, не только forward DFS на save.
+Referential integrity uses a reverse index, the `flow_callgraph_edges` table
+(`caller_flow_id`, `callee_flow_id`, `caller_definition_id`), through `CallGraphRepository`.
 
-### Reverse index
+- `PublishFlowService` replaces the caller's edges inside the publish transaction
+  (`replaceForCallerDefinition`) after extracting every `subflow.flow_id` from the nodes.
+- `ValidateFlowService::validateSubflowCallGraph()` runs `CallGraphValidator::validate(flowId, callees)`
+  when a flow id is known: direct recursion, indirect recursion (a forward BFS from each callee back to
+  the caller) and the depth of the longest forward chain from the caller.
+- Cross-assistant ownership is checked separately by `PublishFlowService` through `flow_drafts`.
 
-```sql
-CREATE TABLE flow_callgraph_edges (
-    caller_flow_id ulid NOT NULL,
-    callee_flow_id ulid NOT NULL,
-    caller_definition_id ulid NOT NULL REFERENCES flow_definitions(id),
-    PRIMARY KEY (caller_flow_id, callee_flow_id, caller_definition_id)
-);
+Violation codes: `subflow_direct_recursion`, `subflow_indirect_recursion`, `subflow_depth_exceeded`,
+`subflow_cross_assistant`.
 
-CREATE INDEX idx_callgraph_callee ON flow_callgraph_edges (callee_flow_id);
-```
-
-Заполняется при save flow_definition: extract все `subflow.flow_id` → INSERT/DELETE.
-
-### Soft draft / strict publish validation
-
-> **Patch v1.2 (ADR Subflow Composition):** проверки разделены по точке применения.
-
-**Save draft** (`is_active = false`): validator выполняет все проверки, возвращает **warnings**, save проходит независимо. UI показывает warnings рядом с problematic nodes — это рабочее пространство.
-
-**Publish** (`is_active` transition false → true): те же проверки, но любое нарушение **блокирует** publish.
-
-Publish refuse cases:
-- `subflow.flow_id` не существует в этом tenant
-- Нет active published version у callee
-- Callee принадлежит другому assistant (cross-assistant запрещён в V1)
-- Cycle detected (включая через transitive closure)
-- Depth > 3 в любой ветке call graph
-- Любые structural validation errors (см. [06-validation.md](../06-validation.md))
-
-### Publish procedure (atomic)
-
-```
-BEGIN TRANSACTION
-  SELECT FROM flow_callgraph_edges WHERE callee_flow_id IN (affected) FOR UPDATE
-    -- защищает от race с concurrent publishes которые могут создать cross-cycles
-
-  Validate:
-    - Resolve direct callees of B
-    - BFS forward through edges → up to depth 3
-    - BFS reverse from B → check каждый caller, его depth после B's update ≤ 3
-    - Check cycles, cross-assistant, existence
-    - If violation → ROLLBACK + return errors
-
-  Update flow_callgraph_edges:
-    - DELETE edges from previous active version of flow_id
-    - INSERT edges from new version
-
-  UPDATE flow_definitions:
-    - SET is_active = false WHERE flow_id = B AND is_active = true
-    - SET is_active = true WHERE id = <new version>
-COMMIT
-```
-
-### Cascade refuse strategy
-
-Save B refuses, если затрагивает любого caller. UI показывает:
-
-> Сохранение нарушит flows: X, Y. Цепочка: A → B → X (depth 4).
-> Обновите эти flows перед сохранением B.
-
-**Why cascade refuse:**
-- Cleaner semantics: либо save удался и всё validated, либо ничего не изменилось
-- Меньше runtime surprise (ни один flow не работает в подвешенном состоянии)
-- Легче UI/UX: явная ошибка с указанием как исправить
-
-Альтернатива (mark-as-invalid каскад) — V1.x как fallback при жалобах на UX.
+Not built: validating the **callers** of a flow when that flow is republished (a reverse BFS, "cascade
+refuse"). Only the flow being validated is checked, so republishing a callee that deepens an existing
+caller's chain is not detected at that moment.
 
 ### Active sessions
 
-Активные sessions не затрагиваются validation:
-- Они работают по своему `flow_definition_id` snapshot
-- Snapshot immutable — старые версии остаются в `flow_definitions` для running sessions
-- Validation касается только **новых** sessions, которые стартуют после save
+Running sessions are unaffected: each runs on its own `flow_definition_id` snapshot, and older
+definitions stay in `flow_definitions`. Validation concerns only sessions that start later.
 
-## Validation flow_definition
+## Validation
 
-- `flow_id` существует (callable flow)
-- Call graph: depth ≤ 3, no cycles
-- Все callers нового flow validated на depth не превышен
-- Strategy: cascade refuse при любом нарушении
+- `subflow_missing_flow_id`, `subflow_template_in_flow_id`: `flow_id` must be a non-empty literal.
+- `subflow_invalid_timeout`: `timeout` must be an ISO 8601 duration.
+- The call-graph and cross-assistant codes above.
+
+A missing target flow is not a publish error: an unknown callee has no edges, and a callee with no active
+definition surfaces at runtime as `subflow_target_inactive` (the `failed` handle).
+
+Save-draft does not validate; validate and publish do (see [../06-validation.md](../06-validation.md)).
 
 ---
 
-## Связано с
+## Related
 
-- [[README]] — nodes README
-- [[06-subflow-lifecycle]] — диаграмма lifecycle subflow
-- [[11-subflow-composition]] — ADR по композиции subflow
-- [[08-expression-language]] — expression language для передачи параметров
-- [[07-emit-event]] — альтернатива через события
-- [[diagrams/06-subflow-lifecycle]] — диаграмма lifecycle
-- [[specs/flow-engine/README]] — обзор flow engine
+- [../../../diagrams/06-subflow-lifecycle.md](../../../diagrams/06-subflow-lifecycle.md) - lifecycle diagram
+- [07-emit-event.md](07-emit-event.md) - the fire-and-forget alternative

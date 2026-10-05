@@ -43,7 +43,7 @@ alongside Core.
 
 A Solution must not live under `app/Solutions` inside Core. Its public contracts
 belong in `fapost/foundation`; reusable primitives that carry no domain meaning
-belong in `fapost/support`, which itself depends only on `fapost/foundation`. Front-end components are possible, but only through the agreed
+belong in `fapost/support`, which itself depends on no FaPost package except `fapost/foundation`. Front-end components are possible, but only through the agreed
 build and publish contract — not by dropping Vue files into the running
 application.
 

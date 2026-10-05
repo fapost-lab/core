@@ -3,10 +3,13 @@ id: adr-01-octane-ingress-only
 type: adr
 status: accepted
 domains: []
-paths: []
+paths:
+  - "app/Domains/Webhook/**"
+  - "gateway/**"
 source: docs/platform/architecture/adr/01-octane-ingress-only.md
 summary: Cancelled Octane decision; still the source of the long-lived worker safety constraints
-source_hash: a3a2843860c29a5e6ef0af697d12c3c1e63420c1
+source_hash: 780319d5f0f1f6f755d58cc422ccec616f20a228
+reviewed_at: 2026-10-05
 ---
 # ADR-01 — Octane: ingress-only
 

@@ -1,5 +1,21 @@
 # ADR-15 — Мультиязычность
 
+> **Superseded in part (2026-10).** What the code does differs from the text below:
+>
+> - `LanguageResolverInterface::resolve(Contact $contact, FlowSession $session)` takes no `Assistant`. The chain is
+>   session (`state.system.language`) → `contact.language` → `TenantSettings::fallback_language`. There is **no assistant
+>   level**: `assistants.default_language` exists as a column but the resolver does not read it
+>   (`app/Domains/Flow/Services/LanguageResolver.php`).
+> - Flow content fallback is: requested language → `content_base_language` → the first key present
+>   (`CachedContentTranslator::resolveField`), not `assistant.default_language` → `fallback_language`.
+> - System translations resolve through `CachedContentTranslator::translate`: `assistant_translations` →
+>   `tenant_translations` (requested language, then `content_base_language`) → the core catalog → the key itself. The
+>   assistant translation layer that the original text left open is built (`assistant_translations` table).
+> - Admin UI language files live in `lang/` (not `resources/lang/`).
+> - The handlers `language_selection` and `contact.update_language` do not exist.
+> - The `content_base_language` lock is a save-time validation in `TenantSettingsPage` (the field is disabled and a save
+>   that changes it is rejected once any `flow_definitions` row exists), not a UI-only rule.
+
 Апрель 2026 · Зафиксировано по результатам архитектурного ревью.
 
 ---

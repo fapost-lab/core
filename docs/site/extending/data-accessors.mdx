@@ -23,7 +23,9 @@ interface DataAccessorInterface
 }
 ```
 
-Register it from your service provider:
+Register it from your service provider. Core does not yet implement
+`CoreRegistrarInterface` (see [Building a Plugin](/extending/plugins)), so this
+call has no effect in Core today:
 
 ```php
 protected function registerExtensions(CoreRegistrarInterface $registrar): void
@@ -53,9 +55,10 @@ data.
 **Return scalars or null.** The accessor sits on a boundary that has to serialise;
 returning an object pushes your internal shape into the engine.
 
-**`supportedKeys()` is validation, not documentation.** It is used when a flow is
-saved, so a flow referencing a key you do not support fails at authoring time
-rather than mid-conversation. Keep it accurate.
+**`supportedKeys()` is meant as validation, not documentation.** Core does not call
+it today: when a flow is saved, it only checks that an accessor exists for the
+namespace (`unknown_module_accessor`), not that the key is supported. Keep it
+accurate so that key-level validation can rely on it.
 
 **`get()` is called during execution.** It is on the hot path for any flow that
 branches on your data. Keep it cheap, and remember it receives the contact and

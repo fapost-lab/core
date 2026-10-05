@@ -1,5 +1,15 @@
 # ADR-10 — State Writer Semantics
 
+> **Superseded in part (2026-10).** What the code does differs from the interface names used below:
+>
+> - `ScopedStateWriterInterface` was never created. Session writes go through `NodeExecutionResult::stateChanges` and
+>   `FlowSessionPersister`; contact writes go through `ContactWriter`.
+> - History is `HistoryWriterInterface`, `DefaultHistoryWriter`, `NoOpHistoryWriter` and `HistoryWriterFactory` in
+>   `app/Domains/Flow/History/`, not `HistoryLoggerInterface` / `DefaultHistoryLogger` / `NoOpHistoryLogger`.
+> - The Core `StateReader` / `StateWriter` layer was deleted (see `.ai/knowledge/adr/0002-retire-core-state-primitives.md`);
+>   `ScopedStateReader` reads directly.
+> - History retention is not implemented: `flow_session_history` accumulates with no pruning (the V1.x item stays open).
+
 **Status:** Accepted
 **Date:** Апрель 2026
 **Контекст:** FaPost Phase 2 — Flow Engine
@@ -707,7 +717,7 @@ CREATE INDEX idx_sessions_parent ON flow_sessions (parent_session_id)
 
 ## Amendment · Brownfield Reconciliation (April 2026)
 
-После brownfield audit (см. `docs/plans/flow-engine/brownfield-audit.md`) часть положений этого ADR переопределена решениями synthesis (см. `docs/plans/flow-engine/synthesis.md`):
+После brownfield audit (см. `docs/archive/platform/plans/flow-engine/brownfield-audit.md`) часть положений этого ADR переопределена решениями synthesis (см. `docs/archive/platform/plans/flow-engine/synthesis.md`):
 
 - **D-3 · Write модель.** Session-state мутации остаются через `NodeExecutionResult.stateChanges` (existing pattern, pure handlers). ADR-овский `ScopedStateWriter` для session **не вводится** в foundation. Только `ContactWriter` для `contact.*` мутаций (replaces existing `effects[]`).
 - **D-4 · State primitives.** Существующие `WriteContext`/`NamespaceWritePolicy`/`NamespaceResolverRegistry`/`StateReader`/`StateWriter` (Core) сохраняются — они богаче ADR-овской модели. Foundation thin contracts (`ScopedStateReaderInterface`, `ContactWriterInterface`) — adapter поверх.
@@ -715,7 +725,7 @@ CREATE INDEX idx_sessions_parent ON flow_sessions (parent_session_id)
 - **D-6 · HistoryLogger.** **НЕ** инжектится в `NodeExecutionContext`. Engine instruments centrally (state_change events from result.stateChanges + ContactWriter notifications + node_entered/failed lifecycle).
 - **D-9 · Migrations.** Existing schema kept; новое — additive (новые колонки `expression_engine`/`logging_enabled` на `flow_definitions`, `parent_session_id` etc на `flow_sessions`, новые таблицы `flow_callgraph_edges` + `flow_session_history`).
 
-Финальный контракт описан в `docs/reference/specs/flow-engine/03-node-handler-interface.md` v1.3.
+Финальный контракт описан в `docs/site/extending/flow-nodes/handler-contract.mdx` (the v1.3 spec it replaced was removed in 2026-10).
 
 ---
 

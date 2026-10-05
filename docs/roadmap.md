@@ -1,6 +1,6 @@
 ---
 status: living
-updated_at: "2026-09-23"
+updated_at: "2026-10-05"
 ---
 
 # Roadmap — fapost-core
@@ -12,7 +12,8 @@ updated_at: "2026-09-23"
 > not here.
 
 > **Scope split.** This file is the product decomposition of [`idea-brief.md`](./idea-brief.md): it
-> says which steps exist and in which order. Each step's own plan — phases, decisions, open
+> says which steps exist and in which order, and — in Engineering backlog — which owed work runs
+> beside them. Every open spec under `.ai/specs/` appears here exactly once. Each step's own plan — phases, decisions, open
 > questions — lives in its spec under `.ai/specs/`, and what was already built is recorded in
 > [`platform/ROADMAP.md`](./platform/ROADMAP.md) and [`platform/TASKS.md`](./platform/TASKS.md).
 > Zones below are verified against [`ARCHITECTURE.md`](../.ai/knowledge/ARCHITECTURE.md).
@@ -26,7 +27,6 @@ A developer inside the Laravel ecosystem can stand up FaPost, extend it through 
 | # | Step | Source | Size | Where it is tracked |
 |---|---|---|:---:|---|
 | 2 | First-contact path — installation, a seeded demo assistant and self-hosting docs, with a named target time from install to a working assistant | idea-brief.md §6 Risks | M | spec `.ai/specs/first-contact-path/` |
-| 3 | Positioning rewrite — project description and landing rebuilt on the three pillars, so the difference reads to someone who already uses an open constructor | idea-brief.md §7 Recommendation | S | task `positioning-rewrite` |
 | 4 | Solution activation lifecycle — manifest validation, activation storage and registry, the activation screen, and the lifecycle tests that prove install → activate → handler available | idea-brief.md §7 Recommendation | M | spec `.ai/specs/solution-activation-lifecycle/` |
 | 5 | UI foundation for extenders — one token source shared by the operator-facing surfaces and the small set of primitives an extension actually composes against | idea-brief.md §6 Risks | M | spec `.ai/specs/ui-foundation/` |
 | 6 | First solution built through the public contracts only — no privileged access into the core, as an outsider would build it | idea-brief.md §7 Recommendation | L | spec `.ai/specs/first-solution/` |
@@ -34,6 +34,29 @@ A developer inside the Laravel ecosystem can stand up FaPost, extend it through 
 | 8 | Ecosystem distribution → see [Not yet specified](#not-yet-specified) | idea-brief.md §7 Recommendation | fog | spec `.ai/specs/ecosystem-distribution/` |
 
 Step progress is read from the specs themselves: `.ai/scripts/jig spec list`. Nothing tracks status here.
+
+## Engineering backlog
+
+Work outside the product order: it does not test the bet in the brief, but it is owed — limits the
+V1 design deferred, retention the code does not enforce, read-side views over data already
+collected. It runs in the gaps between product steps, never ahead of them, and in this order.
+
+| # | Direction | Why it is owed | Size | Where it is tracked |
+|---|---|---|:---:|---|
+| B1 | Data lifecycle — retention for transcripts, session history and flow versions; erasure of a contact's transcript; a transcript read port | Tables grow without bound on a self-hosted install, and deleting a contact leaves its messages behind (the partitioned message table has no foreign keys) | M | spec `.ai/specs/data-lifecycle/` |
+| B2 | Flow engine V1.x — loop checks and budget, safe `call` retries, subflow parameters, per-tenant expression engine, node capabilities | Limits the V1 node design named as "later"; none needs a breaking change | L | spec `.ai/specs/flow-engine-v1x/` |
+| B3 | Operator insights — broadcast report, flow analytics, live inbox | The data is recorded and nobody can read it in the panel | M | spec `.ai/specs/operator-insights/` |
+| B4 | Builder versioning and content — rollback, compare, preview, content keys | A bad publish has no undo in the builder | M | spec `.ai/specs/builder-versioning/` |
+| B5 | RAG knowledge bases — provider and storage decision, then a real adapter | `rag_query` is in the palette and always fails at its runtime guard | M | spec `.ai/specs/rag-knowledge-bases/` |
+
+Defects found while reconciling the documentation with the code (2026-10-05), filed as Jig tasks and
+taken whenever a lane is free: `fix-create-assistant-guard` (the create page requires an admin while
+the policy allows `ManageAssistants`), `translations-assistant-scope` (translation pages do not check
+the assigned assistant), `remove-dead-transactional-job` (`messaging.transactional` has no producer),
+`fix-migration-rule-reason` (a PHPat rule cites a section of `CLAUDE.md` that no longer exists),
+`wire-flow-definition-validator` (the structural graph validator is registered but never called),
+`subflow-child-routing` (the `paused_subflow` routing branch is unreachable and
+`parent_resume_node_id` is never read).
 
 ## Not yet specified
 
@@ -74,7 +97,6 @@ Step progress is read from the specs themselves: `.ai/scripts/jig spec list`. No
 ```mermaid
 flowchart LR
   s2["2 · First-contact path"]
-  s3["3 · Positioning rewrite"]
   s4["4 · Activation lifecycle"]
   s5["5 · UI foundation"]
   s6["6 · First solution"]
@@ -90,10 +112,14 @@ flowchart LR
 
 | Wave | Steps | Zone per step (why parallel-safe) | Unlocks |
 |:---:|---|---|---|
-| 1 | 2 ∥ 3 | 2: `docs/site/self-hosting/` · 3: `README.md` (disjoint) | — |
+| 1 | 2 ∥ B1 | 2: `docs/site/self-hosting/` + demo seeder · B1: `app/Domains/Conversation` + flow console commands (disjoint) | — |
 | 2 | 4 ∥ 5 | 4: `app/Domains/Tenancy` + `app/Filament` · 5: `resources/css` + `resources/js/shared` (disjoint) | 6 |
 | 3 | 6 | 6: `(new)` solution package repository | 7 |
 | 4 | 7 | 7: `docs/site/extending/` | — |
+
+The backlog lane runs beside the product waves, one direction at a time in the order B1 → B5; a
+backlog item never holds up a product step, and B2's Solution-registered commands wait for step 4.
+The defect tasks need no wave — each is one small pull request.
 
 Contract edits that step 4 or step 6 turn out to need happen in the foundation package's own repository, which is `(new)` ground from this working tree's point of view — it is absent here and symlinked in for local development, so it can never conflict with a lane in this repo.
 
@@ -101,4 +127,5 @@ Contract edits that step 4 or step 6 turn out to need happen in the foundation p
 
 | Step | Shipped | Link |
 |---|---|---|
+| 3 · Positioning rewrite | 2026-09-23 | Project description and landing rebuilt on the three pillars — task `positioning-rewrite`. |
 | 1 · Ship the replacement | 2026-09-22 | Every production-readiness criterion closed, the concurrency suite running against real Redis and a load test of 100 concurrent sessions with no state leakage — [`platform/ROADMAP.md`](./platform/ROADMAP.md) § Критерии «Production Ready». Rolling the platform out to real clients is operational work and carries no spec. |

@@ -1,124 +1,77 @@
-# 01 · VariableStorageEditor — общий компонент
+# 01 · VariableStorageEditor — shared component
 
-**Зависит от:** —
-**Блокирует:** 02, 03, 04, 06, 07
-**Слой:** builder (Vue)
+**Layer:** builder (Vue)
+**Used by:** Input, SendMessage `save_to`, Assign, Branch source picker (see 02, 03, 04, 06, 07).
 
-## Цель
+## Purpose
 
-Один Vue-компонент, который инкапсулирует все четыре поля «переменная пользователя»: Name, Type, Save to, Group. Переиспользуется в Input, SendMessage save_to, Assign — везде где нода сохраняет данные пользователя.
+One Vue component that encapsulates the four fields of a "user variable": Name, Type, Save to, Group.
+It is reused wherever a node stores user data. The component owns UI and local state only;
+compiling the value into the JSON snapshot is the parent node's job (see 02–04).
 
-Компонент отвечает только за UI и состояние. Compilation в JSON snapshot — забота родительской ноды (см. задачи 02–04).
-
-## API компонента
+## Component API
 
 ```ts
 interface Variable {
-    name:    string                      // alphanumeric + underscore
-    type:    'text' | 'number' | 'phone' | 'email' | 'contact'
-             | 'select' | 'confirm' | 'file' | 'photo' | 'location' | 'date'
-    storage: 'contact' | 'session'       // default: 'contact'
-    group:   string | null               // null = root
+    name:    string                 // letters, digits, underscore
+    type:    VariableType           // see below
+    storage: 'contact' | 'session'  // default: 'contact'
+    group:   string | null          // null = root; always null for 'session'
+    isList?: boolean                // when true, `type` is the array's item type
 }
 
 defineProps<{
-    modelValue: Variable | null
-    // Узкий список типов, релевантных конкретному контексту. Например, в
-    // SendMessage save_to ожидаются только string|number|boolean — отдадим
-    // только их.
-    typeOptions?: Array<{ value: string; label: string }>
-    // Список существующих групп для dropdown (раздел 4.3). Источник —
-    // builder store, собирает имена групп из других нод.
-    knownGroups?: string[]
-    // Управляет видимостью поля Group. По умолчанию true — но в SendMessage
-    // (там это лишний UI) можно скрыть.
-    showGroup?: boolean
-    // Управляет видимостью переключателя Save to. По умолчанию true; для
-    // нод где режим хранения предопределён (например, всегда temporary)
-    // можно скрыть и зафиксировать значение.
-    showStorage?: boolean
+    modelValue:   Variable | null
+    typeOptions?: Array<{ value: string; label: string }>  // narrow the list per context
+    knownGroups?: string[]                                  // groups offered by the dropdown
+    showGroup?:   boolean                                   // default true
+    showStorage?: boolean                                   // default true
 }>()
-
-defineEmits<{
-    (e: 'update:modelValue', value: Variable): void
-}>()
+defineEmits<{ (e: 'update:modelValue', value: Variable): void }>()
 ```
 
-## UI макет
+`VariableType` (`resources/js/builder/dto/types.ts`, mirrors the PHP enum
+`App\Domains\Flow\State\Variables\VariableType`): `text`, `number`, `boolean`, `phone`, `email`,
+`contact`, `select`, `confirm`, `file`, `photo`, `location`, `date`, `json`, `array`.
 
-Соответствует разделу 3.1 спецификации:
+The default `typeOptions` list offers every type except `boolean` and `array` (an array is
+expressed with the `isList` checkbox). Nodes that need a narrower list pass `typeOptions`.
 
-```
-┌────────────────────────────────────┐
-│ Save as:                            │
-│ ┌────────────────────────────────┐ │
-│ │ Name:    [code             ]   │ │
-│ │ Type:    [Number       ▾   ]   │ │
-│ │                                │ │
-│ │ Save to:                       │ │
-│ │ ◉ 💾 Contact profile            │ │
-│ │ ○ ⏱ Temporary                   │ │
-│ │                                │ │
-│ │ Group:   [— ▾]                 │ │
-│ └────────────────────────────────┘ │
-└────────────────────────────────────┘
-```
+## Behaviour
 
-### Поведение Group dropdown
+- **Name** is a combobox (`NameSelect.vue`): typing filters known variable names; picking a suggestion
+  reuses that variable, an unmatched name simply becomes a new variable.
+- **Cross-namespace uniqueness.** A name belongs to exactly one storage. When the chosen name is already
+  registered elsewhere in the flow, the editor snaps to that registration's storage and group and locks
+  the storage radio.
+- **Group** is visible only when `storage === 'contact'`; switching to `session` clears it (`group: null`
+  in the emitted value). The dropdown offers existing groups and an inline "Create new group" field
+  (no modal).
+- Validation is inline and does not block emitting; the parent decides what to do with an invalid value.
 
-```
-[▾]
-  (No group)               ← default
-  ─────
-  survey_q1                ← existing groups
-  address
-  ─────
-  + Create new group...    ← inline prompt
-```
+| Field | Rule | Message |
+|------|------|---------|
+| Name | not empty | `Name is required` |
+| Name | no dot | `Group depth is limited to 1 level` |
+| Name | letters, digits, underscore | `Use letters, digits, underscore only` |
+| Name | not reserved (`id`, `channel_id`, `tenant_id`, `external_id`, `meta`, `language`, `is_blocked`, `created_at`, `updated_at`) | `Name is reserved` |
+| Group | not `meta` | `Group "meta" is reserved` |
 
-`+ Create new group` открывает inline текстовое поле в том же месте, без модалки. Submit — добавляет группу в `knownGroups` (через emit) и выбирает её.
+## Files
 
-Поле Group видно **только** при `storage === 'contact'` (Temporary не группируется).
-
-## Валидация (inline)
-
-| Поле | Правило | Сообщение |
-|------|---------|-----------|
-| Name | alphanumeric + underscore | `Use letters, digits, underscore only` |
-| Name | не пустое | `Name is required` |
-| Name | не содержит точку | `Group depth is limited to 1 level` (см. п.4.4) |
-| Name | не из reserved keys (`id`, `channel_id`, `meta`, …) | `Name is reserved` |
-| Group | не `meta` (зарезервировано, п.4.6) | `Group "meta" is reserved` |
-
-Валидация показывается inline под полем; не блокирует emit (parent сам решает что делать с невалидным состоянием).
-
-## Файлы
-
-- `resources/js/builder/components/editor/variables/VariableStorageEditor.vue` — основной компонент
-- `resources/js/builder/components/editor/variables/StorageRadio.vue` — sub-component для radio (Profile / Temporary) с иконками
-- `resources/js/builder/components/editor/variables/GroupSelect.vue` — sub-component для group dropdown с inline create
-- `resources/js/builder/composables/useKnownGroups.ts` — собирает `knownGroups` из всех Input/Assign нод текущего flow для autocomplete
-
-## Тестирование
-
-Компонентные тесты пока без инфраструктуры (билдер не покрыт unit-ами). Smoke в storybook-style preview-странице (`pages/preview/VariableStorageEditorPreview.vue`) — рендерит несколько вариантов с разными `typeOptions`/`knownGroups`.
-
-Acceptance:
-- Все варианты props (с/без Group, с/без Storage, с разными Type lists) рендерятся корректно.
-- `+ Create new group` добавляет группу и переключает выбор.
-- Изменение Storage с `contact` на `session` скрывает Group и в emit'е приходит `group: null`.
-- Validation messages появляются и пропадают синхронно с input.
+- `resources/js/builder/components/editor/variables/VariableStorageEditor.vue` — main component
+- `.../variables/NameSelect.vue` — name combobox
+- `.../variables/StorageRadio.vue` — Contact profile / Temporary radio
+- `.../variables/GroupSelect.vue` — group dropdown with inline create
+- `resources/js/builder/composables/useKnownGroups.ts` — collects group names from the flow's nodes
+- `resources/js/builder/composables/useFlowVariables.ts` — known variables used for name suggestions
 
 ## Out of scope
 
-- Drag-and-drop reordering групп (раздел 12 спеки)
-- Tooltip с примерами (раздел 12)
+- Drag-and-drop reordering of groups.
+- Tooltips with examples.
+- Bulk rename of variables.
 
----
+## Related
 
-## Связано с
-
-- [[00-overview]] — overview storage
-- [[02-input-node-migration]] — миграция input ноды
-- [[05-backend-contract]] — backend контракт
-- Bulk rename переменных (V1.x backlog)
+- [02-input-node-migration](02-input-node-migration.md), [05-backend-contract](05-backend-contract.md)

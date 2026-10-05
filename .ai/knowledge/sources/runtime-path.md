@@ -3,10 +3,14 @@ id: feature-runtime-path
 type: feature
 status: active
 domains: []
-paths: []
+paths:
+  - "app/Domains/Webhook/**"
+  - "app/Domains/Flow/Routing/**"
+  - "app/Domains/Flow/Concurrency/**"
 source: docs/site/contributing/runtime.mdx
 summary: End-to-end runtime path from webhook to reply and the concurrency layers along it
-source_hash: eb592f7264c42989e20209184bda49d4ca91f0ba
+source_hash: ce1e70b8c9c297166c3a14dd44f4a0906125300a
+reviewed_at: 2026-10-05
 ---
 # Runtime architecture
 

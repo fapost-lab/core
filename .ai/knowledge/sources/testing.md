@@ -6,10 +6,12 @@ domains: []
 paths:
   - "tests/**"
   - phpunit.xml
+  - phpstan.neon
+  - .github/workflows/ci.yml
 source: docs/site/contributing/testing.mdx
 summary: "How to run and write tests: PostgreSQL locally, CI jobs, gateway golden files"
-source_hash: 9dc2f03842096ba4256e66783e5932f1493ff7e9
-reviewed_at: 2026-09-22
+source_hash: e47f311e26b9df13e891589ebf35039cf381a53b
+reviewed_at: 2026-10-05
 ---
 # Testing and architecture checks
 

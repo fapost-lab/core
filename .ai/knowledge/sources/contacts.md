@@ -8,9 +8,10 @@ paths:
   - "app/Domains/Contact/Models/**"
 source: docs/platform/architecture/platform/05-contacts.md
 summary: Contact schema and why contact attributes are not a module cache
-source_hash: 39316de256e16bde6d943365db4a2edf9ed61eff
+source_hash: 5508518c18c74e3e8829891ce19c79c267f8dcf6
+reviewed_at: 2026-10-05
 ---
-# 05 — Контакты (Contacts)
+# 05 — Contacts
 
 Linked source: [docs/platform/architecture/platform/05-contacts.md](../../../docs/platform/architecture/platform/05-contacts.md). The source owns its rules; this document only says when an agent
 must read it.

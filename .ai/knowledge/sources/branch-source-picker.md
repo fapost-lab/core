@@ -9,6 +9,7 @@ paths:
 source: docs/reference/specs/builder/storage/07-branch-source-picker.md
 summary: "Branch operands: a variable dropdown plus an optional source picker"
 source_hash: 0cb40697129568d6813fa859327294b781155578
+reviewed_at: 2026-10-05
 ---
 # 07 · Branch — dropdown переменных + source picker
 

@@ -1,6 +1,6 @@
 # FaPost Core — Задачи
 
-Запись того, что уже реализовано, по разделам. Для навигации по документам — [[INDEX]].
+Запись того, что уже реализовано, по разделам. Для навигации по документам — [INDEX](../INDEX.md).
 
 > **Не трекер предстоящего.** Открытые направления ведутся спеками Jig под `.ai/specs/`
 > (`.ai/scripts/jig spec list`), отдельные мелкие работы — задачами (`.ai/scripts/jig task list --all`).
@@ -16,15 +16,15 @@
 - [x] Multi-tenancy: `TenantContext`, переключение схем, миграции, `TenantProvisioningService`
 - [x] Flow engine: registry, execution loop, session persistence
 - [x] Messaging pipeline: webhook → queue → worker → response (Telegram)
-- [x] Filament admin: Tenants, Users, Assistants, Channels, Flows, Contacts
+- [x] Filament admin (tenant panel): Assistants, Media, Roles, Users, plus the tenant settings and translations pages; there is no Tenants resource. Channels, Flows, Contacts and the rest live in the assistant panel
 - [x] `platform:install` команда с seed first tenant
 
 ---
 
 ## ⚙️ Flow Engine
 
-Спека: [[specs/flow-engine/README]]  
-План реализации: [[plans/flow-engine/implementation-plan]]
+Спека: [specs/flow-engine/README](../reference/specs/flow-engine/README.md)  
+План реализации: [plans/flow-engine/implementation-plan](../archive/platform/plans/flow-engine/implementation-plan.md)
 
 ### Foundation (Phase A)
 - [x] **A-1** Foundation contracts (`ScopedStateReaderInterface`, `ContactWriterInterface`, `ExpressionEngineInterface`)
@@ -38,17 +38,17 @@
 - [x] **B-1** `NodeExecutionContext` extension (expressionEngine, contactWriter, scopedStateReader)
 - [x] **B-2.1** `SendMessageNodeHandler` refactor
 - [x] **B-2.2** `InputNodeHandler` refactor + type extension
-- [x] **B-2.3** `BranchNodeHandler` (type `branch`, multi-case) — [[specs/flow-engine/nodes/03-branch]]
-- [x] **B-2.4** `AssignNodeHandler` (type `assign`, multi-op) — [[specs/flow-engine/nodes/05-assign]]
-- [x] **B-2.5** `CallNodeHandler` (type `call`, pluggable transport) — [[specs/flow-engine/nodes/06-call]]
+- [x] **B-2.3** `BranchNodeHandler` (type `branch`, multi-case) — [specs/flow-engine/nodes/03-branch](../reference/specs/flow-engine/nodes/03-branch.md)
+- [x] **B-2.4** `AssignNodeHandler` (type `assign`, multi-op) — [specs/flow-engine/nodes/05-assign](../reference/specs/flow-engine/nodes/05-assign.md)
+- [x] **B-2.5** `CallNodeHandler` (type `call`, pluggable transport) — [specs/flow-engine/nodes/06-call](../reference/specs/flow-engine/nodes/06-call.md)
 - [x] **B-2.6** `DelayNodeHandler` refactor
 - [x] **B-3** FlowEngine + ContactWriter wiring; history instrumentation
 
 ### Net-new nodes (Phase C)
-- [x] **C-2** `EndNodeHandler` (color-coded: success/cancelled/failed) — [[specs/flow-engine/nodes/10-end]]
-- [x] **C-4** `SubflowNodeHandler` + CallGraphValidator + lifecycle — [[specs/flow-engine/nodes/08-subflow]]
-- [x] **C-1** `EmitEventNodeHandler` (handler + validation + registry + event-chain flow start — `StartFlowFromEventJob` фанится на подписанные event-триггеры) — [[specs/flow-engine/nodes/07-emit-event]]
-- [-] **C-3** `RagQueryNodeHandler` (handler + registry + validation есть; RAG Feature/storage/providers ещё не готовы) — [[specs/flow-engine/nodes/09-rag-query]]
+- [x] **C-2** `EndNodeHandler` (color-coded: success/cancelled/failed) — [specs/flow-engine/nodes/10-end](../reference/specs/flow-engine/nodes/10-end.md)
+- [x] **C-4** `SubflowNodeHandler` + CallGraphValidator + lifecycle — [specs/flow-engine/nodes/08-subflow](../reference/specs/flow-engine/nodes/08-subflow.md)
+- [x] **C-1** `EmitEventNodeHandler` (handler + validation + registry + event-chain flow start — `StartFlowFromEventJob` фанится на подписанные event-триггеры) — [specs/flow-engine/nodes/07-emit-event](../reference/specs/flow-engine/nodes/07-emit-event.md)
+- [-] **C-3** `RagQueryNodeHandler` (handler + registry + validation есть; RAG Feature/storage/providers ещё не готовы) — спека `.ai/specs/rag-knowledge-bases/`
 
 ### Routing pipeline (Phase D)
 - [x] **D-1** `MessageRouter` + `DropPolicy` + `SessionStateRouter` (6 шагов)
@@ -64,34 +64,34 @@
 
 ## 🔁 Ноды (по приоритету)
 
-Спеки: [[specs/flow-engine/nodes/README]]
+Спеки: [specs/flow-engine/nodes/README](../reference/specs/flow-engine/nodes/README.md)
 
 ### P0 — готово ✅
-- [x] `send_message` — [[specs/flow-engine/nodes/01-send-message]]
-- [x] `input` — [[specs/flow-engine/nodes/02-input]]
-- [x] `condition` / `branch` — [[specs/flow-engine/nodes/03-branch]]
-- [x] `end` — [[specs/flow-engine/nodes/10-end]]
+- [x] `send_message` — [specs/flow-engine/nodes/01-send-message](../reference/specs/flow-engine/nodes/01-send-message.md)
+- [x] `input` — [specs/flow-engine/nodes/02-input](../reference/specs/flow-engine/nodes/02-input.md)
+- [x] `condition` / `branch` — [specs/flow-engine/nodes/03-branch](../reference/specs/flow-engine/nodes/03-branch.md)
+- [x] `end` — [specs/flow-engine/nodes/10-end](../reference/specs/flow-engine/nodes/10-end.md)
 
 ### P1 — готово ✅
-- [x] `delay` — [[specs/flow-engine/nodes/04-delay]]
-- [x] `assign` — [[specs/flow-engine/nodes/05-assign]]
-- [x] `call` — [[specs/flow-engine/nodes/06-call]]
-- [x] `notify` (staff + contacts) — [[specs/flow-engine/nodes/notify]]
-- [x] `set_tag` — [[specs/flow-engine/nodes/set-tag]]
-- [x] `auth_request` — [[specs/flow-engine/nodes/auth-request]]
+- [x] `delay` — [specs/flow-engine/nodes/04-delay](../reference/specs/flow-engine/nodes/04-delay.md)
+- [x] `assign` — [specs/flow-engine/nodes/05-assign](../reference/specs/flow-engine/nodes/05-assign.md)
+- [x] `call` — [specs/flow-engine/nodes/06-call](../reference/specs/flow-engine/nodes/06-call.md)
+- [x] `notify` (staff + contacts) — [specs/flow-engine/nodes/notify](../reference/specs/flow-engine/nodes/notify.md)
+- [x] `set_tag` — [specs/flow-engine/nodes/set-tag](../reference/specs/flow-engine/nodes/set-tag.md)
+- [x] `auth_request` — [specs/flow-engine/nodes/auth-request](../reference/specs/flow-engine/nodes/auth-request.md)
 
 ### P2
-- [x] `subflow` — [[specs/flow-engine/nodes/08-subflow]]
-- [x] `loop` + `loop_end` — [[specs/flow-engine/nodes/11-loop]]
+- [x] `subflow` — [specs/flow-engine/nodes/08-subflow](../reference/specs/flow-engine/nodes/08-subflow.md)
+- [x] `loop` + `loop_end` — [specs/flow-engine/nodes/11-loop](../reference/specs/flow-engine/nodes/11-loop.md)
   - [x] Backend: `LoopNodeHandler`, `LoopEndNodeHandler`, array variables, circular buffer
   - [x] Builder: `FlowLoopCard`, `LoopConfig.vue`, auto-managed `loop_end`, «Store as list»
   - [x] 8.1 Reachability (`ValidateFlowService::validateLoopReachesLoopEnd` — loop без достижимого `loop_end` → publish error `loop_missing_loop_end`)
   - [x] 7.2 Properties-конфликты между flow (array `item_type` drift теперь блокирует publish — `variable_properties_conflict`; `max_size` не в node config, остаётся registry-only)
   - [x] `.length` резолвер для array-переменных в условиях (`OperandResolver` — `contact.photos.length` → count)
   - [x] Budget: `flow.execution.max_iterations` + publish-error на literal count > 100
-  - Остаток (V1.x, warning-only): 8.5 (while condition не меняется), 8.7 (static number check), UI редактирования `max_size`, `{{…length}}` в TemplateEngine
-- [x] `emit_event` — event-chain start завершён: `DispatchFlowTriggerEventJob` теперь фанит `StartFlowFromEventJob` на каждый подписанный event-триггер (было — только лог); flow стартует для emitting-контакта, payload доступен как `flow.event.*`; выровнен формат имени события (trigger `event_name` теперь принимает dotted/mixed-case как emit `event_type`) — [[specs/flow-engine/nodes/07-emit-event]]
-- [-] `rag_query` — handler/registry/validation готовы; Feature: RAG ещё предстоит — [[specs/flow-engine/nodes/09-rag-query]]
+  - Остаток (V1.x, warning-only): 8.5 (while condition не меняется), 8.7 (static number check), UI редактирования `max_size`, `{{…length}}` в TemplateEngine — спека `.ai/specs/flow-engine-v1x/`
+- [x] `emit_event` — event-chain start завершён: `DispatchFlowTriggerEventJob` теперь фанит `StartFlowFromEventJob` на каждый подписанный event-триггер (было — только лог); flow стартует для emitting-контакта, payload доступен как `flow.event.*`; выровнен формат имени события (trigger `event_name` теперь принимает dotted/mixed-case как emit `event_type`) — [specs/flow-engine/nodes/07-emit-event](../reference/specs/flow-engine/nodes/07-emit-event.md)
+- [-] `rag_query` — handler/registry/validation готовы; Feature: RAG ещё предстоит — спека `.ai/specs/rag-knowledge-bases/`
 - [ ] `form` — сбор данных через веб-форму (TMA / hosted) вместо цепочки `input` — спека `.ai/specs/forms-data-collection/`
 
 ### P3
@@ -101,7 +101,7 @@
 
 ## 🖼 Builder (Vue)
 
-Спеки: [[specs/builder/page-structure]]
+Спеки: [specs/builder/page-structure](../archive/reference/specs/builder/page-structure.md)
 
 ### Schema renderer
 - [x] Field-типы: `json`, `state-picker`, `object`, `key-value`, `object-array`, `flow-picker`, `enum-cards`
@@ -135,15 +135,15 @@
 - [x] `useInsertAtCursor` в TextField / Textarea / StatePickerField
 - [x] End node color-coding (success → зелёный, cancelled → амбер, failed → красный)
 - [x] Flow Content Manager (многоязычный редактор контента, отдельная вкладка)
-- [-] `comment` нода на канвасе (P3) — backend-энейблмент готов (палитра/валидация/strip); Vue-карточка на канвасе — задача Jig `comment-node-canvas`
+- [x] `comment` нода на канвасе (P3): backend (палитра/валидация/strip) и Vue-карточка на канвасе
 
 ---
 
 ## 🌍 Мультиязычность
 
-Спека: [[architecture/adr/15-multilingual]]
+Спека: [architecture/adr/15-multilingual](architecture/adr/15-multilingual.md)
 
-- [x] `LanguageResolverInterface` + chain (session → contact → assistant → tenant fallback)
+- [x] `LanguageResolverInterface` + chain (session → contact → tenant fallback; there is no assistant level — `LanguageResolver`)
 - [x] `SystemTranslationCatalogInterface` + `InMemorySystemTranslationCatalog`
 - [x] `CoreSystemTranslations::seed()` (en/ru/uk ключи для commands, errors, buttons)
 - [x] `CachedContentTranslator` (3-layer chain: assistant override → tenant override → catalog → key)
@@ -156,7 +156,7 @@
 
 ## 🔐 Авторизация
 
-Спека: [[specs/auth/00-overview]]
+Спека: [specs/auth/00-overview](../archive/reference/specs/auth/00-overview.md)
 
 - [x] Granular permissions (Permission enum + `label()`, `isSensitive()`, `group()`)
 - [x] Policy classes: Flow, FlowSession, FlowLog, Contact, Assistant
@@ -171,12 +171,12 @@
 - [x] Webhook routing: `/webhook/{channel}/{public_hash}` → Redis → tenant context
 - [x] `IncomingMessageJob` → `MessageRouter` → `FlowOrchestrator`
 - [x] `MessageSender` → `TelegramSender`
-- [x] `ChannelObserver` удалён, webhook handling consolidation
+- [x] Webhook handling consolidated: `ChannelObserver` (`app/Domains/Channels/Observers/ChannelObserver.php`) is the single owner of channel lifecycle side effects (Redis routing registry sync and provider webhook (de)registration)
 - [x] **D-1** MessageRouter полный рефакторинг (6-шаговый pipeline)
 - [x] **D-2** TypingIndicatorService
 
 ### Conversation Logging (новый домен)
-Спека: [[specs/messaging/conversation-logging]]
+Спека: [specs/messaging/conversation-logging](../reference/specs/messaging/conversation-logging.md)
 
 - [x] `Conversation` агрегат + `conversation_messages` (monthly partitions, pgsql; sqlite fallback для тестов)
 - [x] Port-интерфейсы: `ConversationLoggerInterface`, `ConversationStoreInterface` (`ConversationReaderInterface` — с Filament-фазой)
@@ -200,7 +200,7 @@
 
 ## 💬 Inbox / Live Chat (M8) — закрыт
 
-Детали и обоснования решений — [[ROADMAP]] § Milestone 8.
+Детали и обоснования решений — [ROADMAP](ROADMAP.md) § Milestone 8.
 
 ### Безопасность
 - [x] `Permission::ViewConversations` / `ReplyConversations` (обе sensitive), группа `conversations`, раздача ролям
@@ -253,7 +253,7 @@
 
 Перенесено в спеку **`.ai/specs/rag-knowledge-bases/`**.
 
-Что уже в коде: `RagAdapterRegistry`, `RagQueryNodeHandler` ([[specs/flow-engine/nodes/09-rag-query]])
+Что уже в коде: `RagAdapterRegistry`, `RagQueryNodeHandler`
 и RAG-валидация в `ValidateFlowService`. Нода `rag_query` остаётся в палитре и падает на runtime
 guard'е — осознанный долг до выбора провайдера эмбеддингов и хранилища векторов.
 
@@ -285,7 +285,7 @@ guard'е — осознанный долг до выбора провайдер�
 ## 🔧 Infrastructure / Tech Debt
 
 - [x] phpat enforcement (`composer run test:arch`; rules exist under `tests/Architecture` and run via PHPStan)
-- [x] **Статистика использования нод для safe handler removal.** Два среза без DDL: static — агрегат в PHP по `nodes` jsonb активных `flow_definitions`; runtime — портируемый `GROUP BY` по существующему `flow_logs`. Ключ — пара `type@version`, а не тип: реестр резолвит по `type@version`, и без версии вопрос «снять ли v1» не закрывается. Сверка с `NodeHandlerRegistry` даёт ноды без хендлера и типы, не используемые ни одним арендатором (пересечение, не объединение). `NodeUsageStatisticsService` + команда `flow:node-usage` (`--days/--tenant/--type/--json`), обходящая арендаторов через `TenantSwitcher`. SQL view из черновика отклонён (непортируем между pgsql/sqlite, объект схемы в каждой схеме, не отвечает на межарендаторский вопрос); rollup-таблица не делалась — это новая таблица и отдельное решение. Попутно в черновике спеки исправлены три ошибки: `logging_enabled` гейтит `flow_session_history`, а не `flow_logs`; delay-исполнения и idempotency-хиты логируются; статус `conflict` не пишется никогда. Тесты: `NodeUsageStatisticsServiceTest`, `NodeUsageCommandTest`. Спека: [[specs/flow-engine/node-usage-statistics]]
+- [x] **Статистика использования нод для safe handler removal.** Два среза без DDL: static — агрегат в PHP по `nodes` jsonb активных `flow_definitions`; runtime — портируемый `GROUP BY` по существующему `flow_logs`. Ключ — пара `type@version`, а не тип: реестр резолвит по `type@version`, и без версии вопрос «снять ли v1» не закрывается. Сверка с `NodeHandlerRegistry` даёт ноды без хендлера и типы, не используемые ни одним арендатором (пересечение, не объединение). `NodeUsageStatisticsService` + команда `flow:node-usage` (`--days/--tenant/--type/--json`), обходящая арендаторов через `TenantSwitcher`. SQL view из черновика отклонён (непортируем между pgsql/sqlite, объект схемы в каждой схеме, не отвечает на межарендаторский вопрос); rollup-таблица не делалась — это новая таблица и отдельное решение. Попутно в черновике спеки исправлены три ошибки: `logging_enabled` гейтит `flow_session_history`, а не `flow_logs`; delay-исполнения и idempotency-хиты логируются; статус `conflict` не пишется никогда. Тесты: `NodeUsageStatisticsServiceTest`, `NodeUsageCommandTest`. Спека: [specs/flow-engine/node-usage-statistics](../reference/specs/flow-engine/node-usage-statistics.md)
 - [x] End-to-end integration тесты: subflow lifecycle — success/failed (были) + **cancelled** (добавлен, `SubflowLifecycleTest`); timeout покрыт `SubflowTimeoutSweeperTest` (нет отдельного `timeout`-статуса — таймаут = child `failed` + parent `failed`/`expired`)
 - [x] Concurrency hardening тесты: **optimistic-lock retry** (`FlowOrchestratorRetryTest`) + **engine_lock_timeout** drop-outcome (`MessageRouterTest`) добавлены; distributed lock покрыт unit-тестами (`FlowExecutionGuardTest`, `SessionLockManagerTest`, `LockAcquisitionPolicyTest`). Real-Redis integration и heartbeat — в `tests/Feature/Redis` (группа `redis`)
 - [x] **Консолидация блокировок + heartbeat (ADR-09).** Один lock на `(tenant, contact, assistant)` вместо двух вложенных с разными ключами. Новый `SessionLockRegistry` (scoped) — слот текущего захвата; `FlowExecutionGuard` переписан на `SessionLockManager`, стал ре-энтрантным и возвращает слот внешнему владельцу при вложенном вызове на другой scope; `FlowEngine::executeLoop()` продлевает TTL перед каждой нодой, при потере владения бросает `SessionLockLostException` → роутер отдаёт `dropped('lock_lost')`; параметры вынесены в `config/flow.php` (`lock.*`), пять хардкодов `30` убраны; удалены мёртвые `MessageRouter::tickHeartbeat()` и `buildLockKey()`. Тесты: `LockHeartbeatTest`, `SessionLockRegistryTest`, `FlowEngineSessionLockTest` + расширены `FlowExecutionGuardTest` / `MessageRouterTest`
@@ -298,6 +298,5 @@ guard'е — осознанный долг до выбора провайдер�
 ## Связано с
 
 - `.ai/specs/` — открытые направления как спеки Jig (`.ai/scripts/jig spec list`)
-- [[ROADMAP]] — история инженерных майлстоунов
-- [[INDEX]] — навигация по документам
-- [[PROJECT]] — описание проекта
+- [ROADMAP](ROADMAP.md) — история инженерных майлстоунов
+- [INDEX](../INDEX.md) — навигация по документам

@@ -25,7 +25,7 @@ paths:
   - "app/Filament/Assistant/Resources/FlowLogs/**"
   - app/Console/Commands/CreateNextFlowLogPartitionCommand.php
   - app/Console/Commands/PruneFlowLogsCommand.php
-reviewed_at: 2026-09-22
+reviewed_at: 2026-10-05
 ---
 # Flow
 
@@ -53,6 +53,7 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
 | Call, RAG, Action, Expression | `Call/`, `Rag/`, `Action/`, `Expression/` — small registries |
 | History and logging | `History/`, `Logging/` (partitioned `flow_logs`) |
 | Translations | `Translations/`, `app/Infrastructure/Flow/CachedContentTranslator.php` |
+| Node usage statistics | `Statistics/NodeUsageStatisticsService` behind `Contracts/NodeUsageStatisticsInterface`; command `app/Console/Commands/Flow/NodeUsageCommand.php` (`flow:node-usage`), run on demand, not scheduled |
 
 ## Boundaries
 
@@ -74,6 +75,31 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
 
 - Inbound: Webhook's `IncomingMessageJob` (queue `flow.execution`) → `MessageRouter::route()` →
   `FlowOrchestrator::handle()` → `FlowEngine::start()` / `resume()`.
+- No active session: `FlowOrchestrator::handle()` takes the resolved trigger's flow, else the assistant's
+  `default_flow_id`, loads it through `findLatestActiveByFlowId` and calls `FlowEngine::start()` when the access
+  policy lets the contact start it; otherwise it sends the assistant's `fallback_message` through
+  `FallbackMessageService` and stops.
+- `MessageRouter::route()` order: (1) global command match (`/reset`, `/cancel`, tenant
+  `assistant.commands`) without the lock; (2) typing indicator start; (3) session lock
+  `session_lock:{tenant}:{contact}:{assistant}` (`Concurrency/LockScope`, Redis, 30 s TTL) taken through
+  `LockAcquisitionPolicy` (3 attempts, 2 s apart) and published to `SessionLockRegistry`, so
+  `FlowExecutionGuard` stays re-entrant and the engine extends the TTL before each node; (4) staff
+  ownership check (`staff_handled` drop, before session classification, because the session may still
+  be in `waiting_input` from before the takeover), then session classification by `SessionStateRouter`;
+  (5) `FlowOrchestrator::handle()`; (6) cleanup. A lock miss sends the busy reply and returns
+  `RoutingOutcome::dropped('lock_timeout')`; `engine_lock_timeout` and `lock_lost` come from the
+  orchestrator. Entry points that bypass the router (`DelayedSessionResumer`,
+  `ResumeTimedOutSendMessageNodeJob`, `StartFlowFromEventJob`) take the same lock through
+  `FlowExecutionGuard::run()`.
+- Engine navigation: `FlowSessionPersister::persist()` maps results to session columns (`Executed` →
+  next node or completed, `Waiting` → `waiting_input`, `Delayed` → `paused` when it carries `resumeAt`, else `waiting_input`, `Failed`, `Finished`), `persistEnd()` closes
+  the session with an `end_status`; all writes use the optimistic lock on `flow_sessions.version`.
+  A `loop_end` node navigates back to its `loop_node_id` without a graph edge. A subflow node pauses
+  the parent as `paused_subflow` (`Subflow/SubflowStarterService`) and runs the child synchronously
+  through `runSession()`; when the child ends before the node's own result is persisted, the engine
+  skips persisting the stale `Waiting` result (skipPersist). `resumeAfterSubflow()` advances the
+  parent, `resumeFromNode()` creates a session at the node after a given handle, and
+  `runSession($session, resumedAfterDelay)` re-enters the loop for a woken session.
 - Events and schedules: `StartFlowFromEventJob` (queue `scheduled.triggers`) and
   `DispatchFlowTriggerEventJob`. Timeouts: `ResumeTimedOutSendMessageNodeJob`.
 - Delays: the `delay` handler schedules `ResumeDelayedFlowSessionJob` (queue `flow.execution`)
@@ -102,7 +128,7 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   cannot delay, and would re-enter the running engine. There a timeout never fires and a delay
   moves on only with the next inbound message.
 - Console: `flow:sweep-subflow-timeouts` (every minute), `logs:prune-flow`, `logs:create-partition`
-  (`routes/console.php`).
+  (`routes/console.php`); `flow:node-usage` is run by hand and is not scheduled.
 - Bindings: `Providers/FlowServiceProvider.php`. Registries are singletons, frozen after boot
   (not in the testing environment); engine, orchestrator, router and repositories are `scoped`.
   The node handler registry holds handler classes and builds each handler per `resolve()`

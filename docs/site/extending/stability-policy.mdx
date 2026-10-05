@@ -12,7 +12,7 @@ that platform hold still.
 surface. They are what an extension is built against, and they are what Core
 undertakes not to break within a major version.
 
-**`fapost/support`.** Dependency-free primitives, on the same terms.
+**`fapost/support`.** Primitives that depend on no FaPost package except `fapost/foundation`, on the same terms.
 
 **Node contracts, by version.** A node's contract is versioned explicitly. A
 published flow keeps reaching the handler version it was built against — see
@@ -43,9 +43,12 @@ contract. Configure nodes through schema — see
 
 ## Where the line is enforced
 
-This is not an honour system. The dependency direction is checked by PHPat rules
-that run in `composer run test:arch`: `foundation` and `support` may not reference
-`App\…`, and the boundaries are verified on every run rather than at review time.
+This is not an honour system. `foundation` and `support` are separate repositories
+with their own Composer requirements, so they cannot import `App\…` — it would not
+autoload outside Core. Core's own architecture rules (PHPat, run in
+`composer run test:arch`) cover flow runtime isolation, handler versioning, ID
+strategy, messaging boundaries and migrations; the dependency direction itself has
+no PHPat rule.
 
 ## While the platform is pre-1.0
 

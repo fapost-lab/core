@@ -90,9 +90,12 @@ discovered.
 ## What a reviewer is looking for
 
 **The boundaries hold.** Dependency direction, migration isolation, tenant-aware
-execution, worker safety. Most of these are checked mechanically — see
-[Testing and architecture checks](/contributing/testing) — but the rules cannot
-see intent, only shape.
+execution, worker safety. Only some of these have a mechanical check (PHPat covers
+migration isolation, flow runtime isolation, handler versioning, ID strategy and
+messaging boundaries; see
+[Testing and architecture checks](/contributing/testing)). Dependency direction
+and tenant-aware execution are caught in review, and rules cannot see intent,
+only shape.
 
 **Business logic is in the right place.** Controllers and jobs orchestrate;
 services and domain classes decide.

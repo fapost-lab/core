@@ -16,6 +16,7 @@ paths:
   - "tests/*/Domains/Flow/**"
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
+reviewed_at: 2026-10-05
 ---
 # Flow glossary
 
@@ -59,7 +60,7 @@ list is the foundation enum `StateNamespace`.
 ## Idempotency marker
 
 A `system.*` key recording that a node's side effect already happened, checked before repeating
-it: `system.sent_messages`, `system.set_tag.<node>`, `system.staff_notified.*`.
+it: `system.sent_messages`, `system.set_tag.<node>`, `system.staff_notified.*`, `system.contacts_notified.*`.
 
 ## Session lock
 

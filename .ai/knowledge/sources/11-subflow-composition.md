@@ -4,10 +4,13 @@ type: adr
 status: accepted
 domains:
   - flow
-paths: []
+paths:
+  - "app/Domains/Flow/Subflow/**"
+  - app/Domains/Flow/Handlers/SubflowNodeHandler.php
 source: docs/platform/architecture/adr/11-subflow-composition.md
 summary: "Subflow V1: wait-mode child session, depth 3, no recursion, latest active version"
-source_hash: ea1ce9d454023ea4d9c95ee9b027129e33becaaa
+source_hash: 8f83380d4497377df9223815b2ceda47034b1126
+reviewed_at: 2026-10-05
 ---
 # ADR-11 — Subflow Composition
 

@@ -9,6 +9,7 @@ paths:
 source: docs/reference/specs/flow-engine/nodes/03-branch.md
 summary: "branch node: rules, operands, operators and the implicit default handle"
 source_hash: c4a29f51648d4e8c5be6ef6bc87a20a316947255
+reviewed_at: 2026-10-05
 ---
 # Node · `branch`
 

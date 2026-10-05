@@ -1,124 +1,111 @@
-# Node · `loop` / `loop_end`
+# Node: `loop` / `loop_end`
 
-**Документ:** Спецификация Loop-ноды для Flow Engine V1 (addendum)
-**Версия:** 2.0 — приведена в соответствие с текущей кодовой базой (июнь 2026; исходный addendum — апрель 2026)
-**Статус:** см. баннер ниже
-**Связанные документы:** `../README.md`, `../01-state-model.md`, `../06-validation.md`, ADR State Writer Semantics, ADR Message Routing & Concurrency Control
+**Document:** Loop node specification for the Flow Engine (addendum), aligned with the code (verified
+against `LoopNodeHandler`, `LoopEndNodeHandler`, `ValidateFlowService`, `PublishFlowService`,
+`ContactWriter`).
+**Related documents:** [../README.md](../README.md), [../01-state-model.md](../01-state-model.md),
+[../06-validation.md](../06-validation.md), [../node-usage-statistics.md](../node-usage-statistics.md)
 
-> **Статус: ЧАСТИЧНО (актуализировано 2026-06-11).**
->
-> ✅ **Сделано (проверено по коду):**
-> - **Engine + handlers:** `LoopNodeHandler` (counted/while, structured-left `count_source`/`condition`,
->   литерал-форма `{type: 'literal', value: N}`, init/cleanup итератора),
->   `LoopEndNodeHandler` (инкремент итератора); engine-навигация `loop_end → config.loop_node_id`
->   special-case'ом в `FlowEngine::executeLoop()`. Регистрация в `FlowServiceProvider`.
-> - **Отступление от спеки (2026-06-11): total — пер-луп.** Вместо глобального `flow.iteration_total`
->   total counted-режима хранится как `flow.{iterator_name}_total` (`LoopNodeHandler::TOTAL_SUFFIX`),
->   чтобы соседние/последовательные лупы не конфликтовали. Picker и help-текст выводят имя из iterator_name.
-> - **iterator_name** денормализуется в config `loop_end` при publish (`PublishFlowService::denormalizeLoopEndIteratorNames`) — вариант (б) из 14.2.
-> - **Array type:** `VariableType::Array` (+ попутно `Boolean`), pass-through в `VariableCoercer`;
->   `ContactWriter` — append + circular buffer, `max_size` через lazy schema-registry resolver (раздел 5.2/5.3);
->   session-переменные — append в `AssignNodeHandler::executeOperations` и `InputNodeHandler::persistValue`;
->   media-input в array-переменную аппендит каждый дескриптор отдельным элементом (`persistElements`).
-> - **Registry delta:** миграция `tenant_variable_schema.properties jsonb DEFAULT '{}'`,
->   `getProperties()` в `VariableSchemaRegistryInterface` / `CacheBackedVariableSchemaRegistry` (новый формат кеша),
->   properties собираются `VariableSchemaCollector` и персистятся в upsert при publish.
-> - **Validation:** 8.2 (`loop_node_id` → существующий loop), 8.3 (формат + reserved `iterator_name`),
->   8.4 (запрет вложенных loop, BFS), 8.8 (literal `count_source` > 100 → publish error).
-> - **Builder (отступление от §5.4/5.7 — принято в диалоге 2026-06-11):** вместо `expected_type: "array"` —
->   флаг **«Store as list»** на переменной (`VariableStorageEditor`, компилируется в `type: 'array'` +
->   `properties.item_type`); тип элемента выводится из `expected_type` (семантический маппинг
->   `image→photo`, `document/video/voice/audio→file` — `utils/inputVariableType.ts`); read-only подпись Type
->   в карточке; авто-включение списка для новых input внутри тела цикла. `[]`-суффикс на карточке ноды.
-> - **Builder loop UX:** `loop_end` исключён из палитры (`NodeTypesController::AUTO_MANAGED_TYPES`),
->   авто-создаётся при вставке loop, self-heal при загрузке черновика (`builderStore.healLoopConstructs`),
->   удаляется только вместе с loop (`deleteLoop` сносит весь конструкт с confirm); `FlowLoopCard` с кнопкой
->   «Loop body» (вход в ветку `loop`), `default`-цепочка продолжается линейно; bespoke `LoopConfig.vue`
->   (режимы, fixed/variable итерации, while-condition через `ConditionOperandPicker`, advanced `iterator_name`).
-> - **Тесты:** `tests/Feature/Domains/Flow/LoopEngineTest.php` (4), `LoopNodeHandlerTest.php` (10); suite зелёный.
->
-> ✅ **Добавлено (2026-07-22):**
-> - **8.1 — reachability** реализована: `ValidateFlowService::validateLoopReachesLoopEnd` — BFS от `loop`-handle;
->   если ни один путь не достигает `loop_end` с этим `loop_node_id` → error `loop_missing_loop_end` (publish refuse).
->   `loop_end` другого loop не засчитывается (граница чужого тела).
-> - **7.2 — конфликт `properties`** теперь **блокирует** publish для array element type: если `item_type` расходится
->   между flow → error `variable_properties_conflict` (`PublishFlowService::assertNoVariableTypeConflicts`).
->   `max_size` сравнению не подлежит — его нет в node config (registry-only, §7.3).
-> - **14.3 — `.length` резолвер** для условий: `OperandResolver::resolveWithLength` — `contact.photos.length`
->   даёт count элементов; реальный ключ `length` побеждает pseudo-accessor.
->
-> ⏳ **Осталось (TODO):**
-> - 8.3 (вторая часть) — запрет session-переменных с именами активных `iterator_name`/`iteration_total`.
-> - 8.5 — warning «while condition не меняется в теле» (V1: warning-only, не блокер).
-> - 8.7 — static-проверка числового `count_source` (runtime non-number → session failed реализован в handler).
-> - 14.1 — решение по iteration budget не принято: действует общий `flow.execution.max_iterations` + правило 8.8;
->   batch-циклы без wait-нод упираются в лимит при ~30 итерациях.
-> - 14.3 (вторая часть) — `{{….length}}` в TemplateEngine (шаблоны сообщений) ещё не поддержан; сделано только для условий.
-> - UI редактирования `max_size` нет (дефолт 100 из registry) — V1.x, раздел 7.3.
+## Implementation status
 
-> **Changelog v2.0:** форматы конфигов приведены к фактическим контрактам (structured `left`,
-> `expected_type`/`save_to_variable`); Variable Registry сведён к delta поверх существующего
-> `tenant_variable_schema`; cleanup итератора — null-конвенция персистера; возврат `loop_end`
-> оформлен как engine-level навигация; семантика валидации — `/validate`/Publish; раздел
-> Statistics вынесен в отдельный документ [`../../node-usage-statistics.md`](../node-usage-statistics.md).
+**Built (checked against the code):**
+
+- **Engine and handlers:** `LoopNodeHandler` (counted and while modes, structured-left `count_source` /
+  `condition`, literal form `{type: 'literal', value: N}`, iterator init and cleanup) and
+  `LoopEndNodeHandler` (iterator increment). The engine navigates `loop_end -> config.loop_node_id` as a
+  special case in `FlowEngine::executeLoop()`. Both are registered in `FlowServiceProvider::registerCoreNodeHandlers()`.
+- **Per-loop total.** The counted total is `flow.{iterator_name}_total` (`LoopNodeHandler::TOTAL_SUFFIX`),
+  not a global `flow.iteration_total`, so sibling or sequential loops never collide.
+- **`iterator_name` is denormalised** into the `loop_end` config at publish
+  (`PublishFlowService::denormalizeLoopEndIteratorNames`).
+- **Array type:** `VariableType::Array`, pass-through in `VariableCoercer`; `ContactWriter` appends with a
+  circular buffer (`max_size` through a lazy schema-registry resolver); session variables append in
+  `AssignNodeHandler` and `InputNodeHandler`; media input into an array variable appends each descriptor as its own
+  element.
+- **Registry delta:** `tenant_variable_schema.properties` (jsonb, default `{}`), `getProperties()` on
+  `VariableSchemaRegistryInterface` / `CacheBackedVariableSchemaRegistry`; properties are collected by
+  `VariableSchemaCollector` and upserted at publish.
+- **Validation** (all are errors in `ValidateFlowService`, returned by validate and enforced at publish):
+  `loop_end_missing_loop_node_id` / `loop_end_invalid_loop_node_id`, `loop_invalid_iterator_name`,
+  `loop_reserved_iterator_name`, `loop_nested_not_allowed`, `loop_missing_loop_end` (reachability BFS from the
+  `loop` handle), `loop_count_exceeds_budget` (literal count above 100).
+- **Registry conflicts:** an array variable whose `item_type` differs between flows is rejected at publish
+  (`variable_properties_conflict`, `PublishFlowService::assertNoVariableTypeConflicts`); `max_size` is not
+  compared (it is registry-only, see 7.3).
+- **Builder:** the `loop_end` type is excluded from the palette (`NodeTypesController::AUTO_MANAGED_TYPES`),
+  created automatically with a loop, self-healed on draft load (`builderStore.healLoopConstructs`) and removed only with its
+  loop. `FlowLoopCard` has a "Loop body" entry for the `loop` branch while the `default` chain continues
+  linearly; `LoopConfig.vue` is a bespoke config (modes, fixed or variable count, while-condition through
+  `ConditionOperandPicker`, advanced `iterator_name`). Arrays are produced by the **"Store as list"**
+  toggle on a variable (`VariableStorageEditor`), which compiles to `type: 'array'` plus
+  `properties.item_type`; the element type comes from the input's `expected_type`.
+- **Condition `.length`:** `OperandResolver::resolveWithLength` makes `contact.photos.length` yield the element
+  count in conditions; a real `length` key wins over the pseudo-accessor.
+- **Tests:** `tests/Feature/Domains/Flow/LoopEngineTest.php`, `LoopNodeHandlerTest.php`, and the loop cases in
+  `tests/Unit/Domains/Flow/ValidateFlowServiceTest.php`.
+
+**Not built:**
+
+- Rejecting session variables named like an active `iterator_name` or `{iterator_name}_total` (8.3, second part).
+- A warning when a while condition is not changed in the body (8.5).
+- A static type check of a numeric `count_source` (8.7); a non-numeric runtime value fails the session in the handler.
+- A decision on the iteration budget (14.1): the general `flow.execution.max_iterations` (default 100) applies, plus the
+  literal-count rule 8.8. Batch loops with no wait node hit the limit at roughly 30 iterations.
+- `{{....length}}` in `TemplateEngine` message templates (14.3); only conditions support it.
+- A UI to edit `max_size` (the default 100 comes from the registry), see 7.3.
+- Validation severities "warning vs error": `ValidateFlowService` has no warning level; every rule
+  above is an error.
 
 ---
 
-## 1. Обзор
+## 1. Overview
 
-Loop-нода добавляет циклические операции в Flow Engine. Кейсы:
+The loop node adds repetition to the Flow Engine. Use cases:
 
-- Серия input с накоплением («загрузите 5 фото»)
-- Повторяющиеся операции до условия («спрашивайте, пока не получим валидный ответ»)
-- Batch-операции с известным количеством
+- a series of inputs that accumulate ("upload 5 photos"),
+- repeat until a condition ("ask until we get a valid answer"),
+- batch operations with a known count.
 
-V1 поддерживает два режима: **counted** (известное N итераций) и **while** (пока условие true).
+Two modes: **counted** (N iterations) and **while** (while a condition is true).
 
-Документ описывает:
-
-- Две новые ноды: `loop` и `loop_end`
-- Новый тип переменной: `array` (`VariableType::Array`)
-- Delta к существующему variable schema registry (`properties`)
-- Validation rules
-- Требуемые доработки движка (раздел 2)
+The document covers the two nodes `loop` and `loop_end`, the `array` variable type, the delta to the
+variable schema registry (`properties`), the validation rules and the engine changes that were needed.
 
 ---
 
-## 2. Требуемые доработки кода (сводка)
+## 2. Code changes (summary)
 
-| Область | Изменение |
-|---------|-----------|
-| `FlowEngine::executeLoop()` | Special-case навигации `loop_end → config.loop_node_id` (прецедент: `end`, `subflow`); решение по iteration budget (см. 7.8 / 14.1) |
-| Handlers | Новые `LoopNodeHandler`, `LoopEndNodeHandler` (Core, graph-unaware) |
-| `VariableType` | Новый case `Array = 'array'` |
-| `VariableCoercer` | Коэрция array-значений |
-| `ContactWriter` | Append-семантика + circular buffer для array-переменных; lookup `max_size` через lazy-resolver schema registry (прецедент: `schemaRegistryResolver` в `VariableResolver`) |
-| `tenant_variable_schema` | Миграция: колонка `properties jsonb NOT NULL DEFAULT '{}'` |
-| `VariableSchemaCollector` / `PublishFlowService` | Сбор и сравнение `properties` (max_size, item_type) в conflict detection |
-| `ValidateFlowService` | Правила 7.1–7.8 |
-| `InputNodeHandler` | `expected_type: "array"` + `item_type` |
-| `AssignNodeHandler` | Append при записи в array-переменную |
-| `SystemStateNamespacePolicy` | Изменений **не требуется** — `flow.*` открыт для всех handler'ов |
-| Builder (Vue) | Опция Array + Item type в `VariableStorageEditor`-флоу; конфиг-панели loop/loop_end (schema-driven или override) |
+| Area | Change |
+|------|--------|
+| `FlowEngine::executeLoop()` | Special-case navigation `loop_end -> config.loop_node_id` (precedent: `end`, `subflow`) |
+| Handlers | `LoopNodeHandler`, `LoopEndNodeHandler` (Core, graph-unaware) |
+| `VariableType` | `Array = 'array'` |
+| `VariableCoercer` | array pass-through |
+| `ContactWriter` | append + circular buffer for array variables; `max_size` through a lazy registry resolver |
+| `tenant_variable_schema` | column `properties jsonb NOT NULL DEFAULT '{}'` |
+| `VariableSchemaCollector` / `PublishFlowService` | collect and compare `item_type` in conflict detection |
+| `ValidateFlowService` | the loop rules in section 8 |
+| `InputNodeHandler`, `AssignNodeHandler` | append when writing to an array variable |
+| `SystemStateNamespacePolicy` | no change: `flow.*` is open to all handlers |
+| Builder (Vue) | "Store as list" in `VariableStorageEditor`; loop / loop_end config panels |
 
 ---
 
-## 3. Loop нода
+## 3. The loop node
 
-### 3.1 Type и version
+### 3.1 Type and version
 
 - **Type:** `loop`
 - **Version:** 1
-- **Idempotent:** yes — нода только читает условие и пишет state через `stateChanges`;
-  batch персистится атомарно с переходом под optimistic lock
+- **Idempotent:** yes. The node only reads the condition and writes state through `stateChanges`; the batch is
+  persisted with the transition under the optimistic lock.
 
 ### 3.2 Config
 
-Операнды (`count_source`, `condition.left`) — существующий structured-`left` формат
-(`OperandResolver`: `ref: user_variable | source`), операторы — `BranchOperator`.
-UI — `ConditionOperandPicker.vue`.
+Operands (`count_source`, `condition.left`) use the existing structured-`left` format (`OperandResolver`:
+`ref: user_variable | source`); operators are `BranchOperator`. The UI is `ConditionOperandPicker.vue`.
 
-#### Counted режим
+#### Counted mode
 
 ```json
 {
@@ -133,7 +120,9 @@ UI — `ConditionOperandPicker.vue`.
 }
 ```
 
-#### While режим
+A literal count is `"count_source": {"type": "literal", "value": 5}`.
+
+#### While mode
 
 ```json
 {
@@ -143,7 +132,7 @@ UI — `ConditionOperandPicker.vue`.
   "config": {
     "mode": "while",
     "condition": {
-      "left": {"ref": "source", "source": "flow", "path": "user_finished"},
+      "left": {"ref": "user_variable", "variable": {"name": "user_done", "storage": "session"}},
       "operator": "eq",
       "value": false
     },
@@ -152,72 +141,75 @@ UI — `ConditionOperandPicker.vue`.
 }
 ```
 
-### 3.3 Поля
+### 3.3 Fields
 
-| Поле | Тип | Required | Описание |
-|------|-----|----------|----------|
-| `mode` | enum | yes | `counted` или `while` |
-| `count_source` | structured left | если mode=counted | Источник числа итераций |
-| `condition` | structured rule (`left`, `operator`, `value`) | если mode=while | Условие продолжения цикла |
-| `iterator_name` | string | no | Имя итератора в session state. Default `iterator`. Alphanumeric + underscore |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `mode` | enum | no | `counted` (default) or `while` |
+| `count_source` | structured left or literal | counted mode | Source of the number of iterations |
+| `condition` | structured rule (`left`, `operator`, `value`) | while mode | Loop continuation condition |
+| `iterator_name` | string | no | Iterator name in session state. Default `iterator`. Identifier characters only; the names `id`, `language`, `meta`, `tenant_id`, `external_id` are reserved |
 
 ### 3.4 Output handles
 
-| Handle | Условие перехода |
-|--------|------------------|
-| `loop` | Условие итерации выполнено — выполняем тело цикла |
-| `default` | Условие не выполнено — пропускаем цикл и идём дальше |
+| Handle | Taken when |
+|--------|-----------|
+| `loop` | the iteration condition holds: run the loop body |
+| `default` | the condition does not hold: skip the loop and continue |
 
-Оба handle — обычные рёбра в `flow_definitions.edges` (`{from, to, handle}`).
+Both are ordinary edges in `flow_definitions.edges` (`{from, to, handle}`).
 
 ### 3.5 Iterator semantics
 
-**1-based индексация.** `flow.{iterator_name}` равен **1** на первой итерации; инкрементируется
-в `loop_end` при каждом возврате.
+**1-based.** `flow.{iterator_name}` is **1** on the first iteration and is incremented by `loop_end` on each return.
 
 **Counted:**
 
-- Первое достижение Loop: `flow.{iterator_name} = 1`, `flow.iteration_total` = resolved `count_source`
-- Условие продолжения: `flow.{iterator_name} <= flow.iteration_total`
-- true → `loop` handle, false → `default` handle
+- first arrival: `flow.{iterator_name} = 1`; every pass writes `flow.{iterator_name}_total` = the resolved
+  `count_source`
+- continue while `flow.{iterator_name} <= flow.{iterator_name}_total`
+- true -> `loop` handle, false -> `default` handle
 
 **While:**
 
-- Первое достижение Loop: `flow.{iterator_name} = 1`; `flow.iteration_total` не устанавливается
-- Условие продолжения: evaluation `condition`
-- true → `loop`, false → `default`
+- first arrival: `flow.{iterator_name} = 1`; no total is set
+- continue while the `condition` holds
+- true -> `loop`, false -> `default`
 
-**Доступ из expressions** (TemplateEngine):
+**Access from expressions** (`TemplateEngine`):
 
 ```
-"Сделайте фото #{{flow.iterator}} из {{flow.iteration_total}}"   ← counted
-"Вопрос #{{flow.iterator}}"                                       ← any mode
+"Take photo #{{flow.iterator}} of {{flow.iterator_total}}"   <- counted, iterator_name = iterator
+"Question #{{flow.iterator}}"                                  <- any mode
 ```
 
 ### 3.6 Behavior
 
-1. Если `flow.{iterator_name}` равен `null` (не инициализирован) → `stateChanges` устанавливает 1.
-   Проверка строго `null === data_get(...)`: персистер не удаляет ключи, очистка = записанный `null`.
-2. Resolve условия продолжения:
-   - **counted:** evaluate `count_source` → записать в `flow.iteration_total`, проверить `iterator <= total`
-   - **while:** evaluate `condition` через `OperandResolver` + `BranchOperator`
-3. true → `sourceHandle: "loop"`
-4. false → cleanup (записать `null` в `flow.{iterator_name}` и `flow.iteration_total` через
-   `stateChanges`) → `sourceHandle: "default"`
+1. If `flow.{iterator_name}` is `null` (not initialised), `stateChanges` sets it to 1. The check is strictly
+   `null === data_get(...)`: the persister never deletes keys, cleanup is a written `null`.
+2. Evaluate the continuation condition:
+   - **counted:** evaluate `count_source`, write the total to `flow.{iterator_name}_total`, test
+     `iterator <= total`. A non-numeric value throws (`RuntimeException`), failing the session.
+   - **while:** evaluate `condition` with `OperandResolver` and `OperatorComparator`.
+3. True -> `sourceHandle: "loop"`.
+4. False -> cleanup (write `null` into `flow.{iterator_name}`, and for counted also into
+   `flow.{iterator_name}_total`, through `stateChanges`) -> `sourceHandle: "default"`.
 
-**Cleanup при exit** позволяет: переиспользовать `iterator_name` в последовательных циклах
-и не загрязнять state мёртвыми значениями.
+A missing `count_source` (counted) or `condition` (while) throws `InvalidNodeConfigException`.
+
+**Cleanup on exit** lets sequential loops reuse an `iterator_name` and keeps dead values out of state.
 
 ---
 
-## 4. LoopEnd нода
+## 4. The loop_end node
 
-### 4.1 Type и version
+### 4.1 Type and version
 
 - **Type:** `loop_end`
 - **Version:** 1
-- **Idempotent:** yes — инкремент итератора в `stateChanges` персистится атомарно с навигацией
-  в одной транзакции под optimistic lock; retry не задваивает инкремент
+- **Category:** `Logic`; auto-managed (hidden from the palette), empty config schema
+- **Idempotent:** yes. The increment is persisted with the navigation in one transaction under the optimistic
+  lock, so a retry does not double-increment.
 
 ### 4.2 Config
 
@@ -227,66 +219,59 @@ UI — `ConditionOperandPicker.vue`.
   "type": "loop_end",
   "version": 1,
   "config": {
-    "loop_node_id": "01HQ_loop_node"
+    "loop_node_id": "01HQ_loop_node",
+    "iterator_name": "iterator"
   }
 }
 ```
 
-| Поле | Тип | Required | Описание |
-|------|-----|----------|----------|
-| `loop_node_id` | string (ULID) | yes | ID parent Loop-ноды, к которой возвращаемся |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `loop_node_id` | string | yes | Id of the parent loop node to return to |
+| `iterator_name` | string | no | Copied from the parent loop at publish; the handler defaults to `iterator` |
 
-### 4.3 Навигация возврата — engine-level
+### 4.3 Return navigation is engine-level
 
-Output handles отсутствуют, рёбер в `edges` нода не имеет. Закон «handlers graph-unaware»
-сохраняется так:
+There are no output handles and no edges. The "handlers are graph-unaware" rule holds like this:
 
-- **Handler** (`LoopEndNodeHandler`) читает `iterator_name` из конфига parent Loop-ноды
-  (через definition недоступно handler'у — поэтому `iterator_name` резолвит engine, см. ниже)
-  и возвращает `executed` + `stateChanges` с инкрементом итератора.
-- **Engine** в `executeLoop()` special-case'ом по `LoopEndNodeHandler::TYPE` (прецеденты:
-  `EndNodeHandler::TYPE`, `SubflowNodeHandler::TYPE`) выставляет
-  `nextNodeId = config.loop_node_id` вместо edge lookup.
+- the **handler** (`LoopEndNodeHandler`) reads `iterator_name` from its own config (denormalised by
+  `PublishFlowService` at publish) and returns `Executed` with a `null` source handle and a `stateChanges`
+  incrementing the iterator;
+- the **engine**, in `executeLoop()`, special-cases `LoopEndNodeHandler::TYPE` (like `EndNodeHandler::TYPE` and
+  `SubflowNodeHandler::TYPE`) and sets `nextNodeId = config.loop_node_id` instead of an edge lookup.
 
-Реализационная деталь: чтобы handler остался definition-unaware, engine передаёт
-`iterator_name` parent-ноды в node config при подготовке вызова (или handler принимает
-инкремент-путь из собственного конфига, денормализованного валидатором при publish —
-выбрать при реализации; второй вариант проще: validator копирует `iterator_name` в config
-`loop_end` при publish).
-
-Vue Flow может рисовать пунктирную стрелку возврата как visual cue — это не edge в data sense.
+The builder may draw a dashed return arrow as a visual cue; it is not an edge in the data.
 
 ### 4.4 Behavior
 
-1. Инкрементировать `flow.{iterator_name}` на 1 (через `stateChanges`)
-2. Engine переводит выполнение на `loop_node_id` (повторная проверка условия)
+1. Increment `flow.{iterator_name}` by 1 (through `stateChanges`).
+2. The engine moves execution to `loop_node_id` (the condition is re-evaluated).
 
-**Failed iteration counts.** Если внутри loop body session failed — failed вся session
-(стандартный механизм: handler exception → `FlowEngine::markSessionFailed()`), exit-семантика
-цикла не применяется. Итерация считается прошедшей **только если** `loop_end` достигнут.
+**A failed iteration fails the session.** If a node in the loop body fails, the whole session fails (a
+handler exception goes through `FlowEngine::markSessionFailed()`); the loop's exit semantics do not apply. An iteration counts
+as done only when `loop_end` is reached.
 
 ---
 
-## 5. Array Type
+## 5. The array type
 
-### 5.1 Контекст
+### 5.1 Context
 
-Contact attributes сегодня содержат **leaf** (scalar) и **group** (nested object). Loop вводит
-третий тип: **array**. Различение через `jsonb_typeof()`:
+Contact attributes hold **leaf** (scalar) and **group** (nested object) values. The loop adds a third kind,
+**array**:
 
-| Тип | jsonb_typeof | Пример |
-|-----|--------------|--------|
-| leaf | `string`, `number`, `boolean`, `null` | `"Иван"`, `42` |
-| group | `object` | `{"city": "Москва"}` |
-| array | `array` | `["url1", "url2"]` |
+| Kind | JSON type | Example |
+|------|-----------|---------|
+| leaf | string, number, boolean, null | `"Ivan"`, `42` |
+| group | object | `{"city": "Kyiv"}` |
+| array | array | `["url1", "url2"]` |
 
-Код: новый case `VariableType::Array` (существующий `Json` остаётся для structured payload
-целиком, например ответа `call`), поддержка в `VariableCoercer`.
+In code this is `VariableType::Array`; the existing `Json` type stays for a whole structured payload (for
+example a `call` response).
 
 ### 5.2 Append semantics
 
-Запись в переменную типа array — это **append**, не replace. Реализуется в `ContactWriter`
-(сейчас `write()` — строго replace):
+Writing to an array variable **appends**, it does not replace (`ContactWriter`):
 
 ```
 Initial:           contact.photos = []
@@ -294,52 +279,45 @@ After 1st input:   contact.photos = ["url1"]
 After 2nd input:   contact.photos = ["url1", "url2"]
 ```
 
-Поведение действует **всегда** для array-переменной, не только внутри loop:
-array = collection, любая запись = добавление.
+This applies always to an array variable, not only inside a loop. `ContactWriter` treats a path as an array
+variable when the tenant variable schema registry declares it with type `array`; before the first publish of a
+flow that declares it, the registry has no entry and a write replaces.
 
-### 5.3 Circular buffer при достижении лимита
+### 5.3 Circular buffer at the limit
 
-У array-переменной есть `max_size` (см. раздел 7). При append в полный массив:
+An array variable has a `max_size` (default 100, from the registry `properties`). Appending to a full array
+shifts left by one: the oldest element is dropped. This bounds memory and protects against runaway loops.
 
-```
-Лимит = 100, текущий размер = 100
-Append: shift left на 1 → element[0] удаляется (самый старый), element[99] = новый
-```
+### 5.4 Input into an array
 
-Фиксированная максимальная память; защита от unbounded роста при ошибках в loop-конструкции.
-`max_size` `ContactWriter` получает lookup'ом в schema registry через lazy-resolver
-(`ContactWriter` создаётся per-node в `FlowEngine::executeLoop()` — внедрять замыкание,
-прецедент `schemaRegistryResolver` в `VariableResolver`).
-
-### 5.4 Input с типом array
-
-`expected_type: "array"` + `item_type` (underlying тип элемента). Target — существующий
-`save_to_variable` (Variable shape, `VariableStorage::Session|Contact`):
+The author turns on **"Store as list"** on the variable of an `input` node. The variable compiles to a
+`variable` block with `type: "array"` and the element type in `properties.item_type`; the element type is derived
+from the input's `expected_type`:
 
 ```json
 {
   "type": "input",
   "version": 1,
   "config": {
-    "prompt": {"...": "..."},
-    "expected_type": "array",
-    "item_type": "photo",
-    "save_to_variable": {
+    "expected_type": "photo",
+    "variable": {
       "name": "photos",
       "storage": "contact",
       "group": null,
-      "type": "array"
+      "type": "array",
+      "properties": {"item_type": "photo"}
     }
   }
 }
 ```
 
-При получении ответа пользователя — append одного элемента в `contact.photos`.
+Each reply from the user appends one element to `contact.photos`. A media input appends every ingested descriptor
+as its own element.
 
-### 5.5 Assign в array
+### 5.5 Assign into an array
 
-Assign с target array-переменной — тоже append (формат operations — фактический контракт
-`AssignNodeHandler`):
+An `assign` operation whose target is an array variable also appends (the operations format is the actual
+`AssignNodeHandler` contract):
 
 ```json
 {
@@ -355,426 +333,336 @@ Assign с target array-переменной — тоже append (формат op
 }
 ```
 
-**Не replace.** Replace массива целиком — отдельная operation (V1.x).
+Replacing a whole array is a separate operation that does not exist yet.
 
-### 5.6 Чтение array
+### 5.6 Reading an array
 
-TemplateEngine резолвит пути через `data_get` — индекс пишется dot-синтаксисом:
-
-```
-{{contact.photos}}     → весь массив (в тексте — JSON encoded, обычно не нужно)
-{{contact.photos.0}}   → первый элемент
-{{contact.photos.2}}   → третий элемент
-```
-
-Размер массива (`{{contact.photos.length}}`) `data_get` **не поддерживает** — требует
-расширения резолвера; вынесено в Open Questions (14.3). Negative indices, slicing — V1.x.
-
-### 5.7 В UI Constructor
-
-Input с array: dropdown `Type` получает опцию «Array», при выборе появляется поле «Item type».
-Target — существующий `VariableStorageEditor.vue` (Contact profile / Temporary).
+`TemplateEngine` resolves paths with `data_get`, so an index is written with dot syntax:
 
 ```
-┌──────────────────────────────────┐
-│ ❓ Ask user                       │
-│ Question: "Загрузите фото"       │
-│ Save as:                         │
-│ ┌────────────────────────────┐   │
-│ │ Name: [photos            ] │   │
-│ │ Type: [Array     ▾       ] │   │
-│ │ Item: [Photo     ▾       ] │   │
-│ │ Save to:                   │   │
-│ │ ◉ 💾 Contact profile        │   │
-│ │ ○ ⏱ Temporary               │   │
-│ └────────────────────────────┘   │
-└──────────────────────────────────┘
+{{contact.photos}}     -> the whole array (JSON-encoded in text; rarely wanted)
+{{contact.photos.0}}   -> the first element
+{{contact.photos.2}}   -> the third element
 ```
 
-`[]`-суффикс обозначает array в node card (`photos[] 💾`).
+The size (`{{contact.photos.length}}`) is **not** supported in templates. In branch and loop **conditions**
+`OperandResolver::resolveWithLength` supports `.length`. Negative indices and slicing are not built.
+
+### 5.7 In the builder
+
+`VariableStorageEditor.vue` shows a "Store as list (append each value)" toggle; the card shows a read-only Type
+label and a `[]` suffix (for example `photos[]`), and new inputs inside a loop body get the list toggle turned on.
 
 ---
 
-## 6. Loop в графе
+## 6. The loop in the graph
 
-### 6.1 Структура
+### 6.1 Structure
 
 ```
-                      ┌──────────────┐
-                      │  Loop        │
-                      │  counted: 5  │
-                      └─┬─────────┬──┘
-              loop ────┘         └──── default
-                │                       │
-                ▼                       ▼
+                      +--------------+
+                      |  Loop        |
+                      |  counted: 5  |
+                      +-+---------+--+
+              loop ----+         +---- default
+                |                       |
+                v                       v
           [body node 1]            [next node]
-                │
-                ▼
+                |
+                v
           [LoopEnd]
-                │
-                └─── engine: nextNodeId = loop_node_id ──► Loop (re-evaluate)
+                |
+                +--- engine: nextNodeId = loop_node_id --> Loop (re-evaluate)
 ```
 
-Рёбра `loop`/`default` — обычные записи в `flow_definitions.edges`; возврат `loop_end → loop` —
-engine-навигация без ребра (раздел 4.3).
+The `loop` / `default` edges are ordinary `flow_definitions.edges` rows; the return `loop_end -> loop` is
+engine navigation with no edge (4.3).
 
-### 6.2 End внутри loop body
+### 6.2 An `end` inside the loop body
 
-`end` (terminator всего flow) допустим внутри loop body — завершает **весь flow**, не итерацию.
-Это workaround для break:
+An `end` node is allowed in a loop body and ends the **whole flow**, not the iteration. This is the workaround
+for `break`:
 
 ```
 Loop:
-  ├─ Input photo
-  ├─ Branch: photo invalid?
-  │     ├─ true → End (status=failed)  ← завершает flow целиком
-  │     └─ false → continue
-  └─ LoopEnd
+  +- Input photo
+  +- Branch: photo invalid?
+  |     +- true  -> End (status=failed)   <- ends the whole flow
+  |     +- false -> continue
+  +- LoopEnd
 ```
 
-Полноценный break (выход только из loop с продолжением flow) в V1 не поддерживается.
+A real `break` (leave only the loop and continue the flow) is not supported.
 
-### 6.3 LoopEnd обязателен
+### 6.3 LoopEnd is mandatory
 
-Каждая ветка `loop` должна достижимо вести к `loop_end` (см. правило 8.1).
+Every `loop` branch must lead to a reachable `loop_end` (rule 8.1).
 
 ---
 
-## 7. Variable Schema Registry — delta
+## 7. Variable schema registry: the delta
 
-Registry **уже реализован** (docs/reference/specs/builder/storage 05/10): таблица `tenant_variable_schema`
-(ключ `(storage, group, name)`), `CacheBackedVariableSchemaRegistry` (per-tenant кеш,
-`invalidate()` после publish), `VariableSchemaCollector`, lazy upsert и cross-flow conflict
-detection в `PublishFlowService` (`VariableTypeConflictException`). Orphan-семантика тоже
-реализована: `declared_in_flow_id` nullable FK SET NULL — записи переживают удаление flow.
+The registry already exists: the `tenant_variable_schema` table (key `(storage, group, name)`),
+`CacheBackedVariableSchemaRegistry` (per-tenant cache, `invalidate()` after publish), `VariableSchemaCollector`,
+upsert and cross-flow conflict detection in `PublishFlowService` (`VariableTypeConflictException`).
+`declared_in_flow_id` is a nullable FK with SET NULL, so records survive deleting a flow.
 
-Для loop требуется **только delta**:
+The loop needed only this delta:
 
-### 7.1 Колонка properties
+### 7.1 The `properties` column
 
 ```sql
 ALTER TABLE tenant_variable_schema
     ADD COLUMN properties jsonb NOT NULL DEFAULT '{}';
 ```
 
-Для array:
+For an array: `{ "max_size": 100, "item_type": "photo" }`.
 
-```json
-{ "max_size": 100, "item_type": "photo" }
-```
+### 7.2 Properties in collect and conflict
 
-### 7.2 Properties в collect/conflict
-
-`VariableSchemaCollector` собирает properties из node config; conflict-check в
-`PublishFlowService` сравнивает type **и properties**. Ошибка — расширенное сообщение
-существующего `VariableTypeConflictException`:
+`VariableSchemaCollector` collects the `properties` from the node config. For two array declarations of the
+same variable, the conflict check in `PublishFlowService` compares the element type (`item_type`) and rejects
+a mismatch with `variable_properties_conflict`:
 
 ```
-Cannot publish flow "Survey Photos":
-  Variable contact.photos already registered with properties:
-    type: array, max_size: 100, item_type: photo
-
-  This flow tries to use it with:
-    type: array, max_size: 50, item_type: photo
-
-  Resolve by:
-    - Using max_size=100 in your flow (matching existing)
-    - OR using a different variable name
+Variable "contact.photos" is already registered as an array of "photo" elements; flow "Survey Photos" tries to
+use it as an array of "file". Match the existing element type or use a different variable name.
 ```
 
-### 7.3 max_size — source of truth
+`max_size` is intentionally not compared.
 
-Registry, не node config. В JSON snapshot input-ноды `max_size` **не хранится**; runtime
-lookup через lazy-resolver (раздел 5.3). Если record исчез runtime (ручное DB intervention) —
-engine fails: «variable schema not found».
+### 7.3 `max_size` source of truth
 
-В V1 — без UI редактирования registry (изменение properties — миграция данных или
-drop-recreate переменной при отсутствии данных). V1.x: раздел «Variables» в Admin Panel.
+The registry, not the node config. A node snapshot does not store `max_size`; the writer looks it up at runtime
+through the lazy resolver and falls back to 100 when the property is absent.
+
+There is no UI to edit registry properties (changing them is a data migration, or drop and recreate the
+variable while no data exists). A "Variables" section in the admin panel is future work.
 
 ---
 
-## 8. Validation Rules
+## 8. Validation rules
 
-Дополнения к `../06-validation.md`. Семантика уровней: save draft валидацию **не вызывает**
-(закон «Save draft без валидации»); warnings возвращает явный `/validate`, errors — атомарно
-при Publish.
+Additions to [../06-validation.md](../06-validation.md). Save draft runs **no** validation; the explicit validate
+call returns the errors, and publish enforces them atomically. There is no warning level: every rule below is an
+error unless it is listed under "Not built".
 
-### 8.1 LoopEnd обязателен
+### 8.1 LoopEnd is required (`loop_missing_loop_end`)
 
-Для каждой Loop-ноды: BFS/DFS от target ребра `loop`; хотя бы один путь должен достичь
-`loop_end` с `loop_node_id`, ссылающимся на эту Loop.
+For every loop node, a BFS from the targets of its `loop` handle must reach a `loop_end` whose `loop_node_id`
+points at this loop. A `loop_end` of another loop is a boundary and is not traversed past.
 
-**/validate:** warning «Loop без LoopEnd — итерация не завершится» · **Publish:** error, refuse
+### 8.2 LoopEnd references an existing loop (`loop_end_missing_loop_node_id`, `loop_end_invalid_loop_node_id`)
 
-### 8.2 LoopEnd ссылается на существующий Loop
+`loop_node_id` must name an existing `loop` node in the same definition.
 
-`loop_node_id` указывает на существующую Loop-ноду в том же flow_definition.
+### 8.3 `iterator_name` (`loop_invalid_iterator_name`, `loop_reserved_iterator_name`)
 
-**/validate:** warning · **Publish:** error
+Must match `^[A-Za-z_][A-Za-z0-9_]*$` and not be one of the reserved names `id`, `language`, `meta`, `tenant_id`,
+`external_id`.
 
-### 8.3 iterator_name
+Not built: rejecting session variables that have the name of an active `iterator_name` or `{iterator_name}_total`.
 
-Alphanumeric + underscore; не равен reserved `iteration_total`. Дополнительно: запрет на
-объявление user-переменных Session-storage с именами, совпадающими с активными
-`iterator_name` / `iteration_total` (enforce в `VariableSchemaCollector`/`ValidateFlowService`).
+### 8.4 No nested loops (`loop_nested_not_allowed`)
 
-### 8.4 Запрет вложенных Loop
+A BFS from the `loop` handle; another `loop` node in the reachable set means a nested loop.
 
-BFS от `loop` handle; другая Loop-нода в reachable set → nested loop.
+### 8.5 A while condition must change (not built)
 
-**/validate:** warning · **Publish:** error «Nested loops not supported в V1»
-
-### 8.5 While condition должна меняться
-
-Extract paths из `condition.left`; проверить, что хотя бы одна нода тела пишет в них
-(input / assign / call с save в эту переменную). Иначе — предупреждение о possible infinite loop.
-
-**/validate:** warning · **Publish:** warning (не блокер: condition может меняться внешне,
-например event-триггером другого flow, пишущим в Contact). Strict check — V1.x.
+Intended: extract the paths from `condition.left` and check that at least one body node writes to them, else warn
+about a possible infinite loop. It would be a warning only, since the condition may change from outside (for
+example an event trigger of another flow writing to the contact).
 
 ### 8.6 Variable registry conflicts
 
-Publish сверяет все переменные flow с registry (реализовано; delta — properties, раздел 7.2).
-Conflicts → refuse.
+Publish compares every variable of the flow with the registry; conflicts are refused (7.2).
 
-### 8.7 Counted source must be number
+### 8.7 Counted source must be a number (not built)
 
-Best-effort static check на publish: literal → проверка типа; `contact.*` с известным
-registry-типом → проверка; `flow.*` (runtime computed) → skip. Runtime non-number →
-session failed.
+A best-effort static check was planned (literal type, a known registry type for `contact.*`, skip `flow.*`). A
+non-numeric runtime value fails the session in the handler.
 
-### 8.8 Batch-loop iteration budget
+### 8.8 Literal count budget (`loop_count_exceeds_budget`)
 
-Связано с лимитом `flow.execution.max_iterations = 100` (`config/flow.php`): каждая итерация
-цикла стоит `body + 2` engine-итерации в одном проходе `executeLoop()`. Циклы с wait-нодами
-(`input`) безопасны — итерация выполняется в отдельном resume. **Batch-циклы без wait-нод**
-упираются в лимит при ~30 итерациях.
-
-До решения 14.1: counted-loop без wait-нод в теле с литеральным `count_source`, превышающим
-бюджет — **Publish: error**; с runtime-значением — **/validate: warning**.
+A counted loop with a literal `count_source` above 100 is rejected. This is related to the engine limit
+`flow.execution.max_iterations = 100` (`config/flow.php`): each loop iteration costs `body + 2` engine iterations
+inside one `executeLoop()` pass. Loops with a wait node (`input`) are safe because each iteration runs in a
+separate resume. **Batch loops without a wait node** hit the limit at roughly 30 iterations; there is no
+validation for a runtime-valued count.
 
 ---
 
-## 9. Iterator Cleanup и Sequential Loops
+## 9. Iterator cleanup and sequential loops
 
-### 9.1 Cleanup при exit
+### 9.1 Cleanup on exit
 
-Выход через `default` handle — обнуление через `stateChanges` (null-конвенция персистера,
-прецедент: retry counter в `InputNodeHandler`):
+Leaving through the `default` handle nulls the state through `stateChanges` (the persister's null convention,
+precedent: the retry counter in `InputNodeHandler`):
 
 ```php
-$stateChanges['flow.' . $iteratorName] = null;
-$stateChanges['flow.iteration_total']  = null;
+$stateChanges['flow.' . $iteratorName]                      = null;
+$stateChanges['flow.' . $iteratorName . '_total']           = null;   // counted mode
 ```
 
-### 9.2 Sequential loops с тем же iterator_name
+### 9.2 Sequential loops with the same `iterator_name`
 
 ```
-Loop A (iterator_name=iterator) → body A → LoopEnd → Loop A
-Loop A exits → flow.iterator = null
-Loop B (iterator_name=iterator) → body B → LoopEnd → Loop B
+Loop A (iterator_name=iterator) -> body A -> LoopEnd -> Loop A
+Loop A exits -> flow.iterator = null
+Loop B (iterator_name=iterator) -> body B -> LoopEnd -> Loop B
 ```
 
-Корректно: каждый Loop начинает с 1 (проверка инициализации — `null ===`).
+Correct: every loop starts at 1 (the initialisation check is `null ===`).
 
-### 9.3 Параллельные loops в разных ветках
+### 9.3 Parallel loops in different branches
 
-Два branch'а, в каждом свой Loop с тем же iterator_name — OK: выполняется только одна ветка.
+Two branches, each with its own loop and the same `iterator_name`, are fine: only one branch runs.
 
 ---
 
-## 10. Failure Modes
+## 10. Failure modes
 
-| # | Сценарий | Поведение |
+| # | Scenario | Behaviour |
 |---|----------|-----------|
-| 1 | `count_source` = 0 или отрицательное | `1 <= 0` = false → сразу `default`, тело не выполняется. Не error |
-| 2 | `count_source` → non-number runtime | Handler exception → session failed (стандартно: `FlowEngine::markSessionFailed()` — failed status, flow_logs, FlowFailed analytics) |
-| 3 | While condition throws (напр., DataAccessor module failure) | Session failed, как в №2 |
-| 4 | `loop_node_id` → несуществующая Loop runtime (DB intervention; publish-валидация исключает) | Session failed |
-| 5 | Massive array fills | Массив держится на `max_size`, старые элементы выпадают. Acceptable by design («accumulate last N items») |
-| 6 | Batch-loop превышает iteration budget | `FlowExecutionLimitExceededException`, session failed. См. 8.8 / 14.1 |
+| 1 | `count_source` is 0 or negative | `1 <= 0` is false -> straight to `default`, the body does not run. Not an error |
+| 2 | `count_source` resolves to a non-number at runtime | handler exception -> session failed (`FlowEngine::markSessionFailed()`: failed status, flow log, FlowFailed analytics) |
+| 3 | The while condition throws (for example a DataAccessor module failure) | session failed, as in 2 |
+| 4 | `loop_node_id` points at a missing loop at runtime (manual DB intervention; publish validation excludes it) | session failed |
+| 5 | A huge array fills up | the array stays at `max_size`, old elements drop out. Acceptable by design ("keep the last N items") |
+| 6 | A batch loop exceeds the iteration budget | `FlowExecutionLimitExceededException`, session failed. See 8.8 / 14.1 |
 
 ---
 
-## 11. Integration с ADR
+## 11. Integration with the platform
 
-**ADR State Writer Semantics** — без изменений. Loop опирается на: атомарный batch
-`stateChanges` + навигация в одной транзакции под optimistic lock (retry-safe инкремент);
-history logging respects `logging_enabled`.
-
-**ADR Message Routing & Concurrency Control** — без изменений. Длинные циклы покрыты
-lock heartbeat (`LockHeartbeat` реализован); incoming во время input внутри цикла — стандартный
-routing.
-
-**ADR Expression Language** (`../../08-expression-language.md`) — без изменений.
-`count_source`/`condition` — structured формы, не выражения; `flow.iterator` /
-`flow.iteration_total` доступны через TemplateEngine. `.length`-резолвер — отдельное мелкое
-расширение (14.3).
-
-**ADR Subflow Composition** — без изменений. Subflow в теле цикла: каждая итерация = новая
-child session (wait-mode; `resumeAfterSubflow` возвращает в post-subflow позицию внутри тела).
-Performance: 100 итераций × subflow = 100 child sessions — acceptable, но heavy;
-документировать как «осторожно».
+- **State writes:** the loop relies on the atomic `stateChanges` batch plus navigation in one transaction under the
+  optimistic lock (a retry-safe increment). History logging respects `logging_enabled`.
+- **Concurrency:** long loops are covered by the lock heartbeat (`LockHeartbeat`, refreshed before each node); an
+  incoming message during an input inside a loop goes through standard routing.
+- **Expressions:** `count_source` and `condition` are structured forms, not expressions; `flow.iterator` and
+  `flow.{iterator_name}_total` are reachable through `TemplateEngine`. The `.length` resolver exists for conditions
+  only (14.3).
+- **Subflow:** a subflow in a loop body creates a new child session per iteration (wait mode; `resumeAfterSubflow`
+  returns to the post-subflow position inside the body). 100 iterations x a subflow is 100 child sessions:
+  acceptable but heavy, use with care.
 
 ---
 
-## 12. V1 Scope
+## 12. V1 scope
 
-### В V1
+### In
 
-- `loop` node type (counted + while)
-- `loop_end` node type (engine-level навигация возврата)
-- `expected_type: "array"` + `item_type` в input
-- Array storage в Contact attributes JSONB; append + circular buffer at max_size
-- `tenant_variable_schema.properties` + properties в conflict detection
-- `iterator_name` configurable (default `iterator`), `flow.iteration_total` для counted, 1-based
-- Validation 8.1–8.8
-- End внутри loop body завершает весь flow (workaround break)
-- Cleanup итератора при exit (null-присвоение)
+- `loop` node type (counted and while)
+- `loop_end` node type (engine-level return navigation)
+- array variables through "Store as list" with `item_type`
+- array storage in contact attributes JSONB; append plus circular buffer at `max_size`
+- `tenant_variable_schema.properties` and `item_type` in conflict detection
+- configurable `iterator_name` (default `iterator`), `flow.{iterator_name}_total` for counted, 1-based
+- validation rules 8.1-8.4, 8.6, 8.8
+- `end` inside a loop body ends the whole flow (the `break` workaround)
+- iterator cleanup on exit (null assignment)
 
-### Не в V1
+### Not in
 
-- Break / Continue (отложено до запросов)
-- Вложенные loops
-- ForEach mode (V1.x — итерация по коллекции с iteration_item)
-- Variable registry UI в admin panel (V1.x)
-- Array operations beyond append: replace, remove, sort, filter (V1.x)
-- Negative indices, slicing в expressions (V1.x)
-- Per-flow override variable properties (registry — single source of truth)
-- Strict validation для while condition (в V1 только warning)
-- Cleanup orphan registry records (V1.x)
-- Node usage statistics — вынесено в [`../../node-usage-statistics.md`](../node-usage-statistics.md)
+- Break / Continue
+- nested loops
+- ForEach mode (iterate an existing collection with an `iteration_item`)
+- a variables registry UI in the admin panel
+- array operations beyond append: replace, remove, sort, filter
+- negative indices and slicing in expressions
+- per-flow override of variable properties (the registry is the single source of truth)
+- strict while-condition validation (8.5)
+- cleanup of orphan registry records
+- node usage statistics: see [../node-usage-statistics.md](../node-usage-statistics.md)
 
 ---
 
-## 13. Workflow Examples
+## 13. Workflow examples
 
-### 13.1 Counted Loop с фото
+### 13.1 Counted loop with photos
 
 ```
-1. Ask user "Сколько фото отправите?"  → Number → contact.photo_count (💾)
-2. Loop (counted, count_source=contact.photo_count, iterator_name=iterator)
+1. Ask the user "How many photos will you send?"  -> number -> contact.photo_count
+2. Loop (counted, count_source = contact.photo_count, iterator_name = iterator)
 3. [loop]
-   3a. Ask user "Загрузите фото #{{flow.iterator}} из {{flow.iteration_total}}"
-       → Array (item: photo) → contact.photos (💾)
-   3b. LoopEnd (loop_node_id → step 2)
+   3a. Ask "Upload photo #{{flow.iterator}} of {{flow.iterator_total}}"
+       -> list (item: photo) -> contact.photos
+   3b. LoopEnd (loop_node_id -> step 2)
 4. [default]
-   Send "Спасибо, фото получены"
+   Send "Thanks, photos received"
 5. End (success)
 ```
 
-Результат: `contact.photo_count = 5`, `contact.photos = [url1..url5]`.
+Result: `contact.photo_count = 5`, `contact.photos = [url1..url5]`.
 
-### 13.2 While Loop с подтверждением
+### 13.2 While loop with a confirmation
 
 ```
-1. Assign: flow.user_done = false (⏱)
-2. Loop (while, condition: flow.user_done == false, iterator_name=iterator)
+1. Assign: flow.user_done = false
+2. Loop (while, condition: flow.user_done == false, iterator_name = iterator)
 3. [loop]
-   3a. Ask user "Введите ответ #{{flow.iterator}} (или /done)"  → Text → contact.responses (💾, array)
+   3a. Ask "Enter answer #{{flow.iterator}} (or /done)"  -> text -> contact.responses (list)
    3b. Branch: flow.last_response == "/done"
-       - true  → Assign flow.user_done = true (⏱)
-       - false → continue
+       - true  -> Assign flow.user_done = true
+       - false -> continue
    3c. LoopEnd
 4. [default]
-   Send "Ответы получены"
+   Send "Answers received"
 5. End
 ```
 
-### 13.3 Последовательные циклы
+### 13.3 Sequential loops
 
 ```
-1. Ask "Сколько фото?" → contact.photo_count (💾)
-2. Loop A (counted, iterator_name=iterator) · body: Ask photo → contact.photos · LoopEnd
-3. Loop A exits → flow.iterator = null
-4. Ask "Сколько вопросов?" → contact.question_count (💾)
-5. Loop B (counted, iterator_name=iterator) · body: Ask text → contact.questions · LoopEnd
+1. Ask "How many photos?" -> contact.photo_count
+2. Loop A (counted, iterator_name = iterator) - body: ask photo -> contact.photos - LoopEnd
+3. Loop A exits -> flow.iterator = null
+4. Ask "How many questions?" -> contact.question_count
+5. Loop B (counted, iterator_name = iterator) - body: ask text -> contact.questions - LoopEnd
 6. End
 ```
 
-Переиспользование `flow.iterator` безопасно благодаря cleanup при exit.
+Reusing `flow.iterator` is safe because of the cleanup on exit.
 
 ---
 
-## 14. Open Questions
+## 14. Open questions
 
-1. **Iteration budget (8.8).** Вариант (а): не учитывать `loop`/`loop_end` в `max_iterations`,
-   ввести отдельный больший лимит итераций цикла — counted из runtime-значений становится
-   рабочим. Вариант (б): оставить общий бюджет + валидация 8.8. Вариант (а) предпочтителен.
-   **Решить до реализации.**
-2. **Передача `iterator_name` в `loop_end`** (4.3): engine-injection vs денормализация
-   validator'ом в config при publish. Второй проще. Решить при реализации.
-3. **`{{….length}}` резолвер** — V1 или V1.x?
-4. **ForEach mode** — итерация по существующей коллекции. По запросу.
-5. **Break/Continue** — формальный механизм. По запросу.
-6. **Bulk array operations** — replace, remove, sort, filter. По частям, как понадобятся.
-7. **Iterator naming conventions** — рекомендации в документации (`i`, `idx`, `iter`)?
+1. **Iteration budget (8.8).** Option (a): do not count `loop` / `loop_end` against `max_iterations` and add a
+   separate, larger loop-iteration limit, which makes counted loops with runtime values workable. Option (b): keep
+   the shared budget plus rule 8.8. Option (a) is preferred. **Undecided.**
+2. **Iterator name on `loop_end`.** Settled: denormalised by `PublishFlowService` at publish (4.3).
+3. **`{{....length}}` in templates.** Conditions support it; message templates do not yet.
+4. **ForEach mode:** iterate over an existing collection. On request.
+5. **Break / Continue:** a formal mechanism. On request.
+6. **Bulk array operations:** replace, remove, sort, filter. As needed.
+7. **Iterator naming conventions:** recommend `i`, `idx`, `iter` in the docs?
 
 ---
 
-## 15. Test Strategy
+## 15. Test strategy and acceptance
 
-### Unit
+Tests that exist: `LoopNodeHandlerTest` (counted and while evaluation, cleanup, config errors),
+`LoopEngineTest` (the engine returning to the loop through `loop_end`), and the loop validation cases in
+`ValidateFlowServiceTest`.
 
-- Loop counted: iteration counts, exit condition, cleanup (null-присвоение)
-- Loop while: condition evaluation, cleanup
-- LoopEnd: инкремент итератора, engine-возврат к `loop_node_id`
-- Array Input: append, circular buffer at max_size
-- Schema registry: properties в lazy creation и conflict detection
-- 1-based корректность; повторная инициализация после cleanup (`null ===`)
+Acceptance, per the code:
 
-### Integration
-
-- Counted loop, 5 итераций — финальный state
-- While loop с user-триггером выхода
-- Sequential loops (A → B), переиспользование итератора
-- Loop + array input аккумуляция
-- End внутри body — завершение всего flow
-- Variable conflict на publish (refuse с понятным сообщением)
-- Длинный цикл (50+ итераций с input) — lock heartbeat
-- Batch-loop на границе iteration budget (поведение по решению 14.1)
-
-### Validation
-
-- Missing LoopEnd → /validate warning, publish error
-- Nested loops → /validate warning, publish error
-- While condition не меняется в body → warning
-- `loop_node_id` → несуществующая нода → error
-- iterator_name = reserved → error
-
-### Acceptance Criteria
-
-- [ ] Unit + integration + validation tests pass
-- [ ] Manual: counted loop 5 фото end-to-end, `contact.photos` = 5 элементов
-- [ ] Manual: while loop выходит при condition=false
-- [ ] Manual: sequential loops с одним iterator_name без конфликтов
-- [ ] Manual: variable conflict на publish — понятная ошибка
-- [ ] Manual: длинный цикл (60 итераций с input) без проблем с lock
-- [ ] Performance: 100 итераций × 5 нод — приемлемое время выполнения
+- [x] Handler, engine and validation tests exist.
+- [x] Missing LoopEnd, nested loops, an invalid `loop_node_id` and a reserved `iterator_name` are rejected (errors).
+- [x] Sequential loops with the same `iterator_name` do not conflict (cleanup writes `null`).
+- [x] A variable type or element-type conflict is rejected at publish with a clear message.
+- [ ] While condition that never changes in the body gives a warning (8.5): not built.
+- [ ] Manual runs (counted 5 photos end to end, while exit, a 60-iteration loop under the lock heartbeat) and the
+  performance check (100 iterations x 5 nodes): not recorded.
+- [ ] A batch loop at the iteration-budget boundary: behaviour pending decision 14.1.
 
 ---
 
-## 16. Связанные документы
+## 16. Related documents
 
-- `../README.md` — индекс спецификации Flow Engine V1
-- `../01-state-model.md` — namespaces, contact addressing
-- `../06-validation.md` — уровни валидации (draft/publish)
-- `../../10-state-writer-semantics.md` — модель state changes
-- `../../09-message-routing-concurrency.md` — lock semantics, long-running execution
-- `../../08-expression-language.md` — expression syntax
-- `../../11-subflow-composition.md` — subflow integration
-- `../../storage/05-backend-contract.md`, `../../storage/10-variable-type-coercion.md` — variable contract / schema registry
-- `../../node-usage-statistics.md` — node usage statistics (вынесено из этого документа, draft)
-
----
-
-## Связано с
-
-- [[README]] — nodes README
-- [[02-input]] — Store as list флаг на input переменной в loop body
-- [[00-overview]] — обзор builder/storage (variable storage)
-- [[05-backend-contract]] — backend контракт для array переменных
-- [[node-usage-statistics]] — statistics для loop нод
-- [[01-state-model]] — state model
-- [[10-state-writer-semantics]] — ADR state writer semantics
-- [[TASKS]] — задачи реализации
+- [../README.md](../README.md) - Flow Engine spec index
+- [../01-state-model.md](../01-state-model.md) - namespaces, contact addressing
+- [../06-validation.md](../06-validation.md) - validation layers
+- [../node-usage-statistics.md](../node-usage-statistics.md) - node usage statistics
+- [02-input.md](02-input.md) - the "Store as list" variable on an input in a loop body

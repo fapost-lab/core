@@ -16,7 +16,9 @@ paths:
   - "tests/Unit/Domains/Tenancy/**"
   - "tests/Feature/Tenancy/**"
   - "app/Console/Commands/Ops/Tenants*"
-reviewed_at: 2026-09-22
+  - "tests/Feature/Domains/Tenancy/**"
+  - tests/Unit/Architecture/WebhookArchitectureTest.php
+reviewed_at: 2026-10-05
 ---
 # Tenancy
 

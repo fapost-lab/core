@@ -8,7 +8,7 @@ domains:
 paths:
   - "app/Domains/Flow/State/**"
 summary: Why the unused Core state layer (StateReader/StateWriter/NamespaceResolverRegistry) was deleted, superseding ADR-10 D-4
-reviewed_at: 2026-09-11
+reviewed_at: 2026-10-05
 ---
 # ADR-0002: Flow state is read by `ScopedStateReader` directly; the Core state primitives are retired
 

@@ -7,6 +7,7 @@ paths:
   - "app/Domains/*/Models/**"
   - "database/migrations/**"
 summary: Tenant-schema PKs are ULIDs in uuid columns via HasUlidPrimaryKey, per ADR-03
+reviewed_at: 2026-10-05
 ---
 # Tenant-schema ID strategy
 
@@ -26,8 +27,8 @@ strategy without a separate decision.
 ## Example
 
 `app/Domains/Assistant/Models/Assistant.php` uses `HasUlidPrimaryKey`; its tenant
-migration (e.g. `database/migrations/tenant/2026_04_02_100000_create_contacts_table.php`,
-same pattern for `contacts`) declares `$table->uuid('id')->primary()` with no
+migration (`database/migrations/tenant/2026_03_27_210000_create_assistants_table.php`; the same
+pattern is in `2026_04_02_100000_create_contacts_table.php`) declares `$table->uuid('id')->primary()` with no
 default. `PreSaleRequest` (`app/Domains/Presale/Models/PreSaleRequest.php`) is the
 documented exception: it stores public landing-page submissions, not tenant-schema
 data, so it keeps an auto-incrementing integer `id`.

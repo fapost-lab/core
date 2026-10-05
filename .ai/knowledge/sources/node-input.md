@@ -9,6 +9,7 @@ paths:
 source: docs/reference/specs/flow-engine/nodes/02-input.md
 summary: "input node: expected types, validation, retries, where the answer is stored"
 source_hash: 536d1b1e85c5845f8979691e22028a979efe1e40
+reviewed_at: 2026-10-05
 ---
 # Node · `input`
 

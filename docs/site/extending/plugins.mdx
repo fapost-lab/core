@@ -7,6 +7,13 @@ A Plugin adds **platform capability** — a new channel adapter, a new RAG provi
 That is what separates it from a [Solution](/extending/solutions), which adds
 domain logic such as HR or recruitment.
 
+<Warning>
+  Core does not yet provide an implementation of `CoreRegistrarInterface`, and
+  nothing in Core reads or validates `SolutionManifest` at boot. The contracts
+  below exist in `fapost/foundation`; the Core side that consumes them is not
+  built yet.
+</Warning>
+
 ## The service provider
 
 A Plugin is a Composer package whose service provider extends
@@ -50,13 +57,13 @@ both are no-ops unless you override them.
 `SolutionManifest` is what makes a Plugin checkable at boot rather than at the
 moment it breaks. `requiresPlatform` is a version constraint on Core;
 `requiresCapabilities` names the platform capabilities the Plugin needs to be
-present. Core validates the manifest during boot and through the platform update
-lifecycle.
+present. Boot-time and update-lifecycle validation of the manifest is the intended
+behaviour; Core does not perform it yet.
 
 ## What you may register
 
-Everything goes through `CoreRegistrarInterface`. This is the single registration
-entry point.
+Everything is meant to go through `CoreRegistrarInterface`, the single registration
+entry point defined in `fapost/foundation`. Core does not implement it yet.
 
 | Method | Registers |
 |---|---|

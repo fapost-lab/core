@@ -8,6 +8,7 @@ paths:
   - tests/Architecture/MigrationTest.php
   - tests/Unit/Architecture/MigrationTest.php
 summary: "Migrations are pure DDL: no app state, tenant context, feature branching, or cross-module table access; PHPat enforces the App Domains / App Services dependency part."
+reviewed_at: 2026-10-05
 ---
 # Migration isolation
 
@@ -33,9 +34,16 @@ covers the PHPat check, through `tests/Unit/Architecture/MigrationTest.php`, whi
 PHPStan; run `php artisan test tests/Architecture` directly and it reports success while
 checking nothing, because those classes are not PHPUnit `TestCase`s.
 
+Migrations are split by scope: `database/migrations/landlord/` (platform-wide),
+`database/migrations/tenant/` (run once per tenant schema) and `database/migrations/features/`
+(an empty placeholder with a `.gitkeep` for future extension packages). Root-level files are
+framework tables.
+
 Keep the PHPat rule's `->because()` text and this document in sync — the rule exists to
 enforce what this convention describes, and a passing PHPat run is only meaningful evidence
-for the parts of this list it actually encodes.
+for the parts of this list it actually encodes. Known drift: the `->because()` in
+`tests/Architecture/MigrationTest.php` still points to a "Migration Isolation Contract in CLAUDE.md"
+that no longer exists; a code fix is tracked separately.
 
 ## Example
 

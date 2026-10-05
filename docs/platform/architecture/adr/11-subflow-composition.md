@@ -1,5 +1,11 @@
 # ADR-11 — Subflow Composition
 
+> **Superseded in part (2026-10).** The four rule classes named in the validation section (`SubflowCycleRule`,
+> `SubflowSameAssistantRule`, `SubflowDepthRule`, `SubflowTargetExistsRule`) do not exist. The checks are implemented by
+> `CallGraphValidator` (cycle and depth, pure function over the edge set) and `CallGraphRepository` (the
+> `flow_callgraph_edges` reverse index) in `app/Domains/Flow/Subflow/`; the same-assistant check lives in
+> `PublishFlowService`.
+
 **Status:** Accepted
 **Date:** Апрель 2026
 **Контекст:** FaPost Phase 2 — Flow Engine, Sprint 6
@@ -694,7 +700,7 @@ ADR применяется как написано — все примитивы
 - **`flow_session_history.subflow_started`/`subflow_returned`** events emitted via Engine + EndHandler в Phase C (см. ADR State Writer Semantics § History Logging).
 - **Lock chain inheritance**: используется существующий `SessionLockManager` (Phase A-5) — никакой передачи, lock на `(tenant, contact, assistant)` остаётся неизменным через subflow chain.
 
-Реализация subflow handler + lifecycle service + cycle validator в `docs/plans/flow-engine/implementation-plan.md` Phase C-4.
+Реализация subflow handler + lifecycle service + cycle validator в `docs/archive/platform/plans/flow-engine/implementation-plan.md` Phase C-4.
 
 ---
 

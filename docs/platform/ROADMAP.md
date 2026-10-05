@@ -1,6 +1,6 @@
 # FaPost Core — Дорожная карта
 
-История инженерных майлстоунов: что было сделано и чем закрыто. Навигация по документам — [[INDEX]].
+История инженерных майлстоунов: что было сделано и чем закрыто. Навигация по документам — [INDEX](../INDEX.md).
 
 > **Этот файл — запись прошлого, а не план.** Открытые направления живут в спеках Jig под
 > `.ai/specs/` (`.ai/scripts/jig spec list`); каждый незакрытый майлстоун ниже сведён к абзацу со
@@ -61,20 +61,20 @@
 - [x] 7.2 Properties-конфликты — array `item_type` drift блокирует publish (`variable_properties_conflict`)  
 - [x] `.length` резолвер для array-переменных в условиях branch (`OperandResolver`)  
 - [x] Budget: `flow.execution.max_iterations` + publish-error на literal count > 100  
-Остаток вынесен в V1.x warning-only (8.5, 8.7, UI для `max_size`) — см. [[TASKS]].  
-Спека: [[specs/flow-engine/nodes/11-loop]]
+Остаток вынесен в V1.x warning-only (8.5, 8.7, UI для `max_size`) — см. [TASKS](TASKS.md).  
+Спека: [specs/flow-engine/nodes/11-loop](../reference/specs/flow-engine/nodes/11-loop.md)
 
 ### Routing pipeline (Phase D)
 - [x] **D-1** `MessageRouter` 6-шаговый pipeline + `DropPolicy` + `SessionStateRouter`  
 - [x] **D-2** `TypingIndicatorService` (индикатор печатания во время выполнения)  
 - [x] **D-3** `/reset` migration под `BuiltinCommandsRegistry` с force unlock  
-Спека: [[architecture/adr/09-message-routing-concurrency]]
+Спека: [architecture/adr/09-message-routing-concurrency](architecture/adr/09-message-routing-concurrency.md)
 
 ### CI enforcement
 - [x] phpat правила: Migration Isolation, Handler Version Contract, Dependency Direction (`composer run test:arch`)  
-- [-] Concurrency hardening: optimistic-lock retry и distributed lock покрыты (`FlowOrchestratorRetryTest`,
-  `FlowExecutionGuardTest`, `SessionLockManagerTest`, `LockAcquisitionPolicyTest`); не закрыто — интеграция на живом
-  Redis (сейчас моки)
+- [x] Concurrency hardening: optimistic-lock retry и distributed lock покрыты (`FlowOrchestratorRetryTest`,
+  `FlowExecutionGuardTest`, `SessionLockManagerTest`, `LockAcquisitionPolicyTest`), включая integration-suite
+  на живом Redis
 
 ### Locking — закрыт ✅
 
@@ -124,7 +124,7 @@
 
 **Когда:** закрыт (коммит `d6de84c` + доработки медиа). Домен `app/Domains/Conversation` в коде.
 
-Спека: [[specs/messaging/conversation-logging]]
+Спека: [specs/messaging/conversation-logging](../reference/specs/messaging/conversation-logging.md)
 
 ### Домен Conversation
 - [x] Миграции: `conversations`, `conversation_messages` (monthly partitions на pgsql, sqlite-fallback для тестов)
@@ -215,7 +215,7 @@
 
 **Когда:** закрыт (коммит `1d45430` и ранее)
 
-Спека: [[specs/flow-engine/nodes/07-emit-event]]
+Спека: [specs/flow-engine/nodes/07-emit-event](../reference/specs/flow-engine/nodes/07-emit-event.md)
 
 - [x] `EmitEventNodeHandler` (type `emit_event`)  
 - [x] `TenantEventRepository` + `ResolveEventTriggersService`  
@@ -316,8 +316,7 @@
 - **`.ai/specs/first-solution/`** — первый Solution (FaPost HR, `hr.sync_employee`,
   `hr.create_assessment`), собранный строго через публичные контракты, в собственном репозитории.
 
-Документы, на которых они стоят: [[architecture/adr/05-foundation-contract-package]],
-[[architecture/platform/12-solutions-modules]].
+Документ, на котором они стоят: [architecture/adr/05-foundation-contract-package](architecture/adr/05-foundation-contract-package.md).
 
 ---
 
@@ -326,8 +325,6 @@
 > *Многоарендный SaaS: биллинг, план-управление, onboarding.*
 
 **Когда:** отдельный репо `fapost-saas`, после стабилизации Core
-
-Документ: [[architecture/platform/02-saas-shell]]
 
 **Ключевые концепты:**
 - Landlord DB: `tenants`, `plans`, `subscriptions`  
@@ -351,7 +348,7 @@
 майлстоуна (`PluginRegistry`, runtime install, store UI, sandbox, SDK) перенесены туда как кандидаты,
 а не как решения.
 
-Документ: [[architecture/adr/06-frontend-extension-boundary]].
+Документ: [architecture/adr/06-frontend-extension-boundary](architecture/adr/06-frontend-extension-boundary.md).
 
 ---
 
@@ -397,8 +394,6 @@ tenant scoping, авторизация через существующие Polic
 остаётся в палитре и падает на runtime guard'е — осознанный документированный долг. Блокер не
 технический, а решенческий: не выбран провайдер эмбеддингов и хранилище векторов.
 
-Спека ноды: [[specs/flow-engine/nodes/09-rag-query]].
-
 ---
 
 ## Зависимости между milestone'ами
@@ -427,7 +422,6 @@ M10 (SaaS Shell) остаётся вне этого репозитория и в
 ## Связано с
 
 - `.ai/specs/` — открытые направления как спеки Jig (`.ai/scripts/jig spec list`)
-- [[TASKS]] — история реализованного по разделам
-- [[INDEX]] — навигация по документам
-- [[PROJECT]] — описание проекта
-- [[plans/flow-engine/implementation-plan]] — план реализации flow engine
+- [TASKS](TASKS.md) — история реализованного по разделам
+- [INDEX](../INDEX.md) — навигация по документам
+- [plans/flow-engine/implementation-plan](../archive/platform/plans/flow-engine/implementation-plan.md) — план реализации flow engine

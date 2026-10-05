@@ -17,6 +17,7 @@ paths:
   - app/Console/Commands/Ops/MigrateIngressCommand.php
   - app/Console/Commands/Ops/PublishIngressSpecsCommand.php
   - app/Console/Commands/Ops/WebhookRegistryHealthCommand.php
+reviewed_at: 2026-10-05
 ---
 # Channel ingress
 
@@ -45,6 +46,22 @@ in `gateway/`. Code lives in `app/Domains/Webhook` — the folder name predates 
   `webhook:<hash>`, `ingress:spec:<platform>` and `processed:<key>`, the registry entry JSON,
   the `InboundWebhookPayload` v1 format, and the Laravel queue job
   `RawIncomingMessageHandler@handle`. `contracts/ingress/golden.json` is executed by both.
+
+## Request path details
+
+- The controller answers `{"ok": true}` in every case, including a bad signature, an unknown hash
+  or a duplicate (the first two are reported, not returned).
+- Dedup: `WebhookController::markProcessed` sets `processed:{idempotency_key}` (86400 s, `NX`)
+  before the job is dispatched, so a duplicate update never reaches the queue.
+- Verification and the idempotency key go through the adapter's declarative `ingressSpec()`
+  (`ProvidesIngressSpecInterface`, executed by `IngressSpecExecutor`) when the adapter has one, so
+  the controller and the gateway run the same rules; an adapter without a spec uses its own
+  `verifySignature` / `extractIdempotencyKey`.
+- Hash lookup in `Services/WebhookRegistryResolver`: Redis `webhook:{hash}` first; on a miss it reads
+  the landlord registry through `WebhookRegistryReaderInterface` and writes the entry back to Redis.
+  A short `warming:{hash}` leader lock (5 s) is taken on a miss, but both leader and followers do
+  their own landlord read at once — nothing sleeps in the hot path. The database is the source of
+  truth, Redis a cache.
 
 ## Entry points
 

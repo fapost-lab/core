@@ -3,10 +3,12 @@ id: convention-releases
 type: convention
 status: active
 domains: []
-paths: []
+paths:
+  - .github/workflows/publish-images.yml
 source: docs/site/contributing/releases.mdx
 summary: Versioning in 0.x, image tags, hotfix and pre-release procedure
 source_hash: 803f0414dc9b3c18363bbf49a7e03320131940ee
+reviewed_at: 2026-10-05
 ---
 # Releases and versioning
 

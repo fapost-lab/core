@@ -17,7 +17,7 @@ paths:
   - "tests/*/Domains/Flow/**"
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
-reviewed_at: 2026-09-22
+reviewed_at: 2026-10-05
 ---
 # Flow rules
 
@@ -31,7 +31,7 @@ broken.
   constructible and testable without a booted framework, and a hidden container lookup inside a
   worker resolves whatever tenant state is current. Enforced: `tests/Architecture/FlowRuntimeIsolationTest.php`.
   Not covered: `Concurrency`, `Call`, `Expression`, the rest of `Services`.
-- **Every class in `Handlers/` (except `Support`) implements `NodeHandlerInterface`.**
+- **Every class in `Handlers/` (except `Abstract` and `Support`) implements `NodeHandlerInterface`.**
   Enforced: `tests/Architecture/HandlerVersionContractTest.php`.
 - **Node handlers take collaborators as ordinary constructor dependencies.** The registry keeps
   handler classes and builds a handler on every `resolve()` in the current scope (ADR-0001), so a
@@ -75,7 +75,8 @@ broken.
   `scoped` (as `VariableResolverInterface` is), or keep classes
   and build per scope through a factory port implemented in `app/Infrastructure` (as the node
   handler registry does, ADR-0001). A resolver closure is not the answer: a constructor
-  `Closure` is only for breaking a construction cycle (`SubflowStarterService::engineResolver`).
+  `Closure` is only for breaking a construction cycle (`SubflowStarterService` and
+  `DefaultSubflowResumer` each take a lazy `engineResolver`).
   Why: registries are singletons for the worker's lifetime, so a captured scoped object leaks
   the first job's tenant and assistant into later jobs. Review only, apart from the handler
   rule above.
