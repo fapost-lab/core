@@ -13,11 +13,13 @@
 # reported by `jig status`. Adding a key here is a decision about that test,
 # not a convenience; record it in schemas/config.md.
 #
-# `agent.git`, `agent.ci_timeout`, `autopilot.unattended` and
-# `autopilot.parallel` are also in JIG_CFG_LOCAL_ONLY_KEYS below: they answer
+# `agent.git`, `agent.ci_timeout`, `autopilot.unattended`,
+# `autopilot.parallel` and `route.depth` are also in JIG_CFG_LOCAL_ONLY_KEYS
+# below (with `run.exec`, `run.path` and the two `claude.*_model` keys): they
+# answer
 # *only* from this list, never falling back to the project layer the way every
 # other key here does.
-JIG_CFG_LOCAL_KEYS="housekeeping.cadence housekeeping.fetch housekeeping.trash_ttl housekeeping.abandoned_ttl housekeeping.stale_after checkout.busy_ttl verify.busy_ttl git.worktree_root agent.git agent.ci_timeout autopilot.unattended autopilot.parallel"
+JIG_CFG_LOCAL_KEYS="housekeeping.cadence housekeeping.fetch housekeeping.trash_ttl housekeeping.abandoned_ttl housekeeping.stale_after checkout.busy_ttl verify.busy_ttl git.worktree_root agent.git agent.ci_timeout autopilot.unattended autopilot.parallel route.depth release.merge run.exec run.path claude.implement_model claude.review_model"
 
 # Keys whose project-layer value `cfg` never reads at all: only the local
 # file and the default answer. A key belongs here, rather than merely in
@@ -32,9 +34,28 @@ JIG_CFG_LOCAL_KEYS="housekeeping.cadence housekeeping.fetch housekeeping.trash_t
 # `autopilot.parallel` bounds how many task agents a phase run builds at once,
 # which is a question about one person's machine and their tolerance for
 # agents working unwatched, not about the project.
+# `route.depth` trades one person's time against process: `lean` trims the
+# stages a class route allows trimming, never below the class's floor. A
+# committed value would make that trade for every contributor
+# (adr-20261002-route-depth-is-a-personal-choice).
+# `release.merge` says whether this person's unattended agent may merge an
+# epic's final pull request, which is the release: who merges one is the
+# owner's choice, not the project's (this ADR amendment: ADR-0040, 2026-10-04).
+# `run.exec` says where this machine runs the project's checks — a container
+# on one laptop, the host on a colleague's — and a committed value would send
+# every contributor's checks to one person's environment
+# (adr-20261001-checks-run-where-the-project-runs). `run.path` is the same
+# question for a host runtime that is not first on PATH (Laravel Herd): a
+# directory on one person's machine.
+# `claude.implement_model` and `claude.review_model` name the model a stage is
+# handed to when the agent delegates it to a subagent: which model is worth
+# its cost depends on one person's plan, runtime and budget, and a committed
+# value would spend every contributor's. Jig carries the value as an opaque
+# string and never interprets it; empty means no delegation
+# (adr-20261005-jig-names-the-roles-not-the-models).
 # `jig_config_project_ignored` reports a project-layer value here so it does
 # not silently do nothing.
-JIG_CFG_LOCAL_ONLY_KEYS="agent.git agent.ci_timeout autopilot.unattended autopilot.parallel"
+JIG_CFG_LOCAL_ONLY_KEYS="agent.git agent.ci_timeout autopilot.unattended autopilot.parallel route.depth release.merge run.exec run.path claude.implement_model claude.review_model"
 
 # Path of the config file for the current project (JIG_PROJECT must be set).
 jig_config_file() { printf '%s/%s/config.yaml\n' "$JIG_PROJECT" "$JIG_AI_DIR"; }
@@ -123,6 +144,7 @@ git.branch_per_task true
 git.branch_template task/{id}
 git.worktree_root ../<project>.worktrees
 worktree.carry []
+worktree.share []
 forge auto
 housekeeping.cadence 1d
 housekeeping.fetch true
@@ -134,9 +156,15 @@ agent.git none
 agent.ci_timeout 30
 autopilot.unattended false
 autopilot.parallel 2
+route.depth full
+release.merge agent
 knowledge.require_frontmatter true
 verify.full_run local
 verify.busy_ttl 30m
+run.exec auto
+run.path auto
+claude.implement_model
+claude.review_model
 EOF
 }
 
@@ -386,6 +414,50 @@ jig_autopilot_parallel() {
   printf '%s\n' "$((10#$value))"
 }
 
+# jig_release_merge — print release.merge, who merges an epic's final pull
+# request in an unattended run at `agent.git: merge`: `agent` (the default,
+# as before) or `human`, which opens it and leaves the merge — the release —
+# to the person. Exit 1 with the value read for anything else, which every
+# reader takes as `human`: a mistake never merges a release.
+jig_release_merge() {
+  local value
+  value=$(cfg release.merge agent)
+  if _cfg_release_merge "$value"; then
+    printf '%s\n' "$value"
+  else
+    printf 'human\n'
+    return 1
+  fi
+}
+
+_cfg_release_merge() {
+  case "$1" in
+    agent | human) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# jig_route_depth — print route.depth, how much of a class's route this
+# person runs (`full`, the default, or `lean`), and exit 0; for anything else
+# print the value read and exit 1, like jig_agent_git. Every reader takes an
+# invalid value as `full`: a mistake costs process, never a stage
+# (adr-20261002-route-depth-is-a-personal-choice).
+jig_route_depth() {
+  local value
+  value=$(cfg route.depth full)
+  printf '%s\n' "$value"
+  _cfg_route_depth "$value"
+}
+
+# _cfg_route_depth <value> — exit 0 when <value> is a route depth. Shared by
+# the reader above, `jig config set` and `jig task`, so they cannot disagree.
+_cfg_route_depth() {
+  case "$1" in
+    full | lean) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # _cfg_parallel <value> — exit 0 when <value> is a count autopilot.parallel
 # accepts: digits only, 1 to 16. Shared by the reader above and
 # `jig config set`, so the two cannot disagree. The ceiling is not a measured
@@ -412,7 +484,18 @@ _cfg_parallel() {
 # - agent.git and agent.ci_timeout: the checks of jig_agent_git and
 #   jig_ci_timeout;
 # - autopilot.parallel: the check of jig_autopilot_parallel;
-# - git.worktree_root: any path _cfg_read gives back unchanged.
+# - route.depth: the check of jig_route_depth;
+# - release.merge: `agent` or `human`;
+# - git.worktree_root: any path _cfg_read gives back unchanged;
+# - run.exec: `auto`, `host` or a command prefix of plain words — runenv.sh
+#   splits it on blanks and interprets nothing, so a quote, `$`, backtick or
+#   backslash would reach the command as a literal character;
+# - run.path: `auto` or the absolute path of a directory, unquoted — read as
+#   one value, so a blank inside it is kept (Herd's macOS home has one); a
+#   relative one would name a different folder from wherever verify starts;
+# - claude.implement_model and claude.review_model: anything — the value is
+#   the runtime's to understand, never Jig's
+#   (adr-20261005-jig-names-the-roles-not-the-models).
 # Nothing may hold a line break, a `#` (_cfg_read cuts a comment there) or
 # surrounding blanks (it trims them).
 jig_config_value_problem() {
@@ -455,11 +538,34 @@ jig_config_value_problem() {
       _cfg_parallel "$value" \
         || { printf 'not a whole number of tasks (1 to 16)\n'; return 1; }
       ;;
+    route.depth)
+      _cfg_route_depth "$value" \
+        || { printf 'not a depth: full or lean\n'; return 1; }
+      ;;
+    release.merge)
+      _cfg_release_merge "$value" \
+        || { printf 'not agent or human\n'; return 1; }
+      ;;
+    run.exec)
+      case "$value" in
+        *[\"\'\`\$\\]*)
+          printf 'a quote, $, backtick or backslash; write the command prefix as plain words (e.g. docker compose exec -T app)\n'
+          return 1
+          ;;
+      esac
+      ;;
+    run.path)
+      case "$value" in
+        auto | /* | [A-Za-z]:[\\/]*) ;;
+        *) printf 'not auto or an absolute path of a folder\n'; return 1 ;;
+      esac
+      ;;
     git.worktree_root)
       case "$value" in
         \"* | \'*) printf 'quoted; write the path without quotes\n'; return 1 ;;
       esac
       ;;
+    claude.implement_model | claude.review_model) ;;
     *) printf 'not a local key\n'; return 1 ;;
   esac
   return 0
@@ -566,6 +672,9 @@ _config_keys() {
   printf '%-31s%-25s%s\n' "key" "default" "answered by"
   while read -r key default; do
     [ -n "$key" ] || continue
+    # An empty default — a key that is off until a person sets it — prints as
+    # `-`, so the columns still read as columns.
+    [ -n "$default" ] || default=-
     note=""
     if ! jig_config_local_only_key "$key" && ! _cfg_mentions "$file" "$key"; then
       note="not mentioned in $JIG_AI_DIR/config.yaml"
@@ -638,7 +747,8 @@ _config_set() {
   [ -d "$dir" ] || jig_die "config set: no $JIG_AI_DIR/ directory at ${dir%/*}; run jig init there first"
 
   _CONFIG_TMP="$file.tmp.$$"
-  trap 'rm -f "$_CONFIG_TMP" "$_CONFIG_TMP.next"' EXIT
+  jig_cleanup_add "$_CONFIG_TMP"
+  jig_cleanup_add "$_CONFIG_TMP.next"
   if [ -f "$file" ]; then
     cat "$file" > "$_CONFIG_TMP"
   else
@@ -734,7 +844,8 @@ _config_unset() {
   fi
 
   _CONFIG_TMP="$file.tmp.$$"
-  trap 'rm -f "$_CONFIG_TMP" "$_CONFIG_TMP.next"' EXIT
+  jig_cleanup_add "$_CONFIG_TMP"
+  jig_cleanup_add "$_CONFIG_TMP.next"
   cat "$file" > "$_CONFIG_TMP"
   # The report is built here, against the file as it still is, so "unset" and
   # "not set" say what actually happened rather than what was asked for.

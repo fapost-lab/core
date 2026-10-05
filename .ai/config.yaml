@@ -18,3 +18,5 @@ housekeeping.abandoned_ttl: 14d       # abandoned workspaces are purged after th
 housekeeping.stale_after: 60d         # older active tasks are reported as STALE_CANDIDATE
 
 knowledge.require_frontmatter: true   # `jig knowledge check` fails on missing frontmatter
+
+verify.full_run: ci                   # local `jig verify` checks changed files; CI runs the full set

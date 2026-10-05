@@ -31,8 +31,9 @@ task back to verify.
 touches regardless of `verify.full_run`, and each profile reports whether it honoured the
 scope or ran everything anyway.
 
-Wait on the run's own handle and read that exit code: `.ai/scripts/jig verify >verify.log
-2>&1 & wait $!` in plain shell, or the completion signal of the tracked background job if
+Wait on the run's own handle and read that exit code: `.ai/scripts/jig verify & wait $!`
+in plain shell (its report goes to the terminal; do not redirect it into a file in the
+working tree), or the completion signal of the tracked background job if
 the harness started one. Never poll with `pgrep -f <pattern>` — the polling command's own
 command line contains the pattern, so it matches itself and waits forever.
 
@@ -75,7 +76,9 @@ When everything holds:
 
 It refuses while a P0 or P1 review finding is open or fixed but not re-reviewed
 (`jig task findings <id> --blocking` lists them), and when the code, the design or the
-findings changed after the review (`jig task receipt <id> --check` names what). That is not a failure to work around: send
+findings changed after the review (`jig task receipt <id> --check` names what), and while a
+stage of the task's route left no record — the gate's approval, a review receipt — which it names
+as `the route of <id> is missing: …`. That is not a failure to work around: send
 the task back to implementation or to re-review, or ask the human about dismissing it
 ([findings](../jig-review/references/findings.md)).
 

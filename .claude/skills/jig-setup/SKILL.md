@@ -54,12 +54,37 @@ their own file is answered by `config unset` too — say that the key then answe
    may agents work on at the same time?" Each one gets its own folder and its own agent, so
    more means more of the machine and more to read when they finish. Default 2, at most 16.
    Recommend 2, or 1 for someone who wants to watch every change.
-6. **Cleanup** (`housekeeping.*`) — one question, offer to skip: how long an abandoned task is
+6. **Process** (`route.depth`). "How much process should your tasks get?" `full` — each risk
+   class's whole route (default); `lean` — a shorter analysis, the plan folded into it, one
+   review round where the class allows it. Say what never changes: tests on changed files, CI
+   before a merge, the design approval and architecture review of risky work. Recommend `full`;
+   `lean` for someone who would rather trade a little review depth for time and tokens. One
+   task can always differ.
+7. **Cleanup** (`housekeeping.*`) — one question, offer to skip: how long an abandoned task is
    kept (`abandoned_ttl`, 14d), how long the trash is kept (`trash_ttl`, 7d), when an idle task
    is called stale (`stale_after`, 60d), how often cleanup runs (`cadence`, whole days, 1d),
    whether it may `git fetch` (`fetch`, true). Recommend the defaults.
-7. **Worktrees** (`git.worktree_root`) — only if they run several agents at once and want the
+8. **Worktrees** (`git.worktree_root`) — only if they run several agents at once and want the
    task folders somewhere other than `../<project>.worktrees`.
+9. **Where the checks run** (`run.exec`). First run `.ai/scripts/jig verify --explain` and read
+   its `verify: checks run in …` or `verify: refused: …` line: it names what Jig detected, or
+   the signs of a container it could not place. Ask: "Where do this project's tests run — here,
+   or in a container?" With a detection that is right, nothing needs writing (`auto` keeps
+   finding it); say so. Otherwise offer `host`, or the command prefix that reaches the
+   container — work it out from the project (`docker compose exec -T -w <dir> <service>`,
+   `docker exec -i -w <dir> <container>`) and show it; never ask the person to type one. A PHP on
+   this machine that is not first on `PATH` and was not detected (Herd's is) goes to `run.path`,
+   the folder that holds it.
+10. **Helpers** (`claude.implement_model`, `claude.review_model`) — only in Claude Code. Explain:
+    the agent can hand writing the code, and reviewing it, to a helper on another model; what the
+    helper does is still checked — review findings block, the checks must pass — and the agent
+    keeps the design, the decisions and shipping. One review setting covers every review,
+    architecture review included. Ask: "Should helpers do the coding and the reviews, and on
+    which model?" Options: no helpers (default — the agent does every stage itself); one model for
+    both; a different one for each. Write the name as the person gives it — `sonnet`, `opus`,
+    `haiku` or a full model id: Jig passes it to Claude Code unchanged and checks nothing.
+    Recommend no helpers to someone unsure why they would want them; `sonnet` for both to someone
+    whose session runs on Opus and who wants their limits to last.
 
 Ask about no other key. If `jig config set` refuses a key as not local, this version of Jig
 does not have it: drop the question.

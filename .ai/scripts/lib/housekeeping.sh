@@ -24,6 +24,7 @@ _HK_WT_NOTE=""      # ... and as a note in the grouped report
 _HK_BASE_LOG=""     # "<base>\t<ref>\t<epoch>\t<sha>" reflog of every task base's refs, newest first, read once per run
 _HK_WRONG_NOTE=""   # why the last task was flagged wrong-base, as a note in the grouped report
 _HK_DEFAULT_BASE="" # git.base_branch, read once per run
+_HK_LOCK_DIR=""      # the run's own lock directory, once claimed (_hk_lock_acquire); empty otherwise
 
 cmd_housekeeping() {
   jig_require_init
@@ -42,7 +43,9 @@ cmd_housekeeping() {
   # The report is printed once every task is decided, grouped by outcome:
   # forty identical lines in id order said nothing a person could act on.
   _HK_ROWS=$(mktemp "${TMPDIR:-/tmp}/jig-housekeeping.XXXXXX")
-  trap 'rm -f "$_HK_ROWS"' EXIT
+  # shellcheck disable=SC2016 # evaluated at exit, by design
+  jig_on_exit '_hk_lock_release "$_HK_LOCK_DIR"'
+  jig_cleanup_add "$_HK_ROWS"
 
   local runtime="$JIG_PROJECT/$JIG_AI_DIR/runtime"
   # Every walk of this path below is `find "$tasks_dir" ...` with no trailing
@@ -65,8 +68,21 @@ cmd_housekeeping() {
   abandoned_ttl_days=$(( $(jig_duration_seconds "$abandoned_ttl") / 86400 ))
   stale_after_days=$(( $(jig_duration_seconds "$stale_after") / 86400 ))
 
+  # Two runs at once help nobody: both would fetch, both would walk
+  # $tasks_dir and both would purge or log the same tasks. A dry run reads
+  # and prints only, so it never contends with anything and takes no lock
+  # (this task, minor point from the review).
+  if [ "$dry" != 1 ]; then
+    mkdir -p "$runtime" 2>/dev/null || true
+    if ! _hk_lock_acquire "$runtime/housekeeping-lock"; then
+      printf 'another housekeeping run holds this clone; skipping\n'
+      return 0
+    fi
+  fi
+
   _HK_DEFAULT_BASE=$(cfg git.base_branch main)
   _hk_fetch "$dry"
+  _hk_check_latest_release "$dry" "$runtime"
   _hk_forge_init
   _hk_base_reflog_init "$tasks_dir"
 
@@ -105,6 +121,13 @@ cmd_housekeeping() {
         continue
       fi
       found=1
+
+      # Before anything is read through the workspace or acted on because of it
+      # (a worktree retired, a checkout record kept, a purge): a workspace that
+      # is not this repository's own is refused for the whole run. In this
+      # shell, not in a $(...), so the refusal ends the run. A dry run writes
+      # nothing and is left to report.
+      [ "$dry" = 1 ] || _task_guard_write "$tid" "housekeeping"
 
       st=$(task_state_get "$tid" status)
       paused=$(task_state_get "$tid" paused)
@@ -402,8 +425,82 @@ _hk_released() {
   printf 'false\n'
 }
 
+# _hk_lock_ttl — how long a claimed lock still counts as live without a
+# reachable pid behind it (the backstop `jig_verify_busy_holder` also uses
+# for `jig verify`, common.sh). A run here does one fetch, one forge call and
+# one walk of the task directory — minutes, not the long test suites verify
+# waits out — so an hour is generous headroom, and there is no
+# `housekeeping.busy_ttl` to configure: this lock is the review's minor
+# point, not a new surface to tune.
+_hk_lock_ttl() { printf '3600\n'; }
+
+# _hk_lock_acquire <dir> — claim the run for this process alone, or say no.
+#
+# Non-blocking, unlike `jig verify`'s busy record: nobody is waiting on
+# housekeeping to finish (it runs detached off the session hook,
+# jig-session-hook), so a run that finds the lock held just skips instead of
+# queuing — whichever run got there first will do the same work either way.
+#
+# `mkdir` is the claim, the one atomic primitive available on POSIX and in
+# Git Bash alike (ADR-0002), the same idiom `_verify_busy_claim` uses in
+# verify.sh — not shared with it, because one command library never sources
+# another (ARCHITECTURE.md); `jig_verify_busy_holder` (common.sh) is shared,
+# and reads the same "checkout: / pid: " shape this writes, so liveness is
+# checked once, in one place. A record whose pid is no longer alive, or that
+# has outlived the ttl, is reclaimed. A directory that plain will not
+# `mkdir` (a read-only clone root, a permission this agent lacks) is not a
+# reason to refuse to run: fail open, exactly as `_verify_busy_acquire` does.
+_hk_lock_acquire() {
+  local dir="$1"
+  # `busy` is the atomic claim; `$dir` itself is only its parent and may be
+  # made ahead of time by anyone, same as `mkdir -p` everywhere else here.
+  mkdir -p "$dir" 2>/dev/null || true
+  if mkdir "$dir/busy" 2>/dev/null; then
+    printf 'checkout: %s\npid: %s\n' "$JIG_PROJECT" "$$" > "$dir/busy/run" 2>/dev/null || true
+    _HK_LOCK_DIR="$dir"
+    return 0
+  fi
+  if [ -d "$dir/busy" ]; then
+    if jig_verify_busy_holder "$dir" "$(_hk_lock_ttl)" >/dev/null 2>&1; then
+      return 1
+    fi
+    rm -f "$dir/busy/run" 2>/dev/null || true
+    rmdir "$dir/busy" 2>/dev/null || true
+  fi
+  if mkdir "$dir/busy" 2>/dev/null; then
+    printf 'checkout: %s\npid: %s\n' "$JIG_PROJECT" "$$" > "$dir/busy/run" 2>/dev/null || true
+    _HK_LOCK_DIR="$dir"
+    return 0
+  fi
+  # Lost the reclaim race to a neighbour, or the filesystem itself refuses:
+  # run anyway rather than refuse (see above).
+  return 0
+}
+
+# _hk_lock_release <dir> — give the record back. Only ever removes the exact
+# path this run built (RULES.md): no `rm -rf` on anything computed elsewhere,
+# and nothing happens for a run that never held the lock (dry runs, or a run
+# that found it already held).
+_hk_lock_release() {
+  local dir="$1"
+  [ -n "$dir" ] || return 0
+  case "$dir" in
+    */"$JIG_AI_DIR"/runtime/housekeeping-lock) ;;
+    *) return 0 ;;
+  esac
+  rm -f "$dir/busy/run" 2>/dev/null || true
+  rmdir "$dir/busy" 2>/dev/null || true
+  return 0
+}
+
 # _hk_fetch <dry> — refresh remote refs once per run when allowed. A failure
 # is not fatal: the run continues on local state and says so (domains/housekeeping).
+#
+# GIT_TERMINAL_PROMPT=0 and GIT_SSH_COMMAND (jig_git_batch_ssh, common.sh):
+# this runs from the session hook, detached and unattended (jig-session-hook)
+# — nobody is at the terminal to answer a credential prompt, so a remote that
+# would ask for one must fail this fetch instead of hanging it forever
+# (fetch-never-waits-for-a-prompt).
 _hk_fetch() {
   local dry="$1"
   if ! cfg_bool housekeeping.fetch true; then
@@ -418,8 +515,52 @@ _hk_fetch() {
   if ! git -C "$JIG_PROJECT" remote get-url origin >/dev/null 2>&1; then
     return 0
   fi
-  if ! git -C "$JIG_PROJECT" fetch --quiet origin >/dev/null 2>&1; then
+  if ! GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="$(jig_git_batch_ssh)" \
+       git -C "$JIG_PROJECT" fetch --quiet origin >/dev/null 2>&1; then
     _HK_STALE_REMOTE=1
+  fi
+  return 0
+}
+
+# _hk_check_latest_release <dry> <runtime> — the newest jig release, written
+# to .ai/runtime/latest-release so `jig status` can name it without a
+# network call of its own (task status-says-a-newer-jig-exists: "человек
+# узнаёт о вышедшей версии jig, не запуская jig doctor"). Doctor already asks
+# this same question of the global framework checkout on demand; this is the
+# unattended, once-a-cadence twin of that check, for the audience that never
+# runs doctor.
+#
+# Gated on housekeeping.fetch exactly like _hk_fetch above (no new config
+# key, per the task's own boundary), and skipped on a dry run for the same
+# reason _hk_fetch is: a dry run reads and prints only. Nothing here can fail
+# the run — a network hiccup is recorded as "failed", honestly, rather than
+# raised (jig_check_newest_release's own contract, common.sh): the file never
+# claims "up to date" without having actually heard so, and `jig status`
+# (_status_latest_release_available) treats "failed" exactly like "no file".
+_hk_check_latest_release() {
+  local dry="$1" runtime="$2" exe root rc best file tmp
+  if ! cfg_bool housekeeping.fetch true; then
+    return 0
+  fi
+  if [ "$dry" = 1 ]; then
+    return 0
+  fi
+  file="$runtime/latest-release"
+  tmp="$file.tmp.$$"
+  jig_cleanup_add "$tmp"
+  mkdir -p "$runtime" 2>/dev/null || return 0
+  if ! exe=$(jig_global_executable); then
+    return 0
+  fi
+  root="${exe%/scripts/jig}"
+  rc=0
+  best=$(jig_check_newest_release "$root" "$_JIG_RELEASE_CHECK_TIMEOUT") || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    printf 'latest=%s\nchecked_at=%s\n' "${best#v}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$tmp" \
+      && mv "$tmp" "$file"
+  else
+    printf 'failed\nchecked_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$tmp" \
+      && mv "$tmp" "$file"
   fi
   return 0
 }

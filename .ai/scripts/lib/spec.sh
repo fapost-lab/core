@@ -7,7 +7,7 @@
 #
 # A task links to a spec through one `Spec: .ai/specs/<id>/ — Phase <n>` line in
 # its task.md. `new` creates a spec, `done` checks a linked task's roadmap
-# items, `remove` unlinks a spec's open tasks and moves the spec to trash,
+# items, `link` writes a filed task's `Spec:` line, `remove` unlinks a spec's open tasks and moves the spec to trash,
 # `close` removes a spec whose roadmap is complete, `epic` declares, cuts,
 # finishes and reopens a spec's epic branch (ADR-0035, ADR-0040 as amended),
 # and `ship` carries a declaration, an epic or an epic's final pull request as
@@ -15,7 +15,7 @@
 # `list` only reads.
 # shellcheck shell=bash
 
-SPEC_USAGE="usage: jig spec new <id> | jig spec list | jig spec plan <id> --phase <n> [--format text|tsv] | jig spec done <task-id> | jig spec close <id> [--leftovers-handled] | jig spec remove <id> [--dry-run] [--abandon-unstarted] | jig spec epic <id> [--release patch|minor|major | --finish [--leftovers-handled] | --reopen] | jig spec ship <id> [--message-file <file>] [--title <t>] [--body-file <file>]"
+SPEC_USAGE="usage: jig spec new <id> | jig spec resume <id> | jig spec list | jig spec plan <id> --phase <n> [--format text|tsv] | jig spec done <task-id> | jig spec link <spec-id> <task-id> | jig spec close <id> [--leftovers-handled] | jig spec remove <id> [--dry-run] [--abandon-unstarted] | jig spec epic <id> [--release patch|minor|major | --finish [--leftovers-handled] | --reopen] | jig spec ship <id> [--message-file <file>] [--title <t>] [--body-file <file>]"
 
 cmd_spec() {
   local sub="${1:-}"
@@ -24,9 +24,11 @@ cmd_spec() {
     # A command that changes a spec redraws the status page, whose progress
     # by phase it feeds (jig_status_page_touch, common.sh).
     new) spec_new "$@"; jig_status_page_touch ;;
+    resume) spec_resume "$@"; jig_status_page_touch ;;
     list) spec_list "$@" ;;
     plan) spec_plan "$@" ;;
     done) spec_done "$@"; jig_status_page_touch ;;
+    link) spec_link "$@" ;;
     remove) spec_remove "$@"; jig_status_page_touch ;;
     close) spec_close "$@"; jig_status_page_touch ;;
     epic) spec_epic "$@"; jig_status_page_touch ;;
@@ -62,17 +64,90 @@ spec_template() {
   return 1
 }
 
+# _spec_cut_own_branch <id> <cmd> — switch to a fresh `spec/<id>`, branched
+# from HEAD, refusing a name git rejects or one that already exists (reusing
+# it would attach this spec to whatever that branch already holds — the same
+# reasoning `_task_branch_name` uses for a task's branch). <cmd> names the
+# caller in every message; prints the branch name once switched. The one
+# mechanic `spec new`, `spec resume` and `spec ship`'s declaration share,
+# so cutting a spec's branch cannot read three different ways
+# (idea-leaves-a-tree-task-start-refuses).
+_spec_cut_own_branch() {
+  local id="$1" cmd="$2" prefix="${3:-spec}" branch
+  branch="$prefix/$id"
+  git check-ref-format --branch "$branch" >/dev/null 2>&1 \
+    || jig_die "$cmd: git rejects the branch name: $branch"
+  if git -C "$JIG_PROJECT" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null 2>&1; then
+    jig_die "$cmd: $branch exists already; switch to it and run again"
+  fi
+  git -C "$JIG_PROJECT" switch --quiet -c "$branch" >/dev/null 2>&1 \
+    || jig_die "$cmd: could not switch to a new branch $branch"
+  printf '%s\n' "$branch"
+}
+
+# _spec_switch_to_existing_branch <id> <cmd> — switch to `spec/<id>` when it
+# already exists, locally or on origin (fetched fresh first); nothing, and
+# exit 1, when it exists nowhere. Used by `spec resume`, where a spec's
+# branch from an earlier session may already be there, unlike `spec new`
+# and `spec ship`'s declaration, which only ever create one.
+_spec_switch_to_existing_branch() {
+  local id="$1" cmd="$2" branch
+  branch="spec/$id"
+  if git -C "$JIG_PROJECT" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null 2>&1; then
+    git -C "$JIG_PROJECT" switch --quiet "$branch" >/dev/null 2>&1 \
+      || jig_die "$cmd: could not switch to $branch"
+    printf '%s\n' "$branch"
+    return 0
+  fi
+  jig_fetch_branches "$cmd" "$branch" 2>/dev/null
+  if git -C "$JIG_PROJECT" rev-parse --verify --quiet "refs/remotes/origin/$branch" >/dev/null 2>&1; then
+    git -C "$JIG_PROJECT" switch --quiet -c "$branch" --track "origin/$branch" >/dev/null 2>&1 \
+      || jig_die "$cmd: could not switch to origin/$branch"
+    printf '%s\n' "$branch"
+    return 0
+  fi
+  return 1
+}
+
+# _spec_refuse_dirty_tree <cmd> — refuse a dirty tree by the same rule
+# `task start` uses (jig_tracked_changes, common.sh): a tracked change would
+# ride onto the spec's own branch as part of its first commit. No worktree
+# escape here, unlike a task's: a spec has none.
+_spec_refuse_dirty_tree() {
+  local cmd="$1" tracked
+  tracked=$(jig_tracked_changes)
+  [ -n "$tracked" ] \
+    || return 0
+  jig_die "$cmd: uncommitted changes in the working tree; commit or stash them yourself, then run \`$cmd\` again"
+}
+
+# _spec_require_default_branch <cmd> <default> — HEAD must be <default> and
+# resolved (not detached); a spec starts, or resumes, from there so that its
+# own branch is cut at a point every clone agrees on.
+_spec_require_default_branch() {
+  local cmd="$1" default="$2" here
+  here=$(git -C "$JIG_PROJECT" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+  [ -n "$here" ] || jig_die "$cmd: HEAD is detached; switch to $default first"
+  [ "$here" = "$default" ] || jig_die "$cmd: switch to $default first; a spec starts, or resumes, from there"
+}
+
 # spec_new <id> — create .ai/specs/<id>/ with spec.md and roadmap.md from the
-# templates. The id is validated here, at the one place the path is built:
-# a directory with an invalid name would be skipped by every listing, so a
-# spec created under one would silently not exist.
+# templates, then switch to a branch of its own (`spec/<id>`): the same
+# reasoning that puts a task on its own branch, from the first minute
+# (idea-leaves-a-tree-task-start-refuses). The id is validated here, at the
+# one place the path is built: a directory with an invalid name would be
+# skipped by every listing, so a spec created under one would silently not
+# exist.
 spec_new() {
   [ $# -ge 1 ] || jig_die "spec new: missing spec id (usage: jig spec new <id>)"
   [ $# -eq 1 ] || jig_die "spec new: unexpected argument: $2"
-  local id="$1" root dir spec_tpl roadmap_tpl f
+  local id="$1" root dir spec_tpl roadmap_tpl f default branch
   spec_valid_id "$id" \
     || jig_die "spec new: invalid spec id: $id (letters, digits, '.', '_', '-'; no leading dot or dash)"
   jig_require_init
+  default=$(cfg git.base_branch main)
+  _spec_require_default_branch "spec new" "$default"
+  _spec_refuse_dirty_tree "spec new"
   # Both templates are resolved before anything is created, so a missing one
   # leaves no empty directory behind.
   spec_tpl=$(spec_template spec.md) \
@@ -90,6 +165,8 @@ spec_new() {
   # leaves nothing half-created and a retry works. The cleanup removes only
   # the files this run named and then `rmdir`s the directory, which refuses
   # anything that is not empty — it cannot delete what someone else put there.
+  jig_cleanup_add "$dir/spec.md.tmp.$$"
+  jig_cleanup_add "$dir/roadmap.md.tmp.$$"
   if ! cp "$spec_tpl" "$dir/spec.md.tmp.$$" || ! cp "$roadmap_tpl" "$dir/roadmap.md.tmp.$$"; then
     rm -f "$dir/spec.md.tmp.$$" "$dir/roadmap.md.tmp.$$"
     rmdir "$dir" 2>/dev/null || true
@@ -99,6 +176,50 @@ spec_new() {
     mv "$dir/$f.tmp.$$" "$dir/$f" || jig_die "spec new: could not write $JIG_AI_DIR/specs/$id/$f"
     printf '%s/specs/%s/%s\n' "$JIG_AI_DIR" "$id" "$f"
   done
+  branch=$(_spec_cut_own_branch "$id" "spec new") || exit 1
+  printf 'switched to %s\n' "$branch"
+}
+
+# spec_resume <id> — before a second session edits an existing spec, put it
+# back on its own branch: the same dirty-tree refusal `spec new` uses, then a
+# switch to `spec/<id>` (created if this is its first resume, reused if an
+# earlier one already cut it, fetched from origin if only that has it).
+# `jig-idea` calls this before touching an existing spec's files, so the
+# roadmap `jig spec new` files tasks into (step 10, jig-idea) is edited on
+# the branch too, never straight on the default one
+# (idea-leaves-a-tree-task-start-refuses).
+#
+# A spec with an open epic is edited on the epic instead (jig-idea says so);
+# resuming it here would cut a `spec/<id>` nothing ever ships, so it refuses.
+spec_resume() {
+  [ $# -ge 1 ] || jig_die "spec resume: missing spec id (usage: jig spec resume <id>)"
+  [ $# -eq 1 ] || jig_die "spec resume: unexpected argument: $2"
+  local id="$1" dir roadmap default here branch line rc=0
+  spec_valid_id "$id" || jig_die "spec resume: invalid spec id: $id"
+  jig_require_init
+  dir="$(spec_dir)/$id"
+  [ -d "$dir" ] || jig_die "spec resume: no such spec: $JIG_AI_DIR/specs/$id"
+  roadmap="$dir/roadmap.md"
+  if [ -f "$roadmap" ]; then
+    line=$(jig_spec_epic "$roadmap") || rc=$?
+    if [ "$rc" -eq 0 ] && [ -n "$line" ] && [ "${line##* }" = open ]; then
+      jig_die "spec resume: $JIG_AI_DIR/specs/$id/roadmap.md declares an open epic (${line% *}); edit it there instead — switch to ${line% *} first"
+    fi
+  fi
+  default=$(cfg git.base_branch main)
+  branch="spec/$id"
+  here=$(git -C "$JIG_PROJECT" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+  if [ "$here" = "$branch" ]; then
+    printf 'already on %s\n' "$branch"
+    return 0
+  fi
+  _spec_require_default_branch "spec resume" "$default"
+  _spec_refuse_dirty_tree "spec resume"
+  branch=$(_spec_switch_to_existing_branch "$id" "spec resume") || branch=""
+  if [ -z "$branch" ]; then
+    branch=$(_spec_cut_own_branch "$id" "spec resume") || exit 1
+  fi
+  printf 'switched to %s\n' "$branch"
 }
 
 spec_dir() {
@@ -913,13 +1034,36 @@ spec_epic_declare() {
   jig_info "spec epic: $(spec_ship_hint cut "$id" "$branch" "$rel")"
 }
 
+# spec_epic_site <cmd> <epic-branch> <what> — exit 0 when HEAD may carry the
+# epic's finish: the epic itself, or a branch other than the default one that
+# already contains the epic's tip (a release branch cut from it). The epic is
+# protected like the default branch where a repository says so, so its finish
+# is never pushed to it: `spec ship` carries it on a branch of its own
+# (ADR-0040, amendment of 2026-10-04). Dies naming the two places that work.
+spec_epic_site() {
+  local cmd="$1" branch="$2" what="$3" here default tip
+  here=$(git -C "$JIG_PROJECT" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+  [ "$here" != "$branch" ] || return 0
+  default=$(cfg git.base_branch main)
+  if [ -n "$here" ] && [ "$here" != "$default" ]; then
+    for tip in "refs/heads/$branch" "refs/remotes/origin/$branch"; do
+      if git -C "$JIG_PROJECT" rev-parse --verify --quiet "$tip^{commit}" >/dev/null 2>&1; then
+        if git -C "$JIG_PROJECT" merge-base --is-ancestor "$tip" HEAD 2>/dev/null; then
+          return 0
+        fi
+        break
+      fi
+    done
+  fi
+  jig_die "$cmd: $what runs on $branch or on a branch cut from it; switch to one first"
+}
+
 spec_epic_finish() {
-  local id="$1" roadmap="$2" rel="$3" line="$4" handled="$5" branch here default start
+  local id="$1" roadmap="$2" rel="$3" line="$4" handled="$5" branch default start
   [ -n "$line" ] || jig_die "spec epic: $rel declares no epic"
   branch=${line% *}
   [ "${line##* }" = open ] || jig_die "spec epic: $rel marks epic $branch finished, as an older jig did; drop \"— finished\" from the line, then run --finish again"
-  here=$(git -C "$JIG_PROJECT" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
-  [ "$here" = "$branch" ] || jig_die "spec epic: --finish runs on $branch; switch to it first"
+  spec_epic_site "spec epic" "$branch" --finish
   default=$(cfg git.base_branch main)
   jig_fetch_branches "spec epic" "$default"
   start=$(jig_fresh_base_ref "$default" "spec epic") || exit 1
@@ -945,7 +1089,7 @@ spec_epic_finish() {
 # committed, else from the commit before the one that deleted the roadmap.
 # Files are written with `git show`, so the index is left alone.
 spec_epic_reopen() {
-  local id="$1" dir rel roadmap src del line rc=0 branch here path
+  local id="$1" dir rel roadmap src del line rc=0 branch path
   dir="$(spec_dir)/$id"
   rel="$JIG_AI_DIR/specs/$id"
   roadmap="$rel/roadmap.md"
@@ -962,8 +1106,7 @@ spec_epic_reopen() {
     jig_die "spec epic: the removed $roadmap declares no epic"
   fi
   branch=${line% *}
-  here=$(git -C "$JIG_PROJECT" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
-  [ "$here" = "$branch" ] || jig_die "spec epic: --reopen runs on $branch; switch to it first"
+  spec_epic_site "spec epic" "$branch" --reopen
   # Restored into a directory of its own first and moved into place whole: a
   # failure halfway must not leave a partial spec that the "is here" check
   # would then refuse to restore over. A partial copy goes to trash, not to
@@ -1178,15 +1321,14 @@ spec_ship() {
   else
     mode=final
     branch=$(spec_ship_removed_epic "$id") || exit 1
-    [ "$here" = "$branch" ] \
-      || jig_die "spec ship: $rel is not here; an epic's final pull request is shipped from $branch — switch to it first"
+    spec_epic_site "spec ship" "$branch" "an epic's final pull request"
   fi
 
   printf 'mode: %s\n' "$mode"
   case "$mode" in
     declare) spec_ship_declare "$id" "$level" "$here" "$default" "$message_file" "$title" "$body_file" "$line" ;;
     epic) spec_ship_epic "$id" "$level" "$branch" ;;
-    final) spec_ship_final "$id" "$level" "$branch" "$default" "$message_file" "$title" "$body_file" ;;
+    final) spec_ship_final "$id" "$level" "$branch" "$default" "$message_file" "$title" "$body_file" "$here" ;;
   esac
 }
 
@@ -1276,14 +1418,7 @@ $bad"
   if [ "$here" = "$default" ]; then
     # Nothing is committed to the default branch: the declaration gets a
     # branch of its own, and the working tree and index come along unchanged.
-    branch="spec/$id"
-    git check-ref-format --branch "$branch" >/dev/null 2>&1 \
-      || jig_die "spec ship: git rejects the branch name: $branch"
-    if git -C "$JIG_PROJECT" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null 2>&1; then
-      jig_die "spec ship: $branch exists already; switch to it and run again"
-    fi
-    git -C "$JIG_PROJECT" switch --quiet -c "$branch" >/dev/null 2>&1 \
-      || jig_die "spec ship: could not switch to a new branch $branch"
+    branch=$(_spec_cut_own_branch "$id" "spec ship") || exit 1
     printf 'switched to %s\n' "$branch"
   fi
   spec_ship_steps "$level" "$branch" "$default" "$message_file" "$title" "$body_file"
@@ -1308,9 +1443,8 @@ spec_ship_epic() {
 }
 
 # The body file spec_ship_final writes for a draft; script-global because the
-# EXIT trap that removes it runs after the function returned
-# (conventions/shell.md). jig_ship_pr leaves the trap alone when it is given a
-# body file, so this is the one EXIT trap of the process.
+# exit cleanup that removes it runs after the function returned
+# (conventions/shell.md).
 _SPEC_SHIP_BODY_TMP=""
 
 # spec_ship_final — the epic's final pull request. At `merge`, in an unattended
@@ -1322,8 +1456,8 @@ _SPEC_SHIP_BODY_TMP=""
 # the pull request opens as a draft that says so — and no `Release:` line
 # reads as `minor`. Anywhere else the merge is the human's, as it was.
 spec_ship_final() {
-  local id="$1" level="$2" branch="$3" default="$4" message_file="$5" title="$6" body_file="$7"
-  local rel start src release draft=0 unattended=0
+  local id="$1" level="$2" branch="$3" default="$4" message_file="$5" title="$6" body_file="$7" here="$8"
+  local rel start src release draft=0 unattended=0 head="$8" refused=""
   rel="$JIG_AI_DIR/specs/$id"
   [ -n "$message_file" ] || jig_die "spec ship: the final pull request commits; --message-file is required"
   jig_fetch_branches "spec ship" "$default"
@@ -1340,6 +1474,9 @@ spec_ship_final() {
 
   src=$(spec_ship_removed_src "$id") || exit 1
   if [ "$level" = merge ] && jig_unattended; then
+    [ "$(jig_release_merge)" = agent ] || refused=human
+  fi
+  if [ "$level" = merge ] && jig_unattended && [ -z "$refused" ]; then
     unattended=1
     release=$(jig_git_show_path "$src" "$rel/roadmap.md" 2>/dev/null \
       | spec_release_check "spec ship" "$rel/roadmap.md") || exit 1
@@ -1351,7 +1488,7 @@ spec_ship_final() {
     if [ "$release" = major ]; then
       draft=1
       _SPEC_SHIP_BODY_TMP=$(mktemp "${TMPDIR:-/tmp}/jig-spec-body.XXXXXX")
-      trap '[ -z "${_SPEC_SHIP_BODY_TMP:-}" ] || rm -f "$_SPEC_SHIP_BODY_TMP"' EXIT
+      jig_cleanup_add "$_SPEC_SHIP_BODY_TMP"
       {
         printf 'Needs a human: major release?\n\n'
         if [ -n "$body_file" ]; then cat "$body_file"; else tail -n +2 "$message_file"; fi
@@ -1360,8 +1497,21 @@ spec_ship_final() {
     fi
   fi
 
-  spec_ship_steps "$level" "$branch" "$default" "$message_file" "$title" "$body_file" "$draft"
+  # The epic is never pushed to by a finish: where it is protected like the
+  # default branch that would need a bypass. The finish and the version bump
+  # go on a branch cut from it, and that branch is the pull request's head.
+  # Always `finish/<id>`, from the epic or from a branch cut from it: that
+  # name is what the `epic-pr` check of CI watches.
+  if [ "$here" != "finish/$id" ]; then
+    head=$(_spec_cut_own_branch "$id" "spec ship" finish) || exit 1
+    printf 'switched to %s\n' "$head"
+  fi
+  spec_ship_steps "$level" "$head" "$default" "$message_file" "$title" "$body_file" "$draft"
   [ "$level" = merge ] || return 0
+  if [ "$refused" = human ]; then
+    printf "not merged: release.merge is human in this clone; the release's merge is the person's\n"
+    return 0
+  fi
   if [ "$unattended" -eq 0 ]; then
     printf "not merged: the epic's final merge is the release, and outside an unattended run it is the human's\n"
     return 0
@@ -1531,6 +1681,7 @@ spec_close() {
 spec_epic_write() {
   local roadmap="$1" branch="$3" release="${4:-}" tmp
   tmp="$roadmap.tmp.$$"
+  jig_cleanup_add "$tmp"
   # The destination is a paragraph and may wrap: the line goes after the
   # paragraph ends, never inside the sentence.
   awk -v b="$branch" -v r="$release" '
@@ -1623,6 +1774,7 @@ spec_done() {
   [ -f "$roadmap" ] || jig_die "spec done: no roadmap.md in $JIG_AI_DIR/specs/$sid/"
 
   tmp="$roadmap.tmp.$$"
+  jig_cleanup_add "$tmp"
   rc=0
   # Exit 3: no item names the task. Exit 4: every item that does is checked.
   # The id is compared as a string, not a pattern: `.` is legal in an id.
@@ -1759,7 +1911,14 @@ spec_remove() {
   # below; for a borrowed directory the answer is the same for every task at
   # once, and is said rather than left to look like an empty queue.
   local borrowed=0
-  if [ -L "$tasks_root" ]; then
+  # A link above the tasks directory (`.ai/workspace`) leads outside the same
+  # way and `-L` on the directory does not see it: the directory must
+  # physically be this checkout's own, as spec link asks of one workspace.
+  if [ ! -L "$tasks_root" ] && [ -d "$tasks_root" ] \
+    && [ "$(cd -P "$tasks_root" 2>/dev/null && pwd -P)" != "$(cd -P "$JIG_PROJECT" 2>/dev/null && pwd -P)/$JIG_AI_DIR/workspace/tasks" ]; then
+    borrowed=1
+    jig_warn "spec remove: $JIG_AI_DIR/workspace/tasks is not inside this checkout, so no task is unlinked here; run it in the checkout that owns them"
+  elif [ -L "$tasks_root" ]; then
     borrowed=1
     jig_warn "spec remove: this checkout borrows its task workspaces, so no task is unlinked here; run it in the checkout that owns them"
   fi
@@ -1859,6 +2018,128 @@ spec_remove() {
   printf 'moved          %s/specs/%s -> %s\n' "$JIG_AI_DIR" "$sid" "$rel_dest"
 }
 
+# spec_link <spec-id> <task-id> — link a task that is already filed to a spec:
+# write its `Spec: .ai/specs/<spec-id>/ — Phase <n>` line, the line `jig-idea`
+# §10 writes for a task filed from a roadmap item, under the first heading of
+# its task.md. The opposite of what `spec remove` does to the same line
+# (adr-20261002-a-release-is-a-spec-with-an-epic).
+#
+# The phase is read from the roadmap, never given: the item that names the
+# task (`` `<task-id>` — ``) sits under one `## Phase <n>` heading, and a
+# second source could disagree with it. The roadmap item is the agent's to
+# write first; this command checks that the roadmap and the task agree, the
+# condition `spec done` later stands on.
+#
+# A started task is refused: its branch was cut when it started, from the
+# default branch, and it reaches an epic only by being rewritten. It ships
+# where it was cut from, and an epic gets it when the default branch is merged
+# into it — which `spec epic --finish` requires anyway. A borrowed task
+# directory is refused as `spec remove` refuses it: the task.md belongs to the
+# checkout that filed it.
+spec_link() {
+  [ $# -ge 2 ] || jig_die "spec link: missing argument (usage: jig spec link <spec-id> <task-id>)"
+  [ $# -eq 2 ] || jig_die "spec link: unexpected argument: $3"
+  local sid="$1" tid="$2" roadmap tdir tasks_root st branch link rc=0 phases count phase line real phys
+  spec_valid_id "$sid" || jig_die "spec link: invalid spec id: $sid"
+  jig_valid_id "$tid" || jig_die "spec link: invalid task id: $tid"
+  jig_require_init
+  roadmap="$(spec_dir)/$sid/roadmap.md"
+  [ -d "$(spec_dir)/$sid" ] || jig_die "spec link: no such spec in this checkout: $JIG_AI_DIR/specs/$sid"
+  [ -f "$roadmap" ] || jig_die "spec link: $JIG_AI_DIR/specs/$sid has no roadmap.md"
+  tasks_root="$JIG_PROJECT/$JIG_AI_DIR/workspace/tasks"
+  [ ! -L "$tasks_root" ] \
+    || jig_die "spec link: this checkout borrows its task workspaces; run it in the checkout that owns them"
+  tdir=$(spec_task_dir "$tid") || jig_die "spec link: invalid task id: $tid"
+  [ ! -L "$tdir" ] || jig_die "spec link: the workspace of $tid is a link; run it in the checkout that owns it"
+  [ -f "$tdir/task.md" ] || jig_die "spec link: unknown task: $tid (no $JIG_AI_DIR/workspace/tasks/$tid/task.md)"
+  # A link anywhere above the workspace (`.ai/workspace` too) would carry the
+  # write out of this checkout: the workspace must physically be the one this
+  # checkout keeps. spec.sh sources no other command library, so the check is
+  # the plain comparison, and a borrowing checkout is refused as above.
+  real=$(cd -P "$JIG_PROJECT" 2>/dev/null && pwd -P) || real=""
+  phys=""
+  [ -z "$real" ] || phys=$(cd -P "$tdir" 2>/dev/null && pwd -P) || phys=""
+  if [ -z "$real" ] || [ "$phys" != "$real/$JIG_AI_DIR/workspace/tasks/$tid" ]; then
+    jig_die "spec link: the workspace of $tid is not inside this checkout; run it in the checkout that owns it"
+  fi
+
+  st=$(spec_task_state "$tdir" status)
+  case "$st" in
+    consolidated | abandoned) jig_die "spec link: $tid is $st; only a live task is linked" ;;
+  esac
+  link=$(jig_spec_link "$tdir/task.md") || rc=$?
+  [ "$rc" = 0 ] || jig_die "spec link: $tid links to more than one spec in its task.md"
+  if [ "$link" = "$sid" ]; then
+    printf 'spec link: %s already linked to %s\n' "$tid" "$sid"
+    return 0
+  fi
+  [ -z "$link" ] || jig_die "spec link: $tid is linked to spec $link; unlink it there first"
+  branch=$(spec_task_state "$tdir" branch)
+  [ -z "$branch" ] \
+    || jig_die "spec link: $tid is started on $branch; a started task is not moved — ship it where it was cut from, and an epic gets it when the default branch is merged into it"
+
+  # Every phase whose items name the task, once each; `-` for an item above
+  # the first `## Phase` heading.
+  phases=$(awk -v id="$tid" '
+    /^##[[:space:]]/ {
+      phase = "-"
+      h = $0
+      sub(/^##[[:space:]]+/, "", h)
+      if (h ~ /^Phase[[:space:]]+[0-9]+/) {
+        sub(/^Phase[[:space:]]+/, "", h)
+        sub(/[^0-9].*$/, "", h)
+        phase = h
+      }
+      next
+    }
+    /^[[:space:]]*[-*][[:space:]]+\[[ xX]\]/ {
+      text = $0
+      sub(/^[[:space:]]*[-*][[:space:]]+\[[ xX]\][[:space:]]*/, "", text)
+      head = "`" id "`"
+      if (substr(text, 1, length(head)) == head &&
+          substr(text, length(head) + 1) ~ /^[[:space:]]+(—|-|--)[[:space:]]/) {
+        p = (phase == "" ? "-" : phase)
+        if (!(p in seen)) { seen[p] = 1; print p }
+      }
+    }
+  ' "$roadmap")
+  [ -n "$phases" ] \
+    || jig_die "spec link: no item in $JIG_AI_DIR/specs/$sid/roadmap.md names $tid; add \`- [ ] \`$tid\` — <goal>\` to its phase first"
+  count=$(printf '%s\n' "$phases" | wc -l | tr -d ' ')
+  [ "$count" = 1 ] \
+    || jig_die "spec link: items naming $tid sit in more than one phase of $JIG_AI_DIR/specs/$sid/roadmap.md; keep them in one"
+  phase="$phases"
+  if [ "$phase" = - ]; then
+    line="Spec: .ai/specs/$sid/"
+  else
+    line="Spec: .ai/specs/$sid/ — Phase $phase"
+  fi
+  spec_link_task "$tdir/task.md" "$line" || jig_die "spec link: could not write $JIG_AI_DIR/workspace/tasks/$tid/task.md"
+  printf 'spec link: %s linked: %s\n' "$tid" "$line"
+}
+
+# spec_link_task <task.md> <line> — put <line> under the first `# ` heading,
+# after a blank line, or at the top when there is none. Written atomically.
+spec_link_task() {
+  local file="$1" line="$2" tmp
+  tmp="$file.tmp.$$"
+  jig_cleanup_add "$tmp"
+  if ! JIG_SL_LINE="$line" awk '
+    { lines[NR] = $0; if (!at && /^# /) at = NR }
+    END {
+      if (!at) { print ENVIRON["JIG_SL_LINE"]; print "" }
+      for (i = 1; i <= NR; i++) {
+        print lines[i]
+        if (i == at) { print ""; print ENVIRON["JIG_SL_LINE"] }
+      }
+    }
+  ' "$file" > "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  mv "$tmp" "$file"
+}
+
 # spec_links_to <task.md> <spec-id> — whether any `Spec:` line names exactly
 # <spec-id>. The id is compared as a string: `.` is legal in an id, and as a
 # pattern it would match `a.b` against `axb`.
@@ -1879,6 +2160,7 @@ spec_links_to() {
 spec_unlink_task() {
   local file="$1" sid="$2" tmp
   tmp="$file.tmp.$$"
+  jig_cleanup_add "$tmp"
   if ! awk -v sid="$sid" '
     /^Spec: \.ai\/specs\// {
       id = $0
