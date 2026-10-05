@@ -36,7 +36,7 @@ fixed.
 
 1. Extension skeleton
 2. The Extending section rewritten against the first Solution's gap record; The worked example an author follows end to end, published and listed in the site navigation; Skeleton gains Solution examples
-3. fog: the outside reader
+3. the outside reader
 
 <!--
 Rules (jig-idea §8):
