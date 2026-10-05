@@ -189,6 +189,35 @@ From an independent failure hunt (2026-10-05), sharpest first.
   Claude (reversible): parallel inbound workers make the race real, and `count(*)` on the
   inbound hot path grows with the table.
 
+- Revisions from designing the shell (`fapost/saas`, spec `saas-launch`, 2026-10-05). Where they
+  contradict a decision above, these win:
+  - Plans live in a landlord table owned by the shell and edited in its operator panel, not in its
+    code — the operator panel removed the reason for rejecting a table.
+  - Limit keys come from a registry in Foundation: Core (and later Solutions) register each key
+    with a label, a unit and a kind (records, per period, bytes); the shell builds its plan form
+    from it.
+  - Per-period limits reset on the subscription's period, monthly from its start — not the
+    calendar month, which would give a trial started late in the month two allowances.
+  - Usage is recorded idempotently by natural key in the shell's landlord tables, with overshoot
+    bounded by the number of parallel workers. The "atomic counter in the same transaction"
+    decision above is withdrawn: landlord and the tenant schema are separate connections.
+  - The tenant's access mode is asked, not switched: Core asks the operator contract on every
+    request and job, the shell answers from the subscription. Core's default answers "active".
+  - The slug is reserved in Core: signup creates the landlord row in a new `Pending` status with no
+    schema, and provisioning completes that row idempotently by tenant id, so a failed or killed
+    run resumes instead of losing the slug.
+  - Solutions are entitled by plan: Core's activation screen asks the operator contract which
+    installed Solutions a tenant may activate; Core's default allows all of them.
+  - The base domain needs a platform route context with no tenant: today `TenancyMiddleware` runs
+    on the whole `web` group, Livewire's update endpoint included, and the guest redirect points at
+    a tenant panel route.
+  - Core jobs and commands must respect the access mode: jobs load the tenant by id and never check
+    its state, and the tenant console commands iterate only active tenants, so a stopped tenant
+    would miss deploy migrations.
+  - Found by the failure hunt and filed separately: the schema name can exceed PostgreSQL's
+    63-byte identifier limit and two slugs can share a schema (task
+    `fix-tenant-schema-name-truncation`).
+
 ## Open questions
 
 - How a closed package gets into an install: Core's `composer.json` cannot require a private
