@@ -15,13 +15,13 @@ Goal: the shell can create a tester tenant with a plan and Core enforces one lim
 when: a tenant created by the shell opens on its own host, its first assistant is created and the
 second is refused with a reason — while an install without the shell behaves exactly as today.
 
-- [ ] Host-based tenant resolution — any active tenant is resolved from `<slug>.<base_domain>`, panels and builder answer on every tenant host with a per-host session; host is the default, the env-bound single slug is an explicit self-hosted mode only (after: shell design — it fixes how the shell names and creates tenants)
-- [ ] Operator provisioning contract — a Foundation contract to provision a tenant, implemented by Core over `TenantProvisioningService` (after: shell design — the shell is its only consumer)
-- [ ] Quota contract with the assistant seam — the Foundation quota contract and limit registry (key, label, unit, kind) with an allow-everything Core default, wired into assistant creation and the Create button, plus the architecture rule that keeps assistant creation inside its service; `TenantSettings::$max_contacts` removed (after: shell design — the shell is its only consumer)
-- [ ] Platform route context — the base domain serves pages, Livewire requests included, with no tenant context, and guest redirects go to the panel of the host they came from (after: Host-based tenant resolution — the base domain is told apart from tenant hosts by it)
-- [ ] Landlord ownership ADR — amends "landlord data is reached only through Tenancy" to name the operator package as the other owner of its own landlord tables (after: shell design — it names which tables)
+- [ ] `host-tenant-resolution` — Host-based tenant resolution — any active tenant is resolved from `<slug>.<base_domain>`, panels and builder answer on every tenant host with a per-host session; host is the default, the env-bound single slug is an explicit self-hosted mode only (after: shell design — it fixes how the shell names and creates tenants)
+- [ ] `operator-provisioning-contract` — Operator provisioning contract — a Foundation contract to provision a tenant, implemented by Core over `TenantProvisioningService` (after: shell design — the shell is its only consumer)
+- [ ] `quota-contract-assistant-seam` — Quota contract with the assistant seam — the Foundation quota contract and limit registry (key, label, unit, kind) with an allow-everything Core default, wired into assistant creation and the Create button, plus the architecture rule that keeps assistant creation inside its service; `TenantSettings::$max_contacts` removed (after: shell design — the shell is its only consumer)
+- [ ] `platform-route-context` — Platform route context — the base domain serves pages, Livewire requests included, with no tenant context, and guest redirects go to the panel of the host they came from (after: Host-based tenant resolution — the base domain is told apart from tenant hosts by it)
+- [ ] `landlord-ownership-adr` — Landlord ownership ADR — amends "landlord data is reached only through Tenancy" to name the operator package as the other owner of its own landlord tables (after: shell design — it names which tables)
 
-- [ ] Pending reservation and resumable provisioning — a `Pending` tenant reserves a slug with no schema; provisioning completes it idempotently by tenant id and resumes after a failure or a killed worker (after: Operator provisioning contract — the shell reserves and provisions through it)
+- [ ] `pending-tenant-provisioning` — Pending reservation and resumable provisioning — a `Pending` tenant reserves a slug with no schema; provisioning completes it idempotently by tenant id and resumes after a failure or a killed worker (after: Operator provisioning contract — the shell reserves and provisions through it)
 
 ## Phase 2 — Safe to put online
 
