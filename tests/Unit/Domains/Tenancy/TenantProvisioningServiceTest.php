@@ -50,6 +50,20 @@ final class TenantProvisioningServiceTest extends TestCase
         $this->service($repository, $database)->provision('webhook', 'a@b.test', 'secret');
     }
 
+    public function test_rejects_a_too_long_slug_before_touching_the_database(): void
+    {
+        $repository = $this->createMock(TenantRepositoryInterface::class);
+        $repository->expects($this->never())->method('save');
+
+        $database = $this->createMock(TenantDatabaseManagerInterface::class);
+        $database->expects($this->never())->method('schemaExists');
+        $database->expects($this->never())->method('createSchema');
+
+        $this->expectException(InvalidTenantSlugException::class);
+
+        $this->service($repository, $database)->provision(str_repeat('a', 57), 'a@b.test', 'secret');
+    }
+
     public function test_rejects_a_malformed_slug(): void
     {
         $this->expectException(InvalidTenantSlugException::class);

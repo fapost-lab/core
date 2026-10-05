@@ -19,6 +19,21 @@ final class InvalidTenantSlugException extends RuntimeException
         );
     }
 
+    public static function tooLong(string $slug, int $maxLength, int $maxSchemaBytes): self
+    {
+        return new self(
+            "Tenant slug [{$slug}] is too long: use at most {$maxLength} characters, "
+            . "so its schema name fits PostgreSQL's {$maxSchemaBytes}-byte identifier limit."
+        );
+    }
+
+    public static function consecutiveHyphens(string $slug): self
+    {
+        return new self(
+            "Tenant slug [{$slug}] contains '--': its schema name would collide with the slug that has a single hyphen."
+        );
+    }
+
     public static function reserved(string $slug): self
     {
         return new self("Tenant slug [{$slug}] is reserved by the platform.");

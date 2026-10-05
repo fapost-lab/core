@@ -16,7 +16,6 @@ use App\Domains\Tenancy\Exceptions\TenantProvisioningException;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Models\TenantStatus;
 use App\Domains\Tenancy\ValueObjects\MigrationScope;
-use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -45,7 +44,7 @@ final readonly class TenantProvisioningService
      *
      * @param  array<string, mixed>  $config
      *
-     * @throws InvalidTenantSlugException  when the slug is malformed or reserved by the platform.
+     * @throws InvalidTenantSlugException  when the slug is malformed, too long or reserved by the platform.
      * @throws TenantProvisioningException on schema conflict, missing admin credentials, or any step failure.
      */
     public function provision(
@@ -63,7 +62,7 @@ final readonly class TenantProvisioningService
             throw new TenantProvisioningException('First admin email and password are required.');
         }
 
-        $schemaName      = 'tenant_' . Str::slug($slug, '_');
+        $schemaName      = $this->slugPolicy->schemaNameFor($slug);
         $temporaryTenant = $this->makeTemporaryTenant($slug, $schemaName);
 
         if ($this->databaseManager->schemaExists($temporaryTenant)) {
