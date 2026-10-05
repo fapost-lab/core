@@ -41,6 +41,13 @@ broken.
   tenant; any other host, an unknown, inactive or reserved slug is a 404, and the default-slug
   exemption from the reserved list applies only in `single` mode. Enforced:
   `RequestHostClassifierTest`, `HostTenantResolverTest`, `HostResolutionTest`.
+- **In `host` mode a panel's only host boundary is `TenancyMiddleware`.** Panels are registered
+  without a domain (`TenantHost::panelDomain()` is `null`), so `/admin` and `/assistant` match on
+  every host; `TenancyMiddleware` first in each panel's middleware — and persistent, so Livewire
+  updates replay it — is what turns the base domain and foreign hosts into 404. Never remove it or
+  move it after the session stack. URLs built inside a request follow the current host; URLs built
+  outside one (mail, queued jobs) must name the tenant host explicitly. Enforced:
+  `HostModePanelsTest`, `TenantMiddlewareOrderTest` (every `filament.*` route).
 - **A tenant switch always restores.** `runForTenant()` restores the connection, resets the
   context, runs restore hooks and points the permission registrar back at the outer cache key even
   when the database restore itself throws. A restore without a matching switch throws `ConnectionStackEmptyException`.

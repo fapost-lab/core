@@ -125,7 +125,11 @@ of which must resolve to this host.
 
 `TENANCY_RESOLUTION=single` serves that one tenant. `host` serves any number of
 tenants, each from its own `<slug>.` host; it needs a wildcard name and certificate
-and is not covered by this Compose setup yet.
+and is not covered by this Compose setup yet. In `host` mode the admin panel and the
+assistant console are served from every active tenant's host, and the base domain
+does not serve them at all. Panel domains are fixed when the routes are registered,
+so after changing `TENANCY_RESOLUTION` the route cache has to be rebuilt
+(`php artisan route:cache`, which the Docker entrypoint does on start).
 
 **`APP_ENV=production` is not cosmetic.** The images are built with `--no-dev`,
 and development tooling registered for the `local` environment is absent from

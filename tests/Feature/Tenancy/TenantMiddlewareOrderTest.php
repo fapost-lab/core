@@ -30,6 +30,32 @@ final class TenantMiddlewareOrderTest extends FeatureTestCase
         }
     }
 
+    public function test_every_panel_route_enters_the_tenant_before_the_session_starts(): void
+    {
+        $checked = 0;
+
+        foreach (Route::getRoutes() as $route) {
+            $name = (string) $route->getName();
+
+            if (! str_starts_with($name, 'filament.admin.') && ! str_starts_with($name, 'filament.assistant.')) {
+                continue;
+            }
+
+            $stack = array_values(array_filter(
+                $this->app['router']->resolveMiddleware($route->gatherMiddleware(), $route->excludedMiddleware()),
+                'is_string',
+            ));
+
+            $tenant = array_search(TenancyMiddleware::class, $stack, true);
+            $this->assertIsInt($tenant, "{$name} has no TenancyMiddleware.");
+            $this->assertLessThan(array_search(EncryptCookies::class, $stack, true), $tenant, "{$name}: tenant after cookies.");
+            $this->assertLessThan(array_search(StartSession::class, $stack, true), $tenant, "{$name}: tenant after session.");
+            $checked++;
+        }
+
+        $this->assertGreaterThan(2, $checked, 'Panel routes were not found.');
+    }
+
     public function test_web_group_resolves_the_tenant_before_the_session_starts(): void
     {
         Route::middleware('web')->get('/_order', fn () => 'ok')->name('order.probe');
