@@ -47,18 +47,14 @@ final class ActivationHostModeTest extends FeatureTestCase
     {
         [, $url] = $this->sendActivationMail('main');
 
-        $scheme = parse_url((string) config('app.url'), PHP_URL_SCHEME) ?: 'https';
-
-        $this->assertStringStartsWith("{$scheme}://main.{$this->base}/activate?token=", $url);
+        $this->assertStringStartsWith($this->expectedOrigin('main') . '/activate?token=', $url);
     }
 
     public function test_the_link_names_the_host_of_the_users_tenant_not_the_default_one(): void
     {
         [, $url] = $this->sendActivationMail('second');
 
-        $scheme = parse_url((string) config('app.url'), PHP_URL_SCHEME) ?: 'https';
-
-        $this->assertStringStartsWith("{$scheme}://second.{$this->base}/activate?token=", $url);
+        $this->assertStringStartsWith($this->expectedOrigin('second') . '/activate?token=', $url);
     }
 
     public function test_the_link_works_end_to_end_on_the_tenant_host(): void
@@ -136,6 +132,19 @@ final class ActivationHostModeTest extends FeatureTestCase
      *
      * @return array{0: User, 1: string}
      */
+    /**
+     * Scheme and port follow APP_URL, as `TenantHost::urlFor()` builds them: CI's .env (copied from
+     * .env.example) carries a port, a local one may not.
+     */
+    private function expectedOrigin(string $slug): string
+    {
+        $appUrl = (string) config('app.url');
+        $scheme = parse_url($appUrl, PHP_URL_SCHEME) ?: 'https';
+        $port   = parse_url($appUrl, PHP_URL_PORT);
+
+        return "{$scheme}://{$slug}.{$this->base}" . (null === $port ? '' : ':' . $port);
+    }
+
     private function sendActivationMail(string $slug): array
     {
         Mail::fake();
