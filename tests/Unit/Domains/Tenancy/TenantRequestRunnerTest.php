@@ -28,7 +28,8 @@ final class TenantRequestRunnerTest extends TestCase
 
     public function test_sets_tenant_context_and_switches_db(): void
     {
-        $tenant              = Mockery::mock(TenantInterface::class);
+        $tenant = Mockery::mock(TenantInterface::class);
+        $tenant->shouldReceive('getId')->andReturn('t1');
         $resolver            = Mockery::mock(TenantResolverInterface::class);
         $dbManager           = Mockery::mock(TenantDatabaseManagerInterface::class);
         $bootstrap           = Mockery::mock(CoreBootstrapInterface::class);
@@ -41,7 +42,7 @@ final class TenantRequestRunnerTest extends TestCase
         $resolver->shouldReceive('resolve')->once()->with($request)->andReturn($tenant);
         $dbManager->shouldReceive('switchTo')->once()->with($tenant);
         $dbManager->shouldReceive('restore')->once();
-        $permissionRegistrar->shouldReceive('forgetCachedPermissions')->twice();
+        $permissionRegistrar->shouldReceive('clearPermissionsCollection')->twice();
         $bootstrap->shouldReceive('boot')->once();
         $bootstrap->shouldReceive('reset')->once();
 
@@ -54,7 +55,8 @@ final class TenantRequestRunnerTest extends TestCase
 
     public function test_resets_bootstrap_even_on_exception(): void
     {
-        $tenant              = Mockery::mock(TenantInterface::class);
+        $tenant = Mockery::mock(TenantInterface::class);
+        $tenant->shouldReceive('getId')->andReturn('t1');
         $resolver            = Mockery::mock(TenantResolverInterface::class);
         $dbManager           = Mockery::mock(TenantDatabaseManagerInterface::class);
         $bootstrap           = Mockery::mock(CoreBootstrapInterface::class);
@@ -67,7 +69,7 @@ final class TenantRequestRunnerTest extends TestCase
         $resolver->shouldReceive('resolve')->twice()->with($request)->andReturn($tenant);
         $dbManager->shouldReceive('switchTo')->twice()->with($tenant);
         $dbManager->shouldReceive('restore')->twice();
-        $permissionRegistrar->shouldReceive('forgetCachedPermissions');
+        $permissionRegistrar->shouldReceive('clearPermissionsCollection');
         $bootstrap->shouldReceive('boot')->twice();
         $bootstrap->shouldReceive('reset')->twice();
 

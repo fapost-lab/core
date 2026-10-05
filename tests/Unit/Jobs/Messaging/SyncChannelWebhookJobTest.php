@@ -182,7 +182,7 @@ final class SyncChannelWebhookJobTest extends TestCase
         });
 
         $permissionRegistrar = $this->mock(PermissionRegistrar::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('forgetCachedPermissions')->twice();
+            $mock->shouldReceive('clearPermissionsCollection')->twice();
         });
 
         return new TenantSwitcher($tenantContext, $databaseManager, $permissionRegistrar);

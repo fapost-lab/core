@@ -167,6 +167,7 @@ final class AuditFlowGraphCommandTest extends FeatureTestCase
     {
         $tenant = Mockery::mock(TenantInterface::class);
         $tenant->shouldReceive('getSlug')->andReturn('broken');
+        $tenant->shouldReceive('getId')->andReturn('broken');
 
         $repository = Mockery::mock(TenantRepositoryInterface::class);
         $repository->shouldReceive('findAllActive')->andReturn([$tenant]);
@@ -176,7 +177,7 @@ final class AuditFlowGraphCommandTest extends FeatureTestCase
         $tenantDatabase->shouldReceive('restore');
 
         $permissions = Mockery::mock(PermissionRegistrar::class);
-        $permissions->shouldReceive('forgetCachedPermissions');
+        $permissions->shouldReceive('clearPermissionsCollection');
 
         $this->app->instance(TenantRepositoryInterface::class, $repository);
         $this->app->instance(
@@ -231,6 +232,7 @@ final class AuditFlowGraphCommandTest extends FeatureTestCase
     {
         $tenant = Mockery::mock(TenantInterface::class);
         $tenant->shouldReceive('getSlug')->andReturn('alpha');
+        $tenant->shouldReceive('getId')->andReturn('alpha');
 
         $repository = Mockery::mock(TenantRepositoryInterface::class);
         $repository->shouldReceive('findAllActive')->andReturn([$tenant]);
@@ -241,7 +243,7 @@ final class AuditFlowGraphCommandTest extends FeatureTestCase
         $tenantDatabase->shouldReceive('restore');
 
         $permissions = Mockery::mock(PermissionRegistrar::class);
-        $permissions->shouldReceive('forgetCachedPermissions');
+        $permissions->shouldReceive('clearPermissionsCollection');
 
         $this->app->instance(TenantRepositoryInterface::class, $repository);
         $this->app->instance(

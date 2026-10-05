@@ -47,7 +47,7 @@ final class ResolveTenantContextTest extends TestCase
         $dbManager->shouldReceive('switchTo');
         $dbManager->shouldReceive('restore');
         $registrar = Mockery::mock(PermissionRegistrar::class);
-        $registrar->shouldReceive('forgetCachedPermissions');
+        $registrar->shouldReceive('clearPermissionsCollection');
         $bootstrap = Mockery::mock(CoreBootstrapInterface::class);
         $bootstrap->shouldReceive('boot');
         $bootstrap->shouldReceive('reset');
@@ -154,6 +154,7 @@ final class ResolveTenantContextTest extends TestCase
         $tenant = Mockery::mock(TenantInterface::class);
         $tenant->shouldReceive('isActive')->andReturn(true);
         $tenant->shouldReceive('getSlug')->andReturn($slug);
+        $tenant->shouldReceive('getId')->andReturn($slug);
 
         return $tenant;
     }

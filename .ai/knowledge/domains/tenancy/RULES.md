@@ -42,10 +42,21 @@ broken.
   exemption from the reserved list applies only in `single` mode. Enforced:
   `RequestHostClassifierTest`, `HostTenantResolverTest`, `HostResolutionTest`.
 - **A tenant switch always restores.** `runForTenant()` restores the connection, resets the
-  context, runs restore hooks and clears the permission cache even when the database restore
-  itself throws. A restore without a matching switch throws `ConnectionStackEmptyException`.
+  context, runs restore hooks and points the permission registrar back at the outer cache key even
+  when the database restore itself throws. A restore without a matching switch throws `ConnectionStackEmptyException`.
   Why: a Horizon worker that keeps the previous tenant's schema serves the next job from the
   wrong tenant. Enforced: `TenantSwitcherTest`, `TenantDatabaseManagerTest`.
+- **Each tenant's permissions are cached under a key of its own.** On every switch
+  `TenantSwitcher` sets the spatie registrar's `cacheKey` to `<permission.cache.key>.tenant.<id>`
+  and drops the collection loaded in memory; on restore it returns to the outer tenant's key, or
+  the platform key. The cache store is never flushed on a switch. Why: the registrar is a
+  worker-wide singleton and the cache store is shared by every worker, so one global key served
+  one tenant's roles and permissions to another's requests. Limits: an entry lives until
+  `permission.cache.expiration_time` (24h), so a change made outside Eloquent's events — raw SQL,
+  a restored schema under the same tenant id — stays invisible until then; flush that tenant's key.
+  `permission:cache-reset` clears only the platform key, not the tenants'. Role writes flush the
+  key once more after their transaction commits (`RoleWriterService`), so a load racing the commit
+  cannot cache the old grants. Enforced: `TenantSwitcherTest`.
 - **Schema names are validated before they reach SQL** (`^[a-z][a-z0-9_]*$`, in
   `TenantDatabaseManager`). Why: the name is interpolated into `SET search_path`.
 - **Two slugs never map to one physical schema.** The schema name is derived only by

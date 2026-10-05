@@ -16,6 +16,11 @@ use Spatie\Permission\PermissionRegistrar;
  * Consumers may register restore hooks via {@see registerRestoreHook()} to reset per-request context
  * that is not owned by this class (e.g. CurrentAssistant). Hooks are invoked in the finally block
  * before tenant context is restored.
+ *
+ * The permission registrar is a singleton shared by every tenant a worker serves, and its cache
+ * store is shared by every worker. Each switch therefore points the registrar at a cache key of
+ * the tenant's own and drops the collection already loaded in memory; the cached entries of other
+ * tenants stay where they are.
  */
 final class TenantSwitcher
 {
@@ -26,6 +31,7 @@ final class TenantSwitcher
         private readonly TenantContextInterface $tenantContext,
         private readonly TenantDatabaseManagerInterface $databaseManager,
         private readonly PermissionRegistrar $permissionRegistrar,
+        private readonly string $permissionCacheKey = 'spatie.permission.cache',
     ) {
     }
 
@@ -54,7 +60,7 @@ final class TenantSwitcher
 
         $this->tenantContext->set($tenant);
         $this->databaseManager->switchTo($tenant);
-        $this->permissionRegistrar->forgetCachedPermissions();
+        $this->usePermissionCacheOf($tenant);
 
         try {
             return $callback();
@@ -64,7 +70,7 @@ final class TenantSwitcher
             } finally {
                 // A restore that fails (the database went away) must not leave
                 // the tenant identity behind for the next job on this worker.
-                $this->permissionRegistrar->forgetCachedPermissions();
+                $this->usePermissionCacheOf($previousTenant);
 
                 foreach ($this->restoreHooks as $hook) {
                     $hook();
@@ -77,5 +83,19 @@ final class TenantSwitcher
                 }
             }
         }
+    }
+
+    /**
+     * Points the permission registrar at the cache of the given tenant, or at the platform key when
+     * no tenant is active, and forgets what it has loaded in memory. The cache store itself is left
+     * alone: spatie flushes the current key when roles or permissions change.
+     */
+    private function usePermissionCacheOf(?TenantInterface $tenant): void
+    {
+        $this->permissionRegistrar->cacheKey = null === $tenant
+            ? $this->permissionCacheKey
+            : $this->permissionCacheKey . '.tenant.' . $tenant->getId();
+
+        $this->permissionRegistrar->clearPermissionsCollection();
     }
 }
