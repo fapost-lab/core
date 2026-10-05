@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Domains\Conversation\Retention\PartitionRetention;
+
 return [
     /*
     |--------------------------------------------------------------------------
@@ -26,10 +28,13 @@ return [
     |--------------------------------------------------------------------------
     | Retention
     |--------------------------------------------------------------------------
-    | null = keep forever (default). A number of days enables partition pruning
-    | (per-tenant override via tenant settings is a future extension).
+    | null = keep forever (default). A plain positive whole number of days (anything else disables pruning) lets the daily
+    | `conversations:prune` command drop whole monthly partitions older than
+    | that, so a message lives between N and about N + 31 days. Applies to the
+    | whole installation (a per-tenant value is not supported yet). Dropping is
+    | irreversible; threads and media are never touched.
     */
-    'retention_days' => null,
+    'retention_days' => PartitionRetention::parseDays(env('CONVERSATION_RETENTION_DAYS')),
 
     /*
     |--------------------------------------------------------------------------

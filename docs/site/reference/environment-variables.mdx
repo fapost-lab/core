@@ -66,6 +66,14 @@ Redis is not optional: it carries queues, cache, locks, and the webhook routing
 registry. The registry is what keeps the landlord database off the inbound hot
 path — see [Runtime architecture](/contributing/runtime).
 
+## Conversation transcript
+
+| Variable | Default | Notes |
+|---|---|---|
+| `CONVERSATION_RETENTION_DAYS` | *unset* | Unset keeps the transcript forever. A plain whole number of days (anything else, including `0`, disables pruning) lets `conversations:prune` drop whole monthly `conversation_messages` partitions older than that, so a message lives between that many days and about 31 days longer. **Irreversible**: dropped messages come back only from a database backup. Conversation threads and downloaded media are kept. One value for the whole installation |
+
+See [Conversation retention](/self-hosting/observability#conversation-retention).
+
 ## Localisation
 
 | Variable | Default |

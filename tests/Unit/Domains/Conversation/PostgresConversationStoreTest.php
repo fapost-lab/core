@@ -83,7 +83,7 @@ final class PostgresConversationStoreTest extends TestCase
             });
         }
 
-        $this->store = new PostgresConversationStore(new ConversationPartitionManager());
+        $this->store = new PostgresConversationStore(new ConversationPartitionManager(app('db')));
     }
 
     public function test_ensure_conversation_is_idempotent_by_ref(): void
