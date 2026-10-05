@@ -15,6 +15,7 @@ paths:
   - config/tenancy.php
   - "tests/Unit/Domains/Tenancy/**"
   - "tests/Feature/Tenancy/**"
+reviewed_at: 2026-10-05
 ---
 # Tenancy glossary
 

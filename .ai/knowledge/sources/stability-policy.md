@@ -6,7 +6,8 @@ domains: []
 paths: []
 source: docs/site/extending/stability-policy.mdx
 summary: What Core promises not to break for extensions, and how it deprecates
-source_hash: daadb883c32f1f53aa4c658377858b1ed43196d7
+source_hash: c2fddefa4bf192f82c2f1a3d5f040b484bba82d9
+reviewed_at: 2026-10-05
 ---
 # Stability policy
 

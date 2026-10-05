@@ -19,8 +19,8 @@ A Solution must not live under `app/Solutions` inside Core. It is an external
 package, resolved through Composer like any other dependency — see
 [Development setup](/extending/development-setup) for the two-lane workflow.
 
-Its public contracts belong in `fapost/foundation`. Dependency-free primitives
-belong in `fapost/support`. Neither package may reference `App\…`, and neither may
+Its public contracts belong in `fapost/foundation`. Primitives with no Core
+dependency belong in `fapost/support`. Neither package may reference `App\…`, and neither may
 absorb business logic that belongs to Core.
 
 Front-end components are possible, but only through the agreed build and publish

@@ -1,25 +1,23 @@
 # 04 — Assistant Domain (Assistants + Channels)
 
-> Зафиксировано: март 2026. Актуально начиная с Phase 1. Заменяет страницу «04 — Боты» и документ «Bot Domain — Terminology Reference».
-> 
+> Recorded March 2026; corrected against the code in October 2026. Replaces the old "Bots" page and the "Bot Domain —
+> Terminology Reference" document. `Bot` is no longer a term in the platform.
 
 ---
 
-## Core Principle
+## Core principle
 
-`Assistant` — верхний бизнес-агрегат tenant.
+`Assistant` is the top business aggregate of a tenant.
 
-`Channel` — transport endpoint, подчинённый `Assistant`.
+`Channel` is a transport endpoint owned by an `Assistant`.
 
-`Flow` — логика обработки, принадлежит `Assistant`.
+`Flow` is the processing logic, owned by an `Assistant`.
 
-`Session` — runtime execution, запускается в контексте `Assistant`.
-
-`Bot` как верхний термин больше не используется.
+`Session` is a runtime execution, started in the context of an `Assistant`.
 
 ---
 
-## Domain Structure
+## Domain structure
 
 ```
 Assistant
@@ -34,166 +32,149 @@ Assistant
 
 ## Assistant
 
-`Assistant` — самостоятельная управляемая единица внутри tenant.
+`Assistant` is a self-contained managed unit inside a tenant. A tenant can have several (Sales, Support, Warehouse, ...).
+Tables live in the tenant schema; ids are ULIDs stored in `uuid` columns.
 
-Один tenant может иметь несколько `Assistant`. Примеры: Sales Assistant, Support Assistant, Warehouse Assistant.
-
-**Содержит:**
-
-| Поле | Описание |
+| Field | Description |
 | --- | --- |
-| `id` | UUID |
-| `tenant_id` | UUID |
-| `name` | Имя ассистента |
-| `is_active` | Активность |
-| `default_flow_id` | Поток по умолчанию (nullable) |
-| `fallback_message` | Сообщение при ошибке |
-| `settings` | JSONB: AI/runtime настройки |
+| `id` | ULID |
+| `tenant_id` | Owning tenant |
+| `name` | Display name |
+| `is_active` | Activity flag |
+| `default_flow_id` | Default flow (nullable) |
+| `default_language` | Assistant default language (see the multilingual ADR) |
+| `fallback_message` | Localized message map (`array<locale, string>`) sent on error |
+| `busy_message` | Localized message map sent when the session lock cannot be acquired |
+| `commands` | JSON list of bot commands (name, description, behavior), edited in assistant settings |
+| `available_countries` | ISO alpha-2 list of countries offered by phone-input nodes and the builder (`CountryCatalog`) |
+| `settings` | JSON: runtime settings |
 
 ---
 
 ## Channel
 
-`Channel` — подчинённая сущность `Assistant`. Отвечает **только** за транспорт и подключение. Не является самостоятельной бизнес-сущностью.
+`Channel` is owned by an `Assistant` and handles **only** transport and connection. It is not an independent business
+entity.
 
-**Содержит:**
-
-| Поле | Описание |
+| Field | Description |
 | --- | --- |
-| `id` | UUID |
-| `assistant_id` | FK → `assistants` |
-| `tenant_id` | UUID |
-| `type` | `telegram` \ |
-| `token` | encrypted |
-| `secret_token` | encrypted |
-| `webhook_public_hash` | UNIQUE, opaque |
-| `config` | JSONB: channel-specific |
-| `is_active` | Активность |
+| `id` | ULID |
+| `assistant_id` | FK to `assistants` (restrict on delete) |
+| `tenant_id` | Owning tenant |
+| `type` | `ChannelTypeEnum`: `telegram`, `whatsapp` (WhatsApp has no production adapter yet) |
+| `token` | Encrypted |
+| `secret_token` | Encrypted |
+| `telegram_bot_username` | Bot username resolved from Telegram (nullable) |
+| `webhook_public_hash` | Unique, opaque |
+| `config` | JSON: channel-specific |
+| `is_active` | Activity flag |
+
+`ChannelObserver` is the single owner of channel lifecycle side effects: Redis registry sync and provider webhook
+registration, both deferred until the transaction commits.
 
 ---
 
-## Runtime Rule
+## Runtime rule
 
-Любое входящее сообщение сначала попадает в `Channel`. Далее:
+Every incoming message reaches a `Channel` first:
 
 ```
-Incoming webhook
-  → resolve channel (by public_hash из Redis)
-  → resolve assistant (assistant_id из channel payload)
-  → run assistant flow
+POST /webhook/{channel}/{hash}
+  → resolve registry entry by hash (Redis, landlord DB fallback)
+  → entry carries tenant_id, assistant_id, channel_id, schema
+  → run the assistant flow
 ```
 
-Flow запускается не каналом, а **ассистентом**.
+A flow is started by the **assistant**, not by the channel. One `Assistant` has many `Flow`s; a `Channel` uses the flows
+of its `Assistant`.
 
----
-
-## Flow & Session Ownership
-
-| Сущность | Владелец |
+| Entity | Owner |
 | --- | --- |
 | `Flow` | `Assistant` |
 | `Session` | `Assistant` |
 | `Channel` | `Assistant` |
 
-Один `Assistant` → несколько `Flow`.
-
-Один `Channel` использует flow своего `Assistant`.
-
 ---
 
-## Redis Webhook Registry
+## Redis webhook registry
 
-**Ключ:** `{REDIS_PREFIX}:webhook:{public_hash}`
+**Key:** `webhook:{public_hash}` (the application Redis prefix is applied by the framework).
 
-**Значение:**
+**Value:**
 
 ```json
 {
   "tenant_id": "...",
   "assistant_id": "...",
   "channel_id": "...",
+  "schema": "tenant schema name",
   "channel": "telegram",
-  "secret_token": "plain_secret"
+  "secret_token": "plain secret"
 }
 ```
 
-БД — источник истины. Redis — write-through cache, TTL не ставим.
+The database is the source of truth: the landlord `webhook_registry` table. Redis is a write-through cache with no TTL;
+a miss falls back to the landlord table and self-heals, guarded by a short `warming:{hash}` leader lock.
 
 ---
 
-## Distributed Lock Key
+## Distributed lock key
 
 ```
 session_lock:{tenant_id}:{contact_id}:{assistant_id}
 ```
 
-Изоляция по ассистенту, не по каналу.
+Isolation is per assistant, not per channel (`LockScope`).
 
 ---
 
-## UI Architecture
+## UI architecture
 
-### Главная Tenant Admin Panel
+Two Filament panels, both served on the tenant host.
 
-Разделы верхнего уровня:
+- **Admin panel** (`/admin`): top-level tenant management. Resources: Assistants (with a Channels relation manager),
+  Users, Roles, Media. Pages: tenant settings, translations, dashboard.
+- **Assistant panel** (`/assistant/{assistant}`): Filament tenancy, where the Filament tenant is the `Assistant`
+  (`CurrentAssistantInterface` resolves it). Resources: Flows, Flow groups, Flow sessions, Flow logs, Contacts, Contact
+  groups, Contact segments, Conversations, Broadcasts, Channels. Pages: dashboard, assistant settings (general, commands,
+  advanced), translations.
 
-- Пользователи
-- **Ассистенты**
-- Триггеры
-- Рассылки
-- Контакты
-- Интеграции
-- Настройки
-
-### Assistant Management Panel
-
-Отдельная административная область для конкретного ассистента. Вход — кнопка «Управлять».
-
-Внутри: **Каналы** / Flows / Sessions / Context / Logs.
-
-Позволяет изолировать управление и не перегружать главную панель.
+The tenant switcher in the assistant panel lists only the assistants the user may view.
 
 ---
 
-## Triggers & Broadcasts
+## Triggers and broadcasts
 
-Остаются на уровне tenant. При работе с trigger/broadcast пользователь выбирает `Assistant`.
-
-```
-Trigger → Assistant
-Broadcast → Assistant
-```
+Broadcasts belong to an assistant (`broadcasts.assistant_id`, managed in the assistant panel). Flow triggers carry a
+nullable `assistant_id`: a null value is a tenant-wide trigger, and the FK is `nullOnDelete` so such triggers survive
+assistant removal.
 
 ---
 
-## Access Control
+## Access control
 
-User ↔ Assistants: many-to-many (`user_assistants` pivot).
-
-Пользователь видит только назначенные ассистенты. Влияет на: список, assistant panel, выбор в триггерах, выбор в рассылках.
+User ↔ Assistants is many-to-many (`user_assistants`). `AssistantPolicy`: managing assistants requires `manage_assistants`,
+and a non-admin additionally needs the assistant assigned to them. This affects the assistant list, the assistant panel
+tenant list, and the assistant pickers.
 
 ---
 
-## Итоговые термины
+## Terms
 
-| Слой | Термин |
+| Layer | Term |
 | --- | --- |
-| Бизнес-сущность | `Assistant` |
-| Транспорт | `Channel` |
-| Логика | `Flow` |
-| Runtime состояние | `Session` |
-| Таблица БД | `assistants`  • `channels` |
-| UI (ассистент) | «Ассистенты» |
-| UI (канал) | «Каналы» |
+| Business entity | `Assistant` |
+| Transport | `Channel` |
+| Logic | `Flow` |
+| Runtime state | `Session` |
+| Tables | `assistants`, `channels` |
+| UI | "Assistants", "Channels" |
 
 ---
 
-## Связано с
+## Related
 
-- [[06-flow-engine]] — flow engine работает через Assistant
-- [[05-contacts]] — contacts привязаны к Assistant
-- [[02-assistant-panel-console]] — ADR панели ассистента
-- [[15-multilingual]] — default_language ассистента
-- [[10-message-pipeline]] — message pipeline через ассистента
-- [[diagrams/01-webhook-pipeline]] — диаграмма webhook pipeline
-- [[03-staff-users]] — Staff пользователи и доступ
+- [05-contacts](05-contacts.md) — contacts and their channel identities
+- [10-message-pipeline](10-message-pipeline.md) — message pipeline through the assistant
+- [03-staff-users](03-staff-users.md) — staff users and assistant access
+- ADR 15 (multilingual) — `default_language`

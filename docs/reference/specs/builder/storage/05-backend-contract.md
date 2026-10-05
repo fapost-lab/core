@@ -1,145 +1,92 @@
-# 05 · Backend variable contract + резолвер
+# 05 · Backend variable contract and resolver
 
-**Зависит от:** —
-**Блокирует:** —
-**Слой:** backend (PHP)
+**Layer:** backend (PHP)
 
-## Цель
+## Purpose
 
-Единый сервис, который преобразует UI-shape `{ name, storage, group }` в физический path в state JSON / contact attributes. Резолвер используют все handlers, у которых есть «save user data» концепт (Input, SendMessage button save_to, Assign, в будущем — модули).
+One service turns the UI shape `{ name, storage, group, type }` into the physical state path. Every
+handler with a "save user data" concept (Input, SendMessage button `save_to_variable`, Assign, Call)
+uses it. The resolver is symmetric: the same `Variable` maps to the same path for writing and reading.
 
-Резолвер должен быть симметричен для записи и чтения: один и тот же UI-Variable превращается в один и тот же путь и в `flow_sessions.state`, и в `contact.attributes`.
-
-## Контракт
+## Contract
 
 ```php
 namespace App\Domains\Flow\State\Variables;
 
-/**
- * Описание пользовательской переменной как видит её author flow в UI.
- * Compile-time представление; в runtime engine разворачивается в путь
- * через {@see VariableResolver}.
- */
 final readonly class Variable
 {
     public function __construct(
-        public string $name,                 // alphanumeric + underscore
-        public string $type,                 // 'text'|'number'|'phone'|...
-        public VariableStorage $storage,     // enum: Contact | Session
-        public ?string $group = null,        // ровно один уровень или null
+        public string $name,                  // identifier: [A-Za-z_][A-Za-z0-9_]*
+        public VariableStorage $storage,      // enum: Contact | Session
+        public ?string $group = null,         // one level; contact storage only
+        public ?VariableType $type = null,    // enum; null = undeclared, no coercion
+        public array $properties = [],        // e.g. max_size / item_type for arrays
     ) {}
 
-    /**
-     * Создать из массива конфигурации ноды; null если структура неполная.
-     * @param array<string, mixed> $raw
-     */
-    public static function tryFromArray(array $raw): ?self { ... }
+    public static function tryFromArray(array $raw): ?self;  // null when name/storage missing
 }
+```
 
-enum VariableStorage: string
-{
-    case Contact = 'contact';
-    case Session = 'session';
-}
+`Variable.type` is the `VariableType` enum (see 10 for the full list and coercion). Unknown type strings
+from old snapshots are ignored (type becomes `null`) so flows stay loadable.
+
+```php
+namespace App\Domains\Flow\Contracts;
 
 interface VariableResolverInterface
 {
-    /**
-     * Возвращает целевой path для записи через ScopedStateWriter.
-     *  - Contact + name + null group → `contact.attributes.{name}`
-     *  - Contact + name + group      → `contact.attributes.{group}.{name}`
-     *  - Session + name              → `flow.{name}`
-     *
-     * Group depth >1 приводит к InvalidArgumentException.
-     */
+    /** Contact + no group -> contact.{name}; Contact + group -> contact.{group}.{name}; Session -> flow.{name}. */
     public function resolveTargetPath(Variable $variable): string;
 
-    /**
-     * Чтение того же значения через resolver chain (ScopedStateReader).
-     */
-    public function read(Variable $variable, FlowContext $context): mixed;
+    /** Reads through the engine's ScopedStateReader carried by the context; coerces by declared type. */
+    public function read(Variable $variable, NodeExecutionContext $context): mixed;
 
-    /**
-     * Backward-compat: разворачивает legacy `save_to` строку в Variable.
-     * Поддерживает форматы:
-     *  - "flow.foo"           → Session, name=foo, group=null
-     *  - "contact.foo"        → Contact, name=foo, group=null
-     *  - "contact.bar.foo"    → Contact, name=foo, group=bar
-     *  - "foo" (без префикса) → Session, name=foo, group=null   (исторический дефолт)
-     *  - "contact.a.b.c"      → throws (depth >1)
-     */
+    /** Parses a legacy `save_to` string ("flow.foo", "contact.foo", "contact.bar.foo", "foo"); deeper paths throw. */
     public function fromLegacyPath(string $path): Variable;
 }
 ```
 
-## Реализация
+`NodeExecutionContext` is `Fapost\Foundation\DTO\NodeExecutionContext`. `read()` returns `null` when no
+reader is attached or the path is empty. `VariableResolver` is bound as scoped (it holds the tenant's schema
+registry) and never writes: writes go through `ScopedStateWriter` / `ContactWriter` using the returned path.
+`fromLegacyPath()` is part of the contract but handlers currently parse legacy `save_to` themselves.
 
-`VariableResolver` — singleton stateless. Не зависит от tenant context: все операции — чистые трансформации path-строк. Контекст для read() приходит через `FlowContext` (есть session, contact, и т.д.).
+## Reserved names
 
-Запись — всегда через `ScopedStateWriter`. Резолвер не пишет сам — только возвращает path.
+`Variable` rejects the names `id`, `channel_id`, `tenant_id`, `external_id`, `meta`, `language`,
+`is_blocked`, `created_at`, `updated_at` (aligned with `ContactWriter`) and the group `meta`.
+A group on a session variable is rejected.
 
-## Reserved keys
+## Validation
 
-`Variable::tryFromArray` отвергает следующие имена переменных (соотв. п.4.6 спеки и существующим reserved keys в ContactWriter):
-- `id`, `channel_id`, `tenant_id`, `external_id`, `meta`, `language`, `is_blocked`, `created_at`, `updated_at`
+`FlowDefinitionValidator::validateVariableContract()` checks `input`, `send_message` and `assign` configs:
 
-Группа `meta` отвергается (зарезервирована для платформенных данных).
+- the new shape (`variable` / `save_to_variable` / `operations`) and the legacy shape (`save_to`, `target`+`key`)
+  cannot be defined together;
+- the new shape must construct a valid `Variable`;
+- within one Assign node the (`storage`, `group`, `name`) of `operations[*].variable` are unique;
+- Branch rules with a `user_variable` left side must carry a valid variable.
 
-## Schema validation
+## Handlers and legacy snapshots
 
-`FlowDefinitionValidator` дополнительно проверяет в config нод Input/SendMessage/Assign:
-- Если есть и `variable` (новый формат), и `save_to` (legacy) одновременно → ошибка валидации (двойной контракт).
-- `Variable` структура валидна (имя, group depth ≤ 1, reserved keys).
-- Внутри одной Assign ноды — `operations[*].variable` пары `(storage, group, name)` уникальны.
+| Handler | New field | Legacy |
+|---------|-----------|--------|
+| `InputNodeHandler` | `variable` | `save_to` |
+| `SendMessageNodeHandler` | `save_to_variable` | `save_to` + `save_to_type` |
+| `AssignNodeHandler` | `operations[*].variable` | `target` + `key` |
 
-## Handlers — изменения
+Each handler branches once: new shape goes through the resolver, otherwise the legacy path. No data
+migration is needed; a legacy snapshot is rewritten to the new shape on the next builder autosave.
 
-Каждый handler, использующий variable, получает `VariableResolverInterface` через DI и вызывает `resolveTargetPath()` вместо прямой конкатенации:
+## Files
 
-| Handler | Поле в config | Что меняется |
-|---------|---------------|--------------|
-| InputNodeHandler | `variable` (новый) / `save_to` (legacy) | путь резолвится через resolver |
-| SendMessageNodeHandler | `save_to_variable` (новый) / `save_to` + `save_to_type` (legacy) | то же |
-| AssignNodeHandler | `operations[*].variable` (новый) / `target+key` (legacy) | то же, в цикле |
+- `app/Domains/Flow/State/Variables/{Variable,VariableStorage,VariableType,VariableResolver}.php`
+- `app/Domains/Flow/Contracts/VariableResolverInterface.php`
+- `app/Domains/Flow/Providers/FlowServiceProvider.php` — bindings
+- `app/Domains/Flow/Validation/FlowDefinitionValidator.php`
+- `app/Domains/Flow/Handlers/{Input,SendMessage,Assign,Call}NodeHandler.php`
+- Tests: `tests/Unit/Domains/Flow/State/Variables/VariableResolverTest.php`
 
-В каждом handler — один `if (variable)` бранч → resolver, иначе legacy fallback. Когда все ноды мигрированы и legacy snapshots в БД отсутствуют — бранч можно убрать.
+## Related
 
-## Миграция данных
-
-**Не нужна.** Legacy snapshots остаются как есть; на чтении handler детектирует формат и работает с обоими. При первом редактировании flow в builder'е (после задач 02–04) snapshot перезапишется в новый формат через autosave.
-
-## Файлы
-
-- `app/Domains/Flow/State/Variables/Variable.php` — value object
-- `app/Domains/Flow/State/Variables/VariableStorage.php` — enum
-- `app/Domains/Flow/Contracts/VariableResolverInterface.php` — contract
-- `app/Domains/Flow/State/Variables/VariableResolver.php` — реализация
-- `app/Domains/Flow/Providers/FlowServiceProvider.php` — bind contract → impl
-- `app/Domains/Flow/Validation/FlowDefinitionValidator.php` — добавить проверки
-- `app/Domains/Flow/Handlers/{Input,SendMessage,Assign}NodeHandler.php` — wire resolver
-
-## Тестирование
-
-Unit тесты `VariableResolverTest`:
-- Resolve target path для всех комбинаций storage × group.
-- `fromLegacyPath()` парсит все форматы; depth >1 → throws.
-- Reserved keys отвергаются.
-- `Variable::tryFromArray` корректно валидирует.
-
-Feature тест: existing flow с legacy `save_to: "flow.foo"` в SendMessage → button click → state.flow.foo записан.
-
-## Acceptance
-
-- Resolver покрыт unit'ами для всех бранчей.
-- Все три handler'а имеют integration тест с обеими формами snapshot.
-- FlowDefinitionValidator отвергает невалидные variable shape'ы с понятным сообщением.
-
----
-
-## Связано с
-
-- [[00-overview]] — overview storage
-- [[10-state-writer-semantics]] — ADR state writer
-- [[01-state-model]] — state model
-- [[10-variable-type-coercion]] — type coercion
-- Запуск `php artisan ops:tenants-migrate` на пустую тенант-схему проходит без ошибок (контракт без миграции данных).
+- [10-variable-type-coercion](10-variable-type-coercion.md)

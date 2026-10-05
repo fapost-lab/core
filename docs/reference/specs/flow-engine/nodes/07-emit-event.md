@@ -1,10 +1,12 @@
-# Node · `emit_event`
+# Node: `emit_event`
 
-Async генерация события для запуска других flow через triggers.
+Asynchronously emits an event that starts other flows through triggers.
 
 **Type:** `emit_event`
 **Version:** 1
-**Idempotent:** yes (event publishing — append-only)
+**Class:** `app/Domains/Flow/Handlers/EmitEventNodeHandler.php` (category `Logic`)
+**Idempotent:** publishing only queues a job; the node has no dedup marker of its own, so a re-run of
+the node publishes again
 
 ## Config
 
@@ -18,37 +20,56 @@ Async генерация события для запуска других flow 
 }
 ```
 
-**Поля:**
+**Fields:**
 
-| Поле | Тип | Required | Описание |
-|------|-----|----------|----------|
-| `event_type` | string | yes | Имя события (literal, не Expression) |
-| `payload` | object | no | Map ключей → Expressions, resolved перед публикацией |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `event_type` | string | yes | Event name. A literal, not an expression |
+| `payload` | object | no | Map of keys to templates, rendered recursively before publishing |
 
 ## Output handles
 
 - `success`
 
+An empty `event_type` throws `InvalidNodeConfigException`.
+
 ## Behavior
 
-1. Resolve payload через Expressions
-2. Publish event через FlowTriggerEventBus:
-   - `tenant_id` (из session)
-   - `event_type`
-   - `payload` (resolved)
-   - `source: {flow_id, session_id, node_id, assistant_id}`
-3. Engine продолжает с `success` handle. **Не ждёт** обработки события.
-4. Triggers с `type=event, event_type=<this>` запустят свои flow асинхронно (в `scheduled.triggers` queue)
+1. Render `payload` (every string leaf) through `TemplateRenderer`.
+2. Publish through `FlowTriggerEventPublisherInterface::publish(tenantId, eventName, payload, source)`
+   with `source = {tenant_id, session_id, node_id, contact_id}`.
+3. Return `Executed` with the `success` handle and metadata `event_type`. The engine does **not** wait
+   for the event to be handled.
+
+### Publisher chain
+
+```
+FlowTriggerEventPublisherInterface
+  -> QueuedFlowTriggerEventPublisher        (app/Domains/Flow/Events/)
+       dispatches DispatchFlowTriggerEventJob on queue `scheduled.triggers`
+  -> DispatchFlowTriggerEventJob            (app/Jobs/Flow/)
+       switches to the tenant, registers the event name in the tenant registry (best effort),
+       resolves subscribed event triggers (ResolveEventTriggersService) and fans out one job per trigger
+  -> StartFlowFromEventJob                  (app/Jobs/Flow/), queue `scheduled.triggers`
+       starts the subscribed flow through FlowEngine::start under the contact's session lock
+```
+
+Details of the fan-out:
+
+- The started flow runs for the **emitting contact** (`source.contact_id`). An event with no contact is
+  skipped (a flow start needs a contact).
+- The event payload is exposed to the started flow as `flow.event.*`.
+- Each trigger gets its own `StartFlowFromEventJob` so one failing subscriber does not block the others.
+- The contact-facing access policy (the public / auth gate for inbound starts) is intentionally not
+  applied: wiring the trigger is the authorisation.
+- A stale trigger (inactive flow, deleted contact or assistant) is skipped with a log line.
 
 ## Event scope
 
-> **Patch v1.1:** новый sub-block.
+Events are scoped to the **tenant**. Every trigger subscribed to `event_type` receives it regardless
+of the source assistant. The source assistant is not part of the event source and is not a filter.
 
-Events scoped to **tenant**. Все triggers подписанные на `event_type` получают event независимо от source assistant. `source.assistant_id` присутствует в metadata, но не используется как filter в V1.
-
-### Naming convention для cross-assistant изоляции
-
-Рекомендуемая convention в документации:
+Recommended naming, not enforced:
 
 ```
 sales.order.created
@@ -56,32 +77,21 @@ support.ticket.opened
 hr.employee.onboarded
 ```
 
-Namespace по domain/assistant prefix. **Не enforced**, но рекомендовано.
+Not built: an `assistant_filter` on the trigger config.
 
-### V1.x: explicit filter
+## Validation
 
-Можно будет добавить `assistant_filter` в trigger config:
+`ValidateFlowService::validateEmitEventConfig`:
 
-```json
-{
-  "trigger_type": "event",
-  "event_type": "order.created",
-  "filter": {
-    "source_assistant_id": "01HQ_sales"
-  }
-}
-```
+- `emit_event_missing_type`: `event_type` must be non-empty,
+- `emit_event_template_in_type`: no `{{` template expression,
+- `emit_event_invalid_type`: dot-separated segments of letters, digits and underscore.
 
-Не V1. Naming convention достаточно для первой итерации.
-
-## Validation flow_definition
-
-- `event_type` non-empty, alphanumeric + dot
+On publish, the events a flow emits are collected (`EmittedEventCollector`) and registered in the
+tenant event registry, so event triggers on any flow can subscribe to them before the event ever fires.
 
 ---
 
-## Связано с
+## Related
 
-- [[README]] — nodes README
-- [[08-subflow]] — альтернатива go_to_flow через emit-event
-- [[README]] — flow engine README (specs/flow-engine)
+- [08-subflow.md](08-subflow.md) - the synchronous alternative for calling another flow

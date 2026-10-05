@@ -1,69 +1,59 @@
-# Нода `set_tag` (Core, P1)
+# Node: `set_tag`
 
-> **Статус: РЕАЛИЗОВАНО (2026-06-05).** Миграция `contact_tags`, модель `ContactTag`, контракт
-> `ContactTagRepositoryInterface` + Eloquent-реализация (биндинг в `ContactServiceProvider`), хендлер
-> `SetTagNodeHandler` (`type=set_tag`, `v1`, generic renderer), регистрация в `FlowServiceProvider`.
-> add/remove/toggle идемпотентны (unique `(contact_id, tag)`), `tagged_by = flow_session_id`, шаблонные теги
-> резолвятся, пустые/whitespace отбрасываются. Тесты: `tests/Feature/Domains/Flow/SetTagNodeHandlerTest.php`.
+Adds, removes or toggles a tag on the current contact.
 
-**Слой:** Domain Contact (таблица/модель/сервис) + Domain Flow (NodeHandler) · **Уровень:** Core · **P1**
+**Type:** `set_tag` · **Version:** 1 · **Category:** `Data`
+**Class:** `app/Domains/Flow/Handlers/SetTagNodeHandler.php`
 
-## Зачем
-Динамическая разметка контактов прямо из flow: пометить «оплатил», «лид», «vip» и т.п. Теги — один из трёх концептов
-сегментации (Groups / **Tags** / Segments), используются Broadcasting'ом при выборке получателей через
-`ContactSegmentResolver`.
+Tags are one of three segmentation concepts (Groups / **Tags** / Segments) and are used by Broadcasting, and by the
+`notify` node in contacts mode, to select recipients.
 
-## configSchema (generic renderer — override НЕ нужен)
-```php
-Schema::make()
-    ->section(
-        Section::make('action', 'Tagging')->icon('tag')->fields([
-            SelectField::make('action')->label('Action')
-                ->options(['add' => 'Add', 'remove' => 'Remove', 'toggle' => 'Toggle'])
-                ->default('add')->required(),
-            ArrayField::make('tags')->label('Tags')
-                ->help('Language-agnostic labels. Not translated.'),
-        ]),
-    )
-    ->toArray();
+## Config
+
+```json
+{
+  "action": "add",
+  "tags": ["paid", "{{flow.plan}}"]
+}
 ```
-- `action`: `add` | `remove` | `toggle`.
-- `tags`: `array<string>` — теги **language-agnostic**, не переводятся (как `value` у кнопок).
-- Шаблонизация значений тегов (`{{flow.x}}`) допустима — резолвится перед записью.
 
-## Outputs
-- `default` — единственный выход. Тегирование не ветвит.
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `action` | enum | yes | `TagAction`: `add` (default), `remove`, `toggle` |
+| `tags` | list of strings | no | Language-agnostic labels, not translated. Each is rendered as a template; blank results are dropped and duplicates within the node are collapsed |
 
-## Runtime
-- Хендлер `SetTagNodeHandler implements NodeHandlerInterface` (`type()='set_tag'`, `version()=1`).
-- Пишет в `contact_tags` (`contact_id`, `tag`, `tagged_by`, `tagged_at`) через репозиторий (не Eloquent в сервисе напрямую — см. CLAUDE.md § Code conventions).
-- `tagged_by` = `flow_session_id` текущей сессии.
-- **Идемпотентность (CLAUDE.md § Concurrency — handler safe to retry):**
-  - `add` — upsert по уникальному `(contact_id, tag)`; повторный прогон не дублирует.
-  - `remove` — delete по `(contact_id, tag)`; повтор безвреден.
-  - `toggle` — резолвится по текущему наличию; для retry-safety читать-и-писать под уже взятым session lock.
+## UI
 
-## Инфраструктура (нужно создать)
-1. Миграция `tenant/..._create_contact_tags_table` — `contact_id` (foreignUuid, cascade), `tag` (string), `tagged_by`
-   (uuid nullable — `flow_session_id` | `staff_user_id`), `tagged_at`. Unique `(contact_id, tag)`. PK — ULID per ADR-03.
-2. Модель `App\Domains\Contact\Models\ContactTag` (BaseModel, HasUlidPrimaryKey).
-3. Контракт + репозиторий `ContactTagRepositoryInterface` → Eloquent impl, биндинг в `ContactServiceProvider` (или DomainServiceProvider).
-4. Регистрация хендлера в `FlowServiceProvider::register()` рядом с остальными.
+The node has a Core builder override, `SetTagConfig.vue`
+(`resources/js/builder/components/editor/config/overrides/SetTagConfig.vue`), registered in the `OVERRIDES` map of
+`ConfigPanel.vue`. `configSchema()` (built with the fluent `Schema` API) remains the contract.
 
-## Acceptance
-- add/remove/toggle меняют `contact_tags` корректно; повторный прогон ноды не плодит дубли.
-- `tagged_by` = текущий `flow_session_id`.
-- Нода рендерится generic-рендерером (в `OVERRIDES` не добавляется).
-- Unit + feature тесты на три action'а + idempotency + retry.
+## Output handles
 
-## Риски
-- Согласовать формат `tagged_by` (полиморфный источник flow vs staff) с уже задокументированной схемой в CLAUDE.md.
-- Шаблонные теги: пустые/whitespace после резолва — отбрасывать.
+- `default`: always. Tagging does not branch.
 
----
+## Behavior and idempotency
 
-## Связано с
+The handler writes through `ContactTagRepositoryInterface` (bound to `ContactTagRepository` in
+`ContactServiceProvider`), not through Eloquent directly, into the tenant table `contact_tags`
+(`contact_id`, `tag`, `tagged_by`, `tagged_at`; unique `(contact_id, tag)`). `tagged_by` is the current
+`flow_session_id`.
 
-- [[README]] — nodes README
-- [[05-contacts]] — Contact Domain, contact_tags таблица
-- [[03-branch]] — фильтрация по тегам в условиях
+1. If the marker `system.set_tag.{nodeId}` is already `true`, return `Executed` with metadata `replayed = true` and
+   change nothing. The marker matters because `toggle` flips on every run, so a re-execution under the session lock
+   must skip the mutations entirely.
+2. Resolve the tags: render each, drop blank, collapse duplicates.
+3. Apply the action per tag: `add` (an upsert on `(contact_id, tag)`), `remove` (a delete; harmless to repeat),
+   `toggle` (flips by the current presence).
+4. Return `Executed` with `stateChanges = {system.set_tag.{nodeId}: true}` and metadata `action` and `tags`. `set_tag`
+   is a whitelisted writer of `system.*` in `SystemStateNamespacePolicy`.
+
+An unknown `action` falls back to `add`.
+
+## Tests
+
+`tests/Feature/Domains/Flow/SetTagNodeHandlerTest.php`: the three actions, idempotency, template tags, blank tags.
+
+## Related
+
+- [notify.md](notify.md) - notifying contacts by tag

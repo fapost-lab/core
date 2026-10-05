@@ -1,129 +1,123 @@
-# 04 · Call Transport Layer
+# 04. Call Transport Layer
 
 ## 4.1 CallTransportInterface
 
 ```php
-namespace Fapost\Foundation\Contracts\Flow\Call;
+namespace Fapost\Foundation\Flow\Call;
 
 interface CallTransportInterface
 {
-    public static function id(): string;
-    public static function version(): int;
+    public function id(): string;
 
-    /**
-     * @throws CallTransportException
-     */
     public function execute(CallRequest $request, CallContext $context): CallResult;
 }
 ```
 
-## 4.2 DTO
+`id()` is an instance method, and the transport has no `version()`. A transport reports failure by
+returning `CallResult::error(...)`; the built-in ones do not throw.
+
+## 4.2 DTOs
+
+All in `Fapost\Foundation\Flow\Call`, all `final readonly`.
 
 ```php
-final class CallRequest
+final readonly class CallRequest
 {
     public function __construct(
-        public readonly string $target,
-        public readonly array $parameters,
-        public readonly array $options,
+        public string $target,
+        public array $parameters = [],
+        public array $options = [],
     ) {}
 }
 
-final class CallContext
+final readonly class CallContext
 {
     public function __construct(
-        public readonly TenantInterface $tenant,
-        public readonly FlowSessionInterface $session,
-        public readonly string $idempotencyKey,
+        public string $tenantId,
+        public string $contactId,
+        public string $sessionId,
+        public string $nodeId,
+        public string $idempotencyKey,
     ) {}
 }
 
-final class CallResult
+final readonly class CallResult
 {
     public function __construct(
-        public readonly bool $success,
-        public readonly mixed $payload,
-        public readonly ?string $errorCode,
-        public readonly array $metadata,
+        public bool $success,
+        public mixed $payload = null,
+        public ?string $errorCode = null,
+        public array $metadata = [],
     ) {}
+
+    public static function ok(mixed $payload = null, array $metadata = []): self;
+    public static function error(string $errorCode, mixed $payload = null, array $metadata = []): self;
 }
 ```
 
-## 4.3 Built-in транспорты
+`CallContext` carries identifiers, not a tenant or session object. The idempotency key is
+`{sessionId}:{nodeId}` (see [nodes/06-call.md](nodes/06-call.md)).
 
-**HttpTransport** (id='http', version=1):
-- HTTP client (Guzzle / Laravel Http)
-- Поддерживает GET/POST/PUT/DELETE/PATCH
-- Auth: bearer, basic
-- Idempotency-Key header автоматически из CallContext
-- Response parsing: JSON if `Content-Type: application/json`, иначе raw text
-- Success/failure boundary конфигурируется через `transport_options.success_when` (см. [nodes/06-call.md](nodes/06-call.md))
+## 4.3 Built-in transports
 
-**HandlerTransport** (id='handler', version=1):
-- Dispatch в ActionHandlerRegistry
-- target = action ID
-- ActionHandlerInterface::handle($parameters, $context) → возврат → CallResult.payload
+Registered in `FlowServiceProvider` through `CallTransportRegistry`.
+
+**HttpTransport** (`id() = 'http'`, `app/Domains/Flow/Call/Transports/HttpTransport.php`):
+
+- Laravel HTTP client; methods GET, POST, PUT, DELETE, PATCH. The target is `"{METHOD} {URL}"`.
+- Parameters are bucketed by prefix: `body.*`, `query.*`, `headers.*`, `auth.bearer`,
+  `auth.basic.username` / `auth.basic.password`. Options: `timeout` (seconds, default 10), `headers`,
+  `success_when`, `body_raw` (a pre-built JSON string that wins over `body.*`).
+- The `Idempotency-Key` header is set from `CallContext::$idempotencyKey` unless the caller supplied one.
+- Response parsing: JSON when the `Content-Type` is JSON, otherwise raw text.
+- The success boundary is `options.success_when`: `2xx` (default), `any_response`, `2xx_or_4xx`.
+  Transport-level failures (DNS, timeout, TLS) are always errors with code `transport_failure`.
+- Error codes: `invalid_target`, `invalid_method`, `transport_failure`, `http_4xx`, `http_5xx`,
+  `http_other`.
+
+**HandlerTransport** (`id() = 'handler'`, `app/Domains/Flow/Call/Transports/HandlerTransport.php`):
+
+- Dispatches to `ActionHandlerRegistry`; the target is the action id.
+- `ActionHandlerInterface::handle($parameters, $context)` returns the payload, which becomes
+  `CallResult::$payload`. Any exception from the action becomes `CallResult::error('action_exception')`;
+  an unknown id becomes `action_not_found`. The call node therefore never sees an exception from a
+  handler action.
 
 ## 4.4 ActionHandlerInterface
 
 ```php
-namespace Fapost\Foundation\Contracts\Action;
+namespace Fapost\Foundation\Action;
 
 interface ActionHandlerInterface
 {
-    public static function id(): string;          // 'crm.sync_contact', namespace 'core.*' reserved
-    public static function version(): int;
+    public function id(): string;        // 'crm.sync_contact'; "core.*" and "platform.*" are reserved
+    public function version(): int;
 
-    /**
-     * @throws ActionExecutionException
-     */
     public function handle(array $parameters, CallContext $context): mixed;
 }
 ```
 
-ActionHandlerRegistry — отдельный от NodeHandlerRegistry.
+`ActionHandlerRegistry` (`app/Domains/Flow/Action/`) is separate from `NodeHandlerRegistry`. Plugin and
+solution actions register through `CoreRegistrar` before the registry is frozen.
 
-> **Patch v1.1:** ID collision при регистрации = `LogicException` at registration time. Никакого silent override. Resolves Open question 12.3 из v1.0.
+## 4.5 Fail-on-conflict policy for the registries
 
-## 4.5 Fail-on-conflict policy для всех registries
+A duplicate key is a `LogicException` at registration time. There is never a silent override.
 
-Единая политика для четырёх registries:
+| Registry | Conflict key |
+|----------|--------------|
+| `NodeHandlerRegistry` | `type@version` |
+| `CallTransportRegistry` | `id()` |
+| `ActionHandlerRegistry` | `id()` |
+| `ModuleDataAccessorRegistry` | namespace prefix (must start with `module.`; `flow`, `system`, `rag` are reserved) |
+| `RagAdapterRegistry` | adapter id |
 
-| Registry | Ключ конфликта |
-|----------|----------------|
-| `NodeHandlerRegistry` | `(type, version)` |
-| `CallTransportRegistry` | `id` |
-| `ActionHandlerRegistry` | `id` |
-| `DataAccessorRegistry` | `namespace` |
-
-```php
-final class ActionHandlerRegistry
-{
-    /** @var array<string, ActionHandlerInterface> */
-    private array $handlers = [];
-
-    public function register(ActionHandlerInterface $handler): void
-    {
-        $id = $handler::id();
-        if (isset($this->handlers[$id])) {
-            throw new LogicException(
-                "Action handler '{$id}' already registered. " .
-                "Existing: " . get_class($this->handlers[$id]) . ", " .
-                "Conflicting: " . get_class($handler) . ". " .
-                "Conflicts must be resolved (rename one or remove)."
-            );
-        }
-        $this->handlers[$id] = $handler;
-    }
-}
-```
-
-Boot fails → operator видит ошибку немедленно → исправляет до production. Module Registration Contract (Phase 4 plan, task 21) ловит эти ошибки на boot validation модуля и помечает модуль degraded.
+All of them support `freeze()`, called once the application has booted (except in the `testing`
+environment); registering after that throws. A boot failure is visible to the operator immediately.
 
 ---
 
-## Связано с
+## Related
 
-- [[06-call]] — нода call использует transport layer
-- [[12-solutions-modules]] — Solutions регистрируют handlers
-- [[03-node-handler-interface]] — интерфейс handlers
+- [nodes/06-call.md](nodes/06-call.md) - the `call` node uses this transport layer
+- `docs/site/extending/` - how Solutions and plugins register handlers

@@ -46,8 +46,27 @@ Knowledge base integration: search over documents from within a flow.
   against real data in `ValidateFlowService`.
 - Not doing (already done, not part of this work): `RagAdapterRegistry`; `RagQueryNodeHandler`
   (type `rag_query`, writes `rag.*` into state); the RAG config-shape and runtime-guard validation
-  already present in `ValidateFlowService`. See `docs/reference/specs/flow-engine/nodes/09-rag-query.md`
-  for the node's existing contract.
+  already present in `ValidateFlowService`. The node's contract as built is recorded below.
+
+## Contract as built (2026-10)
+
+- Principle: the flow engine is deterministic and an LLM is not, so `rag_query` never puts raw
+  provider output into flow state. The adapter normalises the provider's answer into
+  `StructuredRagResult` (found, confidence `low|medium|high`, answer, intent?, metadata); the
+  normaliser belongs to the adapter, not to the node. A downstream `branch` reads `rag.found` /
+  `rag.confidence`, and `send_message` uses `rag.answer`.
+- `RagAdapterInterface` lives in `fapost/foundation`; adapters register in `RagAdapterRegistry`.
+- Node `rag_query` v1 (`app/Domains/Flow/Handlers/RagQueryNodeHandler.php`): config requires
+  `knowledge_base_id` (literal, not an expression), `query` (expression) and `provider` (literal
+  registry key); optional `options` (adapter-specific). Handles `success` (`found=true`),
+  `not_found`, `error`. Results are written as `rag.found|confidence|answer|intent|metadata` through
+  `stateChanges`; `rag.*` is writable by `rag_query` only (`SystemStateNamespacePolicy`).
+- Interim shape: because no `knowledge_bases` table exists, the provider is chosen by the literal
+  `provider` key. Once knowledge bases ship, the handler takes `knowledge_base_id` only and resolves
+  the provider from the row; `ValidateFlowService` then checks that the base exists for the tenant
+  and that `options` suit its provider.
+- Earlier storage sketch (not decided): `knowledge_bases` (id, name, provider, config JSON) and
+  `knowledge_documents` (title, content, embedding_id, knowledge_base_id, meta).
 
 ## Decisions
 
@@ -68,8 +87,8 @@ Knowledge base integration: search over documents from within a flow.
 ## Assumptions left untested
 
 - That the `StructuredRagResult` shape (found, confidence, answer, intent, metadata) — already fixed
-  by the existing node spec — is sufficient for a real adapter's response — taken at idea depth from
-  `docs/reference/specs/flow-engine/nodes/09-rag-query.md`; would be tested once a real provider is
+  by the node contract above — is sufficient for a real adapter's response — taken at idea depth from
+  that contract; would be tested once a real provider is
   wired in and its actual response shape is mapped onto it.
 - That sequencing this after M12 (MCP Server) is still right — taken at idea depth as roadmap
   ordering; would be tested by revisiting the sequencing once M12 itself is scheduled.

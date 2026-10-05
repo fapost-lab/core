@@ -37,14 +37,15 @@ These areas are planned or partial and should not be documented as finished prod
 - broadcast analytics beyond the aggregate counters on the broadcast list: no per-broadcast view page,
   no `broadcast_recipients` drill-down, no dashboard widget;
 - Knowledge Base/RAG product layer (`knowledge_bases`, `knowledge_documents`, provider adapters, Filament resource);
-- full event-chain start pipeline after `emit_event`;
 - production WhatsApp adapter behavior;
 - product-complete enforcement for every target architecture rule described in `docs/platform/architecture`.
 
 ## Partially Implemented Or Easy To Misread
 
 - `MessageRouter`, `DropPolicy`, `SessionStateRouter`, typing integration, and `/reset` command handling exist.
-- `EmitEventNodeHandler` exists, but event fan-out currently resolves/logs triggers rather than starting subscribed flows.
+- The `emit_event` chain is built end to end: `EmitEventNodeHandler` publishes through
+  `FlowTriggerEventPublisherInterface` (`QueuedFlowTriggerEventPublisher`), `DispatchFlowTriggerEventJob` resolves the
+  subscribed triggers and dispatches one `StartFlowFromEventJob` per trigger, which starts the subscribed flow.
 - `RagAdapterRegistry`, `RagQueryNodeHandler`, and validation exist, but no provider or knowledge-base storage is wired.
 - Loop runtime/builder work exists, including `loop_end` management and execution budget. Some array/property edge cases
   are still tracked in `docs/platform/TASKS.md`.

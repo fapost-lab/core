@@ -1,5 +1,8 @@
 # ADR-03 — ID Strategy: ULID as PK, UUID for external integrations
 
+> **Superseded in part (2026-10).** The trait is `Fapost\Support\Concerns\HasUlidPrimaryKey`, shipped by the
+> `fapost-support` package; the `app/Domains/Shared/Concerns/` location named below no longer exists.
+
 **Статус:** Принято · Апрель 2026
 
 **Контекст**
@@ -18,7 +21,7 @@ UUID v4 случаен — каждая вставка попадает в пр�
 - FK колонки: `foreignUuid('..._id')->constrained()->cascadeOnDelete()` — без изменений
 
 ```php
-// app/Domains/Shared/Concerns/HasUlidPrimaryKey.php
+// packages/fapost-support: Fapost\Support\Concerns\HasUlidPrimaryKey
 trait HasUlidPrimaryKey
 {
     use HasUlids;

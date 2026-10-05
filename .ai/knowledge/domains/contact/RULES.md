@@ -13,6 +13,7 @@ paths:
   - "app/Filament/Assistant/Resources/Contact*/**"
   - "database/migrations/tenant/*contact*"
   - "tests/*/Domains/Contact/**"
+reviewed_at: 2026-10-05
 ---
 # Contact rules
 
@@ -35,6 +36,8 @@ broken.
 
 ## Rules
 
-- **The "deliverable contact" query and the language fallback exist twice** — in
-  `SendContactNotificationJob` and in Broadcasting's `BroadcastRecipientResolver`. Change both
+- **The "deliverable contact" query and the language fallback exist twice** — the query in
+  `SendContactNotificationJob::deliverableChannelContacts` and in Broadcasting's
+  `BroadcastRecipientResolver`; the language fallback in `resolveLanguage` of
+  `SendContactNotificationJob` and of Broadcasting's `SendBroadcastRecipientJob`. Change both
   together, or extract them first. Review only. *(proposed)*

@@ -3,10 +3,13 @@ id: convention-plugins
 type: convention
 status: active
 domains: []
-paths: []
+paths:
+  - app/Providers/ModuleRegistrarInterface.php
+  - "app/Domains/Flow/Action/**"
 source: docs/site/extending/plugins.mdx
 summary: "Writing a Plugin: provider, manifest and the registrar methods"
-source_hash: b8891490f76c793808a2120c62a8b111eee082db
+source_hash: 0d519627232893d56f644dcac6a2908c82f8e556
+reviewed_at: 2026-10-05
 ---
 # Building a Plugin
 

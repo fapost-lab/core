@@ -17,6 +17,7 @@ paths:
   - "tests/Unit/Domains/Assistant/**"
   - "tests/Feature/Assistants/**"
   - tests/Feature/AssistantPanelTest.php
+reviewed_at: 2026-10-05
 ---
 # Assistant glossary
 

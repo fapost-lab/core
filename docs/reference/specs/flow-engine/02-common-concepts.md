@@ -1,69 +1,84 @@
-# 02 · Common Concepts
+# 02. Common Concepts
 
 ## 2.1 Variable definition
 
-Используется в Input и Assign nodes. Единый формат.
+Used by `input`, `assign`, `send_message` (`save_to_variable`) and `branch`. One format
+(`App\Domains\Flow\State\Variables\Variable`).
 
 ```json
 {
   "variable": {
     "name": "input1",
     "storage": "contact",
-    "group": "form"
+    "group": "form",
+    "type": "text"
   }
 }
 ```
 
-Поля:
+Fields:
 
-| Поле | Тип | Required | Описание |
-|------|-----|----------|----------|
-| `name` | string | yes | Имя переменной (alphanumeric + underscore) |
-| `storage` | enum | yes | `contact` или `session` |
-| `group` | string\|null | no | Имя группы (alphanumeric + underscore). null = корень |
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | yes | Variable name (identifier: letters, digits, underscore, not starting with a digit; not in `Variable::RESERVED_NAMES`) |
+| `storage` | enum | yes | `contact` or `session` (`VariableStorage`) |
+| `group` | string or null | no | Group name (identifier). `null` is the root. Contact storage only; `meta` is reserved |
+| `type` | enum or null | no | `VariableType`: `text`, `number`, `boolean`, `phone`, `email`, `confirm`, `date`, `contact`, `file`, `photo`, `location`, `select`, `json`, `array`. Drives coercion when the variable is read; an unknown type string is ignored |
+| `properties` | object | no | Extra schema metadata (for arrays: `item_type`, `max_size`) |
 
-> **Patch v1.1:** поле `type` удалено. Compiler не использует тип для маппинга — путь резолвится по `storage + group + name`. Источник/parsing данных задаётся через `Input.input_type` (см. [nodes/02-input.md](nodes/02-input.md)). Assign Expression resolves в any JSON-serializable значение, кладётся as-is.
+The identity of a variable is the triple `(storage, group, name)`. The path is resolved from
+`storage + group + name` by `VariableResolver`; the `type` does not change the path, only how a read
+value is coerced (the declared type, or the tenant variable schema when the variable has none).
+How the data is captured is set separately, by `input.expected_type` (see [nodes/02-input.md](nodes/02-input.md)).
+Typed declarations are collected at publish time into `tenant_variable_schema`, and a conflicting
+type from another flow is rejected (see [06-validation.md](06-validation.md)).
 
-**Compiler model — где физически хранится:**
+**Where it is physically stored:**
 
 | storage | group | Resolved path |
 |---------|-------|---------------|
 | `contact` | null | `contact.<name>` (in `attributes`) |
 | `contact` | `form` | `contact.form.<name>` (nested in `attributes`) |
 | `session` | null | `flow.<name>` (in `flow_sessions.state.flow`) |
-| `session` | `params` | `flow.params.<name>` |
+| `session` | `params` | not allowed: session variables have no group |
 
 ## 2.2 Expression
 
-Все значения которые могут быть переменными — это `Expression`. В V1 expression это **строка с placeholders**:
+Every value that may be a variable is an `Expression`. An expression is a **string with
+placeholders**:
 
 ```
-"Привет, {{contact.first_name}}"
+"Hello, {{contact.first_name}}"
 "{{flow.code}}"
 "{{contact.form.input1}} {{contact.form.input2}}"
 ```
 
-Чистая строка без placeholders — литерал. Чистый placeholder — значение по path.
+A plain string without placeholders is a literal. A pure placeholder yields the value at that path.
 
-**Решение:** expression evaluation реализуется как pluggable strategy через `ExpressionEngineInterface`. Engine выбирается per-tenant через `tenant.settings.expression_engine`, snapshot-фиксируется в `flow_definitions.expression_engine`. V1 ships built-in engine `'template'` (regex `{{path}}` substitution), дополнительные (Symfony EL, Twig, custom plugin engines) добавляются по first business need. Полный контракт и rationale — см. ADR Expression Language (`docs/platform/architecture/adr/08-expression-language.md`).
+Evaluation is a pluggable strategy behind `ExpressionEngineInterface`. The engine is chosen per flow
+definition: the engine id is stored in `flow_definitions.expression_engine` (default `template`,
+`TemplateEngine::ID`) and the runtime falls back to `template` when the stored id is empty or not
+registered. There is no per-tenant setting for it. Only the built-in `template` engine (`{{path}}`
+substitution) ships; more engines can be registered through `ExpressionEngineRegistry`.
 
-**Sandbox scope в expression:**
+**Namespaces readable in an expression:**
+
 - `system.*`
 - `flow.*`
 - `rag.*`
 - `call.*`
-- `contact.*` (читается через resolver)
-- `module.<name>.*` (читается через DataAccessor)
+- `contact.*` (through the reader)
+- `module.<name>.*` (through a `DataAccessorInterface`)
 
 ## 2.3 Output handles
 
-Каждый node возвращает `NodeExecutionResult` с `sourceHandle` — engine резолвит next node через edge lookup. Handlers — graph-unaware.
-
-Стандартные handles per node — см. описания нод в `nodes/`.
+Every node returns a `NodeExecutionResult` with a `sourceHandle`; the engine resolves the next node
+by edge lookup (`from` = node, `handle` = `sourceHandle`). Handlers are graph-unaware. Standard
+handles per node are described in `nodes/`.
 
 ## 2.4 Node JSON snapshot
 
-Базовая структура одинакова для всех нод:
+The base structure is the same for every node:
 
 ```json
 {
@@ -76,15 +91,14 @@
 }
 ```
 
-`id` — ULID per node в графе flow.
-`type` — типа handler в registry.
-`version` — версия контракта handler.
-`config` — node-specific.
+`id` is a per-node id in the flow graph, `type` is the handler type in the registry, `version` is the
+handler contract version (a missing value is read as `1`), `config` is node-specific. The entry node
+is not stored: it is the single node with no incoming edge.
 
 ---
 
-## Связано с
+## Related
 
-- [[01-state-model]] — state model
-- [[03-node-handler-interface]] — интерфейс handler
-- [[08-expression-language]] — expression language
+- [01-state-model.md](01-state-model.md)
+- [06-validation.md](06-validation.md)
+- `docs/site/extending/flow-nodes/` - the node handler contract for extension authors

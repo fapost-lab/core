@@ -1,5 +1,14 @@
 # ADR-08 — Expression Language Pluggability
 
+> **Superseded in part (2026-10).** What the code does differs from the target described below:
+>
+> - There is **no tenant-level `settings['expression_engine']`**, no tenant boot validation and no engine snapshot taken
+>   at save/publish time. `PublishFlowService` does not set the column.
+> - The engine is read from `flow_definitions.expression_engine` (column default `template`) in `FlowEngine` (around
+>   line 347); an empty or unregistered value falls back to `template`.
+> - `TemplateEngine` is the only engine that exists (`app/Domains/Flow/Expression/Engines/`); the registry
+>   (`ExpressionEngineRegistry`) and the immutable per-definition column are the parts that were built.
+
 **Status:** Accepted
 
 **Date:** Апрель 2026

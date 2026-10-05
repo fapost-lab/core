@@ -8,6 +8,7 @@ paths:
   - README.md
   - CONTRIBUTING.md
 summary: "Where documentation lives: published site, working material, plans in specs; records vs plans"
+reviewed_at: 2026-10-05
 ---
 # Documentation layout
 
@@ -19,14 +20,24 @@ The repository keeps three kinds of documentation apart, and each answers to a d
 truth for users, operators and contributors. Anything covered there is not restated under `docs/` — link
 to it instead. Editing it has its own practice: see `convention-published-docs-updates`.
 
-**Working material under `docs/`.** Drafts, records and design documents that are never published.
-`docs/INDEX.md` is its navigation. Two files there are records of what was already built, not plans:
-`docs/platform/ROADMAP.md` (history of the engineering milestones) and `docs/platform/TASKS.md` (what was
-implemented, by area). Do not add plans, milestones or new checkboxes to them.
-`docs/platform/current-state.md` describes fact, not intent: what exists in the code today.
+**Working material under `docs/`.** Roadmap, records and design documents that are never published.
+`docs/INDEX.md` is its navigation.
+
+- `docs/roadmap.md` is the living product roadmap: the steps in order, plus an Engineering backlog
+  section. It is the one place that says what comes next; the plan of each step or direction lives in
+  `.ai/specs/<id>/`, not in the roadmap.
+- `docs/platform/ROADMAP.md`, `docs/platform/TASKS.md` and `docs/platform/current-state.md` are
+  records. The first two are history of the engineering milestones and of what was implemented, by
+  area; do not add plans, milestones or new checkboxes to them. `current-state.md` describes fact, not
+  intent: what exists in the code today.
+- `docs/reference/` holds design specs and diagrams. They reach agents through stubs in
+  `.ai/knowledge/sources/`, which link to them, rather than by being copied into knowledge.
+- A plan that has been implemented moves to `docs/archive/`. `docs/platform/plans/` and a separate
+  documentation roadmap no longer exist.
 
 **Plans.** Open work is planned in `.ai/specs/` — one spec per product step or direction, each with its
-own roadmap of phases — and tracked as Jig tasks. Nothing under `docs/` tracks what is still to be done.
+own roadmap of phases — and tracked as Jig tasks. `docs/roadmap.md` orders the steps; it does not hold
+their checklists.
 
 Active source-of-truth documentation is written in English. Archive files under `docs/archive/` may keep
 their original language until they are deleted or rewritten.

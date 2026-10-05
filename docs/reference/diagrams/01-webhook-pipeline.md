@@ -1,10 +1,10 @@
-# Webhook Pipeline — входящее сообщение
+# Webhook Pipeline: an incoming message
 
-Полный путь сообщения от Telegram до ответа бота.
+The full path of a message from a channel (Telegram here) to the bot's reply.
 
 ```mermaid
 sequenceDiagram
-    actor U as Пользователь
+    actor U as User
     participant TG as Telegram API
     participant WC as Ingress<br/>(Go gateway or PHP-FPM)
     participant RD as Redis
@@ -16,93 +16,102 @@ sequenceDiagram
     participant NH as NodeHandler
     participant MS as MessageSender
 
-    U->>TG: отправляет сообщение
-    TG->>WC: POST /webhook/telegram/{hash}
+    U->>TG: sends a message
+    TG->>WC: POST /webhook/{channel}/{hash}
 
-    WC->>RD: GET webhook_registry:{hash}
-    RD-->>WC: {tenant_id, assistant_id,<br/>channel_id, secret_token}
+    WC->>RD: GET webhook:{hash}
+    RD-->>WC: {tenant_id, schema, assistant_id,<br/>channel_id, platform, secret_token}
 
-    WC->>WC: verify secret_token
+    WC->>WC: verify signature (secret_token)
+    WC->>RD: SET processed:{idempotency_key} NX EX 86400
     WC->>Q: dispatch IncomingMessageJob
-    WC-->>TG: 200 OK (быстрый ack)
+    WC-->>TG: 200 OK (fast ack)
 
-    Note over Q,J: Async — отдельный worker
+    Note over Q,J: Async, separate worker
 
-    Q->>J: process(message, context)
-    J->>J: TenantContext::set(tenant_id)
-    J->>J: switch DB schema
+    Q->>J: handle(InboundWebhookPayload)
+    J->>J: TenantSwitcher::runForTenant(tenant)<br/>(sets TenantContext, switches search_path)
+    J->>J: adapter.normalize(rawPayload)<br/>resolve assistant, contact, channel
+    J->>J: log inbound message (Conversation capture)
 
-    Note over J: Idempotency dedup уже прошёл в WebhookController,<br/>до dispatch job (processed:{idempotency_key})
+    Note over J: Idempotency dedup already happened in the ingress,<br/>before the job was dispatched
 
     J->>MR: route(contact, incomingMessage, assistant, channel)
 
     Note over MR: 1. Command match (pre-lock, synchronous)
-    MR->>MR: CommandMatcher.match(/reset, /cancel)
-    alt команда найдена
-        MR->>MS: send(system response)
-        MS->>TG: ответ команды
-        MR-->>J: commandHandled (без lock)
+    MR->>MR: CommandMatcher.match(/reset, /cancel, ...)
+    alt command matched
+        MR->>MS: send(command response)
+        MS->>TG: command reply
+        MR-->>J: commandHandled (no lock)
     end
 
     Note over MR: 2. Typing indicator start
-    MR->>TG: indicateProcessing(chatId)
+    MR->>TG: typing action
 
-    Note over MR: 3. Lock acquisition (backoff retry: 3×2s)
+    Note over MR: 3. Lock acquisition (3 attempts, 2s apart)
     MR->>RD: LOCK session_lock:{tenant}:{contact}:{assistant} TTL=30s
-    alt lock занят после всех попыток
-        MR->>MS: send(busy_message)
-        MS->>TG: «занят»
-        MR-->>J: dropped(lock_timeout) — job не ретраится
+    alt lock busy after all attempts
+        MR->>MS: send(busy notice)
+        MS->>TG: "busy"
+        MR-->>J: dropped(lock_timeout), job is not retried
     end
 
-    Note over MR: 4. Route по состоянию сессии<br/>(staff takeover check, затем SessionStateRouter)
-    MR->>FO: orchestrate(session, message)
+    Note over MR: 4. Route by session state<br/>(staff takeover check, wake of a due paused session,<br/>then SessionStateRouter)
+    MR->>FO: handle(contact, message, assistantId, trigger)
 
-    FO->>FE: execute(session, flowDefinition)
+    FO->>FE: start(definition, contact) or resume(session, message)
 
-    loop Execution loop
-        FE->>FE: refresh lock TTL (heartbeat, before each node)
+    loop Execution loop (max 100 iterations)
+        FE->>RD: refresh lock TTL (heartbeat, before each node)
         FE->>FE: resolve NodeHandler(type, version)
         FE->>NH: execute(nodeConfig, state, context)
-        NH-->>FE: NodeExecutionResult<br/>{status, sourceHandle, stateChanges}
-        FE->>FE: apply stateChanges
-        FE->>FE: next = outputs[sourceHandle].next
-        FE->>MS: отправка исходящих
-        MS->>TG: сообщение пользователю
+        NH->>MS: send(OutboundMessage) (send_message and similar handlers)
+        MS->>TG: message to the user
+        NH-->>FE: NodeExecutionResult<br/>{status, sourceHandle, stateChanges, ...}
+        FE->>FE: persist stateChanges + session status/current node<br/>(FlowSessionPersister)
+        FE->>FE: next = edge(from=node, handle=sourceHandle).to
     end
 
-    FE-->>FO: session завершена / ожидает ввода
+    FE-->>FO: session ended / waiting for input / paused
 
     Note over MR: 5-6. Execute done, cleanup
-    MR->>RD: RELEASE lock (Lua token check)
-    MR->>TG: stopProcessing (typing)
+    MR->>RD: RELEASE lock (token check)
+    MR->>TG: stop typing
 ```
 
-## Ключевые классы
+## Key classes
 
-| Класс | Путь | Роль |
+| Class | Path | Role |
 |-------|------|------|
-| `WebhookController` | `Http/Controllers/Webhook/` | Быстрый ack, dispatch job |
-| `IncomingMessageJob` | `Jobs/` | Tenant setup, вызов MessageRouter |
-| `MessageRouter` | `Domains/Flow/Routing/` | 6-шаговый pipeline: commands → typing → lock → state → execute → cleanup |
-| `FlowOrchestrator` | `Domains/Flow/Services/` | Сессия + запуск engine |
-| `FlowEngine` | `Domains/Flow/Services/` | Execution loop, handler registry |
-| `MessageSender` | `Domains/Messaging/Services/` | Отправка через channel adapter |
+| `WebhookController` | `app/Domains/Webhook/Http/WebhookController.php` | Stateless ack: registry lookup, signature check, idempotency, dispatch |
+| `IncomingMessageJob` | `app/Domains/Webhook/Jobs/IncomingMessageJob.php` | Tenant switch, normalisation, contact resolution, calls `MessageRouter` |
+| `MessageRouter` | `app/Domains/Flow/Routing/MessageRouter.php` | Pipeline: commands, typing, lock, state routing, execute, cleanup |
+| `FlowOrchestrator` | `app/Domains/Flow/Orchestration/FlowOrchestrator.php` | Finds or starts the session, access policy, optimistic retry; calls the engine |
+| `FlowEngine` | `app/Domains/Flow/Services/FlowEngine.php` | Execution loop; public API `start`, `resume`, `runSession` (also `resumeFromNode`, `resumeAfterSubflow`) |
+| `MessageSender` | `app/Domains/Messaging/MessageSender.php` | Delivery through the channel adapter, called by handlers via `MessageSenderInterface` |
 
-## Важные инварианты
+## Important invariants
 
-- **Ingress stateless** (ADR-01, отменён): без БД, только Redis и dispatch — поэтому его можно вынести за пределы PHP. Роль быстрого ingress выполняет опциональный Go-гейтвей (`gateway/`); без него те же запросы обслуживает PHP-FPM
-- `public_hash` → Redis — landlord DB не участвует в hot path
-- Session lock — один на triple (tenant, contact, assistant), ключ
-  `session_lock:{tenant}:{contact}:{assistant}` (`LockScope::key()`)
-- Lock не получен после retry (3×2s) → **busy notice** + `dropped(lock_timeout)`,
-  job **не** ретраится. Backoff-очередь (1, 2, 5, 10 сек) срабатывает только
-  когда `MessageRouter` ловит `engine_lock_timeout` (lock потерян во время
-  исполнения, а не при первичном acquire)
-- Optimistic lock: `flow_sessions.version` — `UPDATE WHERE version = N`
+- **The engine does not send messages.** `NodeExecutionResult` carries no outbound messages; handlers
+  such as `send_message` send them during `execute()` through `MessageSenderInterface`.
+- **The ingress is stateless:** no database, only Redis and a dispatch, which is why it can live
+  outside PHP. The optional Go gateway (`gateway/`) is the fast ingress; without it the same requests
+  are served by PHP-FPM (`WebhookController`). The controller touches no Eloquent and no
+  `TenantContext`.
+- The channel hash resolves through Redis (`webhook:{hash}`); on a miss the registry falls back to
+  the landlord `webhook_registry` table and re-caches it.
+- Webhook idempotency: `processed:{idempotency_key}` (`SET NX`, 24 h) in the ingress, before dispatch.
+- The session lock is one per (tenant, contact, assistant) triple, key
+  `session_lock:{tenant}:{contact}:{assistant}` (`LockScope::key()`), TTL 30 s.
+- Lock not acquired after 3 attempts 2 s apart: **busy notice** plus `dropped(lock_timeout)`; the job
+  is **not** retried. The job's backoff (1, 2, 5, 10 s) applies only when the router catches
+  `engine_lock_timeout` (the lock was lost or could not be taken during execution, not at the first
+  acquire).
+- Optimistic lock: `flow_sessions.version`, `UPDATE ... WHERE version = N`; `FlowOrchestrator`
+  retries a `FlowConcurrencyException` up to 3 times.
 
-## Связано с
-- [[architecture/adr/01-octane-ingress-only|ADR-01]] — отменён; ingress-only обоснование сохранено как история
-- [[09-message-routing-concurrency|ADR-09 Message Routing]] — concurrency & lock
-- [[architecture/platform/10-message-pipeline|Platform: Message Pipeline]]
-- [[specs/flow-engine/README|Flow Engine спека]]
+## Related
+
+- `.ai/knowledge/domains/flow/OVERVIEW.md` and `.ai/knowledge/domains/channel-ingress/OVERVIEW.md`
+- [02-flow-engine-loop.md](02-flow-engine-loop.md), [03-tenant-context.md](03-tenant-context.md)

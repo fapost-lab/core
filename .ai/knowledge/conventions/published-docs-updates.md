@@ -6,6 +6,7 @@ domains: []
 paths: []
 load: always
 summary: When a task must update docs.fapost.in, and what counts as too small to edit
+reviewed_at: 2026-10-05
 ---
 # Published documentation updates
 

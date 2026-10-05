@@ -9,10 +9,10 @@ paths:
   - app/Domains/Flow/Services/FlowSessionPersister.php
 source: docs/reference/diagrams/04-session-state-machine.md
 summary: Flow session statuses and the transitions the code makes between them
-source_hash: 18343408ce1e19050af7bcc31bf18282d26c4e91
-reviewed_at: 2026-09-22
+source_hash: 32f3a62ac9f81694606b1dbc799289468a833e6f
+reviewed_at: 2026-10-05
 ---
-# FlowSession — жизненный цикл сессии
+# FlowSession: the session lifecycle
 
 Linked source: [docs/reference/diagrams/04-session-state-machine.md](../../../docs/reference/diagrams/04-session-state-machine.md). The source owns its rules; this document only says when an agent
 must read it.

@@ -23,6 +23,7 @@ paths:
   - app/Http/Requests/SaveDraftRequest.php
   - app/Http/Requests/ValidateFlowRequest.php
   - app/Http/Requests/CallTestRequest.php
+reviewed_at: 2026-10-05
 ---
 # Flow builder
 
@@ -55,3 +56,6 @@ The Telegram mini app (`resources/js/tma`) is a separate surface and not part of
   `api/builderApi.ts`, autosave `useAutoSave`.
 - Config UI: `components/editor/ConfigPanel.vue` (the override map) and `SchemaFields.vue`
   (`FIELD_COMPONENTS`).
+- Variable vocabulary: `StorageRadio.vue` shows staff "Profile" or "Temporary", but
+  `StatePathPicker.vue` and the expression placeholders still show `flow.*` / `contact.*` paths and
+  namespace names.

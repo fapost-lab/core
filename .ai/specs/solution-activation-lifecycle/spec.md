@@ -85,6 +85,26 @@ validation that a package declares what it needs, and no screen that turns one o
 - Extension contracts live in `fapost/foundation`, consumed from their own repository; any contract
   change this work needs is made there, not in Core (ADR-05).
 
+## Earlier design carried over (2026-10)
+
+The pre-Jig platform notes (`docs/platform/architecture/platform/12-solutions-modules.md`,
+`13-self-hosted.md`, `15-open-questions.md`, removed when this was recorded) sketched more than the
+decisions above settle. Kept here as input, not as decisions:
+
+- What a Solution may register: action handlers (not node types — see Decisions), flow templates
+  for its niche, its own tenant-schema migrations, `DataAccessorInterface` implementations, Filament
+  resources, scheduled jobs, and roles/permissions through the registrar.
+- Manifest sketch: `module`, `version`, `requires_platform` (a semver range) and
+  `requires_capabilities` (e.g. `flow.rag_adapter`, `messaging.broadcast`, `contacts.attributes`).
+- Failure isolation: a handler exception fails the session with a fallback message; a Solution that
+  fails to boot leaves the install degraded — new sessions of its flows do not start, running ones
+  finish; a failed migration during an update rolls back that Solution only.
+- `platform:update` in five phases, each rolled back on its own rather than globally: validate
+  (manifests, capabilities, migration conflicts — abort with nothing touched), migrate platform,
+  migrate each Solution separately, boot validation (build registries, check capabilities),
+  activate (warm caches). Today `platform:update` does not exist; `Commands/Platform` holds only
+  install commands.
+
 ## Open questions
 
 - D4 (from the product roadmap): does an installed Solution have to be rebuilt into the front-end
@@ -96,6 +116,11 @@ validation that a package declares what it needs, and no screen that turns one o
   session, or let the current session finish on the handler it started with.
 - Whether a Solution may declare a Foundation version constraint that activation checks, or whether
   Composer's own resolution is the only gate.
+- Cross-Solution migration conflicts: a linter in CI, or a check at `platform:update`.
+- What happens to a Solution's tables when it is deactivated or removed: kept, or soft-deleted.
+- Role and permission names from two Solutions colliding: namespaced by Solution, or rejected at
+  registration.
+- Which Solution follows the first one — decided by demand after step 6, not here.
 
 ## Assumptions left untested
 

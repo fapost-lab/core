@@ -14,6 +14,7 @@ paths:
   - "app/Filament/Resources/Roles/**"
   - database/seeders/RoleSeeder.php
   - "tests/*/Domains/Staff/**"
+reviewed_at: 2026-10-05
 ---
 # Staff glossary
 

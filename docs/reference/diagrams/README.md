@@ -1,25 +1,13 @@
-# Диаграммы FaPost Core
+# FaPost Core diagrams
 
-Визуальное описание ключевых флоу платформы. Все диаграммы — Mermaid, рендерятся в Obsidian нативно.
+Visual descriptions of the key platform flows. All diagrams are Mermaid.
 
-| Диаграмма | Что описывает |
-|-----------|---------------|
-| [[01-webhook-pipeline]] | Входящее сообщение → очередь → обработка → ответ |
-| [[02-flow-engine-loop]] | Цикл выполнения flow engine (нода за нодой) |
-| [[03-tenant-context]] | Установка tenant-контекста и переключение схемы |
-| [[04-session-state-machine]] | Жизненный цикл flow session (статусы) |
-| [[05-conversation-logging]] | Логирование диалогов (новый домен) |
-| [[06-subflow-lifecycle]] | Запуск/возврат subflow |
+| Diagram | What it describes |
+|---------|-------------------|
+| [01-webhook-pipeline.md](01-webhook-pipeline.md) | Inbound message, queue, processing, reply |
+| [02-flow-engine-loop.md](02-flow-engine-loop.md) | The flow engine execution loop (node by node) |
+| [03-tenant-context.md](03-tenant-context.md) | Setting the tenant context and switching the schema |
+| [04-session-state-machine.md](04-session-state-machine.md) | Flow session lifecycle (statuses) |
+| [06-subflow-lifecycle.md](06-subflow-lifecycle.md) | Starting and returning from a subflow |
 
-> Добавляй новые диаграммы сюда и в [[../INDEX]].
-
----
-
-## Связано с
-
-- [[01-webhook-pipeline]] — диаграмма webhook pipeline
-- [[02-flow-engine-loop]] — диаграмма execution loop
-- [[03-tenant-context]] — диаграмма tenant context
-- [[04-session-state-machine]] — диаграмма state machine
-- [[05-conversation-logging]] — диаграмма conversation logging
-- [[06-subflow-lifecycle]] — диаграмма lifecycle subflow
+Add new diagrams here.

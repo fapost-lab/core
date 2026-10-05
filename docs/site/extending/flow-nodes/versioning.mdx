@@ -22,7 +22,8 @@ for, while new flows get the current one.
 
 ## supportedVersions()
 
-`supportedVersions()` declares which node versions a handler can execute. It is
+The registry keys handlers by `type@version()`. `supportedVersions()` is only
+validated to contain the handler's own version and has no runtime effect today. It is
 usually just the current version:
 
 ```php
@@ -38,8 +39,9 @@ public function supportedVersions(): array
 }
 ```
 
-When one implementation can correctly handle both the old and the new shape, it
-may declare both, and the older handler can then be removed:
+A handler may list older versions as documentation of what it can handle. This does
+not make it serve them: the class for version 1 must stay registered for as long as
+flows reference it.
 
 ```php
 public function supportedVersions(): array
@@ -48,9 +50,8 @@ public function supportedVersions(): array
 }
 ```
 
-Do this only when the old shape really is handled correctly — declaring a version
-you no longer honour is how a published flow starts behaving differently without
-anyone touching it.
+Listing an older version changes nothing at runtime today, so do not rely on it to
+keep old flows working. Keep the old handler registered.
 
 ## What counts as breaking
 

@@ -1,17 +1,16 @@
 # Node Usage Statistics
 
 **Document:** Flow Engine node observability (static + runtime usage)
-**Status:** Resolved and implemented. Supersedes the June 2026 draft extracted from the Loop
-addendum (`flow-engine-v1/nodes/11-loop.md`), whose open questions are settled below.
+**Status:** Implemented. The open questions of the June 2026 draft extracted from the Loop
+addendum are settled below.
 **Context:** independent feature — not tied to loop, useful for every node type.
 
 ---
 
 ## Related
 
-- [[11-loop]] — loop node, the original context
-- [[nodes/README]] — node catalogue
-- [[06-flow-engine]] — flow engine architecture
+- [nodes/11-loop.md](nodes/11-loop.md) — loop node, the original context
+- [nodes/README.md](nodes/README.md) — node catalogue
 
 ---
 
@@ -146,14 +145,8 @@ shrunk to retention: if a deployment changes the prune cutoff, a hard cap would 
   column on `flow_logs`.
 - **UI.** SQL and the console command for now; a Filament page can follow if asked for.
 
-## 8. Known defect found nearby, not addressed
+## 8. Related documents
 
-`app/Filament/Widgets/FlowActivityChart.php` aggregates `flow_logs` with
-`DATE(created_at AT TIME ZONE 'UTC')`, which is PostgreSQL-only, and counts everything that is
-not `executed` as failed — including `terminal`, a normal completion.
-
-## 9. Related documents
-
-- `flow-engine-v1/nodes/11-loop.md` — original context (Loop addendum)
+- [nodes/11-loop.md](nodes/11-loop.md) — original context (Loop addendum)
 - `.ai/knowledge/domains/flow/RULES.md` — handler registry and versioning rules
-- `flow-engine-v1/09-out-of-scope-and-open-questions.md` — V1.x backlog
+- `.ai/specs/flow-engine-v1x/spec.md` — the V1.x backlog

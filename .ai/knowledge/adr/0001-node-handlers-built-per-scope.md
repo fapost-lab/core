@@ -10,7 +10,7 @@ paths:
   - app/Domains/Flow/Contracts/NodeHandlerFactoryInterface.php
   - app/Infrastructure/Flow/ContainerNodeHandlerFactory.php
 summary: Why the node handler registry stores classes and builds handlers per resolve in the current scope instead of holding instances or resolver closures
-reviewed_at: 2026-09-11
+reviewed_at: 2026-10-05
 ---
 # ADR-0001: The node handler registry keeps classes and builds each handler in the current scope
 

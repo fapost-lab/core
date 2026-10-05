@@ -1,98 +1,110 @@
-# FlowSession — жизненный цикл сессии
+# FlowSession: the session lifecycle
 
-Statechart состояний `FlowSession` от создания до завершения, включая ожидание ввода, вложенные subflow и аварийный выход.
+A statechart of `FlowSession` states from creation to the end, including waiting for input, nested
+subflows and abnormal exits. Statuses are the `FlowSessionStatus` enum
+(`app/Domains/Flow/Enums/FlowSessionStatus.php`).
 
 ```mermaid
 stateDiagram-v2
-    [*] --> pending : FlowOrchestrator создаёт сессию
+    [*] --> active : FlowEngine::start creates the session<br/>flow_definition_id is pinned
 
-    pending --> active : Engine начинает выполнение\nflow_definition_id зафиксирован
+    active --> waiting_input : handler returned waiting()<br/>or delayed() without resumeAt:<br/>waits for the next message
 
-    active --> waiting_input : Нода вернула waiting()\nили delayed() без resumeAt —\nждёт следующего сообщения
+    waiting_input --> active : contact replied<br/>(MessageRouter routes into the session)
 
-    waiting_input --> active : Пришёл ответ контакта\n(MessageRouter роутит в сессию)
+    active --> paused : handler returned delayed(resumeAt)<br/>FlowSessionPersister writes<br/>system.delayed.{node}.resume_at<br/>and the engine schedules the wake-up
 
-    active --> paused : Нода вернула delayed(resumeAt)\nFlowSessionPersister пишет\nsystem.delayed.{node}.resume_at\nи планирует пробуждение
+    paused --> active : resume_at reached:<br/>DelayedSessionResumer (job, or<br/>MessageRouter inline under the lock)<br/>re-runs the node, resumedAfterDelay=true
 
-    paused --> active : resume_at наступил —\nDelayedSessionResumer\n(задание или MessageRouter\nинлайн под блокировкой)\nбудит ноду, resumedAfterDelay=true
+    paused --> terminated_by_user : GlobalCommandExecutor<br/>(/reset)
 
-    paused --> terminated_by_user : GlobalCommandExecutor\n(/reset-подобная команда)
+    waiting_input --> ended : only through authored edges:<br/>a timeout / no_response / invalid handle<br/>wired to an end node
 
-    waiting_input --> ended : Timeout (no_response)\nили превышен retry_limit
+    waiting_input --> cancelled : persistent button from another branch<br/>(FlowOrchestrator cancels the<br/>current session)
 
-    waiting_input --> cancelled : Нажата постоянная кнопка\nиз другой ветки (FlowOrchestrator:\nтекущая сессия отменяется)
+    active --> paused_subflow : SubflowStarterService<br/>child session created,<br/>parent_session_id set on the child
 
-    active --> paused_subflow : SubflowNodeHandler\nсоздана дочерняя сессия\nparent_session_id установлен в child
+    paused_subflow --> active : child ended: DefaultSubflowResumer<br/>-> FlowEngine::resumeAfterSubflow<br/>parent continues on the handle<br/>= child end_status
 
-    paused_subflow --> active : Дочерняя сессия завершена\n(DefaultSubflowResumer резолвит next node)\nParent resumed с handle end_status
+    paused_subflow --> completed : child ended, parent has no<br/>edge for that handle
 
-    paused_subflow --> completed : Дочерняя сессия завершена\nresumeAfterSubflow не находит\nследующую ноду в parent-графе
+    paused_subflow --> ended : child ended, parent continues<br/>and reaches its own end node
 
-    paused_subflow --> expired : SubflowTimeoutSweeper\nродитель осиротел (нет живого child)\nи expires_at истёк
+    paused_subflow --> expired : SubflowTimeoutSweeper:<br/>orphan parent (no live child)<br/>and expires_at passed
 
-    active --> completed : Граф исчерпан без явной end-ноды\n(NodeExecutionStatus::Finished)
+    active --> completed : Executed with no next node,<br/>or a non-end node returned finished()
 
-    active --> ended : EndNodeHandler выполнен\n(end_status определяет финальный цвет)
+    active --> ended : end node executed<br/>(end_status = success / cancelled / failed)
 
-    active --> failed : Неперехваченное исключение\nв engine или handler
+    active --> failed : handler returned failed(),<br/>handler threw, iteration budget exceeded
 
-    waiting_input --> failed : Неперехваченное исключение\nпри обработке ответа
+    waiting_input --> failed : handler threw while handling the reply
 
-    paused_subflow --> failed : Дочерняя сессия упала\nс неперехваченным исключением
+    active --> terminated_by_user : GlobalCommandExecutor (/reset)
 
-    active --> terminated_by_user : GlobalCommandExecutor\n(/reset-подобная команда)
-
-    waiting_input --> terminated_by_user : GlobalCommandExecutor\n(/reset-подобная команда)
-
-    state ended {
-        [*] --> success : end_status = success
-        [*] --> cancelled : end_status = cancelled
-        [*] --> failed : end_status = failed
-    }
+    waiting_input --> terminated_by_user : GlobalCommandExecutor (/reset)
 
     ended --> [*]
     completed --> [*]
     failed --> [*]
     expired --> [*]
+    cancelled --> [*]
     terminated_by_user --> [*]
 ```
 
-> `cancelled` ставит `FlowOrchestrator` (`FlowSessionRepository::cancel()`), когда нажатие
-> постоянной кнопки запускает её ветку: текущая сессия контакта отменяется, чтобы не было двух
-> активных. `/reset` переводит сессию в `terminated_by_user`, а не в `cancelled` — это верно и для
-> `paused`.
-> `paused` выставляется только для timed-формы `delayed(resumeAt)`; plain `delayed()` по-прежнему
-> паркует в `waiting_input`, как `waiting()`. `findActiveForContact()` возвращает и `paused` —
-> сообщение, пришедшее до `resume_at`, получает "занято" и не сохраняется для ноды; после
-> `resume_at` `MessageRouter` сперва будит ноду инлайн под уже взятой блокировкой
-> (`DelayedSessionResumer::wakeIfDue()`), затем маршрутизирует то же сообщение по новому
-> состоянию сессии.
+## Notes and caveats
 
-## Ключевые поля FlowSession
+- **`pending` is never assigned.** The enum has it and `SessionStateRouter` treats it as busy, but
+  every session is created directly as `active` (`FlowEngine::start`, `resumeFromNode`,
+  `SubflowStarterService`).
+- **`active -> paused` needs `delayed(resumeAt)`, and no built-in node returns it.** The `delay` node
+  parks as `waiting_input` (it returns `waiting()` and schedules its own resume job). `paused` is
+  reachable only by a vendor handler that returns `NodeExecutionResult::delayed(resumeAt: ...)`.
+  A plain `delayed()` parks as `waiting_input`, like `waiting()`.
+- **`findActiveForContact()` returns `active`, `waiting_input` and `paused`.** A message that arrives
+  before `resume_at` gets a "busy" reply and is not kept for the node. After `resume_at`,
+  `MessageRouter` first wakes the node inline under the lock it already holds
+  (`DelayedSessionResumer::wakeIfDue()`), then routes the same message by the new state.
+- **`waiting_input -> ended` has no built-in timeout.** A `send_message` timeout or an `input`
+  `no_response` / `invalid` handle only moves on if the author wired an edge from it, typically to
+  an `end` node. A `waiting_input` session otherwise stays parked.
+- **`cancelled`** is set by `FlowSessionRepository::cancel()` when a persistent-button press starts
+  its branch: the contact's current session is cancelled so that two are never active. `/reset`
+  sets `terminated_by_user` (and clears `current_node_id`), not `cancelled`.
+- **Parent of a subflow is `paused_subflow`.** Such a parent is not returned by
+  `findActiveForContact()`; the live child (`active` / `waiting_input`) is, so the contact's
+  messages land in the child. The `RouteToSubflowChild` branch in `SessionStateRouter` is therefore
+  not reached through the normal lookup.
+- **`completed` vs `ended`.** `ended` (with `end_status`) is written only by `persistEnd` for an
+  `end` node. `completed` is the plain "ran out of graph" outcome.
+- `expired` is set only by `SubflowTimeoutSweeper` for orphaned parents. A parent whose child is
+  still alive past `expires_at` is not expired: the child is force-failed and the parent resumes
+  through its `failed` handle.
 
-| Поле                    | Тип        | Назначение                                                                                  |
-| ----------------------- | ---------- | ------------------------------------------------------------------------------------------- |
-| `flow_definition_id`    | ULID       | Фиксируется при старте, **не меняется** до конца сессии (snapshot)                          |
-| `status`                | enum       | Текущее состояние: `pending`, `active`, `waiting_input`, `paused`, `paused_subflow`, `completed`, `ended`, `failed`, `cancelled`, `expired`, `terminated_by_user` |
-| `end_status`            | enum\|null | Финальный статус: `success`, `cancelled`, `failed` — только когда `status = ended`          |
-| `state`                 | JSONB      | Все переменные сессии (namespaced: `system.*`, `flow.*`, `rag.*`)                           |
-| `version`               | int        | Optimistic lock: `UPDATE WHERE version = N` защищает от concurrent writes                   |
-| `parent_session_id`     | ULID\|null | Ссылка на parent для subflow — null для top-level сессий                                    |
-| `parent_resume_node_id` | ULID\|null | Нода в parent, с которой продолжится выполнение после subflow                               |
+## Key `FlowSession` fields
 
-## Важные инварианты
+| Field | Type | Purpose |
+| ----- | ---- | ------- |
+| `flow_definition_id` | ULID | Pinned at start, **never changes** for the life of the session (snapshot) |
+| `status` | enum | `pending` (unused), `active`, `waiting_input`, `paused`, `paused_subflow`, `completed`, `ended`, `failed`, `cancelled`, `expired`, `terminated_by_user` |
+| `end_status` | string or null | `success`, `cancelled`, `failed`; set only when the session ended through an `end` node (or a forced subflow failure) |
+| `current_node_id` | string or null | The node the engine runs next; null once the session is finished |
+| `state` | JSONB | Session variables (namespaced: `system.*`, `flow.*`, `rag.*`, `call.*`) |
+| `version` | int | Optimistic lock: `UPDATE ... WHERE version = N` guards concurrent writes |
+| `parent_session_id` | ULID or null | Parent link for a subflow child; null for a top-level session |
+| `parent_resume_node_id` | string or null | The parent's subflow node id, recorded on the child at creation. Informational: the resumer continues from the parent's own `current_node_id` |
+| `expires_at` | timestamp or null | Subflow deadline; the starter extends the parent's expiry past the child's |
 
-- `flow_definition_id` неизменяем после создания — сессия всегда выполняется по своему snapshot
-- Routing входящих сообщений: пока существует active child — MessageRouter направляет в child, не в parent
-- `end_status` определяет handle для resume parent: `success` / `cancelled` / `failed` → разные выходы в parent графе
-- Вложенность subflow: максимум 3 уровня, проверяется `CallGraphValidator` при publish
-- Optimistic lock (`version`) + distributed lock (Redis) — два независимых уровня защиты от concurrent execution
+## Important invariants
 
-## Связано с
-- [[specs/flow-engine/00-overview|00 State model]]
-- [[10-state-writer-semantics|ADR-10 State Writer]]
-- [[11-subflow-composition|ADR-11 Subflow]] — paused_subflow статус
-- [[06-subflow-lifecycle]]
-- [[specs/flow-engine/README]] — обзор flow engine
-- [[06-flow-engine]] — flow engine архитектура
-- [[diagrams/02-flow-engine-loop]] — диаграмма execution loop
+- `flow_definition_id` is immutable after creation: a session always runs its own snapshot.
+- Parent resume handle = the child's `end_status` (`success` / `cancelled` / `failed`).
+- Subflow depth is at most 3, checked by `CallGraphValidator` at validation / publish time, not at runtime.
+- Optimistic lock (`version`) plus the distributed Redis session lock are two independent layers
+  against concurrent execution.
+
+## Related
+
+- [02-flow-engine-loop.md](02-flow-engine-loop.md)
+- [06-subflow-lifecycle.md](06-subflow-lifecycle.md)
+- `.ai/knowledge/domains/flow/OVERVIEW.md`

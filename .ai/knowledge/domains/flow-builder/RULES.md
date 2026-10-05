@@ -19,6 +19,7 @@ paths:
   - app/Domains/Flow/Services/ValidateFlowService.php
   - app/Domains/Flow/Services/LoadBuilderFlowService.php
   - "app/Domains/Flow/Validation/**"
+reviewed_at: 2026-10-05
 ---
 # Flow builder rules
 
@@ -47,3 +48,6 @@ broken.
   rebuild. Source: ADR-06.
 - **A button or select `value` is language-agnostic; only its label is translated.** Source:
   `conventions/multilingual.md`. Review only.
+- **Storage-choice controls (`StorageRadio.vue`) use the Profile/Temporary vocabulary, never
+  session, contact or namespace terms** — the intent of the archived builder storage spec. Review
+  only. *(proposed)*

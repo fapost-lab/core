@@ -1,98 +1,95 @@
-# Subflow Lifecycle — запуск вложенного flow и возврат управления
+# Subflow Lifecycle: starting a nested flow and returning control
 
-Полный цикл выполнения subflow-ноды: от запроса контакта до resumed parent, включая routing входящих сообщений в дочернюю сессию.
+The full cycle of a `subflow` node: from the contact's message to a resumed parent, including how
+inbound messages reach the child session.
 
 ```mermaid
 sequenceDiagram
-    actor U as Контакт
+    actor U as Contact
     participant MR as MessageRouter
     participant FO as FlowOrchestrator
     participant FE as FlowEngine
     participant SH as SubflowNodeHandler
+    participant ST as SubflowStarterService
     participant DB as flow_sessions
-    participant EH as EndNodeHandler
-    participant SR as SubflowResumer
+    participant SR as DefaultSubflowResumer
 
-    Note over U,SR: Фаза 1 — Parent flow достигает ноды subflow
+    Note over U,SR: Phase 1: the parent flow reaches the subflow node
 
-    U->>MR: входящее сообщение
-    MR->>FO: orchestrate(parentSession, message)
-    FO->>FE: execute(parentSession)
-
-    FE->>FE: resolve node type=subflow
-    Note over FE: Спец. случай engine (graph-aware)
+    U->>MR: inbound message
+    MR->>FO: handle(contact, message, assistantId)
+    FO->>FE: resume(parentSession, message)
 
     FE->>SH: execute(subflowConfig, state, context)
-    SH->>DB: CREATE child FlowSession\nparent_session_id = parent.id\nparent_resume_node_id = next_node_id\nflow_definition_id = subflow_flow_id
-    DB-->>SH: childSession
+    SH->>ST: start(parent, flow_id, timeout, subflowNodeId)
+    ST->>DB: UPDATE parent: status = paused_subflow<br/>(expires_at extended past the child's)
+    ST->>DB: CREATE child FlowSession<br/>parent_session_id = parent.id<br/>parent_resume_node_id = subflow node id<br/>flow_definition_id = latest active of flow_id<br/>status = active
+    ST->>FE: runSession(child) (synchronously)
+    FE->>FE: child runs to its first wait point<br/>(or straight to its end node)
+    ST-->>SH: child session
+    SH-->>FE: NodeExecutionResult::Waiting<br/>metadata {flow_id, child_id, timeout}
 
-    SH->>DB: UPDATE parentSession\nstatus = paused_subflow
-    SH-->>FE: NodeExecutionResult\nsourceHandle = paused
+    Note over FE: The parent was already moved by the starter,<br/>so the engine skips persisting this Waiting result
 
-    FE-->>FO: parent paused, child active
-    Note over DB: parentSession.status = paused_subflow\nchildSession.status = active
+    Note over U,SR: Phase 2: interaction inside the child
 
-    Note over U,SR: Фаза 2 — Взаимодействие внутри child flow
+    U->>MR: message (reply to an input in the child)
+    MR->>MR: findActiveForContact: parent is paused_subflow<br/>and not returned; the live child is
+    MR->>FO: handle(...)
+    FO->>FE: resume(childSession, message)
+    FE-->>FO: child continues / waits for input
 
-    U->>MR: сообщение (ответ на input в subflow)
-    MR->>MR: ищет active сессию для\n(tenant, contact, assistant)
-    Note over MR: Routing: active child приоритетнее paused parent
-    MR->>FO: orchestrate(childSession, message)
-    FO->>FE: execute(childSession)
-    FE->>FE: обычное выполнение нод child flow
-    FE-->>FO: child продолжается / ждёт ввода
+    Note over U,SR: Phase 3: the child ends (end node)
 
-    Note over U,SR: Фаза 3 — Child flow завершается (нода end)
-
-    U->>MR: последнее сообщение в child
-    MR->>FO: orchestrate(childSession, message)
-    FO->>FE: execute(childSession)
-
-    FE->>FE: resolve node type=end
-    Note over FE: EndNodeHandler — спец. случай engine
-
-    FE->>EH: execute(endConfig, state, context)
-    Note over EH: Видит parent_session_id в контексте
-
-    EH->>DB: UPDATE childSession\nstatus = ended\nend_status = success|cancelled|failed
-    EH->>SR: resumeParent(childSession)
-
-    SR->>DB: LOAD parentSession\nby parent_session_id
-    SR->>DB: UPDATE parentSession\nstatus = active\ncurrent_node_id = parent_resume_node_id
-
-    Note over SR: V1: output_mapping игнорируется\n(передача переменных child→parent — V1.1)
-
-    SR->>FE: execute(parentSession)
-    Note over FE: Parent продолжает с parent_resume_node_id\nhandle = end_status дочерней сессии
-
-    FE->>FE: outputs[end_status].next → следующая нода parent
-    FE-->>FO: parent продолжает выполнение
-
-    FO-->>U: ответ из parent flow
+    FE->>FE: child's end node: persistEnd<br/>status = ended, end_status = success|cancelled|failed
+    FE->>SR: resumeIfChild(child, endStatus)
+    SR->>DB: LOAD parent by parent_session_id
+    SR->>FE: resumeAfterSubflow(parent, handle = end_status)
+    FE->>DB: parent: current_node_id = edge(subflow node, handle).to<br/>status = active (or completed if no edge)
+    FE->>FE: executeLoop(parent): parent continues<br/>synchronously, inside the same tick
+    FE-->>U: reply from the parent flow
 ```
 
-## Ключевые классы
+## Key classes
 
-| Класс | Путь | Роль |
+| Class | Path | Role |
 |-------|------|------|
-| `SubflowNodeHandler` | `Domains/Flow/Handlers/` | Создаёт child сессию, ставит parent в `paused_subflow` |
-| `EndNodeHandler` | `Domains/Flow/Handlers/` | При наличии `parent_session_id` — триггерит resume parent |
-| `SubflowResumer` / `DefaultSubflowResumer` | `Domains/Flow/Services/` | Загружает parent, обновляет статус, перезапускает engine |
-| `FlowEngine` | `Domains/Flow/Services/` | Special-case по типу `subflow` и `end` (graph-aware навигация) |
-| `CallGraphValidator` | `Domains/Flow/Services/` | Валидирует глубину вложенности при publish (max 3 уровня) |
+| `SubflowNodeHandler` | `app/Domains/Flow/Handlers/SubflowNodeHandler.php` | Validates config, calls the starter, returns `Waiting`. Failures: `subflow_parent_missing`, `subflow_target_inactive` (failed result) |
+| `SubflowStarterService` | `app/Domains/Flow/Subflow/SubflowStarterService.php` | Pauses the parent, creates the child, drives it with `runSession()` |
+| `SubflowResumerInterface` / `DefaultSubflowResumer` | `app/Domains/Flow/Subflow/` | `resumeIfChild(child, endStatus)`: maps `end_status` to a handle, records history, calls `FlowEngine::resumeAfterSubflow()` |
+| `NoOpSubflowResumer` | `app/Domains/Flow/Subflow/` | Null implementation |
+| `SubflowTimeoutSweeper` | `app/Domains/Flow/Subflow/SubflowTimeoutSweeper.php` | Timeout and orphan recovery, run by the `flow:sweep-subflow-timeouts` command every minute |
+| `CallGraphValidator` / `CallGraphRepository` | `app/Domains/Flow/Subflow/` | Cycle and depth checks at validation / publish time |
+| `FlowEngine` | `app/Domains/Flow/Services/FlowEngine.php` | The engine, not the end handler, calls `resumeIfChild` after persisting an end node |
 
-## Важные инварианты
+## Important invariants
 
-- **Routing приоритет:** пока child сессия active — все сообщения от контакта роутятся в child, не в parent
-- **flow_definition_id snapshot:** child сессия стартует с `flow_definition_id` subflow — снимок зафиксирован, не меняется
-- **`parent_resume_node_id`** денормализуется в child при создании — parent знает куда вернуться без lookup в граф
-- **Глубина вложенности:** максимум 3 уровня (`A → B → C → D` запрещено), проверяется `CallGraphValidator` при publish, не в runtime
-- **V1 — output_mapping не реализован:** переменные из child state в parent не передаются автоматически; реализуется в V1.1
-- **`end_status` → handle:** parent resume использует `end_status` дочерней сессии как имя выхода (`success` / `cancelled` / `failed`) для резолвинга следующей ноды
+- **Resume is done by the engine.** `EndNodeHandler` only returns `Finished` with the end status in
+  `metadata`; after `persistEnd` the engine calls `SubflowResumerInterface::resumeIfChild()`. The
+  end handler never touches the parent.
+- **The child runs synchronously.** `SubflowStarterService` calls `FlowEngine::runSession($child)`,
+  so one inbound message can carry parent, child, child end and parent resume in a single run.
+- **Routing:** while a child is live the contact's messages go to the child, because a
+  `paused_subflow` parent is not returned by `findActiveForContact()`.
+- **`flow_definition_id` is a snapshot:** the child starts on the latest active definition of
+  `flow_id` and stays pinned to it.
+- **`parent_resume_node_id`** is the id of the parent's subflow node (`$subflowNodeId` in
+  `SubflowStarterService`). It is stored on the child and shown in the admin panel; the resumer
+  continues from the parent's own `current_node_id`, which still is the subflow node.
+- **Depth:** at most 3 levels (`A -> B -> C -> D` is rejected), checked by `CallGraphValidator` at
+  validate / publish time, not at runtime. A cross-assistant subflow is rejected by
+  `PublishFlowService` (`subflow_cross_assistant`).
+- **End status to handle:** the parent continues on the handle named after the child's `end_status`:
+  `success`, `cancelled` or `failed` (`SubflowNodeHandler::HANDLE_*`).
+- **Timeouts:** `config.timeout` is an ISO 8601 duration (default `PT24H`). When the parent's
+  `expires_at` passes, `SubflowTimeoutSweeper` force-ends a live child as `failed` and resumes the
+  parent on `failed`; a parent with no live child is marked `expired`. Each parent is handled under
+  its session lock; a busy lock is skipped until the next sweep.
+- **No output mapping:** variables are not copied from the child's state to the parent
+  automatically (the child starts with an empty `state`).
 
-## Связано с
-- [[11-subflow-composition|ADR-11 Subflow Composition]]
-- [[specs/flow-engine/nodes/08-subflow|Нода subflow]]
-- [[04-session-state-machine]] — paused_subflow статус
-- [[02-flow-engine-loop]] — engine-level навигация
-- [[diagrams/02-flow-engine-loop]] — диаграмма execution loop
+## Related
+
+- [04-session-state-machine.md](04-session-state-machine.md) (the `paused_subflow` status)
+- [02-flow-engine-loop.md](02-flow-engine-loop.md)
+- [../specs/flow-engine/nodes/08-subflow.md](../specs/flow-engine/nodes/08-subflow.md)

@@ -38,12 +38,10 @@ when: a flow with a `rag_query` node pointed at a real knowledge base returns a
 
 ## Waves
 
-1. Decide the embeddings provider and vector storage
-2. `knowledge_bases` table/migration and the `StructuredRagResult` DTO (both depend only on the
-   provider decision, can run in parallel)
-3. The Filament resource and the first adapter (each depends on its own wave-2 counterpart)
-4. `knowledge_base_id` validation in `ValidateFlowService` (needs real `knowledge_bases` rows to
-   validate against)
+1. Decide the embeddings provider and vector storage (pgvector vs. an external service)
+2. Add the `knowledge_bases` table and migration, shaped for the chosen provider; Add the `StructuredRagResult` DTO (found, confidence, answer, intent, metadata)
+3. Add a Filament resource to create and manage knowledge bases; Build the first RAG adapter for the chosen provider and register it in `RagAdapterRegistry`
+4. Validate `knowledge_base_id` against real data in `ValidateFlowService`, replacing the current runtime-only guard
 
 <!--
 Rules (jig-idea §8):

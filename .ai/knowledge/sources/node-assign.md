@@ -8,9 +8,10 @@ paths:
   - app/Domains/Flow/Handlers/AssignNodeHandler.php
 source: docs/reference/specs/flow-engine/nodes/05-assign.md
 summary: "assign node: operations on variables"
-source_hash: 539f89f463cf16995cd0af09a05fc30ca6c7e858
+source_hash: 6c8f90ef153a9227b2a43451b17948fc9ea6a6fe
+reviewed_at: 2026-10-05
 ---
-# Node · `assign`
+# Node: `assign`
 
 Linked source: [docs/reference/specs/flow-engine/nodes/05-assign.md](../../../docs/reference/specs/flow-engine/nodes/05-assign.md). The source owns its rules; this document only says when an agent
 must read it.
