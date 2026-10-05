@@ -121,13 +121,28 @@ From an independent failure hunt (2026-10-05), sharpest first.
   users the bot is a trial; letting contacts through and blocking only broadcasts, because then
   the cap is not a cap.
 - Split between Core and the SaaS shell (the owner's separate closed package, another repository):
-  Core ships only the enforcement seams — a quota contract in `fapost/foundation`, a default
-  implementation that allows everything, a call to it on every creation and runtime path, and the
-  "runtime stopped, admin read-only" tenant state. Plans, plan assignment, usage counters, the
-  trial term and tester provisioning live in the shell. — rejected: plans and trials in Core,
-  because open-source Core would carry the commercial model and every self-hosted install would
-  carry its code; starting with the shell alone, because the shell cannot refuse anything without
-  Core calling it.
+  Core ships only the enforcement seams — Foundation contracts, a default implementation that
+  allows everything, a call on every creation and runtime path, and the "runtime stopped, admin
+  read-only" tenant state. Plans, plan assignment, usage counters, the trial term and tester
+  provisioning live in the shell. — rejected: plans and trials in Core, because open-source Core
+  would carry the commercial model and every self-hosted install would carry its code.
+- Shell first, contracts on demand: the shell is designed first (its own spec, in its repository);
+  then the shell and Core are built in parallel, and each Core seam and Foundation contract is
+  added when the shell needs it. The first slice is a walking skeleton: the shell provisions a
+  tester tenant with a plan of at most one assistant, the tenant opens on its own host, and Core
+  refuses the second assistant. — rejected: building every Core seam ahead of the shell, because
+  contracts designed without a consumer guess their shape (the same reason `ecosystem-distribution`
+  waits for the first Solution).
+- The shell is controlled exactly like `fapost/foundation` and `fapost/support`: its own
+  repository from the first commit, checked out under `packages/` (git-ignored here), linked over
+  `vendor/` by `composer dev:link`. It depends only on Foundation and Support — never on `App\*` —
+  and an architecture test in the shell enforces that. — rejected: developing it inside Core's
+  `app/` and extracting later, because the easiest import is always the internal one and the
+  extraction never gets cheaper.
+- Every Core change made for the shell stands on its own: a default that changes nothing, a
+  deny-everything fake in Core's tests, and its own pull request into Core. A Core change whose
+  only justification is "the shell needs it" means the contract is wrong.
+- Foundation contract changes are batched into releases, not released one method at a time.
 - Storage: plans are defined in the shell's code (config: plan key → limit key → number, `null` =
   unlimited); the plan key, per-tenant overrides and the trial end are landlord data the tenant
   cannot reach. The unused `TenantSettings::$max_contacts` is removed from Core. — rejected: a
@@ -168,6 +183,12 @@ From an independent failure hunt (2026-10-05), sharpest first.
   inbound hot path grows with the table.
 
 ## Open questions
+
+- How a closed package gets into an install: Core's `composer.json` cannot require a private
+  package, and `dev:link` only replaces packages Composer already installed. The SaaS build
+  (and local development) needs a way to add the shell on top of Core without committing it here
+  — first question of the shell's design; same as `ecosystem-distribution`'s "what a paid closed
+  extension needs in order to be installable at all".
 
 - Shell data in the landlord database contradicts the Core rule "landlord data is reached only
   through Tenancy" — the rule needs an amendment (ADR) naming the operator-level package as the
