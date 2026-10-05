@@ -12,6 +12,7 @@ use App\Domains\Tenancy\ValueObjects\MigrationScope;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use InvalidArgumentException;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -156,6 +157,27 @@ final class TenantDatabaseManagerTest extends TestCase
         $this->assertSame($tenant->getSchemaName(), $this->currentSearchPath($tenantConn));
 
         $manager->restore();
+    }
+
+    /**
+     * PostgreSQL truncates a longer name on CREATE, so the existence check would compare a
+     * name the server never stored and miss the schema it aliases. Both refuse before SQL.
+     */
+    public function test_schema_names_past_the_identifier_limit_never_reach_the_database(): void
+    {
+        $manager = new TenantDatabaseManager();
+        $tenant  = $this->makeTenant(str_repeat('a', TenantDatabaseManager::MAX_IDENTIFIER_BYTES));
+
+        DB::shouldReceive('connection')->never();
+
+        foreach (['schemaExists', 'createSchema'] as $method) {
+            try {
+                $manager->{$method}($tenant);
+                $this->fail("{$method} accepted a schema name longer than the identifier limit.");
+            } catch (InvalidArgumentException $e) {
+                $this->assertStringContainsString('identifier limit', $e->getMessage());
+            }
+        }
     }
 
     public function test_restore_throws_on_empty_stack(): void

@@ -22,6 +22,9 @@ use InvalidArgumentException;
  */
 final class TenantDatabaseManager implements TenantDatabaseManagerInterface
 {
+    /** PostgreSQL NAMEDATALEN (64) minus the terminating byte; longer identifiers are silently truncated. */
+    public const int MAX_IDENTIFIER_BYTES = 63;
+
     /**
      * @var array<int, array{connection: string, search_path: array<int, string>|string|null}>
      */
@@ -29,9 +32,13 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
 
     /**
      * Create schema for the given tenant in the landlord database.
+     *
+     * @throws InvalidArgumentException when the name would be truncated into another schema's name.
      */
     public function createSchema(TenantInterface $tenant): void
     {
+        $this->assertFitsIdentifier($tenant->getSchemaName());
+
         DB::connection('landlord')->statement(
             'CREATE SCHEMA IF NOT EXISTS ' . $this->quoteIdentifier($tenant->getSchemaName())
         );
@@ -49,9 +56,17 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
 
     /**
      * Check if tenant schema already exists.
+     *
+     * The name is compared as given, so it must be one PostgreSQL stores unchanged: a longer
+     * name would be truncated on CREATE and never match here, letting a second tenant alias
+     * an existing schema.
+     *
+     * @throws InvalidArgumentException when the name exceeds the identifier limit.
      */
     public function schemaExists(TenantInterface $tenant): bool
     {
+        $this->assertFitsIdentifier($tenant->getSchemaName());
+
         $result = DB::connection('landlord')->selectOne(
             'SELECT 1 FROM information_schema.schemata WHERE schema_name = ?',
             [$tenant->getSchemaName()]
@@ -147,6 +162,19 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
 
         if (null !== $connection) {
             DB::purge($connectionName);
+        }
+    }
+
+    /**
+     * Not applied in quoteIdentifier(): dropSchema() must still reach a legacy schema whose
+     * stored name is longer, which PostgreSQL resolves by truncating it the same way.
+     */
+    private function assertFitsIdentifier(string $name): void
+    {
+        if (mb_strlen($name, '8bit') > self::MAX_IDENTIFIER_BYTES) {
+            throw new InvalidArgumentException(
+                "Schema name [{$name}] exceeds PostgreSQL's " . self::MAX_IDENTIFIER_BYTES . '-byte identifier limit.'
+            );
         }
     }
 

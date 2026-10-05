@@ -23,7 +23,7 @@ final class TenantSlugPolicyTest extends TestCase
             'leading digit' => ['2acme'],
             'all digits'    => ['12345'],
             'single char'   => ['a'],
-            'max length'    => [str_repeat('a', 63)],
+            'max length'    => [str_repeat('a', 56)],
         ];
     }
 
@@ -46,6 +46,18 @@ final class TenantSlugPolicyTest extends TestCase
             'null byte'       => ["acme\0"],
         ];
     }
+
+    /**
+     * @return array<string, array{0: string}>
+     */
+    public static function tooLongSlugs(): array
+    {
+        return [
+            '57 characters' => [str_repeat('a', 57)],
+            '63 characters' => [str_repeat('a', 63)],
+        ];
+    }
+
     #[DataProvider('wellFormedSlugs')]
     public function test_accepts_valid_dns_labels(string $slug): void
     {
@@ -75,6 +87,67 @@ final class TenantSlugPolicyTest extends TestCase
         $this->assertFalse($policy->isWellFormed('acme_corp'));
     }
 
+    public function test_dns_label_check_still_accepts_63_characters(): void
+    {
+        $this->assertTrue($this->policy()->isWellFormed(str_repeat('a', 63)));
+    }
+
+    public function test_slug_length_limit_matches_the_schema_prefix(): void
+    {
+        $this->assertSame(
+            TenantSlugPolicy::MAX_SCHEMA_NAME_BYTES,
+            mb_strlen(TenantSlugPolicy::SCHEMA_PREFIX) + TenantSlugPolicy::MAX_SLUG_LENGTH,
+        );
+    }
+
+    #[DataProvider('tooLongSlugs')]
+    public function test_rejects_slugs_whose_schema_name_would_be_truncated(string $slug): void
+    {
+        $this->expectException(InvalidTenantSlugException::class);
+        $this->expectExceptionMessage('63-byte');
+
+        $this->policy()->assertAssignable($slug);
+    }
+
+    public function test_schema_name_of_the_longest_assignable_slug_fits_exactly(): void
+    {
+        $policy = $this->policy();
+        $slug   = str_repeat('a', TenantSlugPolicy::MAX_SLUG_LENGTH);
+
+        $policy->assertAssignable($slug);
+
+        $this->assertSame(63, mb_strlen($policy->schemaNameFor($slug)));
+        $this->assertSame('tenant_acme_corp', $policy->schemaNameFor('acme-corp'));
+    }
+
+    /**
+     * PostgreSQL truncates identifiers at 63 bytes, so two slugs differing only past
+     * that point would share one physical schema. At most one may be assignable.
+     */
+    public function test_slugs_that_would_collide_after_truncation_are_not_both_assignable(): void
+    {
+        $policy = $this->policy();
+        $first  = str_repeat('a', 56) . 'x';
+        $second = str_repeat('a', 56) . 'y';
+
+        $this->assertSame(
+            mb_substr($policy->schemaNameFor($first), 0, 63),
+            mb_substr($policy->schemaNameFor($second), 0, 63),
+        );
+
+        $assignable = 0;
+
+        foreach ([$first, $second] as $slug) {
+            try {
+                $policy->assertAssignable($slug);
+                $assignable++;
+            } catch (InvalidTenantSlugException) {
+            }
+        }
+
+        $this->assertLessThan(2, $assignable);
+    }
+
     public function test_rejects_reserved_slugs(): void
     {
         $this->expectException(InvalidTenantSlugException::class);
@@ -95,6 +168,23 @@ final class TenantSlugPolicyTest extends TestCase
      * Punycode-prefixed labels render as non-ASCII names in browsers, which makes
      * them a ready-made lookalike for a platform host.
      */
+    /**
+     * The schema name collapses runs of separators, so "web--hook" would derive the same
+     * schema as "web-hook"; only one of the two may ever be assignable.
+     */
+    public function test_rejects_consecutive_hyphens_that_would_collide_after_derivation(): void
+    {
+        $policy = $this->policy();
+
+        $this->assertSame($policy->schemaNameFor('web-hook'), $policy->schemaNameFor('web--hook'));
+
+        $policy->assertAssignable('web-hook');
+
+        $this->expectException(InvalidTenantSlugException::class);
+        $this->expectExceptionMessage("contains '--'");
+        $policy->assertAssignable('web--hook');
+    }
+
     public function test_rejects_the_punycode_prefix(): void
     {
         $this->expectException(InvalidTenantSlugException::class);

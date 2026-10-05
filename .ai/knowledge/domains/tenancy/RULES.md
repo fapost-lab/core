@@ -37,6 +37,15 @@ broken.
   wrong tenant. Enforced: `TenantSwitcherTest`, `TenantDatabaseManagerTest`.
 - **Schema names are validated before they reach SQL** (`^[a-z][a-z0-9_]*$`, in
   `TenantDatabaseManager`). Why: the name is interpolated into `SET search_path`.
+- **Two slugs never map to one physical schema.** The schema name is derived only by
+  `TenantSlugPolicy::schemaNameFor()` (`tenant_` + slug with `-` → `_`); the policy caps a slug at
+  56 characters and rejects `--`, and `TenantDatabaseManager::createSchema()` / `schemaExists()`
+  refuse any name over PostgreSQL's 63-byte identifier limit. Why: PostgreSQL truncates longer
+  identifiers silently and the derivation collapses separator runs, so either would let a new
+  tenant's admin land in another tenant's schema. `dropSchema()` deliberately skips the length
+  check so a legacy long name can still be removed. `config('tenancy.schema_prefix')` is not read:
+  the prefix is fixed in `TenantSlugPolicy::SCHEMA_PREFIX`, and the 56-character cap depends on it.
+  Enforced: `TenantSlugPolicyTest`, `TenantDatabaseManagerTest`, `TenantProvisioningServiceTest`.
 - **An aborted transaction does not drop the connection to `public`.** `TenantPostgresConnection`
   re-applies `search_path` after a rollback. Enforced: `TenantDatabaseManagerTest`.
 - **Provisioning leaves a tenant inactive until its first admin exists**
