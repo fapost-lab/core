@@ -60,7 +60,9 @@ Not to be confused with the *assistant panel's* Filament "tenant", which is an `
   (404). `app/Http/Middleware/ResolveTenantContext.php` is prepended to `web`;
   `app/Http/Middleware/TenancyMiddleware.php` (alias `tenant`, in the Filament panel stacks and on
   builder/media/tma) requires a tenant and is placed before the session stack by the middleware
-  priority list. Both enter the tenant through `Services/TenantRequestRunner`.
+  priority list. Both enter the tenant through `Services/TenantRequestRunner`. Filament panels are
+  bound to the default tenant's host in `single` mode and to no domain in `host` mode
+  (`Support/TenantHost::panelDomain()`).
 - Workers: `TenantSwitcher::runForTenant()`.
 - Lifecycle: `Services/TenantProvisioningService` creates a tenant; `Services/TenantDecommissioner`
   removes one (webhook registry entries, then schema, then landlord row) — irreversible, used only

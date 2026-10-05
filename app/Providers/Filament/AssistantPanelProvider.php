@@ -70,10 +70,11 @@ final class AssistantPanelProvider extends PanelProvider
         return $panel
             ->id('assistant')
             ->path('assistant')
-            // The tenant panels live on the tenant host only. The base domain is
+            // The tenant panels live on tenant hosts only. The base domain is
             // reserved: a control plane for managing tenants belongs there, and a
             // tenant panel answering on it would be a surface nobody asked for.
-            ->domain(TenantHost::forDefaultTenant())
+            // In `host` mode there is no single host: see TenantHost::panelDomain().
+            ->domain(TenantHost::panelDomain())
             ->brandLogo(fn (): string => asset('logo.png'))
             ->brandLogoHeight('1.75rem')
             ->favicon(asset('favicon.png'))
@@ -133,6 +134,10 @@ final class AssistantPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
             ])
+            // Livewire replays only persistent middleware for component updates, and
+            // /livewire/update itself is served on the base domain as well. Without this
+            // a panel component posted there would run with no tenant instead of 404.
+            ->persistentMiddleware([TenancyMiddleware::class])
             ->middleware([
                 SetLocale::class,
             ], isPersistent: true)

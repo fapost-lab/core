@@ -62,10 +62,11 @@ final class AdminPanelProvider extends PanelProvider
             ->default()
             ->id('admin')
             ->path('admin')
-            // The tenant panels live on the tenant host only. The base domain is
+            // The tenant panels live on tenant hosts only. The base domain is
             // reserved: a control plane for managing tenants belongs there, and a
             // tenant panel answering on it would be a surface nobody asked for.
-            ->domain(TenantHost::forDefaultTenant())
+            // In `host` mode there is no single host: see TenantHost::panelDomain().
+            ->domain(TenantHost::panelDomain())
             ->brandLogo(fn (): string => asset('logo.png'))
             ->brandLogoHeight('1.75rem')
             ->favicon(asset('favicon.png'))
@@ -107,6 +108,10 @@ final class AdminPanelProvider extends PanelProvider
                 DispatchServingFilamentEvent::class,
             ])
             // Must run after StartSession (see first middleware() block above). A separate append keeps order correct.
+            // Livewire replays only persistent middleware for component updates, and
+            // /livewire/update itself is served on the base domain as well. Without this
+            // a panel component posted there would run with no tenant instead of 404.
+            ->persistentMiddleware([TenancyMiddleware::class])
             ->middleware([
                 SetLocale::class,
             ], isPersistent: true)

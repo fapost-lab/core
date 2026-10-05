@@ -39,6 +39,26 @@ final class TenantHost
     }
 
     /**
+     * Host the tenant panels are bound to, or null to leave them unbound.
+     *
+     * Evaluated once when the panels are registered, and frozen by `route:cache`,
+     * so it can depend on the mode but never on the request. In `single` mode the
+     * panels live on the one tenant's host. In `host` mode every tenant host serves
+     * them, so the panels carry no domain and TenancyMiddleware, first in each
+     * panel stack, decides who may reach them: a tenant host enters its tenant, the
+     * base domain and foreign hosts get 404. Without a domain the generated URLs
+     * follow the host of the current request.
+     */
+    public static function panelDomain(): ?string
+    {
+        if (TenancyResolutionMode::Host === TenancyResolutionMode::tryFrom((string) config('tenancy.resolution'))) {
+            return null;
+        }
+
+        return self::forDefaultTenant();
+    }
+
+    /**
      * Host patterns the application answers to, as regular expressions for TrustHosts.
      *
      * In `host` mode the Host header selects the tenant, so only the base domain and

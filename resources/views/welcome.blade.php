@@ -121,6 +121,7 @@
         with contacts, and run them through flows you design on a visual canvas.
     </p>
 
+    @if (null !== $adminUrl)
     <a class="cta" href="{{ $adminUrl }}">
         Open the admin panel
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -132,6 +133,7 @@
         Assistants, flows, contacts and conversations each have their own console,
         reached from the assistant you open in the panel.
     </p>
+    @endif
 
     <div class="links">
         <a href="https://docs.fapost.in">Documentation</a>
