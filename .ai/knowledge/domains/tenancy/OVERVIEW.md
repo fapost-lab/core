@@ -18,6 +18,7 @@ paths:
   - "app/Console/Commands/Ops/Tenants*"
   - "tests/Feature/Domains/Tenancy/**"
   - tests/Unit/Architecture/WebhookArchitectureTest.php
+  - app/Http/Middleware/ResolveTenantContext.php
 reviewed_at: 2026-10-05
 ---
 # Tenancy
@@ -52,9 +53,14 @@ Not to be confused with the *assistant panel's* Filament "tenant", which is an `
   `CoreBootstrap` and `TenantSwitcher` are `scoped`; repository and resolver are `bind`; the
   webhook registry reader and writer are `singleton`. The provider also installs the custom
   pgsql connection resolver that makes schema switching possible.
-- HTTP: `app/Http/Middleware/TenancyMiddleware.php` (prepended to `web`, and listed in the
-  Filament panel stacks). The tenant comes from `Services/ConfigTenantResolver`, which resolves
-  `tenancy.default_tenant_slug` — not the request host.
+- HTTP: `tenancy.resolution` picks the mode. `single` (default): `Services/ConfigTenantResolver`
+  serves the one tenant named by `tenancy.default_tenant_slug`. `host`:
+  `Services/RequestHostClassifier` sorts the request host into platform (the base domain, no
+  tenant), tenant (`<slug>.<base_domain>`, resolved by `Services/HostTenantResolver`) or foreign
+  (404). `app/Http/Middleware/ResolveTenantContext.php` is prepended to `web`;
+  `app/Http/Middleware/TenancyMiddleware.php` (alias `tenant`, in the Filament panel stacks and on
+  builder/media/tma) requires a tenant and is placed before the session stack by the middleware
+  priority list. Both enter the tenant through `Services/TenantRequestRunner`.
 - Workers: `TenantSwitcher::runForTenant()`.
 - Lifecycle: `Services/TenantProvisioningService` creates a tenant; `Services/TenantDecommissioner`
   removes one (webhook registry entries, then schema, then landlord row) — irreversible, used only

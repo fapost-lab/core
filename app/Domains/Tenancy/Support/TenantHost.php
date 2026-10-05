@@ -37,4 +37,28 @@ final class TenantHost
 
         return $slug . '.' . $base;
     }
+
+    /**
+     * Host patterns the application answers to, as regular expressions for TrustHosts.
+     *
+     * In `host` mode the Host header selects the tenant, so only the base domain and
+     * its subdomains may reach the application. In `single` mode the host selects
+     * nothing and nothing is restricted, as before.
+     *
+     * @return list<string>
+     */
+    public static function trustedHostPatterns(): array
+    {
+        $base = config('tenancy.base_domain');
+
+        if (TenancyResolutionMode::Host !== TenancyResolutionMode::tryFrom((string) config('tenancy.resolution'))) {
+            return [];
+        }
+
+        if (! is_string($base) || '' === $base) {
+            return [];
+        }
+
+        return ['^(.+\\.)?' . preg_quote(mb_strtolower($base), '#') . '$'];
+    }
 }

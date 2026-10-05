@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Http\Middleware;
+namespace Tests\Unit\Domains\Tenancy;
 
 use App\Domains\Tenancy\Contracts\CoreBootstrapInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantResolverInterface;
 use App\Domains\Tenancy\Services\TenantContext;
+use App\Domains\Tenancy\Services\TenantRequestRunner;
 use App\Domains\Tenancy\Services\TenantSwitcher;
-use App\Http\Middleware\TenancyMiddleware;
 use Illuminate\Http\Request;
 use Mockery;
 use PHPUnit\Framework\TestCase;
@@ -18,7 +18,7 @@ use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpFoundation\Response;
 
-final class TenancyMiddlewareTest extends TestCase
+final class TenantRequestRunnerTest extends TestCase
 {
     protected function tearDown(): void
     {
@@ -45,8 +45,8 @@ final class TenancyMiddlewareTest extends TestCase
         $bootstrap->shouldReceive('boot')->once();
         $bootstrap->shouldReceive('reset')->once();
 
-        $middleware = new TenancyMiddleware($resolver, $switcher, $bootstrap);
-        $response   = $middleware->handle($request, fn (): Response => new Response('ok'));
+        $runner   = new TenantRequestRunner($resolver, $switcher, $bootstrap);
+        $response = $runner->run($request, fn (): Response => new Response('ok'));
 
         $this->assertEquals('ok', $response->getContent());
         $this->assertFalse($context->isResolved());
@@ -71,15 +71,15 @@ final class TenancyMiddlewareTest extends TestCase
         $bootstrap->shouldReceive('boot')->twice();
         $bootstrap->shouldReceive('reset')->twice();
 
-        $middleware = new TenancyMiddleware($resolver, $switcher, $bootstrap);
+        $runner = new TenantRequestRunner($resolver, $switcher, $bootstrap);
 
         try {
-            $middleware->handle($request, function (): Response {
+            $runner->run($request, function (): Response {
                 throw new RuntimeException('test');
             });
             $this->fail('Expected RuntimeException to be thrown.');
         } catch (RuntimeException) {
-            $response = $middleware->handle($request, fn (): Response => new Response('ok'));
+            $response = $runner->run($request, fn (): Response => new Response('ok'));
             $this->assertEquals('ok', $response->getContent());
         }
 

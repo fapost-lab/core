@@ -98,6 +98,7 @@ the first start.
 APP_KEY=                       # generated below
 APP_URL=https://fapost.example.com
 TENANCY_BASE_DOMAIN=fapost.example.com
+TENANCY_RESOLUTION=single
 TENANT_SLUG=app
 
 DB_PASSWORD=<a real password>  # must not be empty
@@ -121,6 +122,10 @@ the welcome page and is reserved for a control plane; the admin panel and the
 assistant console are served from the tenant's own host, `TENANT_SLUG` prefixed
 to it. With the values above that is `app.fapost.example.com` — two names, both
 of which must resolve to this host.
+
+`TENANCY_RESOLUTION=single` serves that one tenant. `host` serves any number of
+tenants, each from its own `<slug>.` host; it needs a wildcard name and certificate
+and is not covered by this Compose setup yet.
 
 **`APP_ENV=production` is not cosmetic.** The images are built with `--no-dev`,
 and development tooling registered for the `local` environment is absent from

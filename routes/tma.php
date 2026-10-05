@@ -7,7 +7,7 @@ use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('tma/api')
-    ->middleware(['tma.auth'])
+    ->middleware(['tenant', 'tma.auth'])
     ->withoutMiddleware([ValidateCsrfToken::class])
     ->group(function (): void {
         Route::get('/forms/{formId}', [TmaFormController::class, 'show']);
