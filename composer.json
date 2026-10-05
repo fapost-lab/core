@@ -76,6 +76,10 @@
     "scripts": {
         "hooks:install": "@php tools/git-hooks/install.php",
         "dev:link": "@php tools/dev-link-packages.php",
+        "overlay": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php tools/composer-overlay.php"
+        ],
         "ngrok": "tools/ngrok-http",
         "tunnel": "tools/cf-tunnel",
         "setup": [

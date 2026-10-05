@@ -56,6 +56,12 @@ Assistant and Media models directly, and import cycles exist (for example Contac
 - **The extension packages are separate repositories.** Core consumes them through VCS
   repositories (`fapost/foundation ^0.3`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
   symlinked over `vendor/` by `composer dev:link` (`tools/dev-link-packages.php`).
+- **Packages Core does not require enter through a composer overlay.** A private or third-party
+  extension is never named in Core's `composer.json` or `composer.lock`: an untracked
+  `composer.overlay.json` is merged into `composer.local.json` and installed against Core's lock by
+  `tools/composer-overlay.php`, which refuses any package Core requires or locks, so an overlay can
+  never move a Core version. The same script serves local development, images derived from Core and
+  an extension's CI.
 - **The extension surface is partly built.** Present: the action handler registry
   (`Flow/Action/ActionHandlerRegistry`) and the builder's vendor-component contract, a static Vite
   glob in `resources/js/builder/utils/vendorComponents.ts`. Absent: a Core implementation of
