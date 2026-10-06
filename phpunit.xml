@@ -31,6 +31,8 @@
         <env name="LANDLORD_DB_DATABASE" value=":memory:"/>
         <env name="TENANT_DB_CONNECTION" value="sqlite"/>
         <env name="TENANT_SLUG" value="main"/>
+        <!-- Pinned: a developer .env with TENANCY_RESOLUTION=host must not change the default mode of the tests; host-mode tests switch it themselves. -->
+        <env name="TENANCY_RESOLUTION" value="single" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
