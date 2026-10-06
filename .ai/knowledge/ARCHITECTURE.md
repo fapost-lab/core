@@ -54,8 +54,11 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   Foundation, a primitive with no domain meaning into Support, anything with one domain's meaning
   stays in Core (ADR-05).
 - **The extension packages are separate repositories.** Core consumes them through VCS
-  repositories (`fapost/foundation ^0.3`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
+  repositories (`fapost/foundation ^0.4`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
   symlinked over `vendor/` by `composer dev:link` (`tools/dev-link-packages.php`).
+  Until 1.0 a package that depends on another FaPost package accepts its whole 0.x line
+  (`fapost/support` requires `fapost/foundation >=0.2 <1.0`), so a Foundation minor needs no release
+  of Support; from 1.0 constraints go by major.
 - **Packages Core does not require enter through a composer overlay.** A private or third-party
   extension is never named in Core's `composer.json` or `composer.lock`: an untracked
   `composer.overlay.json` is merged into `composer.local.json` and installed against Core's lock by

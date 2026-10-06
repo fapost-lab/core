@@ -19,7 +19,7 @@ paths:
   - "tests/Feature/Domains/Tenancy/**"
   - tests/Unit/Architecture/WebhookArchitectureTest.php
   - app/Http/Middleware/ResolveTenantContext.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-06
 ---
 # Tenancy
 
@@ -49,6 +49,7 @@ Not to be confused with the *assistant panel's* Filament "tenant", which is an `
 
 ## Entry points
 
+- Operator provisioning contract: `Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface` (public, in Foundation) is implemented by `Infrastructure/CoreTenantProvisioner`, which wraps `Services/TenantProvisioningService` and maps its failures to `ProvisioningFailure` reasons; a taken slug is checked through the repository before the service runs. It takes a password hash, never a plain password. Synchronous and slow, so callers run it outside HTTP requests; after `Failed` the slug stays taken (inactive row), so callers must not retry automatically.
 - Bindings: `app/Providers/DomainServiceProvider.php`. Tenant context, database manager,
   `CoreBootstrap` and `TenantSwitcher` are `scoped`; repository and resolver are `bind`; the
   webhook registry reader and writer are `singleton`. The provider also installs the custom

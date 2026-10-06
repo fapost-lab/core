@@ -16,6 +16,7 @@ use App\Domains\Tenancy\Exceptions\TenantProvisioningException;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Models\TenantStatus;
 use App\Domains\Tenancy\ValueObjects\MigrationScope;
+use SensitiveParameter;
 use Throwable;
 
 /**
@@ -50,6 +51,7 @@ final readonly class TenantProvisioningService
     public function provision(
         string $slug,
         string $firstAdminEmail,
+        #[SensitiveParameter]
         string $firstAdminPassword,
         string $firstAdminName = 'Administrator',
         array $config = [],
