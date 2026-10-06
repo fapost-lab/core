@@ -17,6 +17,9 @@ use App\Domains\Tenancy\Contracts\TenantInterface;
  */
 final class TenantHost
 {
+    /** Where a tenant's administrators sign in, on the tenant's own host. */
+    public const string ADMIN_LOGIN_PATH = '/admin/login';
+
     /**
      * Host for the tenant this installation resolves by default.
      *

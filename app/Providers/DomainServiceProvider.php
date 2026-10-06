@@ -13,6 +13,7 @@ use App\Domains\Tenancy\Contracts\WebhookRegistryReaderInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Database\TenantDatabaseManager;
 use App\Domains\Tenancy\Database\TenantPostgresConnection;
+use App\Domains\Tenancy\Infrastructure\CoreTenantDirectory;
 use App\Domains\Tenancy\Infrastructure\CoreTenantProvisioner;
 use App\Domains\Tenancy\Infrastructure\EloquentWebhookRegistryReader;
 use App\Domains\Tenancy\Repositories\TenantRepository;
@@ -26,6 +27,7 @@ use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Services\WebhookRegistryWriter;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
+use Fapost\Foundation\Tenancy\Contracts\TenantDirectoryInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Database\Connection;
@@ -78,6 +80,7 @@ final class DomainServiceProvider extends ServiceProvider
             $app->make(TenantSlugPolicy::class),
         ));
         $this->app->bind(TenantProvisionerInterface::class, CoreTenantProvisioner::class);
+        $this->app->bind(TenantDirectoryInterface::class, CoreTenantDirectory::class);
 
         $this->app->when(ConfigTenantResolver::class)
             ->needs('$defaultTenantSlug')
