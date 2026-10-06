@@ -74,6 +74,31 @@ DTOs: `OutboundMessage`, `MessagePayload`, `DeliveryResult`, `OutgoingMessage`,
 
 DTOs: `UploadContext`, `UploadResult`, `DownloadResult`. Enum: `MediaKind`.
 
+## Tenancy
+
+| Contract | Role |
+|---|---|
+| `Tenancy\Contracts\TenantProvisionerInterface` | Creating a tenant with its first administrator. Implemented by Core; a package only calls it |
+
+`provision(ProvisionTenant): ProvisionedTenant` creates the tenant record, its database schema,
+runs the migrations and creates the first admin.
+
+- `ProvisionTenant` carries `slug`, `adminEmail`, `adminName` and `adminPasswordHash`. The hash
+  is made by the caller with the application's hasher (`Hash::make`), never a plain password, so
+  the request can wait in a queued job or a pending row. An empty `adminName` becomes
+  `Administrator`.
+- `ProvisionedTenant` returns `id` (the tenant ULID), `slug` and `loginUrl` (the admin panel
+  login on the tenant's own host).
+- Failures are `Exceptions\TenantProvisioningFailedException` with a `reason`
+  (`Enums\ProvisioningFailure`): `SlugInvalid`, `SlugReserved`, `SlugTaken`,
+  `AdminCredentialsMissing`, `AdminPasswordHashInvalid` and `Failed`. All but `Failed` are
+  caused by the input. The top-level message never contains credentials; messages in the
+  `previous` chain come from Core and are not redacted.
+
+Provisioning is synchronous and slow, because the full tenant schema is migrated: run it from a
+console command or a queued job, not an HTTP request. After `Failed` the slug stays taken (an
+inactive tenant) until it is cleaned up, so a retry gets `SlugTaken`; do not retry automatically.
+
 ## Retrieval
 
 `Contracts\RagAdapterInterface` with `RagQueryContext`, `StructuredRagResult`, and

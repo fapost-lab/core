@@ -11,6 +11,17 @@ use RuntimeException;
  */
 final class InvalidTenantSlugException extends RuntimeException
 {
+    /**
+     * @param  bool  $reservedByPlatform  True when the slug is well-formed but names something the platform owns,
+     *                                    so a caller can tell it from a malformed one without parsing the message.
+     */
+    public function __construct(
+        string $message,
+        public readonly bool $reservedByPlatform = false,
+    ) {
+        parent::__construct($message);
+    }
+
     public static function malformed(string $slug): self
     {
         return new self(
@@ -36,7 +47,7 @@ final class InvalidTenantSlugException extends RuntimeException
 
     public static function reserved(string $slug): self
     {
-        return new self("Tenant slug [{$slug}] is reserved by the platform.");
+        return new self("Tenant slug [{$slug}] is reserved by the platform.", reservedByPlatform: true);
     }
 
     public static function punycodePrefix(string $slug): self
