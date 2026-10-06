@@ -115,6 +115,42 @@ Core; a package only calls it.
 - Ids are lowercase RFC 4122 ULIDs. Any other form names no tenant: `find` returns `null`, and
   `findMany` and the id filters ignore it.
 
+## Quota
+
+| Contract | Role |
+|---|---|
+| `Quota\Contracts\LimitRegistryInterface` | The limit keys the platform can enforce. Implemented by Core; Core and Solutions register keys, an operator package reads them |
+| `Quota\Contracts\TenantLimitsInterface` | How much of a key a tenant may use. Implemented by an operator package; Core's default allows everything |
+| `Quota\Contracts\RecordQuotaInterface` | Asking whether the current tenant may create one more record under a key. Implemented by Core; Core and Solutions call it |
+
+`LimitRegistryInterface` has `register(LimitDefinition)`, `find(string $key)` and `all()` (ordered by
+key). Registering an already known key, or registering after boot has finished, throws a
+`LogicException`: register while the application boots, from a service provider.
+
+- `LimitDefinition` carries `key` (snake_case, such as `assistants`; plans store limits under it),
+  `label` and `unit` (English, what an operator reads), `kind` and an optional `description`.
+- `Enums\LimitKind` says what a limit counts: `Records` (exist at a time, deleting one frees a slot),
+  `PerPeriod` (used within a billing period) and `Bytes` (stored bytes). Callers matching on it keep a
+  default arm, because kinds may be added in a minor release.
+
+`TenantLimitsInterface::limitFor(string $tenantId, string $key): ?int` returns the limit (at least 0)
+or `null` for no limit. The implementation only answers "how much"; Core counts what the tenant uses,
+because the records live in the tenant's own schema, and refuses creation over the limit. It is called
+on creation paths, so answer quickly and cache what you read. Bind it in your package's service
+provider: Core binds its default only when nothing is bound yet, so your binding wins whatever the
+provider order.
+
+`RecordQuotaInterface` has `canCreate(string $key, int $current): bool` and
+`assertCanCreate(string $key, int $current): void`. You count the tenant's existing records and pass
+the number; Core reads the limit for the tenant of the current request or job. `assertCanCreate`
+throws `Quota\Exceptions\RecordLimitReachedException` (`key`, `label`, `limit`, `current`; the
+message is meant for people, such as "Assistants limit reached: 1 of 1."), and a `LogicException`
+when the key is not registered, so a typo never means "no limit".
+
+Core registers `assistants` (kind `Records`). Existing records are never removed when a limit drops
+below the current count: only creating more is refused. Limits that count usage over time or
+bytes have no enforcement contract yet.
+
 ## Retrieval
 
 `Contracts\RagAdapterInterface` with `RagQueryContext`, `StructuredRagResult`, and

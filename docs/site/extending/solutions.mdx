@@ -46,6 +46,46 @@ Most Solutions are a combination of pieces documented elsewhere in this section:
   </Card>
 </CardGroup>
 
+## Limiting what a tenant can create
+
+If your Solution has records an operator should be able to cap per tenant (for example candidates),
+register a limit key from your service provider's `boot()`. Core binds the registry in its own
+provider, which can run after a package's `register()`, and closes the registry once the application
+has booted, so do not register from `register()` or from a `booted()` callback:
+
+```php
+use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
+use Fapost\Foundation\Quota\DTO\LimitDefinition;
+use Fapost\Foundation\Quota\Enums\LimitKind;
+
+$this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(
+    key: 'candidates',
+    label: 'Candidates',
+    unit: 'candidates',
+    kind: LimitKind::Records,
+));
+```
+
+The key is `snake_case` and stable, because plans store limits under it; the label and unit are in
+English. An operator package reads the registry to offer the limit in its plan form, and answers how
+much each tenant may have through `TenantLimitsInterface`. Registering the key is the Solution's
+whole contribution to the contract: it does not decide the number.
+
+Registering the key makes the limit exist; enforcing it is your Solution's job. Create the records
+through one service that counts the tenant's existing ones and asks `RecordQuotaInterface` before
+saving, and send every creation path through that service:
+
+```php
+use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
+
+$this->recordQuota->assertCanCreate('candidates', Candidate::query()->count());
+```
+
+It throws `RecordLimitReachedException` with a message fit for the person who sees it; catch it
+where you show errors. It works in the tenant context of the current request or job. Records that
+already exist stay when a limit drops: only creating more is refused. See
+[Foundation contracts](/reference/foundation-contracts#quota) for the interfaces.
+
 ## Before you start
 
 Read [Choosing an extension type](/extending/choosing-an-extension-type) first. The

@@ -134,6 +134,11 @@ return [
         'label'        => 'Асистент',
         'plural_label' => 'Асистенти',
 
+        'limit' => [
+            'reached_title' => 'Досягнуто ліміт асистентів',
+            'hint'          => 'Ліміт досягнуто (:current з :limit)',
+        ],
+
         'fields' => [
             'name'                => 'Назва',
             'default_language'    => 'Мова за замовчуванням',

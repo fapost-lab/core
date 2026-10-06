@@ -124,7 +124,8 @@ final class MigrateSmartCommand extends Command
 
         return $this->tenantSwitcher->runForTenant($tenant, fn (): int => $this->countPendingMigrationsForConnection(
             connection: (string)config('tenancy.tenant_connection', 'tenant'),
-            paths: [MigrationScope::tenant()->path],
+            // Settings migrations share the tenant's migrations table and run with tenant migrations.
+            paths: [MigrationScope::tenant()->path, MigrationScope::settings()->path],
         ));
     }
 }

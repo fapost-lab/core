@@ -21,12 +21,18 @@ use App\Domains\Tenancy\Services\ConfigTenantResolver;
 use App\Domains\Tenancy\Services\CoreBootstrap;
 use App\Domains\Tenancy\Services\DomainBootstrapper;
 use App\Domains\Tenancy\Services\HostTenantResolver;
+use App\Domains\Tenancy\Services\LimitRegistry;
+use App\Domains\Tenancy\Services\RecordQuota;
 use App\Domains\Tenancy\Services\RequestHostClassifier;
 use App\Domains\Tenancy\Services\TenantContext;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use App\Domains\Tenancy\Services\UnlimitedTenantLimits;
 use App\Domains\Tenancy\Services\WebhookRegistryWriter;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
+use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
+use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
+use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantDirectoryInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
@@ -100,6 +106,8 @@ final class DomainServiceProvider extends ServiceProvider
             $app->make(PermissionRegistrar::class),
             (string) config('permission.cache.key'),
         ));
+        $this->registerQuota();
+
         $this->app->singleton(WebhookRegistryWriterInterface::class, WebhookRegistryWriter::class);
         $this->app->singleton(WebhookRegistryReaderInterface::class, EloquentWebhookRegistryReader::class);
 
@@ -111,6 +119,33 @@ final class DomainServiceProvider extends ServiceProvider
                 $app->make(CoreBootstrapInterface::class)->reset();
             });
         });
+    }
+
+    /**
+     * Close the limit registry once every provider has registered its keys.
+     */
+    public function boot(): void
+    {
+        $this->app->booted(function (): void {
+            if (! $this->app->environment('testing')) {
+                $this->app->make(LimitRegistry::class)->freeze();
+            }
+        });
+    }
+
+    /**
+     * Limit registry, the default "no limits" answer and the record quota service.
+     *
+     * Package providers register before application providers, so the default is bound with
+     * bindIf: an operator package that already bound {@see TenantLimitsInterface} keeps its binding.
+     */
+    private function registerQuota(): void
+    {
+        $this->app->singleton(LimitRegistry::class, fn (): LimitRegistry => new LimitRegistry());
+        $this->app->singleton(LimitRegistryInterface::class, fn ($app): LimitRegistry => $app->make(LimitRegistry::class));
+        $this->app->bindIf(TenantLimitsInterface::class, UnlimitedTenantLimits::class);
+        // Not a singleton: it reads the scoped tenant context.
+        $this->app->bind(RecordQuotaInterface::class, RecordQuota::class);
     }
 
     /**
