@@ -45,12 +45,14 @@ banner.
 
 - [ ] Runtime-stopped, read-only tenant — Core asks a Foundation contract for a tenant's access mode on every request and job (default: active); in the stopped mode inbound is not processed, queued delay wake-ups and broadcasts do not run, the admin panel is read-only with a banner the shell fills, and tenant console commands still migrate stopped tenants (after: Operator provisioning contract — the mode extends the same operator surface)
 - [ ] Solution entitlement seam — Core's Solution activation screen asks the operator contract which installed Solutions a tenant may activate (default: all) and deactivates those it loses (after: Operator provisioning contract — the same operator surface; needs `solution-activation-lifecycle`)
+- [ ] `support-access-contract` — Support access contract — a Foundation contract through which the shell lets an operator enter a tenant's panel: a one-time, short-lived token bound to the operator opens a session of the tenant's platform support user (admin rights, created on first entry, not removable by the tenant, shown to the tenant in its audit and user list); off by default, so a self-hosted install has no such entry (decided with the owner on 2026-10-06; after: Operator provisioning contract — the same operator surface)
+- [ ] `tenant-rename-contract` — Tenant rename contract — a Foundation contract to change a tenant's slug (its host) with the provisioning checks; the schema name stays, and whether the old host redirects is decided in its design (after: Tenant directory contract — the same Foundation Tenancy section)
 - [ ] fog: read-only depth in the builder — whether the builder opens without save or is closed, cannot be stated until the read-only panel exists
 
 ## Waves
 
 1. Host-based tenant resolution; Operator provisioning contract; Quota contract with the assistant seam; Landlord ownership ADR; Tenant directory contract
-2. Panels on every tenant host; Activation on the tenant host; Deploy for several tenants; Pending reservation and resumable provisioning; Egress guard; Count limits on the other models; Inbound active-contact gate; Outbound volume gate; Runtime-stopped, read-only tenant; Solution entitlement seam
+2. Panels on every tenant host; Activation on the tenant host; Deploy for several tenants; Pending reservation and resumable provisioning; Egress guard; Count limits on the other models; Inbound active-contact gate; Outbound volume gate; Runtime-stopped, read-only tenant; Solution entitlement seam; Support access contract; Tenant rename contract
 
 <!--
 Rules (jig-idea §8):
