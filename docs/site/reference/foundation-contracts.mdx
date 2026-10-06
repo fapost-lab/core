@@ -99,6 +99,22 @@ Provisioning is synchronous and slow, because the full tenant schema is migrated
 console command or a queued job, not an HTTP request. After `Failed` the slug stays taken (an
 inactive tenant) until it is cleaned up, so a retry gets `SlugTaken`; do not retry automatically.
 
+`Tenancy\Contracts\TenantDirectoryInterface` is the read side: `list(TenantListQuery): TenantList`,
+`find(string $id): ?TenantSummary` and `findMany(array $ids): array` (keyed by id). Implemented by
+Core; a package only calls it.
+
+- `TenantListQuery` filters by `search` (case-insensitive slug substring), `status`, `onlyIds` and
+  `exceptIds`, and sorts by `Slug` or `CreatedAt` (rows without a creation time come last), ascending or
+  descending. `perPage` is 1 to 100 and each id list holds at most 1000 ids. `onlyIds: []` matches
+  nothing; `null` means no restriction.
+- `TenantList` carries `items`, the `total` across all pages, `page` and `perPage`.
+- `TenantSummary` carries `id`, `slug`, `status` (`Active`, `Inactive`, `Suspended`), `createdAt`
+  (UTC, may be null), `url` (the tenant host root, with a trailing slash) and `loginUrl` (the admin
+  login). With a single tenant per installation every tenant shares the application URL, so `url`
+  addresses a tenant only when the platform resolves tenants by host.
+- Ids are lowercase RFC 4122 ULIDs. Any other form names no tenant: `find` returns `null`, and
+  `findMany` and the id filters ignore it.
+
 ## Retrieval
 
 `Contracts\RagAdapterInterface` with `RagQueryContext`, `StructuredRagResult`, and

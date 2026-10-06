@@ -50,6 +50,7 @@ Not to be confused with the *assistant panel's* Filament "tenant", which is an `
 ## Entry points
 
 - Operator provisioning contract: `Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface` (public, in Foundation) is implemented by `Infrastructure/CoreTenantProvisioner`, which wraps `Services/TenantProvisioningService` and maps its failures to `ProvisioningFailure` reasons; a taken slug is checked through the repository before the service runs. It takes a password hash, never a plain password. Synchronous and slow, so callers run it outside HTTP requests; after `Failed` the slug stays taken (inactive row), so callers must not retry automatically.
+- Operator directory contract: `Fapost\Foundation\Tenancy\Contracts\TenantDirectoryInterface` (public, read-only, in Foundation) is implemented by `Infrastructure/CoreTenantDirectory`: a paginated, searchable list of tenants plus `find`/`findMany`, exposing only id, slug, status, creation time and the tenant's URLs (never the schema name or `config`). This is how a package is given tenants to read; it takes ids as lowercase RFC 4122 ULIDs and treats any other form as naming no tenant.
 - Bindings: `app/Providers/DomainServiceProvider.php`. Tenant context, database manager,
   `CoreBootstrap` and `TenantSwitcher` are `scoped`; repository and resolver are `bind`; the
   webhook registry reader and writer are `singleton`. The provider also installs the custom

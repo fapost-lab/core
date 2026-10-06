@@ -26,9 +26,6 @@ use Throwable;
  */
 final readonly class CoreTenantProvisioner implements TenantProvisionerInterface
 {
-    /** Where a tenant's administrators sign in, on the tenant's own host. */
-    private const string LOGIN_PATH = '/admin/login';
-
     private const string DEFAULT_ADMIN_NAME = 'Administrator';
 
     public function __construct(
@@ -70,7 +67,7 @@ final readonly class CoreTenantProvisioner implements TenantProvisionerInterface
         return new ProvisionedTenant(
             id: $tenant->getId(),
             slug: $tenant->getSlug(),
-            loginUrl: TenantHost::urlFor($tenant, self::LOGIN_PATH),
+            loginUrl: TenantHost::urlFor($tenant, TenantHost::ADMIN_LOGIN_PATH),
         );
     }
 
