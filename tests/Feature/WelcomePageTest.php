@@ -27,6 +27,18 @@ final class WelcomePageTest extends FeatureTestCase
         $response->assertSee($this->panelUrl('/admin'));
     }
 
+    public function test_welcome_page_has_no_admin_link_in_host_mode(): void
+    {
+        // The base domain belongs to the platform in host mode: there is no tenant
+        // of the installation whose panel it could point at.
+        config(['tenancy.resolution' => 'host']);
+
+        $this->get('/')
+            ->assertOk()
+            ->assertDontSee('Open the admin panel')
+            ->assertDontSee('/admin');
+    }
+
     public function test_welcome_page_is_not_indexed(): void
     {
         // An installation's root is not a public marketing page and should not

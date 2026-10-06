@@ -16,9 +16,6 @@ enum SessionRoutingDecision: string
     /** Resume an existing session that's awaiting input. */
     case ResumeWaiting = 'resume_waiting';
 
-    /** Route the message to the active subflow child instead of the parent. */
-    case RouteToSubflowChild = 'route_to_subflow_child';
-
     /** Drop with the configured "busy" notice (or silently for paused/active). */
     case DropBusy = 'drop_busy';
 

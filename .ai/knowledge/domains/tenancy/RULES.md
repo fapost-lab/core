@@ -18,6 +18,7 @@ paths:
   - "tests/Feature/Tenancy/**"
   - "tests/Feature/Domains/Tenancy/**"
   - tests/Unit/Architecture/WebhookArchitectureTest.php
+  - app/Http/Middleware/ResolveTenantContext.php
 reviewed_at: 2026-10-05
 ---
 # Tenancy rules
@@ -30,11 +31,40 @@ broken.
 - **A missing tenant context fails fast.** `TenantContext::get()` throws
   `TenantNotResolvedException`; there is no default-tenant fallback in the context itself.
   Enforced: code, `TenantContextTest`.
+- **The tenant is resolved before the session starts.** Session, password-reset and activation
+  tables live in tenant schemas, so a request must be in its tenant before `StartSession`:
+  `ResolveTenantContext` is first in `web`, and `TenancyMiddleware` is prepended to the
+  middleware priority list before `EncryptCookies`. Why: with the database session driver a
+  session read outside the tenant fails or reads another schema. Enforced:
+  `TenantMiddlewareOrderTest`.
+- **In `host` mode only `<slug>.<base_domain>` reaches a tenant.** The base domain runs with no
+  tenant; any other host, an unknown, inactive or reserved slug is a 404, and the default-slug
+  exemption from the reserved list applies only in `single` mode. Enforced:
+  `RequestHostClassifierTest`, `HostTenantResolverTest`, `HostResolutionTest`.
+- **In `host` mode a panel's only host boundary is `TenancyMiddleware`.** Panels are registered
+  without a domain (`TenantHost::panelDomain()` is `null`), so `/admin` and `/assistant` match on
+  every host; `TenancyMiddleware` first in each panel's middleware — and persistent, so Livewire
+  updates replay it — is what turns the base domain and foreign hosts into 404. Never remove it or
+  move it after the session stack. URLs built inside a request follow the current host; URLs built
+  outside one (mail, queued jobs) must name the tenant host explicitly — through
+  `TenantHost::urlFor()`, as the staff activation mail does. Enforced: `HostModePanelsTest`,
+  `TenantMiddlewareOrderTest` (every `filament.*` route), `ActivationHostModeTest`.
 - **A tenant switch always restores.** `runForTenant()` restores the connection, resets the
-  context, runs restore hooks and clears the permission cache even when the database restore
-  itself throws. A restore without a matching switch throws `ConnectionStackEmptyException`.
+  context, runs restore hooks and points the permission registrar back at the outer cache key even
+  when the database restore itself throws. A restore without a matching switch throws `ConnectionStackEmptyException`.
   Why: a Horizon worker that keeps the previous tenant's schema serves the next job from the
   wrong tenant. Enforced: `TenantSwitcherTest`, `TenantDatabaseManagerTest`.
+- **Each tenant's permissions are cached under a key of its own.** On every switch
+  `TenantSwitcher` sets the spatie registrar's `cacheKey` to `<permission.cache.key>.tenant.<id>`
+  and drops the collection loaded in memory; on restore it returns to the outer tenant's key, or
+  the platform key. The cache store is never flushed on a switch. Why: the registrar is a
+  worker-wide singleton and the cache store is shared by every worker, so one global key served
+  one tenant's roles and permissions to another's requests. Limits: an entry lives until
+  `permission.cache.expiration_time` (24h), so a change made outside Eloquent's events — raw SQL,
+  a restored schema under the same tenant id — stays invisible until then; flush that tenant's key.
+  `permission:cache-reset` clears only the platform key, not the tenants'. Role writes flush the
+  key once more after their transaction commits (`RoleWriterService`), so a load racing the commit
+  cannot cache the old grants. Enforced: `TenantSwitcherTest`.
 - **Schema names are validated before they reach SQL** (`^[a-z][a-z0-9_]*$`, in
   `TenantDatabaseManager`). Why: the name is interpolated into `SET search_path`.
 - **Two slugs never map to one physical schema.** The schema name is derived only by
@@ -59,8 +89,13 @@ broken.
   a `Tenancy/Contracts` interface. Why: tenant isolation stays auditable in one place.
   Review only — no PHPat rule covers it. Known exceptions: the install and
   migrate console commands (`InstallPlatformCommand`, `InstallCommand`, `MigrateSmartCommand`) open
-  the connection to run landlord migrations, and `AppServiceProvider` loads
-  `database/migrations/landlord`.
+  the connection to run platform migrations (`migrate --database=landlord --force`, no `--path`,
+  so every registered migration path runs; `database/settings` is not one of them — the settings
+  migrations are tenant-scoped, so `config/settings.php` leaves `migrations_paths` empty and they
+  run only through `MigrationScope::settings()`), and `AppServiceProvider` loads
+  `database/migrations/landlord`. An extension package may open `landlord` only for tables of its
+  own prefix, and never writes `tenants` or `webhook_registry`
+  (`adr-20261005-extension-packages-own-landlord-tables`).
 - **In workers, change tenant only through `TenantSwitcher::runForTenant()`**; never set
   `search_path` or the context directly. Review only.
 - **Core is not the control plane.** No SaaS logic, billing or onboarding belongs in Core, and

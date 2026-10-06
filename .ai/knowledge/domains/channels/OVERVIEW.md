@@ -56,7 +56,7 @@ Messaging, and its tests still use the `Tests\Unit\Domains\Messaging\Telegram` n
   `channels.telegram_delivery`, `media.channel.uploader`, `media.channel.downloader`.
 - `Services/ChannelService.php`, `Observers/ChannelObserver.php`.
 - `app/Domains/Messaging/MessageSender.php`, `app/Domains/Messaging/Typing/`.
-- Jobs in `app/Jobs/Messaging/`: `BroadcastSendJob` (`messaging.broadcast`), `SyncChannelWebhookJob`
-  (`messaging.system`), and `SendTransactionalMessageJob` (`messaging.transactional`), which is
-  reserved: nothing dispatches it, only tests exercise it. Flow replies are sent inline by
+- Jobs in `app/Jobs/Messaging/`: `BroadcastSendJob` (`messaging.broadcast`) and
+  `SyncChannelWebhookJob` (`messaging.system`). `messaging.transactional` is reserved and has no
+  job (the unused `SendTransactionalMessageJob` was removed in 2026-10). Flow replies are sent inline by
   `FlowMessageSender` → `MessageSender::send()` inside the `flow.execution` job.

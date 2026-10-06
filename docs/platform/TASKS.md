@@ -95,7 +95,7 @@
 - [ ] `form` — сбор данных через веб-форму (TMA / hosted) вместо цепочки `input` — спека `.ai/specs/forms-data-collection/`
 
 ### P3
-- [x] `comment` (builder-only аннотация): палитра (`NodeTypesController`), skip в валидации, strip-at-publish с перебросом edges (`AnnotationNodeTypes`, `PublishFlowService::stripAnnotationNodes`); карточка на канвасе, текст заметки с переносами строк, заголовок в outline-панели, редактирование через generic `SchemaConfigRenderer` (`FlowNodeCard.vue`, `FlowStructureNode.vue`, `nodeColors.ts`)
+- [x] `comment` (builder-only аннотация): палитра (`NodeTypesController`), skip в валидации, strip-at-publish с перебросом edges (`AnnotationNodeTypes`, `AnnotationNodeTypes::strip()`); карточка на канвасе, текст заметки с переносами строк, заголовок в outline-панели, редактирование через generic `SchemaConfigRenderer` (`FlowNodeCard.vue`, `FlowStructureNode.vue`, `nodeColors.ts`)
 
 ---
 
@@ -190,7 +190,7 @@
 - [x] **Фаза 7 — Filament chat viewer** (assistant-панель, read-only): `ConversationResource` + `ConversationsTable` (inbox-лента) + `ViewConversation` (custom Page, blade-пузыри inbound/outbound, media/keyboard/delivery-status); lang en/ru/uk; scope по `assistant_id`
 - [x] **Фаза 4a — inbound media**: `FetchConversationMediaJob` (queue `messaging.logging`) поверх `MediaIngestor::ingestFromChannel(..., source: Conversation)`; сообщение пишется сразу с media-дескриптором `status:pending`, джоба досоздаёт `media_file_id` (`status:ready`) либо `status:failed` с сохранением `provider_file_id`; `MediaSource::Conversation` + фильтр в `MediaService::listFolderContents` (не засоряет медиа-библиотеку); `appendMessage` возвращает id, `updateMessageMedia()` в store
 - [x] Outbound media через upload-as-send (`FlowMessageSender` `alreadyDelivered`) теперь логируется — `buildOutboundMessage()` + `captureOutbound()` в самом `FlowMessageSender` (единственный путь мимо `MessageSender`)
-- [ ] `ConversationReaderInterface` (Фаза 8, при переходе на ClickHouse; сейчас Filament читает Postgres-Eloquent — документированный trade-off §10) — задача Jig `conversation-reader-interface`
+- [ ] `ConversationReaderInterface` (Фаза 8, при переходе на ClickHouse; сейчас Filament читает Postgres-Eloquent — документированный trade-off §10) — пункт «Transcript read port» спеки `.ai/specs/data-lifecycle/`
 
 > **Вне скоупа (отдельная фаза после запуска продукта):** delivery-status (read-receipts). Provider-agnostic плумбинг
 > `updateDeliveryStatus` → `UpdateConversationDeliveryStatusJob` → `store.updateStatus` уже есть и покрыт тестами, но

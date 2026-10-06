@@ -18,7 +18,7 @@ final class ActivationMail extends Mailable
 
     public function __construct(
         public User $user,
-        public string $plainToken,
+        public string $activationUrl,
     ) {
     }
 
@@ -35,7 +35,7 @@ final class ActivationMail extends Mailable
             markdown: 'mail.staff.activation',
             with: [
                 'userName'      => $this->user->name,
-                'activationUrl' => url('/activate?token=' . urlencode($this->plainToken)),
+                'activationUrl' => $this->activationUrl,
             ],
         );
     }

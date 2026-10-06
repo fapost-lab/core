@@ -144,6 +144,64 @@ A Solution, a Plugin or a private extension is added on top of Core with a
 the package is installed against Core's locked versions, and the same mechanism
 serves local development, your extension's CI and an image built from Core.
 
+### Quick start: develop a package against a Core checkout
+
+<Steps>
+  <Step title="Check the package out under packages/">
+    `packages/` is ignored by Core's `.gitignore`, so the checkout never shows up in Core's
+    repository:
+
+    ```bash
+    git clone git@<git-host>:<org>/my-extension.git packages/my-extension
+    ```
+  </Step>
+
+  <Step title="Describe it in composer.overlay.json">
+    At Core's root (the file is git-ignored too):
+
+    ```json
+    {
+      "repositories": [{ "type": "path", "url": "packages/my-extension" }],
+      "require": { "acme/my-extension": "@dev" }
+    }
+    ```
+  </Step>
+
+  <Step title="Install it">
+    ```bash
+    composer overlay
+    ```
+
+    It writes `composer.local.json` and `composer.local.lock` and installs the package against
+    Core's locked versions. `dev:link` then links `vendor/acme/my-extension` to your checkout, so
+    edits are live.
+  </Step>
+
+  <Step title="Keep using the overlaid manifest">
+    Run every further Composer command in Core with `COMPOSER=composer.local.json`:
+
+    ```bash
+    COMPOSER=composer.local.json composer dump-autoload
+    ```
+
+    A plain `composer install` returns Core to its state without the package — `composer overlay`
+    brings it back.
+  </Step>
+
+  <Step title="Run the package's tests inside Core">
+    Test against the real application with Core's PHPUnit and the package's own configuration,
+    whose bootstrap loads Core's `vendor/autoload.php`:
+
+    ```bash
+    php artisan config:clear
+    cd packages/my-extension
+    php ../../vendor/bin/phpunit -c phpunit.xml
+    ```
+  </Step>
+</Steps>
+
+The sections below explain each piece.
+
 ### The overlay file
 
 Describe the package in `composer.overlay.json` at Core's root. The file is
@@ -277,6 +335,24 @@ not change what production installs.
   Solution or Plugin. Make sure your key is authorised, or `auth.json` is set for
   private hosts, before running `composer update`.
 </Note>
+
+## Landlord tables of a package
+
+An extension may keep platform-level data of its own, for example plans or usage per
+tenant, in the `landlord` database. The rules:
+
+- Name every table with the package's own prefix, such as `saas_`.
+- Never write Core's landlord tables (`tenants`, `webhook_registry`) and never put a
+  foreign key on them. Refer to a tenant by its id and clean up your own rows yourself.
+- Deliver the migrations with `loadMigrationsFrom()` in the package's service provider.
+- Declare `protected $connection = 'landlord';` in each migration, and keep it pure DDL.
+
+The platform migrate command applies them together with Core's own, so no extra deploy
+step is needed:
+
+```bash
+php artisan migrate --database=landlord --force
+```
 
 ## Reference
 

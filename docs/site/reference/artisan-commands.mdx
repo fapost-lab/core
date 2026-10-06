@@ -51,6 +51,7 @@ webhooks are not arriving — see [Webhook gateway](/self-hosting/gateway).
 |---|---|
 | `flow:sweep-subflow-timeouts` | Force-fail subflow children whose parent has expired, and resume the parent through its failed handle |
 | `flow:node-usage` | Report which node types and versions are still in use, per tenant and across the platform |
+| `flow:audit-graph` | Report structural graph problems (no single entry node, unreachable nodes, duplicate handles, malformed variables) in active flow definitions and drafts, per tenant |
 
 Run `flow:node-usage` before you remove a node handler or retire a handler version.
 For each `type@version` it reports how many active flow definitions contain the node
@@ -63,6 +64,10 @@ runs sooner or later — while the execution counts reach back only as far as
 on every run. Options: `--days` for the runtime window, `--tenant` for a single slug,
 `--type` for a single node type, and `--json`.
 
+`flow:audit-graph` changes nothing. Findings never change its exit code; it exits non-zero only when the audit itself could not run (an unknown `--tenant` slug, or a tenant that failed). Publishing does not check the
+graph structure yet, so a flow can be active and still fail when a conversation starts.
+Options: `--tenant` for a single slug and `--json`.
+
 ## Log partitions
 
 | Command | Does |
@@ -71,6 +76,15 @@ on every run. Options: `--days` for the runtime window, `--tenant` for a single 
 | `logs:prune-flow` | Drop `flow_logs` monthly partitions older than 30 days |
 
 `logs:prune-flow` accepts `--dry-run` to preview which partitions would be dropped.
+
+## Conversation retention
+
+| Command | Does |
+|---|---|
+| `conversations:prune` | Drop `conversation_messages` monthly partitions older than `CONVERSATION_RETENTION_DAYS`, in every active tenant. Does nothing when the variable is unset |
+
+`conversations:prune` accepts `--dry-run`. Dropping is irreversible; threads and
+media are kept. See [Conversation retention](/self-hosting/observability#conversation-retention).
 
 <Warning>
   `logs:create-partition` is scheduled work. If the scheduler is not running,

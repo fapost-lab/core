@@ -21,8 +21,8 @@ What to watch:
 
 - **Wait time on `flow.execution`** — this is how long a contact waits before the
   assistant even begins. It should be near zero.
-- **Failed jobs** — a rising count on `messaging.transactional` means replies
-  are not reaching people.
+- **Failed jobs** — a rising count on `flow.execution` means inbound messages are
+  not being answered: replies are sent from inside that job.
 - **Throughput on `messaging.broadcast`** — expected to spike; it is the one
   queue whose depth is not alarming.
 
@@ -35,7 +35,7 @@ What to watch:
 
 ## The scheduler
 
-Three scheduled tasks matter, and all fail silently if the scheduler is not
+Four scheduled tasks matter, and all fail silently if the scheduler is not
 running:
 
 | Task | When | If it does not run |
@@ -43,9 +43,27 @@ running:
 | `flow:sweep-subflow-timeouts` | Every minute | Parent flows waiting on expired subflows never resume |
 | `logs:create-partition` | Monthly, on the 1st | Next month's flow-log partition is missing |
 | `logs:prune-flow` | Daily, 03:00 | Old log partitions accumulate |
+| `conversations:prune` | Daily, 03:15 | Nothing is pruned; the transcript keeps growing (a no-op unless retention is set) |
 
 The monthly one is the trap: it fails at a month boundary, weeks after the
 scheduler stopped, and presents as flow logging breaking for no apparent reason.
+
+## Conversation retention
+
+The conversation transcript is kept forever by default. To cap it, set
+`CONVERSATION_RETENTION_DAYS` in `.env`. The daily `conversations:prune` task then
+drops, in every tenant schema, the monthly `conversation_messages` partitions that
+lie wholly older than that many days. Whole months only, so a message lives between
+`CONVERSATION_RETENTION_DAYS` and about 31 days longer.
+
+<Warning>
+  Pruning is irreversible. A dropped partition is gone for good; only a database
+  backup brings it back. Preview first with
+  `php artisan conversations:prune --dry-run`.
+</Warning>
+
+Conversation threads (the inbox rows and their metadata) and downloaded media are
+not touched. With the variable unset the task does nothing.
 
 ## Webhook routing
 

@@ -14,7 +14,7 @@ There is no per-node `Unit/.../<Node>HandlerTest.php` convention. What exists to
 | Unit | `tests/Unit/Domains/Flow/BuiltInNodeHandlersTest.php` | the built-in handlers that need no database: `send_message`, `input`, `branch`, `delay`, `assign`, `call`, `emit_event`, `end`, `rag_query` (execute logic, config errors, source handles, state changes) |
 | Unit | `tests/Unit/Domains/Flow/NodeHandlerRegistryTest.php` | `type@version` registration, duplicates, `supportedVersions()`, freezing, a fresh instance per `resolve()` |
 | Unit | `tests/Unit/Domains/Flow/NodeHandlerSchemaSectionsTest.php` | `configSchema()` shape |
-| Unit | `tests/Unit/Domains/Flow/FlowDefinitionValidatorTest.php` | the structural graph validator |
+| Unit | `tests/Unit/Domains/Flow/FlowGraphStructureValidatorTest.php` | the structural graph validator |
 | Unit | `tests/Unit/Domains/Flow/ValidateFlowServiceTest.php` | per-node config rules and graph rules that the builder shows |
 | Feature | `tests/Feature/Domains/Flow/*NodeHandlerTest.php` | handlers that touch the database or queue: `AuthRequestNodeHandlerTest`, `NotifyNodeHandlerTest`, `SetTagNodeHandlerTest`, `LoopNodeHandlerTest` |
 | Feature | `tests/Feature/Domains/Flow/FlowEngineTest.php`, `LoopEngineTest.php`, `DelayNodeResumeTest.php`, `V1WiringSmokeTest.php` | a node running inside the real flow loop |
@@ -79,10 +79,10 @@ suite, not with a plain `--filter` on a Feature test.
 
 ## 4) Graph compatibility
 
-Through `FlowDefinitionValidatorTest` and `ValidateFlowServiceTest`:
+Through `ValidateFlowServiceTest` and `FlowGraphStructureValidatorTest`:
 
-- a node with a new `type@version` validates once its handler is registered,
-- an unregistered handler gives the expected error,
+- (`ValidateFlowServiceTest`) a node with a new `type@version` validates once its handler is registered,
+- (`ValidateFlowServiceTest`) an unregistered handler gives the expected error,
 - required config fields from `configSchema()['required']` are enforced,
 - terminal-node rules (`end`, keyboard `send_message`, `loop_end`) hold.
 

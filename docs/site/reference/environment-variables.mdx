@@ -14,13 +14,15 @@ to FaPost, and the Laravel ones whose value matters here.
 | `APP_ENV` | `local` | `production` in a deployment |
 | `APP_KEY` | *empty* | Generate with `php artisan key:generate`; never reuse across installations |
 | `APP_DEBUG` | `true` | **Must be `false` in production** |
-| `APP_URL` | `http://localhost` | Used to build webhook URLs |
+| `APP_URL` | `http://localhost` | Used to build webhook URLs; in `host` mode its scheme and port also shape the tenant links sent by mail (`https://<slug>.<TENANCY_BASE_DOMAIN>`) |
 
 ## Tenancy and webhooks
 
 | Variable | Default | Notes |
 |---|---|---|
 | `TENANCY_BASE_DOMAIN` | `localhost` | Base domain tenant hosts are derived from |
+| `TENANCY_RESOLUTION` | `single` | `single`: one tenant, named by `TENANT_SLUG`. `host`: the tenant is taken from the request host `<slug>.<TENANCY_BASE_DOMAIN>`, so one install serves many tenants; unknown hosts get 404 |
+| `TENANT_SLUG` | `app` | The tenant served in `single` mode; ignored in `host` mode |
 | `WEBHOOK_BASE_URL` | `${APP_URL}` | The base providers will call back on |
 | `WEBHOOK_INGRESS_DRIVER` | `laravel` | `laravel` or `gateway` |
 | `WEBHOOK_GATEWAY_URL` | *empty* | Required when the driver is `gateway` |
@@ -63,6 +65,14 @@ connections both depend on it. The database user needs the `CREATE` privilege; s
 Redis is not optional: it carries queues, cache, locks, and the webhook routing
 registry. The registry is what keeps the landlord database off the inbound hot
 path — see [Runtime architecture](/contributing/runtime).
+
+## Conversation transcript
+
+| Variable | Default | Notes |
+|---|---|---|
+| `CONVERSATION_RETENTION_DAYS` | *unset* | Unset keeps the transcript forever. A plain whole number of days (anything else, including `0`, disables pruning) lets `conversations:prune` drop whole monthly `conversation_messages` partitions older than that, so a message lives between that many days and about 31 days longer. **Irreversible**: dropped messages come back only from a database backup. Conversation threads and downloaded media are kept. One value for the whole installation |
+
+See [Conversation retention](/self-hosting/observability#conversation-retention).
 
 ## Localisation
 

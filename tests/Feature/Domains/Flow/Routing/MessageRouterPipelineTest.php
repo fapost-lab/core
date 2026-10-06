@@ -15,6 +15,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Routing\MessageRouter;
+use App\Domains\Flow\Routing\SessionRoutingDecision;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
@@ -179,9 +180,7 @@ final class MessageRouterPipelineTest extends FeatureTestCase
     {
         // Two workers may briefly observe an Active session right after a peer
         // released the lock. The router rejects that race silently — no busy
-        // notice, no execution. (Paused / paused_subflow follow the same
-        // silent-drop / route-to-child rules but aren't visible through the
-        // current findActiveForContact filter; they're covered in unit tests.)
+        // notice, no execution.
         [$tenantId, $assistant, $contact, $channel] = $this->seedTenantWithFlow(
             nodes: [
                 ['id' => 'rec-1', 'type' => 'recording_test', 'version' => 1, 'config' => []],
@@ -331,6 +330,81 @@ final class MessageRouterPipelineTest extends FeatureTestCase
             1,
             FlowSession::query()->where('tenant_id', $tenantId)->where('contact_id', $contact->getKey())->count(),
             'Waking the node and routing the message must not start a second session.',
+        );
+    }
+
+    public function test_inbound_message_goes_to_the_waiting_child_while_the_parent_stays_paused_subflow(): void
+    {
+        // The repository never returns a paused_subflow parent: the waiting
+        // child is the contact's selected session, so the message resumes it.
+        [$tenantId, $assistant, $contact, $channel] = $this->seedTenantWithFlow(
+            nodes: [
+                ['id' => 'in-1', 'type' => 'input', 'version' => 1, 'config' => ['save_to' => 'flow.answer']],
+                ['id' => 'in-2', 'type' => 'input', 'version' => 1, 'config' => ['save_to' => 'flow.second']],
+            ],
+            edges: [
+                ['id' => 'e1', 'from' => 'in-1', 'to' => 'in-2', 'handle' => 'default'],
+            ],
+        );
+
+        $definitionId = FlowDefinition::query()->where('tenant_id', $tenantId)->value('id');
+
+        $parent = FlowSession::query()->create([
+            'tenant_id'          => $tenantId,
+            'assistant_id'       => $assistant->getKey(),
+            'contact_id'         => $contact->getKey(),
+            'flow_definition_id' => $definitionId,
+            'flow_version'       => 1,
+            'current_node_id'    => 'in-1',
+            'state'              => [],
+            'status'             => FlowSessionStatus::PausedSubflow,
+            'version'            => 1,
+        ]);
+
+        $child = FlowSession::query()->create([
+            'tenant_id'          => $tenantId,
+            'assistant_id'       => $assistant->getKey(),
+            'contact_id'         => $contact->getKey(),
+            'flow_definition_id' => $definitionId,
+            'flow_version'       => 1,
+            'current_node_id'    => 'in-1',
+            'state'              => [],
+            'status'             => FlowSessionStatus::WaitingInput,
+            'parent_session_id'  => $parent->getKey(),
+            'version'            => 1,
+        ]);
+
+        // Make the parent the most recently updated row, so a repository that ever started
+        // selecting paused_subflow sessions would pick it over the child and fail this test.
+        $this->travel(1)->seconds();
+        $parent->touch();
+
+        $router = $this->app->make(MessageRouter::class);
+
+        $outcome = $router->route(
+            contact: $contact,
+            message: $this->incoming('hello'),
+            assistant: $assistant,
+            channel: $channel,
+        );
+
+        $this->assertSame('executed', $outcome->kind);
+        $this->assertSame(SessionRoutingDecision::ResumeWaiting, $outcome->decision);
+
+        $child->refresh();
+        $this->assertSame(FlowSessionStatus::WaitingInput, $child->status);
+        $this->assertSame('in-2', $child->current_node_id, 'The child must advance past its input node.');
+        $this->assertSame('hello', $child->state['flow']['answer'] ?? null);
+
+        $parent->refresh();
+        $this->assertSame(FlowSessionStatus::PausedSubflow, $parent->status);
+        $this->assertSame('in-1', $parent->current_node_id);
+        $this->assertSame([], $parent->state);
+
+        $this->assertSame(
+            2,
+            FlowSession::query()->where('tenant_id', $tenantId)->where('contact_id', $contact->getKey())->count(),
+            'Routing to the child must not start a third session.',
         );
     }
 

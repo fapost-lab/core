@@ -54,8 +54,11 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   Foundation, a primitive with no domain meaning into Support, anything with one domain's meaning
   stays in Core (ADR-05).
 - **The extension packages are separate repositories.** Core consumes them through VCS
-  repositories (`fapost/foundation ^0.3`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
+  repositories (`fapost/foundation ^0.4`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
   symlinked over `vendor/` by `composer dev:link` (`tools/dev-link-packages.php`).
+  Until 1.0 a package that depends on another FaPost package accepts its whole 0.x line
+  (`fapost/support` requires `fapost/foundation >=0.2 <1.0`), so a Foundation minor needs no release
+  of Support; from 1.0 constraints go by major.
 - **Packages Core does not require enter through a composer overlay.** A private or third-party
   extension is never named in Core's `composer.json` or `composer.lock`: an untracked
   `composer.overlay.json` is merged into `composer.local.json` and installed against Core's lock by
@@ -68,7 +71,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   `CoreRegistrarInterface`, Solution activation, and manifest validation. The registered
   `HrSolutionServiceProvider` is an empty stub on the framework's own provider.
 - **Landlord data is reached only through Tenancy.** Other domains depend on
-  `Tenancy/Contracts`; the `landlord` connection is opened only inside Tenancy infrastructure.
+  `Tenancy/Contracts`; the `landlord` connection is opened only inside Tenancy infrastructure. An extension package may
+  open it for its own prefixed tables, never for Core's
+  (`adr-20261005-extension-packages-own-landlord-tables`).
 - **Cross-domain asynchronous work goes through named queues** separated by purpose:
   `flow.execution`, `messaging.broadcast`, `messaging.system`, `messaging.logging`,
   `scheduled.triggers`; `messaging.transactional` and `sync.external` are reserved and have no
@@ -88,8 +93,7 @@ Assistant and Media models directly, and import cycles exist (for example Contac
    (`WebhookController`). A job on `flow.execution` runs `MessageRouter` → `FlowOrchestrator` →
    `FlowEngine`, which takes the session lock and runs handlers resolved by `(type, version)`.
    Replies are sent inline: `FlowMessageSender` → `MessageSender::send()` runs inside the
-   `flow.execution` job (`SendTransactionalMessageJob` on `messaging.transactional` is never
-   dispatched); the transcript is persisted on `messaging.logging`.
+   `flow.execution` job (`messaging.transactional` is reserved and has no job); the transcript is persisted on `messaging.logging`.
 2. **Triggers and wake-ups.** Scheduled and event triggers start sessions from jobs on
    `scheduled.triggers`; a `delay` node wakes its session through `ResumeDelayedFlowSessionJob`
    on `flow.execution`, and send-message timeouts through `ResumeTimedOutSendMessageNodeJob`.

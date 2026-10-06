@@ -48,8 +48,12 @@ second backend would need a read port first.
 
 `conversation_messages` is a range-partitioned table with no foreign keys, so messages survive the
 deletion of the contact, assistant or channel (the `conversations` row cascades). Monthly partitions
-are created only on write (`ensureMonthlyPartition` in the store); `retention_days` in
-`config/conversation.php` is never read, so nothing prunes the transcript. The dedup index
+are created only on write (`ensureMonthlyPartition` in the store). Retention is the daily command
+`conversations:prune` (`app/Console/Commands/PruneConversationMessagesCommand.php`): when
+`conversation.retention_days` (env `CONVERSATION_RETENTION_DAYS`, per install, null = keep forever)
+is set, it drops, per active tenant schema, the monthly partitions that lie wholly older than the
+cutoff (`Retention/PartitionRetention`), so a message lives retention to retention + ~31 days. Threads
+and media are not touched. The dedup index
 `conversation_messages_idem_unique` includes `created_at`, the partition key.
 
 ## Takeover

@@ -41,7 +41,7 @@ broken.
 - **The handler registry is closed and unambiguous.** No registration after freeze; a handler's
   `version()` must be in its `supportedVersions()`; a duplicate `type@version` is rejected; an
   unknown key throws. Publishing rejects unknown versions. Enforced: `NodeHandlerRegistry`,
-  `FlowDefinitionValidator`.
+  `ValidateFlowService`.
 - **Only whitelisted node types write `system.*` and `rag.*`.** `system.*`: `send_message`,
   `input`, `delay`, `notify`, `set_tag`; `rag.*`: `rag_query`. `flow.*` and `call.*` are open to
   every handler. Enforced: `SystemStateNamespacePolicy`, applied in `FlowSessionPersister`.

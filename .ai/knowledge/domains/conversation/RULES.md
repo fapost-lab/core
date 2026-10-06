@@ -43,3 +43,9 @@ broken.
 - **`conversation_messages` has no foreign key** (the table is partitioned), so deleting a
   contact or thread leaves its messages behind. Deletion and retention work must remove them
   explicitly.
+- **Retention drops whole monthly partitions of the current tenant schema only.** Never row
+  `DELETE`s; threads (`conversations`) and media are not touched; the partition listing is
+  filtered to `current_schema()` because every tenant schema has identically named partitions.
+  Retention is per install (`conversation.retention_days`, null = keep forever). Enforced:
+  `PartitionRetentionTest`, `PruneConversationMessagesCommandTest`,
+  `ConversationPartitionManagerPgsqlTest` (real PostgreSQL, group `pgsql`).
