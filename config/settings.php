@@ -23,9 +23,11 @@ return [
 
     'setting_class_path' => app_path('Settings'),
 
-    'migrations_paths' => [
-        database_path('settings'),
-    ],
+    // Empty on purpose: spatie would register `database/settings` with the migrator, so every
+    // plain `migrate` (including `migrate --database=landlord`) would create the tenant `settings`
+    // table outside a tenant schema. Settings migrations run per tenant, through
+    // `MigrationScope::settings()`.
+    'migrations_paths' => [],
 
     'default_repository' => 'database',
 

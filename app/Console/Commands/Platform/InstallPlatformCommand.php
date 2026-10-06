@@ -54,16 +54,15 @@ final class InstallPlatformCommand extends Command
         }
 
         $migrateExitCode = 0;
-        $this->components->task('Running landlord migrations', function () use (&$migrateExitCode): void {
+        $this->components->task('Running platform migrations', function () use (&$migrateExitCode): void {
             $migrateExitCode = Artisan::call('migrate', [
-                '--path'     => 'database/migrations/landlord',
                 '--database' => 'landlord',
                 '--force'    => true,
             ]);
         });
 
         if (self::SUCCESS !== $migrateExitCode) {
-            $this->components->error('Landlord migrations failed. Installation aborted.');
+            $this->components->error('Platform migrations failed. Installation aborted.');
 
             return self::FAILURE;
         }

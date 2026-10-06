@@ -89,8 +89,13 @@ broken.
   a `Tenancy/Contracts` interface. Why: tenant isolation stays auditable in one place.
   Review only — no PHPat rule covers it. Known exceptions: the install and
   migrate console commands (`InstallPlatformCommand`, `InstallCommand`, `MigrateSmartCommand`) open
-  the connection to run landlord migrations, and `AppServiceProvider` loads
-  `database/migrations/landlord`.
+  the connection to run platform migrations (`migrate --database=landlord --force`, no `--path`,
+  so every registered migration path runs; `database/settings` is not one of them — the settings
+  migrations are tenant-scoped, so `config/settings.php` leaves `migrations_paths` empty and they
+  run only through `MigrationScope::settings()`), and `AppServiceProvider` loads
+  `database/migrations/landlord`. An extension package may open `landlord` only for tables of its
+  own prefix, and never writes `tenants` or `webhook_registry`
+  (`adr-20261005-extension-packages-own-landlord-tables`).
 - **In workers, change tenant only through `TenantSwitcher::runForTenant()`**; never set
   `search_path` or the context directly. Review only.
 - **Core is not the control plane.** No SaaS logic, billing or onboarding belongs in Core, and

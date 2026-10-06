@@ -318,7 +318,7 @@ to be checked out.
 ```bash
 docker compose pull
 docker compose up -d
-docker compose exec app php artisan migrate --database=landlord --path=database/migrations/landlord --force
+docker compose exec app php artisan migrate --database=landlord --force
 docker compose exec app php artisan ops:tenants-migrate
 docker compose exec app php artisan horizon:terminate
 ```

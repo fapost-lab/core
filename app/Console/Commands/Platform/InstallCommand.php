@@ -116,16 +116,15 @@ final class InstallCommand extends Command
 
         $exitCode = 0;
 
-        $this->components->task('Applying landlord migrations', function () use (&$exitCode): void {
+        $this->components->task('Applying platform migrations', function () use (&$exitCode): void {
             $exitCode = Artisan::call('migrate', [
                 '--database' => 'landlord',
-                '--path'     => 'database/migrations/landlord',
                 '--force'    => true,
             ]);
         });
 
         if (self::SUCCESS !== $exitCode) {
-            $this->components->error('Landlord migrations failed:');
+            $this->components->error('Platform migrations failed:');
             $this->line(Artisan::output());
 
             return false;
