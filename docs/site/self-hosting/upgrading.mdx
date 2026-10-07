@@ -10,7 +10,7 @@ What changes between releases and in what order to apply it.
 Four things happen, and the order is not interchangeable:
 
 1. New code arrives (new image, or new checkout plus `composer install`)
-2. **Landlord** migrations run — platform-wide tables
+2. **Landlord** migrations run — platform-wide tables, including any that an installed extension package adds
 3. **Tenant** migrations run — once per tenant schema
 4. Queue workers restart, so they stop running the previous release from memory
 
@@ -24,7 +24,7 @@ new database schema, which is the worst combination of the two.
 docker compose pull
 docker compose up -d
 
-docker compose exec app php artisan migrate --database=landlord --path=database/migrations/landlord --force
+docker compose exec app php artisan migrate --database=landlord --force
 docker compose exec app php artisan ops:tenants-migrate
 
 docker compose exec app php artisan horizon:terminate

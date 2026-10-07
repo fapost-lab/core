@@ -24,8 +24,6 @@ final class TenantSettings extends Settings
 
     public int $webhook_rate_limit = 60;
 
-    public int $max_contacts = 0;
-
     public string $content_base_language = 'en';
 
     /**

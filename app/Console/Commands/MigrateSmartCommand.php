@@ -72,11 +72,15 @@ final class MigrateSmartCommand extends Command
         ];
     }
 
+    /**
+     * Counts what `migrate --database=landlord` would apply: the root migrations plus every path
+     * registered with `loadMigrationsFrom()` (Core's landlord directory and extension packages).
+     */
     private function countPendingLandlordMigrations(): int
     {
         return $this->countPendingMigrationsForConnection(
             connection: 'landlord',
-            paths: [database_path('migrations/landlord')],
+            paths: [...$this->migrator->paths(), database_path('migrations')],
         );
     }
 
@@ -120,7 +124,8 @@ final class MigrateSmartCommand extends Command
 
         return $this->tenantSwitcher->runForTenant($tenant, fn (): int => $this->countPendingMigrationsForConnection(
             connection: (string)config('tenancy.tenant_connection', 'tenant'),
-            paths: [MigrationScope::tenant()->path],
+            // Settings migrations share the tenant's migrations table and run with tenant migrations.
+            paths: [MigrationScope::tenant()->path, MigrationScope::settings()->path],
         ));
     }
 }

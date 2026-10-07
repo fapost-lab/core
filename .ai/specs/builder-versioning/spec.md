@@ -49,6 +49,9 @@ named Preview, Compare versions, Rollback, a content-key store and a storage UX 
 ## Decisions
 
 - None yet beyond the archived design.
+- Changed 2026-10-07: the "Logged" column goes on the kit's session list (after `ui-foundation`
+  phase 2), not on the Filament FlowSessions resource — Core's operator UI leaves Filament and no
+  new screen is built on it.
 
 ## Open questions
 

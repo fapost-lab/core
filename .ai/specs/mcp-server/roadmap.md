@@ -27,7 +27,7 @@ empty tool registry — is written to `mcp_audit_log`.
       hash, outcome, duration), and rate limiting applies per token (after: the domain scaffold — audit
       needs the request pipeline to hook into)
 - [ ] Test harness for tools, plus a phpat rule that a tool cannot reach the landlord connection
-      directly or pull in Filament (after: the tool contract and registry — nothing to exercise without
+      directly or pull in the UI layer (`App\Http` or the front end) (after: the tool contract and registry — nothing to exercise without
       them)
 
 ## Phase 2 — Read tools (v1)
@@ -83,12 +83,13 @@ end.
 Goal: the MCP surface is usable by tenants and extensible by Solutions, not only by Core developers
 exercising tools directly. Done when: a Solution's tool appears in the registry after install with no
 Core change, and an operator can issue a token and connect an agent using only the generated config and
-the Filament UI.
+the console.
 
 - [ ] Solution-registered tools proven end to end: a Solution registers its own tools through
       `McpToolRegistry`, and installing the Solution makes its tool available without touching Core
-- [ ] Operator-facing token management: a Filament MCP Tokens resource (issue/revoke/scopes/last used)
-      plus an audit log view
+- [ ] Operator-facing token management: an MCP Tokens screen in the console, built on the kit
+      (issue/revoke/scopes/last used) plus an audit log view (after: ui-foundation phase 2 — the
+      screen is built on the kit)
 - [ ] Agent onboarding: generated client config (URL plus headers) for connecting an agent
 - [ ] Developer documentation: a `developers/` page explaining how to write an MCP tool inside a
       Solution
@@ -106,7 +107,7 @@ the Filament UI.
    Phase 2 read tools already existing.
 6. Phase 4 — the resource templates can start once Phase 1 lands; the prompts need Phase 2/3 tools in
    place first; the media decision applies once both exist.
-7. Phase 5 — Solution registration, the Filament token UI, onboarding config and developer docs are
+7. Phase 5 — Solution registration, the console token screen, onboarding config and developer docs are
    independent of each other, and come last because each needs a stable registry and working tools to
    plug into or document.
 

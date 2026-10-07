@@ -25,7 +25,7 @@ in the Content tab and renames a variable across a flow in one action.
 
 - [ ] Content-key store with "Open in Content" from a node
 - [ ] Bulk variable rename
-- [ ] Per-node logging override and a "Logged" column in the session list
+- [ ] Per-node logging override and a "Logged" column in the session list (after: ui-foundation phase 2 — the column goes on the kit's session list, not on Filament's)
 - [ ] fog: attribute groups deeper than one level — no rollout has needed it
 - [ ] fog: contact attribute groups as managed objects — definitions table, cross-flow consistency, archiving, discovery API and a report builder; no rollout has asked for them
 

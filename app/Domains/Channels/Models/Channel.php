@@ -64,6 +64,12 @@ final class Channel extends Model implements ChannelInterface
     use HasUlidPrimaryKey;
 
     /**
+     * Limit key under which a tenant's channel count is capped. Inactive channels count too;
+     * deleting one frees its place.
+     */
+    public const string LIMIT_KEY = 'channels';
+
+    /**
      * @var list<string>
      */
     protected $fillable = [
@@ -75,6 +81,17 @@ final class Channel extends Model implements ChannelInterface
         'config',
         'is_active',
     ];
+
+    /**
+     * How many channels the tenant has, across all its assistants.
+     *
+     * The assistant panel scopes this model to the current assistant through Filament's
+     * tenancy global scope ({@see Assistant::PANEL_TENANCY_SCOPE}); the limit counts the whole tenant.
+     */
+    public static function countForLimit(): int
+    {
+        return self::query()->withoutGlobalScope(Assistant::PANEL_TENANCY_SCOPE)->count();
+    }
 
     public function getId(): string
     {

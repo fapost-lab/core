@@ -73,7 +73,7 @@ install: ## Run the interactive installer inside the container
 	$(COMPOSE) exec app php artisan platform:install
 
 migrate: ## Apply landlord and tenant migrations
-	$(COMPOSE) exec app php artisan migrate --database=landlord --path=database/migrations/landlord --force
+	$(COMPOSE) exec app php artisan migrate --database=landlord --force
 	$(COMPOSE) exec app php artisan ops:tenants-migrate
 
 doctor: ## Check that the gateway and the application see each other

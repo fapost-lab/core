@@ -83,14 +83,41 @@ broken.
 - **The landlord table is the source of truth for the webhook registry; Redis is a cache.**
   Anything in Redis can be rebuilt by `WebhookRegistryHealthChecker`.
 
+- **Core's default for an operator-replaceable contract is bound with `bindIf`.** Package service
+  providers register before application providers, so a plain `bind` in Core would overwrite the
+  operator package's binding. `TenantLimitsInterface` (default `UnlimitedTenantLimits`) is bound this
+  way in `DomainServiceProvider`; do the same for any contract an operator package may replace.
+  Enforced: `RecordQuotaTest` (a binding made before the provider runs wins).
+- **Limits are answered by the operator package and counted by Core.** Records live in the tenant's
+  schema, which the package cannot see, so `RecordQuota` (Core's `RecordQuotaInterface`, for the tenant in `TenantContext`) takes the current count from the caller, and
+  the service that owns creation is the only place a counted record is created: `AssistantService::create()`
+  (`assistants`), `CreateFlowAction` (`flows`, one `FlowDraft` per flow, counted tenant-wide), `ChannelService::create()`
+  (`channels`, inactive included), `CreatePendingUserService` and `UserService::activate()` (`staff`: users with
+  `is_active`, i.e. every account not deactivated, pending and suspended included, through `User::scopeCountedForLimit()`, the one seam for accounts that must not count, such as
+  the platform's support user). `AclBootstrapService::createFirstAdmin()` creates a tenant's first admin without the
+  check, deliberately. The assistant panel's `assistant_tenancy` global scope narrows `FlowDraft` and `Channel` to the
+  current assistant, so their `countForLimit()` strips it. A key unknown to
+  `LimitRegistry` throws `LogicException` rather than meaning "no limit". Existing records stay when a
+  limit drops below the count; only creating more is refused. Concurrent creates may exceed a limit
+  by the number of parallel requests (accepted: tenant schema and landlord are different
+  connections). Enforced: `AssistantLimitTest`, `FlowLimitTest`, `ChannelLimitTest`, `StaffLimitTest`, `RecordQuotaTest`, PHPat
+  `CountableModelCreationTest` (`new` of a counted model outside its creators) and
+  `Tests\Unit\Architecture\CountableModelCreationTest` (static creates; the countable models are
+  listed once in `Tests\Support\CountableModels`).
+
 ## Rules
 
 - **Open the `landlord` connection only inside `app/Domains/Tenancy`.** Other domains depend on
   a `Tenancy/Contracts` interface. Why: tenant isolation stays auditable in one place.
   Review only — no PHPat rule covers it. Known exceptions: the install and
   migrate console commands (`InstallPlatformCommand`, `InstallCommand`, `MigrateSmartCommand`) open
-  the connection to run landlord migrations, and `AppServiceProvider` loads
-  `database/migrations/landlord`.
+  the connection to run platform migrations (`migrate --database=landlord --force`, no `--path`,
+  so every registered migration path runs; `database/settings` is not one of them — the settings
+  migrations are tenant-scoped, so `config/settings.php` leaves `migrations_paths` empty and they
+  run only through `MigrationScope::settings()`), and `AppServiceProvider` loads
+  `database/migrations/landlord`. An extension package may open `landlord` only for tables of its
+  own prefix, and never writes `tenants` or `webhook_registry`
+  (`adr-20261005-extension-packages-own-landlord-tables`).
 - **In workers, change tenant only through `TenantSwitcher::runForTenant()`**; never set
   `search_path` or the context directly. Review only.
 - **Core is not the control plane.** No SaaS logic, billing or onboarding belongs in Core, and

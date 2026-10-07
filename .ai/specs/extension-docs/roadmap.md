@@ -1,7 +1,17 @@
 # Roadmap — Extension documentation for outsiders
 
 Destination: a developer outside the project builds a Solution from the published Extending section
-alone, without reading Core's source.
+alone, without reading Core's source. Written after the kit (`ui-foundation`) and after the first
+Solution, Feedback (`first-solution`).
+
+## Phase 0 — Start from a working package
+
+Goal: a new extension package starts from proven plumbing instead of being assembled by hand. Done
+when: a package created from the skeleton installs into a Core checkout through the composer
+overlay, its CI passes against Core's main, and its README alone explains how to develop it.
+
+- [ ] Extension skeleton — a public template repository (`fapost-lab/extension-skeleton`, Apache-2.0) with the plumbing proven on the SaaS package: a service provider found by package discovery, tests that boot the real Core, CI that installs the package on Core's main through the overlay and proves Core still boots without it, Pint, and a README on developing it; the Extending docs link to it
+- [ ] Skeleton gains Solution examples — the skeleton shows the contracts a Solution implements (handlers, manifest, activation) as the first Solution used them (after: the first-solution spec — the contracts take their shape from that build, a skeleton written earlier would guess)
 
 ## Phase 0 — Start from a working package
 
@@ -19,9 +29,14 @@ Solution touched is documented, and every Core source file that build had to con
 covered by a page or recorded as a contract still missing.
 
 - [ ] The Extending section rewritten against the first Solution's gap record — extension model,
-      the contracts an author touches, activation as an author meets it (after: the first-solution
-      spec's gap record — writing before it describes the design, not the surface)
+      the contracts an author touches, activation as an author meets it, the scaffold command, and
+      the UI publishing path (prebuilt bundles, composer overlay, derived image) (after: the
+      first-solution spec's gap record — writing before it describes the design, not the surface;
+      after: ui-foundation phase 4 and its cut-over — the UI contract and the kit it documents have
+      settled)
 - [ ] The worked example an author follows end to end, published and listed in the site navigation
+      — Feedback, from the scaffold to an installed Solution (after: the first-solution spec — the
+      example is that build)
 
 ## Phase 2 — Prove it on someone
 

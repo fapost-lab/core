@@ -27,9 +27,9 @@ A developer inside the Laravel ecosystem can stand up FaPost, extend it through 
 | # | Step | Source | Size | Where it is tracked |
 |---|---|---|:---:|---|
 | 2 | First-contact path — installation, a seeded demo assistant and self-hosting docs, with a named target time from install to a working assistant | idea-brief.md §6 Risks | M | spec `.ai/specs/first-contact-path/` |
-| 4 | Solution activation lifecycle — manifest validation, activation storage and registry, the activation screen, and the lifecycle tests that prove install → activate → handler available | idea-brief.md §7 Recommendation | M | spec `.ai/specs/solution-activation-lifecycle/` |
-| 5 | UI foundation for extenders — one token source shared by the operator-facing surfaces and the small set of primitives an extension actually composes against | idea-brief.md §6 Risks | M | spec `.ai/specs/ui-foundation/` |
-| 6 | First solution built through the public contracts only — no privileged access into the core, as an outsider would build it | idea-brief.md §7 Recommendation | L | spec `.ai/specs/first-solution/` |
+| 4 | Solution activation lifecycle — manifest validation, activation storage and registry, the activation screen (on the kit, step 5), and the lifecycle tests that prove install → activate → handler available | idea-brief.md §7 Recommendation | M | spec `.ai/specs/solution-activation-lifecycle/` |
+| 5 | UI foundation — Core's operator UI on Inertia: every admin and console screen moved off Filament onto one kit and token source shared with the builder, an app switcher, and the contract by which a Solution adds its own application; Filament and Livewire leave Core | idea-brief.md §6 Risks; widened by the owner, 2026-10-06 | XL | spec `.ai/specs/ui-foundation/` |
+| 6 | First solution built through the public contracts only — Feedback (bug reports and suggestions with votes, for a tenant's own team and for the FaPost team), installed through the composer overlay with its UI prebuilt, so nothing in Core is rebuilt; plus the `artisan` scaffold every later Solution starts from | idea-brief.md §7 Recommendation; subject changed by the owner, 2026-10-07 | L | spec `.ai/specs/first-solution/` |
 | 7 | Extension documentation for outsiders — the Extending section rewritten against contracts that survived a real build | idea-brief.md §3 Users | M | spec `.ai/specs/extension-docs/` |
 | 8 | Ecosystem distribution → see [Not yet specified](#not-yet-specified) | idea-brief.md §7 Recommendation | fog | spec `.ai/specs/ecosystem-distribution/` |
 | 9 | Tenant quotas — limited test and trial tenants: host-based tenant resolution, Foundation quota and operator contracts with allow-everything Core defaults, an egress guard, and a runtime-stopped read-only tenant; a self-hosted install sees no difference | owner, 2026-10 (put Core online for testers; the SaaS trial tier) | L | spec `.ai/specs/tenant-quotas/` |
@@ -46,9 +46,12 @@ collected. It runs in the gaps between product steps, never ahead of them, and i
 |---|---|---|:---:|---|
 | B1 | Data lifecycle — retention for transcripts, session history and flow versions; erasure of a contact's transcript; a transcript read port | Tables grow without bound on a self-hosted install, and deleting a contact leaves its messages behind (the partitioned message table has no foreign keys) | M | spec `.ai/specs/data-lifecycle/` |
 | B2 | Flow engine V1.x — loop checks and budget, safe `call` retries, subflow parameters, per-tenant expression engine, node capabilities | Limits the V1 node design named as "later"; none needs a breaking change | L | spec `.ai/specs/flow-engine-v1x/` |
-| B3 | Operator insights — broadcast report, flow analytics, live inbox | The data is recorded and nobody can read it in the panel | M | spec `.ai/specs/operator-insights/` |
+| B3 | Operator insights — broadcast report, flow analytics, live inbox | The data is recorded and nobody can read it in the panel; every item is a screen, so it waits for step 5's kit | M | spec `.ai/specs/operator-insights/` |
 | B4 | Builder versioning and content — rollback, compare, preview, content keys | A bad publish has no undo in the builder | M | spec `.ai/specs/builder-versioning/` |
 | B5 | RAG knowledge bases — provider and storage decision, then a real adapter | `rag_query` is in the palette and always fails at its runtime guard | M | spec `.ai/specs/rag-knowledge-bases/` |
+
+Step 5 freezes new screens on Filament: a backlog item's or a step's UI waits for the kit and is
+built on it, its backend ships as before.
 
 Defects found while reconciling the documentation with the code (2026-10-05), filed as Jig tasks and
 taken whenever a lane is free: `remove-dead-transactional-job` (`messaging.transactional` has no producer),
@@ -78,8 +81,6 @@ taken whenever a lane is free: `remove-dead-transactional-job` (`messaging.trans
 |---|---|:---:|:---:|:---:|
 | D2 | What is the target time from a fresh installation to a first working assistant, as a number we are willing to be measured against | grilling | human | 2 |
 | D3 | How does "not earning money right now" reconcile with a shell, billing and a marketplace remaining in the plans — which of the two signals leads | grilling | human | 8 |
-| D4 | Does an installed solution have to be rebuilt into the front-end bundle before its overrides appear, and is there a path that avoids it | research | agent | 4 |
-| D5 | Does the public site keep its own brand palette, or does one token source cover every surface including it | grilling | human | 5 |
 
 ## Decisions so far
 
@@ -90,6 +91,10 @@ taken whenever a lane is free: `remove-dead-transactional-job` (`messaging.trans
 - The extension contracts live in their own repositories, absent from this working tree and symlinked in for local development → [`ARCHITECTURE.md`](../.ai/knowledge/ARCHITECTURE.md)
 - The extension surface is partly built already: the action handler registry and the builder component publish contract exist, activation and manifest validation do not → [`ARCHITECTURE.md`](../.ai/knowledge/ARCHITECTURE.md)
 - The bet is tested on the owner's own client rollouts carried out through the public contracts, not on a showcase for buyers → [`idea-brief.md §7 Recommendation`](./idea-brief.md)
+- Core's operator UI leaves Filament for Inertia + Vue on one kit (`@fapost/ui`) shared with the builder; built on `main` behind a switch, visible once at the cut-over; Filament stays only in the closed SaaS package (owner, 2026-10-06) → [`ui-foundation`](../.ai/specs/ui-foundation/spec.md)
+- **D4** — a Solution's UI ships prebuilt in its package and is loaded through Core's import map; installing a Solution never rebuilds Core, and PHP arrives through the composer overlay (owner, 2026-10-07) → [`first-solution`](../.ai/specs/first-solution/spec.md), [`ui-foundation`](../.ai/specs/ui-foundation/spec.md)
+- **D5** — the public site keeps its own palette; the token source covers the operator surfaces only (owner, 2026-10-07) → [`ui-foundation`](../.ai/specs/ui-foundation/spec.md)
+- Solutions are independent applications on top of Core, reached through an app switcher; Core's menu never receives a Solution's entries (owner, 2026-10-07) → [`ui-foundation`](../.ai/specs/ui-foundation/spec.md)
 
 ## Dependency graph
 
@@ -103,7 +108,9 @@ flowchart LR
   s8["8 · Ecosystem distribution"]
   s9["9 · Tenant quotas"]
   s4 -->|"a solution cannot be installed or activated before the lifecycle exists"| s6
-  s5 -->|"a solution that ships an interface has nothing to compose against until one exists"| s6
+  s5 -->|"the solution registers its application through the extension contract and builds against the published kit"| s6
+  s5 -->|"the activation screen is built on the kit"| s4
+  s5 -->|"the read-only banner and limit messages are built on the kit"| s9
   s6 -->|"documenting contracts that never survived a real build would fix the mistakes in writing"| s7
   s4 -->|"the sandbox boundary is only askable once the activation surface is fixed"| s8
   s4 -->|"its Solution entitlement seam extends the activation screen"| s9
@@ -114,7 +121,7 @@ flowchart LR
 | Wave | Steps | Zone per step (why parallel-safe) | Unlocks |
 |:---:|---|---|---|
 | 1 | 2 ∥ B1 | 2: `docs/site/self-hosting/` + demo seeder · B1: `app/Domains/Conversation` + flow console commands (disjoint) | — |
-| 2 | 4 ∥ 5 | 4: `app/Domains/Tenancy` + `app/Filament` · 5: `resources/css` + `resources/js/shared` (disjoint) | 6 |
+| 2 | 4 ∥ 5 | 4: manifest, activation storage and registry in `app/Domains` · 5: `resources/js`, `resources/css`, console controllers in `app/Http`, `app/Filament` (disjoint); step 4's activation screen lands after step 5's shell | 6 |
 | 3 | 6 | 6: `(new)` solution package repository | 7 |
 | 4 | 7 | 7: `docs/site/extending/` | — |
 

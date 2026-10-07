@@ -74,6 +74,92 @@ DTOs: `OutboundMessage`, `MessagePayload`, `DeliveryResult`, `OutgoingMessage`,
 
 DTOs: `UploadContext`, `UploadResult`, `DownloadResult`. Enum: `MediaKind`.
 
+## Tenancy
+
+| Contract | Role |
+|---|---|
+| `Tenancy\Contracts\TenantProvisionerInterface` | Creating a tenant with its first administrator. Implemented by Core; a package only calls it |
+
+`provision(ProvisionTenant): ProvisionedTenant` creates the tenant record, its database schema,
+runs the migrations and creates the first admin.
+
+- `ProvisionTenant` carries `slug`, `adminEmail`, `adminName` and `adminPasswordHash`. The hash
+  is made by the caller with the application's hasher (`Hash::make`), never a plain password, so
+  the request can wait in a queued job or a pending row. An empty `adminName` becomes
+  `Administrator`.
+- `ProvisionedTenant` returns `id` (the tenant ULID), `slug` and `loginUrl` (the admin panel
+  login on the tenant's own host).
+- Failures are `Exceptions\TenantProvisioningFailedException` with a `reason`
+  (`Enums\ProvisioningFailure`): `SlugInvalid`, `SlugReserved`, `SlugTaken`,
+  `AdminCredentialsMissing`, `AdminPasswordHashInvalid` and `Failed`. All but `Failed` are
+  caused by the input. The top-level message never contains credentials; messages in the
+  `previous` chain come from Core and are not redacted.
+
+Provisioning is synchronous and slow, because the full tenant schema is migrated: run it from a
+console command or a queued job, not an HTTP request. After `Failed` the slug stays taken (an
+inactive tenant) until it is cleaned up, so a retry gets `SlugTaken`; do not retry automatically.
+
+`Tenancy\Contracts\TenantDirectoryInterface` is the read side: `list(TenantListQuery): TenantList`,
+`find(string $id): ?TenantSummary` and `findMany(array $ids): array` (keyed by id). Implemented by
+Core; a package only calls it.
+
+- `TenantListQuery` filters by `search` (case-insensitive slug substring), `status`, `onlyIds` and
+  `exceptIds`, and sorts by `Slug` or `CreatedAt` (rows without a creation time come last), ascending or
+  descending. `perPage` is 1 to 100 and each id list holds at most 1000 ids. `onlyIds: []` matches
+  nothing; `null` means no restriction.
+- `TenantList` carries `items`, the `total` across all pages, `page` and `perPage`.
+- `TenantSummary` carries `id`, `slug`, `status` (`Active`, `Inactive`, `Suspended`), `createdAt`
+  (UTC, may be null), `url` (the tenant host root, with a trailing slash) and `loginUrl` (the admin
+  login). With a single tenant per installation every tenant shares the application URL, so `url`
+  addresses a tenant only when the platform resolves tenants by host.
+- Ids are lowercase RFC 4122 ULIDs. Any other form names no tenant: `find` returns `null`, and
+  `findMany` and the id filters ignore it.
+
+## Quota
+
+| Contract | Role |
+|---|---|
+| `Quota\Contracts\LimitRegistryInterface` | The limit keys the platform can enforce. Implemented by Core; Core and Solutions register keys, an operator package reads them |
+| `Quota\Contracts\TenantLimitsInterface` | How much of a key a tenant may use. Implemented by an operator package; Core's default allows everything |
+| `Quota\Contracts\RecordQuotaInterface` | Asking whether the current tenant may create one more record under a key. Implemented by Core; Core and Solutions call it |
+
+`LimitRegistryInterface` has `register(LimitDefinition)`, `find(string $key)` and `all()` (ordered by
+key). Registering an already known key, or registering after boot has finished, throws a
+`LogicException`: register while the application boots, from a service provider.
+
+- `LimitDefinition` carries `key` (snake_case, such as `assistants`; plans store limits under it),
+  `label` and `unit` (English, what an operator reads), `kind` and an optional `description`.
+- `Enums\LimitKind` says what a limit counts: `Records` (exist at a time, deleting one frees a slot),
+  `PerPeriod` (used within a billing period) and `Bytes` (stored bytes). Callers matching on it keep a
+  default arm, because kinds may be added in a minor release.
+
+`TenantLimitsInterface::limitFor(string $tenantId, string $key): ?int` returns the limit (at least 0)
+or `null` for no limit. The implementation only answers "how much"; Core counts what the tenant uses,
+because the records live in the tenant's own schema, and refuses creation over the limit. It is called
+on creation paths, so answer quickly and cache what you read. Bind it in your package's service
+provider: Core binds its default only when nothing is bound yet, so your binding wins whatever the
+provider order.
+
+`RecordQuotaInterface` has `canCreate(string $key, int $current): bool` and
+`assertCanCreate(string $key, int $current): void`. You count the tenant's existing records and pass
+the number; Core reads the limit for the tenant of the current request or job. `assertCanCreate`
+throws `Quota\Exceptions\RecordLimitReachedException` (`key`, `label`, `limit`, `current`; the
+message is meant for people, such as "Assistants limit reached: 1 of 1."), and a `LogicException`
+when the key is not registered, so a typo never means "no limit".
+
+Core registers four keys of kind `Records`:
+
+| Key | What counts |
+|---|---|
+| `assistants` | Every assistant of the tenant |
+| `flows` | Every flow of the tenant, across its assistants. A flow is one draft; its published versions do not count |
+| `channels` | Every channel of the tenant, inactive ones included |
+| `staff` | Staff accounts that are not deactivated, pending (invited) and suspended ones included. A deactivated account frees its place, so reactivating one needs a free place. The tenant's first administrator is created without the check, and still counts |
+
+Existing records are never removed when a limit drops
+below the current count: only creating more is refused. Limits that count usage over time or
+bytes have no enforcement contract yet.
+
 ## Retrieval
 
 `Contracts\RagAdapterInterface` with `RagQueryContext`, `StructuredRagResult`, and

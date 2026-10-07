@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace App\Domains\Tenancy\Services;
 
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
-use App\Domains\Staff\Enums\UserStatus;
-use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
@@ -16,6 +14,7 @@ use App\Domains\Tenancy\Exceptions\TenantProvisioningException;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Models\TenantStatus;
 use App\Domains\Tenancy\ValueObjects\MigrationScope;
+use SensitiveParameter;
 use Throwable;
 
 /**
@@ -50,6 +49,7 @@ final readonly class TenantProvisioningService
     public function provision(
         string $slug,
         string $firstAdminEmail,
+        #[SensitiveParameter]
         string $firstAdminPassword,
         string $firstAdminName = 'Administrator',
         array $config = [],
@@ -89,7 +89,7 @@ final readonly class TenantProvisioningService
                 $this->databaseManager->runMigrations(MigrationScope::settings());
                 $this->databaseManager->runMigrations(MigrationScope::tenant());
                 $this->aclBootstrapService->bootstrap();
-                $this->createFirstTenantAdminUser($firstAdminEmail, $firstAdminPassword, $firstAdminName);
+                $this->aclBootstrapService->createFirstAdmin($firstAdminEmail, $firstAdminPassword, $firstAdminName);
                 $this->channelWebhookRegistry->warmup($tenant);
             });
         } catch (Throwable $throwable) {
@@ -142,21 +142,5 @@ final readonly class TenantProvisioningService
                 return $default;
             }
         };
-    }
-
-    /**
-     * @internal Invoked only inside {@see TenantSwitcher::runForTenant()} after tenant migrations.
-     */
-    private function createFirstTenantAdminUser(string $email, string $password, string $name): void
-    {
-        $user = User::query()->create([
-            'name'              => $name,
-            'email'             => $email,
-            'password'          => $password,
-            'email_verified_at' => now(),
-            'status'            => UserStatus::Active,
-        ]);
-
-        $user->assignRole('admin');
     }
 }

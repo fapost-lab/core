@@ -10,13 +10,19 @@ use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Filament\Assistant\Resources\Channels\ChannelResource;
+use App\Filament\Support\ChecksRecordLimitOnMount;
+use App\Filament\Support\RecordLimit;
+use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Filament\Resources\Pages\CreateRecord;
+use Filament\Support\Exceptions\Halt;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 use InvalidArgumentException;
 
 final class CreateChannel extends CreateRecord
 {
+    use ChecksRecordLimitOnMount;
+
     protected static string $resource = ChannelResource::class;
 
     protected CurrentAssistantInterface $currentAssistant;
@@ -34,6 +40,10 @@ final class CreateChannel extends CreateRecord
     protected function authorizeAccess(): void
     {
         Gate::authorize('create', [Channel::class, $this->currentAssistant->get()]);
+
+        // Admins pass the policy, so the page is closed here when the tenant is at its channel limit,
+        // on mount only (see ChecksRecordLimitOnMount).
+        abort_if($this->mounting && ChannelResource::isLimitReached(), 403);
     }
 
     protected function handleRecordCreation(array $data): Model
@@ -44,7 +54,13 @@ final class CreateChannel extends CreateRecord
             throw new InvalidArgumentException('Current assistant must be an Assistant model.');
         }
 
-        return $this->channelService->create($owner, $this->normalizeConfigPayload($data));
+        try {
+            return $this->channelService->create($owner, $this->normalizeConfigPayload($data));
+        } catch (RecordLimitReachedException $e) {
+            RecordLimit::notifyReached($e, 'staff.channels.limit');
+
+            throw new Halt();
+        }
     }
 
     /**

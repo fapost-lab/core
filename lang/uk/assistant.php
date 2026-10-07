@@ -18,7 +18,13 @@ return [
     'flows' => [
         'label'        => 'Сценарій',
         'plural_label' => 'Сценарії',
-        'fields'       => [
+
+        'limit' => [
+            'reached_title' => 'Досягнуто ліміт сценаріїв',
+            'hint'          => 'Ліміт досягнуто (:current з :limit)',
+        ],
+
+        'fields' => [
             'name'                 => 'Назва',
             'description'          => 'Опис',
             'group'                => 'Група',

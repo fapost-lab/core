@@ -34,7 +34,8 @@ validation that a package declares what it needs, and no screen that turns one o
     activation store moves with it.
   - A Solution's back-end registration is enough to make it useful. False for any Solution that
     ships an interface: its Vue components reach the builder only through the Vite glob, which is
-    a build-time contract (open question D4 below).
+    a build-time contract. Resolved 2026-10-07: a Solution's UI ships prebuilt and is loaded at run
+    time (D4 below), so this holds for UI too, provided the kit range matches.
   - The manifest can be validated without executing the package. Holds only if the manifest is
     declarative data; a manifest that is PHP code cannot be checked before it is loaded.
 - The main trade-off: validating a manifest at `platform:update` catches a broken package before a
@@ -61,8 +62,8 @@ validation that a package declares what it needs, and no screen that turns one o
 ## Scope and non-goals
 
 - In scope: manifest format and its validation, activation storage and registry, the Core
-  implementation of `CoreRegistrarInterface`, per-tenant activation UI in Filament, publishing a
-  Solution's builder components through the agreed Vite/publish contract, and the lifecycle test
+  implementation of `CoreRegistrarInterface`, the per-tenant activation screen on the kit (console/admin, after ui-foundation),
+  publishing a Solution's prebuilt UI through the agreed publish contract, and the lifecycle test
   suite that proves the chain end to end.
 - Not doing: the marketplace and third-party distribution (step 8 — an extension reaching another
   installation is a separate question, and the sandbox boundary cannot be stated before this
@@ -84,6 +85,15 @@ validation that a package declares what it needs, and no screen that turns one o
   screen before anything checks it.
 - Extension contracts live in `fapost/foundation`, consumed from their own repository; any contract
   change this work needs is made there, not in Core (ADR-05).
+- Changed 2026-10-07: the activation screen is built on the kit (Inertia + Vue), not Filament, and
+  also shows a kit-range mismatch as the reason a Solution is not activated — Core's operator UI
+  leaves Filament (`ui-foundation`), and no new screen is built on it.
+- Changed 2026-10-07: a Solution registers its UI through the ui-foundation extension contract
+  (an application in the switcher, contextual actions, a shell slot, dashboard widgets, settings
+  tabs, table columns), not "Filament resources" — superseded together with ADR-06's build-time-only
+  rule (ADR planned in ui-foundation phase 4).
+- Installation is a composer overlay (`composer.overlay.json`) and a derived image, with no Node
+  and no rebuild of Core (`first-solution` phase 0).
 
 ## Earlier design carried over (2026-10)
 
@@ -92,8 +102,8 @@ The pre-Jig platform notes (`docs/platform/architecture/platform/12-solutions-mo
 decisions above settle. Kept here as input, not as decisions:
 
 - What a Solution may register: action handlers (not node types — see Decisions), flow templates
-  for its niche, its own tenant-schema migrations, `DataAccessorInterface` implementations, Filament
-  resources, scheduled jobs, and roles/permissions through the registrar.
+  for its niche, its own tenant-schema migrations, `DataAccessorInterface` implementations, UI through
+  the ui-foundation extension contract (was: Filament resources — superseded 2026-10-07), scheduled jobs, and roles/permissions through the registrar.
 - Manifest sketch: `module`, `version`, `requires_platform` (a semver range) and
   `requires_capabilities` (e.g. `flow.rag_adapter`, `messaging.broadcast`, `contacts.attributes`).
 - Failure isolation: a handler exception fails the session with a fallback message; a Solution that
@@ -107,11 +117,12 @@ decisions above settle. Kept here as input, not as decisions:
 
 ## Open questions
 
-- D4 (from the product roadmap): does an installed Solution have to be rebuilt into the front-end
-  bundle before its builder overrides appear, and is there a path that avoids it — decided by
-  research, an agent's job. It blocks the authoring half of this spec: if a rebuild is unavoidable,
-  the activation screen must say so, and "install → activate → usable" is not true for a Solution
-  that ships UI.
+- Resolved 2026-10-07 — D4 (from the product roadmap): does an installed Solution have to be
+  rebuilt into the front-end bundle before its UI appears? No: the UI ships prebuilt in the
+  package's `dist/` and is loaded through Core's import map; installation is a composer overlay
+  plus a derived image, with no Node. Decided in `first-solution` phase 0 and `ui-foundation`
+  (supersedes ADR-06's build-time-only rule). Cost: the kit becomes a run-time interface, and the
+  activation screen must say why a Solution with a mismatched kit range is not activated.
 - What happens to a tenant's running sessions when a Solution is deactivated mid-flow — fail the
   session, or let the current session finish on the handler it started with.
 - Whether a Solution may declare a Foundation version constraint that activation checks, or whether

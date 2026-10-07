@@ -10,6 +10,8 @@ use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
+use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 
@@ -24,16 +26,23 @@ final readonly class ChannelService implements ChannelServiceInterface
     public function __construct(
         private ChannelWebhookRegistryInterface $registry,
         private TenantContextInterface $tenantContext,
+        private RecordQuotaInterface $recordQuota,
     ) {
     }
 
     /**
      * Create and persist a channel for the given assistant.
      *
+     * This is the only place a channel is created: the current tenant's channel limit is checked here.
+     *
      * @param  array<string, mixed>  $data
+     *
+     * @throws RecordLimitReachedException when the tenant is at its channel limit
      */
     public function create(Assistant $assistant, array $data): Channel
     {
+        $this->recordQuota->assertCanCreate(Channel::LIMIT_KEY, Channel::countForLimit());
+
         $normalized = $this->normalizeInput($data);
 
         $channel = new Channel([

@@ -8,6 +8,9 @@ real build used); the reversible calls are taken here as assumptions.
 Step 7 of the product roadmap, in the owner's words: "Extension documentation for outsiders — the
 Extending section rewritten against contracts that survived a real build."
 
+Updated 2026-10-07: written after the UI kit (`ui-foundation`) and after the first Solution
+(`first-solution`, whose subject is Feedback); the scaffold command is part of what it describes.
+
 ## Goal and problem
 
 - Who is worse off without this, and how: the developer or integrator inside the Laravel ecosystem —
@@ -24,10 +27,12 @@ Extending section rewritten against contracts that survived a real build."
 - Hidden assumptions — "this holds only if …":
   - That step 6 produced an honest gap record. Documentation written from a build whose detours
     went unrecorded describes the happy path only.
-  - That one Solution's shape generalises. A handler-only Solution teaches little about shipping an
-    interface, so parts of the section stay written from design rather than from evidence.
+  - That one Solution's shape generalises. Feedback ships an interface, its own tables and a flow
+    trigger, but not a `call` action handler, so that part of the section stays written from
+    design rather than from evidence.
   - That Filament is a fair reference point for documentation quality. The brief names it as the
-    bar; holding it single-handed is listed as a project risk.
+    bar; holding it single-handed is listed as a project risk. It is only a documentation-quality
+    benchmark now: Filament is no longer part of what an extension author touches.
 - The main trade-off: documenting the contracts as they came out of a real build makes the section
   true today and dates it to today's surface — every later contract change now has a documentation
   cost that did not exist while the section was aspirational.
@@ -51,7 +56,9 @@ Extending section rewritten against contracts that survived a real build."
 
 - In scope: the Extending section of the published site (`docs/site/extending/`), rewritten against
   what step 6 learned — the extension model, the contracts an extension actually touches, the
-  activation lifecycle as an author meets it, and the publishing path for a Solution's UI.
+  activation lifecycle as an author meets it, the scaffold command that generates a Solution, and
+  the publishing path for a Solution's UI: prebuilt bundles in the package's `dist/`, a composer
+  overlay and a derived image, no Node and no rebuild of Core.
 - Not doing: the Contributing section (working on Core itself); reference material generated from
   code; the marketplace and distribution story (step 8, still fog); translating the section.
 
@@ -64,11 +71,16 @@ Extending section rewritten against contracts that survived a real build."
   documentation rules in `AGENTS.md`: a page absent from the navigation is not published, and the
   site deploys from the default branch after merge.
 - Written in English, like every published page.
+- Changed 2026-10-07: written after the kit and after the first Solution, whose subject is Feedback
+  (not HR); the publishing path for UI is prebuilt bundles + composer overlay + derived image, and
+  the scaffold command is documented with Feedback as the worked example — superseded: the earlier
+  framing of a handler-only first Solution and of Filament resources as the UI path.
 
 ## Open questions
 
-- Whether an example Solution repository ships alongside the section, and whether it is the step 6
-  Solution itself or a smaller one written to be read.
+- Whether an example Solution repository ships alongside the section — settled by the first-solution
+  spec: Feedback is the full worked example, and the scaffold command generates the small starting
+  package; what remains is whether Feedback's repository is public as it stands.
 - Who reads it as an outsider before it is called done — nobody on the project can.
 
 ## Assumptions left untested

@@ -62,6 +62,16 @@ final class Assistant extends BaseModel implements HasName
     /** @use HasFactory<AssistantFactory> */
     use HasFactory;
     use HasUlidPrimaryKey;
+    /**
+     * Limit key under which a tenant's assistant count is capped.
+     */
+    public const string LIMIT_KEY = 'assistants';
+
+    /**
+     * Name of the global scope Filament's `assistant` panel adds to models owned by an assistant
+     * (its panel id plus `_tenancy`). Counting a tenant-wide limit strips it.
+     */
+    public const string PANEL_TENANCY_SCOPE = 'assistant_tenancy';
 
     /** @var class-string<AssistantBuilder> */
     protected string $customBuilder = AssistantBuilder::class;

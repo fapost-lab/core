@@ -38,7 +38,9 @@ domain rules named as its source; this file is the index of what holds and how i
 
 - **Landlord data is reached only through Tenancy.** Other domains depend on a contract from
   `Tenancy/Contracts`; `DB::connection('landlord')` stays inside Tenancy infrastructure. Source: `domains/tenancy/RULES.md`,
-  `ARCHITECTURE.md` § Boundaries and dependency direction. Review only.
+  `ARCHITECTURE.md` § Boundaries and dependency direction. Review only. Exception: an extension
+  package may open `landlord` for its own prefixed tables only, never for Core's
+  (`adr-20261005-extension-packages-own-landlord-tables`).
 - **Controllers and jobs orchestrate; business logic lives in services and domain classes.**
   Domain services take collaborators through the constructor, never through `app()`,
   `resolve()` or global helpers; facades belong to infrastructure (providers, jobs, controllers,

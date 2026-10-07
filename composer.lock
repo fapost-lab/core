@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "7357f391a6ae32459535055612945302",
+  "content-hash": "c08c0c309342bea04b34c38168cf4c93",
   "packages": [
     {
       "name": "anourvalar/eloquent-serialize",
@@ -1267,16 +1267,16 @@
     },
     {
       "name": "fapost/foundation",
-      "version": "v0.3.0",
+      "version": "v0.6.1",
       "source": {
         "type": "git",
         "url": "https://github.com/fapost-lab/foundation.git",
-        "reference": "a0c1a346f338f492fd45383c4b5f1a239c0b9ca2"
+        "reference": "87aae6a7cbb34142fc07a455df7bb4057fcdf100"
       },
       "dist": {
         "type": "zip",
-        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/a0c1a346f338f492fd45383c4b5f1a239c0b9ca2",
-        "reference": "a0c1a346f338f492fd45383c4b5f1a239c0b9ca2",
+        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/87aae6a7cbb34142fc07a455df7bb4057fcdf100",
+        "reference": "87aae6a7cbb34142fc07a455df7bb4057fcdf100",
         "shasum": ""
       },
       "require": {
@@ -1314,27 +1314,27 @@
       ],
       "description": "FaPost public contract layer for Solutions, Plugins and external integrations",
       "support": {
-        "source": "https://github.com/fapost-lab/foundation/tree/v0.3.0",
+        "source": "https://github.com/fapost-lab/foundation/tree/v0.6.1",
         "issues": "https://github.com/fapost-lab/foundation/issues"
       },
-      "time": "2026-09-22T11:46:26+00:00"
+      "time": "2026-10-06T19:21:24+00:00"
     },
     {
       "name": "fapost/support",
-      "version": "v0.2.2",
+      "version": "v0.2.3",
       "source": {
         "type": "git",
         "url": "https://github.com/fapost-lab/support.git",
-        "reference": "a41fa393d8217694c75c5f10162f264260d1d804"
+        "reference": "94fdc9c7ee44672117a135e3bde0e80a40b0b5b2"
       },
       "dist": {
         "type": "zip",
-        "url": "https://api.github.com/repos/fapost-lab/support/zipball/a41fa393d8217694c75c5f10162f264260d1d804",
-        "reference": "a41fa393d8217694c75c5f10162f264260d1d804",
+        "url": "https://api.github.com/repos/fapost-lab/support/zipball/94fdc9c7ee44672117a135e3bde0e80a40b0b5b2",
+        "reference": "94fdc9c7ee44672117a135e3bde0e80a40b0b5b2",
         "shasum": ""
       },
       "require": {
-        "fapost/foundation": "^0.2 || ^0.3",
+        "fapost/foundation": ">=0.2 <1.0",
         "illuminate/database": "^11.0 || ^12.0",
         "illuminate/support": "^11.0 || ^12.0",
         "php": "^8.4"
@@ -1363,10 +1363,10 @@
       ],
       "description": "FaPost reusable Eloquent primitives — traits, base model, and model concerns",
       "support": {
-        "source": "https://github.com/fapost-lab/support/tree/v0.2.2",
+        "source": "https://github.com/fapost-lab/support/tree/v0.2.3",
         "issues": "https://github.com/fapost-lab/support/issues"
       },
-      "time": "2026-09-22T14:25:37+00:00"
+      "time": "2026-10-06T07:16:57+00:00"
     },
     {
       "name": "filament/actions",

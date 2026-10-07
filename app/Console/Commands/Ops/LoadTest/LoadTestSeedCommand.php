@@ -10,7 +10,7 @@ use App\Console\Commands\Ops\LoadTest\Support\LoadTestStateStore;
 use App\Console\Commands\Ops\LoadTest\Support\RefusesProduction;
 use App\Domains\Assistant\Contracts\AssistantServiceInterface;
 use App\Domains\Channels\Contracts\ChannelServiceInterface;
-use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Services\TenantProvisioningService;
@@ -47,6 +47,7 @@ final class LoadTestSeedCommand extends Command
         private readonly TenantSwitcher $tenantSwitcher,
         private readonly AssistantServiceInterface $assistants,
         private readonly ChannelServiceInterface $channels,
+        private readonly CreateFlowAction $flows,
         private readonly PublishFlowService $publisher,
         private readonly Repository $config,
         private readonly LoadTestStateStore $state,
@@ -192,20 +193,12 @@ final class LoadTestSeedCommand extends Command
     ): array {
         $assistant = $this->assistants->create($tenant, ['name' => "Load Test {$slug}"]);
 
-        $flowId = (string)Str::uuid();
-
-        FlowDraft::query()->create([
-            'tenant_id'       => $tenant->getId(),
-            'flow_id'         => $flowId,
-            'assistant_id'    => $assistant->getKey(),
-            'draft_version'   => 1,
-            'name'            => 'Load Test Flow',
-            'is_public'       => true,
-            'is_active'       => true,
-            'logging_enabled' => false,
-            'nodes'           => LoadTestFlowBlueprint::nodes(),
-            'edges'           => LoadTestFlowBlueprint::edges(),
-        ]);
+        $flowId = $this->flows->execute([
+            'assistant_id' => (string)$assistant->getKey(),
+            'name'         => 'Load Test Flow',
+            'nodes'        => LoadTestFlowBlueprint::nodes(),
+            'edges'        => LoadTestFlowBlueprint::edges(),
+        ])->flow_id;
 
         $this->publisher->execute($flowId);
 

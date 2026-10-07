@@ -60,7 +60,7 @@ submission, and an acceptable look.
 
 - In scope: the `Forms` domain and storage, the `form` flow node, the external-event
   resume path, the signed link token, dual (client+server) validation against one schema,
-  multilingual label/value handling, the Filament schema editor, and the timeout sweeper
+  multilingual label/value handling, the schema editor screen on the kit, and the timeout sweeper
   — the eight decisions below, plus the Core-vs-Solution boundary decision.
 - Not doing: per `docs/roadmap.md` § Out of scope, this feature as a whole sits outside
   the current product roadmap's priority ("no anchor in the brief; it neither tests
@@ -101,7 +101,9 @@ submission, and an acceptable look.
 - **Multilingual content.** Label, placeholder and error text go through the content
   translator chain as flow content; `value` on a select/checkbox is language-agnostic,
   the same as a button's value.
-- **Schema editor.** The schema editor lives in Filament (`FormResource`); the builder
+- **Schema editor.** The schema editor lives in an Inertia/Vue screen on the kit (changed
+  2026-10-07: was a Filament `FormResource`, superseded because Core's operator UI leaves Filament
+  and no new screen is built on it — `ui-foundation`); the builder
   only lets an author pick an existing form in the node's config. An existing
   open-source editor is embedded rather than hand-built; the dependency needs separate
   agreement and a license filter — rejected: AGPL editors (Formbricks, OpnForm, HeyForm,
@@ -132,7 +134,7 @@ submission, and an acceptable look.
   already exists in the code"; would be tested by reading those files in detail once
   Phase 1 starts.
 - `@bpmn-io/form-js` and `@formio/js` actually fit the embedding need (JSON schema
-  compatibility inside Filament, a usable Vue integration) — taken at normal depth as a
+  compatibility inside a Vue screen on the kit, a usable Vue integration) — taken at normal depth as a
   named candidate list, not a verified fit; would be tested with a short embedding spike
   before committing to one in Phase 1.
 - `docs/roadmap.md` § Out of scope reflects the current, still-valid product priority —
