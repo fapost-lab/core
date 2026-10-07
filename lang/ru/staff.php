@@ -99,6 +99,11 @@ return [
         'label'        => 'Пользователь',
         'plural_label' => 'Пользователи',
 
+        'limit' => [
+            'reached_title' => 'Достигнут лимит сотрудников',
+            'hint'          => 'Лимит достигнут (:current из :limit)',
+        ],
+
         'fields' => [
             'name'     => 'Имя',
             'email'    => 'Email',
@@ -165,6 +170,11 @@ return [
     'channels' => [
         'label'        => 'Канал',
         'plural_label' => 'Каналы',
+
+        'limit' => [
+            'reached_title' => 'Достигнут лимит каналов',
+            'hint'          => 'Лимит достигнут (:current из :limit)',
+        ],
 
         'fields' => [
             'type'                 => 'Канал',

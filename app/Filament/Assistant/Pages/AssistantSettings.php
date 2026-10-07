@@ -12,9 +12,12 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
+use App\Filament\Assistant\Resources\Flows\FlowResource;
 use App\Filament\Support\ContentLanguages;
 use App\Filament\Support\LocalizedTextarea;
+use App\Filament\Support\RecordLimit;
 use BackedEnum;
+use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Filament\Actions\Action;
 use Filament\Forms\Components\KeyValue;
 use Filament\Forms\Components\Repeater;
@@ -44,6 +47,8 @@ final class AssistantSettings extends Page
     protected string         $view                          = 'filament.assistant.pages.assistant-settings';
 
     protected CurrentAssistantInterface $currentAssistant;
+
+    private ?RecordLimit $flowLimit = null;
 
     public static function canAccess(): bool
     {
@@ -164,6 +169,7 @@ final class AssistantSettings extends Page
                                                     ->maxLength(255)
                                                     ->autofocus(),
                                             ])
+                                            ->visible(fn (): bool => ! $this->flowLimit()->reached)
                                             ->action(function (array $data, Set $set): void {
                                                 // Persist current form first — the redirect leaves the page
                                                 // before the user can press Save and any pending edits would
@@ -174,11 +180,17 @@ final class AssistantSettings extends Page
 
                                                 $assistant = $this->currentAssistant->get();
 
-                                                $flow = app(CreateFlowAction::class)->execute([
-                                                    'assistant_id' => (string) $assistant->getKey(),
-                                                    'name'         => $data['name'],
-                                                    'is_public'    => true,
-                                                ]);
+                                                try {
+                                                    $flow = app(CreateFlowAction::class)->execute([
+                                                        'assistant_id' => (string) $assistant->getKey(),
+                                                        'name'         => $data['name'],
+                                                        'is_public'    => true,
+                                                    ]);
+                                                } catch (RecordLimitReachedException $e) {
+                                                    RecordLimit::notifyReached($e, 'assistant.flows.limit');
+
+                                                    return;
+                                                }
 
                                                 // The new flow becomes the default, overriding whatever was
                                                 // selected before the modal opened.
@@ -270,6 +282,7 @@ final class AssistantSettings extends Page
                                                             ->maxLength(255)
                                                             ->autofocus(),
                                                     ])
+                                                    ->visible(fn (): bool => ! $this->flowLimit()->reached)
                                                     ->action(function (array $data): void {
                                                         // Persist current form first — pending edits to other
                                                         // commands and settings would be lost on redirect.
@@ -279,11 +292,17 @@ final class AssistantSettings extends Page
 
                                                         $assistant = $this->currentAssistant->get();
 
-                                                        $flow = app(CreateFlowAction::class)->execute([
-                                                            'assistant_id' => (string) $assistant->getKey(),
-                                                            'name'         => $data['name'],
-                                                            'is_public'    => true,
-                                                        ]);
+                                                        try {
+                                                            $flow = app(CreateFlowAction::class)->execute([
+                                                                'assistant_id' => (string) $assistant->getKey(),
+                                                                'name'         => $data['name'],
+                                                                'is_public'    => true,
+                                                            ]);
+                                                        } catch (RecordLimitReachedException $e) {
+                                                            RecordLimit::notifyReached($e, 'assistant.flows.limit');
+
+                                                            return;
+                                                        }
 
                                                         $this->redirect(url("/builder/flows/{$flow->flow_id}"));
                                                     }),
@@ -316,6 +335,14 @@ final class AssistantSettings extends Page
                 ->label(__('assistant.pages.settings.actions.save'))
                 ->action('save'),
         ];
+    }
+
+    /**
+     * Read once per request: every create-flow suffix action shares one count.
+     */
+    private function flowLimit(): RecordLimit
+    {
+        return $this->flowLimit ??= FlowResource::limit();
     }
 
     /**

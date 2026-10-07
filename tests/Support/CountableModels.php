@@ -6,6 +6,13 @@ namespace Tests\Support;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Services\AssistantService;
+use App\Domains\Channels\Models\Channel;
+use App\Domains\Channels\Services\ChannelService;
+use App\Domains\Flow\Actions\CreateFlowAction;
+use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Services\AclBootstrapService;
+use App\Domains\Staff\Services\CreatePendingUserService;
 
 /**
  * Models whose count a tenant limit caps. Every creation path of these must go through the
@@ -17,14 +24,21 @@ use App\Domains\Assistant\Services\AssistantService;
 final class CountableModels
 {
     /**
-     * Countable model => its only creator and the name of the relation that points at it.
+     * Countable model => the classes allowed to create it and the name of the relation that points at it.
      *
-     * @return array<class-string, array{creator: class-string, relation: string}>
+     * A model has more than one creator only when one of them is a deliberate exception to the
+     * limit: the first administrator of a tenant (`AclBootstrapService`) is created before any
+     * limit applies and still counts toward it.
+     *
+     * @return array<class-string, array{creators: list<class-string>, relation: string}>
      */
     public static function models(): array
     {
         return [
-            Assistant::class => ['creator' => AssistantService::class, 'relation' => 'assistants'],
+            Assistant::class => ['creators' => [AssistantService::class], 'relation' => 'assistants'],
+            FlowDraft::class => ['creators' => [CreateFlowAction::class], 'relation' => 'drafts'],
+            Channel::class   => ['creators' => [ChannelService::class], 'relation' => 'channels'],
+            User::class      => ['creators' => [CreatePendingUserService::class, AclBootstrapService::class], 'relation' => 'users'],
         ];
     }
 }

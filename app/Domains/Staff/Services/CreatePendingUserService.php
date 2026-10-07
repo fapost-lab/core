@@ -9,6 +9,8 @@ use App\Domains\Staff\Jobs\SendActivationEmailJob;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
+use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -20,14 +22,21 @@ final class CreatePendingUserService
     public function __construct(
         private readonly ActivationTokenService $activationTokenService,
         private readonly TenantContextInterface $tenantContext,
+        private readonly RecordQuotaInterface $recordQuota,
     ) {
     }
 
     /**
+     * An invited user takes a staff place at once, so the tenant's staff limit is checked here.
+     *
      * @param  array{name: string, email: string, phone: ?string, role_id: int|string}  $data
+     *
+     * @throws RecordLimitReachedException when the tenant is at its staff limit
      */
     public function create(User $actor, array $data): User
     {
+        $this->recordQuota->assertCanCreate(User::LIMIT_KEY, User::countForLimit());
+
         return DB::transaction(function () use ($actor, $data): User {
             $user = User::query()->create([
                 'name'     => $data['name'],

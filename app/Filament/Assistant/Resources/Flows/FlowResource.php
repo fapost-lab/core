@@ -12,6 +12,7 @@ use App\Filament\Assistant\Resources\Flows\Pages\EditFlow;
 use App\Filament\Assistant\Resources\Flows\Pages\ListFlows;
 use App\Filament\Assistant\Resources\Flows\Schemas\FlowFormSchema;
 use App\Filament\Assistant\Resources\Flows\Tables\FlowsTable;
+use App\Filament\Support\RecordLimit;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -54,6 +55,36 @@ final class FlowResource extends Resource
     public static function table(Table $table): Table
     {
         return FlowsTable::configure($table);
+    }
+
+    /**
+     * Closed for everyone, admins included, once the tenant is at its limit.
+     * The policy cannot do this: admins pass `Gate::before`.
+     */
+    public static function canCreate(): bool
+    {
+        return static::canCreateIgnoringLimit() && ! self::isLimitReached();
+    }
+
+    /**
+     * The policy answer alone: a create page checks it on every request, the limit only on mount.
+     */
+    public static function canCreateIgnoringLimit(): bool
+    {
+        return parent::canCreate();
+    }
+
+    /**
+     * The tenant's limit as it stands now: whether it is reached and the "N of M" hint.
+     */
+    public static function limit(): RecordLimit
+    {
+        return new RecordLimit(FlowDraft::LIMIT_KEY, FlowDraft::countForLimit(), 'assistant.flows.limit');
+    }
+
+    public static function isLimitReached(): bool
+    {
+        return self::limit()->reached;
     }
 
     public static function getEloquentQuery(): Builder

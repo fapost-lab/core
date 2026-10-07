@@ -22,32 +22,32 @@ final class CountableModelCreationTest extends TestCase
     private const string RELATION_CALLS = '(?:create|createMany|forceCreate|firstOrCreate|updateOrCreate|save|saveMany|make)';
 
     /**
-     * @return array<class-string, array{class-string, class-string, string}>
+     * @return array<class-string, array{class-string, list<class-string>, string}>
      */
     public static function countableModels(): array
     {
         $cases = [];
 
         foreach (CountableModels::models() as $model => $info) {
-            $cases[$model] = [$model, $info['creator'], $info['relation']];
+            $cases[$model] = [$model, $info['creators'], $info['relation']];
         }
 
         return $cases;
     }
 
     /**
-     * @param  class-string  $model
-     * @param  class-string  $creator
+     * @param  class-string        $model
+     * @param  list<class-string>  $creators
      */
     #[DataProvider('countableModels')]
-    public function test_app_does_not_create_countable_model_outside_its_creator(string $model, string $creator, string $relation): void
+    public function test_app_does_not_create_countable_model_outside_its_creator(string $model, array $creators, string $relation): void
     {
-        $violations = $this->scan(base_path('app'), $model, $creator, $relation);
+        $violations = $this->scan(base_path('app'), $model, $creators, $relation);
 
         $this->assertSame(
             [],
             $violations,
-            sprintf('%s must be created only by %s, which checks the tenant limit.', $model, $creator),
+            sprintf('%s must be created only by %s, which check the tenant limit.', $model, implode(', ', $creators)),
         );
     }
 
@@ -86,12 +86,12 @@ final class CountableModelCreationTest extends TestCase
     }
 
     /**
-     * @param  class-string  $model
-     * @param  class-string  $creator
+     * @param  class-string        $model
+     * @param  list<class-string>  $creators
      *
      * @return list<string> files that create the model
      */
-    private function scan(string $dir, string $model, string $creator, string $relation): array
+    private function scan(string $dir, string $model, array $creators, string $relation): array
     {
         $short      = $this->shortName($model);
         $violations = [];
@@ -106,8 +106,10 @@ final class CountableModelCreationTest extends TestCase
             $path = $file->getPathname();
             $code = (string) file_get_contents($path);
 
-            if ($this->declares($code, $creator) || $this->declares($code, $model)) {
-                continue;
+            foreach ([...$creators, $model] as $allowed) {
+                if ($this->declares($code, $allowed)) {
+                    continue 2;
+                }
             }
 
             if ([] !== $this->violationsIn($code, $short, $relation)) {

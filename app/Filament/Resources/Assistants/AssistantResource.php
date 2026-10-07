@@ -13,8 +13,8 @@ use App\Filament\Resources\Assistants\Pages\ViewAssistant;
 use App\Filament\Resources\Assistants\RelationManagers\ChannelsRelationManager;
 use App\Filament\Resources\Assistants\Schemas\AssistantFormSchema;
 use App\Filament\Resources\Assistants\Tables\AssistantsTable;
+use App\Filament\Support\RecordLimit;
 use BackedEnum;
-use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -81,34 +81,33 @@ final class AssistantResource extends Resource
     }
 
     /**
-     * Hidden for everyone, admins included, once the tenant is at its assistant limit.
+     * Closed for everyone, admins included, once the tenant is at its limit.
      * The policy cannot do this: admins pass `Gate::before`.
      */
     public static function canCreate(): bool
     {
-        return parent::canCreate() && ! self::isLimitReached();
+        return static::canCreateIgnoringLimit() && ! self::isLimitReached();
+    }
+
+    /**
+     * The policy answer alone: a create page checks it on every request, the limit only on mount.
+     */
+    public static function canCreateIgnoringLimit(): bool
+    {
+        return parent::canCreate();
+    }
+
+    /**
+     * The tenant's limit as it stands now: whether it is reached and the "N of M" hint.
+     */
+    public static function limit(): RecordLimit
+    {
+        return new RecordLimit(Assistant::LIMIT_KEY, Assistant::query()->count(), 'staff.assistants.limit');
     }
 
     public static function isLimitReached(): bool
     {
-        return ! app(RecordQuotaInterface::class)->canCreate(
-            Assistant::LIMIT_KEY,
-            Assistant::query()->count(),
-        );
-    }
-
-    /**
-     * Human-readable "N of M" for the limit hint, or null when the tenant has no limit.
-     */
-    public static function limitHint(): ?string
-    {
-        $limit = app(RecordQuotaInterface::class)->limit(Assistant::LIMIT_KEY);
-
-        if (null === $limit) {
-            return null;
-        }
-
-        return __('staff.assistants.limit.hint', ['current' => Assistant::query()->count(), 'limit' => $limit]);
+        return self::limit()->reached;
     }
 
     public static function shouldRegisterNavigation(): bool

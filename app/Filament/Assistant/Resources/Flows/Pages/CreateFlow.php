@@ -7,12 +7,18 @@ namespace App\Filament\Assistant\Resources\Flows\Pages;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Filament\Assistant\Resources\Flows\FlowResource;
+use App\Filament\Support\ChecksRecordLimitOnMount;
+use App\Filament\Support\RecordLimit;
+use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
+use Filament\Support\Exceptions\Halt;
 use Illuminate\Database\Eloquent\Model;
 
 final class CreateFlow extends CreateRecord
 {
+    use ChecksRecordLimitOnMount;
+
     protected static string $resource = FlowResource::class;
 
     protected CurrentAssistantInterface $currentAssistant;
@@ -26,7 +32,13 @@ final class CreateFlow extends CreateRecord
     {
         $data['assistant_id'] = (string)$this->currentAssistant->get()->getKey();
 
-        return app(CreateFlowAction::class)->execute($data);
+        try {
+            return app(CreateFlowAction::class)->execute($data);
+        } catch (RecordLimitReachedException $e) {
+            RecordLimit::notifyReached($e, 'assistant.flows.limit');
+
+            throw new Halt();
+        }
     }
 
     protected function getRedirectUrl(): string

@@ -8,6 +8,9 @@ use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\ResendActivationService;
 use App\Domains\Staff\Services\UserService;
+use App\Filament\Resources\Users\UserResource;
+use App\Filament\Support\RecordLimit;
+use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -21,6 +24,14 @@ final class UsersTable
 {
     public static function configure(Table $table): Table
     {
+        // Read on first use and shared by every row of this render, not kept between requests.
+        $limit        = null;
+        $limitReached = static function () use (&$limit): bool {
+            $limit ??= UserResource::limit();
+
+            return $limit->reached;
+        };
+
         return $table
             ->columns([
                 TextColumn::make('name')
@@ -95,17 +106,24 @@ final class UsersTable
                     ->icon('heroicon-o-lock-open')
                     ->color('success')
                     ->requiresConfirmation()
-                    ->visible(function (User $record): bool {
+                    ->visible(function (User $record) use ($limitReached): bool {
                         $actor = Auth::user();
 
+                        // A deactivated account takes a staff place again when reactivated.
                         return ! $record->is_active
+                               && ! $limitReached()
                                && $actor instanceof User
                                && $actor->can('activate', $record);
                     })
                     ->action(function (User $record, UserService $userService): void {
                         /** @var User $actor */
                         $actor = Auth::user();
-                        $userService->activate($actor, $record);
+
+                        try {
+                            $userService->activate($actor, $record);
+                        } catch (RecordLimitReachedException $e) {
+                            RecordLimit::notifyReached($e, 'staff.users.limit');
+                        }
                     }),
             ])
             ->toolbarActions([
