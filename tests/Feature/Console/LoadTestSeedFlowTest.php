@@ -37,8 +37,9 @@ final class LoadTestSeedFlowTest extends FeatureTestCase
         $draft = FlowDraft::query()->where('flow_id', $created['flow_id'])->firstOrFail();
 
         $this->assertSame('Load Test Flow', $draft->name);
-        $this->assertSame(LoadTestFlowBlueprint::nodes(), $draft->nodes);
-        $this->assertSame(LoadTestFlowBlueprint::edges(), $draft->edges);
+        // Postgres stores the graph as jsonb, which does not keep key order: compare by content.
+        $this->assertEquals(LoadTestFlowBlueprint::nodes(), $draft->nodes);
+        $this->assertEquals(LoadTestFlowBlueprint::edges(), $draft->edges);
         $this->assertSame(1, FlowDraft::query()->count());
     }
 
