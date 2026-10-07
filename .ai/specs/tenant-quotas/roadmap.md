@@ -20,11 +20,14 @@ second is refused with a reason — while an install without the shell behaves e
 - [x] `tenant-host-activation` — Activation on the tenant host — staff activation links name the tenant host and `/activate` is served there (after: Panels on every tenant host — the post-activation redirect lands in the panel)
 - [ ] `multi-tenant-deploy` — Deploy for several tenants — wildcard site and certificate, session and gateway constraints, Horizon/Telescope off tenant hosts (after: Panels on every tenant host — the deploy serves what they expose)
 - [x] `operator-provisioning-contract` — Operator provisioning contract — a Foundation contract to provision a tenant, implemented by Core over `TenantProvisioningService` (after: shell design — the shell is its only consumer)
-- [ ] `quota-contract-assistant-seam` — Quota contract with the assistant seam — the Foundation quota contract and limit registry (key, label, unit, kind) with an allow-everything Core default, wired into assistant creation and the Create button, plus the architecture rule that keeps assistant creation inside its service; `TenantSettings::$max_contacts` removed (after: shell design — the shell is its only consumer)
+- [x] `quota-contract-assistant-seam` — Quota contract with the assistant seam — the Foundation quota contract and limit registry (key, label, unit, kind) with an allow-everything Core default, wired into assistant creation and the Create button, plus the architecture rule that keeps assistant creation inside its service; `TenantSettings::$max_contacts` removed (after: shell design — the shell is its only consumer)
 - [x] `landlord-ownership-adr` — Landlord ownership ADR — amends "landlord data is reached only through Tenancy" to name the operator package as the other owner of its own landlord tables (after: shell design — it names which tables)
 - [x] `tenant-directory-contract` — Tenant directory contract — a read-only Foundation contract that lists tenants and returns one with its slug, status, creation time and host URL, implemented by Core over the tenant repository, so the shell's operator panel sees every tenant, those awaiting an operator included (after: Operator provisioning contract — the same Foundation Tenancy section and the same consumer)
 
 - [ ] `pending-tenant-provisioning` — Pending reservation and resumable provisioning — a `Pending` tenant reserves a slug with no schema; provisioning completes it idempotently by tenant id and resumes after a failure or a killed worker (after: Operator provisioning contract — the shell reserves and provisions through it)
+- [ ] `tenant-schema-on-tenant-connection` — Tenant schema DDL on the connection that uses it — create and check tenant schemas on the tenant connection, so a separate landlord database cannot put a schema in the wrong place; signup needs it (after: Operator provisioning contract — provisioning creates the schema)
+- [ ] `landlord-ownership-saas-only` — Landlord ownership narrowed to the operator package — record in the landlord-ownership ADR that only the SaaS operator package owns landlord tables, as ADR-06 says (after: Landlord ownership ADR — it amends it)
+- [ ] `remove-platform-settings` — Remove the unused PlatformSettings — the per-tenant `platform` settings group that looks platform-wide and is read nowhere (after: Landlord ownership ADR — platform-wide settings belong to the operator package)
 
 ## Phase 2 — Safe to put online
 
@@ -32,10 +35,10 @@ Goal: Core can host untrusted tenants. Done when: a `call` node aimed at a priva
 metadata address fails on every install, and every countable record and volume unit goes through
 the quota contract.
 
-- [ ] Egress guard — the `call` node refuses private, loopback, link-local and metadata addresses after DNS resolution and on every redirect, for every install
-- [ ] Count limits on the other models — flows, channels, staff and the remaining countable models refuse creation when the contract denies it, with the architecture rule extended; the Create button is hidden in Filament by the task already in flight, and on the kit's screens when ui-foundation moves them (after: Quota contract with the assistant seam — they repeat its pattern)
-- [ ] Inbound active-contact gate — an inbound message the contract refuses creates no contact and starts no flow, is logged, and the admin panel shows the refusal, a screen built on the kit (after: Quota contract with the assistant seam — the gate calls it; after: ui-foundation phase 3 — the admin screen is built on the kit)
-- [ ] Outbound volume gate — outbound messages, broadcast sends and `call` executions consume volume through the contract and stop when refused (after: Quota contract with the assistant seam — the gate calls it)
+- [ ] `egress-guard` — Egress guard — the `call` node refuses private, loopback, link-local and metadata addresses after DNS resolution and on every redirect, for every install
+- [x] `count-limits-other-models` — Count limits on the other models — flows, channels, staff and the remaining countable models refuse creation when the contract denies it, with the architecture rule extended; the Create button is hidden in Filament by the task already in flight, and on the kit's screens when ui-foundation moves them (after: Quota contract with the assistant seam — they repeat its pattern)
+- [ ] `inbound-active-contact-gate` — Inbound active-contact gate — an inbound message the contract refuses creates no contact and starts no flow, is logged, and the admin panel shows the refusal, a screen built on the kit (after: Quota contract with the assistant seam — the gate calls it; after: ui-foundation phase 3 — the admin screen is built on the kit)
+- [ ] `outbound-volume-gate` — Outbound volume gate — outbound messages, broadcast sends and `call` executions consume volume through the contract and stop when refused (after: Quota contract with the assistant seam — the gate calls it)
 
 ## Phase 3 — Tenant lifecycle
 
@@ -43,8 +46,8 @@ Goal: the shell can end a trial without losing the tenant. Done when: the shell 
 to stopped and back, and while stopped nothing runs and the panel is read-only with the shell's
 banner.
 
-- [ ] Runtime-stopped, read-only tenant — Core asks a Foundation contract for a tenant's access mode on every request and job (default: active); in the stopped mode inbound is not processed, queued delay wake-ups and broadcasts do not run, the admin panel is read-only with a banner the shell fills, built on the kit, and tenant console commands still migrate stopped tenants (after: Operator provisioning contract — the mode extends the same operator surface; after: ui-foundation phases 1 to 3 — the read-only switch and banner are built on the kit's shell and screens)
-- [ ] Solution entitlement seam — Core's Solution activation screen asks the operator contract which installed Solutions a tenant may activate (default: all) and deactivates those it loses (after: Operator provisioning contract — the same operator surface; needs `solution-activation-lifecycle`; after: ui-foundation phase 4 — the screen is built on the kit)
+- [ ] `runtime-stopped-tenant` — Runtime-stopped, read-only tenant — Core asks a Foundation contract for a tenant's access mode on every request and job (default: active); in the stopped mode inbound is not processed, queued delay wake-ups and broadcasts do not run, the admin panel is read-only with a banner the shell fills, built on the kit, and tenant console commands still migrate stopped tenants (after: Operator provisioning contract — the mode extends the same operator surface; after: ui-foundation phases 1 to 3 — the read-only switch and banner are built on the kit's shell and screens)
+- [ ] `solution-entitlement-seam` — Solution entitlement seam — Core's Solution activation screen asks the operator contract which installed Solutions a tenant may activate (default: all) and deactivates those it loses (after: Operator provisioning contract — the same operator surface; needs `solution-activation-lifecycle`; after: ui-foundation phase 4 — the screen is built on the kit)
 - [ ] `support-access-contract` — Support access contract — a Foundation contract through which the shell lets an operator enter a tenant's panel: a one-time, short-lived token bound to the operator opens a session of the tenant's platform support user (admin rights, created on first entry, not removable by the tenant, shown to the tenant in its audit and user list); off by default, so a self-hosted install has no such entry (decided with the owner on 2026-10-06; after: Operator provisioning contract — the same operator surface)
 - [ ] `tenant-rename-contract` — Tenant rename contract — a Foundation contract to change a tenant's slug (its host) with the provisioning checks; the schema name stays, and whether the old host redirects is decided in its design (after: Tenant directory contract — the same Foundation Tenancy section)
 - [ ] fog: read-only depth in the builder — whether the builder opens without save or is closed, cannot be stated until the read-only panel exists on the kit
@@ -52,7 +55,8 @@ banner.
 ## Waves
 
 1. Host-based tenant resolution; Operator provisioning contract; Quota contract with the assistant seam; Landlord ownership ADR; Tenant directory contract
-2. Panels on every tenant host; Activation on the tenant host; Deploy for several tenants; Pending reservation and resumable provisioning; Egress guard; Count limits on the other models; Inbound active-contact gate; Outbound volume gate; Runtime-stopped, read-only tenant; Solution entitlement seam; Support access contract; Tenant rename contract
+2. Tenant schema DDL on the connection that uses it; Landlord ownership narrowed to the operator package; Remove the unused PlatformSettings
+3. Panels on every tenant host; Activation on the tenant host; Deploy for several tenants; Pending reservation and resumable provisioning; Egress guard; Count limits on the other models; Inbound active-contact gate; Outbound volume gate; Runtime-stopped, read-only tenant; Solution entitlement seam; Support access contract; Tenant rename contract
 
 <!--
 Rules (jig-idea §8):
