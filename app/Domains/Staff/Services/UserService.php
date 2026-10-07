@@ -74,6 +74,13 @@ final class UserService
 
     private function assertCanChangeStatus(User $actor, User $target, string $ability): void
     {
+        // The Gate refuses this for admins too; the service is also reached without it.
+        if ($target->isPlatformSupport()) {
+            throw ValidationException::withMessages([
+                'user' => __('staff.support_access.protected'),
+            ]);
+        }
+
         if ($actor->isAdmin()) {
             return;
         }
@@ -85,6 +92,7 @@ final class UserService
 
     /**
      * Returns true when $target is the only active admin left in the tenant.
+     * The platform support user is an admin too, but it is not one of the tenant's people.
      */
     private function isLastActiveAdmin(User $target): bool
     {
@@ -93,6 +101,7 @@ final class UserService
         }
 
         $activeAdminCount = User::query()
+            ->withoutPlatformSupport()
             ->where('is_active', true)
             ->whereHas('roles', fn ($q) => $q->where('name', RoleEnum::Admin->value))
             ->count();

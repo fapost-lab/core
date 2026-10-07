@@ -73,6 +73,8 @@ use Spatie\Permission\Traits\HasRoles;
  *                   $phone
  * @property bool
  *                   $is_active
+ * @property bool
+ *                   $is_platform_support
  * @property-read bool|null
  *                        $assistants_exists
  * @property-read bool|null
@@ -147,8 +149,8 @@ final class User extends Authenticatable implements FilamentUser, HasTenants
      * Users that take a staff place: every account that is not deactivated (`is_active`), pending
      * (invited) and suspended ones included, because an invitation is a reserved place. A deactivated account frees its place.
      *
-     * This is the one seam for accounts that must not count, such as the platform's support
-     * user: exclude them here and every count, hint and check follows.
+     * This is the one seam for accounts that must not count: the platform's support user is
+     * excluded here, so every count, hint and check follows.
      *
      * @param  Builder<User>  $query
      *
@@ -156,12 +158,32 @@ final class User extends Authenticatable implements FilamentUser, HasTenants
      */
     public function scopeCountedForLimit(Builder $query): Builder
     {
-        return $query->where('is_active', true);
+        return $query->where('is_active', true)->withoutPlatformSupport();
     }
 
     public function isAdmin(): bool
     {
         return $this->hasRole(RoleEnum::Admin->value);
+    }
+
+    /**
+     * The tenant's one service account an operator enters through (see the support access ADR).
+     * It has no password and the tenant's administrators cannot change or remove it.
+     */
+    public function isPlatformSupport(): bool
+    {
+        return true === $this->is_platform_support;
+    }
+
+    /**
+     * People of the tenant: everything except its platform support user.
+     *
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    public function scopeWithoutPlatformSupport(Builder $query): Builder
+    {
+        return $query->where('is_platform_support', false);
     }
 
     /**
@@ -203,6 +225,12 @@ final class User extends Authenticatable implements FilamentUser, HasTenants
             ->values();
     }
 
+    protected static function booted(): void
+    {
+        // Row deletes only: dropping a tenant's schema removes the account with everything else.
+        static::deleting(static fn (User $user): bool => ! $user->isPlatformSupport());
+    }
+
     protected static function newFactory(): UserFactory
     {
         return UserFactory::new();
@@ -214,10 +242,11 @@ final class User extends Authenticatable implements FilamentUser, HasTenants
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password'          => 'hashed',
-            'status'            => UserStatus::class,
-            'is_active'         => 'boolean',
+            'email_verified_at'   => 'datetime',
+            'password'            => 'hashed',
+            'status'              => UserStatus::class,
+            'is_active'           => 'boolean',
+            'is_platform_support' => 'boolean',
         ];
     }
 }

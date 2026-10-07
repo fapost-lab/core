@@ -115,6 +115,28 @@ Core; a package only calls it.
 - Ids are lowercase RFC 4122 ULIDs. Any other form names no tenant: `find` returns `null`, and
   `findMany` and the id filters ignore it.
 
+`Tenancy\Contracts\SupportAccessInterface` lets an operator package send its staff into a tenant's
+admin panel. Implemented by Core; a package only calls it.
+
+- `issue(SupportAccessRequest): SupportAccessGrant`. `SupportAccessRequest` carries `tenantId`,
+  `operatorRef`, `operatorName` and `operatorEmail`: who is asking, as the package knows them. Core
+  does not check them and records the name and email in the tenant's support access log.
+- `SupportAccessGrant` carries `enterUrl` (absolute, on the tenant's own host), `token()` and
+  `expiresAt` (UTC). The token is single use and valid for 60 seconds. Send the operator's browser
+  to `enterUrl` with an auto-submitting form `POST` whose body has a `token` field; never put the
+  token in a URL, a log or a queue. A grant is not a session: the browser must arrive within the
+  minute.
+- Entering signs the browser in as the tenant's **platform support user**: an administrator account
+  with no password that Core creates on the first entry. Its session lasts 60 minutes, shows a
+  banner naming the operator and is recorded in the tenant's support access log. Until the new UI
+  shows that log, the tenant sees the platform support user, marked "Platform support", in its
+  users list.
+- Support access works only where tenants are resolved by host, and is off unless the platform
+  enables it (`SUPPORT_ACCESS_ENABLED`, config `tenancy.support_access.enabled`). Off, `issue()`
+  throws `Exceptions\SupportAccessUnavailableException::disabled()`; an unknown or inactive tenant
+  throws `tenantNotFound()` or `tenantNotActive()`. Branch on the exception's `reason`
+  (`SupportAccessFailure`: `Disabled`, `TenantNotFound`, `TenantNotActive`), not on its message.
+
 ## Quota
 
 | Contract | Role |

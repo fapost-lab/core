@@ -15,7 +15,7 @@ paths:
   - "app/Filament/Resources/Roles/**"
   - database/seeders/RoleSeeder.php
   - "tests/*/Domains/Staff/**"
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-07
 ---
 # Staff rules
 
@@ -30,6 +30,15 @@ broken.
   every 5 minutes** (`ActivationTokenService`, `ResendActivationService`).
 - **Admins bypass every policy** through `Gate::before` in `StaffServiceProvider`. A policy that
   returns `false` does not stop an admin — write policies with that in mind.
+- **Nobody changes or removes the platform support user, admins included.** The Gate refuses
+  update, delete, deactivate, activate and role changes on `is_platform_support` users in
+  `Gate::before`, ahead of the admin bypass (`PlatformSupportProtection`); `UserService` refuses
+  them too; the users table bulk delete authorizes each record. The support user has a null
+  password, is not counted as the last active admin, and is left out of the staff limit count (`User::scopeCountedForLimit()`); it is created by `PlatformSupportUserService`, allowed in the record-creation architecture rules, and never refused by the limit.
+  Enforced: `PlatformSupportProtectionTest`.
+- **A support session ends 60 minutes after it began** (`EndExpiredSupportSession`, in the `web`
+  group and both panels) and every entry is recorded in `support_access_entries`, closed by a
+  `Logout` listener. Enforced: `SupportAccessEntryTest`.
 - **Staff notifications are delivered at most once:** the idempotency guard is set before
   delivery (`SendStaffNotificationJob`).
 

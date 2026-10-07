@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domains\Staff\Listeners\CloseSupportAccessEntry;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Notifications\Notifiers\EmailStaffNotifier;
 use App\Domains\Staff\Notifications\Notifiers\InAppStaffNotifier;
 use App\Domains\Staff\Notifications\StaffNotifierRegistry;
 use App\Domains\Staff\Notifications\StaffRecipientResolver;
+use App\Domains\Staff\Policies\PlatformSupportProtection;
 use App\Domains\Staff\Policies\RolePolicy;
 use App\Domains\Staff\Policies\UserPolicy;
 use App\Domains\Staff\Services\AclBootstrapService;
@@ -19,6 +21,8 @@ use App\Domains\Staff\Services\UserService;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
+use Illuminate\Auth\Events\Logout;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -62,7 +66,18 @@ final class StaffServiceProvider extends ServiceProvider
         // Admin role bypasses all permission checks — no need to re-seed when new permissions are added.
         // Users of other guards (e.g. an operator package's own accounts) reach the Gate too:
         // only Core's staff admins short-circuit it; everyone else goes through their policies.
-        Gate::before(static fn (mixed $user): ?bool => $user instanceof User && $user->isAdmin() ? true : null);
+        //
+        // The one exception runs first: nobody, an admin included, changes or removes the tenant's
+        // platform support user. A policy cannot say this, because the bypass would override it.
+        Gate::before(static function (mixed $user, string $ability, array $arguments): ?bool {
+            if (PlatformSupportProtection::forbids($ability, $arguments)) {
+                return false;
+            }
+
+            return $user instanceof User && $user->isAdmin() ? true : null;
+        });
+
+        Event::listen(Logout::class, CloseSupportAccessEntry::class);
 
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
@@ -73,7 +88,7 @@ final class StaffServiceProvider extends ServiceProvider
             label: 'Staff',
             unit: 'staff members',
             kind: LimitKind::Records,
-            description: 'How many staff accounts a tenant can have at a time; deactivated accounts do not count, invited and suspended ones do.',
+            description: 'How many staff accounts a tenant can have at a time; deactivated accounts and the platform support user do not count, invited and suspended ones do.',
         ));
     }
 }

@@ -6,6 +6,8 @@ namespace App\Filament\Resources\Users\Schemas;
 
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Services\PlatformSupportUserService;
+use Closure;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Schema;
@@ -30,7 +32,14 @@ final class UserForm
                     ->label(__('staff.users.fields.email'))
                     ->email()
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->rules([
+                        static fn (): Closure => static function (string $attribute, mixed $value, Closure $fail): void {
+                            if (is_string($value) && PlatformSupportUserService::isReservedEmail($value)) {
+                                $fail(__('staff.support_access.reserved_email'));
+                            }
+                        },
+                    ]),
                 TextInput::make('password')
                     ->label(__('staff.users.fields.password'))
                     ->password()

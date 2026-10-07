@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Domains\Tenancy\Contracts\CoreBootstrapInterface;
+use App\Domains\Tenancy\Contracts\SupportAccessRedeemerInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
@@ -13,6 +14,7 @@ use App\Domains\Tenancy\Contracts\WebhookRegistryReaderInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Database\TenantDatabaseManager;
 use App\Domains\Tenancy\Database\TenantPostgresConnection;
+use App\Domains\Tenancy\Infrastructure\CoreSupportAccess;
 use App\Domains\Tenancy\Infrastructure\CoreTenantDirectory;
 use App\Domains\Tenancy\Infrastructure\CoreTenantProvisioner;
 use App\Domains\Tenancy\Infrastructure\EloquentWebhookRegistryReader;
@@ -24,6 +26,7 @@ use App\Domains\Tenancy\Services\HostTenantResolver;
 use App\Domains\Tenancy\Services\LimitRegistry;
 use App\Domains\Tenancy\Services\RecordQuota;
 use App\Domains\Tenancy\Services\RequestHostClassifier;
+use App\Domains\Tenancy\Services\SupportAccessTokenStore;
 use App\Domains\Tenancy\Services\TenantContext;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
@@ -33,6 +36,7 @@ use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
+use Fapost\Foundation\Tenancy\Contracts\SupportAccessInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantDirectoryInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
@@ -87,6 +91,12 @@ final class DomainServiceProvider extends ServiceProvider
         ));
         $this->app->bind(TenantProvisionerInterface::class, CoreTenantProvisioner::class);
         $this->app->bind(TenantDirectoryInterface::class, CoreTenantDirectory::class);
+
+        // Core is the only implementation of support access, so a plain bind: an operator package
+        // calls the contract and never replaces it. Without the package the feature stays off
+        // (`tenancy.support_access.enabled`), not unbound.
+        $this->app->bind(SupportAccessInterface::class, CoreSupportAccess::class);
+        $this->app->bind(SupportAccessRedeemerInterface::class, SupportAccessTokenStore::class);
 
         $this->app->when(ConfigTenantResolver::class)
             ->needs('$defaultTenantSlug')

@@ -12,6 +12,7 @@ use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Staff\Services\CreatePendingUserService;
+use App\Domains\Staff\Services\PlatformSupportUserService;
 use App\Domains\Staff\Services\UserService;
 use App\Domains\Tenancy\Services\UnlimitedTenantLimits;
 use App\Filament\Resources\Users\Pages\CreateUser;
@@ -27,9 +28,9 @@ use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
 
 /**
- * The staff limit counts active accounts, invited (Pending) ones included, and is checked where a
- * place is taken: CreatePendingUserService and UserService::activate. The first admin of a tenant
- * is created without the check.
+ * The staff limit counts active accounts, invited (Pending) ones included and the platform support
+ * user excluded, and is checked where a place is taken: CreatePendingUserService and
+ * UserService::activate. The first admin of a tenant is created without the check.
  */
 final class StaffLimitTest extends FeatureTestCase
 {
@@ -107,6 +108,33 @@ final class StaffLimitTest extends FeatureTestCase
 
             app(CreatePendingUserService::class)->create($admin, $this->invitation('extra@example.test'));
         });
+    }
+
+    public function test_the_platform_support_user_takes_no_place(): void
+    {
+        $admin = $this->actingAsAdmin('admin');
+        app(PlatformSupportUserService::class)->ensure();
+
+        $this->assertSame(1, User::countForLimit(), 'Only the admin counts; the platform support user does not.');
+
+        $this->limitRecords('staff', 2);
+
+        $this->inTenant(function () use ($admin): void {
+            app(CreatePendingUserService::class)->create($admin, $this->invitation('member@example.test'));
+
+            $this->assertSame(2, User::countForLimit());
+        });
+    }
+
+    public function test_the_platform_support_user_is_created_even_at_the_limit(): void
+    {
+        $this->actingAsAdmin('admin');
+        $this->limitRecords('staff', 1);
+
+        $support = app(PlatformSupportUserService::class)->ensure();
+
+        $this->assertTrue($support->isPlatformSupport());
+        $this->assertSame(1, User::countForLimit());
     }
 
     public function test_deactivating_frees_a_place(): void

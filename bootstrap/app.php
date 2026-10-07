@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domains\Flow\Exceptions\DraftVersionConflictException;
 use App\Domains\Flow\Exceptions\FlowValidationException;
+use App\Domains\Staff\Http\Middleware\EndExpiredSupportSession;
 use App\Domains\Tenancy\Exceptions\TenantNotActiveException;
 use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
@@ -57,11 +58,16 @@ return Application::configure(basePath: dirname(__DIR__))
             append: [
                 SetLocale::class,
                 HandleInertiaRequests::class,
+                EndExpiredSupportSession::class,
             ],
             prepend: [
                 ResolveTenantContext::class,
             ],
         );
+
+        // The support entry is a form post from the operator's own site, so no CSRF token can accompany it:
+        // the single-use token in its body is the proof (see SupportAccessController).
+        $middleware->validateCsrfTokens(except: ['support/enter']);
 
         // Registered in every mode; the closure runs per request, after config is loaded, and
         // yields no patterns in `single` mode, which leaves every host trusted as before.
