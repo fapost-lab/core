@@ -13,6 +13,8 @@ variable gets a publish warning or error naming the node.
 - [ ] Loop-aware iteration budget instead of the shared `max_iterations = 100`
 - [ ] `{{x.length}}` in templates and a `max_size` editor in the builder
 
+- [ ] `block-invalid-flow-graphs` — Publishing refuses a structurally broken graph — duplicate ids, dangling edges, duplicate `(from, handle)`, not exactly one entry, orphans, variable-contract breaks: the errors `flow:audit-graph` only reports today
+
 ## Phase 2 — Calls that can be retried safely
 
 Goal: a `call` to a flaky endpoint can be retried without duplicating its effect. Done when: a call
@@ -31,6 +33,8 @@ its results without sharing session variables, against a pinned version of the c
 - [ ] Subflow pinned to a target version
 - [ ] `emit_event` `assistant_filter` on event triggers
 - [ ] Design-time leaf-vs-group variable path check
+
+- [ ] `subflow-orphan-parents` — A subflow parent never stays `paused_subflow` without a live child — any end of the child returns control to the parent, and the sweeper does not count a live child as dead
 
 ## Phase 4 — Engine and node capabilities
 
