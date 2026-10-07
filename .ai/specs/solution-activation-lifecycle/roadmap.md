@@ -32,11 +32,14 @@ an activated Solution provides, and stops reaching it after deactivation.
 Goal: turning a Solution on is a panel action, not a deploy. Done when: a staff user with the right
 permission activates and deactivates a Solution for their tenant and sees the result in a flow.
 
-- [ ] Filament activation screen: install state, activate, deactivate, and what the Solution
-      registers (after: activation storage — the screen edits that state)
-- [ ] A Solution's builder components reach the builder through the agreed publish contract, with
-      the rebuild requirement either removed or stated on the screen (after: D4 in `spec.md` — the
-      answer decides whether this is a publish step or a build step)
+- [ ] Activation screen on the kit (console/admin): install state, activate, deactivate, what the
+      Solution registers through the ui-foundation extension contract, and the reason when its kit
+      range does not match Core's (after: activation storage — the screen edits that state; after:
+      ui-foundation phase 3 — the screen is built on the kit)
+- [ ] A Solution's prebuilt UI reaches the console through the agreed publish contract — installed
+      by composer overlay and derived image, no rebuild (after: ui-foundation phase 4 — the
+      extension contract it registers through; after: first-solution phase 0 — D4 is resolved
+      there as prebuilt bundles)
 
 ## Phase 4 — An update cannot take the install down
 
@@ -54,8 +57,8 @@ leaves the install serving every other flow, and a Solution migration that fails
 
 1. A Solution declares its identity, its Foundation constraint and what it registers in a manifest that is validated at `platform:update`
 2. Per-tenant activation storage and registry: a Solution is on or off for one tenant, and the state survives a worker restart without leaking between tenants
-3. Core implementation of `CoreRegistrarInterface`: an activated Solution's action handlers resolve in the flow runtime, and a name collision with Core fails at registration instead of overwriting; Filament activation screen: install state, activate, deactivate, and what the Solution registers; `platform:update` with per-phase rollback: validate, migrate platform, migrate each Solution separately, boot validation, activate
-4. A Solution's builder components reach the builder through the agreed publish contract, with the rebuild requirement either removed or stated on the screen; Failure isolation at boot: a Solution that fails to boot is marked degraded, new sessions of its flows do not start, running ones finish; Lifecycle test suite over the whole chain: install → activate → handler available → deactivate → gone, with the tenant boundary asserted
+3. Core implementation of `CoreRegistrarInterface`: an activated Solution's action handlers resolve in the flow runtime, and a name collision with Core fails at registration instead of overwriting; Activation screen on the kit (console/admin): install state, activate, deactivate, what the Solution registers through the ui-foundation extension contract, and the reason when its kit range does not match Core's; `platform:update` with per-phase rollback: validate, migrate platform, migrate each Solution separately, boot validation, activate
+4. A Solution's prebuilt UI reaches the console through the agreed publish contract — installed by composer overlay and derived image, no rebuild; Failure isolation at boot: a Solution that fails to boot is marked degraded, new sessions of its flows do not start, running ones finish; Lifecycle test suite over the whole chain: install → activate → handler available → deactivate → gone, with the tenant boundary asserted
 
 <!--
 Rules (jig-idea §8):

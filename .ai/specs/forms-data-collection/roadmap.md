@@ -4,7 +4,7 @@ Destination: a contact fills a multi-field questionnaire on one form screen (Tel
 Mini App or hosted page), validated once against a single schema on both client and
 server, and the flow session resumes on submission through a dedicated path — with
 answers mapped into the contact record, the transcript and an export, and the form
-itself authored in Filament without touching code.
+itself authored on the kit (Inertia + Vue) without touching code.
 
 ## Phase 1 — Foundation
 
@@ -52,13 +52,13 @@ answers saved.
 ## Phase 3 — Authoring
 
 Goal: an operator can build and wire a form without touching code. Done when: a form
-created in Filament can be picked on a `form` node in the builder, and publishing a flow
+created on the kit can be picked on a `form` node in the builder, and publishing a flow
 rejects a `form` node that points at a form outside its own assistant.
 
-- [ ] Filament `FormResource` with the embedded schema editor, plus `FormPolicy` and its
-  `Permission`
+- [ ] Form authoring screen on the kit with the embedded schema editor, plus `FormPolicy` and
+  its `Permission` (after: ui-foundation phase 2 — the screen is built on the kit, not Filament)
 - [ ] Builder `FormConfig.vue` override (form picker, `save_to`, field mapping), palette
-  entry and `NodeIcon` (after: Filament `FormResource` — there is nothing to pick in the
+  entry and `NodeIcon` (after: the form authoring screen — there is nothing to pick in the
   builder before a form can be authored)
 - [ ] Publish-time validation that a `form` node references an existing form belonging
   to the same assistant (after: builder `FormConfig.vue` override — the check applies to
@@ -80,9 +80,9 @@ contact field, appears in the transcript, and can be exported.
 1. Phase 1 — foundation (`Forms` domain, link token, initData HMAC, server-side
    validation, editor license decision): no runtime dependency on the other phases.
 2. Phase 2 (runtime: node handler, resume path, sweeper, renderer, hosted page) and
-   Phase 3 (authoring: Filament resource, builder override, publish validation) — both
+   Phase 3 (authoring: kit screen, builder override, publish validation) — both
    depend only on the Phase 1 domain and token, not on each other; runtime touches
-   `FlowEngine`/channel senders while authoring touches Filament/builder, so the two can
+   `FlowEngine`/channel senders while authoring touches the kit screen/builder, so the two can
    proceed in parallel once Phase 1 lands.
 3. Phase 4 — data integration, which needs the submission path and saved answers that
    only exist once Phase 2's runtime is in place.

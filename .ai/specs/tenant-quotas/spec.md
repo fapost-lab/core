@@ -33,7 +33,7 @@ happens at the cap); the rest follows from them.
 - Contacts are created implicitly by inbound messages (`IncomingMessageJob` →
   `ContactService::findOrCreate`), not by staff.
 - Core makes no LLM calls itself; RAG adapters come from extensions. No usage accounting exists.
-- Policies with `create()` exist for most entities and drive the Filament Create buttons, but the
+- Policies with `create()` exist for most entities and drive the Create buttons (Filament today; the kit's screens after ui-foundation), but the
   runtime paths (inbound contacts, `CreateFlowAction`, `Broadcast::create`, the load-test seeder)
   bypass them.
 
@@ -47,8 +47,8 @@ From an independent failure hunt (2026-10-05), sharpest first.
     boundary, not a deterrent — hence volume and time limits (see Decisions).
   - Per-tenant limits mean something only if each tester has their own tenant. Today one
     deployment serves one tenant, resolved from env; host-based resolution is a prerequisite.
-  - The cap holds only if every creation path goes through the guard. Filament replicate
-    actions, imports, seeders, flow runs and future Solution packages can write models directly.
+  - The cap holds only if every creation path goes through the guard. Replicate
+    actions (Filament today), imports, seeders, flow runs and future Solution packages can write models directly.
 - The main trade-off: strict enforcement (atomic counters, an architecture rule over every
   create path) against the cost of touching every domain that creates countable records.
 - The weakest point: the flow `call` node. Any tester with one flow can make the platform an
@@ -209,7 +209,8 @@ From an independent failure hunt (2026-10-05), sharpest first.
   - Solutions are entitled by plan: Core's activation screen asks the operator contract which
     installed Solutions a tenant may activate; Core's default allows all of them.
   - The base domain needs a platform route context with no tenant: today `TenancyMiddleware` runs
-    on the whole `web` group, Livewire's update endpoint included, and the guest redirect points at
+    on the whole `web` group, Livewire's update endpoint included (Livewire leaves Core with
+    ui-foundation; the Inertia routes then fall under the same middleware), and the guest redirect points at
     a tenant panel route.
   - Core jobs and commands must respect the access mode: jobs load the tenant by id and never check
     its state, and the tenant console commands iterate only active tenants, so a stopped tenant
@@ -217,6 +218,15 @@ From an independent failure hunt (2026-10-05), sharpest first.
   - Found by the failure hunt and filed separately: the schema name can exceed PostgreSQL's
     63-byte identifier limit and two slugs can share a schema (task
     `fix-tenant-schema-name-truncation`).
+
+- **Changed 2026-10-07 — the UI items of this spec are built on the kit, not on Filament.**
+  ui-foundation moves Core's UI off Filament and freezes new Filament screens. Hiding the Create
+  button on the other models, the inbound-refusal warning, the read-only panel with its banner and
+  the Solution entitlement screen wait for the kit; the backend seams (contract, gates, access
+  mode) ship first. Only the already designed `quota-contract-assistant-seam` Create-button edit
+  lands in Filament. The earlier Livewire-specific read-only design is superseded: the read-only
+  state is a shared prop plus authorization on the kit's screens. Reason: ui-foundation moves
+  Core's UI off Filament.
 
 ## Open questions
 
@@ -235,15 +245,16 @@ From an independent failure hunt (2026-10-05), sharpest first.
 - Exact list of count limits and volume limits for the first tester plan, and the trial term and
   retention period — numbers, decided in the shell's spec.
 - Which admin pages stay usable in read-only mode (viewing conversations and flows: yes; the
-  builder: open but no save?) — decides how deep the read-only switch reaches into Filament and
-  the builder.
+  builder: open but no save?) — decides how deep the read-only switch reaches into the console's screens (built on the kit
+  and Inertia since ui-foundation, so the switch is a shared prop and per-action authorization,
+  not a Livewire concern) and the builder.
 
 ## Assumptions left untested
 
 - A per-host session cookie is enough to keep tenants' panel sessions apart — taken at normal
   depth; tested by logging into two tenant hosts in one browser.
 - Every creation path of a countable model can be routed through its domain service without
-  breaking Filament's create pages — taken at normal depth; tested when the architecture rule is
+  breaking the create screens (Filament's today, the kit's after ui-foundation) — taken at normal depth; tested when the architecture rule is
   first switched on and the violations are counted.
 - A quota check per inbound message adds no noticeable latency when the shell's implementation is
   an indexed counter — taken at normal depth; tested by the load-test harness with a plan set.

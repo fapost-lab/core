@@ -61,10 +61,15 @@ A journal of staff actions: who changed what, and when, in the tenant panel.
   release, only sales to multi-staff tenants, and it is deliberately sequenced after the release
   track lands.
 
+- **Changed 2026-10-07 — the journal's view is built on the kit, not on Filament.** The question
+  "dedicated Filament resource vs. a History tab" stays open but is now asked of the kit's screens,
+  and the view waits for ui-foundation (phases 2 and 3); capture and retention are backend and do
+  not wait. Reason: ui-foundation moves Core's UI off Filament.
+
 ## Open questions
 
-- Does this need a dedicated Filament resource with a list and filters, or a "History" tab on each
-  record? — decides the UI shape and how much dedicated screen real estate the feature gets.
+- Does this need a dedicated console screen with a list and filters, or a "History" tab on each
+  record (built on the kit, not on Filament)? — decides the UI shape and how much dedicated screen real estate the feature gets.
 - Do we store full old/new value diffs, and how do we keep channel secrets out of the log? — decides
   what gets written per entry and what redaction has to happen before persisting.
 - Who can see the journal: only the tenant owner, or any role with a dedicated permission? — decides

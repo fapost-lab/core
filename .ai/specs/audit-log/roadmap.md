@@ -30,9 +30,9 @@ configured retention period.
 ## Phase 3 — Make it visible
 
 Goal: staff with permission can read the journal. Done when: an authorized user can open a view of
-the log — resource or tab — and see the recorded actions for their tenant.
+the log — a dedicated screen or a tab, built on the kit — and see the recorded actions for their tenant.
 
-- [ ] fog: dedicated Filament resource vs. a "History" tab on each record — shape not decided
+- [ ] fog: dedicated console screen vs. a "History" tab on each record, built on the kit — shape not decided (after: ui-foundation phases 2 and 3 — the view is built on the kit)
 - [ ] fog: who can see the journal (owner-only vs. permission-gated role) — blocks how the view is
       authorized
 
@@ -42,7 +42,7 @@ the log — resource or tab — and see the recorded actions for their tenant.
 2. Capture staff actions on `Contact`/segments/`Broadcast`/`User`/`Role`/tenant settings, and staff
    sign-in/sign-out (both depend only on the recording mechanism built in wave 1)
 3. Retention and the scheduled cleanup command
-4. Visibility (Filament resource or History tab) — waits on the open UI and authorization questions
+4. Visibility (a dedicated screen or a History tab, on the kit) — waits on the kit (ui-foundation phases 2 and 3) and on the open UI and authorization questions
 
 <!--
 Rules (jig-idea §8):
