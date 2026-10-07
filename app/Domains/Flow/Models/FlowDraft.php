@@ -57,6 +57,12 @@ final class FlowDraft extends BaseModel
     use HasUlidPrimaryKey;
 
     /**
+     * Limit key under which a tenant's flow count is capped. A flow is one draft row; its
+     * published versions do not count.
+     */
+    public const string LIMIT_KEY = 'flows';
+
+    /**
      * @var list<string>
      */
     protected $fillable = [
@@ -73,6 +79,17 @@ final class FlowDraft extends BaseModel
         'nodes',
         'edges',
     ];
+
+    /**
+     * How many flows the tenant has, across all its assistants.
+     *
+     * The assistant panel scopes this model to the current assistant through Filament's
+     * tenancy global scope ({@see Assistant::PANEL_TENANCY_SCOPE}); the limit counts the whole tenant.
+     */
+    public static function countForLimit(): int
+    {
+        return self::query()->withoutGlobalScope(Assistant::PANEL_TENANCY_SCOPE)->count();
+    }
 
     public function assistant(): BelongsTo
     {

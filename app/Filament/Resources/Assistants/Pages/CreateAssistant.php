@@ -8,14 +8,17 @@ use App\Domains\Assistant\Contracts\AssistantServiceInterface;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Filament\Resources\Assistants\AssistantResource;
+use App\Filament\Support\ChecksRecordLimitOnMount;
+use App\Filament\Support\RecordLimit;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
-use Filament\Notifications\Notification;
 use Filament\Resources\Pages\CreateRecord;
 use Filament\Support\Exceptions\Halt;
 use Illuminate\Database\Eloquent\Model;
 
 final class CreateAssistant extends CreateRecord
 {
+    use ChecksRecordLimitOnMount;
+
     protected static string $resource = AssistantResource::class;
 
     protected function handleRecordCreation(array $data): Model
@@ -25,11 +28,7 @@ final class CreateAssistant extends CreateRecord
         try {
             return app(AssistantServiceInterface::class)->create($tenant, $data);
         } catch (RecordLimitReachedException $e) {
-            Notification::make()
-                ->danger()
-                ->title(__('staff.assistants.limit.reached_title'))
-                ->body($e->getMessage())
-                ->send();
+            RecordLimit::notifyReached($e, 'staff.assistants.limit');
 
             throw new Halt();
         }

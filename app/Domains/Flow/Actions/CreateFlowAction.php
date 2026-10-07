@@ -8,23 +8,36 @@ use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
+use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Support\Str;
 
 /**
  * Creates a new flow draft seeded with a terminal `end` node (status=success).
  * Authors always need a terminal — seeding it removes the empty-canvas state
  * and gives the builder a real, selectable End node to configure instead of a
- * decorative placeholder.
+ * decorative placeholder. A caller that already has a graph (the load-test seed) passes `nodes`
+ * and `edges` instead.
  */
 final readonly class CreateFlowAction
 {
     public function __construct(
         private TenantContextInterface $tenantContext,
+        private RecordQuotaInterface $recordQuota,
     ) {
     }
 
+    /**
+     * This is the only place a flow is created: the current tenant's flow limit is checked here.
+     *
+     * @param  array<string, mixed>  $data
+     *
+     * @throws RecordLimitReachedException when the tenant is at its flow limit
+     */
     public function execute(array $data): FlowDraft
     {
+        $this->recordQuota->assertCanCreate(FlowDraft::LIMIT_KEY, FlowDraft::countForLimit());
+
         return FlowDraft::create([
             'tenant_id'     => $this->tenantContext->get()->id,
             'flow_id'       => (string)Str::uuid(),
@@ -34,7 +47,7 @@ final readonly class CreateFlowAction
             'description'   => $data['description'] ?? null,
             'is_public'     => $data['is_public'] ?? true,
             'is_active'     => true,
-            'nodes'         => [
+            'nodes'         => $data['nodes'] ?? [
                 [
                     'id'      => Str::lower((string)Str::ulid()),
                     'type'    => EndNodeHandler::TYPE,
@@ -42,7 +55,7 @@ final readonly class CreateFlowAction
                     'config'  => ['status' => EndStatus::Success->value],
                 ],
             ],
-            'edges' => [],
+            'edges' => $data['edges'] ?? [],
         ]);
     }
 }

@@ -18,7 +18,13 @@ return [
     'flows' => [
         'label'        => 'Flow',
         'plural_label' => 'Flows',
-        'fields'       => [
+
+        'limit' => [
+            'reached_title' => 'Flow limit reached',
+            'hint'          => 'Limit reached (:current of :limit)',
+        ],
+
+        'fields' => [
             'name'                 => 'Name',
             'description'          => 'Description',
             'group'                => 'Group',

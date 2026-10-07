@@ -16,6 +16,9 @@ use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Staff\Services\RoleFormDataMapper;
 use App\Domains\Staff\Services\RoleWriterService;
 use App\Domains\Staff\Services\UserService;
+use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
+use Fapost\Foundation\Quota\DTO\LimitDefinition;
+use Fapost\Foundation\Quota\Enums\LimitKind;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 
@@ -35,7 +38,8 @@ final class StaffServiceProvider extends ServiceProvider
             ->needs('$guard')
             ->giveConfig('auth.defaults.guard', 'web');
         $this->app->singleton(RoleFormDataMapper::class);
-        $this->app->singleton(UserService::class);
+        // Not a singleton: it holds the record quota, which reads the scoped tenant context.
+        $this->app->bind(UserService::class);
         $this->app->singleton(StaffRecipientResolver::class);
 
         // Staff notification transports — registered into a single in-memory
@@ -62,5 +66,14 @@ final class StaffServiceProvider extends ServiceProvider
 
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
+
+        // Registered the way a Solution registers its keys: from boot(), before the registry is frozen.
+        $this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(
+            key: User::LIMIT_KEY,
+            label: 'Staff',
+            unit: 'staff members',
+            kind: LimitKind::Records,
+            description: 'How many staff accounts a tenant can have at a time; deactivated accounts do not count, invited and suspended ones do.',
+        ));
     }
 }

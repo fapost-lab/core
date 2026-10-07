@@ -147,7 +147,16 @@ throws `Quota\Exceptions\RecordLimitReachedException` (`key`, `label`, `limit`, 
 message is meant for people, such as "Assistants limit reached: 1 of 1."), and a `LogicException`
 when the key is not registered, so a typo never means "no limit".
 
-Core registers `assistants` (kind `Records`). Existing records are never removed when a limit drops
+Core registers four keys of kind `Records`:
+
+| Key | What counts |
+|---|---|
+| `assistants` | Every assistant of the tenant |
+| `flows` | Every flow of the tenant, across its assistants. A flow is one draft; its published versions do not count |
+| `channels` | Every channel of the tenant, inactive ones included |
+| `staff` | Staff accounts that are not deactivated, pending (invited) and suspended ones included. A deactivated account frees its place, so reactivating one needs a free place. The tenant's first administrator is created without the check, and still counts |
+
+Existing records are never removed when a limit drops
 below the current count: only creating more is refused. Limits that count usage over time or
 bytes have no enforcement contract yet.
 

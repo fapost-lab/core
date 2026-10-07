@@ -99,6 +99,11 @@ return [
         'label'        => 'User',
         'plural_label' => 'Users',
 
+        'limit' => [
+            'reached_title' => 'Staff limit reached',
+            'hint'          => 'Limit reached (:current of :limit)',
+        ],
+
         'fields' => [
             'name'     => 'Name',
             'email'    => 'Email',
@@ -165,6 +170,11 @@ return [
     'channels' => [
         'label'        => 'Channel',
         'plural_label' => 'Channels',
+
+        'limit' => [
+            'reached_title' => 'Channel limit reached',
+            'hint'          => 'Limit reached (:current of :limit)',
+        ],
 
         'fields' => [
             'type'                 => 'Channel',

@@ -13,6 +13,7 @@ use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -44,6 +45,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @property-read int|null
  *                        $roles_count
  * @method static \Database\Factories\UserFactory factory($count = null, $state = [])
+ * @method static \Illuminate\Database\Eloquent\Builder<static>|User countedForLimit()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|User newModelQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|User newQuery()
  * @method static \Illuminate\Database\Eloquent\Builder<static>|User permission($permissions, $without = false)
@@ -101,6 +103,11 @@ final class User extends Authenticatable implements FilamentUser, HasTenants
     use Notifiable;
 
     /**
+     * Limit key under which a tenant's staff count is capped.
+     */
+    public const string LIMIT_KEY = 'staff';
+
+    /**
      * @var list<string>
      */
     protected $fillable = [
@@ -121,11 +128,35 @@ final class User extends Authenticatable implements FilamentUser, HasTenants
     ];
 
     /**
+     * How many staff places the tenant uses.
+     */
+    public static function countForLimit(): int
+    {
+        return self::query()->countedForLimit()->count();
+    }
+
+    /**
      * Active status AND not deactivated by admin.
      */
     public function canAccessPanel(Panel $panel): bool
     {
         return UserStatus::Active === $this->status && $this->is_active;
+    }
+
+    /**
+     * Users that take a staff place: every account that is not deactivated (`is_active`), pending
+     * (invited) and suspended ones included, because an invitation is a reserved place. A deactivated account frees its place.
+     *
+     * This is the one seam for accounts that must not count, such as the platform's support
+     * user: exclude them here and every count, hint and check follows.
+     *
+     * @param  Builder<User>  $query
+     *
+     * @return Builder<User>
+     */
+    public function scopeCountedForLimit(Builder $query): Builder
+    {
+        return $query->where('is_active', true);
     }
 
     public function isAdmin(): bool

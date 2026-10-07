@@ -11,6 +11,7 @@ use App\Filament\Assistant\Resources\Channels\Pages\EditChannel;
 use App\Filament\Assistant\Resources\Channels\Pages\ListChannels;
 use App\Filament\Assistant\Resources\Channels\Tables\ChannelsTable;
 use App\Filament\Resources\Assistants\Schemas\ChannelFormSchema;
+use App\Filament\Support\RecordLimit;
 use BackedEnum;
 use Filament\Facades\Filament;
 use Filament\Resources\Resource;
@@ -64,7 +65,19 @@ final class ChannelResource extends Resource
         ];
     }
 
+    /**
+     * Closed for everyone, admins included, once the tenant is at its limit.
+     * The policy cannot do this: admins pass `Gate::before`.
+     */
     public static function canCreate(): bool
+    {
+        return static::canCreateIgnoringLimit() && ! self::isLimitReached();
+    }
+
+    /**
+     * The policy answer alone: a create page checks it on every request, the limit only on mount.
+     */
+    public static function canCreateIgnoringLimit(): bool
     {
         $tenant = Filament::getTenant();
 
@@ -73,5 +86,18 @@ final class ChannelResource extends Resource
         }
 
         return Gate::allows('create', [Channel::class, $tenant]);
+    }
+
+    /**
+     * The tenant's limit as it stands now: whether it is reached and the "N of M" hint.
+     */
+    public static function limit(): RecordLimit
+    {
+        return new RecordLimit(Channel::LIMIT_KEY, Channel::countForLimit(), 'staff.channels.limit');
+    }
+
+    public static function isLimitReached(): bool
+    {
+        return self::limit()->reached;
     }
 }

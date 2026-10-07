@@ -156,15 +156,14 @@ final class AssistantLimitTest extends FeatureTestCase
     public function test_race_shows_a_notification_instead_of_an_error(): void
     {
         $this->actingAsPanelUser(admin: true);
-        $limits = $this->limitAssistants(1);
+        $this->limitAssistants(1);
 
         $component = Livewire::test(CreateAssistant::class)
             ->fillForm(['name' => 'Raced', 'default_language' => 'en']);
 
-        // Another request takes the last slot after this page's own access checks have passed:
-        // Filament checks canCreate() when the component hydrates and again inside create().
+        // Another request takes the last slot after the page was opened below the limit: the stale
+        // page must reach the service and get a notification, not a 403.
         Assistant::factory()->create();
-        $limits->unlimitedAnswers = 2;
 
         $component->call('create')->assertNotified(__('staff.assistants.limit.reached_title'));
 

@@ -6,6 +6,8 @@ namespace App\Domains\Staff\Services;
 
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
+use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
+use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -14,6 +16,11 @@ use Illuminate\Validation\ValidationException;
  */
 final class UserService
 {
+    public function __construct(
+        private readonly RecordQuotaInterface $recordQuota,
+    ) {
+    }
+
     /**
      * Deactivate a staff account. Immediately invalidates sessions and blocks login.
      *
@@ -49,10 +56,18 @@ final class UserService
     /**
      * Reactivate a previously deactivated account.
      * A new login is required — sessions are not restored.
+     *
+     * A deactivated account does not take a staff place, so reactivating it needs a free one.
+     *
+     * @throws RecordLimitReachedException when the tenant is at its staff limit
      */
     public function activate(User $actor, User $target): void
     {
         $this->assertCanChangeStatus($actor, $target, 'activate');
+
+        if (! $target->is_active) {
+            $this->recordQuota->assertCanCreate(User::LIMIT_KEY, User::countForLimit());
+        }
 
         $target->update(['is_active' => true]);
     }

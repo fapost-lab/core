@@ -139,6 +139,9 @@ use App\Infrastructure\Flow\QueuedDelayResumeScheduler;
 use App\Infrastructure\Flow\QueuedSendMessageTimeoutScheduler;
 use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
+use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
+use Fapost\Foundation\Quota\DTO\LimitDefinition;
+use Fapost\Foundation\Quota\Enums\LimitKind;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -160,6 +163,15 @@ final class FlowServiceProvider extends ServiceProvider
         Gate::policy(FlowGroup::class, FlowGroupPolicy::class);
         Gate::policy(FlowSession::class, FlowSessionPolicy::class);
         Gate::policy(FlowLog::class, FlowLogPolicy::class);
+
+        // Registered the way a Solution registers its keys: from boot(), before the registry is frozen.
+        $this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(
+            key: FlowDraft::LIMIT_KEY,
+            label: 'Flows',
+            unit: 'flows',
+            kind: LimitKind::Records,
+            description: 'How many flows a tenant can have at a time; published versions of a flow do not count.',
+        ));
 
         // Seed Core's system translation keys. Features and Solutions register
         // their own keys through the same catalog from their providers.
