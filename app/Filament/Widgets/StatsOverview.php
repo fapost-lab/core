@@ -39,7 +39,7 @@ final class StatsOverview extends StatsOverviewWidget
             FlowSessionStatus::Paused,
         ])->count();
 
-        $staffUsers = User::count();
+        $staffUsers = User::query()->withoutPlatformSupport()->count();
 
         return [
             Stat::make(__('staff.dashboard.stats.assistants.label'), $totalAssistants)

@@ -120,6 +120,8 @@ return [
         'pulse*',
         '_boost*',
         '.well-known*',
+        // Its body carries a single-use support access token.
+        'support/enter',
     ],
 
     'ignore_commands' => [

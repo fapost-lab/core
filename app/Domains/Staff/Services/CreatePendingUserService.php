@@ -35,6 +35,10 @@ final class CreatePendingUserService
      */
     public function create(User $actor, array $data): User
     {
+        if (PlatformSupportUserService::isReservedEmail($data['email'])) {
+            throw ValidationException::withMessages(['email' => __('staff.support_access.reserved_email')]);
+        }
+
         $this->recordQuota->assertCanCreate(User::LIMIT_KEY, User::countForLimit());
 
         return DB::transaction(function () use ($actor, $data): User {

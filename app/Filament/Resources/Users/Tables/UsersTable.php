@@ -38,6 +38,11 @@ final class UsersTable
                     ->label(__('staff.users.table.name'))
                     ->searchable()
                     ->sortable(),
+                TextColumn::make('is_platform_support')
+                    ->label('')
+                    ->badge()
+                    ->color('warning')
+                    ->state(fn (User $record): ?string => $record->isPlatformSupport() ? __('staff.users.platform_support') : null),
                 TextColumn::make('email')
                     ->label(__('staff.users.table.email'))
                     ->searchable()
@@ -128,7 +133,11 @@ final class UsersTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DeleteBulkAction::make(),
+                    // Without per-record authorization Filament deletes the whole selection with one
+                    // query, bypassing both the policy and model events. Authorizing each record is
+                    // what makes the Gate refuse the platform support user here.
+                    DeleteBulkAction::make()
+                        ->authorizeIndividualRecords('delete'),
                 ]),
             ]);
     }

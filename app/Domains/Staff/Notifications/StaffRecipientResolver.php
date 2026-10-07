@@ -45,6 +45,7 @@ final class StaffRecipientResolver
     private function activeStaff(): Builder
     {
         return User::query()
+            ->withoutPlatformSupport()
             ->where('is_active', true)
             ->where('status', UserStatus::Active->value);
     }

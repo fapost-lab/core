@@ -19,7 +19,7 @@ paths:
   - "tests/Feature/Domains/Tenancy/**"
   - tests/Unit/Architecture/WebhookArchitectureTest.php
   - app/Http/Middleware/ResolveTenantContext.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-07
 ---
 # Tenancy rules
 
@@ -104,6 +104,16 @@ broken.
   `CountableModelCreationTest` (`new` of a counted model outside its creators) and
   `Tests\Unit\Architecture\CountableModelCreationTest` (static creates; the countable models are
   listed once in `Tests\Support\CountableModels`).
+
+- **Support access is off unless the flag is on, and a token is single use.** `issue()` throws
+  when `tenancy.support_access.enabled` is false or the resolution mode is not `host`, and `POST /support/enter` answers 404 before it
+  consumes anything. A token is stored hashed in the landlord `support_access_tokens`, lives 60
+  seconds, travels in a POST body (never a URL) and is consumed by one conditional UPDATE that must
+  change exactly one row; only `SupportAccessTokenStore` touches the table, and the other domains
+  use `SupportAccessRedeemerInterface`. The `SupportAccessInterface` binding is a plain `bind`
+  (Core is the only implementation), unlike the `bindIf` defaults above. Enforced:
+  `SupportAccessIssueTest`, `SupportAccessTokenStoreTest`, `SupportAccessEntryTest`
+  (`adr-20261007-support-access-through-platform-support-user`).
 
 ## Rules
 

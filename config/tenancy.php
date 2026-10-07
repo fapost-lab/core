@@ -32,6 +32,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Support access
+    |--------------------------------------------------------------------------
+    |
+    | Lets a platform operator enter a tenant's panels as its platform support
+    | user (Foundation's SupportAccessInterface). Off by default: an
+    | installation without an operator package offers no such entry. The
+    | operator package turns it on when it boots in host mode.
+    |
+    | The flag is read when a grant is issued and when an entry is redeemed,
+    | so switching it off stops new entries at once. It is also an emergency
+    | stop: open support sessions end on their next request.
+    |
+    */
+    'support_access' => [
+        'enabled' => (bool) env('SUPPORT_ACCESS_ENABLED', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Reserved tenant slugs
     |--------------------------------------------------------------------------
     |

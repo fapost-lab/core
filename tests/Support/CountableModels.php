@@ -13,6 +13,7 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Staff\Services\CreatePendingUserService;
+use App\Domains\Staff\Services\PlatformSupportUserService;
 
 /**
  * Models whose count a tenant limit caps. Every creation path of these must go through the
@@ -28,7 +29,8 @@ final class CountableModels
      *
      * A model has more than one creator only when one of them is a deliberate exception to the
      * limit: the first administrator of a tenant (`AclBootstrapService`) is created before any
-     * limit applies and still counts toward it.
+     * limit applies and still counts toward it; the platform support user
+     * (`PlatformSupportUserService`) is created on an operator's first entry and never counts.
      *
      * @return array<class-string, array{creators: list<class-string>, relation: string}>
      */
@@ -38,7 +40,7 @@ final class CountableModels
             Assistant::class => ['creators' => [AssistantService::class], 'relation' => 'assistants'],
             FlowDraft::class => ['creators' => [CreateFlowAction::class], 'relation' => 'drafts'],
             Channel::class   => ['creators' => [ChannelService::class], 'relation' => 'channels'],
-            User::class      => ['creators' => [CreatePendingUserService::class, AclBootstrapService::class], 'relation' => 'users'],
+            User::class      => ['creators' => [CreatePendingUserService::class, AclBootstrapService::class, PlatformSupportUserService::class], 'relation' => 'users'],
         ];
     }
 }

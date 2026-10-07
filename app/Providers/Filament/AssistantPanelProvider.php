@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Providers\Filament;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Staff\Http\Middleware\EndExpiredSupportSession;
 use App\Domains\Staff\Http\Middleware\EnsureUserIsActive;
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Filament\Assistant\Pages\AssistantDashboard;
+use App\Filament\Support\SupportAccessBanner;
 use App\Http\Controllers\Filament\AssistantPanelHomeController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\SetLocale;
@@ -140,7 +142,9 @@ final class AssistantPanelProvider extends PanelProvider
             ->persistentMiddleware([TenancyMiddleware::class])
             ->middleware([
                 SetLocale::class,
+                EndExpiredSupportSession::class,
             ], isPersistent: true)
+            ->renderHook(PanelsRenderHook::BODY_START, static fn (): string => SupportAccessBanner::render())
             ->authMiddleware([
                 TenancyMiddleware::class,
                 Authenticate::class,
