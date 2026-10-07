@@ -15,13 +15,14 @@ fixed target to build against.
 
 ## Phase 2 — Make knowledge bases a real, configurable resource
 
-Goal: a knowledge base can be created and managed in the tenant panel. Done when: staff can create a
-`knowledge_base` record through Filament and it persists with the fields the chosen provider needs.
+Goal: a knowledge base can be created and managed in the console. Done when: staff can create a
+`knowledge_base` record through the console and it persists with the fields the chosen provider needs.
 
 - [ ] Add the `knowledge_bases` table and migration, shaped for the chosen provider (after: provider
       decision — the schema depends on what the chosen storage needs)
-- [ ] Add a Filament resource to create and manage knowledge bases (after: `knowledge_bases` table —
-      needs the model and table to manage)
+- [ ] Add a console screen to create and manage knowledge bases, built on the kit (after:
+      `knowledge_bases` table — needs the model and table to manage; after: ui-foundation phase 2 —
+      the screen is built on the kit)
 
 ## Phase 3 — Wire a real adapter end to end
 
@@ -40,7 +41,7 @@ when: a flow with a `rag_query` node pointed at a real knowledge base returns a
 
 1. Decide the embeddings provider and vector storage (pgvector vs. an external service)
 2. Add the `knowledge_bases` table and migration, shaped for the chosen provider; Add the `StructuredRagResult` DTO (found, confidence, answer, intent, metadata)
-3. Add a Filament resource to create and manage knowledge bases; Build the first RAG adapter for the chosen provider and register it in `RagAdapterRegistry`
+3. Add a console screen to create and manage knowledge bases; Build the first RAG adapter for the chosen provider and register it in `RagAdapterRegistry`
 4. Validate `knowledge_base_id` against real data in `ValidateFlowService`, replacing the current runtime-only guard
 
 <!--

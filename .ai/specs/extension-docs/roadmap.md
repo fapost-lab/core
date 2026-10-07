@@ -1,7 +1,8 @@
 # Roadmap — Extension documentation for outsiders
 
 Destination: a developer outside the project builds a Solution from the published Extending section
-alone, without reading Core's source.
+alone, without reading Core's source. Written after the kit (`ui-foundation`) and after the first
+Solution, Feedback (`first-solution`).
 
 ## Phase 0 — Start from a working package
 
@@ -19,9 +20,14 @@ Solution touched is documented, and every Core source file that build had to con
 covered by a page or recorded as a contract still missing.
 
 - [ ] The Extending section rewritten against the first Solution's gap record — extension model,
-      the contracts an author touches, activation as an author meets it (after: the first-solution
-      spec's gap record — writing before it describes the design, not the surface)
+      the contracts an author touches, activation as an author meets it, the scaffold command, and
+      the UI publishing path (prebuilt bundles, composer overlay, derived image) (after: the
+      first-solution spec's gap record — writing before it describes the design, not the surface;
+      after: ui-foundation phase 4 and its cut-over — the UI contract and the kit it documents have
+      settled)
 - [ ] The worked example an author follows end to end, published and listed in the site navigation
+      — Feedback, from the scaffold to an installed Solution (after: the first-solution spec — the
+      example is that build)
 
 ## Phase 2 — Prove it on someone
 

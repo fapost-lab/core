@@ -75,7 +75,7 @@ and operates the platform through the Model Context Protocol.
     block: it is a separate direction tied to the AI layer and to Milestone 5 (RAG).
   - OAuth 2.1 — left as an open question (below); v1 does not commit to it.
   - MCP Apps (interactive HTML panels rendered in the client) — left as an open question (below); not
-    committed for v1, and flagged as a risk of duplicating Filament.
+    committed for v1, and flagged as a risk of duplicating the console UI.
   - A separate REST API alongside MCP — the stated point of this surface is to avoid needing one.
   - Deciding *whether or when* this milestone gets picked up: `docs/roadmap.md` currently lists
     "Model-integration server surface" under **Out of scope** for the product roadmap ("no section
@@ -117,6 +117,12 @@ Open (not yet decided, resolved by the Phase 1 ADR, not by this spec):
 - Token model: the project has no Sanctum installed today; whether `mcp_tokens` is built on Sanctum or
   as a standalone token implementation is settled in the same ADR.
 
+- **Changed 2026-10-07 — the token screen is built on the kit, not on Filament.** The Phase 5
+  "Filament MCP Tokens resource" becomes a console screen on the kit and waits for ui-foundation
+  phase 2; the done-criterion "the Filament UI" becomes "the console"; the phpat rule bars a tool
+  from pulling in the UI layer (`App\Http`, the front end) instead of Filament. Reason:
+  ui-foundation moves Core's UI off Filament.
+
 ## Open questions
 
 - One MCP server for the whole platform, with tenant scope resolved from the token, vs a separate URL
@@ -124,7 +130,7 @@ Open (not yet decided, resolved by the Phase 1 ADR, not by this spec):
 - Whether OAuth 2.1 is needed before a plugin marketplace exists, or bearer tokens are sufficient —
   undecided; shapes the token model decided in the Phase 1 ADR.
 - Whether MCP Apps (interactive HTML panels rendered in the client) are needed — undecided; the source
-  flags a risk of duplicating Filament UI; would affect the scope of Phase 4/5.
+  flags a risk of duplicating the console UI; would affect the scope of Phase 4/5.
 
 ## Assumptions left untested
 

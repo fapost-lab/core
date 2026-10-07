@@ -59,6 +59,11 @@ assistant."
 
 ## Decisions
 
+- Changed 2026-10-07: this step does not wait for `ui-foundation` — the seed and the install
+  sequence do not depend on the UI. The panel steps of the walk are walked again after its
+  cut-over (phase 5), and no panel screenshots are taken before it, because Core's operator UI
+  moves from Filament to Inertia + Vue and a screenshot of Filament shows screens that are going
+  away.
 - The path ends at an assistant answering a real message on a real channel — rejected: ending at
   "the panel opens", because the promise is a working assistant, not a running container.
 - The demo is seeded, not imported by hand — the existing `DemoContentSeeder` is the starting

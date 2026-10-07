@@ -33,8 +33,8 @@ metadata address fails on every install, and every countable record and volume u
 the quota contract.
 
 - [ ] Egress guard — the `call` node refuses private, loopback, link-local and metadata addresses after DNS resolution and on every redirect, for every install
-- [ ] Count limits on the other models — flows, channels, staff and the remaining countable models refuse creation when the contract denies it, with the Create button hidden and the architecture rule extended (after: Quota contract with the assistant seam — they repeat its pattern)
-- [ ] Inbound active-contact gate — an inbound message the contract refuses creates no contact and starts no flow, is logged, and the admin panel shows the refusal (after: Quota contract with the assistant seam — the gate calls it)
+- [ ] Count limits on the other models — flows, channels, staff and the remaining countable models refuse creation when the contract denies it, with the architecture rule extended; the Create button is hidden in Filament by the task already in flight, and on the kit's screens when ui-foundation moves them (after: Quota contract with the assistant seam — they repeat its pattern)
+- [ ] Inbound active-contact gate — an inbound message the contract refuses creates no contact and starts no flow, is logged, and the admin panel shows the refusal, a screen built on the kit (after: Quota contract with the assistant seam — the gate calls it; after: ui-foundation phase 3 — the admin screen is built on the kit)
 - [ ] Outbound volume gate — outbound messages, broadcast sends and `call` executions consume volume through the contract and stop when refused (after: Quota contract with the assistant seam — the gate calls it)
 
 ## Phase 3 — Tenant lifecycle
@@ -43,11 +43,11 @@ Goal: the shell can end a trial without losing the tenant. Done when: the shell 
 to stopped and back, and while stopped nothing runs and the panel is read-only with the shell's
 banner.
 
-- [ ] Runtime-stopped, read-only tenant — Core asks a Foundation contract for a tenant's access mode on every request and job (default: active); in the stopped mode inbound is not processed, queued delay wake-ups and broadcasts do not run, the admin panel is read-only with a banner the shell fills, and tenant console commands still migrate stopped tenants (after: Operator provisioning contract — the mode extends the same operator surface)
-- [ ] Solution entitlement seam — Core's Solution activation screen asks the operator contract which installed Solutions a tenant may activate (default: all) and deactivates those it loses (after: Operator provisioning contract — the same operator surface; needs `solution-activation-lifecycle`)
+- [ ] Runtime-stopped, read-only tenant — Core asks a Foundation contract for a tenant's access mode on every request and job (default: active); in the stopped mode inbound is not processed, queued delay wake-ups and broadcasts do not run, the admin panel is read-only with a banner the shell fills, built on the kit, and tenant console commands still migrate stopped tenants (after: Operator provisioning contract — the mode extends the same operator surface; after: ui-foundation phases 1 to 3 — the read-only switch and banner are built on the kit's shell and screens)
+- [ ] Solution entitlement seam — Core's Solution activation screen asks the operator contract which installed Solutions a tenant may activate (default: all) and deactivates those it loses (after: Operator provisioning contract — the same operator surface; needs `solution-activation-lifecycle`; after: ui-foundation phase 4 — the screen is built on the kit)
 - [ ] `support-access-contract` — Support access contract — a Foundation contract through which the shell lets an operator enter a tenant's panel: a one-time, short-lived token bound to the operator opens a session of the tenant's platform support user (admin rights, created on first entry, not removable by the tenant, shown to the tenant in its audit and user list); off by default, so a self-hosted install has no such entry (decided with the owner on 2026-10-06; after: Operator provisioning contract — the same operator surface)
 - [ ] `tenant-rename-contract` — Tenant rename contract — a Foundation contract to change a tenant's slug (its host) with the provisioning checks; the schema name stays, and whether the old host redirects is decided in its design (after: Tenant directory contract — the same Foundation Tenancy section)
-- [ ] fog: read-only depth in the builder — whether the builder opens without save or is closed, cannot be stated until the read-only panel exists
+- [ ] fog: read-only depth in the builder — whether the builder opens without save or is closed, cannot be stated until the read-only panel exists on the kit
 
 ## Waves
 

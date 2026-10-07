@@ -39,12 +39,21 @@ a broadcast report, an analytics view, a live inbox.
 
 ## Decisions
 
-- None yet.
+- Changed 2026-10-07: every item here is UI and is built on the kit (Inertia + Vue, after
+  `ui-foundation`), not on Filament — Core's operator UI leaves Filament and no new screen is built
+  on it. The existing `app/Filament/Widgets/FlowActivityChart.php` is replaced in ui-foundation
+  phase 3 (the admin dashboard on a query service), so the flow analytics view builds on that, not
+  on the widget.
+- Changed 2026-10-07: live inbox updates build on ui-foundation's live-updates composable (Echo when
+  a broadcaster is configured, polling otherwise; Reverb ships dormant in Core), rather than a
+  separate mechanism of their own.
 
 ## Open questions
 
-- Live inbox through a WebSocket backend or polling — decides whether self-hosted installs get a new
-  service.
+- Resolved 2026-10-07 — live inbox through a WebSocket backend or polling: both, through one
+  composable (Echo when a broadcaster is configured, polling otherwise); Reverb ships dormant in
+  Core with an optional Compose profile (`ui-foundation` phase 2), so self-hosted installs get no
+  new service by default.
 
 ## Assumptions left untested
 

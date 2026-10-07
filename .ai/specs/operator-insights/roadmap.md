@@ -1,23 +1,24 @@
 # Roadmap — Operator insights
 
 Destination: a staff user sees the outcome of a broadcast, the activity of flows and new inbox
-messages without leaving the panel or reloading it.
+messages without leaving the panel or reloading it — every screen built on the kit, after
+ui-foundation.
 
 ## Phase 1 — Reports from data already collected
 
 Goal: what the platform records is visible. Done when: a broadcast has a report page listing
 recipients with their outcome, and the panel shows flow starts and completions per flow.
 
-- [ ] Broadcast report: page, recipients drill-down, dashboard widget
-- [ ] Flow analytics view over `analytics_events`
-- [ ] Node usage in the panel
+- [ ] Broadcast report: page, recipients drill-down, dashboard widget (after: ui-foundation phase 2 — the screen is built on the kit)
+- [ ] Flow analytics view over `analytics_events` (after: ui-foundation phase 3 — it replaces `FlowActivityChart` on the kit's admin dashboard)
+- [ ] Node usage in the panel (after: ui-foundation phase 3 — the screen is built on the kit)
 
 ## Phase 2 — A live inbox
 
 Goal: an operator sees a new message as it arrives. Done when: a contact's message appears in an
 open conversation without a reload.
 
-- [ ] Live inbox updates (after: the WebSocket-or-polling open question — it decides the runtime dependency)
+- [ ] Live inbox updates (after: ui-foundation phase 2 — builds on its live-updates composable, Echo when a broadcaster is configured and polling otherwise)
 - [ ] Read receipts (after: spec `data-lifecycle` delivery status ingestion — receipts are that data)
 
 ## Waves

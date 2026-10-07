@@ -12,7 +12,8 @@ database, one documented sequence produces a tenant, an assistant and a flow tha
       rather than only filling a tenant that already exists
 - [ ] The install-to-answer sequence walked end to end on a clean machine, with each place it dies
       fixed or documented (after: the first-run seed — there is no sequence to walk until the seed
-      produces something that answers)
+      produces something that answers); the panel steps of the walk are walked again after
+      ui-foundation's cut-over
 
 ## Phase 2 — The path is measured
 
@@ -30,7 +31,8 @@ walk actually hit.
 
 - [ ] The Self-Hosting section rewritten around the walked path, with the failures it hit answered
       where a reader meets them (after: the walk — pages written before it document the intended
-      path, not the real one)
+      path, not the real one); no panel screenshots before ui-foundation's cut-over — they would
+      show Filament screens that are going away
 
 ## Waves
 

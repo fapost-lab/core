@@ -41,8 +41,8 @@ Knowledge base integration: search over documents from within a flow.
 
 ## Scope and non-goals
 
-- In scope: the provider/storage decision; the `knowledge_bases` table, its migration and a Filament
-  resource; the `StructuredRagResult` DTO; the first real adapter; `knowledge_base_id` validation
+- In scope: the provider/storage decision; the `knowledge_bases` table, its migration and a console
+  screen on the kit; the `StructuredRagResult` DTO; the first real adapter; `knowledge_base_id` validation
   against real data in `ValidateFlowService`.
 - Not doing (already done, not part of this work): `RagAdapterRegistry`; `RagQueryNodeHandler`
   (type `rag_query`, writes `rag.*` into state); the RAG config-shape and runtime-guard validation
@@ -77,6 +77,10 @@ Knowledge base integration: search over documents from within a flow.
 - `rag_query` stays visible in the palette and fails at the runtime guard until storage exists —
   rejected: hiding or removing the node from the palette in the meantime, because this is documented,
   deliberate debt rather than an accidental gap.
+- **Changed 2026-10-07 — the knowledge-base screen is built on the kit, not as a Filament
+  resource.** It becomes a console screen and waits for ui-foundation phase 2; the table, the DTO,
+  the adapter and the validation are backend and do not wait. Reason: ui-foundation moves Core's UI
+  off Filament.
 
 ## Open questions
 
