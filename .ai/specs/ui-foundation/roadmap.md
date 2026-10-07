@@ -80,17 +80,24 @@ entry and the dashboard are served by Inertia.
 ## Phase 4 — Solutions add screens
 
 Goal: an extension can contribute UI to the console. Done when: a fixture Solution in the test
-suite adds a page, a menu entry, a dashboard widget, a settings tab and a table column, each
-rendered in the console after a rebuild.
+suite registers an application in the switcher with its own menu and pages, a contextual action
+on a Core screen, an element in the shell's slot, a dashboard widget, a settings tab and a table
+column, each rendered in the console with pages resolved by name.
 
-- [ ] An ADR that supersedes ADR-06's "Filament resources: Solution ✓" and states what a
-      Solution may add to the console and how
-- [ ] The extension contract — a Foundation contract to register pages, navigation entries,
-      dashboard widgets, settings tabs and table columns; Vue picked up from `vendor/` by a Vite
-      glob; the fixture Solution proving each point; docs marking each point experimental
-      (after: the ADR — it fixes the shapes; after: phases 2 and 3 — the points extend the
-      shell, dashboard, settings and data table they built)
-- [ ] fog: how a Solution's UI reaches an installation on the prebuilt images (D4)
+- [ ] An ADR that supersedes ADR-06's "Filament resources: Solution ✓" and its build-time-only
+      rule — what a Solution may add to the console, pages referenced by name, UI shipped
+      prebuilt with the shared modules from Core's import map
+- [ ] The app switcher — the rail with the Console, the Admin panel and pinned Solutions, "All
+      applications" with search, per-user pinning and order, ⌘K across applications, the
+      assistant switcher only where an application works per assistant (after: the shell in phase
+      1 — the rail wraps it)
+- [ ] The extension contract — a Foundation contract to register an application with its menu
+      and pages, contextual actions, shell-slot elements, dashboard widgets, settings tabs and
+      table columns; the fixture Solution proving each point; docs marking each point
+      experimental (after: the ADR — it fixes the shapes; after: the app switcher — the
+      application point lives in it; after: phases 2 and 3 — the other points extend the
+      dashboard, settings and data table they built)
+- [ ] fog: a mini-app extension point — how a Solution reaches customers in the mini app
 - [ ] fog: the version story of the kit and the extension contract
 
 ## Phase 5 — Cut-over
@@ -116,7 +123,8 @@ new UI, and `@fapost/ui` is published.
 1. The current assistant without Filament; the kit and its tokens
 2. The switch and the shell
 3. The pilot
-4. The console screens and the admin screens, in parallel; the ADR for Solution UI
+4. The console screens and the admin screens, in parallel; the ADR for Solution UI; the app
+   switcher
 5. Realtime for self-hosters; the conversation inbox; the extension contract
 6. Filament removed; the kit extracted
 7. The docs and knowledge

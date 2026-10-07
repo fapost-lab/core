@@ -95,7 +95,8 @@ An independent failure hunt (a fresh agent given only the idea and the chosen op
     request; queued jobs have no route segment, and a binding that outlives a job carries one
     assistant into the next job on the same worker.
   - Solutions can be installed on the published images. Not while a Solution's Vue needs an npm
-    rebuild (D4): a self-hoster on the prebuilt `core`/`web` images has no front-end build.
+    rebuild (D4) — closed by shipping Solution UI prebuilt; what remains is that the kit becomes a
+    run-time interface whose versions must match.
   - The SaaS package's Filament panel is unaffected. Only if nothing it relies on leaves Core
     unnoticed — Filament interfaces on `User` and `Assistant`, Livewire-aware middleware, Vite
     and Tailwind configuration now owned by Core's new front end.
@@ -107,9 +108,10 @@ An independent failure hunt (a fresh agent given only the idea and the chosen op
     day one) against guessing every shape before a consumer exists and paying a release for
     nearly every kit change.
 - The weakest point: the extension contract for Solution UI is designed in full before any
-  Solution exists, and its distribution (published Vue plus an npm rebuild) does not reach
-  self-hosters on the prebuilt images. The long-lived epic was the weakest point until the
-  build moved onto `main` behind a switch.
+  Solution exists, and with prebuilt Solution UI the kit is a run-time interface from its first
+  release — a careless kit change breaks installed Solutions. The long-lived epic was the weakest
+  point until the build moved onto `main` behind a switch; delivery to the prebuilt images was
+  next, until D4 closed on prebuilt bundles.
 - Failure modes — cause, what breaks, the signal:
   1. The epic drifts from `main` — changes made in Filament code on `main` are re-expressed by
      hand on the epic and nothing flags a missed one; the final diff cannot be reviewed; users
@@ -221,26 +223,59 @@ An independent failure hunt (a fresh agent given only the idea and the chosen op
   silently inside jobs and the engine; rejected: the assistant kept in the session, because it
   breaks today's URLs and two assistants in two browser tabs.
 - **The full extension contract for Solution UI is in this spec** (owner's choice; the
-  recommendation was a minimal page-plus-menu contract): pages, navigation entries, dashboard
-  widgets, settings tabs and columns added to Core's tables. Vue code arrives the way builder
-  components do (published into `vendor/`, picked up by a Vite glob, then a rebuild — ADR-06,
-  D4); registration goes through a Foundation contract. A new ADR supersedes ADR-06's row
-  "Filament resources: Solution ✓". Cost accepted: every extension point is designed before any
+  recommendation was a minimal page-plus-menu contract). A Solution is an independent application
+  on top of Core with its own tables and pages (owner, 2026-10-07), so the contract's centre is the
+  Solution's own application; reaching into Core's screens comes second. The points, in that
+  order:
+  1. an application in the app switcher, with its own menu and pages;
+  2. contextual actions in Core's screens (a "feedback from this customer" button on the contact
+     view), the direct way into a Solution by meaning rather than by menu;
+  3. a slot in the shell for elements present on every screen (a floating "help us improve"
+     button and its modal);
+  4. dashboard widgets, settings tabs and columns added to Core's tables.
+  Registration goes through a Foundation contract; pages are referenced by name
+  (`<solution>::<Page>`), never by import path, so how their code is delivered can change without
+  breaking the contract. A new ADR supersedes ADR-06's row "Filament resources: Solution ✓" and
+  its build-time-only rule (below). Cost accepted: every extension point is designed before any
   Solution consumes it (step 6 is the first), so each is a guess to maintain; see Stress test.
+- **Navigation: an app switcher; Core's menu never receives a Solution's entries** (owner,
+  2026-10-07: many Solutions must not clutter the menu, and going into one must be easy). A narrow
+  rail on the left holds the Console, the Admin panel and the pinned Solutions; "All applications"
+  opens a searchable grid of every Solution activated for the tenant and allowed to the user; the
+  sidebar belongs to the application chosen in the rail; each user pins and orders their own
+  rail; ⌘K searches the pages of every application; the assistant switcher shows only in
+  applications that work per assistant (the Console, and Solutions that declare it). Mock-up:
+  "Переключатель приложений — Solutions" on the design canvas. — rejected: one "Applications"
+  group in Core's menu (a long list at ten Solutions, Core's and Solutions' items mixed);
+  rejected: ⌘K only (nobody learns a Solution exists).
+- **A Solution's UI ships prebuilt; Core is never rebuilt to install one (D4 closed,
+  2026-10-07).** The Solution's package carries ES modules, CSS and a manifest in `dist/`, built by
+  its author with FaPost's Vite preset, which externalizes `vue`, `@inertiajs/vue3` and
+  `@fapost/ui`, bundles the Solution's own npm dependencies, records the kit range it was built
+  against and turns Tailwind's preflight off. Core maps the shared modules through an import map
+  to its own chunks, resolves `<solution>::<Page>` from the Solution's manifest, and publishes the
+  assets with a PHP command at install; PHP arrives through the existing composer overlay, so an
+  installation on the published images needs only a derived image with `composer install` and no
+  Node. Owner's reason: "for the first author to appear, everything has to be ready and
+  convenient from the start"; it is also where Filament, Nova, Grafana and Backstage ended up.
+  Delivery is built in `first-solution`'s phase 0. — rejected: Vue published into `vendor/`,
+  picked up by a Vite glob and a rebuild (ADR-06's original rule and this spec's first decision:
+  every install needs Node and a Vite build, a Solution's own npm dependencies have nowhere to be
+  declared, a Solution's build error breaks Core's build). Plugins still ship no Vue.
 - **Extensions compose against a separate, versioned npm package of the kit** (owner's choice;
   the recommendation was an import alias with no guarantee until 1.0). Core consumes the same
-  package, so a Solution and Core render the same components; the package follows semver on its
-  own release cycle. A Solution's Vue is compiled inside Core's build, so its imports of
-  `@fapost/ui` resolve to Core's copy — one version, one Vue instance, the same tokens; a Solution
-  declares the kit as a `peerDependency` with the range it supports and never bundles its own
-  copy. The npm package serves the Solution author's development (types, editor support,
-  component tests outside Core) and states compatibility. The kit is the default path, not an
+  package, so a Solution and Core render the same components. A Solution builds against
+  `@fapost/ui` from npm, declares it as a `peerDependency` with the range it supports, and never
+  bundles its own copy; at run time its imports resolve through Core's import map to Core's copy —
+  one version, one Vue instance, the same tokens. A Solution whose range does not match Core's kit
+  is not activated, and the activation screen says why. The kit is therefore a run-time interface:
+  its semver holds strictly from its first published version. The kit is the default path, not an
   obligation: a Solution built by a third party may carry its own visual style (owner,
-  2026-10-07). One limit holds because its CSS is compiled into Core's bundle — a Solution's
-  styles stay scoped to its own components (`<style scoped>` or its own class prefix), with no
-  global rules, resets or overrides of the kit's classes, so it can look like anything on its own
-  pages and cannot restyle Core's or another Solution's. Cost accepted: one more repository and
-  release cycle before the first external consumer exists.
+  2026-10-07); it cannot restyle Core's or another Solution's screens, because the preset turns
+  Tailwind's preflight off and a Solution's styles stay scoped to its own components
+  (`<style scoped>` or its own class prefix), with no global rules or overrides of the kit's
+  classes. Cost accepted: one more repository and release cycle before the first external
+  consumer exists, and Tailwind utilities partly duplicated between Core's and a Solution's CSS.
 - **The builder moves onto the shared tokens, not onto the kit.** Its CSS variables take their
   values from the kit's tokens, its fonts and top bar match the console, dark mode works there
   too; rewriting the builder's own components on the kit is follow-up work outside this spec. —
@@ -301,13 +336,13 @@ An independent failure hunt (a fresh agent given only the idea and the chosen op
 
 ## Open questions
 
-- D4, now sharper: how a Solution's UI reaches an installation on the prebuilt `core`/`web`
-  images, where nobody runs an npm build. Rebuild in a derived image, or Solutions shipping
-  prebuilt ES-module bundles loaded at runtime — the second changes ADR-06's build-time-only
-  stance. Decide before the extension contract is published, not before the migration starts.
+- A mini-app extension point: customers reach a Solution (the feedback widget) through the mini
+  app or the bot, and the mini app is a separate Vue application, not the Inertia console; how a
+  Solution contributes to it is not designed yet.
 - The version story of `@fapost/ui` and of the extension contract — what an installed Solution is
-  promised when Core restyles or reshapes a table. It cannot be stated before something outside
-  Core depends on them.
+  promised when Core restyles or reshapes a table, and how long a kit major stays served beside
+  the next. More pressing now that the kit is a run-time interface; its first answer is needed by
+  the kit's `0.1.0`.
 - Which extension-point shapes survive contact with a real Solution — answered by step 6
   (`first-solution`); until then every point is marked experimental in the docs.
 
