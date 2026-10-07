@@ -148,6 +148,29 @@ the UI extension contract; its own tables and pages are not gaps, a missing cont
   updates only new Solutions; existing ones follow the changelog. — rejected: a template
   repository derived from Feedback (it ages separately from Core); rejected: Feedback itself as the
   template (everyone starts from someone else's business logic).
+- **A Solution installs without touching Core's `composer.json` or rebuilding Core's front end**
+  (owner, 2026-10-07: "for the first author to appear, everything has to be ready and convenient
+  from the start"):
+  - PHP through the existing composer overlay (`composer.overlay.json`, `tools/composer-overlay.php`);
+    a self-hoster on the published images builds a derived image — `FROM` Core's image plus the
+    overlay, `composer install`, no Node — from a documented recipe in one command.
+  - The UI ships prebuilt: the Solution's package carries ES modules, CSS and a manifest in
+    `dist/`, built by the author with FaPost's Vite preset (`@fapost/vite-plugin-solution`, set up by
+    the scaffold). The preset externalizes `vue`, `@inertiajs/vue3` and `@fapost/ui`, records the
+    kit range the Solution was built against, bundles the Solution's own npm dependencies, and
+    turns Tailwind's preflight off so the Solution cannot restyle Core.
+  - Core maps the shared modules through an import map to its own chunks (one Vue, one kit),
+    resolves Inertia pages named `<solution>::<Page>` from the Solution's manifest, and publishes the
+    Solution's assets with a PHP command at install.
+  - Compatibility is checked, not hoped for: a Solution whose kit range does not match Core's kit
+    is not activated, and the activation screen says why.
+  - Rejected: a full rebuild of Core's front end at install (ADR-06's original stance) — every
+    install needs Node and a Vite build, a Solution's own npm dependencies have nowhere to be
+    declared, and a Solution's build error breaks Core's build. Cost accepted: `@fapost/ui` becomes
+    a runtime interface whose semver must hold strictly from its first published version, and
+    Tailwind utilities are partly duplicated between Core's and a Solution's CSS. Supersedes the
+    build-time-only rule of ADR-06 and ui-foundation's "Vue picked up by a Vite glob" — to be
+    recorded in ui-foundation's planned ADR. Plugins still ship no Vue.
 - Carried over: the Solution lives in its own repository, installed as a package; no `App\…`
   imports; contract changes go into the Foundation repository.
 
@@ -160,6 +183,8 @@ the UI extension contract; its own tables and pages are not gaps, a missing cont
   it, and what is stripped (tenant names, personal data) before it is shown elsewhere.
 - How an installation authenticates to the receiver — registration with a token, rate limits,
   revocation.
+- How a Solution is developed against a running Core — a watch build of `dist/` that Core picks up,
+  or a dev server Core proxies; the convenience the owner asked for depends on it.
 - How customers reach the widget: a mini app extension point, a bot command, or both — the UI
   extension contract has no mini-app point yet.
 - Whether the gap record is a document in this repository or issues in the Foundation repository.

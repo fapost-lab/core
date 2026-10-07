@@ -5,6 +5,23 @@ the tenant's staff and customers file and vote on feedback, the FaPost team runs
 platform board — with every contract gap it hit recorded and closed outside Core, and a command
 in Core that generates a new Solution which installs and passes its tests.
 
+## Phase 0 — Solutions plug in without a rebuild
+
+Goal: installing a Solution is a composer overlay and nothing else. Done when: a fixture Solution
+with a prebuilt page is installed into an image derived from Core's published image with no Node
+and no change to Core's files, activated, and its page renders inside the console's shell on
+Core's Vue and kit.
+
+- [ ] Prebuilt Solution UI — the Vite preset for Solutions, the import map for the shared
+      modules, Inertia pages resolved from a Solution's manifest, asset publishing at install, and
+      the kit-range check that refuses activation on a mismatch (after: ui-foundation's kit
+      extracted — authors build against the published `@fapost/ui`)
+- [ ] The derived-image recipe — `FROM` Core's image, the overlay, `composer install`, assets
+      published; documented for self-hosters and used by the SaaS (after: prebuilt Solution UI —
+      the recipe has no Node step only because of it)
+- [ ] The development loop — a Solution rebuilt on save and picked up by a running Core (after:
+      prebuilt Solution UI)
+
 ## Phase 1 — Feedback inside a tenant
 
 Goal: a Solution an outsider could have written, used by a tenant's own team. Done when: on an
@@ -14,9 +31,10 @@ team — with no `App\…` import and no change made to Core for its benefit.
 
 - [ ] The package in its own repository against Foundation, Support and `@fapost/ui`, with a
       manifest the platform accepts and its own tables, permissions and pages as an application
-      in the console's switcher (after: the activation lifecycle spec — nothing to declare a
-      manifest to before it; after: ui-foundation phase 4 — the extension contract it registers
-      through)
+      in the console's switcher; installed through the composer overlay and a derived image, its UI
+      loaded prebuilt from `dist/` with no rebuild of Core (after: the activation lifecycle spec —
+      nothing to declare a manifest to before it; after: ui-foundation phase 4 — the extension
+      contract it registers through; after: prebuilt Solution UI — the way its pages load)
 - [ ] The widget for staff — the button in the shell's slot on every console screen, the modal
       with type, text and similar items to vote on instead of filing a duplicate (after: the
       package — the widget writes into its tables)
@@ -73,6 +91,7 @@ proves it on every run.
 
 ## Waves
 
+0. Prebuilt Solution UI; then the derived-image recipe and the development loop
 1. The package
 2. The staff widget; triage and voting; notification through a flow
 3. Receiver mode
