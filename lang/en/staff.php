@@ -134,6 +134,11 @@ return [
         'label'        => 'Assistant',
         'plural_label' => 'Assistants',
 
+        'limit' => [
+            'reached_title' => 'Assistant limit reached',
+            'hint'          => 'Limit reached (:current of :limit)',
+        ],
+
         'fields' => [
             'name'                => 'Name',
             'default_language'    => 'Default language',

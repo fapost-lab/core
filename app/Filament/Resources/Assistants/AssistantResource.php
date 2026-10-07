@@ -14,6 +14,7 @@ use App\Filament\Resources\Assistants\RelationManagers\ChannelsRelationManager;
 use App\Filament\Resources\Assistants\Schemas\AssistantFormSchema;
 use App\Filament\Resources\Assistants\Tables\AssistantsTable;
 use BackedEnum;
+use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -77,6 +78,37 @@ final class AssistantResource extends Resource
             'view'   => ViewAssistant::route('/{record}'),
             'edit'   => EditAssistant::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Hidden for everyone, admins included, once the tenant is at its assistant limit.
+     * The policy cannot do this: admins pass `Gate::before`.
+     */
+    public static function canCreate(): bool
+    {
+        return parent::canCreate() && ! self::isLimitReached();
+    }
+
+    public static function isLimitReached(): bool
+    {
+        return ! app(RecordQuotaInterface::class)->canCreate(
+            Assistant::LIMIT_KEY,
+            Assistant::query()->count(),
+        );
+    }
+
+    /**
+     * Human-readable "N of M" for the limit hint, or null when the tenant has no limit.
+     */
+    public static function limitHint(): ?string
+    {
+        $limit = app(RecordQuotaInterface::class)->limit(Assistant::LIMIT_KEY);
+
+        if (null === $limit) {
+            return null;
+        }
+
+        return __('staff.assistants.limit.hint', ['current' => Assistant::query()->count(), 'limit' => $limit]);
     }
 
     public static function shouldRegisterNavigation(): bool
