@@ -83,6 +83,22 @@ broken.
 - **The landlord table is the source of truth for the webhook registry; Redis is a cache.**
   Anything in Redis can be rebuilt by `WebhookRegistryHealthChecker`.
 
+- **Core's default for an operator-replaceable contract is bound with `bindIf`.** Package service
+  providers register before application providers, so a plain `bind` in Core would overwrite the
+  operator package's binding. `TenantLimitsInterface` (default `UnlimitedTenantLimits`) is bound this
+  way in `DomainServiceProvider`; do the same for any contract an operator package may replace.
+  Enforced: `RecordQuotaTest` (a binding made before the provider runs wins).
+- **Limits are answered by the operator package and counted by Core.** Records live in the tenant's
+  schema, which the package cannot see, so `RecordQuota` (Core's `RecordQuotaInterface`, for the tenant in `TenantContext`) takes the current count from the caller and
+  `AssistantService::create()` is the only place an assistant is created. A key unknown to
+  `LimitRegistry` throws `LogicException` rather than meaning "no limit". Existing records stay when a
+  limit drops below the count; only creating more is refused. Concurrent creates may exceed a limit
+  by the number of parallel requests (accepted: tenant schema and landlord are different
+  connections). Enforced: `AssistantLimitTest`, `RecordQuotaTest`, PHPat
+  `CountableModelCreationTest` (`new Assistant` outside the service) and
+  `Tests\Unit\Architecture\CountableModelCreationTest` (static creates; the countable models are
+  listed once in `Tests\Support\CountableModels`).
+
 ## Rules
 
 - **Open the `landlord` connection only inside `app/Domains/Tenancy`.** Other domains depend on

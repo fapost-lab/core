@@ -6,6 +6,10 @@ includes:
 # new architecture test class below.
 services:
 	-
+		class: Tests\Architecture\CountableModelCreationTest
+		tags:
+			- phpat.test
+	-
 		class: Tests\Architecture\FlowRuntimeIsolationTest
 		tags:
 			- phpat.test

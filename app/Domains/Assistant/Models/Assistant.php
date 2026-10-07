@@ -62,6 +62,10 @@ final class Assistant extends BaseModel implements HasName
     /** @use HasFactory<AssistantFactory> */
     use HasFactory;
     use HasUlidPrimaryKey;
+    /**
+     * Limit key under which a tenant's assistant count is capped.
+     */
+    public const string LIMIT_KEY = 'assistants';
 
     /** @var class-string<AssistantBuilder> */
     protected string $customBuilder = AssistantBuilder::class;

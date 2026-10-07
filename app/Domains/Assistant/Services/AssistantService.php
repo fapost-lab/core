@@ -8,9 +8,13 @@ use App\Domains\Assistant\Contracts\AssistantServiceInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
+use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
+use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 use Throwable;
 
 /**
@@ -24,16 +28,29 @@ final readonly class AssistantService implements AssistantServiceInterface
     public function __construct(
         private ChannelServiceInterface $channelService,
         private ChannelWebhookRegistryInterface $channelWebhookRegistry,
+        private RecordQuotaInterface $recordQuota,
+        private TenantContextInterface $tenantContext,
     ) {
     }
 
     /**
      * Create an assistant within a tenant.
      *
+     * This is the only place that creates an assistant: the current tenant's assistant limit is checked here (the tenant context must be the given tenant).
+     *
      * @param  array<string, mixed>  $data
+     *
+     * @throws RecordLimitReachedException when the tenant is at its assistant limit
+     * @throws LogicException              when the given tenant is not the current tenant context
      */
     public function create(TenantInterface $tenant, array $data): Assistant
     {
+        if ($this->tenantContext->get()->getId() !== $tenant->getId()) {
+            throw new LogicException('Assistants can be created only for the current tenant context.');
+        }
+
+        $this->recordQuota->assertCanCreate(Assistant::LIMIT_KEY, Assistant::query()->count());
+
         $assistant = new Assistant([
             'tenant_id'        => $tenant->getId(),
             'name'             => (string)$data['name'],
