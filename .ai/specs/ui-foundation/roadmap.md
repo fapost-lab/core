@@ -29,6 +29,8 @@ visible changed, and the builder renders from the kit's tokens in light and dark
       pagination, bulk actions), form, confirmation, toasts; the patterns every later screen
       copies (after: the shell — the screen lives inside it)
 
+- [ ] `close-policy-gaps` — Authorization gaps closed before screens move — broadcasts and contact segments get policies and the builder routes check permissions, so the new UI inherits rules that hold (found while writing this spec)
+
 ## Phase 2 — The console at parity
 
 Goal: the assistant console needs no Filament screen. Done when: with the switch on, every
@@ -76,6 +78,8 @@ entry and the dashboard are served by Inertia.
       the pilot)
 - [ ] The admin dashboard and search — stats and the activity chart on a query service, the ⌘K
       palette over assistants, users, roles and media (after: the pilot)
+
+- [ ] `support-access-log-screen` — The support access log — admins see which platform operator entered the tenant as support and when, read from `support_access_entries`; until then the support user's badge in the user list is all the tenant sees (after: Users and roles — it sits next to them)
 
 ## Phase 4 — Solutions add screens
 
