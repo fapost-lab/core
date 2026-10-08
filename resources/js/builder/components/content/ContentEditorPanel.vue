@@ -93,7 +93,7 @@ const translatedCount = computed(() =>
 .card-header-btn {
     padding: 3px 10px;
     border-radius: 5px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 11px;
     font-weight: 500;
     cursor: pointer;
@@ -235,7 +235,7 @@ const translatedCount = computed(() =>
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 13px;
     color: var(--text);
     outline: none;

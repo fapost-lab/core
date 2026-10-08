@@ -331,7 +331,7 @@ const layoutOpen   = ref(false)
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12px;
     color: var(--text-2);
     cursor: pointer;
@@ -373,7 +373,7 @@ const layoutOpen   = ref(false)
     border-radius: 6px;
     background: var(--primary);
     color: #fff;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12.5px;
     font-weight: 500;
     cursor: pointer;
@@ -499,7 +499,7 @@ const layoutOpen   = ref(false)
     border-radius: 6px;
     background: transparent;
     color: var(--text-3);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12px;
     cursor: pointer;
     transition: border-color .12s, color .12s, background .12s;

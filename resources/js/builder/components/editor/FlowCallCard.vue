@@ -95,7 +95,7 @@ function openMoveDialog() { moveDialog.open(node.value.id) }
             <div class="node-card-body">
                 <div class="node-summary-row">
                     <span class="node-summary-key">{{ transportLabel }}</span>
-                    <span v-if="summary" class="node-summary-val" style="font-family:'Victor Mono',monospace;font-size:11.5px">{{ summary }}</span>
+                    <span v-if="summary" class="node-summary-val" style="font-family:var(--font-mono);font-size:11.5px">{{ summary }}</span>
                     <span v-else class="node-summary-val muted">Not configured</span>
                 </div>
 

@@ -151,7 +151,7 @@ const SAVE_COLORS: Record<string, string> = {
 
 <style scoped>
 .topbar {
-    background: var(--surface);
+    background: var(--card);
     border-bottom: 1px solid var(--border);
     height: 52px;
     display: flex;
@@ -184,7 +184,7 @@ const SAVE_COLORS: Record<string, string> = {
     border: 1px solid var(--border);
     background: var(--surface);
     color: var(--text-2);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
@@ -236,14 +236,16 @@ const SAVE_COLORS: Record<string, string> = {
     color: #fff;
 }
 .flow-name {
-    font-size: 14px;
+    font-family: var(--font-display);
+    font-size: 17px;
     font-weight: 600;
+    letter-spacing: .01em;
     color: var(--text);
 }
 .version-badge { display: flex; align-items: center; gap: 5px; }
 .badge {
     font-size: 11px;
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     padding: 2px 7px;
     border-radius: 4px;
     font-weight: 500;
@@ -271,7 +273,7 @@ const SAVE_COLORS: Record<string, string> = {
     border-radius: 6px;
     border: none;
     background: transparent;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 13px;
     font-weight: 500;
     color: var(--text-3);
@@ -289,7 +291,7 @@ const SAVE_COLORS: Record<string, string> = {
 .btn {
     padding: 6px 12px;
     border-radius: var(--radius);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12.5px;
     font-weight: 500;
     cursor: pointer;

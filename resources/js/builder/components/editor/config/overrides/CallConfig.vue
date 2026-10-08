@@ -593,17 +593,17 @@ async function runTest() {
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface-2);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12.5px;
     color: var(--text);
     outline: none;
 }
 .field-input:focus { border-color: var(--primary); background: #fff; }
-.field-input.mono { font-family: 'Victor Mono', monospace; font-size: 12px; }
+.field-input.mono { font-family: var(--font-mono); font-size: 12px; }
 .method-sel { flex: 0 0 92px; }
 .kv-key { flex: 0 0 38%; }
 .field-help { margin: 5px 0 0; font-size: 11.5px; color: var(--text-3); line-height: 1.5; }
-.field-help code { font-family: 'Victor Mono', monospace; }
+.field-help code { font-family: var(--font-mono); }
 .mode-toggle { display: flex; gap: 4px; }
 .mode-pill {
     flex: 1; padding: 5px; border: 1px solid var(--border); border-radius: 6px;
@@ -627,7 +627,7 @@ async function runTest() {
 
 .test-var-key {
     flex: 0 0 40%;
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11.5px;
     color: var(--text-2);
     overflow: hidden;

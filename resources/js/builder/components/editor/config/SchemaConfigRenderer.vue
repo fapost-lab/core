@@ -134,7 +134,7 @@ function emitPatch(patch: Record<string, unknown>) {
                 <div class="field-label">Node ID</div>
                 <input
                     class="field-input"
-                    style="font-family:'Victor Mono',monospace;font-size:11.5px"
+                    style="font-family:var(--font-mono);font-size:11.5px"
                     :value="node.id"
                     readonly
                 >

@@ -96,7 +96,7 @@ const inputClass = computed(() => [
     gap: 4px;
 }
 .json-field {
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11.5px;
     line-height: 1.5;
 }

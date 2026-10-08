@@ -75,7 +75,7 @@ function flag(code: string) {
     width: 100%; padding: 5px;
     border: 1px dashed var(--border-2);
     border-radius: 6px; background: transparent;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12px; color: var(--text-3);
     cursor: pointer; transition: all .15s;
 }

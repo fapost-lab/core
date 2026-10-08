@@ -89,7 +89,7 @@ function toggle(key: string) { open.value[key] = !open.value[key] }
 </template>
 
 <style scoped>
-.jt { font-family: 'Victor Mono', monospace; font-size: 11.5px; line-height: 1.6; }
+.jt { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.6; }
 .jt-child { margin-left: 14px; border-left: 1px dotted var(--border); padding-left: 6px; }
 .jt-row { display: flex; align-items: baseline; gap: 3px; white-space: nowrap; }
 .jt-toggle { width: 12px; flex-shrink: 0; cursor: pointer; color: var(--text-3); user-select: none; }

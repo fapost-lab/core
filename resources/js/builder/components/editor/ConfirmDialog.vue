@@ -50,7 +50,7 @@ function onCancel() {
     margin: 0;
 }
 .btn {
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12.5px;
     font-weight: 500;
     padding: 6px 14px;

@@ -344,7 +344,7 @@ function onDragStart(v: PickerVariable, e: DragEvent) {
     border: 1px solid var(--border);
     border-radius: 4px;
     background: var(--surface);
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10px;
     color: var(--text-3);
     cursor: pointer;
@@ -451,7 +451,7 @@ function onDragStart(v: PickerVariable, e: DragEvent) {
     font-size: 10px;
     color: var(--text-3);
     opacity: .8;
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
 }
 
 .vp-item {
@@ -491,7 +491,7 @@ function onDragStart(v: PickerVariable, e: DragEvent) {
 .vp-key--rel { color: var(--text-2); font-size: 11px; }
 
 .vp-key {
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11.5px;
     color: var(--text);
     flex: 1;

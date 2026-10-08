@@ -1,0 +1,108 @@
+/*
+ * Design tokens shared by the console kit (ui.css) and the flow builder (builder.css).
+ * Custom properties only: no Tailwind, no selectors beyond :root and .dark.
+ */
+:root {
+  --radius: 0.625rem;
+
+  --background: #f7f6f4;
+  --foreground: #1c1917;
+  --card: #ffffff;
+  --card-foreground: #1c1917;
+  --popover: #ffffff;
+  --popover-foreground: #1c1917;
+  --primary: #5a6e58;
+  --primary-foreground: #ffffff;
+  --secondary: #efedea;
+  --secondary-foreground: #1c1917;
+  --muted: #f3f1ee;
+  --muted-foreground: #57534e;
+  --accent: #e9eee7;
+  --accent-foreground: #2f3b30;
+  --destructive: #b42318;
+  --destructive-foreground: #ffffff;
+  --border: #e7e5e4;
+  --input: #d6d3d1;
+  --ring: #5a6e58;
+
+  --chart-1: #5a6e58;
+  --chart-2: #3b6b8f;
+  --chart-3: #c2410c;
+  --chart-4: #a8b8a6;
+  --chart-5: #b45309;
+
+  --sidebar: #fbfaf8;
+  --sidebar-foreground: #57534e;
+  --sidebar-primary: #5a6e58;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e9eee7;
+  --sidebar-accent-foreground: #2f3b30;
+  --sidebar-border: #e7e5e4;
+  --sidebar-ring: #5a6e58;
+
+  --success: #e9eee7;
+  --success-foreground: #2f3b30;
+  --info: #e8f0f6;
+  --info-foreground: #2f5675;
+  --warning: #fef3c7;
+  --warning-foreground: #92400e;
+  --danger: #fdecea;
+  --danger-foreground: #8a1c12;
+
+  /* Decorative only: too light for text that has to be read. */
+  --subtle-foreground: #a09b94;
+  --surface-muted: #fbfaf8;
+
+  --font-sans: 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Roboto Condensed Variable', 'Onest Variable', sans-serif;
+  --font-mono: 'Victor Mono Variable', ui-monospace, monospace;
+}
+
+.dark {
+  --background: #161412;
+  --foreground: #f2efeb;
+  --card: #1e1b18;
+  --card-foreground: #f2efeb;
+  --popover: #24201d;
+  --popover-foreground: #f2efeb;
+  --primary: #8fa68c;
+  --primary-foreground: #141a13;
+  --secondary: #2a2623;
+  --secondary-foreground: #f2efeb;
+  --muted: #24211e;
+  --muted-foreground: #a8a29e;
+  --accent: #27302a;
+  --accent-foreground: #cfdccb;
+  --destructive: #e5604f;
+  --destructive-foreground: #1a0a08;
+  --border: #2e2a26;
+  --input: #3d3833;
+  --ring: #8fa68c;
+
+  --chart-1: #8fa68c;
+  --chart-2: #7aa5c7;
+  --chart-3: #f08a5d;
+  --chart-4: #5f735c;
+  --chart-5: #e0a458;
+
+  --sidebar: #1a1816;
+  --sidebar-foreground: #a8a29e;
+  --sidebar-primary: #8fa68c;
+  --sidebar-primary-foreground: #141a13;
+  --sidebar-accent: #27302a;
+  --sidebar-accent-foreground: #cfdccb;
+  --sidebar-border: #2a2623;
+  --sidebar-ring: #8fa68c;
+
+  --success: #27302a;
+  --success-foreground: #b9cdb5;
+  --info: #1f2a33;
+  --info-foreground: #9cc0dc;
+  --warning: #33270f;
+  --warning-foreground: #f0c27a;
+  --danger: #3a1d19;
+  --danger-foreground: #f4a297;
+
+  --subtle-foreground: #78716c;
+  --surface-muted: #1a1816;
+}

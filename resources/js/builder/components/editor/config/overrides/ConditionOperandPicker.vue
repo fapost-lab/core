@@ -126,7 +126,7 @@ function clear() {
     padding: 5px 8px;
     border: none;
     background: transparent;
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     color: var(--text);
 }
@@ -134,7 +134,7 @@ function clear() {
     outline: none;
 }
 .operand-input::placeholder {
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12.5px;
     color: var(--text-3);
 }

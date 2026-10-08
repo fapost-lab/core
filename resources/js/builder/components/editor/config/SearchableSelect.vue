@@ -185,10 +185,10 @@ onUnmounted(() => {
     width: 100%; padding: 6px 9px;
     border: 1px solid var(--border); border-radius: 6px;
     background: var(--surface-2); color: var(--text);
-    font-family: 'DM Sans', sans-serif; font-size: 12.5px;
+    font-family: var(--font-sans); font-size: 12.5px;
     cursor: pointer; text-align: left;
 }
-.ss-trigger.mono { font-family: 'Victor Mono', monospace; font-size: 12px; }
+.ss-trigger.mono { font-family: var(--font-mono); font-size: 12px; }
 .ss-trigger--open { border-color: var(--primary); background: #fff; }
 .ss-trigger--placeholder .ss-trigger-label { color: var(--text-3); }
 .ss-trigger-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -204,7 +204,7 @@ onUnmounted(() => {
     width: 100%; padding: 6px 8px; margin-bottom: 4px;
     border: 1px solid var(--border); border-radius: 4px;
     background: var(--surface-2); color: var(--text);
-    font-family: 'DM Sans', sans-serif; font-size: 12.5px; outline: none;
+    font-family: var(--font-sans); font-size: 12.5px; outline: none;
 }
 .ss-search:focus { border-color: var(--primary); background: #fff; }
 .ss-list { max-height: 220px; overflow-y: auto; }
@@ -212,10 +212,10 @@ onUnmounted(() => {
     display: flex; align-items: center; gap: 8px; width: 100%;
     padding: 6px 8px; border: none; border-radius: 4px;
     background: transparent; color: var(--text);
-    font-family: 'DM Sans', sans-serif; font-size: 12.5px;
+    font-family: var(--font-sans); font-size: 12.5px;
     text-align: left; cursor: pointer;
 }
-.ss-option.mono .ss-option-label { font-family: 'Victor Mono', monospace; font-size: 12px; }
+.ss-option.mono .ss-option-label { font-family: var(--font-mono); font-size: 12px; }
 .ss-option:hover { background: var(--surface-2, #f4f5f6); }
 .ss-option--active { background: var(--primary-bg, rgba(0,0,0,.04)); }
 .ss-option--custom { color: var(--primary); }

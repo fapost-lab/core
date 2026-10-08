@@ -59,13 +59,13 @@ const insert   = useInsertAtCursor(inputRef, (next) => emit('update:modelValue',
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface-2);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12.5px;
     color: var(--text);
     outline: none;
 }
 .field-input.mono {
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
 }
 .field-input:focus { border-color: var(--primary); background: #fff; }

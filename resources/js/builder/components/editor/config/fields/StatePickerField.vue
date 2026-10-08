@@ -76,7 +76,7 @@ function onStrictUpdate(next: string) {
     min-width: 0;
 }
 .state-picker-input {
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 11.5px;
 }
 .field-picker {

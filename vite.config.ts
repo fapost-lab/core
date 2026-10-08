@@ -13,6 +13,7 @@ export default defineConfig({
             input: [
                 'resources/css/app.css',
                 'resources/css/builder.css',
+                'resources/css/ui.css',
                 'resources/css/filament/theme.css',
                 'resources/js/app.js',
                 'resources/js/builder/app.ts',
@@ -28,6 +29,7 @@ export default defineConfig({
             '@builder': path.resolve(__dirname, 'resources/js/builder'),
             '@shared': path.resolve(__dirname, 'resources/js/shared'),
             '@tma': path.resolve(__dirname, 'resources/js/tma'),
+            '@fapost/ui': path.resolve(__dirname, 'resources/js/ui'),
         },
     },
     server: {

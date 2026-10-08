@@ -176,7 +176,7 @@ function ruleValueAsString(rule: RuleConfig): string {
                 <div class="field-label">Node ID</div>
                 <input
                     class="field-input"
-                    style="font-family:'Victor Mono',monospace;font-size:11.5px"
+                    style="font-family:var(--font-mono);font-size:11.5px"
                     :value="props.node.id"
                     readonly
                 />
@@ -213,7 +213,7 @@ function ruleValueAsString(rule: RuleConfig): string {
     flex: 1;
     border: none;
     background: transparent;
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12.5px;
     font-weight: 600;
     color: var(--text);
@@ -268,7 +268,7 @@ function ruleValueAsString(rule: RuleConfig): string {
     border: 1px solid var(--border);
     border-radius: 6px;
     background: var(--surface-2);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12.5px;
     color: var(--text);
     outline: none;
@@ -285,7 +285,7 @@ function ruleValueAsString(rule: RuleConfig): string {
     border: 1px dashed var(--border-2);
     border-radius: 6px;
     background: transparent;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12px;
     color: var(--text-3);
     cursor: pointer;
@@ -305,7 +305,7 @@ function ruleValueAsString(rule: RuleConfig): string {
 
 .fallback-label {
     flex: 1;
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12.5px;
     font-weight: 600;
     color: var(--text-2);
