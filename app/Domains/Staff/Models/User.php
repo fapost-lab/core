@@ -7,7 +7,7 @@ namespace App\Domains\Staff\Models;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\UserStatus;
-use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Staff\Services\AccessibleAssistants;
 use Database\Factories\UserFactory;
 use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Filament\Models\Contracts\FilamentUser;
@@ -233,14 +233,7 @@ final class User extends Authenticatable implements FilamentUser, HasTenants
             return collect();
         }
 
-        $platformTenant = app(TenantContextInterface::class)->get();
-
-        return Assistant::query()
-            ->where('tenant_id', $platformTenant->getId())
-            ->orderBy('name')
-            ->get()
-            ->filter(fn (Assistant $assistant): bool => Gate::forUser($this)->allows('view', $assistant))
-            ->values();
+        return app(AccessibleAssistants::class)->for($this);
     }
 
     protected static function booted(): void

@@ -33,6 +33,8 @@
         <env name="TENANT_SLUG" value="main"/>
         <!-- Pinned: a developer .env with TENANCY_RESOLUTION=host must not change the default mode of the tests; host-mode tests switch it themselves. -->
         <env name="TENANCY_RESOLUTION" value="single" force="true"/>
+        <!-- Pinned: a developer .env with UI_INERTIA=true must not move the tests onto the Inertia console; console tests switch it themselves. -->
+        <env name="UI_INERTIA" value="false" force="true"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

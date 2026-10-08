@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Support\SupportAccessSession;
 use App\Domains\Tenancy\Services\CurrentAccessState;
+use App\Http\Shell\AssistantSwitcher;
+use App\Http\Shell\NavigationBuilder;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route;
 use Inertia\Middleware;
 
 final class HandleInertiaRequests extends Middleware
@@ -40,7 +44,7 @@ final class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        return [
+        $shared = [
             ...parent::share($request),
             'csrf_token' => csrf_token(),
             'locale'     => app()->getLocale(),
@@ -63,6 +67,87 @@ final class HandleInertiaRequests extends Middleware
             'broadcaster'   => fn (): array => $this->broadcaster(),
             'supportAccess' => fn (): ?array => $this->supportAccess($request),
         ];
+
+        if (! $this->isConsoleRequest($request)) {
+            return $shared;
+        }
+
+        // The shell's own props; the builder and the other `web` pages never carry them.
+        $shared['translations']['console'] = trans('console');
+        $shared['shell']                   = fn (): array => $this->shell();
+        $shared['navigation']              = fn (): ?array => $this->navigation($request);
+        $shared['assistants']              = fn (): ?array => $this->assistants($request);
+
+        return $shared;
+    }
+
+    /**
+     * Whether the route runs in the console's `admin` or `console` stack (both end in {@see SetConsoleRootView}).
+     */
+    private function isConsoleRequest(Request $request): bool
+    {
+        $route = $request->route();
+
+        if (! $route instanceof Route) {
+            return false;
+        }
+
+        return in_array(SetConsoleRootView::class, app('router')->gatherRouteMiddleware($route), true);
+    }
+
+    /**
+     * Fixed endpoints and choices of the shell.
+     *
+     * @return array{localeUrl: string, logoutUrl: string, supportLeaveUrl: string, locales: list<string>}
+     */
+    private function shell(): array
+    {
+        return [
+            'localeUrl'       => route('console.locale.update', [], false),
+            'logoutUrl'       => route('console.auth.logout', [], false),
+            'supportLeaveUrl' => route('support.leave', [], false),
+            'locales'         => SetLocale::SUPPORTED_LOCALES,
+        ];
+    }
+
+    /**
+     * The side menu: an assistant's screens under `assistant/{tenant}`, otherwise the tenant-wide ones.
+     *
+     * @return array{mode: string, groups: list<array{label: string|null, items: list<array<string, mixed>>}>}|null
+     */
+    private function navigation(Request $request): ?array
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        $builder    = app(NavigationBuilder::class);
+        $assistants = app(CurrentAssistantInterface::class);
+
+        if ($assistants->isResolved()) {
+            return ['mode' => 'console', 'groups' => $builder->console($user, $assistants->get())];
+        }
+
+        return ['mode' => 'admin', 'groups' => $builder->admin($user)];
+    }
+
+    /**
+     * The assistant switcher; only the assistant screens have one.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function assistants(Request $request): ?array
+    {
+        $user       = $request->user();
+        $assistants = app(CurrentAssistantInterface::class);
+
+        if (! $user instanceof User || ! $assistants->isResolved()) {
+            return null;
+        }
+
+        return app(AssistantSwitcher::class)->for($user, $assistants->get());
     }
 
     /**

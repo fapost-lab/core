@@ -30,9 +30,17 @@ final class ConsoleSwitchTest extends FeatureTestCase
         }
     }
 
+    public function test_filament_answers_the_assistant_dashboard(): void
+    {
+        $action = $this->route('filament.assistant.pages.dashboard')->getActionName();
+
+        $this->assertStringNotContainsString('App\\Http\\Controllers\\Console', $action);
+        $this->assertStringContainsString('Filament', $action);
+    }
+
     public function test_no_console_route_is_registered(): void
     {
-        foreach (['console.auth.login.attempt', 'console.auth.logout'] as $name) {
+        foreach (['console.auth.login.attempt', 'console.auth.logout', 'console.locale.update'] as $name) {
             $this->assertNull(Route::getRoutes()->getByName($name), $name);
         }
 

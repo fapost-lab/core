@@ -84,6 +84,9 @@ final class AssistantPanelProvider extends PanelProvider
             ->favicon(asset('favicon.png'))
             ->login()
             ->spa()
+            // A screen the Inertia console has taken over (routes/inertia.php) must load as a full page: the SPA mode
+            // would fetch it through Livewire and morph Inertia's HTML into the panel.
+            ->spaUrlExceptions(fn (): array => config('ui.inertia') ? ['*/assistant/*/dashboard'] : [])
             ->sidebarFullyCollapsibleOnDesktop()
             ->font('DM Sans')
             ->viteTheme('resources/css/filament/theme.css')
