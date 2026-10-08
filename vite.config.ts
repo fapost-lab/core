@@ -17,6 +17,7 @@ export default defineConfig({
                 'resources/css/filament/theme.css',
                 'resources/js/app.js',
                 'resources/js/builder/app.ts',
+                'resources/js/console/app.ts',
                 'resources/js/tma/app.ts',
             ],
             refresh: true,

@@ -5,16 +5,24 @@ declare(strict_types=1);
 use App\Domains\Flow\Exceptions\DraftVersionConflictException;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Staff\Http\Middleware\EndExpiredSupportSession;
+use App\Domains\Staff\Http\Middleware\EnsureUserIsActive;
 use App\Domains\Tenancy\Exceptions\TenantNotActiveException;
 use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use App\Domains\Tenancy\Support\TenantHost;
+use App\Http\Middleware\EnsureCanAccessPanel;
+use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RedirectTenantRootToAdmin;
+use App\Http\Middleware\RefuseWritesWhenTenantStopped;
+use App\Http\Middleware\ResolveCurrentAssistant;
 use App\Http\Middleware\ResolveTenantContext;
+use App\Http\Middleware\SetConsoleRootView;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TenancyMiddleware;
 use App\Http\Middleware\TmaAuthMiddleware;
+use Filament\Http\Middleware\AuthenticateSession;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
@@ -38,6 +46,12 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware('web')->group(base_path('routes/builder.php'));
             Route::middleware('web')->group(base_path('routes/media.php'));
             Route::middleware('web')->group(base_path('routes/tma.php'));
+
+            // Registered after the Filament panels on purpose: a route with the same method, domain, URI and name
+            // replaces Filament's (see routes/inertia.php). Off by default; takes effect after a restart.
+            if (config('ui.inertia')) {
+                Route::group([], base_path('routes/inertia.php'));
+            }
         }
     )
     ->withMiddleware(function (Middleware $middleware): void {
@@ -53,6 +67,30 @@ return Application::configure(basePath: dirname(__DIR__))
         // users live in the tenant schema, and a request that names no tenant has to be answered
         // 404 before anything asks it to log in. EncryptCookies is the first entry of that stack.
         $middleware->prependToPriorityList(before: EncryptCookies::class, prepend: TenancyMiddleware::class);
+
+        // A session that holds a user id the provider cannot use (a numeric id from before ULID keys) has to be
+        // forgotten before anything asks the guard for the user: on PostgreSQL a non-uuid id is a query error.
+        // Unlisted middleware sorts after the listed ones, which put `auth` ahead of it in the console stacks.
+        $middleware->prependToPriorityList(before: AuthenticatesRequests::class, prepend: ForgetInvalidAuthenticatedSession::class);
+
+        // Stacks of the Inertia console (routes/inertia.php), the Filament panels' checks in the same order:
+        // the tenant first (sessions live in the tenant schema), then the session, authentication and
+        // the account checks that Filament repeats on every request. `console` adds the assistant of the
+        // URL, whose parameter keeps Filament's name `{tenant}` until Filament goes.
+        $admin = [
+            'web',
+            'tenant',
+            ForgetInvalidAuthenticatedSession::class,
+            'auth',
+            AuthenticateSession::class,
+            EnsureUserIsActive::class,
+            EnsureCanAccessPanel::class,
+            RefuseWritesWhenTenantStopped::class,
+            SetConsoleRootView::class,
+        ];
+
+        $middleware->group('admin', $admin);
+        $middleware->group('console', [...$admin, ResolveCurrentAssistant::class . ':tenant']);
 
         $middleware->web(
             append: [
