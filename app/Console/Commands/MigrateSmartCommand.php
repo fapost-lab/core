@@ -13,11 +13,13 @@ use RuntimeException;
 
 final class MigrateSmartCommand extends Command
 {
+    /** @var string */
     protected $signature = 'migrate:smart
         {--landlord : Check pending landlord migrations only}
         {--tenant : Check pending tenant migrations for the default local tenant only}
         {--all : Check both landlord and tenant migrations}';
 
+    /** @var string */
     protected $description = 'Show pending landlord and default local tenant migrations without running them';
 
     public function __construct(

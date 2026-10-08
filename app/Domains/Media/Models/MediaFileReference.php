@@ -27,10 +27,11 @@ final class MediaFileReference extends BaseModel
 {
     use HasUlidPrimaryKey;
 
-    public const UPDATED_AT = null;
+    public const ?string UPDATED_AT = null;
 
-    public const TYPE_FLOW_DEFINITION = 'flow_definition';
+    public const string TYPE_FLOW_DEFINITION = 'flow_definition';
 
+    /** @var string */
     protected $table = 'media_file_references';
 
     /** @var list<string> */

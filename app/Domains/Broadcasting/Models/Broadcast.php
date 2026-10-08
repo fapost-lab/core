@@ -40,6 +40,7 @@ final class Broadcast extends BaseModel
 {
     use HasUlidPrimaryKey;
 
+    /** @var string */
     protected $table = 'broadcasts';
 
     /**

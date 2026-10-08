@@ -35,8 +35,10 @@ final class FlowSessionHistoryEntry extends BaseModel
 {
     use HasUlidPrimaryKey;
 
+    /** @var bool */
     public $timestamps = false;
 
+    /** @var string */
     protected $table = 'flow_session_history';
 
     /**

@@ -47,7 +47,7 @@ final class Role extends SpatieRole
 {
     use HasUlidPrimaryKey;
 
-    private const STAFF_GUARD = 'web';
+    private const string STAFF_GUARD = 'web';
 
     /**
      * Maximum priority among the given role collection (0 if empty).

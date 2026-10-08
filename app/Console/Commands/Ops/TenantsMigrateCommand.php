@@ -17,8 +17,10 @@ use Throwable;
  */
 final class TenantsMigrateCommand extends Command
 {
+    /** @var string */
     protected $signature = 'ops:tenants-migrate';
 
+    /** @var string */
     protected $description = 'Run database/migrations/tenant for all active tenants';
 
     public function __construct(

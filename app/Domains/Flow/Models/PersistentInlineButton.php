@@ -30,6 +30,7 @@ final class PersistentInlineButton extends BaseModel
 
     public const string CREATED_AT = 'created_at';
 
+    /** @var bool */
     public $timestamps = false;
 
     /**

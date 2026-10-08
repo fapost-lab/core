@@ -33,8 +33,10 @@ final class Tenant extends Model implements TenantInterface
 {
     use HasUlidPrimaryKey;
 
+    /** @var string */
     protected $connection = 'landlord';
 
+    /** @var string */
     protected $table = 'tenants';
 
     /**

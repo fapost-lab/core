@@ -20,10 +20,12 @@ use Throwable;
  */
 final class TenantsSeedAclCommand extends Command
 {
+    /** @var string */
     protected $signature = 'ops:tenants-seed-acl
         {--tenant=* : Tenant slug(s); ignored when --all is used}
         {--all : Run for all active tenants (skips interactive selection)}';
 
+    /** @var string */
     protected $description = 'Run TenantAclSeeder (domain permissions + default roles) for selected active tenant(s)';
 
     public function __construct(

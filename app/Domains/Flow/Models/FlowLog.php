@@ -32,8 +32,10 @@ final class FlowLog extends Model
 {
     use HasUlidPrimaryKey;
 
+    /** @var bool */
     public $timestamps = false;
 
+    /** @var string */
     protected $table = 'flow_logs';
 
     /** @var list<string> */

@@ -46,8 +46,10 @@ final class ConversationMessage extends BaseModel
 {
     use HasUlidPrimaryKey;
 
+    /** @var bool */
     public $timestamps = false;
 
+    /** @var string */
     protected $table = 'conversation_messages';
 
     /**

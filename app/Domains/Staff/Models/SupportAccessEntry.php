@@ -24,8 +24,10 @@ final class SupportAccessEntry extends Model
 {
     use HasUlidPrimaryKey;
 
+    /** @var bool */
     public $timestamps = false;
 
+    /** @var string */
     protected $table = 'support_access_entries';
 
     /**

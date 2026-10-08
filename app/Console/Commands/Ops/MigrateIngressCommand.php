@@ -16,11 +16,13 @@ use Illuminate\Console\Command;
  */
 final class MigrateIngressCommand extends Command
 {
+    /** @var string */
     protected $signature = 'ops:ingress-migrate
         {--apply : Queue re-registration; without it the command only reports drift}
         {--platform= : Restrict to a single platform}
         {--limit=50 : Maximum channels to queue per platform in this run}';
 
+    /** @var string */
     protected $description = 'Report or migrate channels whose webhook still points at a previous ingress host';
 
     public function __construct(

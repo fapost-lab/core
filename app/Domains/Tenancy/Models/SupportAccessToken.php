@@ -26,10 +26,13 @@ final class SupportAccessToken extends Model
 {
     use HasUlidPrimaryKey;
 
+    /** @var bool */
     public $timestamps = false;
 
+    /** @var string */
     protected $connection = 'landlord';
 
+    /** @var string */
     protected $table = 'support_access_tokens';
 
     /**

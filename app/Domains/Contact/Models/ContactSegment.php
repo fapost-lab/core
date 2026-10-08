@@ -25,6 +25,7 @@ final class ContactSegment extends BaseModel
 {
     use HasUlidPrimaryKey;
 
+    /** @var string */
     protected $table = 'contact_segments';
 
     /**

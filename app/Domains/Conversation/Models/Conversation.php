@@ -41,6 +41,7 @@ final class Conversation extends BaseModel
 {
     use HasUlidPrimaryKey;
 
+    /** @var string */
     protected $table = 'conversations';
 
     /**

@@ -33,6 +33,7 @@ final class LoadTestRunCommand extends Command
     /** @var list<string> */
     private const array DRAINED_QUEUES = ['flow.execution', 'messaging.transactional', 'messaging.logging'];
 
+    /** @var string */
     protected $signature = 'loadtest:run
         {--url= : Base URL of the running app (default: app.url)}
         {--messages=3 : Messages per contact; must be >=2, the 2nd message is always the code}
@@ -40,6 +41,7 @@ final class LoadTestRunCommand extends Command
         {--burst : Send all messages for each contact together, instead of waiting between them}
         {--timeout=120 : Seconds to wait for flow.execution/messaging.transactional/messaging.logging to drain}';
 
+    /** @var string */
     protected $description = 'Send synthetic Telegram webhook traffic for the seeded load-test contacts';
 
     public function __construct(

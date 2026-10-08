@@ -30,6 +30,7 @@ final class MediaFolder extends BaseModel
 {
     use HasUlidPrimaryKey;
 
+    /** @var string */
     protected $table = 'media_folders';
 
     /** @var list<string> */

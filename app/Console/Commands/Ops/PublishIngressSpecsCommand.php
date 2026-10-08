@@ -18,8 +18,10 @@ use JsonException;
  */
 final class PublishIngressSpecsCommand extends Command
 {
+    /** @var string */
     protected $signature = 'ops:ingress-specs-publish';
 
+    /** @var string */
     protected $description = 'Publish declarative channel ingress specs to Redis for the external webhook gateway';
 
     public function __construct(

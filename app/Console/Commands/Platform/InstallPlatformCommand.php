@@ -12,12 +12,14 @@ use Illuminate\Support\Facades\DB;
 
 final class InstallPlatformCommand extends Command
 {
+    /** @var string */
     protected $signature = 'platform:install
         {--tenant-slug=app : Slug for the first tenant}
         {--admin-email= : Email for the first admin}
         {--admin-password= : Password for the first admin}
         {--admin-password-file= : Read the admin password from a file, or from standard input when given as -}';
 
+    /** @var string */
     protected $description = 'Install FaPost Core platform';
 
     public function __construct(
