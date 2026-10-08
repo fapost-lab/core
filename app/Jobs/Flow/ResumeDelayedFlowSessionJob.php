@@ -6,6 +6,9 @@ namespace App\Jobs\Flow;
 
 use App\Domains\Flow\Orchestration\DelayedSessionResumer;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
+use App\Domains\Tenancy\Queue\StoppedTenantAction;
+use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,7 +20,7 @@ use Illuminate\Foundation\Queue\Queueable;
  * with the delay applied by {@see \App\Infrastructure\Flow\QueuedDelayResumeScheduler};
  * the staleness checks and the session lock live in {@see DelayedSessionResumer}.
  */
-final class ResumeDelayedFlowSessionJob implements ShouldQueue
+final class ResumeDelayedFlowSessionJob implements ShouldQueue, TenantAccessGatedJob
 {
     use Dispatchable;
     use Queueable;
@@ -29,6 +32,19 @@ final class ResumeDelayedFlowSessionJob implements ShouldQueue
         public readonly string $resumeAt,
     ) {
         $this->onQueue('flow.execution');
+    }
+
+    public function accessModeTenantId(): string
+    {
+        return $this->tenantId;
+    }
+
+    /**
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [new RespectsTenantAccessMode(StoppedTenantAction::Postpone)];
     }
 
     public function handle(

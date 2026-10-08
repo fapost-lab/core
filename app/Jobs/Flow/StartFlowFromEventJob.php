@@ -11,6 +11,9 @@ use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
+use App\Domains\Tenancy\Queue\StoppedTenantAction;
+use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -31,7 +34,7 @@ use Throwable;
  *
  * The event payload is exposed to the started flow under `flow.event.*`.
  */
-final class StartFlowFromEventJob implements ShouldQueue
+final class StartFlowFromEventJob implements ShouldQueue, TenantAccessGatedJob
 {
     use Dispatchable;
     use Queueable;
@@ -48,6 +51,19 @@ final class StartFlowFromEventJob implements ShouldQueue
         public readonly string $eventName,
     ) {
         $this->onQueue('scheduled.triggers');
+    }
+
+    public function accessModeTenantId(): string
+    {
+        return $this->tenantId;
+    }
+
+    /**
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [new RespectsTenantAccessMode(StoppedTenantAction::Drop)];
     }
 
     public function handle(

@@ -19,8 +19,10 @@ use App\Domains\Tenancy\Infrastructure\CoreTenantDirectory;
 use App\Domains\Tenancy\Infrastructure\CoreTenantProvisioner;
 use App\Domains\Tenancy\Infrastructure\EloquentWebhookRegistryReader;
 use App\Domains\Tenancy\Repositories\TenantRepository;
+use App\Domains\Tenancy\Services\AlwaysActiveAccessMode;
 use App\Domains\Tenancy\Services\ConfigTenantResolver;
 use App\Domains\Tenancy\Services\CoreBootstrap;
+use App\Domains\Tenancy\Services\CurrentAccessState;
 use App\Domains\Tenancy\Services\DomainBootstrapper;
 use App\Domains\Tenancy\Services\HostTenantResolver;
 use App\Domains\Tenancy\Services\LimitRegistry;
@@ -37,6 +39,7 @@ use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
 use Fapost\Foundation\Tenancy\Contracts\SupportAccessInterface;
+use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantDirectoryInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
@@ -117,6 +120,7 @@ final class DomainServiceProvider extends ServiceProvider
             (string) config('permission.cache.key'),
         ));
         $this->registerQuota();
+        $this->registerAccessMode();
 
         $this->app->singleton(WebhookRegistryWriterInterface::class, WebhookRegistryWriter::class);
         $this->app->singleton(WebhookRegistryReaderInterface::class, EloquentWebhookRegistryReader::class);
@@ -156,6 +160,18 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->bindIf(TenantLimitsInterface::class, UnlimitedTenantLimits::class);
         // Not a singleton: it reads the scoped tenant context.
         $this->app->bind(RecordQuotaInterface::class, RecordQuota::class);
+    }
+
+    /**
+     * The default "everything is active" access mode and the per-request state it feeds.
+     *
+     * Bound with bindIf for the same reason as the limits: an operator package that already bound
+     * {@see TenantAccessModeInterface} keeps its binding.
+     */
+    private function registerAccessMode(): void
+    {
+        $this->app->bindIf(TenantAccessModeInterface::class, AlwaysActiveAccessMode::class);
+        $this->app->scoped(CurrentAccessState::class);
     }
 
     /**

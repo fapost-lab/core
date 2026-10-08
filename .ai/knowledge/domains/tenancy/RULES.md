@@ -19,7 +19,10 @@ paths:
   - "tests/Feature/Domains/Tenancy/**"
   - tests/Unit/Architecture/WebhookArchitectureTest.php
   - app/Http/Middleware/ResolveTenantContext.php
-reviewed_at: 2026-10-07
+  - app/Http/Middleware/RefuseWritesWhenTenantStopped.php
+  - tests/Unit/Architecture/RuntimeJobAccessModeTest.php
+  - app/Filament/Support/AccessNoticeBanner.php
+reviewed_at: 2026-10-08
 ---
 # Tenancy rules
 
@@ -118,6 +121,18 @@ broken.
   (Core is the only implementation), unlike the `bindIf` defaults above. Enforced:
   `SupportAccessIssueTest`, `SupportAccessTokenStoreTest`, `SupportAccessEntryTest`
   (`adr-20261007-support-access-through-platform-support-user`).
+
+- **A stopped tenant is a mode, never a status, and Core asks the operator on every request and runtime job.**
+  `TenantRequestRunner` asks `TenantAccessModeInterface` once per request into the `scoped` `CurrentAccessState`;
+  the default is `AlwaysActiveAccessMode`, bound with `bindIf`. While stopped: unsafe methods on the builder,
+  media and mini-app routes answer 423 (`RefuseWritesWhenTenantStopped`; the platform support user passes; a
+  route with no side effects opts out with `withoutMiddleware`), runtime jobs are dropped or postponed by
+  `RespectsTenantAccessMode`, and `flow:sweep-subflow-timeouts` skips the tenant. The tenant stays `Active` so
+  console commands see it. A postponed job is re-queued as a delayed copy, never `release()`d (a release spends
+  an attempt). Fail open: an operator that throws is reported and counts as active (`TenantAccessStates`). A
+  gateway "Class@method" handler must run the job's middleware itself. Every queued job in `app/` is either listed as runtime (and gated) or as keeping running. Enforced:
+  `StoppedTenantRequestTest`, `StoppedTenantRuntimeTest`, `RespectsTenantAccessModeTest`,
+  `RuntimeJobAccessModeTest` (`adr-20261008-access-mode-is-a-mode-not-a-status`).
 
 ## Rules
 

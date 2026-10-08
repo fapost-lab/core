@@ -14,7 +14,8 @@ use Symfony\Component\HttpFoundation\Response;
  * Runs the rest of a request inside the tenant its host names.
  *
  * Shared by the two tenant middleware so both enter a tenant the same way: resolve,
- * switch the schema, boot the tenant runtime, and tear it all down when the request ends.
+ * switch the schema, boot the tenant runtime, note the tenant's access mode, and tear it all down
+ * when the request ends.
  */
 final readonly class TenantRequestRunner
 {
@@ -22,6 +23,8 @@ final readonly class TenantRequestRunner
         private TenantResolverInterface $resolver,
         private TenantSwitcher $tenantSwitcher,
         private CoreBootstrapInterface $coreBootstrap,
+        private TenantAccessStates $accessStates,
+        private CurrentAccessState $accessState,
     ) {
     }
 
@@ -32,12 +35,16 @@ final readonly class TenantRequestRunner
     {
         $tenant = $this->resolver->resolve($request);
 
-        return $this->tenantSwitcher->runForTenant($tenant, function () use ($next, $request): Response {
+        return $this->tenantSwitcher->runForTenant($tenant, function () use ($next, $request, $tenant): Response {
             $this->coreBootstrap->boot();
 
             try {
+                // Asked once per request: the write guard, the banner and the shared props read it from here.
+                $this->accessState->set($this->accessStates->stateFor($tenant->getId()));
+
                 return $next($request);
             } finally {
+                $this->accessState->clear();
                 $this->coreBootstrap->reset();
             }
         });

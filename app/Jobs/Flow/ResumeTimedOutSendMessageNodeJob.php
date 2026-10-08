@@ -8,6 +8,9 @@ use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
+use App\Domains\Tenancy\Queue\StoppedTenantAction;
+use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Fapost\Foundation\DTO\IncomingMessage;
 use Fapost\Foundation\DTO\IncomingMessageType;
@@ -24,7 +27,7 @@ use Illuminate\Foundation\Queue\Queueable;
  * A busy lock surfaces as {@see \App\Domains\Flow\Exceptions\SessionLockTimeoutException}
  * and the queue retries the job.
  */
-final class ResumeTimedOutSendMessageNodeJob implements ShouldQueue
+final class ResumeTimedOutSendMessageNodeJob implements ShouldQueue, TenantAccessGatedJob
 {
     use Dispatchable;
     use Queueable;
@@ -36,6 +39,19 @@ final class ResumeTimedOutSendMessageNodeJob implements ShouldQueue
         public readonly string $platform,
     ) {
         $this->onQueue('flow.execution');
+    }
+
+    public function accessModeTenantId(): string
+    {
+        return $this->tenantId;
+    }
+
+    /**
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [new RespectsTenantAccessMode(StoppedTenantAction::Postpone)];
     }
 
     public function handle(

@@ -12,6 +12,10 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Queue\DefersWhenDroppedWhileStopped;
+use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
+use App\Domains\Tenancy\Queue\StoppedTenantAction;
+use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Fapost\Foundation\Messaging\MessagePayload;
@@ -21,6 +25,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 /**
@@ -31,7 +36,7 @@ use Throwable;
  * with origin=broadcast), and advances the broadcast to Completed once the last
  * recipient is processed.
  */
-final class SendBroadcastRecipientJob implements ShouldQueue
+final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, ShouldQueue, TenantAccessGatedJob
 {
     use Dispatchable;
     use Queueable;
@@ -39,8 +44,44 @@ final class SendBroadcastRecipientJob implements ShouldQueue
     public function __construct(
         public readonly string $tenantId,
         public readonly string $recipientId,
+        public readonly ?string $broadcastId = null,
     ) {
         $this->onQueue('messaging.broadcast');
+    }
+
+    public function accessModeTenantId(): string
+    {
+        return $this->tenantId;
+    }
+
+    /**
+     * Dropped, not postponed, while the tenant is stopped: a big broadcast has a job per recipient,
+     * and a delayed copy of each would swamp the shared queue. The recipient row stays Pending, and
+     * {@see self::deferUntilActive()} sees to one {@see RunBroadcastJob} that fans the Pending rows out again.
+     *
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [new RespectsTenantAccessMode(StoppedTenantAction::Drop)];
+    }
+
+    /**
+     * Queues one delayed re-run of the broadcast for all the recipient jobs dropped in this stretch.
+     * A job queued before `broadcastId` existed names no broadcast and is simply lost.
+     */
+    public function deferUntilActive(): void
+    {
+        if (null === $this->broadcastId) {
+            return;
+        }
+
+        // Held a little longer than the postponement, so the flag and the re-run copy overlap.
+        if (! Cache::add("broadcast_resume:{$this->tenantId}:{$this->broadcastId}", true, RespectsTenantAccessMode::POSTPONE_SECONDS * 2)) {
+            return;
+        }
+
+        RunBroadcastJob::dispatch($this->tenantId, $this->broadcastId)->delay(RespectsTenantAccessMode::POSTPONE_SECONDS);
     }
 
     public function handle(

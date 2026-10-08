@@ -10,6 +10,9 @@ use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Services\BroadcastRecipientResolver;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
+use App\Domains\Tenancy\Queue\StoppedTenantAction;
+use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -30,7 +33,7 @@ use Illuminate\Support\Str;
  * re-scheduled (before any recipient rows are created, so it's cheap to retry)
  * instead of piling more work on.
  */
-final class RunBroadcastJob implements ShouldQueue
+final class RunBroadcastJob implements ShouldQueue, TenantAccessGatedJob
 {
     use Dispatchable;
     use Queueable;
@@ -44,6 +47,19 @@ final class RunBroadcastJob implements ShouldQueue
         public readonly string $broadcastId,
     ) {
         $this->onQueue('messaging.broadcast');
+    }
+
+    public function accessModeTenantId(): string
+    {
+        return $this->tenantId;
+    }
+
+    /**
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [new RespectsTenantAccessMode(StoppedTenantAction::Postpone)];
     }
 
     public function handle(
@@ -128,7 +144,7 @@ final class RunBroadcastJob implements ShouldQueue
             ->orderBy('id')
             ->pluck('id')
             ->each(function (string $recipientId) use (&$index, $chunkSize): void {
-                SendBroadcastRecipientJob::dispatch($this->tenantId, $recipientId)
+                SendBroadcastRecipientJob::dispatch($this->tenantId, $recipientId, $this->broadcastId)
                     ->delay(now()->addSeconds(intdiv($index, $chunkSize)));
                 $index++;
             });
