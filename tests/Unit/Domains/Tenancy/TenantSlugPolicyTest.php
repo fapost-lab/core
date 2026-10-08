@@ -205,6 +205,23 @@ final class TenantSlugPolicyTest extends TestCase
         $this->assertContains('app', $reserved, 'The Laravel ingress hostname must be reserved too.');
     }
 
+    public function test_platform_subdomains_are_reserved(): void
+    {
+        config()->set('tenancy.default_tenant_slug', 'main');
+        config()->set('tenancy.platform_subdomains', ['Saas', ' ops ', '']);
+
+        $policy   = app(TenantSlugPolicy::class);
+        $reserved = $policy->reservedSlugs();
+
+        $this->assertContains('saas', $reserved);
+        $this->assertContains('ops', $reserved);
+        $this->assertNotContains('', $reserved);
+        $this->assertTrue($policy->isReserved('saas'));
+
+        $this->expectException(InvalidTenantSlugException::class);
+        $policy->assertAssignable('saas');
+    }
+
     /**
      * A gateway on an unrelated domain claims no subdomain of ours, so nothing
      * should be reserved from it.

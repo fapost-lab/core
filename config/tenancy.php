@@ -32,6 +32,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Platform subdomains
+    |--------------------------------------------------------------------------
+    |
+    | First-level subdomains of the base domain that serve platform pages with
+    | no tenant, such as the host of an operator package. In host mode such a
+    | host is treated like the base domain itself: no tenant is resolved and
+    | the tenant panels answer 404 there. Each label is also reserved as a
+    | tenant slug automatically.
+    |
+    | An operator package fills this list while it registers, or an installation
+    | publishes the config and edits it. There is no environment variable.
+    |
+    */
+    'platform_subdomains' => [],
+
+    /*
+    |--------------------------------------------------------------------------
     | Support access
     |--------------------------------------------------------------------------
     |

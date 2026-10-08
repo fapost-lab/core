@@ -41,9 +41,13 @@ broken.
   session read outside the tenant fails or reads another schema. Enforced:
   `TenantMiddlewareOrderTest`.
 - **In `host` mode only `<slug>.<base_domain>` reaches a tenant.** The base domain runs with no
-  tenant; any other host, an unknown, inactive or reserved slug is a 404, and the default-slug
-  exemption from the reserved list applies only in `single` mode. Enforced:
-  `RequestHostClassifierTest`, `HostTenantResolverTest`, `HostResolutionTest`.
+  tenant, and neither does a declared platform subdomain (`tenancy.platform_subdomains`, filled by
+  an operator package): it runs with no tenant like the base domain, its tenant panels answer 404,
+  and its label is reserved as a slug. Any other host, an unknown, inactive or reserved slug is a
+  404, and the default-slug exemption from the reserved list applies only in `single` mode.
+  Enforced: `RequestHostClassifierTest`, `HostTenantResolverTest`, `HostResolutionTest`,
+  `HostModePanelsTest::test_platform_subdomain_runs_without_a_tenant_and_serves_no_panels`,
+  `TenantSlugPolicyTest::test_platform_subdomains_are_reserved`.
 - **In `host` mode a panel's only host boundary is `TenancyMiddleware`.** Panels are registered
   without a domain (`TenantHost::panelDomain()` is `null`), so `/admin` and `/assistant` match on
   every host; `TenancyMiddleware` first in each panel's middleware — and persistent, so Livewire

@@ -46,7 +46,7 @@ A tenant value object rebuilt from a job payload without a landlord lookup.
 ## Tenant slug
 
 The tenant's DNS-safe identifier, validated by `TenantSlugPolicy`: a valid DNS label, not
-starting with `xn--`, not a reserved name (reserved names include the ingress hosts).
+starting with `xn--`, not a reserved name (reserved names include the ingress hosts and the platform subdomains).
 
 ## Webhook registry
 

@@ -6,6 +6,7 @@ namespace Tests\Feature\Tenancy;
 
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Filament\Resources\Assistants\AssistantResource;
 use Database\Seeders\TenantAclSeeder;
@@ -79,6 +80,26 @@ final class HostModePanelsTest extends FeatureTestCase
             $this->get("http://ghost.{$this->base}{$path}")->assertNotFound();
             $this->get("http://example.com{$path}")->assertNotFound();
         }
+    }
+
+    public function test_platform_subdomain_runs_without_a_tenant_and_serves_no_panels(): void
+    {
+        config(['tenancy.platform_subdomains' => ['ops']]);
+
+        Route::middleware('web')->get('/_probe/platform', fn (): array => [
+            'resolved' => $this->app->make(TenantContextInterface::class)->isResolved(),
+        ]);
+
+        $this->getJson("http://ops.{$this->base}/_probe/platform")
+            ->assertOk()
+            ->assertJsonPath('resolved', false);
+
+        foreach (['/admin/login', '/assistant/login', '/admin'] as $path) {
+            $this->get("http://ops.{$this->base}{$path}")->assertNotFound();
+        }
+
+        // An unlisted label stays a tenant host.
+        $this->get("http://main.{$this->base}/admin/login")->assertOk();
     }
 
     public function test_guest_is_sent_to_the_login_of_the_host_they_came_to(): void

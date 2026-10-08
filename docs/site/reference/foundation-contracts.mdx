@@ -157,6 +157,14 @@ admin panel. Implemented by Core; a package only calls it.
   throws `tenantNotFound()` or `tenantNotActive()`. Branch on the exception's `reason`
   (`SupportAccessFailure`: `Disabled`, `TenantNotFound`, `TenantNotActive`), not on its message.
 
+A package that serves its own pages on a subdomain of the base domain, such as an operator panel
+at `saas.<base_domain>`, adds that label to the config `tenancy.platform_subdomains` while it
+registers (in the service provider's `register()`). Core then serves that host with no tenant,
+like the base domain, answers 404 for the tenant panels there, and reserves the label as a tenant
+slug. Only first-level labels count. Such a host has no tenant schema, so sessions there cannot
+use the `database` driver: the `sessions` table lives in tenant schemas. A tenant that already holds
+the label as its slug stops being served once the label is declared.
+
 ## Quota
 
 | Contract | Role |
