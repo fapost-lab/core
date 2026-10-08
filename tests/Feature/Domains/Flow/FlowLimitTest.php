@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Flow;
 
+use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Domains\Flow\Models\FlowDraft;
@@ -171,6 +172,7 @@ final class FlowLimitTest extends FeatureTestCase
         $this->limitRecords('flows', 1);
         $this->actingAsAdmin('assistant');
         Filament::setTenant($assistant);
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
 
         $component = Livewire::test(CreateFlow::class)
             ->fillForm(['name' => 'Raced']);
@@ -212,6 +214,7 @@ final class FlowLimitTest extends FeatureTestCase
         $limits = $this->limitRecords('flows', 2);
         $this->actingAsAdmin('assistant');
         Filament::setTenant($assistant);
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
 
         $component = Livewire::test(AssistantSettings::class);
 

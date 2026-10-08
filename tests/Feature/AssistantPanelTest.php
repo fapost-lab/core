@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
 use App\Filament\Assistant\Resources\Channels\ChannelResource;
+use App\Filament\Support\SetCurrentAssistantFromPanelTenant;
 use Database\Seeders\TenantAclSeeder;
 use Filament\Facades\Filament;
+use Livewire\Livewire;
+use Tests\Support\RecordingCurrentAssistant;
 
 final class AssistantPanelTest extends FeatureTestCase
 {
@@ -144,6 +148,33 @@ final class AssistantPanelTest extends FeatureTestCase
         $this->actingAs($user);
 
         $this->get($this->assistantTranslationsUrl($assistant))->assertForbidden();
+    }
+
+    public function test_panel_request_makes_the_page_assistant_the_current_assistant(): void
+    {
+        $this->seedTenantAcl();
+
+        $assistant = Assistant::factory()->create();
+        $user      = User::factory()->create();
+        $user->assignRole(RoleEnum::Admin->value);
+
+        $this->actingAs($user);
+
+        $recorder = new RecordingCurrentAssistant();
+        $this->app->instance(CurrentAssistantInterface::class, $recorder);
+
+        $this->get($this->assistantPanelUrl($assistant))->assertOk();
+
+        $this->assertCount(1, $recorder->assistantsSet);
+        $this->assertTrue($assistant->is($recorder->assistantsSet[0]));
+    }
+
+    public function test_current_assistant_middleware_is_persistent_tenant_middleware_of_the_panel(): void
+    {
+        $panel = Filament::getPanel('assistant');
+
+        $this->assertContains(SetCurrentAssistantFromPanelTenant::class, $panel->getTenantMiddleware());
+        $this->assertContains(SetCurrentAssistantFromPanelTenant::class, Livewire::getPersistentMiddleware());
     }
 
     private function seedTenantAcl(): void

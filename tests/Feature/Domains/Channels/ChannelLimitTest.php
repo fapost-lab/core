@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Channels;
 
+use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
@@ -200,6 +201,7 @@ final class ChannelLimitTest extends FeatureTestCase
         $this->limitRecords('channels', 1);
         $this->actingAsAdmin('assistant');
         Filament::setTenant($assistant);
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
 
         $component = Livewire::test(CreateChannel::class)
             ->fillForm(['type' => ChannelTypeEnum::Telegram->value, 'token' => 'raced-token', 'secret_token' => 'raced-secret']);
