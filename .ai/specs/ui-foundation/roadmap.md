@@ -14,10 +14,10 @@ visible changed, and the builder renders from the kit's tokens in light and dark
 - [x] `current-assistant-without-filament` — The current assistant no longer comes from Filament — `CurrentAssistant` is set by a
       route middleware for console requests and from the payload inside jobs, request- or
       job-scoped and reset; the Filament panel keeps working by feeding the same service
-- [ ] `kit-and-tokens` — The kit and its tokens live in Core — shadcn-vue in `resources/js/ui` behind the
+- [x] `kit-and-tokens` — The kit and its tokens live in Core — shadcn-vue in `resources/js/ui` behind the
       `@fapost/ui` alias, Warm Minimal light and dark, Onest and Roboto Condensed; the builder's
       variables read from the same tokens and its top bar matches the console
-- [ ] The new UI switch and shell — a configuration switch (off by default) hands the console
+- [ ] `ui-switch-and-shell` — The new UI switch and shell — a configuration switch (off by default) hands the console
       and admin addresses to Inertia; shell with navigation, assistant switcher, language
       switcher; Inertia login at `/admin/login`; shared props (user, permissions, flash,
       locale, broadcaster); menu entries for unmigrated screens lead into Filament;
@@ -25,6 +25,10 @@ visible changed, and the builder renders from the kit's tokens in light and dark
       authorization call in every action; the SaaS package's CI runs with the switch on (after:
       the current assistant — the shell's console routes resolve it; after: the kit — the shell
       is built from it)
+- [ ] `builder-dark-theme` — The builder in the dark theme — its ~210 literal colours and its own
+      `--accent` (which shadows the token of the same name) move onto the tokens, so the builder
+      follows `.dark` like the console (after: `kit-and-tokens` — the tokens it moves onto; split
+      out of it by the owner, 2026-10-08)
 - [ ] Pilot: contact groups end to end — the server-side data table (filters, sorting,
       pagination, bulk actions), form, confirmation, toasts; the patterns every later screen
       copies (after: the shell — the screen lives inside it)
