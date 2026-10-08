@@ -23,8 +23,10 @@ use Throwable;
  */
 final class PruneFlowLogsCommand extends Command
 {
+    /** @var string */
     protected $signature = 'logs:prune-flow {--dry-run : Preview dropped partitions only}';
 
+    /** @var string */
     protected $description = 'Drops flow_logs monthly partitions older than 30 days for every active tenant';
 
     public function __construct(

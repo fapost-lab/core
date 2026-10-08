@@ -17,8 +17,10 @@ use Throwable;
  */
 final class SweepSubflowTimeoutsCommand extends Command
 {
+    /** @var string */
     protected $signature = 'flow:sweep-subflow-timeouts';
 
+    /** @var string */
     protected $description = 'Force-fail subflow children whose parent has expired and resume the parent through the failed handle';
 
     public function __construct(

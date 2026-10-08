@@ -34,6 +34,7 @@ final class MediaBlob extends BaseModel implements MediaBlobReadInterface
 {
     use HasUlidPrimaryKey;
 
+    /** @var string */
     protected $table = 'media_blobs';
 
     /** @var list<string> */

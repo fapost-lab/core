@@ -22,7 +22,7 @@ final class FlowDefinitionMediaReferenceExtractor implements MediaReferenceExtra
      *
      * @var list<string>
      */
-    private const MEDIA_FILE_ID_PATHS = [
+    private const array MEDIA_FILE_ID_PATHS = [
         'config.media_file_id',
     ];
 

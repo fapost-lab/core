@@ -30,6 +30,7 @@ final class VariableSchemaEntry extends BaseModel
 {
     use HasUlidPrimaryKey;
 
+    /** @var bool */
     public $timestamps = false;
 
     /**

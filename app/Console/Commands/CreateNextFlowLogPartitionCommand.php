@@ -25,8 +25,10 @@ use Throwable;
  */
 final class CreateNextFlowLogPartitionCommand extends Command
 {
+    /** @var string */
     protected $signature = 'logs:create-partition';
 
+    /** @var string */
     protected $description = 'Creates current and next month flow_logs partitions for every active tenant';
 
     public function __construct(

@@ -14,9 +14,11 @@ use Illuminate\Console\Command;
  */
 final class WebhookRegistryHealthCommand extends Command
 {
+    /** @var string */
     protected $signature = 'ops:webhook-registry-health
         {--repair : Rewrite missing/stale entries from the DB and delete orphaned Redis keys}';
 
+    /** @var string */
     protected $description = 'Check (and optionally repair) Redis↔DB consistency of the webhook routing registry';
 
     public function __construct(

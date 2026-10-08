@@ -28,6 +28,7 @@ final class ContactGroup extends BaseModel
 {
     use HasUlidPrimaryKey;
 
+    /** @var string */
     protected $table = 'contact_groups';
 
     /**
