@@ -11,7 +11,7 @@ runtime depends on Filament any more. Done when: with the switch on, the contact
 is served by Inertia at its old address inside the new shell, with the switch off nothing
 visible changed, and the builder renders from the kit's tokens in light and dark.
 
-- [ ] The current assistant no longer comes from Filament — `CurrentAssistant` is set by a
+- [ ] `current-assistant-without-filament` — The current assistant no longer comes from Filament — `CurrentAssistant` is set by a
       route middleware for console requests and from the payload inside jobs, request- or
       job-scoped and reset; the Filament panel keeps working by feeding the same service
 - [ ] The kit and its tokens live in Core — shadcn-vue in `resources/js/ui` behind the
@@ -29,7 +29,7 @@ visible changed, and the builder renders from the kit's tokens in light and dark
       pagination, bulk actions), form, confirmation, toasts; the patterns every later screen
       copies (after: the shell — the screen lives inside it)
 
-- [ ] `close-policy-gaps` — Authorization gaps closed before screens move — broadcasts and contact segments get policies and the builder routes check permissions, so the new UI inherits rules that hold (found while writing this spec)
+- [x] `close-policy-gaps` — Authorization gaps closed before screens move — broadcasts and contact segments get policies and the builder routes check permissions, so the new UI inherits rules that hold (found while writing this spec)
 
 ## Phase 2 — The console at parity
 
