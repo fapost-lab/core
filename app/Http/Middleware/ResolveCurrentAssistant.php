@@ -9,6 +9,7 @@ use App\Domains\Assistant\Models\Assistant;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -45,7 +46,9 @@ final readonly class ResolveCurrentAssistant
             return $parameter;
         }
 
-        if (! is_string($parameter) || '' === $parameter) {
+        // Keys are ULIDs stored as `uuid` (ADR-03); anything else in the URL is not an assistant, and
+        // Postgres would reject it as invalid uuid syntax instead of finding nothing.
+        if (! is_string($parameter) || ! Str::isUuid($parameter)) {
             return null;
         }
 

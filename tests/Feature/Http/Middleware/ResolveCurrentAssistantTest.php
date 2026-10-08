@@ -62,7 +62,23 @@ final class ResolveCurrentAssistantTest extends FeatureTestCase
         $user = User::factory()->create();
         $user->assignRole(RoleEnum::Admin->value);
 
+        $this->actingAs($user)
+            ->get('/_test/console/' . mb_strtolower((string) Str::ulid()->toRfc4122()))
+            ->assertNotFound();
+
+        $this->assertSame([], $this->recorder->assistantsSet);
+    }
+
+    /**
+     * Keys are uuids; a malformed id must be a 404, not an invalid-uuid database error (a 500 on Postgres).
+     */
+    public function test_malformed_assistant_id_gets_404(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole(RoleEnum::Admin->value);
+
         $this->actingAs($user)->get('/_test/console/' . Str::ulid())->assertNotFound();
+        $this->actingAs($user)->get('/_test/console/not-an-id')->assertNotFound();
 
         $this->assertSame([], $this->recorder->assistantsSet);
     }
