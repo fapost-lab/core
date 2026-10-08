@@ -88,6 +88,19 @@ operation in one switch, from editing a draft to publishing it live.
   publish them — a separation the legacy permission cannot express.
 </Note>
 
+## Permissions and assistants
+
+A permission says what someone may do; their assignment says to which assistants.
+Anything that belongs to one assistant needs both, and admins reach every
+assistant without being assigned.
+
+| Area | What it takes |
+|---|---|
+| **Broadcasts** | **Manage broadcasts**, plus an assignment to the broadcast's assistant. Sending and cancelling follow the same rule |
+| **Segments** | **View contacts**, **Manage contacts** or **Manage broadcasts** to see them; **Manage contacts** or **Manage broadcasts** to create, edit and delete them. Segments are the audiences of broadcasts, so a broadcast manager can build them without access to the contact base |
+| **Flow builder** | **Create / edit flow drafts**, plus an assignment to the flow's assistant. **Publish flow to live** is needed on top of that to publish |
+| **Testing a `call` node** | **Create / edit flow drafts**. The test sends a real request, so it is not open to every signed-in user |
+
 ## Choosing a set
 
 Start from the role closest to the person's job and remove what they do not need,

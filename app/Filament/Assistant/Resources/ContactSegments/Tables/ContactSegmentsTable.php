@@ -50,6 +50,7 @@ final class ContactSegmentsTable
                 Action::make('refresh_count')
                     ->label(__('segment.actions.refresh_count'))
                     ->icon(Heroicon::ArrowPath)
+                    ->authorize('update')
                     ->action(static function (ContactSegment $record): void {
                         $count = app(ContactSegmentResolver::class)->refreshCount($record);
 

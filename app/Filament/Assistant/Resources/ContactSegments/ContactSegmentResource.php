@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Assistant\Resources\ContactSegments;
 
 use App\Domains\Contact\Models\ContactSegment;
-use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Filament\Assistant\Resources\ContactSegments\Pages\CreateContactSegment;
 use App\Filament\Assistant\Resources\ContactSegments\Pages\EditContactSegment;
@@ -18,7 +17,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 /**
@@ -68,11 +66,6 @@ final class ContactSegmentResource extends Resource
             'create' => CreateContactSegment::route('/create'),
             'edit'   => EditContactSegment::route('/{record}/edit'),
         ];
-    }
-
-    public static function shouldRegisterNavigation(): bool
-    {
-        return Auth::user() instanceof User;
     }
 
     public static function getEloquentQuery(): Builder

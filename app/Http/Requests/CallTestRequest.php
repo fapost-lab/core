@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests;
 
+use App\Domains\Flow\Models\FlowDraft;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -11,9 +12,12 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 final class CallTestRequest extends FormRequest
 {
+    /**
+     * Testing a `call` node is part of authoring flows, so it needs the flow-draft permission.
+     */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('create', FlowDraft::class) ?? false;
     }
 
     /** @return array<string, array<int, string>> */

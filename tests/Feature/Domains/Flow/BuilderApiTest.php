@@ -8,7 +8,9 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Models\TenantEvent;
+use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
+use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
@@ -16,6 +18,13 @@ use Tests\Feature\FeatureTestCase;
 
 final class BuilderApiTest extends FeatureTestCase
 {
+    /**
+     * Assistants of the drafts built so far; the staff user is assigned to all of them.
+     *
+     * @var list<Assistant>
+     */
+    private array $draftAssistants = [];
+
     public function test_show_returns_builder_flow_dto(): void
     {
         $draft = $this->draft();
@@ -442,7 +451,16 @@ final class BuilderApiTest extends FeatureTestCase
 
     private function staffUser(): User
     {
-        return User::factory()->createOne();
+        $this->seed(TenantAclSeeder::class);
+
+        $user = User::factory()->createOne();
+        $user->givePermissionTo(Permission::ManageFlowDefinitions->value, Permission::PublishFlow->value);
+        $user->assistants()->attach(array_map(
+            static fn (Assistant $assistant): string => (string) $assistant->getKey(),
+            $this->draftAssistants,
+        ));
+
+        return $user;
     }
 
     /**
@@ -450,7 +468,8 @@ final class BuilderApiTest extends FeatureTestCase
      */
     private function draft(array $attributes = []): FlowDraft
     {
-        $assistant = Assistant::factory()->create();
+        $assistant               = Assistant::factory()->create();
+        $this->draftAssistants[] = $assistant;
 
         return FlowDraft::factory()->create([
             'tenant_id'    => $assistant->tenant_id,
@@ -461,7 +480,8 @@ final class BuilderApiTest extends FeatureTestCase
 
     private function draftWithUnconnectedOutput(): FlowDraft
     {
-        $assistant = Assistant::factory()->create();
+        $assistant               = Assistant::factory()->create();
+        $this->draftAssistants[] = $assistant;
 
         return FlowDraft::factory()->withUnconnectedOutput()->create([
             'tenant_id'    => $assistant->tenant_id,

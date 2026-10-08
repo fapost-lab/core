@@ -79,6 +79,7 @@ final class BroadcastsTable
                     ->label(__('broadcast.actions.send'))
                     ->icon(Heroicon::PaperAirplane)
                     ->color('success')
+                    ->authorize('send')
                     ->visible(static fn (Broadcast $record): bool => BroadcastStatus::Draft === $record->status)
                     ->requiresConfirmation()
                     ->modalHeading(__('broadcast.actions.send_confirm_title'))
@@ -96,6 +97,7 @@ final class BroadcastsTable
                     ->label(__('broadcast.actions.cancel'))
                     ->icon(Heroicon::XCircle)
                     ->color('warning')
+                    ->authorize('cancel')
                     ->visible(static fn (Broadcast $record): bool => BroadcastStatus::Running === $record->status)
                     ->requiresConfirmation()
                     ->action(static function (Broadcast $record): void {
