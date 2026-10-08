@@ -17,7 +17,7 @@ visible changed, and the builder renders from the kit's tokens in light and dark
 - [x] `kit-and-tokens` — The kit and its tokens live in Core — shadcn-vue in `resources/js/ui` behind the
       `@fapost/ui` alias, Warm Minimal light and dark, Onest and Roboto Condensed; the builder's
       variables read from the same tokens and its top bar matches the console
-- [ ] `ui-switch-and-shell` — The new UI switch and shell — a configuration switch (off by default) hands the console
+- [x] `ui-switch-and-shell` — The new UI switch and shell — a configuration switch (off by default) hands the console
       and admin addresses to Inertia; shell with navigation, assistant switcher, language
       switcher; Inertia login at `/admin/login`; shared props (user, permissions, flash,
       locale, broadcaster); menu entries for unmigrated screens lead into Filament;
@@ -25,13 +25,19 @@ visible changed, and the builder renders from the kit's tokens in light and dark
       authorization call in every action; the SaaS package's CI runs with the switch on (after:
       the current assistant — the shell's console routes resolve it; after: the kit — the shell
       is built from it)
+- [ ] `console-shell-layout` — The shell's look on the kit — the sidebar from a server-side
+      navigation builder that repeats Filament's items, groups, order and visibility (unmigrated
+      screens as plain links into Filament), the assistant switcher, the language switcher, the
+      access-mode and support banners, sign-out, and room for the app rail of phase 4 (after:
+      `ui-switch-and-shell` — its routes, stacks and shared props; split out of it by the owner at
+      the gate, 2026-10-08)
 - [ ] `builder-dark-theme` — The builder in the dark theme — its ~210 literal colours and its own
       `--accent` (which shadows the token of the same name) move onto the tokens, so the builder
       follows `.dark` like the console (after: `kit-and-tokens` — the tokens it moves onto; split
       out of it by the owner, 2026-10-08)
 - [ ] Pilot: contact groups end to end — the server-side data table (filters, sorting,
       pagination, bulk actions), form, confirmation, toasts; the patterns every later screen
-      copies (after: the shell — the screen lives inside it)
+      copies (after: `console-shell-layout` — the screen lives inside it)
 
 - [x] `close-policy-gaps` — Authorization gaps closed before screens move — broadcasts and contact segments get policies and the builder routes check permissions, so the new UI inherits rules that hold (found while writing this spec)
 
