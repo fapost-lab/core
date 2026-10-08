@@ -8,13 +8,14 @@ use App\Domains\Assistant\Exceptions\CurrentAssistantNotResolvedException;
 use App\Domains\Assistant\Models\Assistant;
 
 /**
- * UI-scoped assistant for the assistant Filament panel: resolved from Filament tenancy when present, with an optional
- * override for tests. Platform (schema) tenant remains {@see \App\Domains\Tenancy\Contracts\TenantContextInterface}.
+ * The assistant the current request or job works on. It is set explicitly: by the console middleware, by the panel
+ * middleware, or by a job from its payload. Platform (schema) tenant remains
+ * {@see \App\Domains\Tenancy\Contracts\TenantContextInterface}.
  */
 interface CurrentAssistantInterface
 {
     /**
-     * Provide an explicit assistant override for this request/UI session.
+     * Set the current assistant for this request or job.
      */
     public function set(Assistant $assistant): void;
 
@@ -26,7 +27,7 @@ interface CurrentAssistantInterface
     public function isResolved(): bool;
 
     /**
-     * Clear the explicit override.
+     * Forget the current assistant.
      */
     public function reset(): void;
 }

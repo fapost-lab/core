@@ -10,6 +10,7 @@ use App\Domains\Staff\Http\Middleware\EnsureUserIsActive;
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Filament\Assistant\Pages\AssistantDashboard;
 use App\Filament\Support\AccessNoticeBanner;
+use App\Filament\Support\SetCurrentAssistantFromPanelTenant;
 use App\Filament\Support\SupportAccessBanner;
 use App\Http\Controllers\Filament\AssistantPanelHomeController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
@@ -145,6 +146,8 @@ final class AssistantPanelProvider extends PanelProvider
                 SetLocale::class,
                 EndExpiredSupportSession::class,
             ], isPersistent: true)
+            // Runs after the tenant is identified; persistent so Livewire updates (form saves) replay it.
+            ->tenantMiddleware([SetCurrentAssistantFromPanelTenant::class], isPersistent: true)
             ->renderHook(PanelsRenderHook::BODY_START, static fn (): string => SupportAccessBanner::render())
             ->renderHook(PanelsRenderHook::BODY_START, static fn (): string => AccessNoticeBanner::render())
             ->authMiddleware([

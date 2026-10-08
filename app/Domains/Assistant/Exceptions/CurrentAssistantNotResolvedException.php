@@ -8,7 +8,7 @@ use RuntimeException;
 
 /**
  * Thrown when {@see \App\Domains\Assistant\Contracts\CurrentAssistantInterface::get()} is called
- * and neither Filament tenancy nor an explicit override has resolved the assistant.
+ * and no assistant has been set for the current request or job.
  */
 final class CurrentAssistantNotResolvedException extends RuntimeException
 {
