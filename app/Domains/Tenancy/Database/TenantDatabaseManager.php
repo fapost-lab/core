@@ -8,6 +8,7 @@ use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Exceptions\ConnectionStackEmptyException;
 use App\Domains\Tenancy\ValueObjects\MigrationScope;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
@@ -31,7 +32,8 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
     private array $stack = [];
 
     /**
-     * Create schema for the given tenant in the landlord database.
+     * Create schema for the given tenant on the tenant connection, so the schema lands
+     * in the database that tenant migrations and queries use.
      *
      * @throws InvalidArgumentException when the name would be truncated into another schema's name.
      */
@@ -39,7 +41,7 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
     {
         $this->assertFitsIdentifier($tenant->getSchemaName());
 
-        DB::connection('landlord')->statement(
+        $this->schemaConnection()->statement(
             'CREATE SCHEMA IF NOT EXISTS ' . $this->quoteIdentifier($tenant->getSchemaName())
         );
     }
@@ -49,7 +51,7 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
      */
     public function dropSchema(TenantInterface $tenant): void
     {
-        DB::connection('landlord')->statement(
+        $this->schemaConnection()->statement(
             'DROP SCHEMA IF EXISTS ' . $this->quoteIdentifier($tenant->getSchemaName()) . ' CASCADE'
         );
     }
@@ -67,7 +69,7 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
     {
         $this->assertFitsIdentifier($tenant->getSchemaName());
 
-        $result = DB::connection('landlord')->selectOne(
+        $result = $this->schemaConnection()->selectOne(
             'SELECT 1 FROM information_schema.schemata WHERE schema_name = ?',
             [$tenant->getSchemaName()]
         );
@@ -187,6 +189,15 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
         }
 
         return '"' . $name . '"';
+    }
+
+    /**
+     * Schema DDL and existence checks run where the schema is used. The landlord connection may
+     * point at another database (LANDLORD_DB_DATABASE), which would create the schema out of reach.
+     */
+    private function schemaConnection(): ConnectionInterface
+    {
+        return DB::connection((string)config('tenancy.tenant_connection', 'tenant'));
     }
 
     private function connectionDriver(string $connection): string
