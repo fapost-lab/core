@@ -15,6 +15,8 @@ use Illuminate\Foundation\Auth\User as AuthUser;
  *
  * Authoring drafts requires {@see Permission::ManageFlowDefinitions}.
  * Publishing requires the additional {@see Permission::PublishFlow} gate.
+ * Everything that targets a concrete draft also requires access to the draft's assistant
+ * ({@see User::hasAssistantAccess()}), so a permission alone never reaches another assistant's flows.
  */
 final class FlowDraftPolicy
 {
@@ -29,7 +31,8 @@ final class FlowDraftPolicy
     public function view(AuthUser $authUser, FlowDraft $draft): bool
     {
         return $authUser instanceof User
-               && $authUser->can(Permission::ManageFlowDefinitions->value);
+               && $authUser->can(Permission::ManageFlowDefinitions->value)
+               && $this->canAccessAssistant($authUser, $draft);
     }
 
     public function create(AuthUser $authUser): bool
@@ -41,13 +44,15 @@ final class FlowDraftPolicy
     public function update(AuthUser $authUser, FlowDraft $draft): bool
     {
         return $authUser instanceof User
-               && $authUser->can(Permission::ManageFlowDefinitions->value);
+               && $authUser->can(Permission::ManageFlowDefinitions->value)
+               && $this->canAccessAssistant($authUser, $draft);
     }
 
     public function delete(AuthUser $authUser, FlowDraft $draft): bool
     {
         return $authUser instanceof User
-               && $authUser->can(Permission::ManageFlowDefinitions->value);
+               && $authUser->can(Permission::ManageFlowDefinitions->value)
+               && $this->canAccessAssistant($authUser, $draft);
     }
 
     public function deleteAny(AuthUser $authUser): bool
@@ -62,6 +67,14 @@ final class FlowDraftPolicy
     public function publish(AuthUser $authUser, FlowDraft $draft): bool
     {
         return $authUser instanceof User
-               && $authUser->can(Permission::PublishFlow->value);
+               && $authUser->can(Permission::PublishFlow->value)
+               && $this->canAccessAssistant($authUser, $draft);
+    }
+
+    private function canAccessAssistant(User $authUser, FlowDraft $draft): bool
+    {
+        $assistant = $draft->assistant;
+
+        return null !== $assistant && $authUser->hasAssistantAccess($assistant);
     }
 }

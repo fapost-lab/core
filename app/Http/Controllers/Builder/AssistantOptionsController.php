@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Builder;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Supplies the builder's `notify` node (contacts mode) with selectable target
@@ -17,6 +19,8 @@ final class AssistantOptionsController extends Controller
 {
     public function index(): JsonResponse
     {
+        Gate::authorize('viewAny', FlowDraft::class);
+
         $options = Assistant::query()
             ->orderBy('name')
             ->get(['id', 'name'])

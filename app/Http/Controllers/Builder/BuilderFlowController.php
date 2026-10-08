@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Builder;
 
+use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Exceptions\InvalidTriggerPayloadException;
 use App\Domains\Flow\Services\LoadBuilderFlowService;
 use App\Domains\Flow\Services\PublishFlowService;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\SaveDraftRequest;
 use App\Http\Requests\ValidateFlowRequest;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -20,8 +22,11 @@ final class BuilderFlowController extends Controller
 {
     public function show(
         string $flow,
+        FlowDraftRepositoryInterface $drafts,
         LoadBuilderFlowService $service,
     ): Response {
+        Gate::authorize('view', $drafts->findByFlowId($flow));
+
         $dto = $service->execute(flowId: $flow);
 
         return Inertia::render('FlowBuilder/FlowEditor', [
@@ -110,8 +115,11 @@ final class BuilderFlowController extends Controller
 
     public function publish(
         string $flow,
+        FlowDraftRepositoryInterface $drafts,
         PublishFlowService $service,
     ): JsonResponse {
+        Gate::authorize('publish', $drafts->findByFlowId($flow));
+
         $definition = $service->execute(flowId: $flow);
 
         return response()->json([

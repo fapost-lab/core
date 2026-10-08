@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Assistant\Resources\Broadcasts;
 
 use App\Domains\Broadcasting\Models\Broadcast;
-use App\Domains\Staff\Models\User;
 use App\Filament\Assistant\Resources\Broadcasts\Pages\CreateBroadcast;
 use App\Filament\Assistant\Resources\Broadcasts\Pages\EditBroadcast;
 use App\Filament\Assistant\Resources\Broadcasts\Pages\ListBroadcasts;
@@ -17,7 +16,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Auth;
 use UnitEnum;
 
 /**
@@ -69,17 +67,14 @@ final class BroadcastResource extends Resource
         ];
     }
 
-    public static function shouldRegisterNavigation(): bool
-    {
-        return Auth::user() instanceof User;
-    }
-
     /**
      * A broadcast is only editable while still a draft — a started/finished run is
-     * an immutable record.
+     * an immutable record — and only by a user the policy lets update it.
      */
     public static function canEdit(Model $record): bool
     {
-        return $record instanceof Broadcast && $record->status->isEditable();
+        return parent::canEdit($record)
+               && $record instanceof Broadcast
+               && $record->status->isEditable();
     }
 }

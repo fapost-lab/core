@@ -175,6 +175,15 @@ final class User extends Authenticatable implements FilamentUser, HasTenants
         return $this->belongsToMany(Assistant::class, 'user_assistants');
     }
 
+    /**
+     * Whether the user may work with the given assistant: admins reach every assistant,
+     * everyone else only the ones assigned through {@see assistants()}.
+     */
+    public function hasAssistantAccess(Assistant $assistant): bool
+    {
+        return $this->isAdmin() || $this->assistants()->whereKey($assistant->getKey())->exists();
+    }
+
     public function canAccessTenant(Model $tenant): bool
     {
         return $tenant instanceof Assistant && Gate::forUser($this)->allows('view', $tenant);

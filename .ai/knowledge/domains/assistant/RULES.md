@@ -18,7 +18,7 @@ paths:
   - "tests/Unit/Domains/Assistant/**"
   - "tests/Feature/Assistants/**"
   - tests/Feature/AssistantPanelTest.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-08
 ---
 # Assistant rules
 
@@ -31,6 +31,11 @@ broken.
   assignment;** a user without access gets 404. Enforced: `AssistantPolicy`, `AssistantPanelTest`.
 - **Deactivating an assistant deactivates its channels in one transaction;** deleting an
   assistant deletes its channels. Enforced: `AssistantService`, `AssistantServiceTest`.
+- **Anything that belongs to one assistant is authorized by a permission and access to that
+  assistant;** access is `User::hasAssistantAccess()` (admin, or assigned through
+  `user_assistants`), checked inside the record's policy, never left to the panel's tenant alone.
+  A permission alone never reaches another assistant's records. Enforced: `ChannelPolicy`,
+  `BroadcastPolicy`, `FlowDraftPolicy` and their tests.
 
 ## Rules
 

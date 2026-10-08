@@ -95,14 +95,8 @@ final class ChannelPolicy
 
     private function canAccessAssistant(AuthUser $authUser, ?Assistant $assistant): bool
     {
-        if (! $authUser instanceof User || ! $assistant) {
-            return false;
-        }
-
-        if ($authUser->isAdmin()) {
-            return true;
-        }
-
-        return $authUser->assistants()->whereKey($assistant->getKey())->exists();
+        return $authUser instanceof User
+               && null !== $assistant
+               && $authUser->hasAssistantAccess($assistant);
     }
 }

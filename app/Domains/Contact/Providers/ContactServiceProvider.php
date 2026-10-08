@@ -8,8 +8,10 @@ use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Models\ContactGroup;
+use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Contact\Policies\ContactGroupPolicy;
 use App\Domains\Contact\Policies\ContactPolicy;
+use App\Domains\Contact\Policies\ContactSegmentPolicy;
 use App\Domains\Contact\Repositories\ContactTagRepository;
 use App\Domains\Contact\Services\ContactService;
 use Illuminate\Support\Facades\Gate;
@@ -38,5 +40,6 @@ final class ContactServiceProvider extends ServiceProvider
     {
         Gate::policy(Contact::class, ContactPolicy::class);
         Gate::policy(ContactGroup::class, ContactGroupPolicy::class);
+        Gate::policy(ContactSegment::class, ContactSegmentPolicy::class);
     }
 }

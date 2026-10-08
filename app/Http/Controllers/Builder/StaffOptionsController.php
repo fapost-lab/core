@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Builder;
 
+use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\User;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Supplies the builder's `notify` node (staff mode) with selectable staff
@@ -18,6 +20,8 @@ final class StaffOptionsController extends Controller
 {
     public function index(): JsonResponse
     {
+        Gate::authorize('viewAny', FlowDraft::class);
+
         $options = User::query()
             ->where('is_active', true)
             ->where('status', UserStatus::Active->value)

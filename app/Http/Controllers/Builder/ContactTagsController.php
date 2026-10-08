@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Builder;
 
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 
 /**
  * Supplies the builder's `set_tag` node with the tenant's existing tag
@@ -16,6 +18,8 @@ final class ContactTagsController extends Controller
 {
     public function index(ContactTagRepositoryInterface $tags): JsonResponse
     {
+        Gate::authorize('viewAny', FlowDraft::class);
+
         return response()->json(['data' => $tags->distinctTags()]);
     }
 }

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Builder;
 
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Http\Controllers\Controller;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\Gate;
 
 final class NodeTypesController extends Controller
 {
@@ -23,6 +25,8 @@ final class NodeTypesController extends Controller
 
     public function index(NodeHandlerRegistryInterface $registry): JsonResponse
     {
+        Gate::authorize('viewAny', FlowDraft::class);
+
         $types = collect($registry->all())
             ->map(fn (NodeHandlerInterface $handler): array => [
                 'type'          => $handler->type(),
