@@ -34,7 +34,7 @@ const emit = defineEmits(['select'])
 .key-item {
     padding: 7px 12px;
     font-size: 12.5px;
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     color: var(--text-2);
     cursor: pointer;
     border-radius: 6px;
@@ -51,7 +51,7 @@ const emit = defineEmits(['select'])
     font-size: 10px;
     padding: 1px 5px;
     border-radius: 3px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-weight: 500;
     flex-shrink: 0;
 }

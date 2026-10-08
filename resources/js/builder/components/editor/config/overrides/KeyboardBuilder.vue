@@ -275,7 +275,7 @@ function onDropUnplaced() {
     display: flex; align-items: center; justify-content: center;
     padding: 0 8px;
     font-size: 12.5px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     color: var(--text);
     cursor: grab;
     border-radius: 6px;

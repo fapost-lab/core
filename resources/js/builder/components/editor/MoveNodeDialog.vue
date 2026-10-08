@@ -490,7 +490,7 @@ function pick(dest: Destination) {
 }
 
 .move-row-id {
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10.5px;
     color: var(--text-3);
     background: var(--surface-2);

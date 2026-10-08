@@ -298,7 +298,7 @@ function onSave() {
     border-radius: 6px;
     cursor: pointer;
     text-align: left;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12.5px;
     color: var(--text-2);
     transition: background .1s, color .1s;

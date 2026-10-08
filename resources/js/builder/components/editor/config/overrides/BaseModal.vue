@@ -66,7 +66,7 @@ watch(() => props.open, (val) => {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
 }
 
 .bm-header {

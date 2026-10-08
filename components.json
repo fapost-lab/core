@@ -1,0 +1,20 @@
+{
+  "$schema": "https://shadcn-vue.com/schema.json",
+  "style": "new-york",
+  "typescript": true,
+  "tailwind": {
+    "config": "",
+    "css": "resources/css/ui.css",
+    "baseColor": "stone",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "@fapost/ui/components",
+    "composables": "@fapost/ui/composables",
+    "utils": "@fapost/ui/lib/utils",
+    "ui": "@fapost/ui/components",
+    "lib": "@fapost/ui/lib"
+  },
+  "iconLibrary": "lucide"
+}

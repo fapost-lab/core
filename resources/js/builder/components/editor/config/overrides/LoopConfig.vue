@@ -258,7 +258,7 @@ input.field-input.lc-indent {
     line-height: 1.4;
 }
 .lc-hint code {
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 10.5px;
     background: var(--surface-2);
     padding: 1px 4px;

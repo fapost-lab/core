@@ -354,7 +354,7 @@ function defaultConfig(type: string): Record<string, unknown> {
     border: none;
     background: transparent;
     border-radius: 6px;
-    font-family: 'Victor Mono', monospace;
+    font-family: var(--font-mono);
     font-size: 12px;
     color: var(--text);
     cursor: pointer;
@@ -414,7 +414,7 @@ function defaultConfig(type: string): Record<string, unknown> {
     border-radius: 6px;
     background: transparent;
     color: var(--text-3);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12px;
     cursor: pointer;
     transition: border-color .12s, color .12s, background .12s;
@@ -432,7 +432,7 @@ function defaultConfig(type: string): Record<string, unknown> {
     border-radius: 6px;
     background: transparent;
     color: var(--rose, #e53e3e);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-sans);
     font-size: 12px;
     cursor: pointer;
     transition: background .12s, color .12s;

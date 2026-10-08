@@ -12,7 +12,8 @@
     "paths": {
       "@builder/*": ["./resources/js/builder/*"],
       "@shared/*": ["./resources/js/shared/*"],
-      "@tma/*": ["./resources/js/tma/*"]
+      "@tma/*": ["./resources/js/tma/*"],
+      "@fapost/ui/*": ["./resources/js/ui/*"]
     }
   },
   "include": ["resources/js/**/*"],

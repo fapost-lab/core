@@ -39,6 +39,11 @@ broken.
 
 ## Rules
 
+- **The builder's colours and fonts come from `resources/css/tokens.css`,** through its own
+  variables in `builder.css`; a new literal colour or font family is not added to a builder
+  component. The builder's `--accent` (brown) shadows the token of the same name inside the
+  builder, so the token's accent is not reachable there under that name. Review only.
+
 - **Every builder route authorizes through `FlowDraftPolicy`:** a flow's own endpoints check
   `view`, `update` or `publish` on its draft (which includes access to the draft's assistant);
   option lists and the `call` test check the flow-draft permission. The builder has no panel

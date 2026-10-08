@@ -114,9 +114,13 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   database driver as fallbacks; `.env.example` selects PostgreSQL and Redis. Locally PHPUnit uses
   in-memory SQLite, an array cache and a sync queue, so locks and queue concurrency are exercised
   only against mocks; CI additionally runs the suite on PostgreSQL 15.
-- **There is no shared front-end design system.** The public site (`resources/css/app.css`), the
-  builder (`resources/css/builder.css`) and the Filament theme (`resources/css/filament/theme.css`)
-  each define their own tokens — the builder and the Filament theme duplicate one palette under
-  different names — and no component is shared across surfaces.
+- **The operator surfaces share one token source; the kit is not yet used by a screen.**
+  `resources/css/tokens.css` holds the Warm Minimal tokens (light and `.dark`, fonts Onest,
+  Roboto Condensed, Victor Mono, self-hosted through Fontsource); the kit (`resources/js/ui`,
+  shadcn-vue, alias `@fapost/ui`, styles `resources/css/ui.css`) builds on it, and the builder's
+  own variables point at it — though about 210 literal colours in the builder remain until its
+  dark theme lands. The Filament theme (`resources/css/filament/theme.css`) still duplicates the
+  palette until Filament leaves Core, and the public site (`resources/css/app.css`) keeps its own
+  palette by decision (D5, spec `ui-foundation`).
 - **Only one messenger integration is real.** Telegram is implemented; the WhatsApp adapter throws
   on every method. Channel swappability is a property of the contracts, not yet a demonstrated one.

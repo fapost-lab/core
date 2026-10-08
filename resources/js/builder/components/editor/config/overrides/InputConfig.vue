@@ -283,7 +283,7 @@ function onTypeChange(newType: string) {
                     <div class="field-label">Pattern (PHP regex)</div>
                     <input
                         class="field-input"
-                        style="font-family:'Victor Mono',monospace;font-size:12px"
+                        style="font-family:var(--font-mono);font-size:12px"
                         placeholder="/^[A-Z]{3}-\d+$/"
                         :value="validation.pattern ?? ''"
                         @input="updateValidation({ pattern: ($event.target as HTMLInputElement).value })"
@@ -448,7 +448,7 @@ function onTypeChange(newType: string) {
                 <div class="field-label">Node ID</div>
                 <input
                     class="field-input"
-                    style="font-family:'Victor Mono',monospace;font-size:11.5px"
+                    style="font-family:var(--font-mono);font-size:11.5px"
                     :value="props.node.id"
                     readonly
                 >

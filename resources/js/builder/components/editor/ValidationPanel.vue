@@ -162,10 +162,10 @@ function humanPath(path: string | undefined): string {
 }
 .val-error-row:hover { background: var(--rose-bg); }
 .val-dot { color: var(--rose); font-size: 10px; margin-top: 3px; flex-shrink: 0; }
-.val-path { font-family: 'Victor Mono', monospace; font-size: 11px; color: var(--text-3); }
+.val-path { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
 .val-msg  { font-size: 12.5px; color: var(--text-2); margin-top: 1px; }
 
-.btn { padding: 6px 12px; border-radius: var(--radius); font-family: 'DM Sans', sans-serif;
+.btn { padding: 6px 12px; border-radius: var(--radius); font-family: var(--font-sans);
   font-size: 12.5px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all .15s; }
 .btn-ghost { background: transparent; color: var(--text-2); border-color: var(--border); }
 .btn-ghost:hover { background: var(--surface-2); color: var(--text); }
