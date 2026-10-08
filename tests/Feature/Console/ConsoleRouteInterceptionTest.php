@@ -6,6 +6,8 @@ namespace Tests\Feature\Console;
 
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
+use App\Http\Controllers\Console\DashboardController;
+use App\Http\Controllers\Console\LocaleController;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -25,8 +27,9 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
     public static function interceptedRoutes(): array
     {
         return [
-            'admin login'     => ['filament.admin.auth.login', LoginController::class, 'show', 'admin/login'],
-            'assistant login' => ['filament.assistant.auth.login', LoginController::class, 'assistant', 'assistant/login'],
+            'admin login'         => ['filament.admin.auth.login', LoginController::class, 'show', 'admin/login'],
+            'assistant login'     => ['filament.assistant.auth.login', LoginController::class, 'assistant', 'assistant/login'],
+            'assistant dashboard' => ['filament.assistant.pages.dashboard', DashboardController::class, '', 'assistant/{tenant}/dashboard'],
         ];
     }
 
@@ -35,7 +38,7 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
     {
         $route = $this->route($name);
 
-        $this->assertSame($controller . '@' . $method, $route->getActionName(), $name);
+        $this->assertSame('' === $method ? $controller : $controller . '@' . $method, $route->getActionName(), $name);
         $this->assertSame($uri, $route->uri(), $name);
         $this->assertSame(['GET', 'HEAD'], $route->methods(), $name);
     }
@@ -55,6 +58,7 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
     {
         $this->assertSame(LoginController::class . '@store', $this->route('console.auth.login.attempt')->getActionName());
         $this->assertSame(LogoutController::class, $this->route('console.auth.logout')->getActionName());
+        $this->assertSame(LocaleController::class, $this->route('console.locale.update')->getActionName());
     }
 
     public function test_route_names_are_unique(): void

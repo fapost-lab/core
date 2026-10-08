@@ -122,6 +122,10 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   nothing and Filament keeps answering silently, which `ConsoleRouteInterceptionTest` guards. The
   switch is read at boot, so it changes only with a restart. Console routes use the `admin` /
   `console` middleware groups (`bootstrap/app.php`), which repeat the panels' checks.
+  The shell's navigation (`app/Http/Shell`) repeats Filament's menus and marks an item migrated
+  when its named route's action lives in `App\Http\Controllers\Console` or `Admin`; an unmigrated
+  item is a plain link into Filament, never an Inertia `<Link>`. Tests pin `UI_INERTIA=false` in
+  `phpunit.xml`; console tests switch it on themselves.
 - **The operator surfaces share one token source; the kit is not yet used by a screen.**
   `resources/css/tokens.css` holds the Warm Minimal tokens (light and `.dark`, fonts Onest,
   Roboto Condensed, Victor Mono, self-hosted through Fontsource); the kit (`resources/js/ui`,

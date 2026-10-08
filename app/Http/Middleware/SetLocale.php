@@ -25,11 +25,11 @@ use Symfony\Component\HttpFoundation\Response;
 final class SetLocale
 {
     /** @var list<string> */
-    private const array SUPPORTED_LOCALES = ['en', 'ru', 'uk'];
+    public const array SUPPORTED_LOCALES = ['en', 'ru', 'uk'];
 
-    private const string LOCALE_COOKIE = 'filament_language_switcher_locale';
+    public const string LOCALE_COOKIE = 'filament_language_switcher_locale';
 
-    private const int COOKIE_MINUTES = 365 * 24 * 60;
+    public const int COOKIE_MINUTES = 365 * 24 * 60;
 
     public function handle(Request $request, Closure $next): Response
     {

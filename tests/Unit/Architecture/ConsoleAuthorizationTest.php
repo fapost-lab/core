@@ -6,6 +6,7 @@ namespace Tests\Unit\Architecture;
 
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
+use App\Http\Controllers\Console\LocaleController;
 use FilesystemIterator;
 use Illuminate\Foundation\Http\FormRequest;
 use PHPUnit\Framework\TestCase;
@@ -28,7 +29,8 @@ use ReflectionNamedType;
  * Limits: a check inside a method the action calls is not seen (put it in the action, or in the FormRequest);
  * a comment or a string that spells the call satisfies the scan; the scan reads only the controller files under
  * `app/Http/Controllers/Console` and `app/Http/Controllers/Admin`. The sign-in and sign-out controllers are exempt:
- * they act for a visitor who has no abilities yet.
+ * they act for a visitor who has no abilities yet. So is the language switch, which stores the user's own interface
+ * language and touches no record.
  */
 final class ConsoleAuthorizationTest extends TestCase
 {
@@ -40,6 +42,8 @@ final class ConsoleAuthorizationTest extends TestCase
     private const array EXEMPT = [
         LoginController::class,
         LogoutController::class,
+        // Sets the signed-in user's own interface language: a browser preference, not a record.
+        LocaleController::class,
     ];
 
     private const string CHECK = '/Gate::(?:authorize|allows|denies|check|inspect)\(|->authorize\(|->can\(|->cannot\(/';

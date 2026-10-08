@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
+use App\Http\Controllers\Console\DashboardController;
+use App\Http\Controllers\Console\LocaleController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\SetConsoleRootView;
 use Illuminate\Support\Facades\Route;
@@ -41,5 +43,15 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('admin/login', [LoginController::class, 'store'])->name('console.auth.login.attempt');
         Route::get('assistant/login', [LoginController::class, 'assistant'])->name('filament.assistant.auth.login');
         Route::post('console/logout', LogoutController::class)->name('console.auth.logout');
+    });
+
+    // Tenant-wide screens and the interface language, behind the `admin` stack.
+    Route::middleware('admin')->group(function (): void {
+        Route::post('console/locale', LocaleController::class)->name('console.locale.update');
+    });
+
+    // An assistant's screens: `{tenant}` is the assistant, under the name Filament gave the parameter.
+    Route::middleware('console')->group(function (): void {
+        Route::get('assistant/{tenant}/dashboard', DashboardController::class)->name('filament.assistant.pages.dashboard');
     });
 });
