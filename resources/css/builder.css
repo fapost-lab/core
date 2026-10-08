@@ -26,9 +26,9 @@
   --sage-bg:    var(--success);
   --sage-bg-2:  #e3ebe5;
   --rose:       #b07070;
-  --rose-bg:    var(--danger);
+  --rose-bg:    #f5eaea; /* paler than the --danger badge token on purpose; moves to a token with the dark theme */
   --amber:      #b08040;
-  --amber-bg:   var(--warning);
+  --amber-bg:   #f5f0e6; /* paler than the --warning badge token on purpose; moves to a token with the dark theme */
   --sky:        #6888a8;
   --sky-bg:     var(--info);
   --primary-bg: #e9eee7; /* token --accent value; the builder's own --accent shadows the token */
