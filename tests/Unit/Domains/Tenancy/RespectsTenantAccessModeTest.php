@@ -9,10 +9,10 @@ use App\Domains\Tenancy\Queue\StoppedTenantAction;
 use App\Domains\Tenancy\Services\AlwaysActiveAccessMode;
 use App\Jobs\Flow\ResumeDelayedFlowSessionJob;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
+use Fapost\Foundation\Tenancy\DTO\TenantAccessState;
 use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
-use Fapost\Foundation\Tenancy\DTO\TenantAccessState;
 use LogicException;
 use RuntimeException;
 use stdClass;
@@ -100,7 +100,7 @@ final class RespectsTenantAccessModeTest extends TestCase
 
     public function test_an_operator_that_cannot_be_asked_counts_as_active(): void
     {
-        $this->app->instance(TenantAccessModeInterface::class, new class implements TenantAccessModeInterface {
+        $this->app->instance(TenantAccessModeInterface::class, new class () implements TenantAccessModeInterface {
             public function stateFor(string $tenantId): TenantAccessState
             {
                 throw new RuntimeException('operator is down');

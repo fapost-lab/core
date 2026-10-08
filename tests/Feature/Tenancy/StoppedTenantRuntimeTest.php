@@ -58,29 +58,6 @@ final class StoppedTenantRuntimeTest extends FeatureTestCase
         $this->app->instance(TenantAccessModeInterface::class, $this->mode);
     }
 
-    public function test_an_inbound_message_creates_no_contact_and_the_job_finishes(): void
-    {
-        Log::spy();
-
-        IncomingMessageJob::dispatchSync(new InboundWebhookPayload(
-            tenantId: self::TENANT_ID,
-            schema: 'main',
-            assistantId: (string) Assistant::factory()->create(['tenant_id' => self::TENANT_ID])->getKey(),
-            channelId: 'channel-1',
-            platform: 'telegram',
-            rawPayload: ['update_id' => 1, 'message' => ['from' => ['id' => 42], 'chat' => ['id' => 42], 'text' => 'hi']],
-            idempotencyKey: 'tg:channel-1:up-1',
-            receivedAt: 1_700_000_000,
-        ));
-
-        $this->assertSame(0, Contact::query()->count());
-        $this->assertSame(0, DB::table('flow_sessions')->count());
-        Log::shouldHaveReceived('info')->with('tenant.access_mode.job_dropped', [
-            'job'       => IncomingMessageJob::class,
-            'tenant_id' => self::TENANT_ID,
-        ])->once();
-    }
-
     /**
      * @return array<string, array{0: class-string, 1: callable(): object}>
      */
@@ -107,6 +84,43 @@ final class StoppedTenantRuntimeTest extends FeatureTestCase
     }
 
     /**
+     * @return array<string, array{0: callable(): object}>
+     */
+    public static function postponedJobs(): array
+    {
+        $tenant = self::TENANT_ID;
+
+        return [
+            'delayed wake-up'      => [static fn (): object => new ResumeDelayedFlowSessionJob($tenant, 'session-1', 'node-1', '2026-10-08T10:00:00+00:00')],
+            'send_message timeout' => [static fn (): object => new ResumeTimedOutSendMessageNodeJob($tenant, 'session-1', 'node-1', 'telegram')],
+            'broadcast run'        => [static fn (): object => new RunBroadcastJob($tenant, 'broadcast-1')],
+        ];
+    }
+
+    public function test_an_inbound_message_creates_no_contact_and_the_job_finishes(): void
+    {
+        Log::spy();
+
+        IncomingMessageJob::dispatchSync(new InboundWebhookPayload(
+            tenantId: self::TENANT_ID,
+            schema: 'main',
+            assistantId: (string) Assistant::factory()->create(['tenant_id' => self::TENANT_ID])->getKey(),
+            channelId: 'channel-1',
+            platform: 'telegram',
+            rawPayload: ['update_id' => 1, 'message' => ['from' => ['id' => 42], 'chat' => ['id' => 42], 'text' => 'hi']],
+            idempotencyKey: 'tg:channel-1:up-1',
+            receivedAt: 1_700_000_000,
+        ));
+
+        $this->assertSame(0, Contact::query()->count());
+        $this->assertSame(0, DB::table('flow_sessions')->count());
+        Log::shouldHaveReceived('info')->with('tenant.access_mode.job_dropped', [
+            'job'       => IncomingMessageJob::class,
+            'tenant_id' => self::TENANT_ID,
+        ])->once();
+    }
+
+    /**
      * @param  class-string  $class
      * @param  callable(): object  $make
      *
@@ -123,20 +137,6 @@ final class StoppedTenantRuntimeTest extends FeatureTestCase
 
         Log::shouldHaveReceived('info')->with('tenant.access_mode.job_dropped', ['job' => $class, 'tenant_id' => self::TENANT_ID])->once();
         Bus::assertNothingDispatched();
-    }
-
-    /**
-     * @return array<string, array{0: callable(): object}>
-     */
-    public static function postponedJobs(): array
-    {
-        $tenant = self::TENANT_ID;
-
-        return [
-            'delayed wake-up'      => [static fn (): object => new ResumeDelayedFlowSessionJob($tenant, 'session-1', 'node-1', '2026-10-08T10:00:00+00:00')],
-            'send_message timeout' => [static fn (): object => new ResumeTimedOutSendMessageNodeJob($tenant, 'session-1', 'node-1', 'telegram')],
-            'broadcast run'        => [static fn (): object => new RunBroadcastJob($tenant, 'broadcast-1')],
-        ];
     }
 
     /**
@@ -226,7 +226,7 @@ final class StoppedTenantRuntimeTest extends FeatureTestCase
 
     public function test_an_operator_that_throws_counts_as_active_on_the_job_path(): void
     {
-        $this->app->instance(TenantAccessModeInterface::class, new class implements TenantAccessModeInterface {
+        $this->app->instance(TenantAccessModeInterface::class, new class () implements TenantAccessModeInterface {
             public function stateFor(string $tenantId): TenantAccessState
             {
                 throw new RuntimeException('operator is down');

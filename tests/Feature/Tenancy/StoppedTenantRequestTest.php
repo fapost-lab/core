@@ -16,6 +16,7 @@ use App\Filament\Support\AccessNoticeBanner;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Fapost\Foundation\Tenancy\DTO\AccessNotice;
+use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeTenantAccessMode;
 
@@ -121,14 +122,14 @@ final class StoppedTenantRequestTest extends FeatureTestCase
 
     public function test_an_operator_that_throws_leaves_the_request_unchanged_and_is_reported(): void
     {
-        $this->app->instance(TenantAccessModeInterface::class, new class implements TenantAccessModeInterface {
+        $this->app->instance(TenantAccessModeInterface::class, new class () implements TenantAccessModeInterface {
             public function stateFor(string $tenantId): \Fapost\Foundation\Tenancy\DTO\TenantAccessState
             {
-                throw new \RuntimeException('operator is down');
+                throw new RuntimeException('operator is down');
             }
         });
         $reported = [];
-        $this->app->make(\Illuminate\Contracts\Debug\ExceptionHandler::class)->reportable(function (\RuntimeException $e) use (&$reported): void {
+        $this->app->make(\Illuminate\Contracts\Debug\ExceptionHandler::class)->reportable(function (RuntimeException $e) use (&$reported): void {
             $reported[] = $e->getMessage();
         });
 

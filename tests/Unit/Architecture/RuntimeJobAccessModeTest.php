@@ -144,7 +144,7 @@ final class RuntimeJobAccessModeTest extends TestCase
 
     public function test_the_scan_catches_a_new_job_and_a_runtime_job_without_the_gate(): void
     {
-        $newJob = new class implements ShouldQueue {};
+        $newJob = new class () implements ShouldQueue {};
 
         $this->assertSame([$newJob::class], $this->undecided([...$this->queuedJobsInApp(), $newJob::class]));
         $this->assertSame([$newJob::class], $this->ungated([...self::RUNTIME_JOBS, $newJob::class]));
