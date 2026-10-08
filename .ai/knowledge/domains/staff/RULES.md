@@ -15,7 +15,7 @@ paths:
   - "app/Filament/Resources/Roles/**"
   - database/seeders/RoleSeeder.php
   - "tests/*/Domains/Staff/**"
-reviewed_at: 2026-10-07
+reviewed_at: 2026-10-08
 ---
 # Staff rules
 
@@ -41,6 +41,15 @@ broken.
   `Logout` listener. Enforced: `SupportAccessEntryTest`.
 - **Staff notifications are delivered at most once:** the idempotency guard is set before
   delivery (`SendStaffNotificationJob`).
+
+- **Who may use the console is decided in one place, `User::canAccessConsole()`** (status Active
+  and `is_active`); Filament's `canAccessPanel()` delegates to it, the Inertia sign-in and
+  `EnsureCanAccessPanel` call it, so the two stacks cannot disagree. Enforced: `ConsoleLoginTest`,
+  `ConsoleStackTest`.
+- **The Inertia sign-in behaves like Filament's** (`ConsoleLoginService`): 5 attempts a minute per
+  IP, every attempt counted; one failure message for an unknown email, a wrong password and an
+  account that may not sign in, padded by a `Timebox`; the `Attempting`, `Failed` and `Login` events
+  (the SaaS shell listens to `Login`). Enforced: `ConsoleLoginTest`.
 
 ## Rules
 

@@ -142,6 +142,15 @@ final class User extends Authenticatable implements FilamentUser, HasTenants
      */
     public function canAccessPanel(Panel $panel): bool
     {
+        return $this->canAccessConsole();
+    }
+
+    /**
+     * The same rule without a Filament panel: the new console (Inertia) checks it directly, and
+     * `canAccessPanel()` delegates here so the two stacks can never disagree.
+     */
+    public function canAccessConsole(): bool
+    {
         return UserStatus::Active === $this->status && $this->is_active;
     }
 

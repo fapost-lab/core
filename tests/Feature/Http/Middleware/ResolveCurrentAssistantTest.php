@@ -31,6 +31,9 @@ final class ResolveCurrentAssistantTest extends FeatureTestCase
 
         Route::middleware(['web', 'auth', 'tenant', ResolveCurrentAssistant::class])
             ->get('/_test/console/{assistant}', fn (): string => 'ok');
+
+        Route::middleware(['web', 'auth', 'tenant', ResolveCurrentAssistant::class . ':tenant'])
+            ->get('/_test/named/{tenant}', fn (): string => 'ok');
     }
 
     public function test_assigned_user_with_permission_gets_the_assistant_set(): void
@@ -92,5 +95,29 @@ final class ResolveCurrentAssistantTest extends FeatureTestCase
         $this->actingAs($user)->get("/_test/console/{$assistant->getKey()}")->assertOk();
 
         $this->assertTrue($assistant->is($this->recorder->assistantsSet[0]));
+    }
+
+    public function test_the_parameter_name_comes_from_the_middleware_argument(): void
+    {
+        $assistant = Assistant::factory()->create();
+        $user      = User::factory()->create();
+        $user->assignRole(RoleEnum::Admin->value);
+
+        $this->actingAs($user)->get("/_test/named/{$assistant->getKey()}")->assertOk();
+
+        $this->assertTrue($assistant->is($this->recorder->assistantsSet[0]));
+    }
+
+    public function test_a_route_without_the_named_parameter_finds_no_assistant(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole(RoleEnum::Admin->value);
+
+        Route::middleware(['web', 'auth', 'tenant', ResolveCurrentAssistant::class . ':tenant'])
+            ->get('/_test/other/{assistant}', fn (): string => 'ok');
+
+        $this->actingAs($user)->get('/_test/other/' . Assistant::factory()->create()->getKey())->assertNotFound();
+
+        $this->assertSame([], $this->recorder->assistantsSet);
     }
 }

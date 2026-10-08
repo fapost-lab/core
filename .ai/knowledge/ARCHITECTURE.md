@@ -114,6 +114,14 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   database driver as fallbacks; `.env.example` selects PostgreSQL and Redis. Locally PHPUnit uses
   in-memory SQLite, an array cache and a sync queue, so locks and queue concurrency are exercised
   only against mocks; CI additionally runs the suite on PostgreSQL 15.
+- **The Inertia console takes over Filament's addresses one route at a time, behind `ui.inertia`.**
+  With `UI_INERTIA` on, `routes/inertia.php` loads after the Filament panels and declares a
+  migrated screen with Filament's exact domain, method, URI (`{tenant}`, `{record}`) and name; the
+  route collection keys routes by method + domain + URI, so the later one replaces Filament's, also
+  under `route:cache`, and every `route()` by name follows. A different parameter name replaces
+  nothing and Filament keeps answering silently, which `ConsoleRouteInterceptionTest` guards. The
+  switch is read at boot, so it changes only with a restart. Console routes use the `admin` /
+  `console` middleware groups (`bootstrap/app.php`), which repeat the panels' checks.
 - **The operator surfaces share one token source; the kit is not yet used by a screen.**
   `resources/css/tokens.css` holds the Warm Minimal tokens (light and `.dark`, fonts Onest,
   Roboto Condensed, Victor Mono, self-hosted through Fontsource); the kit (`resources/js/ui`,

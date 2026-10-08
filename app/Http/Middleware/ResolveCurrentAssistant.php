@@ -13,8 +13,9 @@ use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Route middleware for the console: resolves the `assistant` route parameter (a ULID, or an
- * already bound model) in the current tenant schema and makes it the current assistant.
+ * Route middleware for the console: resolves the route parameter named by the middleware argument (default `assistant`;
+ * the console uses `ResolveCurrentAssistant:tenant` while its URLs keep Filament's `{tenant}`), a ULID or an
+ * already bound model, in the current tenant schema and makes it the current assistant.
  *
  * A missing assistant and one the user may not view are both answered 404, never 403: the
  * response must not reveal that an assistant exists. This matches the assistant panel.
@@ -27,9 +28,9 @@ final readonly class ResolveCurrentAssistant
     ) {
     }
 
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string $parameter = 'assistant'): Response
     {
-        $assistant = $this->find($request->route('assistant'));
+        $assistant = $this->find($request->route($parameter));
 
         if (null === $assistant || Gate::forUser($request->user())->denies('view', $assistant)) {
             abort(404);

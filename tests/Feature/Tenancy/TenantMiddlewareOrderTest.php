@@ -56,6 +56,38 @@ final class TenantMiddlewareOrderTest extends FeatureTestCase
         $this->assertGreaterThan(2, $checked, 'Panel routes were not found.');
     }
 
+    /**
+     * By address rather than by route name: whatever answers under `admin/` or `assistant/` (Filament's route or, with
+     * `UI_INERTIA` on, the console's, which keeps the name but not the stack) enters the tenant first.
+     * The same rule with the switch on, and proved on a violator, is in
+     * {@see \Tests\Feature\Console\ConsoleRoutesArchitectureTest}.
+     */
+    public function test_every_route_under_the_panel_prefixes_enters_the_tenant_before_the_session_starts(): void
+    {
+        $checked = 0;
+
+        foreach (Route::getRoutes() as $route) {
+            $uri = $route->uri();
+
+            if ('admin' !== $uri && ! str_starts_with($uri, 'admin/') && ! str_starts_with($uri, 'assistant')) {
+                continue;
+            }
+
+            $stack = array_values(array_filter(
+                $this->app['router']->resolveMiddleware($route->gatherMiddleware(), $route->excludedMiddleware()),
+                'is_string',
+            ));
+
+            $tenant = array_search(TenancyMiddleware::class, $stack, true);
+            $this->assertIsInt($tenant, "{$uri} has no TenancyMiddleware.");
+            $this->assertLessThan(array_search(EncryptCookies::class, $stack, true), $tenant, "{$uri}: tenant after cookies.");
+            $this->assertLessThan(array_search(StartSession::class, $stack, true), $tenant, "{$uri}: tenant after session.");
+            $checked++;
+        }
+
+        $this->assertGreaterThan(2, $checked, 'Panel routes were not found.');
+    }
+
     public function test_web_group_resolves_the_tenant_before_the_session_starts(): void
     {
         Route::middleware('web')->get('/_order', fn () => 'ok')->name('order.probe');
