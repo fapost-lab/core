@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Middleware;
 
+use App\Domains\Tenancy\Services\CurrentAccessState;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -43,6 +44,28 @@ final class HandleInertiaRequests extends Middleware
             'locale'       => app()->getLocale(),
             'translations' => [
                 'builder' => trans('builder'),
+            ],
+            'accessState' => $this->accessState(),
+        ];
+    }
+
+    /**
+     * The tenant's access mode and notice for the builder and the UI kit.
+     *
+     * @return array{mode: string, notice: array{title: string, message: string|null, actionLabel: string|null, actionUrl: string|null}|null}
+     */
+    private function accessState(): array
+    {
+        $state  = app(CurrentAccessState::class)->get();
+        $notice = $state->notice;
+
+        return [
+            'mode'   => $state->mode->value,
+            'notice' => null === $notice ? null : [
+                'title'       => $notice->title,
+                'message'     => $notice->message,
+                'actionLabel' => $notice->actionLabel,
+                'actionUrl'   => $notice->actionUrl,
             ],
         ];
     }

@@ -7,6 +7,7 @@ namespace App\Providers\Filament;
 use App\Domains\Staff\Http\Middleware\EndExpiredSupportSession;
 use App\Domains\Staff\Http\Middleware\EnsureUserIsActive;
 use App\Domains\Tenancy\Support\TenantHost;
+use App\Filament\Support\AccessNoticeBanner;
 use App\Filament\Support\SupportAccessBanner;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\SetLocale;
@@ -119,6 +120,7 @@ final class AdminPanelProvider extends PanelProvider
                 EndExpiredSupportSession::class,
             ], isPersistent: true)
             ->renderHook(PanelsRenderHook::BODY_START, static fn (): string => SupportAccessBanner::render())
+            ->renderHook(PanelsRenderHook::BODY_START, static fn (): string => AccessNoticeBanner::render())
             ->authMiddleware([
                 TenancyMiddleware::class,
                 Authenticate::class,

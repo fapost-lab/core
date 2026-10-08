@@ -11,6 +11,9 @@ use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Enums\ContactNotifyTarget;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
+use App\Domains\Tenancy\Queue\StoppedTenantAction;
+use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use App\Jobs\Messaging\BroadcastSendJob;
@@ -41,7 +44,7 @@ use Psr\Log\LoggerInterface;
  * A Redis-backed guard keyed on (session, node) keeps a retried fan-out from
  * double-enqueuing; the per-message idempotency key dedupes the actual sends.
  */
-final class SendContactNotificationJob implements ShouldQueue
+final class SendContactNotificationJob implements ShouldQueue, TenantAccessGatedJob
 {
     use Queueable;
 
@@ -59,6 +62,19 @@ final class SendContactNotificationJob implements ShouldQueue
         public string $nodeId,
     ) {
         $this->onQueue('messaging.broadcast');
+    }
+
+    public function accessModeTenantId(): string
+    {
+        return $this->tenantId;
+    }
+
+    /**
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [new RespectsTenantAccessMode(StoppedTenantAction::Drop)];
     }
 
     public function handle(

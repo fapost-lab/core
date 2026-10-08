@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Jobs\Messaging;
 
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
+use App\Domains\Tenancy\Queue\StoppedTenantAction;
+use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Fapost\Foundation\Messaging\MessageSenderInterface;
 use Fapost\Foundation\Messaging\OutboundMessage;
@@ -19,7 +22,7 @@ use RuntimeException;
  * tenantId) so future per-recipient bookkeeping — broadcast_recipients status,
  * delivery logs — lands in the correct schema without reworking the job contract.
  */
-final class BroadcastSendJob implements ShouldQueue
+final class BroadcastSendJob implements ShouldQueue, TenantAccessGatedJob
 {
     use Queueable;
 
@@ -30,6 +33,23 @@ final class BroadcastSendJob implements ShouldQueue
         public readonly OutboundMessage $message,
     ) {
         $this->onQueue('messaging.broadcast');
+    }
+
+    public function accessModeTenantId(): string
+    {
+        return $this->message->tenantId;
+    }
+
+    /**
+     * Dropped while the tenant is stopped. These are the per-contact messages of a flow's contact
+     * notification, whose parent job is dropped too and which keep no record to fan out from again;
+     * a delayed copy per contact would only fill the shared queue.
+     *
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [new RespectsTenantAccessMode(StoppedTenantAction::Drop)];
     }
 
     /**

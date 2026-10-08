@@ -13,6 +13,9 @@ use App\Domains\Conversation\Capture\ConversationCaptureFactory;
 use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Flow\Routing\MessageRouter;
 use App\Domains\Flow\Routing\RoutingOutcome;
+use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
+use App\Domains\Tenancy\Queue\StoppedTenantAction;
+use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Domains\Webhook\Services\ChannelAdapterResolver;
@@ -34,7 +37,7 @@ use Illuminate\Foundation\Queue\Queueable;
  *   5. Release-with-delay if the router signalled a transient lock miss
  *      that warrants retrying this job (vs the user-facing busy notice).
  */
-final class IncomingMessageJob implements ShouldQueue
+final class IncomingMessageJob implements ShouldQueue, TenantAccessGatedJob
 {
     use Queueable;
 
@@ -43,6 +46,19 @@ final class IncomingMessageJob implements ShouldQueue
     public function __construct(
         public readonly InboundWebhookPayload $payload,
     ) {
+    }
+
+    public function accessModeTenantId(): string
+    {
+        return $this->payload->tenantId;
+    }
+
+    /**
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [new RespectsTenantAccessMode(StoppedTenantAction::Drop)];
     }
 
     public function handle(
