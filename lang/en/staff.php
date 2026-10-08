@@ -128,11 +128,21 @@ return [
             'suspended' => 'Suspended',
         ],
 
+        'platform_support' => 'Platform support',
+
         'actions' => [
             'resend_activation' => 'Resend activation',
             'deactivate'        => 'Deactivate',
             'activate'          => 'Activate',
         ],
+    ],
+
+    'support_access' => [
+        'banner'         => 'You are signed in as platform support (:name, :email).',
+        'leave'          => 'Sign out',
+        'invalid_link'   => 'The support access link is invalid or has expired.',
+        'reserved_email' => 'Addresses on the .invalid domain are reserved.',
+        'protected'      => 'The platform support account cannot be changed.',
     ],
 
     'assistants' => [

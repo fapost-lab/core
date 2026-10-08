@@ -13,6 +13,7 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Staff\Services\CreatePendingUserService;
+use App\Domains\Staff\Services\PlatformSupportUserService;
 use App\Domains\Tenancy\Services\TenantProvisioningService;
 use App\Providers\StaffServiceProvider;
 use PHPat\Selector\Selector;
@@ -57,8 +58,8 @@ final class CountableModelCreationTest
     {
         return $this->constructedOnlyBy(
             User::class,
-            [CreatePendingUserService::class, AclBootstrapService::class],
-            'The tenant staff limit is checked in CreatePendingUserService; AclBootstrapService creates the first admin of a tenant on purpose, without the check. Constructing a User elsewhere bypasses the limit.',
+            [CreatePendingUserService::class, AclBootstrapService::class, PlatformSupportUserService::class],
+            'The tenant staff limit is checked in CreatePendingUserService; AclBootstrapService creates the first admin of a tenant on purpose, without the check, and PlatformSupportUserService creates the platform support user, which the limit does not count. Constructing a User elsewhere bypasses the limit.',
         );
     }
 

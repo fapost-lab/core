@@ -19,6 +19,7 @@ final class StaffOptionsController extends Controller
     public function index(): JsonResponse
     {
         $options = User::query()
+            ->withoutPlatformSupport()
             ->where('is_active', true)
             ->where('status', UserStatus::Active->value)
             ->orderBy('name')

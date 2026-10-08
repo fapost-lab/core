@@ -13,7 +13,7 @@ use Laravel\Telescope\TelescopeApplicationServiceProvider;
 /**
  * Laravel Telescope configuration provider.
  *
- * Applies request/job filtering and hides sensitive headers/parameters in non-local environments.
+ * Applies request/job filtering and hides sensitive request parameters everywhere and sensitive headers in non-local environments.
  */
 final class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
 {
@@ -43,11 +43,13 @@ final class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
      */
     protected function hideSensitiveRequestDetails(): void
     {
+        // In every environment, local included: `token` is the single-use secret of the support
+        // access entry (`POST /support/enter`, also ignored by path in config/telescope.php).
+        Telescope::hideRequestParameters(['_token', 'token']);
+
         if ($this->app->environment('local')) {
             return;
         }
-
-        Telescope::hideRequestParameters(['_token']);
 
         Telescope::hideRequestHeaders([
             'cookie',

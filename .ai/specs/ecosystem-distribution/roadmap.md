@@ -17,6 +17,8 @@ down, and the decision to build a channel — or to declare Composer the channel
 - [ ] The recon pass written up as a decision: the channel, the boundary, and what is not being
       built
 
+- [ ] `plugin-runtime-contract-idea` — Think through a runtime plugin contract without Composer (ADR-06: plugins install from a zip without a deploy) with `jig-idea`, as an input to the recon pass
+
 ## Phase 2 — Build whatever the pass chose
 
 Goal: extensions move. Done when: an extension authored outside the project is installed into an

@@ -13,6 +13,17 @@ overlay, its CI passes against Core's main, and its README alone explains how to
 - [ ] Extension skeleton — a public template repository (`fapost-lab/extension-skeleton`, Apache-2.0) with the plumbing proven on the SaaS package: a service provider found by package discovery, tests that boot the real Core, CI that installs the package on Core's main through the overlay and proves Core still boots without it, Pint, and a README on developing it; the Extending docs link to it
 - [ ] Skeleton gains Solution examples — the skeleton shows the contracts a Solution implements (handlers, manifest, activation) as the first Solution used them (after: the first-solution spec — the contracts take their shape from that build, a skeleton written earlier would guess)
 
+## Phase 0 — Start from a working package
+
+Goal: a new extension package starts from proven plumbing instead of being assembled by hand. Done
+when: a package created from the skeleton installs into a Core checkout through the composer
+overlay, its CI passes against Core's main, and its README alone explains how to develop it.
+
+- [ ] Extension skeleton — a public template repository (`fapost-lab/extension-skeleton`, Apache-2.0) with the plumbing proven on the SaaS package: a service provider found by package discovery, tests that boot the real Core, CI that installs the package on Core's main through the overlay and proves Core still boots without it, Pint, and a README on developing it; the Extending docs link to it
+- [ ] Skeleton gains Solution examples — the skeleton shows the contracts a Solution implements (handlers, manifest, activation) as the first Solution used them (after: the first-solution spec — the contracts take their shape from that build, a skeleton written earlier would guess)
+
+- [ ] `fix-overlay-image-docs` — The derived-image example in the overlay docs re-owns only what the step creates, mounts the secret as required and keeps Composer's cache out of the layer
+
 ## Phase 1 — Write it from the evidence
 
 Goal: the section describes the surface a real build used. Done when: every contract the first
