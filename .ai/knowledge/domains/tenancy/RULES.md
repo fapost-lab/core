@@ -76,6 +76,10 @@ broken.
   check so a legacy long name can still be removed. `config('tenancy.schema_prefix')` is not read:
   the prefix is fixed in `TenantSlugPolicy::SCHEMA_PREFIX`, and the 56-character cap depends on it.
   Enforced: `TenantSlugPolicyTest`, `TenantDatabaseManagerTest`, `TenantProvisioningServiceTest`.
+- **Schema DDL runs on the tenant connection** (`config('tenancy.tenant_connection')`):
+  `createSchema()`, `schemaExists()` and `dropSchema()` in `TenantDatabaseManager`. Why: `landlord`
+  may point at another database (`LANDLORD_DB_DATABASE`), and a schema created there is invisible
+  to tenant migrations and queries. Enforced: `TenantDatabaseManagerTest`.
 - **An aborted transaction does not drop the connection to `public`.** `TenantPostgresConnection`
   re-applies `search_path` after a rollback. Enforced: `TenantDatabaseManagerTest`.
 - **Provisioning leaves a tenant inactive until its first admin exists**

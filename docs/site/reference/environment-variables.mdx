@@ -44,9 +44,11 @@ to FaPost, and the Laravel ones whose value matters here.
 | `DB_DATABASE` | `fapost_core` |
 | `DB_USERNAME` | `root` |
 | `DB_PASSWORD` | *empty* |
+| `TENANT_DB_CONNECTION` | `pgsql` |
+| `LANDLORD_DB_HOST`, `LANDLORD_DB_PORT`, `LANDLORD_DB_DATABASE`, `LANDLORD_DB_USERNAME`, `LANDLORD_DB_PASSWORD` | the matching `DB_*` value (advanced, unsupported for now) |
 
 PostgreSQL is required, not one option among several — landlord and tenant
-connections both depend on it. The database user needs the `CREATE` privilege; see
+connections both depend on it. Tenant schemas are created on the tenant connection (`TENANT_DB_CONNECTION`). Do not set the `LANDLORD_DB_*` variables yet: a separate landlord database leaves root tables (cache, jobs, failed jobs, Telescope) where they are not read. The database user needs the `CREATE` privilege; see
 [Requirements](/self-hosting/requirements).
 
 ## Redis, cache, queues, sessions
