@@ -23,8 +23,10 @@ use Throwable;
  */
 final class PruneConversationMessagesCommand extends Command
 {
+    /** @var string */
     protected $signature = 'conversations:prune {--dry-run : Preview dropped partitions only}';
 
+    /** @var string */
     protected $description = 'Drops conversation_messages monthly partitions older than the retention period for every active tenant';
 
     public function __construct(

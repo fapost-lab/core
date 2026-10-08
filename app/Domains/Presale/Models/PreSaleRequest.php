@@ -42,8 +42,10 @@ final class PreSaleRequest extends Model
     /** @use HasFactory<PreSaleRequestFactory> */
     use HasFactory;
 
+    /** @var string */
     protected $table = 'presale_requests';
 
+    /** @var list<string> */
     protected $fillable = [
         'name',
         'company',

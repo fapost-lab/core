@@ -25,9 +25,11 @@ final class LoadTestCleanCommand extends Command
 {
     use RefusesProduction;
 
+    /** @var string */
     protected $signature = 'loadtest:clean
         {--all : Also sweep any loadtest-* tenant left behind by a previous, incomplete run}';
 
+    /** @var string */
     protected $description = 'Remove tenants and webhook registry entries created by the load-test harness';
 
     public function __construct(

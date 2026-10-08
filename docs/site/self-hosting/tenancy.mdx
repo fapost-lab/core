@@ -8,7 +8,7 @@ knowing which one you are acting on.
 
 | Scope | Holds | Migrations in |
 |---|---|---|
-| **Landlord** | Platform-level records, including the tenant list | `database/migrations/landlord`; extension packages may add landlord tables of their own |
+| **Landlord** | Platform-level records, including the tenant list | `database/migrations/landlord`; the SaaS operator package may add landlord tables of its own |
 | **Tenant** | Everything belonging to one tenant | `database/migrations/tenant` |
 
 Tenant migrations are not run once. They run **per tenant**, which is why adding a

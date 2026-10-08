@@ -7,10 +7,12 @@ namespace Tests\Unit\Domains\Webhook;
 use App\Domains\Webhook\Jobs\IncomingMessageJob;
 use App\Domains\Webhook\Jobs\RawIncomingMessageHandler;
 use Fapost\Foundation\DTO\InboundWebhookPayload;
+use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Queue\Job;
 use Mockery;
 use Mockery\MockInterface;
+use Tests\Support\FakeTenantAccessMode;
 use Tests\TestCase;
 use ValueError;
 
@@ -83,6 +85,51 @@ final class RawIncomingMessageHandlerTest extends TestCase
         );
     }
 
+    /**
+     * The gateway's payload never reaches the queue's own middleware pipeline, so the handler runs the
+     * job's middleware itself: a stopped tenant's message is neither handled nor left on the queue.
+     */
+    public function test_a_stopped_tenant_is_not_handled_and_the_queue_job_is_deleted(): void
+    {
+        $this->app->instance(TenantAccessModeInterface::class, FakeTenantAccessMode::stopped());
+        $container = $this->mock(Container::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('call')->never();
+        });
+        $queueJob = $this->mock(Job::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('isDeletedOrReleased')->andReturnFalse();
+            $mock->shouldReceive('delete')->once();
+        });
+
+        (new RawIncomingMessageHandler($container))->handle($queueJob, $this->wirePayload());
+    }
+
+    /**
+     * Laravel deletes an ordinary job in CallQueuedHandler; a "Class@method" job is the handler's to
+     * delete. Left alone it would stay reserved and run again after retry_after, answering the same
+     * message up to maxTries times.
+     */
+    public function test_a_handled_message_is_deleted_from_the_queue(): void
+    {
+        $captured = null;
+        $queueJob = $this->mock(Job::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('isDeletedOrReleased')->andReturnFalse();
+            $mock->shouldReceive('delete')->once();
+        });
+
+        (new RawIncomingMessageHandler($this->containerCapturing($captured)))->handle($queueJob, $this->wirePayload());
+    }
+
+    public function test_a_message_released_for_a_retry_is_not_deleted(): void
+    {
+        $captured = null;
+        $queueJob = $this->mock(Job::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('isDeletedOrReleased')->andReturnTrue();
+            $mock->shouldReceive('delete')->never();
+        });
+
+        (new RawIncomingMessageHandler($this->containerCapturing($captured)))->handle($queueJob, $this->wirePayload());
+    }
+
     public function test_request_id_is_optional(): void
     {
         $captured = null;
@@ -139,7 +186,10 @@ final class RawIncomingMessageHandlerTest extends TestCase
 
     private function queueJob(): Job
     {
-        return $this->mock(Job::class);
+        return $this->mock(Job::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('isDeletedOrReleased')->andReturnFalse()->byDefault();
+            $mock->shouldReceive('delete')->byDefault();
+        });
     }
 
     /**

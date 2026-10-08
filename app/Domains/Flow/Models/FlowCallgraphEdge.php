@@ -18,11 +18,17 @@ use Fapost\Support\Models\BaseModel;
  */
 final class FlowCallgraphEdge extends BaseModel
 {
+    /** @var bool */
     public $incrementing = false;
 
+    /** @var bool */
     public $timestamps = false;
 
-    /** Composite primary key — Eloquent has no first-class support, fall back to standard table semantics. */
+    /**
+     * Composite primary key — Eloquent has no first-class support, fall back to standard table semantics.
+     *
+     * @var string|null
+     */
     protected $primaryKey = null;
 
     /**

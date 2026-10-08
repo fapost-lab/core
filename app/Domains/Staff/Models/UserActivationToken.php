@@ -31,6 +31,7 @@ final class UserActivationToken extends Model
 {
     use HasUlidPrimaryKey;
 
+    /** @var bool */
     public $timestamps = false;
 
     /**

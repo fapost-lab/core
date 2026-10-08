@@ -8,6 +8,8 @@ use App\Domains\Tenancy\Contracts\CoreBootstrapInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantResolverInterface;
+use App\Domains\Tenancy\Services\CurrentAccessState;
+use App\Domains\Tenancy\Services\TenantAccessStates;
 use App\Domains\Tenancy\Services\TenantContext;
 use App\Domains\Tenancy\Services\TenantRequestRunner;
 use App\Domains\Tenancy\Services\TenantSwitcher;
@@ -17,6 +19,7 @@ use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Support\FakeTenantAccessMode;
 
 final class TenantRequestRunnerTest extends TestCase
 {
@@ -37,6 +40,9 @@ final class TenantRequestRunnerTest extends TestCase
         $context             = new TenantContext();
         $switcher            = new TenantSwitcher($context, $dbManager, $permissionRegistrar);
 
+        $mode  = FakeTenantAccessMode::stopped();
+        $state = new CurrentAccessState();
+
         $request = Request::create('/test');
 
         $resolver->shouldReceive('resolve')->once()->with($request)->andReturn($tenant);
@@ -46,11 +52,16 @@ final class TenantRequestRunnerTest extends TestCase
         $bootstrap->shouldReceive('boot')->once();
         $bootstrap->shouldReceive('reset')->once();
 
-        $runner   = new TenantRequestRunner($resolver, $switcher, $bootstrap);
-        $response = $runner->run($request, fn (): Response => new Response('ok'));
+        $runner   = new TenantRequestRunner($resolver, $switcher, $bootstrap, new TenantAccessStates($mode), $state);
+        $response = $runner->run($request, function () use ($state): Response {
+            // Inside the request the state is the operator's answer for this tenant.
+            return new Response($state->get()->isStopped() ? 'stopped' : 'active');
+        });
 
-        $this->assertEquals('ok', $response->getContent());
+        $this->assertEquals('stopped', $response->getContent());
+        $this->assertSame(['t1'], $mode->asked);
         $this->assertFalse($context->isResolved());
+        $this->assertFalse($state->get()->isStopped(), 'the state must not outlive the request');
     }
 
     public function test_resets_bootstrap_even_on_exception(): void
@@ -64,6 +75,9 @@ final class TenantRequestRunnerTest extends TestCase
         $context             = new TenantContext();
         $switcher            = new TenantSwitcher($context, $dbManager, $permissionRegistrar);
 
+        $mode  = FakeTenantAccessMode::stopped();
+        $state = new CurrentAccessState();
+
         $request = Request::create('/test');
 
         $resolver->shouldReceive('resolve')->twice()->with($request)->andReturn($tenant);
@@ -73,7 +87,7 @@ final class TenantRequestRunnerTest extends TestCase
         $bootstrap->shouldReceive('boot')->twice();
         $bootstrap->shouldReceive('reset')->twice();
 
-        $runner = new TenantRequestRunner($resolver, $switcher, $bootstrap);
+        $runner = new TenantRequestRunner($resolver, $switcher, $bootstrap, new TenantAccessStates($mode), $state);
 
         try {
             $runner->run($request, function (): Response {

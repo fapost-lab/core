@@ -28,8 +28,10 @@ final class MediaChannelRef extends BaseModel
 {
     use HasUlidPrimaryKey;
 
+    /** @var bool */
     public $timestamps = false;
 
+    /** @var string */
     protected $table = 'media_channel_refs';
 
     /** @var list<string> */

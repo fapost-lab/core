@@ -7,6 +7,9 @@ namespace App\Jobs\Flow;
 use App\Domains\Flow\Models\TenantEvent;
 use App\Domains\Flow\Services\ResolveEventTriggersService;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
+use App\Domains\Tenancy\Queue\StoppedTenantAction;
+use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -23,7 +26,7 @@ use Illuminate\Support\Facades\Log;
  * (`source.contact_id`); events without a contact are skipped (a flow start
  * requires a contact).
  */
-final class DispatchFlowTriggerEventJob implements ShouldQueue
+final class DispatchFlowTriggerEventJob implements ShouldQueue, TenantAccessGatedJob
 {
     use Dispatchable;
     use Queueable;
@@ -38,6 +41,19 @@ final class DispatchFlowTriggerEventJob implements ShouldQueue
         public readonly array $payload,
         public readonly array $source,
     ) {
+    }
+
+    public function accessModeTenantId(): string
+    {
+        return $this->tenantId;
+    }
+
+    /**
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [new RespectsTenantAccessMode(StoppedTenantAction::Drop)];
     }
 
     public function handle(

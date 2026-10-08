@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
  */
 final class ActivationTokenService
 {
-    private const TTL_HOURS = 72;
+    private const int TTL_HOURS = 72;
 
     /**
      * @return non-empty-string Plain token for URLs (store only hash in DB).

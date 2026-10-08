@@ -29,10 +29,12 @@ use Throwable;
  */
 final class AuditFlowGraphCommand extends Command
 {
+    /** @var string */
     protected $signature = 'flow:audit-graph
         {--tenant= : Limit the audit to one tenant slug}
         {--json : Emit machine-readable JSON instead of a table}';
 
+    /** @var string */
     protected $description = 'Reports structural graph problems in active flow definitions and drafts for every active tenant';
 
     public function __construct(

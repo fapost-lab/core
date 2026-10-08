@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "cb59af6de3922ef58c68a8d8398ff2cf",
+  "content-hash": "f9d881c7becd39a58522ac2f051822aa",
   "packages": [
     {
       "name": "anourvalar/eloquent-serialize",
@@ -1267,16 +1267,16 @@
     },
     {
       "name": "fapost/foundation",
-      "version": "v0.7.0",
+      "version": "v0.8.0",
       "source": {
         "type": "git",
         "url": "https://github.com/fapost-lab/foundation.git",
-        "reference": "23b6365262f77610dade7a2893620a0559c5334c"
+        "reference": "7c1e886237a331c58b7f24d6ffdec06996411100"
       },
       "dist": {
         "type": "zip",
-        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/23b6365262f77610dade7a2893620a0559c5334c",
-        "reference": "23b6365262f77610dade7a2893620a0559c5334c",
+        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/7c1e886237a331c58b7f24d6ffdec06996411100",
+        "reference": "7c1e886237a331c58b7f24d6ffdec06996411100",
         "shasum": ""
       },
       "require": {
@@ -1314,10 +1314,10 @@
       ],
       "description": "FaPost public contract layer for Solutions, Plugins and external integrations",
       "support": {
-        "source": "https://github.com/fapost-lab/foundation/tree/v0.7.0",
+        "source": "https://github.com/fapost-lab/foundation/tree/v0.8.0",
         "issues": "https://github.com/fapost-lab/foundation/issues"
       },
-      "time": "2026-10-07T08:41:46+00:00"
+      "time": "2026-10-08T07:16:50+00:00"
     },
     {
       "name": "fapost/support",

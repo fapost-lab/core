@@ -29,6 +29,7 @@ final class ContactTag extends BaseModel
     use HasFactory;
     use HasUlidPrimaryKey;
 
+    /** @var bool */
     public $timestamps = false;
 
     /**

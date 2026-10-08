@@ -17,10 +17,12 @@ use Throwable;
  */
 final class TenantsWebhookWarmupCommand extends Command
 {
+    /** @var string */
     protected $signature = 'ops:webhook-warmup
         {--tenant=* : Tenant slug(s); ignored when --all is used}
         {--all : Run for all active tenants}';
 
+    /** @var string */
     protected $description = 'Write-through warmup: push all active channels to Redis webhook registry per tenant';
 
     public function __construct(

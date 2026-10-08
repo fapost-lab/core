@@ -12,13 +12,15 @@ use Illuminate\Console\Command;
 use Throwable;
 
 /**
- * Runs {@see MigrationScope::tenant()} for every active tenant. Keeps tenant schema current;
+ * Runs {@see MigrationScope::tenant()} and then {@see MigrationScope::settings()} for every active tenant. Keeps tenant schema current;
  * later operational commands (e.g. seed ACL, sync webhooks) can be run separately after migrate.
  */
 final class TenantsMigrateCommand extends Command
 {
+    /** @var string */
     protected $signature = 'ops:tenants-migrate';
 
+    /** @var string */
     protected $description = 'Run database/migrations/tenant for all active tenants';
 
     public function __construct(
@@ -42,6 +44,8 @@ final class TenantsMigrateCommand extends Command
             try {
                 $this->tenantSwitcher->runForTenant($tenant, function (): void {
                     $this->databaseManager->runMigrations(MigrationScope::tenant());
+                    // Settings migrations change what tenant settings hold; an upgraded tenant needs them too.
+                    $this->databaseManager->runMigrations(MigrationScope::settings());
                 });
                 $this->line("✔ {$slug}");
                 $success++;

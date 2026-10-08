@@ -10,7 +10,7 @@ What changes between releases and in what order to apply it.
 Four things happen, and the order is not interchangeable:
 
 1. New code arrives (new image, or new checkout plus `composer install`)
-2. **Landlord** migrations run — platform-wide tables, including any that an installed extension package adds
+2. **Landlord** migrations run — platform-wide tables, including any that the SaaS operator package adds
 3. **Tenant** migrations run — once per tenant schema
 4. Queue workers restart, so they stop running the previous release from memory
 
@@ -45,8 +45,9 @@ APP_VERSION=1.4.2
 ## Two schemas, two migration commands
 
 Tenant isolation is schema-per-tenant, so a migration touching tenant tables must
-run once per tenant. `ops:tenants-migrate` iterates active tenants; plain
-`artisan migrate` does not and will leave every tenant schema untouched.
+run once per tenant. `ops:tenants-migrate` iterates active tenants and runs each tenant's schema
+migrations and then its settings migrations; plain `artisan migrate` does not and will leave every
+tenant schema untouched.
 
 A release can contain either kind or both. Running both commands unconditionally
 is safe — an already-applied migration is skipped.

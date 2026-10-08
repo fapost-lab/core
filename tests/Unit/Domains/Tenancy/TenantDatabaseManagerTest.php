@@ -9,6 +9,7 @@ use App\Domains\Tenancy\Database\TenantDatabaseManager;
 use App\Domains\Tenancy\Exceptions\ConnectionStackEmptyException;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\MigrationScope;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -178,6 +179,33 @@ final class TenantDatabaseManagerTest extends TestCase
                 $this->assertStringContainsString('identifier limit', $e->getMessage());
             }
         }
+    }
+
+    /**
+     * With LANDLORD_DB_DATABASE set apart, landlord is another database; the schema must be
+     * created, checked and dropped where tenant migrations and queries run.
+     */
+    public function test_schema_ddl_runs_on_the_tenant_connection_only(): void
+    {
+        config(['tenancy.tenant_connection' => 'tenant_probe']);
+
+        $probe = $this->createMock(ConnectionInterface::class);
+        $probe->expects($this->once())->method('selectOne')->willReturn((object) ['?column?' => 1]);
+        $probe->expects($this->exactly(2))->method('statement')->with($this->logicalOr(
+            'CREATE SCHEMA IF NOT EXISTS "tenant_acme"',
+            'DROP SCHEMA IF EXISTS "tenant_acme" CASCADE',
+        ));
+
+        DB::partialMock()
+            ->shouldReceive('connection')->with('landlord')->never()
+            ->shouldReceive('connection')->with('tenant_probe')->times(3)->andReturn($probe);
+
+        $manager = new TenantDatabaseManager();
+        $tenant  = $this->makeTenant('acme');
+
+        $manager->createSchema($tenant);
+        $this->assertTrue($manager->schemaExists($tenant));
+        $manager->dropSchema($tenant);
     }
 
     public function test_restore_throws_on_empty_stack(): void

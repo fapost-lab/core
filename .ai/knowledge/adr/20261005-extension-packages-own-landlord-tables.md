@@ -9,7 +9,7 @@ paths:
   - app/Providers/AppServiceProvider.php
   - "app/Console/Commands/Platform/Install*.php"
   - app/Console/Commands/MigrateSmartCommand.php
-summary: Packages may own prefixed landlord tables; migrations load via loadMigrationsFrom, applied by migrate --database=landlord without --path
+summary: Only the SaaS operator package may own prefixed landlord tables (amended 2026-10-08; Plugin and Solution may not); migrations load via loadMigrationsFrom, applied by migrate --database=landlord without --path
 ---
 # Extension packages may own landlord tables of their own, applied by Core's landlord migrate command without a path
 
@@ -80,6 +80,22 @@ tenant groups and run twice from then on. Core therefore sets `migrations_paths`
   database, where nothing reads them; see task `tenant-schema-on-tenant-connection`.
 - A package's tables and Core's share one landlord database; prefixes keep them apart, and review
   keeps packages off Core's tables.
+
+## Amendment 2026-10-08: only the SaaS operator package
+
+Decided by the owner on 2026-10-06, recorded on 2026-10-08. The text above is kept as accepted; where
+it says "an extension package" or "a package", read it as narrowed by this amendment.
+
+- Landlord-table ownership belongs to the **SaaS operator package only**. Plugin and Solution
+  packages do not own landlord tables and do not open the `landlord` connection. This follows
+  ADR-06 (`docs/platform/architecture/adr/06-frontend-extension-boundary.md`): landlord access is
+  Core ✗, Plugin ✗, Solution ✗, SaaS-only ✓.
+- The context's remark that "a paid Solution may need the same" no longer holds. A Solution's data
+  lives in tenant schemas, behind Foundation contracts where it needs anything from Core.
+- Everything else in the Decision stands for the SaaS package: `saas_` prefix, no writes to
+  `tenants` or `webhook_registry`, no foreign keys on them, `loadMigrationsFrom()`, pure DDL, and
+  the path-less `migrate --database=landlord --force`.
+- The Alternatives and Consequences are unchanged except that "a package" means the SaaS package.
 
 Source: spec `tenant-quotas` (Core), task `landlord-ownership-adr`, decided with the owner on
 2026-10-05.

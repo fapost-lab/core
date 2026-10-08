@@ -27,9 +27,11 @@ use ValueError;
  */
 final class GatewayDoctorCommand extends Command
 {
+    /** @var string */
     protected $signature = 'gateway:doctor
         {--url= : Gateway base URL to probe (default: the configured one)}';
 
+    /** @var string */
     protected $description = 'Verify that the gateway and the application share the same Redis, specs and routing';
 
     private int $problems = 0;

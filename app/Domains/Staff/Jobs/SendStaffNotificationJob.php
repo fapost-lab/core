@@ -8,6 +8,9 @@ use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Staff\Notifications\StaffNotifierRegistry;
 use App\Domains\Staff\Notifications\StaffRecipientResolver;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
+use App\Domains\Tenancy\Queue\StoppedTenantAction;
+use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -24,7 +27,7 @@ use Throwable;
  * across the selected channels for each recipient. A Redis-backed idempotency
  * guard keyed on (session, node) ensures a retried job never double-delivers.
  */
-final class SendStaffNotificationJob implements ShouldQueue
+final class SendStaffNotificationJob implements ShouldQueue, TenantAccessGatedJob
 {
     use Queueable;
 
@@ -41,6 +44,19 @@ final class SendStaffNotificationJob implements ShouldQueue
         public string $message,
     ) {
         $this->onQueue('messaging.system');
+    }
+
+    public function accessModeTenantId(): string
+    {
+        return $this->tenantId;
+    }
+
+    /**
+     * @return list<object>
+     */
+    public function middleware(): array
+    {
+        return [new RespectsTenantAccessMode(StoppedTenantAction::Drop)];
     }
 
     public function handle(

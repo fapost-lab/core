@@ -32,6 +32,7 @@ final class BroadcastRecipient extends BaseModel
 {
     use HasUlidPrimaryKey;
 
+    /** @var string */
     protected $table = 'broadcast_recipients';
 
     /**

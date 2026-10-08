@@ -8,8 +8,11 @@ use App\Domains\Tenancy\Contracts\CoreBootstrapInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Services\AlwaysActiveAccessMode;
+use App\Domains\Tenancy\Services\CurrentAccessState;
 use App\Domains\Tenancy\Services\HostTenantResolver;
 use App\Domains\Tenancy\Services\RequestHostClassifier;
+use App\Domains\Tenancy\Services\TenantAccessStates;
 use App\Domains\Tenancy\Services\TenantContext;
 use App\Domains\Tenancy\Services\TenantRequestRunner;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
@@ -60,6 +63,8 @@ final class ResolveTenantContextTest extends TestCase
             new HostTenantResolver($this->repository, $classifier, $policy),
             new TenantSwitcher($this->context, $dbManager, $registrar),
             $bootstrap,
+            new TenantAccessStates(new AlwaysActiveAccessMode()),
+            new CurrentAccessState(),
         );
 
         $this->web      = new ResolveTenantContext($classifier, $runner);

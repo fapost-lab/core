@@ -115,6 +115,26 @@ Core; a package only calls it.
 - Ids are lowercase RFC 4122 ULIDs. Any other form names no tenant: `find` returns `null`, and
   `findMany` and the id filters ignore it.
 
+`Tenancy\Contracts\TenantAccessModeInterface` lets an operator package stop a tenant without removing it.
+Core asks it, and a package implements it; Core's default answers "active" for every tenant.
+
+- `stateFor(string $tenantId): TenantAccessState`. Core calls it on every request to a tenant host and
+  before every unit of runtime work, so answer quickly from a cache. Implementations should not throw: if
+  `stateFor` throws, Core reports the exception and treats the tenant as active (an outage of the operator
+  must not stop every tenant). The mode is computed: nothing schedules a change of it.
+- `TenantAccessState` carries an `AccessMode` (`Active` or `Stopped`; new modes may be added in a minor
+  release, so keep a default arm) and an optional `AccessNotice` (`title`, `message`, `actionLabel`,
+  `actionUrl`, the last two together and http or https). The notice is shown as a banner in the admin
+  panels and given to the builder as the shared prop `accessState`; it may accompany `Active` too.
+- While a tenant is `Stopped`: inbound messages, event triggers and notifications sent from a flow are
+  dropped with a log line; delayed wake-ups, send-message timeouts and the broadcast run wait (re-checked every
+  hour, so work resumes up to an hour after the tenant is active again) and a broadcast's recipients stay
+  pending and are sent once it is; the builder, media library and mini app refuse changes with
+  `423 Locked` and the notice, while reading stays open; the platform support user may still change things. The Filament panel shows the banner but is not
+  guarded until the new UI.
+  The conversation record, delivery statuses, webhook sync and the console commands run as usual. The
+  tenant stays `Active` as a status, so its host keeps answering.
+
 `Tenancy\Contracts\SupportAccessInterface` lets an operator package send its staff into a tenant's
 admin panel. Implemented by Core; a package only calls it.
 

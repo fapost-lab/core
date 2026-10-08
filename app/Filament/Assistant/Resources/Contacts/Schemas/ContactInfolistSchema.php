@@ -36,7 +36,7 @@ final class ContactInfolistSchema
     /**
      * Threshold below which group sections render expanded by default.
      */
-    private const GROUP_EXPAND_THRESHOLD = 3;
+    private const int GROUP_EXPAND_THRESHOLD = 3;
 
     public static function configure(Schema $schema): Schema
     {

@@ -29,9 +29,41 @@ final class SupportAccessIssueTest extends FeatureTestCase
         $this->restoreTenancyResolution();
     }
 
-    public function test_it_is_off_by_default(): void
+    /**
+     * Core's own default, read from the file: an installed operator package may switch the
+     * flag on at register, so the live config says nothing about it.
+     */
+    public function test_core_ships_with_support_access_off(): void
     {
-        $this->assertFalse(config('tenancy.support_access.enabled'));
+        $previous = getenv('SUPPORT_ACCESS_ENABLED');
+        $env      = $_ENV['SUPPORT_ACCESS_ENABLED'] ?? null;
+        $server   = $_SERVER['SUPPORT_ACCESS_ENABLED'] ?? null;
+        putenv('SUPPORT_ACCESS_ENABLED');
+        unset($_ENV['SUPPORT_ACCESS_ENABLED'], $_SERVER['SUPPORT_ACCESS_ENABLED']);
+
+        try {
+            /** @var array{support_access: array{enabled: bool}} $defaults */
+            $defaults = require config_path('tenancy.php');
+        } finally {
+            if (false !== $previous) {
+                putenv("SUPPORT_ACCESS_ENABLED={$previous}");
+            }
+
+            if (null !== $env) {
+                $_ENV['SUPPORT_ACCESS_ENABLED'] = $env;
+            }
+
+            if (null !== $server) {
+                $_SERVER['SUPPORT_ACCESS_ENABLED'] = $server;
+            }
+        }
+
+        $this->assertFalse($defaults['support_access']['enabled']);
+    }
+
+    public function test_it_refuses_to_issue_while_the_flag_is_off(): void
+    {
+        config(['tenancy.support_access.enabled' => false]);
 
         $this->expectException(SupportAccessUnavailableException::class);
         $this->expectExceptionMessage('not enabled');

@@ -33,7 +33,7 @@ final class TenantsMigrateCommandTest extends TestCase
         $this->assertStringContainsString('Migrated: 0 successful, 0 failed', Artisan::output());
     }
 
-    public function test_runs_tenant_migrations_once_for_single_active_tenant(): void
+    public function test_runs_tenant_then_settings_migrations_for_single_active_tenant(): void
     {
         $tenant = $this->tenantStub('acme', 'tenant_acme');
 
@@ -43,9 +43,12 @@ final class TenantsMigrateCommandTest extends TestCase
 
         $db = Mockery::mock(TenantDatabaseManagerInterface::class);
         $db->shouldReceive('switchTo')->once()->with($tenant);
+        $scopes = [];
         $db->shouldReceive('runMigrations')
-            ->once()
-            ->with(Mockery::on(fn (MigrationScope $scope): bool => 'tenant' === $scope->label));
+            ->twice()
+            ->andReturnUsing(function (MigrationScope $scope) use (&$scopes): void {
+                $scopes[] = $scope->label;
+            });
         $db->shouldReceive('restore')->once();
 
         $this->app->instance(TenantDatabaseManagerInterface::class, $db);
@@ -57,6 +60,8 @@ final class TenantsMigrateCommandTest extends TestCase
         $output = Artisan::output();
         $this->assertStringContainsString('✔ acme', $output);
         $this->assertStringContainsString('Migrated: 1 successful, 0 failed', $output);
+        // An upgraded tenant also needs the settings migrations, after its schema migrations.
+        $this->assertSame(['tenant', 'settings'], $scopes);
     }
 
     public function test_continues_when_one_tenant_migration_fails_and_returns_failure(): void
@@ -73,9 +78,9 @@ final class TenantsMigrateCommandTest extends TestCase
         $db->shouldReceive('restore')->twice();
 
         $call = 0;
+        // The failing tenant stops after its schema migrations; the next one runs schema and settings.
         $db->shouldReceive('runMigrations')
-            ->twice()
-            ->with(Mockery::on(fn (MigrationScope $scope): bool => 'tenant' === $scope->label))
+            ->times(3)
             ->andReturnUsing(function () use (&$call): void {
                 $call++;
                 if (1 === $call) {

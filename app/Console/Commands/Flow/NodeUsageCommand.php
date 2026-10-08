@@ -34,12 +34,14 @@ final class NodeUsageCommand extends Command
      */
     private const int LOG_RETENTION_DAYS = 30;
 
+    /** @var string */
     protected $signature = 'flow:node-usage
         {--days=30 : Runtime window in days; capped in practice by flow_logs retention}
         {--tenant= : Limit the report to one tenant slug}
         {--type= : Limit the report to one node type}
         {--json : Emit machine-readable JSON instead of tables}';
 
+    /** @var string */
     protected $description = 'Reports node type usage across active flow definitions and runtime logs for every active tenant';
 
     public function __construct(

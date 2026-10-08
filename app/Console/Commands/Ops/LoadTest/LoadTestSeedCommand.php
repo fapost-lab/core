@@ -36,10 +36,12 @@ final class LoadTestSeedCommand extends Command
 {
     use RefusesProduction;
 
+    /** @var string */
     protected $signature = 'loadtest:seed
         {--tenants=3 : Number of tenants to provision}
         {--contacts=100 : Total synthetic contacts to plan for, spread across tenants}';
 
+    /** @var string */
     protected $description = 'Seed tenants/assistants/channels/flow for the load-test harness';
 
     public function __construct(

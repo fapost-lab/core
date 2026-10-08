@@ -18,8 +18,10 @@ use Throwable;
  */
 final class PruneSupportAccessCommand extends Command
 {
+    /** @var string */
     protected $signature = 'support-access:prune';
 
+    /** @var string */
     protected $description = 'Deletes expired support access tokens and closes abandoned support access entries';
 
     public function __construct(

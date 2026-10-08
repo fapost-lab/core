@@ -33,10 +33,12 @@ use Throwable;
  */
 final class InstallGatewayCommand extends Command
 {
+    /** @var string */
     protected $signature = 'gateway:install
         {--disable : Point new channels back at the application and skip the gateway}
         {--output= : Directory for generated deployment files (default: gateway/dist)}';
 
+    /** @var string */
     protected $description = 'Configure the webhook ingress gateway and generate its deployment files';
 
     public function handle(): int

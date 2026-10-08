@@ -19,7 +19,10 @@ paths:
   - "tests/Feature/Domains/Tenancy/**"
   - tests/Unit/Architecture/WebhookArchitectureTest.php
   - app/Http/Middleware/ResolveTenantContext.php
-reviewed_at: 2026-10-07
+  - app/Http/Middleware/RefuseWritesWhenTenantStopped.php
+  - tests/Unit/Architecture/RuntimeJobAccessModeTest.php
+  - app/Filament/Support/AccessNoticeBanner.php
+reviewed_at: 2026-10-08
 ---
 # Tenancy rules
 
@@ -76,6 +79,10 @@ broken.
   check so a legacy long name can still be removed. `config('tenancy.schema_prefix')` is not read:
   the prefix is fixed in `TenantSlugPolicy::SCHEMA_PREFIX`, and the 56-character cap depends on it.
   Enforced: `TenantSlugPolicyTest`, `TenantDatabaseManagerTest`, `TenantProvisioningServiceTest`.
+- **Schema DDL runs on the tenant connection** (`config('tenancy.tenant_connection')`):
+  `createSchema()`, `schemaExists()` and `dropSchema()` in `TenantDatabaseManager`. Why: `landlord`
+  may point at another database (`LANDLORD_DB_DATABASE`), and a schema created there is invisible
+  to tenant migrations and queries. Enforced: `TenantDatabaseManagerTest`.
 - **An aborted transaction does not drop the connection to `public`.** `TenantPostgresConnection`
   re-applies `search_path` after a rollback. Enforced: `TenantDatabaseManagerTest`.
 - **Provisioning leaves a tenant inactive until its first admin exists**
@@ -115,6 +122,18 @@ broken.
   `SupportAccessIssueTest`, `SupportAccessTokenStoreTest`, `SupportAccessEntryTest`
   (`adr-20261007-support-access-through-platform-support-user`).
 
+- **A stopped tenant is a mode, never a status, and Core asks the operator on every request and runtime job.**
+  `TenantRequestRunner` asks `TenantAccessModeInterface` once per request into the `scoped` `CurrentAccessState`;
+  the default is `AlwaysActiveAccessMode`, bound with `bindIf`. While stopped: unsafe methods on the builder,
+  media and mini-app routes answer 423 (`RefuseWritesWhenTenantStopped`; the platform support user passes; a
+  route with no side effects opts out with `withoutMiddleware`), runtime jobs are dropped or postponed by
+  `RespectsTenantAccessMode`, and `flow:sweep-subflow-timeouts` skips the tenant. The tenant stays `Active` so
+  console commands see it. A postponed job is re-queued as a delayed copy, never `release()`d (a release spends
+  an attempt). Fail open: an operator that throws is reported and counts as active (`TenantAccessStates`). A
+  gateway "Class@method" handler must run the job's middleware itself. Every queued job in `app/` is either listed as runtime (and gated) or as keeping running. Enforced:
+  `StoppedTenantRequestTest`, `StoppedTenantRuntimeTest`, `RespectsTenantAccessModeTest`,
+  `RuntimeJobAccessModeTest` (`adr-20261008-access-mode-is-a-mode-not-a-status`).
+
 ## Rules
 
 - **Open the `landlord` connection only inside `app/Domains/Tenancy`.** Other domains depend on
@@ -125,9 +144,9 @@ broken.
   so every registered migration path runs; `database/settings` is not one of them — the settings
   migrations are tenant-scoped, so `config/settings.php` leaves `migrations_paths` empty and they
   run only through `MigrationScope::settings()`), and `AppServiceProvider` loads
-  `database/migrations/landlord`. An extension package may open `landlord` only for tables of its
-  own prefix, and never writes `tenants` or `webhook_registry`
-  (`adr-20261005-extension-packages-own-landlord-tables`).
+  `database/migrations/landlord`. Only the SaaS operator package may open `landlord`, and only for tables of its
+  own prefix; it never writes `tenants` or `webhook_registry`. Plugin and Solution packages have no landlord access
+  (`adr-20261005-extension-packages-own-landlord-tables`, amended 2026-10-08).
 - **In workers, change tenant only through `TenantSwitcher::runForTenant()`**; never set
   `search_path` or the context directly. Review only.
 - **Core is not the control plane.** No SaaS logic, billing or onboarding belongs in Core, and

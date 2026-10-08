@@ -38,6 +38,7 @@ final class MediaFile extends BaseModel
     use HasUlidPrimaryKey;
     use SoftDeletes;
 
+    /** @var string */
     protected $table = 'media_files';
 
     /** @var list<string> */

@@ -61,13 +61,11 @@ final class ViewConversation extends Page
     public string $replyText = '';
 
     /**
-     * Livewire temporary upload for the composer's attachment. Untyped on
-     * purpose — the property holds a TemporaryUploadedFile mid-request and a
+     * Livewire temporary upload for the composer's attachment. Typed `mixed`
+     * on purpose — the property holds a TemporaryUploadedFile mid-request and a
      * plain string (the temp path) across hydration.
-     *
-     * @var mixed
      */
-    public $attachment = null;
+    public mixed $attachment = null;
 
     protected static string $resource = ConversationResource::class;
 

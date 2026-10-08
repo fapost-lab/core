@@ -36,9 +36,11 @@ final class LoadTestVerifyCommand extends Command
 {
     use RefusesProduction;
 
+    /** @var string */
     protected $signature = 'loadtest:verify
         {--max-dropped=5 : Fail only when the dropped-contact ratio exceeds this percentage}';
 
+    /** @var string */
     protected $description = 'Verify a load-test run for leaks, drops and failed jobs';
 
     public function __construct(

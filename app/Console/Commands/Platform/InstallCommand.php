@@ -32,10 +32,12 @@ use Throwable;
  */
 final class InstallCommand extends Command
 {
+    /** @var string */
     protected $signature = 'install
         {--skip-gateway : Do not offer to set up the webhook gateway}
         {--env-path= : Environment file to configure (default: .env in the project root)}';
 
+    /** @var string */
     protected $description = 'Configure and install FaPost Core step by step';
 
     public function __construct(

@@ -6,24 +6,28 @@ namespace App\Console\Commands\Flow;
 
 use App\Domains\Flow\Subflow\SubflowTimeoutSweeper;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Services\TenantAccessStates;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Console\Command;
 use Throwable;
 
 /**
- * Sweeps expired subflow chains across every active tenant. Wired to the
+ * Sweeps expired subflow chains across every active tenant that is not stopped. Wired to the
  * scheduler in {@see routes/console.php} to run every minute. Exit code is
  * always 0 — a per-tenant failure is logged and the loop continues.
  */
 final class SweepSubflowTimeoutsCommand extends Command
 {
+    /** @var string */
     protected $signature = 'flow:sweep-subflow-timeouts';
 
+    /** @var string */
     protected $description = 'Force-fail subflow children whose parent has expired and resume the parent through the failed handle';
 
     public function __construct(
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantSwitcher $switcher,
+        private readonly TenantAccessStates $accessStates,
     ) {
         parent::__construct();
     }
@@ -34,6 +38,13 @@ final class SweepSubflowTimeoutsCommand extends Command
             $slug = $tenant->getSlug();
 
             try {
+                // The sweep would force-fail a stopped tenant's expired chains and resume their parents,
+                // which is runtime work. Skipping only delays that: the expiry is absolute, so the first
+                // sweep after the tenant is active again catches everything that came due meanwhile.
+                if ($this->accessStates->stateFor($tenant->getId())->isStopped()) {
+                    continue;
+                }
+
                 $this->switcher->runForTenant($tenant, function () use ($slug): void {
                     $report = app(SubflowTimeoutSweeper::class)->sweep();
 
