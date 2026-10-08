@@ -91,6 +91,7 @@ final class DomainServiceProvider extends ServiceProvider
             (string) $app['config']->get('tenancy.base_domain'),
             $app['config']->get('tenancy.default_tenant_slug'),
             $app->make(TenantSlugPolicy::class),
+            $this->platformSubdomains($app['config']),
         ));
         $this->app->bind(TenantProvisionerInterface::class, CoreTenantProvisioner::class);
         $this->app->bind(TenantDirectoryInterface::class, CoreTenantDirectory::class);
@@ -176,7 +177,7 @@ final class DomainServiceProvider extends ServiceProvider
 
     /**
      * Slugs no tenant may claim: the configured list plus the platform's own
-     * ingress hostnames, minus the default tenant slug.
+     * ingress hostnames and declared platform subdomains, minus the default tenant slug.
      *
      * Ingress hostnames are derived rather than listed so that pointing the
      * gateway at a different subdomain reserves that name automatically. A
@@ -189,7 +190,7 @@ final class DomainServiceProvider extends ServiceProvider
     {
         $reserved = array_map(mb_strtolower(...), (array) $config->get('tenancy.reserved_slugs', []));
 
-        foreach ($this->ingressLabels($config) as $label) {
+        foreach ([...$this->ingressLabels($config), ...$this->platformSubdomains($config)] as $label) {
             $reserved[] = $label;
         }
 
@@ -204,6 +205,22 @@ final class DomainServiceProvider extends ServiceProvider
             array_unique($reserved),
             static fn (string $slug): bool => '' !== $slug && $slug !== $default,
         ));
+    }
+
+    /**
+     * Declared platform subdomains, read at resolve time so that a label an operator
+     * package adds while registering is seen.
+     *
+     * @return list<string>
+     */
+    private function platformSubdomains(ConfigRepository $config): array
+    {
+        $labels = array_map(
+            static fn (mixed $label): string => mb_strtolower(mb_trim((string) $label)),
+            (array) $config->get('tenancy.platform_subdomains', []),
+        );
+
+        return array_values(array_unique(array_filter($labels, static fn (string $label): bool => '' !== $label)));
     }
 
     /**

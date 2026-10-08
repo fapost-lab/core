@@ -53,6 +53,22 @@ final class RequestHostClassifierTest extends TestCase
         ];
     }
 
+    /**
+     * @return array<string, array{string, RequestHostKind, string|null}>
+     */
+    public static function hostsWithPlatformSubdomains(): array
+    {
+        return [
+            'listed label is the platform'        => ['saas.fapost.test', RequestHostKind::Platform, null],
+            'listed label, any case'              => ['SaaS.FaPost.Test', RequestHostKind::Platform, null],
+            'listed label with a port'            => ['saas.fapost.test:8443', RequestHostKind::Platform, null],
+            'second listed label'                 => ['ops.fapost.test', RequestHostKind::Platform, null],
+            'unlisted label is still a tenant'    => ['acme.fapost.test', RequestHostKind::Tenant, 'acme'],
+            'label under a listed one is foreign' => ['x.saas.fapost.test', RequestHostKind::Foreign, null],
+            'listed label on a foreign domain'    => ['saas.example.com', RequestHostKind::Foreign, null],
+        ];
+    }
+
     #[DataProvider('hosts')]
     public function test_classifies_host_in_host_mode(string $host, RequestHostKind $kind, ?string $slug): void
     {
@@ -82,6 +98,28 @@ final class RequestHostClassifierTest extends TestCase
         $this->assertTrue($result->isTenant());
         $this->assertSame('main', $result->slug);
     }
+
+    #[DataProvider('hostsWithPlatformSubdomains')]
+    public function test_platform_subdomains_are_not_tenants_in_host_mode(string $host, RequestHostKind $kind, ?string $slug): void
+    {
+        $classifier = new RequestHostClassifier(TenancyResolutionMode::Host, 'fapost.test', 'main', new TenantSlugPolicy(), ['saas', 'Ops']);
+
+        $result = $classifier->classifyHost($host);
+
+        $this->assertSame($kind, $result->kind);
+        $this->assertSame($slug, $result->slug);
+    }
+
+    public function test_single_mode_ignores_platform_subdomains(): void
+    {
+        $classifier = new RequestHostClassifier(TenancyResolutionMode::Single, 'fapost.test', 'main', new TenantSlugPolicy(), ['saas']);
+
+        $result = $classifier->classifyHost('saas.fapost.test');
+
+        $this->assertTrue($result->isTenant());
+        $this->assertSame('main', $result->slug);
+    }
+
     private function hostMode(): RequestHostClassifier
     {
         return new RequestHostClassifier(TenancyResolutionMode::Host, 'fapost.test', 'main', new TenantSlugPolicy());

@@ -15,8 +15,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 /**
  * Prefix of the `web` group: puts the request in the tenant its host names, if any.
  *
- * The base domain carries platform pages and runs with no tenant; a tenant host runs
- * inside that tenant; any other host is not ours. Routes that cannot work without a
+ * The base domain and any declared platform subdomain carry platform pages and run with no
+ * tenant; a tenant host runs inside that tenant; any other host is not ours. Routes that cannot work without a
  * tenant say so with the `tenant` alias ({@see TenancyMiddleware}).
  */
 final readonly class ResolveTenantContext

@@ -10,7 +10,8 @@ use App\Domains\Tenancy\Contracts\TenantInterface;
  * Where a tenant's own surfaces are served.
  *
  * The base domain belongs to the platform: it carries the installation's welcome
- * page today and is reserved for a control plane that manages tenants. Anything
+ * page today and is reserved for a control plane that manages tenants. So do the
+ * platform subdomains an installation declares (`tenancy.platform_subdomains`). Anything
  * scoped to a single tenant — the admin panel, the assistant console — is served
  * from that tenant's own host instead, so the two can never be confused for one
  * another and the base domain stays free.

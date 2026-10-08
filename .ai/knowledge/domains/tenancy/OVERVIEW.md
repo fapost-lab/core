@@ -57,9 +57,10 @@ Not to be confused with the *assistant panel's* Filament "tenant", which is an `
   pgsql connection resolver that makes schema switching possible.
 - HTTP: `tenancy.resolution` picks the mode. `single` (default): `Services/ConfigTenantResolver`
   serves the one tenant named by `tenancy.default_tenant_slug`. `host`:
-  `Services/RequestHostClassifier` sorts the request host into platform (the base domain, no
-  tenant), tenant (`<slug>.<base_domain>`, resolved by `Services/HostTenantResolver`) or foreign
-  (404). `app/Http/Middleware/ResolveTenantContext.php` is prepended to `web`;
+  `Services/RequestHostClassifier` sorts the request host into platform (the base domain or a
+  declared `tenancy.platform_subdomains` label, no tenant), tenant (`<slug>.<base_domain>`,
+  resolved by `Services/HostTenantResolver`) or foreign (404).
+  `app/Http/Middleware/ResolveTenantContext.php` is prepended to `web`;
   `app/Http/Middleware/TenancyMiddleware.php` (alias `tenant`, in the Filament panel stacks and on
   builder/media/tma) requires a tenant and is placed before the session stack by the middleware
   priority list. Both enter the tenant through `Services/TenantRequestRunner`. Filament panels are
