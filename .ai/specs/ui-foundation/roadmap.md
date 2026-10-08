@@ -11,10 +11,10 @@ runtime depends on Filament any more. Done when: with the switch on, the contact
 is served by Inertia at its old address inside the new shell, with the switch off nothing
 visible changed, and the builder renders from the kit's tokens in light and dark.
 
-- [ ] `current-assistant-without-filament` — The current assistant no longer comes from Filament — `CurrentAssistant` is set by a
+- [x] `current-assistant-without-filament` — The current assistant no longer comes from Filament — `CurrentAssistant` is set by a
       route middleware for console requests and from the payload inside jobs, request- or
       job-scoped and reset; the Filament panel keeps working by feeding the same service
-- [ ] The kit and its tokens live in Core — shadcn-vue in `resources/js/ui` behind the
+- [ ] `kit-and-tokens` — The kit and its tokens live in Core — shadcn-vue in `resources/js/ui` behind the
       `@fapost/ui` alias, Warm Minimal light and dark, Onest and Roboto Condensed; the builder's
       variables read from the same tokens and its top bar matches the console
 - [ ] The new UI switch and shell — a configuration switch (off by default) hands the console
