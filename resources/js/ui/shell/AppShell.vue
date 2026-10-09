@@ -1,15 +1,22 @@
 <script setup lang="ts">
+import { Toaster } from '@fapost/ui/components/sonner'
 import ShellBanners from './ShellBanners.vue'
 import ShellHeader from './ShellHeader.vue'
 import ShellSidebar from './ShellSidebar.vue'
+import { useFlashToasts } from './useFlashToasts'
+import { useIsDark } from './useIsDark'
 
 /**
  * The frame of every console page: side menu, header with breadcrumbs and the language, theme and user controls,
  * and the banners above the page. Pages choose it as a persistent layout (`defineOptions({ layout: AppShell })`),
  * so the menu keeps its state while the page changes.
  *
+ * Inertia's flash data (`success`, `error`) is shown here as toasts, after every visit; they follow the console's theme.
+ *
  * The `rail` slot, left of the menu, is reserved for the application strip of a later phase; it is empty now.
  */
+useFlashToasts()
+const dark = useIsDark()
 </script>
 
 <template>
@@ -27,5 +34,7 @@ import ShellSidebar from './ShellSidebar.vue'
         <slot />
       </main>
     </div>
+
+    <Toaster :theme="dark ? 'dark' : 'light'" position="bottom-right" rich-colors close-button />
   </div>
 </template>

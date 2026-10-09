@@ -64,6 +64,10 @@ describe('interpolate', () => {
         expect(interpolate('Live sessions (:count)', {count: 3})).toBe('Live sessions (3)')
         expect(interpolate('(:name, :email)', {name: 'Olga', email: 'o@x.io'})).toBe('(Olga, o@x.io)')
     })
+
+    it('inserts a value verbatim', () => {
+        expect(interpolate('Delete :name?', {name: "a$&b$'c"})).toBe("Delete a$&b$'c?")
+    })
 })
 
 describe('initials', () => {

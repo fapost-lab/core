@@ -61,9 +61,9 @@ export function breadcrumbs(root: string, groups: NavGroup[], currentUrl: string
     return crumbs
 }
 
-/** Fills `:name` placeholders as Laravel's translator does. */
+/** Fills `:name` placeholders as Laravel's translator does; a value is inserted verbatim, `$&` included. */
 export function interpolate(template: string, values: Record<string, string | number>): string {
-    return Object.entries(values).reduce((text, [name, value]) => text.replaceAll(`:${name}`, String(value)), template)
+    return Object.entries(values).reduce((text, [name, value]) => text.replaceAll(`:${name}`, () => String(value)), template)
 }
 
 /** Up to two initials of a person's name, for the avatar. */

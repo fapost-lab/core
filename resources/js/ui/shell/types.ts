@@ -55,6 +55,37 @@ export interface AccessNotice {
     actionUrl: string | null
 }
 
+/** Strings every list screen built on the kit's DataTable shares (`table` in the console lang files). */
+export interface TableTranslations {
+    search: string
+    search_hint: string
+    empty: string
+    empty_search: string
+    clear_search: string
+    selected: string
+    clear_selection: string
+    select_all: string
+    select_row: string
+    actions: string
+    sort_by: string
+    rows_per_page: string
+    range: string
+    page: string
+    previous: string
+    next: string
+}
+
+/** Strings every form screen shares (`form` in the console lang files). */
+export interface FormTranslations {
+    save: string
+    saving: string
+    cancel: string
+    delete: string
+    edit: string
+    edit_named: string
+    delete_named: string
+}
+
 export interface ConsoleTranslations {
     navigation: { dashboard: string; menu: string }
     breadcrumbs: { admin: string }
@@ -64,6 +95,8 @@ export interface ConsoleTranslations {
     user_menu: { label: string; sign_out: string }
     support: { banner: string; leave: string }
     dashboard: Record<string, string | Record<string, string>>
+    table: TableTranslations
+    form: FormTranslations
 }
 
 export interface ShellPageProps {
