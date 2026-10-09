@@ -117,8 +117,8 @@ final class ChannelObserverTest extends TestCase
 
         Bus::assertDispatchedSync(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => 'telegram' === $job->channelType
                 && 'hash-1' === $job->webhookPublicHash
-                && 'token-1' === $job->token
-                && 'secret-1' === $job->secretToken
+                && null === $job->token
+                && null === $job->secretToken
                 && 'tenant-1' === $job->tenantId
                 && true === $job->register);
     }
@@ -161,7 +161,12 @@ final class ChannelObserverTest extends TestCase
         $observer = $this->observer(hasRegistrar: true);
         $observer->saved($channel);
 
-        Bus::assertDispatchedSync(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => false === $job->register);
+        Bus::assertDispatchedSync(
+            SyncChannelWebhookJob::class,
+            fn (SyncChannelWebhookJob $job): bool => false === $job->register
+                && 'token-1' === $job->token
+                && 'secret-1' === $job->secretToken,
+        );
     }
 
     public function test_saved_dispatches_register_job_sync_when_channel_is_reactivated(): void

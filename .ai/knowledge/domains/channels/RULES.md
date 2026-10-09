@@ -54,6 +54,13 @@ broken.
 - **A new messenger is a new integration, not a branch.** Add a `ChannelIntegrationDefinition`
   tagged `channels.integration` with its adapter, sender and registrar, in its own provider —
   `Telegram/TelegramChannelServiceProvider.php` is the model. Review only. *(proposed)*
+- **A channel secret never leaves the request or job that uses it.** A provider client throws
+  exceptions whose text went through `SecretRedactor` and does not chain the original (a connection
+  error's message carries the URL, and Telegram's URL carries the bot token); a queued job names the
+  channel and loads its credentials when it runs. Only a synchronous deregister carries a snapshot,
+  because a deleted row cannot be loaded. Why: exception text and job payloads end up in logs,
+  `jobs` and `failed_jobs`. Enforced: `TelegramBotApiClientRedactionTest`,
+  `SyncChannelWebhookJobCredentialsTest`, `BroadcastSendJobTest`.
 - **Pick the queue by purpose:** replies in an active dialogue `messaging.transactional`,
   broadcasts `messaging.broadcast`, service and lifecycle work `messaging.system`. Source:
   `conventions/queues.md`.

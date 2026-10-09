@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Jobs\Messaging;
 
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
 use App\Domains\Tenancy\Queue\StoppedTenantAction;
@@ -27,11 +28,18 @@ final class BroadcastSendJob implements ShouldQueue, TenantAccessGatedJob
     use Queueable;
 
     /**
-     * @param  OutboundMessage  $message  Fully prepared outbound message envelope.
+     * The envelope as it is queued: without the transport token, which the job loads from the channel
+     * when it runs. A token in the envelope would be serialized into `jobs` and `failed_jobs`.
      */
-    public function __construct(
-        public readonly OutboundMessage $message,
-    ) {
+    public readonly OutboundMessage $message;
+
+    /**
+     * @param  OutboundMessage  $message  Fully prepared outbound message envelope; its transport token is dropped.
+     */
+    public function __construct(OutboundMessage $message)
+    {
+        $this->message = $this->withoutToken($message);
+
         $this->onQueue('messaging.broadcast');
     }
 
@@ -63,11 +71,37 @@ final class BroadcastSendJob implements ShouldQueue, TenantAccessGatedJob
         $tenant = $tenants->getById($this->message->tenantId);
 
         $switcher->runForTenant($tenant, function () use ($sender): void {
-            $result = $sender->send($this->message);
+            $channel = Channel::query()->find($this->message->channelId);
+
+            // Deleted since the job was queued: there is no one left to send through.
+            if (null === $channel) {
+                return;
+            }
+
+            $result = $sender->send($this->withToken($this->message, $channel->token));
 
             if (! $result->sent && ! $result->duplicate) {
                 throw new RuntimeException($result->error ?? 'Broadcast message delivery failed.');
             }
         });
+    }
+
+    private function withoutToken(OutboundMessage $message): OutboundMessage
+    {
+        return $this->withToken($message, null);
+    }
+
+    private function withToken(OutboundMessage $message, ?string $token): OutboundMessage
+    {
+        return new OutboundMessage(
+            idempotencyKey: $message->idempotencyKey,
+            tenantId: $message->tenantId,
+            channelId: $message->channelId,
+            channelType: $message->channelType,
+            transportToken: $token,
+            chatId: $message->chatId,
+            payload: $message->payload,
+            metadata: $message->metadata,
+        );
     }
 }

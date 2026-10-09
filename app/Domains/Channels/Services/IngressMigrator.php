@@ -124,15 +124,16 @@ final readonly class IngressMigrator
 
             // Queued rather than run inline: each dispatch is a provider API call,
             // and the shared messaging.system queue is where that backpressure
-            // is already handled.
+            // is already handled. The credentials are not part of the payload (it is
+            // stored in `jobs` and `failed_jobs`); the job loads them by channel id.
             SyncChannelWebhookJob::dispatch(
                 tenantId: $tenantId,
                 schema: $schema,
                 channelId: (string) $channel->getKey(),
                 channelType: $channel->type->value,
                 webhookPublicHash: $channel->webhook_public_hash,
-                token: $channel->token,
-                secretToken: $channel->secret_token,
+                token: null,
+                secretToken: null,
                 config: is_array($channel->config) ? $channel->config : [],
                 register: true,
             );
