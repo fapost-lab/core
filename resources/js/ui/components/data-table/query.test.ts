@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest'
-import {buildQuery, keepVisible, nextSort, selectionState, sortDirection, toggleAll, toggleRow} from './query'
+import {buildQuery, groupRuns, visibleRows, keepVisible, nextSort, selectionState, sortDirection, toggleAll, toggleRow} from './query'
 
 const defaults = {sort: 'name', perPage: 25}
 
@@ -79,5 +79,66 @@ describe('selection', () => {
 
     it('keeps only the selected ids still on the page', () => {
         expect(keepVisible(['a', 'gone', 'c'], rows)).toEqual(['a', 'c'])
+    })
+})
+
+describe('buildQuery with filters and a grouping', () => {
+    const grouped = {sort: 'name', perPage: 25, group: ''}
+
+    it('leaves the keys out when the table declares none', () => {
+        expect(buildQuery({search: '', sort: 'name', perPage: 25}, defaults)).toEqual({})
+    })
+
+    it('carries the filters that have a value, trimmed', () => {
+        expect(buildQuery({search: '', sort: 'name', perPage: 25, filters: {group: ' abc ', active: ''}, group: ''}, grouped)).toEqual({
+            filter: {group: 'abc'},
+        })
+    })
+
+    it('reads the empty list the server sends for no filters', () => {
+        expect(buildQuery({search: '', sort: 'name', perPage: 25, filters: [] as unknown as Record<string, string>, group: ''}, grouped)).toEqual({})
+    })
+
+    it('sends the grouping unless it is the default one', () => {
+        expect(buildQuery({search: '', sort: 'name', perPage: 25, filters: {}, group: 'group'}, grouped)).toEqual({group: 'group'})
+        expect(buildQuery({search: '', sort: 'name', perPage: 25, filters: {}, group: ''}, grouped)).toEqual({})
+    })
+})
+
+describe('groupRuns', () => {
+    const key = (row: {g: string}): string => row.g
+
+    it('is empty for no rows', () => {
+        expect(groupRuns([], key)).toEqual([])
+    })
+
+    it('gathers neighbours with the same key, in order', () => {
+        const rows = [{g: 'a'}, {g: 'a'}, {g: 'b'}, {g: ''}]
+
+        expect(groupRuns(rows, key).map((run) => [run.key, run.rows.length])).toEqual([
+            ['a', 2],
+            ['b', 1],
+            ['', 1],
+        ])
+    })
+
+    it('starts a new run when a key comes up again after another', () => {
+        expect(groupRuns([{g: 'a'}, {g: 'b'}, {g: 'a'}], key).map((run) => run.key)).toEqual(['a', 'b', 'a'])
+    })
+})
+
+describe('visibleRows', () => {
+    const runs = [
+        {key: 'a', label: 'A', rows: [1, 2]},
+        {key: 'b', label: 'B', rows: [3]},
+    ]
+
+    it('leaves out the rows of collapsed runs', () => {
+        expect(visibleRows(runs, [])).toEqual([1, 2, 3])
+        expect(visibleRows(runs, ['a'])).toEqual([3])
+    })
+
+    it('never collapses a run without a header', () => {
+        expect(visibleRows([{key: '', label: null, rows: [1, 2]}], [''])).toEqual([1, 2])
     })
 })

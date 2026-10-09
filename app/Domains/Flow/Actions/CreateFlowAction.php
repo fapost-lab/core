@@ -39,15 +39,16 @@ final readonly class CreateFlowAction
         $this->recordQuota->assertCanCreate(FlowDraft::LIMIT_KEY, FlowDraft::countForLimit());
 
         return FlowDraft::create([
-            'tenant_id'     => $this->tenantContext->get()->id,
-            'flow_id'       => (string)Str::uuid(),
-            'assistant_id'  => $data['assistant_id'],
-            'flow_group_id' => $data['flow_group_id'] ?? null,
-            'name'          => $data['name'],
-            'description'   => $data['description'] ?? null,
-            'is_public'     => $data['is_public'] ?? true,
-            'is_active'     => true,
-            'nodes'         => $data['nodes'] ?? [
+            'tenant_id'       => $this->tenantContext->get()->id,
+            'flow_id'         => (string)Str::uuid(),
+            'assistant_id'    => $data['assistant_id'],
+            'flow_group_id'   => $data['flow_group_id'] ?? null,
+            'name'            => $data['name'],
+            'description'     => $data['description'] ?? null,
+            'is_public'       => $data['is_public'] ?? true,
+            'logging_enabled' => $data['logging_enabled'] ?? false,
+            'is_active'       => true,
+            'nodes'           => $data['nodes'] ?? [
                 [
                     'id'      => Str::lower((string)Str::ulid()),
                     'type'    => EndNodeHandler::TYPE,

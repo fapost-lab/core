@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Assistant\Resources\Flows\Tables;
 
-use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Exceptions\FlowHasLiveSessionsException;
 use App\Domains\Flow\Models\FlowDraft;
-use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowTrigger;
+use App\Domains\Flow\Services\FlowDraftService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
@@ -21,6 +21,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 final class FlowsTable
@@ -123,13 +124,7 @@ final class FlowsTable
                         ->requiresConfirmation(),
                     DeleteAction::make()
                         ->before(function (FlowDraft $record, DeleteAction $action): void {
-                            $hasSessions = FlowSession::where('flow_id', $record->flow_id)
-                                ->whereIn('status', [
-                                    FlowSessionStatus::Active->value,
-                                    FlowSessionStatus::WaitingInput->value,
-                                    FlowSessionStatus::Paused->value,
-                                ])
-                                ->exists();
+                            $hasSessions = app(FlowDraftService::class)->hasLiveSessions($record);
 
                             if ($hasSessions) {
                                 Notification::make()
@@ -146,7 +141,32 @@ final class FlowsTable
                     ->iconButton(),
             ])
             ->bulkActions([
-                DeleteBulkAction::make(),
+                DeleteBulkAction::make()
+                    ->using(function (Collection $records, DeleteBulkAction $action): void {
+                        $flows   = app(FlowDraftService::class);
+                        $blocked = 0;
+
+                        foreach ($records as $record) {
+                            try {
+                                $flows->delete($record);
+                            } catch (FlowHasLiveSessionsException) {
+                                ++$blocked;
+                            }
+                        }
+
+                        if ($blocked > 0) {
+                            Notification::make()
+                                ->warning()
+                                ->title(__('assistant.flows.delete_guard.title'))
+                                ->body(__('assistant.flows.delete_guard.skipped', ['count' => $blocked]))
+                                ->send();
+                        }
+
+                        // Nothing was deleted: stop before Filament reports a success.
+                        if ($blocked === $records->count()) {
+                            $action->halt();
+                        }
+                    }),
             ]);
     }
 

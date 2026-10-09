@@ -1,5 +1,5 @@
 export { default as DataTable } from "./DataTable.vue"
 export { default as DataTablePagination } from "./DataTablePagination.vue"
-export { buildQuery, nextSort, selectionState, sortDirection } from "./query"
-export type { SortDirection, TableDefaults, TableMeta, TableQuery, TableState } from "./query"
+export { buildQuery, groupRuns, nextSort, selectionState, sortDirection } from "./query"
+export type { RowRun, SortDirection, TableDefaults, TableMeta, TableQuery, TableState } from "./query"
 export type { DataTableColumn } from "./types"

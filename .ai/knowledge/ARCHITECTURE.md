@@ -126,12 +126,11 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   when its named route's action lives in `App\Http\Controllers\Console` or `Admin`; an unmigrated
   item is a plain link into Filament, never an Inertia `<Link>`. Tests pin `UI_INERTIA=false` in
   `phpunit.xml`; console tests switch it on themselves.
-- **The operator surfaces share one token source; the kit is not yet used by a screen.**
+- **The operator surfaces share one token source.**
   `resources/css/tokens.css` holds the Warm Minimal tokens (light and `.dark`, fonts Onest,
   Roboto Condensed, Victor Mono, self-hosted through Fontsource); the kit (`resources/js/ui`,
   shadcn-vue, alias `@fapost/ui`, styles `resources/css/ui.css`) builds on it, and the builder's
-  own variables point at it — though about 210 literal colours in the builder remain until its
-  dark theme lands. The Filament theme (`resources/css/filament/theme.css`) still duplicates the
+  own variables point at it in both themes. The Filament theme (`resources/css/filament/theme.css`) still duplicates the
   palette until Filament leaves Core, and the public site (`resources/css/app.css`) keeps its own
   palette by decision (D5, spec `ui-foundation`).
 - **Only one messenger integration is real.** Telegram is implemented; the WhatsApp adapter throws

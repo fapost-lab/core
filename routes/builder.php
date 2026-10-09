@@ -13,7 +13,7 @@ use App\Http\Middleware\SetBuilderRootView;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'tenant', 'verified', RefuseWritesWhenTenantStopped::class, SetBuilderRootView::class])->prefix('builder')->group(function (): void {
-    Route::get('/flows/{flow}', [BuilderFlowController::class, 'show']);
+    Route::get('/flows/{flow}', [BuilderFlowController::class, 'show'])->name('builder.flows.show');
     Route::put('/flows/{flow}/draft', [BuilderFlowController::class, 'saveDraft']);
     // Validation has no side effects, so a stopped tenant may still run it.
     Route::post('/flows/{flow}/validate', [BuilderFlowController::class, 'validate'])
