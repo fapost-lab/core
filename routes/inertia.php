@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
+use App\Http\Controllers\Console\ChannelController;
 use App\Http\Controllers\Console\ContactGroupController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
@@ -56,6 +57,15 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
     // An assistant's screens: `{tenant}` is the assistant, under the name Filament gave the parameter.
     Route::middleware('console')->group(function (): void {
         Route::get('assistant/{tenant}/dashboard', DashboardController::class)->name('filament.assistant.pages.dashboard');
+
+        // Channels: the assistant's transport endpoints; rotation is its own write.
+        Route::get('assistant/{tenant}/channels', [ChannelController::class, 'index'])->name('filament.assistant.resources.channels.index');
+        Route::get('assistant/{tenant}/channels/create', [ChannelController::class, 'create'])->name('filament.assistant.resources.channels.create');
+        Route::get('assistant/{tenant}/channels/{record}/edit', [ChannelController::class, 'edit'])->name('filament.assistant.resources.channels.edit');
+        Route::post('assistant/{tenant}/channels', [ChannelController::class, 'store'])->name('console.channels.store');
+        Route::put('assistant/{tenant}/channels/{record}', [ChannelController::class, 'update'])->name('console.channels.update');
+        Route::post('assistant/{tenant}/channels/{record}/rotate-webhook', [ChannelController::class, 'rotateWebhook'])->name('console.channels.rotate-webhook');
+        Route::delete('assistant/{tenant}/channels/{record}', [ChannelController::class, 'destroy'])->name('console.channels.destroy');
 
         // Contact groups: tenant-level, listed under the assistant's menu like Filament's resource was.
         Route::get('assistant/{tenant}/contact-groups', [ContactGroupController::class, 'index'])->name('filament.assistant.resources.contact-groups.index');

@@ -17,7 +17,7 @@ paths:
   - "tests/Unit/Domains/Messaging/**"
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-09
 ---
 # Channels rules
 
@@ -48,7 +48,7 @@ broken.
 - **Send through `MessageSenderInterface`, never through `ProviderSenderInterface` or a provider
   namespace.** Why: idempotency, rate limit and transcript live in `MessageSender`. Enforced for
   Flow only, by `tests/Architecture/MessagingBoundariesTest.php`: a provider module is any
-  sub-namespace of `App\Domains\Channels` except the shared layers (`Contracts`, `Enums`,
+  sub-namespace of `App\Domains\Channels` except the shared layers (`Contracts`, `DTOs`, `Enums`,
   `Models`, `Observers`, `Policies`, `Providers`, `Services`), so a new provider is covered
   automatically and a new shared layer must be added to that exclusion list.
 - **A new messenger is a new integration, not a branch.** Add a `ChannelIntegrationDefinition`

@@ -9,8 +9,8 @@ hear from anyone.
 
 ## The list
 
-Each channel shows its **platform**, its **webhook hash**, whether it is
-**active**, and when it was last **updated**. Three actions: **Edit**, **Rotate
+Each channel shows its **platform**, its **bot** (a link to it, once the provider has
+registered the webhook), whether it is **active**, and when it was last **updated**. Three actions: **Edit**, **Rotate
 webhook hash**, **Delete**.
 
 ## Connecting one
@@ -29,29 +29,34 @@ value checked against the `X-Telegram-Bot-Api-Secret-Token` header.
 **Channel settings** — free-form key/value pairs for options a particular
 platform needs beyond the two above.
 
+In the new console the platform is chosen when the channel is created and cannot be changed afterwards.
+
 <Warning>
   Saving a channel contacts the provider and registers the webhook. A token that
-  does not belong to a real bot makes the save fail — the platform is not storing
-  a credential and hoping, it is proving the credential works before accepting
-  it.
+  does not belong to a real bot makes the registration fail, but the channel
+  itself is already saved by then. The new console tells you the provider
+  refused, and you correct the token and save again; the current admin screens
+  end in an error page instead, and the channel is still in the list.
 
-  This is why a channel cannot be prepared in advance and filled in later. Have
-  the token ready.
+  Have the token ready: until the provider accepts it, the channel does not
+  receive messages.
 </Warning>
 
 ## The webhook hash
 
 Every channel gets a unique hash, which becomes part of the URL the provider
 delivers to. It is not a display value: **it is the credential that identifies
-this channel**, which is why the list shows it in full only to those who may
-manage channels.
+this channel**, which is why it is shown only to those who may manage channels
+(on the channel's edit page).
 
-**Rotate webhook hash** issues a new one.
+**Rotate webhook hash** issues a new one. For Telegram the webhook is registered
+again with the new hash automatically; for other platforms, update the address
+with the provider.
 
 <Warning>
-  Rotating invalidates the URL the provider currently has. Deliveries stop until
-  the webhook is re-registered on the provider side, and nothing warns you —
-  messages simply arrive nowhere.
+  Rotating invalidates the URL the provider currently has. Where the webhook is
+  not registered again automatically, deliveries stop until you do it on the
+  provider side, and nothing warns you — messages simply arrive nowhere.
 
   Rotate when the hash may have leaked. Do not rotate to "refresh" a channel that
   is misbehaving; that is not what it fixes.

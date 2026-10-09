@@ -18,7 +18,7 @@ paths:
   - tests/Architecture/MessagingBoundariesTest.php
   - "database/migrations/tenant/*channels*"
   - "app/Filament/Assistant/Resources/Channels/**"
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-09
 ---
 # Channels
 
@@ -55,6 +55,11 @@ Messaging, and its tests still use the `Tests\Unit\Domains\Messaging\Telegram` n
 - `Telegram/TelegramChannelServiceProvider.php` — the reference integration; tags
   `channels.telegram_delivery`, `media.channel.uploader`, `media.channel.downloader`.
 - `Services/ChannelService.php`, `Observers/ChannelObserver.php`.
+- `Services/AssistantChannelService.php` — reads and writes the channels of an assistant the caller names (tenant
+  and assistant bounded explicitly, no Filament scope); the Inertia console and, later, the admin use it. The
+  type of a channel is chosen at creation and does not change in the console: changing it would leave the old
+  provider's webhook registered against a hash the router now reads as another type.
+  `Telegram/TelegramWebhookOptions.php` holds the update types and the `max_connections` bounds.
 - `app/Domains/Messaging/MessageSender.php`, `app/Domains/Messaging/Typing/`.
 - Jobs in `app/Jobs/Messaging/`: `BroadcastSendJob` (`messaging.broadcast`) and
   `SyncChannelWebhookJob` (`messaging.system`). `messaging.transactional` is reserved and has no

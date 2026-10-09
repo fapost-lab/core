@@ -38,6 +38,7 @@ final class MessagingBoundariesTest
             Selector::inNamespace('#^App\\\\Domains\\\\Channels\\\\#', true),
             Selector::NoneOf(
                 Selector::inNamespace('App\\Domains\\Channels\\Contracts'),
+                Selector::inNamespace('App\\Domains\\Channels\\DTOs'),
                 Selector::inNamespace('App\\Domains\\Channels\\Enums'),
                 Selector::inNamespace('App\\Domains\\Channels\\Models'),
                 Selector::inNamespace('App\\Domains\\Channels\\Observers'),
