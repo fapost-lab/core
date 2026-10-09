@@ -9,6 +9,7 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
 use App\Domains\Contact\Enums\PlatformEnum;
+use App\Domains\Contact\Services\InboundContactGate;
 use App\Domains\Conversation\Capture\ConversationCaptureFactory;
 use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Flow\Routing\MessageRouter;
@@ -32,9 +33,12 @@ use Illuminate\Foundation\Queue\Queueable;
  * Execution order (must be strictly preserved):
  *   1. Switch to tenant schema.
  *   2. Normalize raw payload → IncomingMessage via channel adapter.
- *   3. Resolve assistant + contact + channel.
- *   4. Delegate to MessageRouter::route().
- *   5. Release-with-delay if the router signalled a transient lock miss
+ *   3. Resolve the assistant.
+ *   4. Ask the active-contact gate; a refused sender is recorded and the job ends
+ *      before anything about them is stored.
+ *   5. Resolve contact + channel.
+ *   6. Delegate to MessageRouter::route().
+ *   7. Release-with-delay if the router signalled a transient lock miss
  *      that warrants retrying this job (vs the user-facing busy notice).
  */
 final class IncomingMessageJob implements ShouldQueue, TenantAccessGatedJob
@@ -70,6 +74,7 @@ final class IncomingMessageJob implements ShouldQueue, TenantAccessGatedJob
         MessageRouter $router,
         ConversationLoggerInterface $conversationLogger,
         ConversationCaptureFactory $captureFactory,
+        InboundContactGate $contactGate,
     ): void {
         $tenant = new RuntimeTenant(
             id: $this->payload->tenantId,
@@ -86,6 +91,7 @@ final class IncomingMessageJob implements ShouldQueue, TenantAccessGatedJob
                 $router,
                 $conversationLogger,
                 $captureFactory,
+                $contactGate,
             ): void {
                 $platform       = PlatformEnum::from($this->payload->platform);
                 $adapter        = $adapterResolver->resolve($platform);
@@ -93,6 +99,20 @@ final class IncomingMessageJob implements ShouldQueue, TenantAccessGatedJob
 
                 $assistant = $assistants->findById($this->payload->assistantId);
                 $currentAssistant->set($assistant);
+
+                // Stable across retries (ingress receive time), like the transcript's timestamp.
+                $receivedAt = CarbonImmutable::createFromTimestamp($this->payload->receivedAt, 'UTC');
+
+                // Before the contact exists: a refused sender leaves no trace but the refusal record.
+                if (! $contactGate->admit(
+                    tenantId: $this->payload->tenantId,
+                    platform: $platform,
+                    externalUserId: $inboundMessage->externalUserId,
+                    channelId: $this->payload->channelId,
+                    occurredAt: $receivedAt,
+                )) {
+                    return;
+                }
 
                 $contact = $contactService->findOrCreate(
                     tenantId: $this->payload->tenantId,
@@ -121,10 +141,9 @@ final class IncomingMessageJob implements ShouldQueue, TenantAccessGatedJob
                         channelId: $this->payload->channelId,
                         message: $inboundMessage,
                         idempotencyKey: $this->payload->idempotencyKey,
-                        // Stable across retries (ingress receive time) so a retried
-                        // delivery dedups on the transcript unique index instead of
-                        // inserting a duplicate row.
-                        occurredAt: CarbonImmutable::createFromTimestamp($this->payload->receivedAt, 'UTC'),
+                        // Stable across retries so a retried delivery dedups on the
+                        // transcript unique index instead of inserting a duplicate row.
+                        occurredAt: $receivedAt,
                     ),
                 );
 

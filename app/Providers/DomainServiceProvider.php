@@ -28,6 +28,7 @@ use App\Domains\Tenancy\Services\DomainBootstrapper;
 use App\Domains\Tenancy\Services\HostModeDeploymentCheck;
 use App\Domains\Tenancy\Services\HostTenantResolver;
 use App\Domains\Tenancy\Services\LimitRegistry;
+use App\Domains\Tenancy\Services\PeriodQuota;
 use App\Domains\Tenancy\Services\RecordQuota;
 use App\Domains\Tenancy\Services\RequestHostClassifier;
 use App\Domains\Tenancy\Services\SupportAccessTokenStore;
@@ -36,11 +37,13 @@ use App\Domains\Tenancy\Services\TenantProvisioningService;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Services\UnlimitedTenantLimits;
+use App\Domains\Tenancy\Services\UnlimitedUsageMeter;
 use App\Domains\Tenancy\Services\WebhookRegistryWriter;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
+use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Tenancy\Contracts\SupportAccessInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantDirectoryInterface;
@@ -182,10 +185,11 @@ final class DomainServiceProvider extends ServiceProvider
     }
 
     /**
-     * Limit registry, the default "no limits" answer and the record quota service.
+     * Limit registry, the default "no limits" answers and the record and per-period quota services.
      *
      * Package providers register before application providers, so the default is bound with
-     * bindIf: an operator package that already bound {@see TenantLimitsInterface} keeps its binding.
+     * bindIf: an operator package that already bound {@see TenantLimitsInterface} or
+     * {@see UsageMeterInterface} keeps its binding.
      */
     private function registerQuota(): void
     {
@@ -194,6 +198,10 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->bindIf(TenantLimitsInterface::class, UnlimitedTenantLimits::class);
         // Not a singleton: it reads the scoped tenant context.
         $this->app->bind(RecordQuotaInterface::class, RecordQuota::class);
+        // Same for the per-period usage meter: an operator's binding made earlier wins.
+        $this->app->bindIf(UsageMeterInterface::class, UnlimitedUsageMeter::class);
+        // Not a singleton either: it reads the scoped tenant context.
+        $this->app->bind(PeriodQuota::class);
     }
 
     /**

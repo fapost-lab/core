@@ -11,3 +11,4 @@ Schedule::command('logs:create-partition')->monthlyOn(1, '00:00');
 Schedule::job(new CleanupSoftDeletedMediaJob())->dailyAt('03:30');
 Schedule::command('flow:sweep-subflow-timeouts')->everyMinute()->withoutOverlapping();
 Schedule::command('support-access:prune')->dailyAt('03:45');
+Schedule::command('limit-refusals:prune')->dailyAt('04:00');

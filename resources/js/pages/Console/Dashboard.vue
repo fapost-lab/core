@@ -7,9 +7,10 @@ export default { layout: AppShell }
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Head, usePage } from '@inertiajs/vue3'
-import { FileText, ListOrdered } from '@lucide/vue'
+import { FileText, ListOrdered, UsersRound } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@fapost/ui/components/card'
+import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { interpolate } from '@fapost/ui/shell'
 
 interface DashboardTranslations {
@@ -23,15 +24,18 @@ interface DashboardTranslations {
   operations_intro: string
   live_sessions: string
   errors_24h: string
+  contact_limit: { title: string; reached: string; lifted: string; unknown: string; last: string }
 }
 
 const props = defineProps<{
   assistant: { id: string; name: string; isActive: boolean; channelsCount: number }
   operations: { liveSessions: number; errors24h: number; sessionsUrl: string | null; logsUrl: string | null }
+  contactLimit: { people: number; messages: number; lastRefusedAt: string; limit: number | null; limitKnown: boolean } | null
 }>()
 
-const page = usePage<{ translations: { console: { dashboard: DashboardTranslations } } }>()
+const page = usePage<{ locale: string; translations: { console: { dashboard: DashboardTranslations } } }>()
 const t = computed(() => page.props.translations.console.dashboard)
+const lastRefusedAt = computed(() => (props.contactLimit ? relativeTime(props.contactLimit.lastRefusedAt, page.props.locale) : ''))
 const status = computed(() => (props.assistant.isActive ? t.value.status_active : t.value.status_inactive))
 </script>
 
@@ -42,6 +46,27 @@ const status = computed(() => (props.assistant.isActive ? t.value.status_active 
     <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
 
     <div class="grid gap-4 md:grid-cols-2">
+      <Card v-if="contactLimit" class="md:col-span-2" data-test="contact-limit-card">
+        <CardHeader>
+          <CardTitle class="font-display flex items-center gap-2 tracking-wide uppercase">
+            <UsersRound aria-hidden="true" class="size-4" />
+            {{ t.contact_limit.title }}
+          </CardTitle>
+          <CardDescription>
+            {{
+              interpolate(!contactLimit.limitKnown ? t.contact_limit.unknown : contactLimit.limit === null ? t.contact_limit.lifted : t.contact_limit.reached, {
+                people: contactLimit.people,
+                messages: contactLimit.messages,
+                limit: contactLimit.limit ?? '',
+              })
+            }}
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="text-muted-foreground text-sm">
+          <p :title="contactLimit.lastRefusedAt">{{ interpolate(t.contact_limit.last, { time: lastRefusedAt }) }}</p>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle class="font-display">{{ t.sections.summary }}</CardTitle>

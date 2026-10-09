@@ -86,6 +86,12 @@ Options: `--tenant` for a single slug and `--json`.
 `conversations:prune` accepts `--dry-run`. Dropping is irreversible; threads and
 media are kept. See [Conversation retention](/self-hosting/observability#conversation-retention).
 
+## Limit refusals
+
+| Command | Does |
+|---|---|
+| `limit-refusals:prune` | Delete records of work a per-period limit turned away that are older than `quota.refusals_retention_days` (90 days), in every active tenant. Scheduled daily at 04:00 |
+
 <Warning>
   `logs:create-partition` is scheduled work. If the scheduler is not running,
   the partition for next month is never created — see

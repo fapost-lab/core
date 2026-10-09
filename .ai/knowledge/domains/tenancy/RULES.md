@@ -135,6 +135,15 @@ broken.
   operator package's binding. `TenantLimitsInterface` (default `UnlimitedTenantLimits`) is bound this
   way in `DomainServiceProvider`; do the same for any contract an operator package may replace.
   Enforced: `RecordQuotaTest` (a binding made before the provider runs wins).
+- **Per-period usage is asked of the operator, only through `PeriodQuota`, and fails open.**
+  `PeriodQuota::consume(key, unitKey, occurredAt)` requires a registered `PerPeriod` key, takes the
+  tenant from `TenantContext` and calls Foundation's `UsageMeterInterface`; Core never computes the
+  period. The operator is idempotent by unit key and period, so callers pass a natural key that a
+  retry repeats (inbound: `contact:` + sha256 of tenant, platform and external id; `occurredAt`
+  stable where the caller has a stable time, otherwise now). An operator error is reported and the
+  unit allowed — deliberately the opposite of `RecordQuota`, because no person is there to retry.
+  Without an operator package `UnlimitedUsageMeter` (bound with `bindIf`) allows everything.
+  Enforced: `PeriodQuotaTest`.
 - **Limits are answered by the operator package and counted by Core.** Records live in the tenant's
   schema, which the package cannot see, so `RecordQuota` (Core's `RecordQuotaInterface`, for the tenant in `TenantContext`) takes the current count from the caller, and
   the service that owns creation is the only place a counted record is created: `AssistantService::create()`

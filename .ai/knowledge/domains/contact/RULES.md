@@ -43,6 +43,13 @@ broken.
   the tenant alone would show a sibling assistant's contacts. Enforced: `AssistantContactService`,
   `ContactsConsoleTest`.
 
+- **A sender becomes a contact only after the inbound gate admits it.** In `IncomingMessageJob`
+  the `monthly_active_contacts` gate runs after the assistant is resolved and before any contact,
+  `channel_contact`, transcript entry or flow; a refused message leaves none of them and gets no
+  reply. Refusals are kept in `limit_refusals` (pseudonymous hash, counters, per limit key, person,
+  channel and UTC day) for 90 days (`limit-refusals:prune`); logs carry no external ids or text.
+  Enforced: `InboundContactGateTest`, `PruneLimitRefusalsCommandTest`.
+
 ## Rules
 
 - **The "deliverable contact" query and the language fallback exist twice** — the query in

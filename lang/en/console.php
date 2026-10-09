@@ -56,6 +56,13 @@ return [
         'operations_intro' => 'Diagnose live and recent flow executions.',
         'live_sessions'    => 'Live sessions (:count)',
         'errors_24h'       => 'Errors 24 h (:count)',
+        'contact_limit'    => [
+            'title'   => 'Contact limit reached',
+            'reached' => 'Not answered in the last 30 days: people :people, messages :messages. The limit of monthly active contacts (:limit) was reached.',
+            'lifted'  => 'Not answered in the last 30 days: people :people, messages :messages. The limit of monthly active contacts was reached; there is no such limit now.',
+            'unknown' => 'Not answered in the last 30 days: people :people, messages :messages. The limit of monthly active contacts was reached.',
+            'last'    => 'Last refusal: :time',
+        ],
     ],
 
     // Shared by every list screen built on the kit's DataTable.
