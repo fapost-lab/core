@@ -91,6 +91,18 @@ final class CoreTenantDirectoryTest extends FeatureTestCase
         $this->assertSame(1, $result->total);
     }
 
+    public function test_a_pending_tenant_is_listed_and_found_as_pending(): void
+    {
+        $id = $this->tenant('pend-a', 'pending');
+        $this->tenant('pend-b');
+
+        $found  = $this->directory->find($id);
+        $listed = $this->directory->list(new TenantListQuery(search: 'pend-', status: TenantStatus::Pending));
+
+        $this->assertSame(TenantStatus::Pending, $found?->status);
+        $this->assertSame(['pend-a'], $this->slugs($listed->items));
+    }
+
     public function test_only_ids_and_except_ids_narrow_the_list(): void
     {
         $a = $this->tenant('ids-a');

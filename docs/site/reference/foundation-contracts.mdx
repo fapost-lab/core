@@ -79,6 +79,7 @@ DTOs: `UploadContext`, `UploadResult`, `DownloadResult`. Enum: `MediaKind`.
 | Contract | Role |
 |---|---|
 | `Tenancy\Contracts\TenantProvisionerInterface` | Creating a tenant with its first administrator. Implemented by Core; a package only calls it |
+| `Tenancy\Contracts\TenantReservationInterface` | Holding a slug for a tenant that does not exist yet, then completing it by id. Implemented by Core; a package only calls it |
 
 `provision(ProvisionTenant): ProvisionedTenant` creates the tenant record, its database schema,
 runs the migrations and creates the first admin.
@@ -91,13 +92,51 @@ runs the migrations and creates the first admin.
   login on the tenant's own host).
 - Failures are `Exceptions\TenantProvisioningFailedException` with a `reason`
   (`Enums\ProvisioningFailure`): `SlugInvalid`, `SlugReserved`, `SlugTaken`,
-  `AdminCredentialsMissing`, `AdminPasswordHashInvalid` and `Failed`. All but `Failed` are
-  caused by the input. The top-level message never contains credentials; messages in the
-  `previous` chain come from Core and are not redacted.
+  `AdminCredentialsMissing`, `AdminPasswordHashInvalid` and `Failed`; the reservation contract
+  below adds `TenantNotFound`, `TenantNotPending`, `Conflict` and `InProgress`. `isInputError()` is true for
+  every reason except `Failed`, `Conflict` and `InProgress`, and `isRetryable()` is true for `Failed` and `InProgress` only. The
+  top-level message never contains credentials; messages in the `previous` chain come from Core
+  and are not redacted.
 
 Provisioning is synchronous and slow, because the full tenant schema is migrated: run it from a
-console command or a queued job, not an HTTP request. After `Failed` the slug stays taken (an
-inactive tenant) until it is cleaned up, so a retry gets `SlugTaken`; do not retry automatically.
+console command or a queued job, not an HTTP request. After `Failed` the slug is held by a
+`Pending` tenant, whose id is on the exception (`tenantId`), so a retry of this method gets
+`SlugTaken`. To continue, call `TenantReservationInterface::provision()` with that id.
+
+`Tenancy\Contracts\TenantReservationInterface` splits creation in two. A tenant is first
+reserved: a `Pending` tenant holds the slug and has no schema, takes no traffic and shows in the
+directory with status `Pending`. It is completed later, by id.
+
+- `check(string $slug): SlugCheck` writes nothing and is advisory; only `reserve()` decides.
+  `SlugCheck` carries `availability` (`Enums\SlugAvailability`: `Available`, `Invalid`, `Reserved`,
+  `Taken`) and, for `Invalid` only, `problem` (`Enums\SlugProblem`: `Malformed`, `TooLong`,
+  `PunycodePrefix`, `ConsecutiveHyphens`). The problem is a code: the text a person reads is the
+  caller's, in the caller's language. A slug held by any tenant, `Pending` ones included, is `Taken`.
+- `reserve(string $slug, string $reservationKey): ReservedTenant` creates the `Pending` tenant and
+  returns its `id` and `slug`. The key is a stable string of 1 to 64 characters that the caller stores
+  before calling, such as the id of its own sign-up record. Reserving again with the same key returns
+  the same tenant in any status, so a caller that crashed after the call can find its tenant. A key
+  stays bound to its slug: the same key with another slug throws `InvalidArgumentException`, as does
+  an empty or over-long key. A refusal is a `TenantProvisioningFailedException` with `SlugInvalid`,
+  `SlugReserved` or `SlugTaken`; a slug whose schema name is already used by a schema without a
+  tenant is `SlugTaken`.
+- `release(string $tenantId): void` deletes a `Pending` tenant that never started provisioning. An
+  unknown id does nothing. A tenant that is not `Pending`, has claimed its schema or is being
+  provisioned right now throws `TenantReleaseRefusedException` and is left as it is; a tenant that
+  has claimed a schema is removed only by an operator.
+- `provision(string $tenantId, TenantAdmin $admin): ProvisionedTenant` completes a `Pending` tenant.
+  `TenantAdmin` carries `email`, `name` and `passwordHash` under the same rules as `ProvisionTenant`.
+  Repeating the call is safe: after a failure or a killed worker it continues where it stopped, and on
+  an `Active` tenant it returns at once. A failure leaves the tenant `Pending` and throws
+  `Failed` with `tenantId`. Another run holding the tenant throws `InProgress`; repeat later. A
+  crashed run frees the tenant for a repeat after the lease runs out (15 minutes by default,
+  `tenancy.provisioning.lease_seconds`). The reasons `TenantNotFound` and `TenantNotPending`
+  (inactive or suspended) will not go away on a repeat, and neither will `Conflict`: a schema of the
+  tenant's name that the tenant never claimed, or a user already in the tenant besides the first
+  administrator. The tenant stays `Pending` until an operator resolves it; do not queue a retry.
+
+`Enums\TenantStatus` gains `Pending`. New statuses and reasons may appear in a minor release, so
+branch on them with a default arm.
 
 `Tenancy\Contracts\TenantDirectoryInterface` is the read side: `list(TenantListQuery): TenantList`,
 `find(string $id): ?TenantSummary` and `findMany(array $ids): array` (keyed by id). Implemented by
@@ -108,7 +147,7 @@ Core; a package only calls it.
   descending. `perPage` is 1 to 100 and each id list holds at most 1000 ids. `onlyIds: []` matches
   nothing; `null` means no restriction.
 - `TenantList` carries `items`, the `total` across all pages, `page` and `perPage`.
-- `TenantSummary` carries `id`, `slug`, `status` (`Active`, `Inactive`, `Suspended`), `createdAt`
+- `TenantSummary` carries `id`, `slug`, `status` (`Pending`, `Active`, `Inactive`, `Suspended`), `createdAt`
   (UTC, may be null), `url` (the tenant host root, with a trailing slash) and `loginUrl` (the admin
   login). With a single tenant per installation every tenant shares the application URL, so `url`
   addresses a tenant only when the platform resolves tenants by host.

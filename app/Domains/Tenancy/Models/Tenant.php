@@ -15,6 +15,11 @@ use Illuminate\Database\Eloquent\Model;
  * @property string       $schema_name
  * @property TenantStatus $status
  * @property array<array-key, mixed> $config
+ * @property string|null $reservation_key
+ * @property \Illuminate\Support\Carbon|null $provisioning_lease_until
+ * @property \Illuminate\Support\Carbon|null $schema_claimed_at
+ * @property \Illuminate\Support\Carbon|null $provisioning_failed_at
+ * @property string|null $provisioning_error
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  * @method static Builder<static>|Tenant newModelQuery()
@@ -47,6 +52,7 @@ final class Tenant extends Model implements TenantInterface
         'schema_name',
         'status',
         'config',
+        'reservation_key',
     ];
 
     public function getId(): string
@@ -80,8 +86,11 @@ final class Tenant extends Model implements TenantInterface
     protected function casts(): array
     {
         return [
-            'config' => 'array',
-            'status' => TenantStatus::class,
+            'config'                   => 'array',
+            'status'                   => TenantStatus::class,
+            'provisioning_lease_until' => 'datetime',
+            'schema_claimed_at'        => 'datetime',
+            'provisioning_failed_at'   => 'datetime',
         ];
     }
 }

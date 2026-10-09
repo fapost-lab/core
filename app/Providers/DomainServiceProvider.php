@@ -17,6 +17,7 @@ use App\Domains\Tenancy\Database\TenantPostgresConnection;
 use App\Domains\Tenancy\Infrastructure\CoreSupportAccess;
 use App\Domains\Tenancy\Infrastructure\CoreTenantDirectory;
 use App\Domains\Tenancy\Infrastructure\CoreTenantProvisioner;
+use App\Domains\Tenancy\Infrastructure\CoreTenantReservations;
 use App\Domains\Tenancy\Infrastructure\EloquentWebhookRegistryReader;
 use App\Domains\Tenancy\Repositories\TenantRepository;
 use App\Domains\Tenancy\Services\AlwaysActiveAccessMode;
@@ -30,6 +31,7 @@ use App\Domains\Tenancy\Services\RecordQuota;
 use App\Domains\Tenancy\Services\RequestHostClassifier;
 use App\Domains\Tenancy\Services\SupportAccessTokenStore;
 use App\Domains\Tenancy\Services\TenantContext;
+use App\Domains\Tenancy\Services\TenantProvisioningService;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Services\UnlimitedTenantLimits;
@@ -42,6 +44,7 @@ use Fapost\Foundation\Tenancy\Contracts\SupportAccessInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantDirectoryInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface;
+use Fapost\Foundation\Tenancy\Contracts\TenantReservationInterface;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Database\Connection;
 use Illuminate\Support\ServiceProvider;
@@ -94,6 +97,8 @@ final class DomainServiceProvider extends ServiceProvider
             $this->platformSubdomains($app['config']),
         ));
         $this->app->bind(TenantProvisionerInterface::class, CoreTenantProvisioner::class);
+        // Plain bind as well: Core is the only implementation of slug reservation, and nothing in Core calls it.
+        $this->app->bind(TenantReservationInterface::class, CoreTenantReservations::class);
         $this->app->bind(TenantDirectoryInterface::class, CoreTenantDirectory::class);
 
         // Core is the only implementation of support access, so a plain bind: an operator package
@@ -101,6 +106,10 @@ final class DomainServiceProvider extends ServiceProvider
         // (`tenancy.support_access.enabled`), not unbound.
         $this->app->bind(SupportAccessInterface::class, CoreSupportAccess::class);
         $this->app->bind(SupportAccessRedeemerInterface::class, SupportAccessTokenStore::class);
+
+        $this->app->when(TenantProvisioningService::class)
+            ->needs('$leaseSeconds')
+            ->giveConfig('tenancy.provisioning.lease_seconds', 900);
 
         $this->app->when(ConfigTenantResolver::class)
             ->needs('$defaultTenantSlug')

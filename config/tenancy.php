@@ -68,6 +68,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Provisioning
+    |--------------------------------------------------------------------------
+    |
+    | lease_seconds - how long a provisioning run holds a Pending tenant before
+    |                 another run may take it over. Renewed between steps, so it
+    |                 only needs to outlast the slowest single step (a tenant
+    |                 migration). A killed run frees the tenant after this long;
+    |                 a repeat before then is told the tenant is in progress.
+    |                 Never below 60: a shorter lease would expire inside a
+    |                 single migration and let a second run start.
+    |
+    */
+    'provisioning' => [
+        'lease_seconds' => max(60, (int) env('TENANCY_PROVISIONING_LEASE_SECONDS', 900)),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Reserved tenant slugs
     |--------------------------------------------------------------------------
     |

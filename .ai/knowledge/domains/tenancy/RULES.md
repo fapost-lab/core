@@ -89,8 +89,22 @@ broken.
   to tenant migrations and queries. Enforced: `TenantDatabaseManagerTest`.
 - **An aborted transaction does not drop the connection to `public`.** `TenantPostgresConnection`
   re-applies `search_path` after a rollback. Enforced: `TenantDatabaseManagerTest`.
-- **Provisioning leaves a tenant inactive until its first admin exists**
-  (`TenantProvisioningService`). Why: a half-provisioned tenant must not accept traffic.
+- **A tenant stays `pending` until provisioning completes, and provisioning resumes by id.**
+  `reserve` inserts a Pending row with no schema (unique `slug`, `schema_name`, `reservation_key`;
+  the same key returns the same tenant); `provisionReserved` takes a lease on the row (a conditional
+  UPDATE, `tenancy.provisioning.lease_seconds`, default 900, at least 60), and every later write —
+  schema claim, lease renewal, failure mark, activation — is conditioned on the lease end it read, so
+  a run that lost its lease changes nothing. The schema claim marker is written before
+  `CREATE SCHEMA`; a schema without this row's marker is never adopted (`Conflict`). The tenant turns
+  `active` only after its first admin and the webhook warm-up. A failure leaves the row Pending with
+  `<step>: <exception class>`; messages and bindings (a password hash may be among them) go nowhere
+  but the exception chain. `release` is one conditional DELETE, refused once a schema is claimed or a
+  lease is live. Pending is never served (host and config resolvers require Active) and console
+  iterations skip it. Why: a half-provisioned tenant must not accept traffic, and a killed worker
+  must not orphan a slug or a schema. Enforced: `CoreTenantReservationsTest`,
+  `ResumableProvisioningTest`, `PostgresProvisioningTest` (pgsql), `CreateFirstAdminIdempotencyTest`.
+- **`TenantReservationInterface` is Core's alone, bound with a plain `bind`.** Core never calls it;
+  only an operator package does. Without a package nothing changes.
 - **The landlord table is the source of truth for the webhook registry; Redis is a cache.**
   Anything in Redis can be rebuilt by `WebhookRegistryHealthChecker`.
 

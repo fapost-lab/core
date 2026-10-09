@@ -22,6 +22,7 @@ to FaPost, and the Laravel ones whose value matters here.
 |---|---|---|
 | `TENANCY_BASE_DOMAIN` | `localhost` | Base domain tenant hosts are derived from |
 | `TENANCY_RESOLUTION` | `single` | `single`: one tenant, named by `TENANT_SLUG`. `host`: the tenant is taken from the request host `<slug>.<TENANCY_BASE_DOMAIN>`, so one install serves many tenants; unknown hosts get 404 |
+| `TENANCY_PROVISIONING_LEASE_SECONDS` | `900` | How long a provisioning run holds a pending tenant before another run may take it over (at least 60; the run renews it between steps). A crashed run frees the tenant after this long |
 | `TENANT_SLUG` | `app` | The tenant served in `single` mode; ignored in `host` mode |
 | `WEBHOOK_BASE_URL` | `${APP_URL}` | The base providers will call back on |
 | `WEBHOOK_INGRESS_DRIVER` | `laravel` | `laravel` or `gateway` |
