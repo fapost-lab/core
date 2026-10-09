@@ -32,6 +32,7 @@ final class CreateFlowActionTest extends TestCase
             $table->text('description')->nullable();
             $table->boolean('is_public')->default(true);
             $table->boolean('is_active')->default(true);
+            $table->boolean('logging_enabled')->default(false);
             $table->json('nodes')->nullable();
             $table->json('edges')->nullable();
             $table->timestamps();
@@ -103,14 +104,16 @@ final class CreateFlowActionTest extends TestCase
         );
 
         $draft = app(CreateFlowAction::class)->execute([
-            'assistant_id'  => '00000000-0000-0000-0000-000000000003',
-            'flow_group_id' => $groupId,
-            'name'          => 'Reset session',
-            'description'   => 'Reset session in any place',
-            'is_public'     => true,
+            'assistant_id'    => '00000000-0000-0000-0000-000000000003',
+            'flow_group_id'   => $groupId,
+            'name'            => 'Reset session',
+            'description'     => 'Reset session in any place',
+            'is_public'       => true,
+            'logging_enabled' => true,
         ]);
 
         $this->assertSame($tenantId, $draft->tenant_id);
+        $this->assertTrue($draft->logging_enabled, 'The flag the form sends is kept, not dropped.');
         $this->assertSame($groupId, $draft->flow_group_id);
         $this->assertSame('Reset session', $draft->name);
         $this->assertDatabaseHas('flow_drafts', [

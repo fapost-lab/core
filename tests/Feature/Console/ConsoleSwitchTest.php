@@ -38,9 +38,45 @@ final class ConsoleSwitchTest extends FeatureTestCase
         $this->assertStringContainsString('Filament', $action);
     }
 
+    public function test_filament_answers_the_flow_and_flow_group_screens(): void
+    {
+        foreach ([
+            'filament.assistant.resources.flows.index',
+            'filament.assistant.resources.flows.create',
+            'filament.assistant.resources.flows.edit',
+            'filament.assistant.resources.flow-groups.index',
+            'filament.assistant.resources.flow-groups.create',
+            'filament.assistant.resources.flow-groups.edit',
+        ] as $name) {
+            $action = $this->route($name)->getActionName();
+
+            $this->assertStringNotContainsString('App\\Http\\Controllers\\Console', $action, $name);
+            $this->assertStringContainsString('Filament', $action, $name);
+        }
+    }
+
+    public function test_the_builder_page_is_named_with_the_switch_off_too(): void
+    {
+        $this->assertNotNull(Route::getRoutes()->getByName('builder.flows.show'));
+    }
+
     public function test_no_console_route_is_registered(): void
     {
-        foreach (['console.auth.login.attempt', 'console.auth.logout', 'console.locale.update'] as $name) {
+        foreach ([
+            'console.auth.login.attempt',
+            'console.auth.logout',
+            'console.locale.update',
+            'console.flows.store',
+            'console.flows.update',
+            'console.flows.activity',
+            'console.flows.destroy',
+            'console.flows.destroy-many',
+            'console.flow-groups.store',
+            'console.flow-groups.store-inline',
+            'console.flow-groups.update',
+            'console.flow-groups.destroy',
+            'console.flow-groups.destroy-many',
+        ] as $name) {
             $this->assertNull(Route::getRoutes()->getByName($name), $name);
         }
 

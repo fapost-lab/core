@@ -7,6 +7,8 @@ use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
 use App\Http\Controllers\Console\ContactGroupController;
 use App\Http\Controllers\Console\DashboardController;
+use App\Http\Controllers\Console\FlowController;
+use App\Http\Controllers\Console\FlowGroupController;
 use App\Http\Controllers\Console\LocaleController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\SetConsoleRootView;
@@ -63,5 +65,26 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::delete('assistant/{tenant}/contact-groups', [ContactGroupController::class, 'destroyMany'])->name('console.contact-groups.destroy-many');
         Route::put('assistant/{tenant}/contact-groups/{record}', [ContactGroupController::class, 'update'])->name('console.contact-groups.update');
         Route::delete('assistant/{tenant}/contact-groups/{record}', [ContactGroupController::class, 'destroy'])->name('console.contact-groups.destroy');
+
+        // Flow groups and flows: both belong to the assistant in the URL. Creating a flow ends in the builder.
+        Route::get('assistant/{tenant}/flow-groups', [FlowGroupController::class, 'index'])->name('filament.assistant.resources.flow-groups.index');
+        Route::get('assistant/{tenant}/flow-groups/create', [FlowGroupController::class, 'create'])->name('filament.assistant.resources.flow-groups.create');
+        Route::get('assistant/{tenant}/flow-groups/{record}/edit', [FlowGroupController::class, 'edit'])->name('filament.assistant.resources.flow-groups.edit');
+        Route::post('assistant/{tenant}/flow-groups', [FlowGroupController::class, 'store'])->name('console.flow-groups.store');
+        // A group made from a flow's form, without leaving it.
+        Route::post('assistant/{tenant}/flow-groups/inline', [FlowGroupController::class, 'storeInline'])->name('console.flow-groups.store-inline');
+        Route::delete('assistant/{tenant}/flow-groups', [FlowGroupController::class, 'destroyMany'])->name('console.flow-groups.destroy-many');
+        Route::put('assistant/{tenant}/flow-groups/{record}', [FlowGroupController::class, 'update'])->name('console.flow-groups.update');
+        Route::delete('assistant/{tenant}/flow-groups/{record}', [FlowGroupController::class, 'destroy'])->name('console.flow-groups.destroy');
+
+        Route::get('assistant/{tenant}/flows', [FlowController::class, 'index'])->name('filament.assistant.resources.flows.index');
+        Route::get('assistant/{tenant}/flows/create', [FlowController::class, 'create'])->name('filament.assistant.resources.flows.create');
+        Route::get('assistant/{tenant}/flows/{record}/edit', [FlowController::class, 'edit'])->name('filament.assistant.resources.flows.edit');
+        Route::post('assistant/{tenant}/flows', [FlowController::class, 'store'])->name('console.flows.store');
+        Route::delete('assistant/{tenant}/flows', [FlowController::class, 'destroyMany'])->name('console.flows.destroy-many');
+        Route::put('assistant/{tenant}/flows/{record}', [FlowController::class, 'update'])->name('console.flows.update');
+        // The state is sent (`active`), not toggled, so a repeated request changes nothing.
+        Route::patch('assistant/{tenant}/flows/{record}/active', [FlowController::class, 'updateActivity'])->name('console.flows.activity');
+        Route::delete('assistant/{tenant}/flows/{record}', [FlowController::class, 'destroy'])->name('console.flows.destroy');
     });
 });

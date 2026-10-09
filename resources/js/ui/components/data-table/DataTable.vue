@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import { useDebounceFn } from '@vueuse/core'
-import { ArrowDown, ArrowUp, ArrowUpDown, Search, X } from '@lucide/vue'
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, Search, X } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { Checkbox } from '@fapost/ui/components/checkbox'
 import { Input } from '@fapost/ui/components/input'
@@ -13,12 +13,14 @@ import type { ShellPageProps } from '@fapost/ui/shell'
 import DataTablePagination from './DataTablePagination.vue'
 import {
   buildQuery,
+  groupRuns,
   keepVisible,
   nextSort,
   selectionState,
   sortDirection,
   toggleAll,
   toggleRow,
+  visibleRows,
   type TableDefaults,
   type TableMeta,
   type TableState,
@@ -33,10 +35,15 @@ import type { DataTableColumn } from './types'
  * Slots:
  *  - `cell-<key>` (row)   : the content of a cell, instead of the row's value;
  *  - `actions` (row)      : the last cell of a row, for its buttons;
- *  - `toolbar`            : beside the search, for a "New" button;
+ *  - `toolbar`            : beside the search, for a "New" button and the screen's filters; gets `filters` (the applied
+ *                           ones), `setFilter(key, value)` (an empty value clears it), `group` (the key of the grouping
+ *                           applied, '') and `setGroup(key)`; each change starts over on the first page;
  *  - `bulk-actions` (selected, clear): shown while rows are ticked (needs `selectable`);
  *  - `empty` (searching)  : the empty state, instead of the plain text; `searching` tells a search that found
  *                           nothing from a list that is empty.
+ *
+ * Grouping: when the server has applied a grouping (`state.group` is set) and the screen gives `groupOf`, neighbouring
+ * rows with the same group key sit under a header row that collapses them. The table shows the order it was sent in.
  */
 const props = withDefaults(
   defineProps<{
@@ -54,6 +61,8 @@ const props = withDefaults(
     searchable?: boolean
     hasActions?: boolean
     searchLabel?: string
+    /** The group a row belongs to, for a grouped list: the key tells groups apart, the label is the header's text. */
+    groupOf?: (row: T) => { key: string; label: string }
   }>(),
   {
     rowKey: 'id',
@@ -62,6 +71,7 @@ const props = withDefaults(
     searchable: true,
     hasActions: false,
     searchLabel: undefined,
+    groupOf: undefined,
   },
 )
 
@@ -78,10 +88,51 @@ const selected = ref<string[]>([])
 // Typed text the server has not seen yet: the input is the user's until the visit that sends it.
 let typingPending = false
 
-const rowIds = computed(() => props.rows.map((row) => idOf(row)))
+// The keys of the group runs the user collapsed; kept by key, so a reload that keeps the group keeps it closed.
+const collapsed = ref<string[]>([])
+
+// Select-all and the selection cover what is on screen: rows inside a collapsed group are not.
+const rowIds = computed(() => visibleRows(runs.value, collapsed.value).map((row) => idOf(row)))
 const allSelected = computed(() => selectionState(selected.value, rowIds.value))
 const columnCount = computed(() => props.columns.length + (props.selectable ? 1 : 0) + (props.hasActions ? 1 : 0))
 const isSearching = computed(() => props.state.search !== '')
+const isGrouped = computed(() => props.groupOf !== undefined && (props.state.group ?? '') !== '')
+
+interface BodyRun {
+  key: string
+  label: string | null
+  rows: T[]
+}
+
+const runs = computed<BodyRun[]>(() => {
+  const groupOf = props.groupOf
+
+  if (!isGrouped.value || !groupOf) {
+    return [{ key: '', label: null, rows: props.rows }]
+  }
+
+  return groupRuns(props.rows, (row) => groupOf(row).key).map((run) => ({ ...run, label: groupOf(run.rows[0]).label }))
+})
+
+function toggleRun(key: string): void {
+  collapsed.value = collapsed.value.includes(key) ? collapsed.value.filter((value) => value !== key) : [...collapsed.value, key]
+}
+
+function setFilter(key: string, value: string): void {
+  const filters = { ...(props.state.filters ?? {}) }
+
+  if (value === '') {
+    delete filters[key]
+  } else {
+    filters[key] = value
+  }
+
+  visit({ filters })
+}
+
+function setGroup(group: string): void {
+  visit({ group })
+}
 
 function idOf(row: T): string {
   return String(row[props.rowKey])
@@ -184,8 +235,8 @@ function ariaSort(column: DataTableColumn): 'ascending' | 'descending' | 'none' 
         </Button>
       </div>
 
-      <div class="flex items-center gap-2">
-        <slot name="toolbar" />
+      <div class="flex flex-wrap items-center gap-2">
+        <slot name="toolbar" :filters="state.filters ?? {}" :set-filter="setFilter" :group="state.group ?? ''" :set-group="setGroup" />
       </div>
     </div>
 
@@ -247,23 +298,44 @@ function ariaSort(column: DataTableColumn): 'ascending' | 'descending' | 'none' 
             </slot>
           </TableEmpty>
 
-          <TableRow v-for="row in rows" :key="idOf(row)" :data-state="selected.includes(idOf(row)) ? 'selected' : undefined">
-            <TableCell v-if="selectable" class="w-10 pl-3">
-              <Checkbox
-                :model-value="selected.includes(idOf(row))"
-                :aria-label="interpolate(t.select_row, { name: labelOf(row) })"
-                @update:model-value="(value) => setSelected(toggleRow(selected, idOf(row), value === true))"
-              />
-            </TableCell>
+          <template v-for="(run, runIndex) in runs" :key="`${runIndex}:${run.key}`">
+            <TableRow v-if="run.label !== null" class="bg-muted/40 hover:bg-muted/40">
+              <TableCell :colspan="columnCount" class="py-1.5">
+                <button
+                  type="button"
+                  class="hover:text-foreground focus-visible:ring-ring/50 -mx-1 inline-flex items-center gap-1.5 rounded px-1 text-sm font-medium outline-none focus-visible:ring-3"
+                  :aria-expanded="!collapsed.includes(run.key)"
+                  :aria-label="interpolate(collapsed.includes(run.key) ? t.expand_group : t.collapse_group, { name: run.label })"
+                  @click="toggleRun(run.key)"
+                >
+                  <ChevronRight v-if="collapsed.includes(run.key)" class="size-4" aria-hidden="true" />
+                  <ChevronDown v-else class="size-4" aria-hidden="true" />
+                  {{ run.label }}
+                  <span class="text-muted-foreground font-normal">({{ run.rows.length }})</span>
+                </button>
+              </TableCell>
+            </TableRow>
 
-            <TableCell v-for="column in columns" :key="column.key" :class="cn(align(column), column.class)">
-              <slot :name="`cell-${column.key}`" :row="row">{{ row[column.key] }}</slot>
-            </TableCell>
+            <template v-if="run.label === null || !collapsed.includes(run.key)">
+              <TableRow v-for="row in run.rows" :key="idOf(row)" :data-state="selected.includes(idOf(row)) ? 'selected' : undefined">
+                <TableCell v-if="selectable" class="w-10 pl-3">
+                  <Checkbox
+                    :model-value="selected.includes(idOf(row))"
+                    :aria-label="interpolate(t.select_row, { name: labelOf(row) })"
+                    @update:model-value="(value) => setSelected(toggleRow(selected, idOf(row), value === true))"
+                  />
+                </TableCell>
 
-            <TableCell v-if="hasActions" class="text-right whitespace-nowrap">
-              <slot name="actions" :row="row" />
-            </TableCell>
-          </TableRow>
+                <TableCell v-for="column in columns" :key="column.key" :class="cn(align(column), column.class)">
+                  <slot :name="`cell-${column.key}`" :row="row">{{ row[column.key] }}</slot>
+                </TableCell>
+
+                <TableCell v-if="hasActions" class="text-right whitespace-nowrap">
+                  <slot name="actions" :row="row" />
+                </TableCell>
+              </TableRow>
+            </template>
+          </template>
         </TableBody>
       </Table>
     </div>

@@ -6,6 +6,7 @@ namespace Tests\Unit\Http\DataTable;
 
 use App\Http\DataTable\DataTable;
 use Illuminate\Database\Capsule\Manager as Capsule;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
@@ -145,6 +146,85 @@ final class DataTableTest extends TestCase
         $result = $this->table()->respond($this->request(['search' => 'a']), Thing::query()->where('name', '!=', 'Banana'), $this->row(...));
 
         $this->assertSame(['A_b', 'Apple', 'Date'], array_column($result['rows'], 'name'));
+    }
+
+    public function test_a_table_that_declares_no_filters_or_groups_has_neither_in_its_state(): void
+    {
+        $result = $this->table()->respond($this->request(['filter' => ['starts' => 'a'], 'group' => 'a_first']), Thing::query(), $this->row(...));
+
+        $this->assertSame(6, $result['meta']['total']);
+        $this->assertSame(['search' => '', 'sort' => 'name', 'perPage' => 25], $result['state']);
+        $this->assertSame(['sort' => 'name', 'perPage' => 25, 'perPageOptions' => [25, 50, 100]], $result['defaults']);
+    }
+
+    public function test_a_declared_filter_narrows_the_query_and_is_echoed_back(): void
+    {
+        $result = $this->filtered()->respond($this->request(['filter' => ['starts' => ' a ']]), Thing::query(), $this->row(...));
+
+        $this->assertSame(['A_b', 'Apple'], array_column($result['rows'], 'name'));
+        $this->assertSame(['starts' => 'a'], $result['state']['filters']);
+        $this->assertSame('', $result['state']['group']);
+        $this->assertSame('', $result['defaults']['group']);
+    }
+
+    public function test_a_filter_the_screen_declined_or_never_declared_is_not_applied(): void
+    {
+        // `starts` declines anything that is not a single letter; `secret` is not a declared filter.
+        foreach ([['starts' => 'abc'], ['starts' => ''], ['starts' => ['a']], ['secret' => 'z-Date'], ['STARTS' => 'a']] as $filter) {
+            $result = $this->filtered()->respond($this->request(['filter' => $filter]), Thing::query(), $this->row(...));
+
+            $this->assertSame(6, $result['meta']['total'], json_encode($filter));
+            $this->assertSame([], $result['state']['filters'], json_encode($filter));
+        }
+
+        $result = $this->filtered()->respond($this->request(['filter' => 'a']), Thing::query(), $this->row(...));
+
+        $this->assertSame(6, $result['meta']['total']);
+    }
+
+    public function test_a_declared_group_orders_the_rows_before_the_sort_does(): void
+    {
+        $result = $this->filtered()->respond($this->request(['group' => 'a_first']), Thing::query(), $this->row(...));
+
+        $this->assertSame(['A_b', 'Apple', '50% off', 'Banana', 'Cherry', 'Date'], array_column($result['rows'], 'name'));
+        $this->assertSame('a_first', $result['state']['group']);
+
+        $result = $this->filtered()->respond($this->request(['group' => 'a_first', 'sort' => '-name']), Thing::query(), $this->row(...));
+
+        $this->assertSame(['Apple', 'A_b', 'Date', 'Cherry', 'Banana', '50% off'], array_column($result['rows'], 'name'));
+    }
+
+    public function test_an_unknown_group_is_no_group(): void
+    {
+        foreach (['nope', '', ['a_first'], 'A_FIRST'] as $group) {
+            $result = $this->filtered()->respond($this->request(['group' => $group]), Thing::query(), $this->row(...));
+
+            $this->assertSame('', $result['state']['group'], json_encode($group));
+            $this->assertSame('50% off', $result['rows'][0]['name'], json_encode($group));
+        }
+    }
+
+    private function filtered(): DataTable
+    {
+        return new DataTable(
+            sortable: ['name'],
+            searchable: ['name'],
+            defaultSort: 'name',
+            filters: [
+                'starts' => static function (Builder $query, string $value): bool {
+                    if (1 !== preg_match('/^[a-z]$/i', $value)) {
+                        return false;
+                    }
+
+                    $query->where('name', 'like', $value . '%');
+
+                    return true;
+                },
+            ],
+            groups: [
+                'a_first' => static fn (Builder $query) => $query->orderByRaw("CASE WHEN name LIKE 'A%' THEN 0 ELSE 1 END"),
+            ],
+        );
     }
 
     /**

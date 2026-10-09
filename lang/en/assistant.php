@@ -55,8 +55,9 @@ return [
             'create_modal_heading' => 'Create group',
         ],
         'delete_guard' => [
-            'title' => 'Cannot delete',
-            'body'  => 'This flow has active sessions. Deactivate it first.',
+            'title'   => 'Cannot delete',
+            'body'    => 'This flow has active sessions. Deactivate it first.',
+            'skipped' => 'Skipped because they have active sessions: :count.',
         ],
         'trigger_summary' => [
             'message'  => 'Message: keywords :keywords; phrases :phrases',
@@ -75,8 +76,9 @@ return [
             'flows_count' => 'Flows',
         ],
         'delete_guard' => [
-            'title' => 'Cannot delete',
-            'body'  => 'This group has flows. Move or delete them first.',
+            'title'   => 'Cannot delete',
+            'body'    => 'This group has flows. Move or delete them first.',
+            'skipped' => 'Skipped because they still have flows: :count.',
         ],
     ],
     'pages' => [

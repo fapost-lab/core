@@ -8,6 +8,8 @@ use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
 use App\Http\Controllers\Console\ContactGroupController;
 use App\Http\Controllers\Console\DashboardController;
+use App\Http\Controllers\Console\FlowController;
+use App\Http\Controllers\Console\FlowGroupController;
 use App\Http\Controllers\Console\LocaleController;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
@@ -34,6 +36,34 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'contact groups list'   => ['filament.assistant.resources.contact-groups.index', ContactGroupController::class, 'index', 'assistant/{tenant}/contact-groups'],
             'contact groups create' => ['filament.assistant.resources.contact-groups.create', ContactGroupController::class, 'create', 'assistant/{tenant}/contact-groups/create'],
             'contact groups edit'   => ['filament.assistant.resources.contact-groups.edit', ContactGroupController::class, 'edit', 'assistant/{tenant}/contact-groups/{record}/edit'],
+            'flow groups list'      => ['filament.assistant.resources.flow-groups.index', FlowGroupController::class, 'index', 'assistant/{tenant}/flow-groups'],
+            'flow groups create'    => ['filament.assistant.resources.flow-groups.create', FlowGroupController::class, 'create', 'assistant/{tenant}/flow-groups/create'],
+            'flow groups edit'      => ['filament.assistant.resources.flow-groups.edit', FlowGroupController::class, 'edit', 'assistant/{tenant}/flow-groups/{record}/edit'],
+            'flows list'            => ['filament.assistant.resources.flows.index', FlowController::class, 'index', 'assistant/{tenant}/flows'],
+            'flows create'          => ['filament.assistant.resources.flows.create', FlowController::class, 'create', 'assistant/{tenant}/flows/create'],
+            'flows edit'            => ['filament.assistant.resources.flows.edit', FlowController::class, 'edit', 'assistant/{tenant}/flows/{record}/edit'],
+        ];
+    }
+
+    /**
+     * The writes Filament had no routes for. `store-inline` and `activity` are not the camel-cased route name, so the
+     * action is spelled out.
+     *
+     * @return array<string, array{0: string, 1: class-string, 2: string, 3: string, 4: string}>
+     */
+    public static function newRoutes(): array
+    {
+        return [
+            'flow group store'        => ['console.flow-groups.store', FlowGroupController::class, 'store', 'POST', 'assistant/{tenant}/flow-groups'],
+            'flow group store inline' => ['console.flow-groups.store-inline', FlowGroupController::class, 'storeInline', 'POST', 'assistant/{tenant}/flow-groups/inline'],
+            'flow group update'       => ['console.flow-groups.update', FlowGroupController::class, 'update', 'PUT', 'assistant/{tenant}/flow-groups/{record}'],
+            'flow group destroy'      => ['console.flow-groups.destroy', FlowGroupController::class, 'destroy', 'DELETE', 'assistant/{tenant}/flow-groups/{record}'],
+            'flow group destroy many' => ['console.flow-groups.destroy-many', FlowGroupController::class, 'destroyMany', 'DELETE', 'assistant/{tenant}/flow-groups'],
+            'flow store'              => ['console.flows.store', FlowController::class, 'store', 'POST', 'assistant/{tenant}/flows'],
+            'flow update'             => ['console.flows.update', FlowController::class, 'update', 'PUT', 'assistant/{tenant}/flows/{record}'],
+            'flow activity'           => ['console.flows.activity', FlowController::class, 'updateActivity', 'PATCH', 'assistant/{tenant}/flows/{record}/active'],
+            'flow destroy'            => ['console.flows.destroy', FlowController::class, 'destroy', 'DELETE', 'assistant/{tenant}/flows/{record}'],
+            'flow destroy many'       => ['console.flows.destroy-many', FlowController::class, 'destroyMany', 'DELETE', 'assistant/{tenant}/flows'],
         ];
     }
 
@@ -76,6 +106,22 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             $this->assertContains($verb, $route->methods());
             $this->assertSame($uri, $route->uri());
         }
+    }
+
+    #[DataProvider('newRoutes')]
+    public function test_the_new_flow_routes_exist(string $name, string $controller, string $method, string $verb, string $uri): void
+    {
+        $route = $this->route($name);
+
+        $this->assertSame($controller . '@' . $method, $route->getActionName(), $name);
+        $this->assertContains($verb, $route->methods(), $name);
+        $this->assertSame($uri, $route->uri(), $name);
+    }
+
+    public function test_the_builder_flow_page_has_a_name(): void
+    {
+        $this->assertSame('builder/flows/{flow}', $this->route('builder.flows.show')->uri());
+        $this->assertSame('/builder/flows/abc', route('builder.flows.show', ['flow' => 'abc'], false));
     }
 
     public function test_route_names_are_unique(): void

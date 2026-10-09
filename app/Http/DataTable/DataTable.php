@@ -20,7 +20,13 @@ use Illuminate\Http\Request;
  * - `search`   : text matched case-insensitively against any searchable column;
  * - `sort`     : a sortable column, `-` in front for descending;
  * - `per_page` : one of the page size options;
- * - `page`     : the page number, 1-based.
+ * - `page`     : the page number, 1-based;
+ * - `filter`   : `filter[key]=value` for a filter the screen declared;
+ * - `group`    : the key of a grouping the screen declared, which gathers the rows before the sort orders them.
+ *
+ * Filters and groupings are optional and domain-neutral: the screen hands in the closures that narrow or order its own
+ * query, the table only decides whether the request names one and what to echo back. A table that declares neither
+ * has no `filters` or `group` in its `state` and `defaults`, so the shape of the screens that do not use them stays.
  *
  * Typical use, in a controller: `(new DataTable(sortable: ['name'], searchable: ['name'], defaultSort: 'name'))
  * ->respond($request, $query, fn (Group $group): array => [...])`.
@@ -34,12 +40,19 @@ final readonly class DataTable
      * @param  list<string>  $searchable     columns the search text is matched against
      * @param  string        $defaultSort    `column` or `-column`, used when the request names no valid sort
      * @param  list<int>     $perPageOptions the first one is the default page size
+     * @param  array<string, Closure(Builder<covariant Model>, string): bool>  $filters  by key; gets the query and the
+     *         trimmed value from `filter[key]` and returns whether it narrowed the query (a value it does not accept
+     *         is no filter and is not echoed back)
+     * @param  array<string, Closure(Builder<covariant Model>): void>  $groups  by key; orders the query so a group's
+     *         rows sit together, applied before the sort
      */
     public function __construct(
         private array $sortable,
         private array $searchable,
         private string $defaultSort,
         private array $perPageOptions = [25, 50, 100],
+        private array $filters = [],
+        private array $groups = [],
     ) {
     }
 
@@ -52,8 +65,8 @@ final readonly class DataTable
      * @return array{
      *     rows: list<array<string, mixed>>,
      *     meta: array{total: int, perPage: int, currentPage: int, lastPage: int, from: int|null, to: int|null},
-     *     state: array{search: string, sort: string, perPage: int},
-     *     defaults: array{sort: string, perPage: int, perPageOptions: list<int>}
+     *     state: array{search: string, sort: string, perPage: int, filters?: array<string, string>, group?: string},
+     *     defaults: array{sort: string, perPage: int, perPageOptions: list<int>, group?: string}
      * }
      */
     public function respond(Request $request, Builder $query, Closure $map): array
@@ -65,6 +78,9 @@ final readonly class DataTable
         if ('' !== $search) {
             $this->applySearch($query, $search);
         }
+
+        $appliedFilters = $this->applyFilters($request, $query);
+        $group          = $this->applyGroup($request, $query);
 
         $this->applySort($query, $sort);
 
@@ -86,9 +102,21 @@ final readonly class DataTable
                 'from'        => $paginator->firstItem(),
                 'to'          => $paginator->lastItem(),
             ],
-            'state' => ['search' => $search, 'sort' => $sort, 'perPage' => $perPage],
+            'state' => [
+                'search'  => $search,
+                'sort'    => $sort,
+                'perPage' => $perPage,
+                // Only the filters that narrowed the query; `[]` when none did.
+                ...([] === $this->filters ? [] : ['filters' => $appliedFilters]),
+                ...([] === $this->groups ? [] : ['group' => $group]),
+            ],
             // What the query string leaves out, so the client does not repeat the screen's choices.
-            'defaults' => ['sort' => $this->defaultSort, 'perPage' => $this->perPageOptions[0], 'perPageOptions' => $this->perPageOptions],
+            'defaults' => [
+                'sort'           => $this->defaultSort,
+                'perPage'        => $this->perPageOptions[0],
+                'perPageOptions' => $this->perPageOptions,
+                ...([] === $this->groups ? [] : ['group' => '']),
+            ],
         ];
     }
 
@@ -116,6 +144,54 @@ final readonly class DataTable
         }
 
         return $this->defaultSort;
+    }
+
+    /**
+     * Applies the declared filters the request names with a usable value.
+     *
+     * @param  Builder<covariant Model>  $query
+     *
+     * @return array<string, string> the filters that narrowed the query, by key
+     */
+    private function applyFilters(Request $request, Builder $query): array
+    {
+        $requested = $request->query('filter');
+        $applied   = [];
+
+        if ([] === $this->filters || ! is_array($requested)) {
+            return $applied;
+        }
+
+        foreach ($this->filters as $key => $filter) {
+            $value = $requested[$key] ?? null;
+            $value = is_string($value) ? mb_substr(mb_trim($value), 0, self::MAX_SEARCH_LENGTH) : '';
+
+            if ('' !== $value && $filter($query, $value)) {
+                $applied[$key] = $value;
+            }
+        }
+
+        return $applied;
+    }
+
+    /**
+     * Applies the declared grouping the request names, if any.
+     *
+     * @param  Builder<covariant Model>  $query
+     *
+     * @return string the key applied, or '' for none
+     */
+    private function applyGroup(Request $request, Builder $query): string
+    {
+        $key = $request->query('group');
+
+        if (! is_string($key) || ! isset($this->groups[$key])) {
+            return '';
+        }
+
+        $this->groups[$key]($query);
+
+        return $key;
     }
 
     private function perPage(Request $request): int

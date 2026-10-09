@@ -73,6 +73,8 @@ export interface TableTranslations {
     page: string
     previous: string
     next: string
+    expand_group: string
+    collapse_group: string
 }
 
 /** Strings every form screen shares (`form` in the console lang files). */

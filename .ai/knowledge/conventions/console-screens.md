@@ -10,6 +10,7 @@ paths:
   - routes/inertia.php
   - "resources/js/pages/Console/**"
   - "resources/js/ui/**"
+reviewed_at: 2026-10-09
 ---
 # Console screens
 
@@ -38,13 +39,29 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   `@fapost/ui` components: `data-table`, `form-field`, `confirm-dialog`. Permission flags for
   buttons come from the controller as `can`.
 - A bulk delete as one query skips model events; say so on the method, and delete model by model
-  where observers matter.
+  where observers matter. A delete with a guard (a group that still holds flows, a flow with live
+  sessions) is always per record: the service throws a domain exception, the controller turns it
+  into `Inertia::flash('error')`, and a bulk delete skips the blocked records and reports both
+  counts.
+- **The console has no Filament tenancy scope.** Every service query filters `tenant_id` and, for
+  assistant-owned records, `assistant_id` itself. A policy that checks the record's assistant
+  (`FlowDraftPolicy`) gets its `can` flags from an unsaved model with the current assistant set
+  as its relation (`FlowDraftService::abilityProbe()`); a bare `new Model()` has no assistant and
+  answers false.
+- **Filters and grouping** go through `DataTable`'s optional `filters` (`filter[key]`) and `groups`
+  (`group=key`) — whitelisted closures; their keys appear in the props only on a table that
+  declares them. The kit's `data-table` draws group headers from a `groupOf` callback.
+- **The builder is a separate Inertia app**: reach it with a plain `<a>` or `Inertia::location()`
+  to the named route `builder.flows.show`, never a `<Link>` or a redirect. A related record
+  created from inside a form (a flow's new group) uses its own `*-inline` route that redirects
+  back with the new id in the flash.
 
 ## Example
 
 `ContactGroupController`, `ContactGroupService`, `ContactGroupRequest`,
 `DestroyContactGroupsRequest`, `resources/js/pages/Console/ContactGroups/*`,
-`tests/Feature/Console/ContactGroupsConsoleTest.php`.
+`tests/Feature/Console/ContactGroupsConsoleTest.php`. With filters, grouping, guards and an
+assistant-owned policy: `FlowController`, `FlowDraftService`, `resources/js/pages/Console/Flows/*`.
 
 ## Rationale
 
