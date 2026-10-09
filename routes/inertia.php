@@ -6,6 +6,7 @@ use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
 use App\Http\Controllers\Console\ChannelController;
+use App\Http\Controllers\Console\ContactController;
 use App\Http\Controllers\Console\ContactGroupController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
@@ -66,6 +67,13 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::put('assistant/{tenant}/channels/{record}', [ChannelController::class, 'update'])->name('console.channels.update');
         Route::post('assistant/{tenant}/channels/{record}/rotate-webhook', [ChannelController::class, 'rotateWebhook'])->name('console.channels.rotate-webhook');
         Route::delete('assistant/{tenant}/channels/{record}', [ChannelController::class, 'destroy'])->name('console.channels.destroy');
+
+        // Contacts: tenant-level records shown under the assistant whose channels they wrote to; read-only except tags and group membership.
+        Route::get('assistant/{tenant}/contacts', [ContactController::class, 'index'])->name('filament.assistant.resources.contacts.index');
+        Route::get('assistant/{tenant}/contacts/{record}', [ContactController::class, 'show'])->name('filament.assistant.resources.contacts.view');
+        // The whole set is sent, so a repeated request changes nothing.
+        Route::put('assistant/{tenant}/contacts/{record}/tags', [ContactController::class, 'updateTags'])->name('console.contacts.tags');
+        Route::put('assistant/{tenant}/contacts/{record}/groups', [ContactController::class, 'updateGroups'])->name('console.contacts.groups');
 
         // Contact groups: tenant-level, listed under the assistant's menu like Filament's resource was.
         Route::get('assistant/{tenant}/contact-groups', [ContactGroupController::class, 'index'])->name('filament.assistant.resources.contact-groups.index');
