@@ -31,11 +31,11 @@ visible changed, and the builder renders from the kit's tokens in light and dark
       access-mode and support banners, sign-out, and room for the app rail of phase 4 (after:
       `ui-switch-and-shell` — its routes, stacks and shared props; split out of it by the owner at
       the gate, 2026-10-08)
-- [ ] `builder-dark-theme` — The builder in the dark theme — its ~210 literal colours and its own
+- [x] `builder-dark-theme` — The builder in the dark theme — its ~210 literal colours and its own
       `--accent` (which shadows the token of the same name) move onto the tokens, so the builder
       follows `.dark` like the console (after: `kit-and-tokens` — the tokens it moves onto; split
       out of it by the owner, 2026-10-08)
-- [ ] `contact-groups-pilot` — Pilot: contact groups end to end — the server-side data table (filters, sorting,
+- [x] `contact-groups-pilot` — Pilot: contact groups end to end — the server-side data table (filters, sorting,
       pagination, bulk actions), form, confirmation, toasts; the patterns every later screen
       copies (after: `console-shell-layout` — the screen lives inside it)
 
@@ -46,30 +46,30 @@ visible changed, and the builder renders from the kit's tokens in light and dark
 Goal: the assistant console needs no Filament screen. Done when: with the switch on, every
 console menu entry is served by Inertia and the console's tests run against the new routes.
 
-- [ ] Flow groups and flows — list with grouping, trigger hints, toggle and delete guards;
+- [ ] `console-flows` — Flow groups and flows — list with grouping, trigger hints, toggle and delete guards;
       create and edit; links into the builder through typed routes and the builder's way back
       (after: the pilot — copies its table and form patterns)
-- [ ] Channels — list, create, edit in a dialog, webhook rotation; the channel form shared with
+- [ ] `console-channels` — Channels — list, create, edit in a dialog, webhook rotation; the channel form shared with
       the admin side (after: the pilot)
-- [ ] Contacts — list with filters, the contact view with grouped attributes, tags and groups
+- [ ] `console-contacts` — Contacts — list with filters, the contact view with grouped attributes, tags and groups
       management (after: the pilot)
-- [ ] Contact segments — the rule builder with match all/any and typed conditions, size refresh
+- [ ] `console-contact-segments` — Contact segments — the rule builder with match all/any and typed conditions, size refresh
       (after: the pilot; after: `close-policy-gaps` — the screen relies on the new policy)
-- [ ] Broadcasts — list with progress, send and cancel, the form with live reach and the
+- [ ] `console-broadcasts` — Broadcasts — list with progress, send and cancel, the form with live reach and the
       base-language guard (after: the pilot; after: `close-policy-gaps` — the screen relies on
       the new policy)
-- [ ] Live updates with sessions and flow logs — the composable that subscribes through Echo
+- [ ] `console-live-updates` — Live updates with sessions and flow logs — the composable that subscribes through Echo
       when a broadcaster is configured and polls otherwise; flow sessions and flow logs on it,
       every log query bounded to a time window (after: the pilot)
-- [ ] Realtime for self-hosters — `laravel/reverb` dormant in Core, the Echo client as a lazy
+- [ ] `realtime-self-hosted` — Realtime for self-hosters — `laravel/reverb` dormant in Core, the Echo client as a lazy
       chunk, an optional `reverb` service behind a Compose profile, a self-hosting "Realtime"
       page (after: live updates — it is what they switch on)
-- [ ] The conversation inbox — transcript paging, composer with attachments, take over and
+- [ ] `console-inbox` — The conversation inbox — transcript paging, composer with attachments, take over and
       return to bot, status, read marking after authorization, live through the composable
       (after: live updates — the inbox is its main consumer)
-- [ ] Assistant settings — tabs, the commands repeater, localized text fields, the inline
+- [ ] `console-assistant-settings` — Assistant settings — tabs, the commands repeater, localized text fields, the inline
       create-flow dialog (after: the pilot)
-- [ ] The assistant dashboard and the translations page shared by both panels (after: the
+- [ ] `console-translations` — The assistant dashboard and the translations page shared by both panels (after: the
       pilot)
 
 ## Phase 3 — The admin panel at parity
