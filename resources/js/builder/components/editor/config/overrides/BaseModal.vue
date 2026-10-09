@@ -48,7 +48,7 @@ watch(() => props.open, (val) => {
 .bm-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(28, 25, 23, .45);
+    background: color-mix(in srgb, var(--scrim) 45%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -60,7 +60,7 @@ watch(() => props.open, (val) => {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, .25);
+    box-shadow: var(--shadow-modal);
     max-width: calc(100vw - 32px);
     max-height: calc(100vh - 32px);
     display: flex;

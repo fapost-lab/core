@@ -159,7 +159,7 @@ const kindLabels: Record<string, string> = {
     font-weight: 500;
     padding: 2px 8px;
     border-radius: 20px;
-    background: var(--primary-bg, #eef2ee);
+    background: var(--primary-bg);
     color: var(--primary);
     border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent);
 }
@@ -185,15 +185,15 @@ const kindLabels: Record<string, string> = {
     padding: 6px 14px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
-    background: var(--surface-2, #f8f9fa);
+    background: var(--surface-2);
 }
 
 .mpm-error {
     padding: 8px 14px;
     font-size: 12px;
-    color: var(--rose, #e53e3e);
-    background: color-mix(in srgb, var(--rose, #e53e3e) 8%, transparent);
-    border-bottom: 1px solid color-mix(in srgb, var(--rose, #e53e3e) 20%, transparent);
+    color: var(--rose);
+    background: color-mix(in srgb, var(--rose) 8%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--rose) 20%, transparent);
     flex-shrink: 0;
 }
 
@@ -238,6 +238,6 @@ const kindLabels: Record<string, string> = {
     border-top: 1px solid var(--border);
     padding: 10px 14px;
     flex-shrink: 0;
-    background: var(--surface-2, #f8f9fa);
+    background: var(--surface-2);
 }
 </style>

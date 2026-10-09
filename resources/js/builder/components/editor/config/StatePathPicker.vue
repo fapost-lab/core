@@ -314,7 +314,7 @@ onUnmounted(() => {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+    box-shadow: var(--shadow-pop);
     max-height: 280px;
 }
 .spp-search {
@@ -357,10 +357,10 @@ onUnmounted(() => {
     transition: background 100ms;
 }
 .spp-option:hover {
-    background: var(--surface-2, #f4f5f6);
+    background: var(--surface-2);
 }
 .spp-option--active {
-    background: var(--primary-bg, rgba(0, 0, 0, 0.04));
+    background: var(--primary-bg);
 }
 .spp-option-mark {
     flex: 0 0 14px;

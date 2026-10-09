@@ -19,7 +19,7 @@ paths:
   - app/Domains/Flow/Services/ValidateFlowService.php
   - app/Domains/Flow/Services/LoadBuilderFlowService.php
   - "app/Domains/Flow/Validation/**"
-reviewed_at: 2026-10-08
+reviewed_at: 2026-10-09
 ---
 # Flow builder rules
 
@@ -40,9 +40,12 @@ broken.
 ## Rules
 
 - **The builder's colours and fonts come from `resources/css/tokens.css`,** through its own
-  variables in `builder.css`; a new literal colour or font family is not added to a builder
-  component. The builder's `--accent` (brown) shadows the token of the same name inside the
-  builder, so the token's accent is not reachable there under that name. Review only.
+  variables, defined only in the `:root` and `.dark` blocks of `builder.css`; every variable with
+  a literal value there has a `.dark` override, and no builder component or script carries a
+  literal colour. The builder's own brown is `--builder-accent`, so the token `--accent` stays
+  reachable. Why: the builder follows the console's light/dark choice (the shared pre-paint script
+  in `resources/views/partials/theme-script.blade.php`), and a literal stays light in the dark
+  theme. Enforced: `resources/js/builder/colors.test.ts`.
 
 - **Every builder route authorizes through `FlowDraftPolicy`:** a flow's own endpoints check
   `view`, `update` or `publish` on its draft (which includes access to the draft's assistant);

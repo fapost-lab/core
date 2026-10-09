@@ -404,7 +404,7 @@ function defaultConfig(type: string): Record<string, unknown> {
     font-size: 18px;
     line-height: 1;
 }
-.delete-inline:hover { color: #e53e3e; }
+.delete-inline:hover { color: var(--error); }
 
 .add-item-btn {
     width: 100%;
@@ -428,18 +428,18 @@ function defaultConfig(type: string): Record<string, unknown> {
 .delete-trigger-btn {
     width: 100%;
     padding: 8px 10px;
-    border: 1px solid var(--rose, #e53e3e);
+    border: 1px solid var(--rose);
     border-radius: 6px;
     background: transparent;
-    color: var(--rose, #e53e3e);
+    color: var(--rose);
     font-family: var(--font-sans);
     font-size: 12px;
     cursor: pointer;
     transition: background .12s, color .12s;
 }
 .delete-trigger-btn:hover {
-    background: var(--rose, #e53e3e);
-    color: #fff;
+    background: var(--rose);
+    color: var(--on-solid);
 }
 
 .field-hint {

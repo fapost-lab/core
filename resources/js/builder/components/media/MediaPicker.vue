@@ -145,7 +145,7 @@ function onImageError() {
     gap: 6px;
     width: 100%;
     padding: 7px 10px;
-    background: var(--surface-2, #f4f5f6);
+    background: var(--surface-2);
     border: 1.5px dashed var(--border);
     border-radius: 6px;
     font-size: 12px;
@@ -156,7 +156,7 @@ function onImageError() {
 .mp-empty:hover {
     border-color: var(--primary);
     color: var(--primary);
-    background: var(--primary-bg, #eef2ee);
+    background: var(--primary-bg);
 }
 
 /* Selected state */
@@ -165,7 +165,7 @@ function onImageError() {
     align-items: center;
     gap: 8px;
     padding: 6px 8px;
-    background: var(--surface-2, #f4f5f6);
+    background: var(--surface-2);
     border: 1px solid var(--border);
     border-radius: 6px;
     min-width: 0;
@@ -231,5 +231,5 @@ function onImageError() {
 }
 .mp-btn--ghost:hover { background: var(--surface-2); border-color: var(--border); }
 
-.mp-btn--danger:hover { color: var(--rose, #e53e3e); border-color: color-mix(in srgb, var(--rose, #e53e3e) 30%, transparent); }
+.mp-btn--danger:hover { color: var(--rose); border-color: color-mix(in srgb, var(--rose) 30%, transparent); }
 </style>

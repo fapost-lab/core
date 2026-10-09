@@ -97,26 +97,26 @@ const translatedCount = computed(() =>
     font-size: 11px;
     font-weight: 500;
     cursor: pointer;
-    background: rgba(255, 255, 255, .14);
-    color: rgba(255, 255, 255, .9);
-    border: 1px solid rgba(255, 255, 255, .25);
+    background: color-mix(in srgb, var(--band-fg) 14%, transparent);
+    color: color-mix(in srgb, var(--band-fg) 90%, transparent);
+    border: 1px solid color-mix(in srgb, var(--band-fg) 25%, transparent);
     transition: background .15s, color .15s;
 }
 
 .card-header-btn:hover {
-    background: rgba(255, 255, 255, .24);
-    color: #fff;
+    background: color-mix(in srgb, var(--band-fg) 24%, transparent);
+    color: var(--band-fg);
 }
 
 .card-header-btn--primary {
-    background: #fff;
-    color: var(--primary);
-    border-color: #fff;
+    background: var(--band-fg);
+    color: var(--band-btn-fg);
+    border-color: var(--band-fg);
 }
 
 .card-header-btn--primary:hover {
-    background: rgba(255, 255, 255, .9);
-    color: var(--primary);
+    background: color-mix(in srgb, var(--band-fg) 90%, transparent);
+    color: var(--band-btn-fg);
 }
 
 .empty {
@@ -144,7 +144,7 @@ const translatedCount = computed(() =>
     overflow: hidden;
     border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
     border-radius: 8px;
-    background: linear-gradient(180deg, rgba(107, 120, 97, .9) 0%, rgba(125, 138, 112, .76) 24%, rgba(125, 138, 112, .2) 48%, rgba(125, 138, 112, 0) 68%),
+    background: linear-gradient(180deg, color-mix(in srgb, var(--band-deep-2) 90%, transparent) 0%, color-mix(in srgb, var(--band-tint-2) 76%, transparent) 24%, color-mix(in srgb, var(--band-tint-2) 20%, transparent) 48%, color-mix(in srgb, var(--band-tint-2) 0%, transparent) 68%),
     var(--primary-bg);
     box-shadow: var(--shadow);
     padding: 7px;
@@ -158,7 +158,7 @@ const translatedCount = computed(() =>
     padding: 7px 14px 8px;
     border: none;
     background: transparent;
-    color: rgba(255, 255, 255, .9);
+    color: color-mix(in srgb, var(--band-fg) 90%, transparent);
     flex-shrink: 0;
 }
 
@@ -171,34 +171,34 @@ const translatedCount = computed(() =>
     line-height: 1.2;
     letter-spacing: .04em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, .9);
+    color: color-mix(in srgb, var(--band-fg) 90%, transparent);
 }
 
 .content-editor-meta {
-    color: rgba(255, 255, 255, .68);
+    color: color-mix(in srgb, var(--band-fg) 68%, transparent);
     font-weight: 600;
 }
 
 .content-editor-card .card-header-btn {
-    background: rgba(255, 255, 255, .14);
-    color: rgba(255, 255, 255, .9);
-    border-color: rgba(255, 255, 255, .25);
+    background: color-mix(in srgb, var(--band-fg) 14%, transparent);
+    color: color-mix(in srgb, var(--band-fg) 90%, transparent);
+    border-color: color-mix(in srgb, var(--band-fg) 25%, transparent);
 }
 
 .content-editor-card .card-header-btn:hover {
-    background: rgba(255, 255, 255, .24);
-    color: #fff;
+    background: color-mix(in srgb, var(--band-fg) 24%, transparent);
+    color: var(--band-fg);
 }
 
 .content-editor-card .card-header-btn--primary {
-    background: #fff;
-    color: var(--primary);
-    border-color: #fff;
+    background: var(--band-fg);
+    color: var(--band-btn-fg);
+    border-color: var(--band-fg);
 }
 
 .content-editor-card .card-header-btn--primary:hover {
-    background: rgba(255, 255, 255, .9);
-    color: var(--primary);
+    background: color-mix(in srgb, var(--band-fg) 90%, transparent);
+    color: var(--band-btn-fg);
 }
 
 .content-editor-body {
@@ -207,11 +207,11 @@ const translatedCount = computed(() =>
     overflow-y: auto;
     margin-top: 0;
     padding: 10px;
-    background: linear-gradient(180deg, rgba(255, 255, 255, .96), rgba(255, 255, 255, .9)),
+    background: linear-gradient(180deg, color-mix(in srgb, var(--paper) 96%, transparent), color-mix(in srgb, var(--paper) 90%, transparent)),
     var(--primary-bg);
-    border: 1px dashed color-mix(in srgb, var(--primary) 44%, #fff);
+    border: 1px dashed color-mix(in srgb, var(--primary) 44%, var(--paper));
     border-radius: 7px;
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .65);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--paper) 65%, transparent);
 }
 
 .lang-field { margin-bottom: 16px; }

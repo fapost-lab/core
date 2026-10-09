@@ -109,7 +109,7 @@ function update(field: FieldEntry, value: unknown) {
 
 <style scoped>
 .schema-required {
-    color: #e53e3e;
+    color: var(--error);
     margin-left: 2px;
 }
 

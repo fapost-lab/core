@@ -205,7 +205,7 @@ function ruleValueAsString(rule: RuleConfig): string {
 
 .branch-arrow {
     font-size: 13px;
-    color: var(--primary, #5b7fa6);
+    color: var(--primary);
     flex-shrink: 0;
 }
 
@@ -237,7 +237,7 @@ function ruleValueAsString(rule: RuleConfig): string {
     flex-shrink: 0;
 }
 
-.del-btn:hover { color: var(--rose, #e05252); }
+.del-btn:hover { color: var(--rose); }
 
 .branch-body {
     padding: 8px 10px;
@@ -274,7 +274,7 @@ function ruleValueAsString(rule: RuleConfig): string {
     outline: none;
 }
 
-.field-input:focus { border-color: var(--primary); background: #fff; }
+.field-input:focus { border-color: var(--primary); background: var(--paper); }
 
 .op-sel  { flex: 0 0 150px; }
 .val-input { flex: 1; }
@@ -295,7 +295,7 @@ function ruleValueAsString(rule: RuleConfig): string {
 .add-btn:hover {
     border-color: var(--primary);
     color: var(--primary);
-    background: var(--primary-bg, #f0f4f8);
+    background: var(--primary-bg);
 }
 
 .branch-card--fallback {
@@ -316,7 +316,7 @@ function ruleValueAsString(rule: RuleConfig): string {
     font-weight: 600;
     padding: 2px 6px;
     border-radius: 4px;
-    background: var(--surface-3, #e8e8e8);
+    background: var(--surface-3);
     color: var(--text-3);
     letter-spacing: 0.03em;
 }

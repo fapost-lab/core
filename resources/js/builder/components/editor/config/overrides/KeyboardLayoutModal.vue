@@ -367,7 +367,7 @@ function cancel() {
 .kl-btn--primary {
     background: var(--primary);
     border-color: var(--primary);
-    color: #fff;
+    color: var(--on-solid);
     font-weight: 500;
 }
 .kl-btn--primary:hover { opacity: .9; }

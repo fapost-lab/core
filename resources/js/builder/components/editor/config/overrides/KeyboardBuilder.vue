@@ -266,7 +266,7 @@ function onDropUnplaced() {
     display: flex; align-items: center; justify-content: center;
     transition: border-color .12s, background .12s;
 }
-.kb-cell--over     { border-color: var(--primary); background: var(--primary-bg, #eef2ee); }
+.kb-cell--over     { border-color: var(--primary); background: var(--primary-bg); }
 .kb-cell--occupied { border-style: solid; border-color: var(--border); }
 
 /* Chips */
@@ -300,10 +300,10 @@ function onDropUnplaced() {
     padding: 6px 8px;
     border: 1.5px dashed var(--border);
     border-radius: 7px;
-    background: var(--surface-2, #f8f9fa);
+    background: var(--surface-2);
     transition: border-color .12s, background .12s;
 }
-.kb-unplaced--over { border-color: var(--primary); background: var(--primary-bg, #eef2ee); }
+.kb-unplaced--over { border-color: var(--primary); background: var(--primary-bg); }
 .kb-unplaced-label {
     font-size: 10px; font-weight: 600;
     text-transform: uppercase; letter-spacing: .05em;

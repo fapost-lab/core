@@ -1,9 +1,22 @@
 <script setup lang="ts">
 import {computed} from 'vue'
 import {usePage} from '@inertiajs/vue3'
+import {isThemePreference} from '@fapost/ui/shell/theme'
+import {useTheme} from '@fapost/ui/shell/useTheme'
 import {useTranslations} from '../composables/useTranslations.js'
 
 const { t } = useTranslations()
+
+// The same preference as the console (localStorage + `.dark` on <html>), so the
+// builder opens in the theme the author chose there.
+const { preference, setPreference } = useTheme()
+
+function switchTheme(event: Event): void {
+    const value = (event.target as HTMLSelectElement).value
+    if (isThemePreference(value)) {
+        setPreference(value)
+    }
+}
 
 /**
  * Interface language switcher. The selected locale is persisted server-side
@@ -133,6 +146,17 @@ const SAVE_COLORS: Record<string, string> = {
             >
                 <option v-for="l in LOCALES" :key="l.code" :value="l.code">{{ l.label }}</option>
             </select>
+            <select
+                class="lang-select"
+                :value="preference"
+                :title="t('topbar.theme')"
+                :aria-label="t('topbar.theme')"
+                @change="switchTheme"
+            >
+                <option value="light">{{ t('topbar.theme_light') }}</option>
+                <option value="dark">{{ t('topbar.theme_dark') }}</option>
+                <option value="system">{{ t('topbar.theme_system') }}</option>
+            </select>
             <button class="btn btn-ghost" :disabled="!canUndo" @click="emit('undo')">↩ Undo</button>
             <button class="btn btn-ghost" :disabled="!canRedo" @click="emit('redo')">↪ Redo</button>
             <button class="btn btn-outline" :disabled="validating" @click="emit('validate')">
@@ -174,7 +198,7 @@ const SAVE_COLORS: Record<string, string> = {
     margin-left: 6px;
     font-size: 13px;
     line-height: 1;
-    color: var(--amber, #d69e2e);
+    color: var(--amber);
     transform: translateY(-1px);
 }
 .lang-select {
@@ -233,7 +257,7 @@ const SAVE_COLORS: Record<string, string> = {
 }
 .btn-reload:hover {
     background: var(--amber);
-    color: #fff;
+    color: var(--on-solid);
 }
 .flow-name {
     font-family: var(--font-display);
@@ -250,8 +274,8 @@ const SAVE_COLORS: Record<string, string> = {
     border-radius: 4px;
     font-weight: 500;
 }
-.badge-draft { background: var(--amber-bg); color: var(--amber); border: 1px solid #e8d8b8; }
-.badge-pub   { background: var(--sage-bg);  color: var(--sage);  border: 1px solid #cdddd4; }
+.badge-draft { background: var(--amber-bg); color: var(--amber); border: 1px solid var(--amber-border); }
+.badge-pub   { background: var(--sage-bg);  color: var(--sage);  border: 1px solid var(--sage-border); }
 .badge-muted { background: var(--surface-2); color: var(--text-3); border: 1px solid var(--border); }
 .save-status { font-size: 12px; }
 
@@ -284,7 +308,7 @@ const SAVE_COLORS: Record<string, string> = {
     background: var(--surface);
     color: var(--text);
     font-weight: 600;
-    box-shadow: 0 1px 3px rgba(0,0,0,.12);
+    box-shadow: var(--shadow-tab);
 }
 
 .topbar-right { display: flex; align-items: center; gap: 6px; flex: 1; justify-content: flex-end; }
@@ -303,10 +327,10 @@ const SAVE_COLORS: Record<string, string> = {
 }
 .btn-ghost   { background: transparent; color: var(--text-2); border-color: var(--border); }
 .btn-ghost:hover { background: var(--surface-2); color: var(--text); }
-.btn-outline { background: transparent; color: var(--accent); border-color: var(--border-2); }
+.btn-outline { background: transparent; color: var(--builder-accent); border-color: var(--border-2); }
 .btn-outline:hover { background: var(--surface-2); }
-.btn-primary { background: var(--primary); color: #fff; border-color: var(--primary); }
-.btn-primary:hover { background: #4a5c48; }
+.btn-primary { background: var(--primary); color: var(--on-solid); border-color: var(--primary); }
+.btn-primary:hover { background: var(--primary-hover); }
 .btn:disabled { opacity: .3; cursor: not-allowed; }
 
 .published-msg {

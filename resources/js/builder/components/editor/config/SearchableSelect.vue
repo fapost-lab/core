@@ -189,7 +189,7 @@ onUnmounted(() => {
     cursor: pointer; text-align: left;
 }
 .ss-trigger.mono { font-family: var(--font-mono); font-size: 12px; }
-.ss-trigger--open { border-color: var(--primary); background: #fff; }
+.ss-trigger--open { border-color: var(--primary); background: var(--paper); }
 .ss-trigger--placeholder .ss-trigger-label { color: var(--text-3); }
 .ss-trigger-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ss-caret { color: var(--text-3); font-size: 11px; flex-shrink: 0; transition: transform 120ms; }
@@ -198,7 +198,7 @@ onUnmounted(() => {
 .ss-menu {
     position: fixed; z-index: 60; padding: 4px;
     background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
-    box-shadow: 0 4px 16px rgba(0,0,0,.1);
+    box-shadow: var(--shadow-pop);
 }
 .ss-search {
     width: 100%; padding: 6px 8px; margin-bottom: 4px;
@@ -206,7 +206,7 @@ onUnmounted(() => {
     background: var(--surface-2); color: var(--text);
     font-family: var(--font-sans); font-size: 12.5px; outline: none;
 }
-.ss-search:focus { border-color: var(--primary); background: #fff; }
+.ss-search:focus { border-color: var(--primary); background: var(--paper); }
 .ss-list { max-height: 220px; overflow-y: auto; }
 .ss-option {
     display: flex; align-items: center; gap: 8px; width: 100%;
@@ -216,8 +216,8 @@ onUnmounted(() => {
     text-align: left; cursor: pointer;
 }
 .ss-option.mono .ss-option-label { font-family: var(--font-mono); font-size: 12px; }
-.ss-option:hover { background: var(--surface-2, #f4f5f6); }
-.ss-option--active { background: var(--primary-bg, rgba(0,0,0,.04)); }
+.ss-option:hover { background: var(--surface-2); }
+.ss-option--active { background: var(--primary-bg); }
 .ss-option--custom { color: var(--primary); }
 .ss-option-mark { flex: 0 0 14px; text-align: center; color: var(--primary); font-size: 11px; }
 .ss-option-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

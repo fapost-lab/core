@@ -95,17 +95,17 @@ function toggle(key: string) { open.value[key] = !open.value[key] }
 .jt-toggle { width: 12px; flex-shrink: 0; cursor: pointer; color: var(--text-3); user-select: none; }
 .jt-toggle--leaf { cursor: default; }
 .jt-key {
-    color: var(--primary, #5b7fa6);
+    color: var(--primary);
     cursor: pointer;
     border-radius: 3px;
     padding: 0 2px;
 }
-.jt-key:hover { background: var(--primary-bg, #eef2f7); text-decoration: underline; }
+.jt-key:hover { background: var(--primary-bg); text-decoration: underline; }
 .jt-colon { color: var(--text-3); }
 .jt-val { overflow: hidden; text-overflow: ellipsis; }
-.jt-string  { color: #7a8c52; }
-.jt-number  { color: #b06d3a; }
-.jt-boolean { color: #8a5fb0; }
+.jt-string  { color: var(--json-string); }
+.jt-number  { color: var(--json-number); }
+.jt-boolean { color: var(--json-boolean); }
 .jt-null    { color: var(--text-3); }
 .jt-object,
 .jt-array   { color: var(--text-3); }

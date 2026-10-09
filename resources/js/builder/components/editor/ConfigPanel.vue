@@ -210,8 +210,8 @@ function deleteTrigger() {
     border-radius: 5px;
     cursor: pointer;
     font-size: 17px; line-height: 1;
-    color: rgba(255, 255, 255, .8);
+    color: color-mix(in srgb, var(--band-fg) 80%, transparent);
     transition: background .12s, color .12s;
 }
-.config-close-btn:hover { background: rgba(255, 255, 255, .18); color: #fff; }
+.config-close-btn:hover { background: color-mix(in srgb, var(--band-fg) 18%, transparent); color: var(--band-fg); }
 </style>

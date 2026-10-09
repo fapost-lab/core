@@ -24,8 +24,8 @@ const emit = defineEmits(['dismiss'])
     align-items: flex-start;
     gap: 8px;
     padding: 8px 12px;
-    background: color-mix(in srgb, var(--amber, #d97706) 12%, transparent);
-    border: 1px solid color-mix(in srgb, var(--amber, #d97706) 35%, transparent);
+    background: color-mix(in srgb, var(--amber) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
     border-radius: 7px;
     font-size: 12px;
     color: var(--text);
@@ -34,7 +34,7 @@ const emit = defineEmits(['dismiss'])
 .mpw-icon {
     width: 14px;
     height: 14px;
-    color: var(--amber, #d97706);
+    color: var(--amber);
     flex-shrink: 0;
     margin-top: 1px;
 }

@@ -257,13 +257,13 @@ function onSave() {
     min-height: 42px;
     padding: 12px 14px 10px;
     border-bottom: 1px solid color-mix(in srgb, var(--primary) 18%, var(--border));
-    background: linear-gradient(180deg, rgba(107, 120, 97, .86) 0%, rgba(125, 138, 112, .62) 48%, rgba(125, 138, 112, .08) 100%),
+    background: linear-gradient(180deg, color-mix(in srgb, var(--band-deep-2) 86%, transparent) 0%, color-mix(in srgb, var(--band-tint-2) 62%, transparent) 48%, color-mix(in srgb, var(--band-tint-2) 8%, transparent) 100%),
     var(--primary-bg);
     font-size: 12px;
     font-weight: 700;
     letter-spacing: .04em;
     text-transform: uppercase;
-    color: rgba(255, 255, 255, .9);
+    color: color-mix(in srgb, var(--band-fg) 90%, transparent);
     flex-shrink: 0;
 }
 
@@ -304,7 +304,7 @@ function onSave() {
     transition: background .1s, color .1s;
 }
 .field-item:hover { background: var(--surface-2); color: var(--text); }
-.field-item.is-selected { background: var(--primary-bg, #eef2ee); color: var(--primary); }
+.field-item.is-selected { background: var(--primary-bg); color: var(--primary); }
 
 .field-name {
     flex: 1;

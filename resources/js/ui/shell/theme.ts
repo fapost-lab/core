@@ -2,7 +2,7 @@
  * Colour theme of the console: light, dark, or whatever the system prefers.
  *
  * The choice lives in localStorage and shows as the `.dark` class on <html>. The same rule runs twice: in the
- * inline script of console.blade.php before the first paint (so a dark page never flashes light), and here.
+ * inline script of resources/views/partials/theme-script.blade.php (included by the console and builder views) before the first paint (so a dark page never flashes light), and here.
  * Keep `STORAGE_KEY` equal to the key that script reads.
  */
 export type ThemePreference = 'light' | 'dark' | 'system'

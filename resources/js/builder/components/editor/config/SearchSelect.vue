@@ -267,7 +267,7 @@ onUnmounted(() => {
     gap: 4px;
     padding: 1px 6px;
     border-radius: 10px;
-    background: var(--surface-2, #eef1f4);
+    background: var(--surface-2);
     color: var(--text);
     font-size: 12px;
 }
@@ -296,7 +296,7 @@ onUnmounted(() => {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-pop);
     max-height: 260px;
     overflow-y: auto;
 }
@@ -330,10 +330,10 @@ onUnmounted(() => {
     cursor: pointer;
 }
 .ss-option:hover {
-    background: var(--surface-2, #f4f5f6);
+    background: var(--surface-2);
 }
 .ss-option--active {
-    background: var(--primary-bg, rgba(0, 0, 0, 0.04));
+    background: var(--primary-bg);
 }
 .ss-option-mark {
     flex: 0 0 14px;

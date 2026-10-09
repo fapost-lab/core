@@ -562,11 +562,11 @@ function updateKeyboardMode(value: string) {
     transition: background 0.15s, color 0.15s;
 }
 .kb-type-btn:hover {
-    background: var(--bg-2);
+    background: var(--surface-2);
 }
 .kb-type-btn--active {
     background: var(--primary);
-    color: #fff;
+    color: var(--on-solid);
 }
 .kb-type-btn--disabled {
     opacity: 0.4;

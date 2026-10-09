@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Builder — FaPost</title>
+    @include('partials.theme-script')
     @vite(['resources/css/builder.css', 'resources/js/builder/app.ts'])
     @inertiaHead
 </head>

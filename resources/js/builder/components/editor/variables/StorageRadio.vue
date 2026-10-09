@@ -71,7 +71,7 @@ defineEmits<{
 .storage-option.active {
     background: var(--surface);
     color: var(--text);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    box-shadow: var(--shadow-xs);
 }
 .storage-option .icon {
     font-size: 12px;
