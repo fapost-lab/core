@@ -46,7 +46,7 @@ function hasValue(field: ContactCardField): boolean {
 <template>
   <Head :title="title" />
 
-  <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
+  <div class="flex w-full flex-col gap-5">
     <div class="flex flex-col gap-2">
       <Button as-child variant="ghost" size="sm" class="-ml-2 w-fit">
         <Link :href="urls.index">
@@ -54,7 +54,7 @@ function hasValue(field: ContactCardField): boolean {
           {{ t.back }}
         </Link>
       </Button>
-      <h1 class="font-display text-2xl font-semibold tracking-wide break-all uppercase">{{ title }}</h1>
+      <h1 class="font-display text-[28px] leading-tight font-semibold break-all">{{ title }}</h1>
     </div>
 
     <Card>
@@ -65,7 +65,7 @@ function hasValue(field: ContactCardField): boolean {
         <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div class="flex flex-col gap-1">
             <dt class="text-muted-foreground text-sm">{{ t.view.platform }}</dt>
-            <dd><Badge variant="secondary">{{ platformLabel }}</Badge></dd>
+            <dd><Badge variant="info">{{ platformLabel }}</Badge></dd>
           </div>
           <div class="flex min-w-0 flex-col gap-1">
             <dt class="text-muted-foreground text-sm">{{ t.view.external_id }}</dt>
@@ -77,7 +77,7 @@ function hasValue(field: ContactCardField): boolean {
           <div class="flex flex-col gap-1">
             <dt class="text-muted-foreground text-sm">{{ t.view.language }}</dt>
             <dd>
-              <Badge v-if="contact.language" variant="outline">{{ contact.language }}</Badge>
+              <Badge v-if="contact.language" variant="neutral">{{ contact.language }}</Badge>
               <span v-else class="text-muted-foreground">{{ t.view.empty_value }}</span>
             </dd>
           </div>
@@ -114,7 +114,7 @@ function hasValue(field: ContactCardField): boolean {
               </Button>
             </div>
             <ul v-if="contact.tags.length" class="flex flex-wrap gap-1.5">
-              <li v-for="tag in contact.tags" :key="tag"><Badge variant="secondary">{{ tag }}</Badge></li>
+              <li v-for="tag in contact.tags" :key="tag"><Badge variant="neutral">{{ tag }}</Badge></li>
             </ul>
             <p v-else class="text-muted-foreground text-sm">{{ t.view.no_tags }}</p>
           </div>
@@ -128,7 +128,7 @@ function hasValue(field: ContactCardField): boolean {
               </Button>
             </div>
             <ul v-if="contact.groups.length" class="flex flex-wrap gap-1.5">
-              <li v-for="group in contact.groups" :key="group.id"><Badge variant="secondary">{{ group.name }}</Badge></li>
+              <li v-for="group in contact.groups" :key="group.id"><Badge variant="neutral">{{ group.name }}</Badge></li>
             </ul>
             <p v-else class="text-muted-foreground text-sm">{{ t.view.no_groups }}</p>
           </div>

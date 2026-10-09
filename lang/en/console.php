@@ -103,6 +103,12 @@ return [
             'contacts'    => 'Contacts',
             'created_at'  => 'Created',
         ],
+        'sections' => [
+            'general' => [
+                'title'       => 'General',
+                'description' => 'The name and the description of the group.',
+            ],
+        ],
         'fields' => [
             'name'        => 'Name',
             'description' => 'Description',
@@ -134,6 +140,12 @@ return [
         'columns'      => [
             'name'  => 'Name',
             'flows' => 'Flows',
+        ],
+        'sections' => [
+            'general' => [
+                'title'       => 'General',
+                'description' => 'The name of the group.',
+            ],
         ],
         'fields' => [
             'name' => 'Name',
@@ -170,6 +182,16 @@ return [
             'group'      => 'Group',
             'visibility' => 'Visibility',
             'version'    => 'Version',
+        ],
+        'sections' => [
+            'general' => [
+                'title'       => 'General',
+                'description' => 'The name, the group and the description of the flow.',
+            ],
+            'behaviour' => [
+                'title'       => 'Behaviour',
+                'description' => 'Who can start the flow and what is recorded about its sessions.',
+            ],
         ],
         'fields' => [
             'name'                 => 'Name',
@@ -261,6 +283,16 @@ return [
         'status'      => [
             'active'   => 'Active',
             'inactive' => 'Inactive',
+        ],
+        'sections' => [
+            'connection' => [
+                'title'       => 'Connection',
+                'description' => 'How the platform talks to the messenger. Secrets are stored encrypted.',
+            ],
+            'behaviour' => [
+                'title'       => 'Behaviour',
+                'description' => 'Whether the channel accepts incoming messages.',
+            ],
         ],
         'fields' => [
             'type'                 => 'Channel',

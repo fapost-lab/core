@@ -2,9 +2,10 @@
 import { computed, ref, watch } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
 import { useDebounceFn } from '@vueuse/core'
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, Search, X } from '@lucide/vue'
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, Inbox, Search, SearchX, X } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { Checkbox } from '@fapost/ui/components/checkbox'
+import { EmptyState } from '@fapost/ui/components/empty-state'
 import { Input } from '@fapost/ui/components/input'
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@fapost/ui/components/table'
 import { cn } from '@fapost/ui/lib/utils'
@@ -218,11 +219,17 @@ function ariaSort(column: DataTableColumn): 'ascending' | 'descending' | 'none' 
 </script>
 
 <template>
-  <div class="flex flex-col gap-4">
-    <div v-if="searchable || $slots.toolbar" class="flex flex-wrap items-center justify-between gap-3">
-      <div v-if="searchable" class="relative w-full sm:max-w-xs">
-        <Search class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" aria-hidden="true" />
-        <Input v-model="search" type="search" class="px-9" :placeholder="t.search_hint" :aria-label="searchLabel ?? t.search" />
+  <section class="bg-card overflow-hidden rounded-xl border">
+    <div v-if="searchable || $slots.toolbar" class="border-border flex flex-wrap items-center gap-2 border-b px-3.5 py-3">
+      <div v-if="searchable" class="relative min-w-[200px] flex-1 basis-64 sm:max-w-md">
+        <Search class="text-faint-foreground pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" aria-hidden="true" />
+        <Input
+          v-model="search"
+          type="search"
+          class="bg-surface-muted border-border h-9 px-8 text-base md:text-[13.5px]"
+          :placeholder="t.search_hint"
+          :aria-label="searchLabel ?? t.search"
+        />
         <Button
           v-if="search !== ''"
           variant="ghost"
@@ -243,20 +250,20 @@ function ariaSort(column: DataTableColumn): 'ascending' | 'descending' | 'none' 
     <div
       v-if="selectable && selected.length > 0"
       role="status"
-      class="bg-muted flex flex-wrap items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm"
+      class="bg-primary-soft border-primary-soft-border flex flex-wrap items-center gap-2 border-b px-3.5 py-2 text-[13px]"
     >
-      <span class="font-medium">{{ interpolate(t.selected, { count: selected.length }) }}</span>
+      <span class="text-accent-foreground flex-1 font-semibold">{{ interpolate(t.selected, { count: selected.length }) }}</span>
       <div class="flex items-center gap-2">
         <slot name="bulk-actions" :selected="selected" :clear="() => setSelected([])" />
         <Button variant="ghost" size="sm" @click="setSelected([])">{{ t.clear_selection }}</Button>
       </div>
     </div>
 
-    <div class="rounded-md border">
+    <div>
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead v-if="selectable" class="w-10 pl-3">
+            <TableHead v-if="selectable" class="w-11 pl-3.5">
               <Checkbox
                 :model-value="allSelected"
                 :disabled="rows.length === 0"
@@ -294,12 +301,12 @@ function ariaSort(column: DataTableColumn): 'ascending' | 'descending' | 'none' 
         <TableBody :class="cn('transition-opacity', busy && 'opacity-60')" :aria-busy="busy">
           <TableEmpty v-if="rows.length === 0" :colspan="columnCount">
             <slot name="empty" :searching="isSearching">
-              <span class="text-muted-foreground">{{ isSearching ? t.empty_search : t.empty }}</span>
+              <EmptyState :icon="isSearching ? SearchX : Inbox" :title="isSearching ? t.empty_search : t.empty" />
             </slot>
           </TableEmpty>
 
           <template v-for="(run, runIndex) in runs" :key="`${runIndex}:${run.key}`">
-            <TableRow v-if="run.label !== null" class="bg-muted/40 hover:bg-muted/40">
+            <TableRow v-if="run.label !== null" class="bg-surface-muted hover:bg-surface-muted">
               <TableCell :colspan="columnCount" class="py-1.5">
                 <button
                   type="button"
@@ -318,7 +325,7 @@ function ariaSort(column: DataTableColumn): 'ascending' | 'descending' | 'none' 
 
             <template v-if="run.label === null || !collapsed.includes(run.key)">
               <TableRow v-for="row in run.rows" :key="idOf(row)" :data-state="selected.includes(idOf(row)) ? 'selected' : undefined">
-                <TableCell v-if="selectable" class="w-10 pl-3">
+                <TableCell v-if="selectable" class="w-11 pl-3.5">
                   <Checkbox
                     :model-value="selected.includes(idOf(row))"
                     :aria-label="interpolate(t.select_row, { name: labelOf(row) })"
@@ -349,5 +356,5 @@ function ariaSort(column: DataTableColumn): 'ascending' | 'descending' | 'none' 
       @page="(pageNumber) => visit({}, pageNumber)"
       @per-page="(perPage) => visit({ perPage })"
     />
-  </div>
+  </section>
 </template>

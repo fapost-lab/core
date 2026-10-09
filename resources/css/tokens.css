@@ -13,6 +13,7 @@
   --popover-foreground: #1c1917;
   --primary: #5a6e58;
   --primary-foreground: #ffffff;
+  --primary-hover: #48594a;
   --secondary: #efedea;
   --secondary-foreground: #1c1917;
   --muted: #f3f1ee;
@@ -52,6 +53,31 @@
   /* Decorative only: too light for text that has to be read. */
   --subtle-foreground: #a09b94;
   --surface-muted: #fbfaf8;
+  /* Hints, handles and group captions: the 12-13px grey under a value. Readable on card and sidebar. */
+  --faint-foreground: #78716c;
+  --border-soft: #f0eeeb;
+  /* Tinted surfaces of the primary hue: bulk bar, selected row, empty-state icon tile. */
+  --primary-soft: #f1f4ef;
+  --primary-soft-border: #c9d3c7;
+  --row-selected: #f6f8f5;
+  /* Neutral status (draft, group chips) and the dot of a status. */
+  --neutral: #efedea;
+  --neutral-foreground: #44403c;
+  --success-dot: #5a6e58;
+  --warning-dot: #b45309;
+  --danger-dot: #d92d20;
+  --neutral-dot: #a8a29e;
+  --info-dot: #3b6b8f;
+  /* Danger accents that are not the button fill: field border on error, warning text. */
+  --danger-border: #f3c8c2;
+  --invalid: #d92d20;
+  /* Modal backdrop, shadow colour and the toast (a dark pill in both themes). */
+  --scrim: rgb(28 25 23 / 0.32);
+  --shadow-ink: #1c1917;
+  --toast: #1c1917;
+  --toast-foreground: #fafaf9;
+  --toast-muted-foreground: #d6d3d1;
+  --toast-border: #1c1917;
 
   --font-sans: 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
   --font-display: 'Roboto Condensed Variable', 'Onest Variable', sans-serif;
@@ -67,6 +93,7 @@
   --popover-foreground: #f2efeb;
   --primary: #8fa68c;
   --primary-foreground: #141a13;
+  --primary-hover: #a9c2a5;
   --secondary: #2a2623;
   --secondary-foreground: #f2efeb;
   --muted: #24211e;
@@ -105,4 +132,24 @@
 
   --subtle-foreground: #78716c;
   --surface-muted: #1a1816;
+  --faint-foreground: #928b85;
+  --border-soft: #25221f;
+  --primary-soft: #222a24;
+  --primary-soft-border: #3a4a3d;
+  --row-selected: #1f2621;
+  --neutral: #2a2623;
+  --neutral-foreground: #d6d3d1;
+  --success-dot: #8fa68c;
+  --warning-dot: #e0a458;
+  --danger-dot: #e5604f;
+  --neutral-dot: #78716c;
+  --info-dot: #7aa5c7;
+  --danger-border: #5a2a24;
+  --invalid: #e5604f;
+  --scrim: rgb(0 0 0 / 0.6);
+  --shadow-ink: #000000;
+  --toast: #2a2623;
+  --toast-foreground: #f2efeb;
+  --toast-muted-foreground: #a8a29e;
+  --toast-border: #3d3833;
 }

@@ -103,6 +103,12 @@ return [
             'contacts'    => 'Контакти',
             'created_at'  => 'Створено',
         ],
+        'sections' => [
+            'general' => [
+                'title'       => 'Основне',
+                'description' => 'Назва й опис групи.',
+            ],
+        ],
         'fields' => [
             'name'        => 'Назва',
             'description' => 'Опис',
@@ -134,6 +140,12 @@ return [
         'columns'      => [
             'name'  => 'Назва',
             'flows' => 'Сценарії',
+        ],
+        'sections' => [
+            'general' => [
+                'title'       => 'Основне',
+                'description' => 'Назва групи.',
+            ],
         ],
         'fields' => [
             'name' => 'Назва',
@@ -170,6 +182,16 @@ return [
             'group'      => 'Група',
             'visibility' => 'Видимість',
             'version'    => 'Версія',
+        ],
+        'sections' => [
+            'general' => [
+                'title'       => 'Основне',
+                'description' => 'Назва, група й опис флоу.',
+            ],
+            'behaviour' => [
+                'title'       => 'Поведінка',
+                'description' => 'Хто може запускати флоу і що записується про його сесії.',
+            ],
         ],
         'fields' => [
             'name'                 => 'Назва',
@@ -261,6 +283,16 @@ return [
         'status'      => [
             'active'   => 'Активний',
             'inactive' => 'Неактивний',
+        ],
+        'sections' => [
+            'connection' => [
+                'title'       => 'Підключення',
+                'description' => 'Як платформа спілкується з месенджером. Секрети зберігаються зашифрованими.',
+            ],
+            'behaviour' => [
+                'title'       => 'Поведінка',
+                'description' => 'Чи приймає канал вхідні повідомлення.',
+            ],
         ],
         'fields' => [
             'type'                 => 'Канал',

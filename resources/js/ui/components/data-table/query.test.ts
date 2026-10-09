@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest'
-import {buildQuery, groupRuns, visibleRows, keepVisible, nextSort, selectionState, sortDirection, toggleAll, toggleRow} from './query'
+import {buildQuery, groupRuns, pageWindow, visibleRows, keepVisible, nextSort, selectionState, sortDirection, toggleAll, toggleRow} from './query'
 
 const defaults = {sort: 'name', perPage: 25}
 
@@ -140,5 +140,23 @@ describe('visibleRows', () => {
 
     it('never collapses a run without a header', () => {
         expect(visibleRows([{key: '', label: null, rows: [1, 2]}], [''])).toEqual([1, 2])
+    })
+})
+
+describe('pageWindow', () => {
+    it('lists every page of a short list', () => {
+        expect(pageWindow(2, 5)).toEqual([1, 2, 3, 4, 5])
+        expect(pageWindow(1, 1)).toEqual([1])
+    })
+
+    it('skips the middle of a long list', () => {
+        expect(pageWindow(1, 121)).toEqual([1, 2, 3, 4, null, 121])
+        expect(pageWindow(60, 121)).toEqual([1, null, 59, 60, 61, null, 121])
+        expect(pageWindow(121, 121)).toEqual([1, null, 118, 119, 120, 121])
+    })
+
+    it('does not mark a gap of one page', () => {
+        expect(pageWindow(5, 9)).toEqual([1, null, 4, 5, 6, null, 9])
+        expect(pageWindow(4, 9)).toEqual([1, 2, 3, 4, 5, null, 9])
     })
 })

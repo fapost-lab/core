@@ -23,18 +23,20 @@ const dark = useIsDark()
   <div class="bg-background text-foreground flex min-h-screen">
     <slot name="rail" />
 
-    <aside class="bg-sidebar text-sidebar-foreground border-sidebar-border sticky top-0 hidden h-screen w-64 shrink-0 border-r lg:block">
+    <aside class="bg-sidebar text-sidebar-foreground border-sidebar-border sticky top-0 hidden h-screen w-[248px] shrink-0 border-r lg:block">
       <ShellSidebar />
     </aside>
 
     <div class="flex min-w-0 flex-1 flex-col">
       <ShellBanners />
       <ShellHeader />
-      <main class="flex-1 p-4 sm:p-6">
-        <slot />
+      <main class="flex-1 px-4 pt-6 pb-10 sm:px-6 lg:px-8 lg:pt-7">
+        <div class="w-full max-w-[1200px]">
+          <slot />
+        </div>
       </main>
     </div>
 
-    <Toaster :theme="dark ? 'dark' : 'light'" position="bottom-right" rich-colors close-button />
+    <Toaster :theme="dark ? 'dark' : 'light'" position="bottom-right" close-button />
   </div>
 </template>

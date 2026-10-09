@@ -7,7 +7,8 @@ export default { layout: AppShell }
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Head, Link, router, usePage } from '@inertiajs/vue3'
-import { Pencil, Plus, Trash2 } from '@lucide/vue'
+import { Pencil, Plus, SearchX, Trash2 } from '@lucide/vue'
+import { EmptyState } from '@fapost/ui/components/empty-state'
 import { Badge } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { ConfirmDialog } from '@fapost/ui/components/confirm-dialog'
@@ -63,10 +64,10 @@ function deleteMany(): void {
 <template>
   <Head :title="t.title" />
 
-  <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
+  <div class="flex w-full flex-col gap-5">
     <div class="flex flex-col gap-1">
-      <h1 class="font-display text-2xl font-semibold tracking-wide uppercase">{{ t.title }}</h1>
-      <p class="text-muted-foreground text-sm">{{ t.description }}</p>
+      <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+      <p class="text-muted-foreground">{{ t.description }}</p>
     </div>
 
     <DataTable
@@ -91,7 +92,7 @@ function deleteMany(): void {
       </template>
 
       <template #bulk-actions="{ selected }">
-        <Button variant="destructive" size="sm" @click="askAboutMany(selected)">
+        <Button variant="outline-danger" size="sm" @click="askAboutMany(selected)">
           <Trash2 aria-hidden="true" />
           {{ t.delete_selected }}
         </Button>
@@ -102,7 +103,7 @@ function deleteMany(): void {
       </template>
 
       <template #cell-flowsCount="{ row }">
-        <Badge variant="secondary">{{ row.flowsCount }}</Badge>
+        <Badge variant="neutral">{{ row.flowsCount }}</Badge>
       </template>
 
       <template #actions="{ row }">
@@ -119,11 +120,8 @@ function deleteMany(): void {
       </template>
 
       <template #empty="{ searching }">
-        <p v-if="searching" class="text-muted-foreground">{{ tableLabels.empty_search }}</p>
-        <div v-else class="flex flex-col items-center gap-1 text-center">
-          <p class="font-medium">{{ t.empty }}</p>
-          <p class="text-muted-foreground text-sm">{{ t.empty_hint }}</p>
-        </div>
+        <EmptyState v-if="searching" :icon="SearchX" :title="tableLabels.empty_search" />
+        <EmptyState v-else :title="t.empty" :description="t.empty_hint" />
       </template>
     </DataTable>
 
