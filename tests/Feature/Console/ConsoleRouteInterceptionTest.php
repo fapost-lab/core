@@ -7,6 +7,7 @@ namespace Tests\Feature\Console;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
 use App\Http\Controllers\Console\ChannelController;
+use App\Http\Controllers\Console\ContactController;
 use App\Http\Controllers\Console\ContactGroupController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
@@ -37,6 +38,8 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'channels list'         => ['filament.assistant.resources.channels.index', ChannelController::class, 'index', 'assistant/{tenant}/channels'],
             'channels create'       => ['filament.assistant.resources.channels.create', ChannelController::class, 'create', 'assistant/{tenant}/channels/create'],
             'channels edit'         => ['filament.assistant.resources.channels.edit', ChannelController::class, 'edit', 'assistant/{tenant}/channels/{record}/edit'],
+            'contacts list'         => ['filament.assistant.resources.contacts.index', ContactController::class, 'index', 'assistant/{tenant}/contacts'],
+            'contacts view'         => ['filament.assistant.resources.contacts.view', ContactController::class, 'show', 'assistant/{tenant}/contacts/{record}'],
             'contact groups list'   => ['filament.assistant.resources.contact-groups.index', ContactGroupController::class, 'index', 'assistant/{tenant}/contact-groups'],
             'contact groups create' => ['filament.assistant.resources.contact-groups.create', ContactGroupController::class, 'create', 'assistant/{tenant}/contact-groups/create'],
             'contact groups edit'   => ['filament.assistant.resources.contact-groups.edit', ContactGroupController::class, 'edit', 'assistant/{tenant}/contact-groups/{record}/edit'],
@@ -62,6 +65,8 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'channel update'          => ['console.channels.update', ChannelController::class, 'update', 'PUT', 'assistant/{tenant}/channels/{record}'],
             'channel rotate webhook'  => ['console.channels.rotate-webhook', ChannelController::class, 'rotateWebhook', 'POST', 'assistant/{tenant}/channels/{record}/rotate-webhook'],
             'channel destroy'         => ['console.channels.destroy', ChannelController::class, 'destroy', 'DELETE', 'assistant/{tenant}/channels/{record}'],
+            'contact tags'            => ['console.contacts.tags', ContactController::class, 'updateTags', 'PUT', 'assistant/{tenant}/contacts/{record}/tags'],
+            'contact groups'          => ['console.contacts.groups', ContactController::class, 'updateGroups', 'PUT', 'assistant/{tenant}/contacts/{record}/groups'],
             'flow group store'        => ['console.flow-groups.store', FlowGroupController::class, 'store', 'POST', 'assistant/{tenant}/flow-groups'],
             'flow group store inline' => ['console.flow-groups.store-inline', FlowGroupController::class, 'storeInline', 'POST', 'assistant/{tenant}/flow-groups/inline'],
             'flow group update'       => ['console.flow-groups.update', FlowGroupController::class, 'update', 'PUT', 'assistant/{tenant}/flow-groups/{record}'],
