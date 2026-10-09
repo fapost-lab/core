@@ -83,7 +83,10 @@ return [
     |
     */
 
-    'middleware' => ['web'],
+    // OnlyOnPlatformHosts first: in `host` tenancy mode Horizon answers on the base domain and platform
+    // subdomains only, never on a tenant's host. It stays closed to everyone until `viewHorizon` allows a user
+    // (see HorizonServiceProvider).
+    'middleware' => [App\Http\Middleware\OnlyOnPlatformHosts::class, 'web'],
 
     /*
     |--------------------------------------------------------------------------

@@ -68,6 +68,44 @@ Flow node contracts. A node handler's contract is versioned: existing flow
 definitions keep running against the old version, but a release may add a new one
 that new flows use.
 
+## Moving to host mode
+
+Switching `TENANCY_RESOLUTION` from `single` to `host` changes which hosts the
+application answers, so do it deliberately:
+
+1. Set up the wildcard DNS record and certificate first
+   ([Several tenants](/self-hosting/docker-compose#several-tenants-host-mode)).
+2. Make sure `SESSION_DRIVER` is not `database` and `SESSION_DOMAIN` is unset. Sessions
+   stored by the old driver are not carried over, so everyone signs in again.
+3. Put `WEBHOOK_BASE_URL` and the gateway host under `TENANCY_BASE_DOMAIN`. A host
+   outside it gets 400, and channels registered against such a host stop receiving.
+4. Set `TENANCY_RESOLUTION=host`, then recreate the containers so the route cache is
+   rebuilt: `docker compose up -d --force-recreate app horizon scheduler`.
+
+The existing tenant keeps its slug and is served at `<slug>.<base domain>`; the base
+domain stops serving the panel. Going back to `single` is the same edit the other way.
+
+## Trusted proxies
+
+`TRUSTED_PROXIES` is new. Compose installations get a default that trusts only the
+bundled Caddy at its fixed address on the compose network, which makes the client
+address correct behind it and changes what rate limits see: they now count real
+clients instead of one. The Compose file now also defines the network's subnet
+(`172.30.0.0/24`, dynamic addresses from `172.30.0.128/25`); set `COMPOSE_SUBNET`,
+`COMPOSE_IP_RANGE` and `CADDY_ADDRESS` together if that collides with something on your
+host, and give a second installation from the same file (a staging `ENV_FILE`) its own
+values. Because the network definition changed, recreate it once:
+`docker compose down` and then `docker compose up -d`. Bare metal and other setups trust nobody until the variable
+is set, as before.
+
+## Host-mode installs: sessions are now checked
+
+An installation already running with `TENANCY_RESOLUTION=host` that has
+`SESSION_DRIVER=database` or `SESSION_DOMAIN` set used to fail only on platform pages.
+After this upgrade **every web request fails** with a message naming the setting.
+Before upgrading, switch to `SESSION_DRIVER=redis` and unset `SESSION_DOMAIN`; people
+sign in again once. Queue workers and console commands are not affected.
+
 ## Downtime
 
 The application tolerates a short window where old and new run side by side —

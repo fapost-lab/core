@@ -25,6 +25,7 @@ use App\Domains\Tenancy\Services\ConfigTenantResolver;
 use App\Domains\Tenancy\Services\CoreBootstrap;
 use App\Domains\Tenancy\Services\CurrentAccessState;
 use App\Domains\Tenancy\Services\DomainBootstrapper;
+use App\Domains\Tenancy\Services\HostModeDeploymentCheck;
 use App\Domains\Tenancy\Services\HostTenantResolver;
 use App\Domains\Tenancy\Services\LimitRegistry;
 use App\Domains\Tenancy\Services\RecordQuota;
@@ -47,6 +48,7 @@ use Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantReservationInterface;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Database\Connection;
+use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -150,11 +152,33 @@ final class DomainServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->checkHostModeDeployment();
+
         $this->app->booted(function (): void {
             if (! $this->app->environment('testing')) {
                 $this->app->make(LimitRegistry::class)->freeze();
             }
         });
+    }
+
+    /**
+     * Refuses to serve web requests in `host` mode with sessions that cannot work there.
+     *
+     * Console and queue processes boot without it: they hold no session, and a worker that
+     * dies on a web-only setting could not even run `config:clear` to repair it. `about` lists
+     * what is wrong either way, including advice that never stops a request.
+     */
+    private function checkHostModeDeployment(): void
+    {
+        $check = new HostModeDeploymentCheck($this->app['config']);
+
+        AboutCommand::add('Tenancy', static fn (): array => [
+            'Host mode problems' => [] === ($found = [...$check->errors(), ...$check->warnings()]) ? 'none' : implode(' ', $found),
+        ]);
+
+        if (! $this->app->runningInConsole()) {
+            $check->assertWorkable();
+        }
     }
 
     /**

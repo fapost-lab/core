@@ -47,6 +47,9 @@ type Options struct {
 	MaxBodyBytes int64
 	DedupTTL     time.Duration
 
+	// UpstreamPreserveHost forwards the caller's Host on the fallback instead of the upstream URL's.
+	UpstreamPreserveHost bool
+
 	// TrustedProxies are the networks whose X-Forwarded-For may be believed.
 	// A single address is expressed as the range containing only itself, which
 	// config does when resolving the setting.
@@ -291,6 +294,15 @@ func (h *Handler) proxy(w http.ResponseWriter, r *http.Request, dc dispatchConte
 	// Headers are copied verbatim: the signature the application will check is
 	// computed over headers and raw body, so altering either breaks verification.
 	request.Header = r.Header.Clone()
+
+	// http.NewRequest takes Host from the target URL, and a server request's header map carries no Host, so
+	// the application sees the upstream's own name ("web:80"). Host tenancy mode answers only hosts under its
+	// base domain, so an internal upstream opts in to receiving the Host the caller used. It is opt-in
+	// because a public upstream URL behind the same proxy as the gateway would route that Host back here.
+	if h.options.UpstreamPreserveHost {
+		request.Host = r.Host
+	}
+
 	request.Header.Set(RequestIDHeader, dc.requestID)
 	request.Header.Set("X-Forwarded-For", h.clientIP(r))
 	request.Header.Set("X-Forwarded-Host", r.Host)

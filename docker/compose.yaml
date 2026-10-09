@@ -43,6 +43,13 @@ x-app: &app
     DB_PORT: 5432
     REDIS_HOST: redis
     REDIS_PORT: 6379
+    # Who may vouch for the client address (X-Forwarded-For). PHP's peer is whoever connected to
+    # nginx, which is Caddy, so the default trusts that one address, pinned below on the compose
+    # network. Without the tls profile nothing sits at that address and nobody is trusted. Set it
+    # to a list of addresses or ranges to replace it (add Cloudflare's when it fronts Caddy), or
+    # to nothing at all to trust no one. Keep HTTP_BIND=127.0.0.1 behind Caddy: a caller who can
+    # reach the web port directly is not a trusted proxy, but would otherwise bypass Caddy.
+    TRUSTED_PROXIES: ${TRUSTED_PROXIES-${CADDY_ADDRESS:-172.30.0.2}}
   volumes:
     # The only writable path. Application code stays in the image, so a deploy
     # is a new image rather than a directory someone edited in place.
@@ -139,9 +146,15 @@ services:
   # balancer, leave this off and point it at the `web` service instead.
   caddy:
     profiles: ["tls"]
-    image: caddy:2-alpine
+    # Override with an image that carries your DNS provider's module when a wildcard
+    # certificate is issued through the DNS challenge (host tenancy mode).
+    image: ${CADDY_IMAGE:-caddy:2-alpine}
     depends_on:
       - web
+    networks:
+      default:
+        # A fixed address, so the application can trust exactly this proxy (TRUSTED_PROXIES).
+        ipv4_address: ${CADDY_ADDRESS:-172.30.0.2}
     ports:
       - "80:80"
       - "443:443"
@@ -151,6 +164,9 @@ services:
       # every certificate, which the rate limits punish.
       - caddy-data:/data
       - caddy-config:/config
+      # Extra sites, imported by the Caddyfile. Host tenancy mode puts its wildcard site
+      # here; see "Several tenants" in the self-hosting guide. An empty directory adds nothing.
+      - ${CADDY_SITES_DIR:-./caddy.d}:/etc/caddy/conf.d:ro
     configs:
       - source: caddyfile
         target: /etc/caddy/Caddyfile
@@ -193,6 +209,8 @@ services:
       # Falls back to the application's own ingress on a cache miss, so a cold
       # Redis costs throughput rather than dropped deliveries.
       GATEWAY_UPSTREAM_URL: "http://web:80"
+      # web serves every host, and host tenancy mode needs the original one to accept the request.
+      GATEWAY_UPSTREAM_PRESERVE_HOST: "true"
       GATEWAY_LOG_FORMAT: "json"
       GATEWAY_LOG_DESTINATION: "stdout"
       GATEWAY_LOG_LEVEL: "${GATEWAY_LOG_LEVEL:-info}"
@@ -212,6 +230,18 @@ services:
       timeout: 3s
       retries: 3
     restart: unless-stopped
+
+networks:
+  default:
+    ipam:
+      config:
+        # Pinned so Caddy can have a fixed address inside it. Dynamic addresses come only from
+        # ip_range (the upper half), so no container started before Caddy can take its address,
+        # which must lie outside ip_range. Change all three together (COMPOSE_SUBNET,
+        # COMPOSE_IP_RANGE, CADDY_ADDRESS) if the subnet collides with a network on the host or
+        # with a second installation from this file.
+        - subnet: ${COMPOSE_SUBNET:-172.30.0.0/24}
+          ip_range: ${COMPOSE_IP_RANGE:-172.30.0.128/25}
 
 volumes:
   postgres:
@@ -340,3 +370,10 @@ configs:
       		format json
       	}
       }
+
+      # Sites an installation adds itself. In host tenancy mode that is the wildcard
+      # `*.<base domain>` site with its certificate, which this file cannot declare:
+      # a wildcard certificate comes from the DNS challenge, and that needs a module
+      # for the operator's DNS provider that the stock image does not carry. With
+      # nothing in the directory this imports nothing.
+      import /etc/caddy/conf.d/*.caddy

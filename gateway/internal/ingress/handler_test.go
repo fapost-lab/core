@@ -117,6 +117,7 @@ type upstreamRequest struct {
 	body      string
 	headers   http.Header
 	requestID string
+	host      string
 }
 
 func newHarness(t *testing.T, configure func(*fakeChannels)) *harness {
@@ -156,6 +157,7 @@ func newHarness(t *testing.T, configure func(*fakeChannels)) *harness {
 			body:      string(body),
 			headers:   r.Header.Clone(),
 			requestID: r.Header.Get(RequestIDHeader),
+			host:      r.Host,
 		})
 		h.mu.Unlock()
 
@@ -398,6 +400,47 @@ func TestProxyForwardsBodyAndSignatureHeaderUnchanged(t *testing.T) {
 
 	if call.requestID == "" {
 		t.Error("the correlation id was not forwarded upstream")
+	}
+}
+
+func proxiedHost(t *testing.T, preserve bool) (upstreamHost, upstreamURLHost string) {
+	t.Helper()
+
+	h := newHarness(t, func(c *fakeChannels) { c.lookupErr = registry.ErrNotFound })
+	h.handler.options.UpstreamPreserveHost = preserve
+
+	request := httptest.NewRequest(http.MethodPost, "/webhook/telegram/"+testHash, strings.NewReader(testBody))
+	request.Host = "gateway.fapost.example.com"
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Telegram-Bot-Api-Secret-Token", testSecret)
+
+	h.handler.ServeHTTP(httptest.NewRecorder(), request)
+
+	calls := h.upstreamCalls()
+	if len(calls) != 1 {
+		t.Fatalf("upstream calls = %d, want 1", len(calls))
+	}
+
+	return calls[0].host, h.handler.options.Upstream.Host
+}
+
+// Host tenancy mode answers only hosts under its base domain, so an internal upstream can opt in to the
+// caller's Host on the fallback.
+func TestProxyPreservesTheOriginalHostWhenOptedIn(t *testing.T) {
+	got, _ := proxiedHost(t, true)
+
+	if got != "gateway.fapost.example.com" {
+		t.Errorf("upstream Host = %q, want the original host", got)
+	}
+}
+
+// A public upstream URL behind the proxy that fronts the gateway would route the gateway's own Host back to
+// the gateway: by default the upstream URL's Host is kept.
+func TestProxyKeepsTheUpstreamHostByDefault(t *testing.T) {
+	got, want := proxiedHost(t, false)
+
+	if got != want {
+		t.Errorf("upstream Host = %q, want the upstream URL's %q", got, want)
 	}
 }
 
