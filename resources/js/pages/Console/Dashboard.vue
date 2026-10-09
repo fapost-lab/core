@@ -44,7 +44,7 @@ const status = computed(() => (props.assistant.isActive ? t.value.status_active 
     <div class="grid gap-4 md:grid-cols-2">
       <Card>
         <CardHeader>
-          <CardTitle class="font-display tracking-wide uppercase">{{ t.sections.summary }}</CardTitle>
+          <CardTitle class="font-display">{{ t.sections.summary }}</CardTitle>
         </CardHeader>
         <CardContent class="flex flex-col gap-2 text-sm">
           <p>{{ interpolate(t.name, { name: assistant.name }) }}</p>
@@ -54,14 +54,14 @@ const status = computed(() => (props.assistant.isActive ? t.value.status_active 
 
       <Card>
         <CardHeader>
-          <CardTitle class="font-display tracking-wide uppercase">{{ t.sections.channels }}</CardTitle>
+          <CardTitle class="font-display">{{ t.sections.channels }}</CardTitle>
           <CardDescription>{{ interpolate(t.channels_intro, { count: assistant.channelsCount }) }}</CardDescription>
         </CardHeader>
       </Card>
 
       <Card class="md:col-span-2">
         <CardHeader>
-          <CardTitle class="font-display tracking-wide uppercase">{{ t.sections.operations }}</CardTitle>
+          <CardTitle class="font-display">{{ t.sections.operations }}</CardTitle>
           <CardDescription>{{ t.operations_intro }}</CardDescription>
         </CardHeader>
         <CardContent v-if="!operations.sessionsUrl || !operations.logsUrl" class="text-muted-foreground flex flex-col gap-1 text-sm">

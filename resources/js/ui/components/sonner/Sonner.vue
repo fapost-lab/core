@@ -3,9 +3,20 @@ import type { ToasterProps } from "vue-sonner"
 import { CheckIcon, InfoIcon, Loader2Icon, TriangleAlertIcon, XIcon } from "@lucide/vue"
 import { Toaster as Sonner } from "vue-sonner"
 import "vue-sonner/style.css"
+import { computed } from "vue"
 import { cn } from '@fapost/ui/lib/utils'
 
 const props = defineProps<ToasterProps>()
+
+// The toast is a dark pill in both themes: its description, close button and border follow the toast tokens.
+const toastOptions = computed(() => ({
+  ...props.toastOptions,
+  classes: {
+    description: 'text-toast-muted-foreground!',
+    closeButton: 'bg-toast! text-toast-foreground! border-toast-border!',
+    ...props.toastOptions?.classes,
+  },
+}))
 </script>
 
 <template>
@@ -17,7 +28,7 @@ const props = defineProps<ToasterProps>()
       '--normal-border': 'var(--toast-border)',
       '--border-radius': 'calc(var(--radius) + 2px)',
     }"
-    v-bind="props"
+    v-bind="{ ...props, toastOptions }"
   >
     <template #success-icon>
       <span class="bg-primary text-primary-foreground flex size-[22px] items-center justify-center rounded-full">

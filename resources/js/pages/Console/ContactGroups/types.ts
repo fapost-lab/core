@@ -7,6 +7,7 @@ export interface ContactGroupsTranslations {
   create_title: string
   edit_title: string
   columns: { name: string; description: string; contacts: string; created_at: string }
+  sections: { general: { title: string; description: string } }
   fields: { name: string; description: string }
   search_label: string
   empty: string

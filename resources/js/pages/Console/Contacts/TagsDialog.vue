@@ -77,7 +77,7 @@ function submit(): void {
       <form class="flex flex-col gap-5" novalidate @submit.prevent="submit">
         <FormField id="contact-tag" :label="t.view.tags" :error="errors[0]" v-slot="{ invalid, describedBy }">
           <div v-if="form.tags.length" class="flex flex-wrap gap-1.5">
-            <Badge v-for="tag in form.tags" :key="tag" variant="secondary" class="gap-1 pr-1">
+            <Badge v-for="tag in form.tags" :key="tag" variant="neutral" class="gap-1 pr-1">
               <span class="max-w-48 truncate">{{ tag }}</span>
               <button
                 type="button"

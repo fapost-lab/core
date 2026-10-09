@@ -7,6 +7,7 @@ export interface FlowGroupsTranslations {
   create_title: string
   edit_title: string
   columns: { name: string; flows: string }
+  sections: { general: { title: string; description: string } }
   fields: { name: string }
   search_label: string
   empty: string

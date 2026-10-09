@@ -7,8 +7,9 @@ export default { layout: AppShell }
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Head, Link, usePage } from '@inertiajs/vue3'
-import { Eye } from '@lucide/vue'
+import { Eye, SearchX } from '@lucide/vue'
 import { Badge } from '@fapost/ui/components/badge'
+import { EmptyState } from '@fapost/ui/components/empty-state'
 import { Button } from '@fapost/ui/components/button'
 import { DataTable, type DataTableColumn, type TableDefaults, type TableMeta, type TableState } from '@fapost/ui/components/data-table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
@@ -52,10 +53,10 @@ function label(row: ContactRow): string {
 <template>
   <Head :title="t.title" />
 
-  <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
+  <div class="flex w-full flex-col gap-5">
     <div class="flex flex-col gap-1">
-      <h1 class="font-display text-2xl font-semibold tracking-wide uppercase">{{ t.title }}</h1>
-      <p class="text-muted-foreground text-sm">{{ t.description }}</p>
+      <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+      <p class="text-muted-foreground">{{ t.description }}</p>
     </div>
 
     <DataTable
@@ -100,7 +101,7 @@ function label(row: ContactRow): string {
       </template>
 
       <template #cell-platform="{ row }">
-        <Badge variant="secondary">{{ platformLabel(row.platform) }}</Badge>
+        <Badge variant="info">{{ platformLabel(row.platform) }}</Badge>
       </template>
 
       <template #cell-externalId="{ row }">
@@ -113,7 +114,7 @@ function label(row: ContactRow): string {
       </template>
 
       <template #cell-language="{ row }">
-        <Badge v-if="row.language" variant="outline">{{ row.language }}</Badge>
+        <Badge v-if="row.language" variant="neutral">{{ row.language }}</Badge>
         <span v-else class="text-muted-foreground">—</span>
       </template>
 
@@ -132,11 +133,8 @@ function label(row: ContactRow): string {
       </template>
 
       <template #empty="{ searching }">
-        <p v-if="searching" class="text-muted-foreground">{{ tableLabels.empty_search }}</p>
-        <div v-else class="flex flex-col items-center gap-1 text-center">
-          <p class="font-medium">{{ t.empty }}</p>
-          <p class="text-muted-foreground text-sm">{{ t.empty_hint }}</p>
-        </div>
+        <EmptyState v-if="searching" :icon="SearchX" :title="tableLabels.empty_search" />
+        <EmptyState v-else :title="t.empty" :description="t.empty_hint" />
       </template>
     </DataTable>
   </div>

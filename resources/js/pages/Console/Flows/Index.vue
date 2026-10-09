@@ -151,7 +151,7 @@ function toggleActivity(): void {
       </template>
 
       <template #bulk-actions="{ selected }">
-        <Button variant="destructive" size="sm" @click="askAboutMany(selected)">
+        <Button variant="outline-danger" size="sm" @click="askAboutMany(selected)">
           <Trash2 aria-hidden="true" />
           {{ t.delete_selected }}
         </Button>

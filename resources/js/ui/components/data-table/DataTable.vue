@@ -226,7 +226,7 @@ function ariaSort(column: DataTableColumn): 'ascending' | 'descending' | 'none' 
         <Input
           v-model="search"
           type="search"
-          class="bg-surface-muted border-border h-9 px-8 text-[13.5px]"
+          class="bg-surface-muted border-border h-9 px-8 text-base md:text-[13.5px]"
           :placeholder="t.search_hint"
           :aria-label="searchLabel ?? t.search"
         />

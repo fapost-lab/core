@@ -32,7 +32,7 @@ const pages = computed(() => pageWindow(props.meta.currentPage, props.meta.lastP
 </script>
 
 <template>
-  <div class="text-muted-foreground border-border flex flex-wrap items-center gap-3 border-t px-3.5 py-3 text-[13px]">
+  <div class="text-muted-foreground flex flex-wrap items-center gap-3 px-3.5 py-3 text-[13px]">
     <span class="flex-1">{{ range }}</span>
 
     <div class="flex items-center gap-1.5">
