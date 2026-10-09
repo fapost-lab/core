@@ -7,7 +7,7 @@ export default { layout: AppShell }
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Head, Link, router, usePage } from '@inertiajs/vue3'
-import { CircleCheck, CircleX, EllipsisVertical, ExternalLink, KeyRound, Pencil, Plus, Trash2 } from '@lucide/vue'
+import { CircleCheck, CircleX, EllipsisVertical, ExternalLink, KeyRound, Pencil, Plus, RefreshCw, Trash2 } from '@lucide/vue'
 import { Badge } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { ConfirmDialog } from '@fapost/ui/components/confirm-dialog'
@@ -16,6 +16,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { interpolate } from '@fapost/ui/shell'
 import type { ChannelRow, ChannelsPageProps } from './types'
+import WebhookStatus from './WebhookStatus.vue'
 
 const props = defineProps<{
   table: { rows: ChannelRow[]; meta: TableMeta; state: TableState; defaults: TableDefaults & { perPageOptions: number[] } }
@@ -62,6 +63,10 @@ function rotate(): void {
   if (rowToRotate.value) {
     router.post(rowToRotate.value.rotateUrl, {}, { preserveScroll: true })
   }
+}
+
+function registerAgain(row: ChannelRow): void {
+  router.post(row.registerWebhookUrl, {}, { preserveScroll: true })
 }
 
 function destroy(): void {
@@ -111,6 +116,7 @@ function destroy(): void {
           <ExternalLink class="size-3.5" aria-hidden="true" />
         </a>
         <span v-else class="text-muted-foreground">{{ t.bot_pending }}</span>
+        <WebhookStatus v-if="row.webhook === 'failed'" class="ml-2" />
       </template>
 
       <template #cell-isActive="{ row }">
@@ -135,6 +141,10 @@ function destroy(): void {
                 <Pencil aria-hidden="true" />
                 {{ common.edit }}
               </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="can.update && row.webhook === 'failed'" @select="registerAgain(row)">
+              <RefreshCw aria-hidden="true" />
+              {{ t.webhook.register_again }}
             </DropdownMenuItem>
             <DropdownMenuItem v-if="can.rotate" variant="destructive" @select="askAboutRotation(row)">
               <KeyRound aria-hidden="true" />

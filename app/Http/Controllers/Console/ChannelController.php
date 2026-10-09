@@ -8,7 +8,7 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Services\AssistantChannelService;
-use App\Domains\Channels\Telegram\Exceptions\TelegramApiException;
+use App\Domains\Channels\Services\ChannelWebhookSyncOutcome;
 use App\Domains\Channels\Telegram\TelegramWebhookOptions;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
@@ -33,15 +33,17 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  * them empty (an empty field keeps what is stored). The webhook hash is shown on the edit page and, once, after a
  * rotation, to the one who may rotate.
  *
- * The provider is called while the channel is saved, so it may refuse after the record is already stored. That is
- * worded as a toast with a fixed text: the exception's message can carry the request URL, and with it the bot's token.
- * Only Telegram's exception is known here; a driver that throws its own gets a server error until it is added.
+ * The provider is called while the channel is saved, and a write never fails on its refusal: the record is stored, the
+ * outcome of the registration is stored on it (shown in the list, with an action to register again), and a deregister
+ * refusal is noted for the request in {@see ChannelWebhookSyncOutcome}. The toast is worded from that outcome with a
+ * fixed text, never from an exception: its message can carry the request URL, and with it the bot's token.
  */
 final class ChannelController extends Controller
 {
     public function __construct(
         private readonly AssistantChannelService $channels,
         private readonly CurrentAssistantInterface $assistant,
+        private readonly ChannelWebhookSyncOutcome $outcome,
     ) {
     }
 
@@ -63,16 +65,18 @@ final class ChannelController extends Controller
                 $request,
                 $this->channels->query($assistant),
                 fn (Channel $channel): array => [
-                    'id'        => (string) $channel->getKey(),
-                    'type'      => $channel->type->value,
-                    'typeLabel' => trans($channel->type->labelKey()),
-                    'handle'    => $channel->publicHandle(),
-                    'url'       => $channel->publicUrl(),
-                    'isActive'  => $channel->is_active,
-                    'updatedAt' => $channel->updated_at?->toIso8601String(),
-                    'editUrl'   => $this->url('edit', ['record' => $channel->getKey()]),
-                    'deleteUrl' => $this->url('destroy', ['record' => $channel->getKey()]),
-                    'rotateUrl' => $this->url('rotate-webhook', ['record' => $channel->getKey()]),
+                    'id'                 => (string) $channel->getKey(),
+                    'type'               => $channel->type->value,
+                    'typeLabel'          => trans($channel->type->labelKey()),
+                    'handle'             => $channel->publicHandle(),
+                    'url'                => $channel->publicUrl(),
+                    'isActive'           => $channel->is_active,
+                    'webhook'            => $this->webhookState($channel),
+                    'updatedAt'          => $channel->updated_at?->toIso8601String(),
+                    'editUrl'            => $this->url('edit', ['record' => $channel->getKey()]),
+                    'deleteUrl'          => $this->url('destroy', ['record' => $channel->getKey()]),
+                    'rotateUrl'          => $this->url('rotate-webhook', ['record' => $channel->getKey()]),
+                    'registerWebhookUrl' => $this->url('register-webhook', ['record' => $channel->getKey()]),
                 ],
             ),
             'limit' => [
@@ -114,20 +118,17 @@ final class ChannelController extends Controller
 
     public function store(ChannelRequest $request): RedirectResponse
     {
-        $assistant = $this->assistant->get();
-        $index     = $this->url('index');
-
         try {
-            $this->channels->create($assistant, $request->fields());
+            $channel = $this->channels->create($this->assistant->get(), $request->fields());
         } catch (RecordLimitReachedException $exception) {
             Inertia::flash('error', trans('console.channels.limit_reached') . '. ' . $exception->getMessage());
 
-            return redirect()->back(fallback: $index);
-        } catch (TelegramApiException $exception) {
-            return $this->providerRefused($exception, 'saved', $index);
+            return redirect()->back(fallback: $this->url('index'));
         }
 
-        return $this->backToIndex(trans('console.channels.created'), $index);
+        return $channel->webhookRegistrationFailed()
+            ? $this->backToIndex(trans('console.channels.provider_failed.saved'), 'error')
+            : $this->backToIndex(trans('console.channels.created'));
     }
 
     /*
@@ -145,14 +146,17 @@ final class ChannelController extends Controller
 
         return Inertia::render('Console/Channels/Edit', [
             'channel' => [
-                'id'          => (string) $channel->getKey(),
-                'type'        => $channel->type->value,
-                'typeLabel'   => trans($channel->type->labelKey()),
-                'isActive'    => $channel->is_active,
-                'webhookHash' => $channel->webhook_public_hash,
-                'handle'      => $channel->publicHandle(),
-                'url'         => $channel->publicUrl(),
-                'telegram'    => $isTelegram ? [
+                'id'                 => (string) $channel->getKey(),
+                'type'               => $channel->type->value,
+                'typeLabel'          => trans($channel->type->labelKey()),
+                'isActive'           => $channel->is_active,
+                'webhook'            => $this->webhookState($channel),
+                'webhookAt'          => $channel->webhook_status_at?->toIso8601String(),
+                'registerWebhookUrl' => $this->url('register-webhook', ['record' => $channel->getKey()]),
+                'webhookHash'        => $channel->webhook_public_hash,
+                'handle'             => $channel->publicHandle(),
+                'url'                => $channel->publicUrl(),
+                'telegram'           => $isTelegram ? [
                     'allowedUpdates' => $this->allowedUpdates($config),
                     'maxConnections' => is_numeric($config['max_connections'] ?? null)
                         ? (int) $config['max_connections']
@@ -171,18 +175,16 @@ final class ChannelController extends Controller
     public function update(ChannelRequest $request, string $tenant, string $record): RedirectResponse
     {
         $channel = $this->channels->findFor($this->assistant->get(), $record);
-        $index   = $this->url('index');
+        $updated = $this->channels->update($channel, $request->fields());
 
-        $fields = $request->fields();
-
-        try {
-            $this->channels->update($channel, $fields);
-        } catch (TelegramApiException $exception) {
-            // Switching a channel off deregisters its webhook, which is another thing to check than a rejected token.
-            return $this->providerRefused($exception, false === $fields['is_active'] ? 'deactivated' : 'saved', $index);
+        // Switching a channel off deregisters its webhook, which is another thing to check than a rejected token.
+        if ($this->outcome->deregisterFailed((string) $updated->getKey())) {
+            return $this->backToIndex(trans('console.channels.provider_failed.deactivated'), 'error');
         }
 
-        return $this->backToIndex(trans('console.channels.updated'), $index);
+        return $updated->webhookRegistrationFailed()
+            ? $this->backToIndex(trans('console.channels.provider_failed.saved'), 'error')
+            : $this->backToIndex(trans('console.channels.updated'));
     }
 
     public function rotateWebhook(string $tenant, string $record): RedirectResponse
@@ -194,16 +196,29 @@ final class ChannelController extends Controller
 
         Gate::authorize('rotateWebhook', $channel);
 
-        $index = $this->url('index');
+        $rotated = $this->channels->rotateWebhookHash($channel);
 
-        try {
-            $rotated = $this->channels->rotateWebhookHash($channel);
-        } catch (TelegramApiException $exception) {
-            return $this->providerRefused($exception, 'rotated', $index, backToList: true);
+        if ($rotated->webhookRegistrationFailed()) {
+            return $this->backToList(trans('console.channels.provider_failed.rotated'), 'error');
         }
 
         // The new hash is shown, as the Filament action showed it; only someone who may rotate gets here.
-        return $this->backToList(trans('console.channels.rotated', ['hash' => $rotated->webhook_public_hash]), $index);
+        return $this->backToList(trans('console.channels.rotated', ['hash' => $rotated->webhook_public_hash]));
+    }
+
+    public function registerWebhook(string $tenant, string $record): RedirectResponse
+    {
+        $channel = $this->channels->findFor($this->assistant->get(), $record);
+
+        Gate::authorize('update', $channel);
+
+        if (! $channel->is_active) {
+            return $this->backToList(trans('console.channels.register_webhook.inactive'), 'error');
+        }
+
+        return $this->channels->reregisterWebhook($channel)->webhookRegistrationFailed()
+            ? $this->backToList(trans('console.channels.register_webhook.failed'), 'error')
+            : $this->backToList(trans('console.channels.register_webhook.done'));
     }
 
     public function destroy(string $tenant, string $record): RedirectResponse
@@ -212,30 +227,22 @@ final class ChannelController extends Controller
 
         Gate::authorize('delete', $channel);
 
-        $index = $this->url('index');
+        $this->channels->delete($channel);
 
-        try {
-            $this->channels->delete($channel);
-        } catch (TelegramApiException $exception) {
-            return $this->providerRefused($exception, 'deleted', $index, backToList: true);
-        }
-
-        return $this->backToList(trans('console.channels.deleted'), $index);
+        return $this->outcome->deregisterFailed((string) $channel->getKey())
+            ? $this->backToList(trans('console.channels.provider_failed.deleted'), 'error')
+            : $this->backToList(trans('console.channels.deleted'));
     }
 
     /**
-     * The provider refused while the change was being made. The change is stored (the provider is called after the
-     * commit), so the user is told what stands and what to check; the exception is reported, never shown.
+     * What the screen says about the webhook: null when nothing is to be said (unknown, registered, or the channel is
+     * off and has no webhook to register), `failed` when the provider refused the last registration.
      *
-     * @param  'saved'|'deactivated'|'rotated'|'deleted'  $what
+     * @return 'failed'|null
      */
-    private function providerRefused(TelegramApiException $exception, string $what, string $index, bool $backToList = false): RedirectResponse
+    private function webhookState(Channel $channel): ?string
     {
-        report($exception);
-
-        return $backToList
-            ? $this->backToList(trans("console.channels.provider_failed.{$what}"), $index, 'error')
-            : $this->backToIndex(trans("console.channels.provider_failed.{$what}"), $index, 'error');
+        return $channel->is_active && $channel->webhookRegistrationFailed() ? 'failed' : null;
     }
 
     /**
@@ -309,16 +316,13 @@ final class ChannelController extends Controller
      * After a form: the list, as it opens by default. The message is Inertia flash data, so it reaches the toast once
      * and is not kept in the browser's history.
      *
-     * The list's URL is taken before the write and passed in: saving a channel runs the provider's webhook job inside
-     * the request, and switching tenants for it resets the current assistant, so nothing after a write may ask for it.
-     *
      * @param  'success'|'error'  $kind
      */
-    private function backToIndex(string $message, string $index, string $kind = 'success'): RedirectResponse
+    private function backToIndex(string $message, string $kind = 'success'): RedirectResponse
     {
         Inertia::flash($kind, $message);
 
-        return redirect()->to($index);
+        return redirect()->to($this->url('index'));
     }
 
     /**
@@ -327,11 +331,11 @@ final class ChannelController extends Controller
      *
      * @param  'success'|'error'  $kind
      */
-    private function backToList(string $message, string $index, string $kind = 'success'): RedirectResponse
+    private function backToList(string $message, string $kind = 'success'): RedirectResponse
     {
         Inertia::flash($kind, $message);
 
-        return redirect()->back(fallback: $index);
+        return redirect()->back(fallback: $this->url('index'));
     }
 
     /**

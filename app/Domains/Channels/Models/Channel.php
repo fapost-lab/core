@@ -6,6 +6,7 @@ namespace App\Domains\Channels\Models;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Enums\ChannelWebhookStatus;
 use App\Domains\Channels\Observers\ChannelObserver;
 use Database\Factories\ChannelFactory;
 use Fapost\Foundation\Channel\ChannelInterface;
@@ -38,6 +39,8 @@ use Illuminate\Support\Str;
  * @property string              $secret_token
  * @property string|null         $telegram_bot_username
  * @property string              $webhook_public_hash
+ * @property ChannelWebhookStatus|null $webhook_status
+ * @property \Illuminate\Support\Carbon|null $webhook_status_at
  * @property array<array-key, mixed> $config
  * @property bool                $is_active
  * @property \Illuminate\Support\Carbon|null $created_at
@@ -161,6 +164,14 @@ final class Channel extends Model implements ChannelInterface
     }
 
     /**
+     * Whether the provider refused the last webhook registration. Unknown (null) is not a refusal.
+     */
+    public function webhookRegistrationFailed(): bool
+    {
+        return ChannelWebhookStatus::Failed === $this->webhook_status;
+    }
+
+    /**
      * @return BelongsTo<Assistant, $this>
      */
     public function assistant(): BelongsTo
@@ -206,11 +217,13 @@ final class Channel extends Model implements ChannelInterface
     protected function casts(): array
     {
         return [
-            'type'         => ChannelTypeEnum::class,
-            'token'        => 'encrypted',
-            'secret_token' => 'encrypted',
-            'config'       => 'array',
-            'is_active'    => 'boolean',
+            'type'              => ChannelTypeEnum::class,
+            'token'             => 'encrypted',
+            'secret_token'      => 'encrypted',
+            'config'            => 'array',
+            'is_active'         => 'boolean',
+            'webhook_status'    => ChannelWebhookStatus::class,
+            'webhook_status_at' => 'datetime',
         ];
     }
 }

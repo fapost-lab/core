@@ -8,6 +8,7 @@ use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Filament\Assistant\Resources\Channels\ChannelResource;
+use App\Filament\Support\ChannelWebhookFeedback;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
 use InvalidArgumentException;
@@ -57,7 +58,7 @@ final class EditChannel extends EditRecord
             throw new InvalidArgumentException('Expected channel record.');
         }
 
-        $this->channelService->update($record, $data);
+        ChannelWebhookFeedback::afterWrite($this->channelService->update($record, $data));
 
         return $record->refresh();
     }

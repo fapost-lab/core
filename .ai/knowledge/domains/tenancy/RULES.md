@@ -57,8 +57,11 @@ broken.
   `TenantHost::urlFor()`, as the staff activation mail does. Enforced: `HostModePanelsTest`,
   `TenantMiddlewareOrderTest` (every `filament.*` route), `ActivationHostModeTest`.
 - **A tenant switch always restores.** `runForTenant()` restores the connection, resets the
-  context, runs restore hooks and points the permission registrar back at the outer cache key even
-  when the database restore itself throws. A restore without a matching switch throws `ConnectionStackEmptyException`.
+  context, runs restore hooks and context-hook exits and points the permission registrar back at the outer cache key even
+  when the database restore itself throws. A context hook (`registerContextHook`) snapshots what it owns
+  before the switch and returns the closure that puts it back on exit, in reverse order; the assistant uses it so a
+  nested switch hides the outer assistant and gives it back (`TenantSwitcherTest`). `CoreBootstrap`'s restore hook
+  still drops the outer request's memo, which costs one extra load and is known. A restore without a matching switch throws `ConnectionStackEmptyException`.
   Why: a Horizon worker that keeps the previous tenant's schema serves the next job from the
   wrong tenant. Enforced: `TenantSwitcherTest`, `TenantDatabaseManagerTest`.
 - **Each tenant's permissions are cached under a key of its own.** On every switch

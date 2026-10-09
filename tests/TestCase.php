@@ -10,6 +10,14 @@ use Illuminate\Support\Facades\ParallelTesting;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Pages are rendered without a Vite manifest: tests assert on
+        // responses, not on compiled assets, and CI has no public/build.
+        $this->withoutVite();
+    }
     /**
      * The application is rebuilt for every test, and with it the config, so the
      * landlord connection is pointed at this process's database each time.
@@ -19,15 +27,6 @@ abstract class TestCase extends BaseTestCase
         parent::refreshApplication();
 
         $this->isolateLandlordPerParallelProcess();
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        // Pages are rendered without a Vite manifest: tests assert on
-        // responses, not on compiled assets, and CI has no public/build.
-        $this->withoutVite();
     }
 
     /**

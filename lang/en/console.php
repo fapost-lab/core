@@ -257,6 +257,17 @@ return [
             'active'  => 'Active',
             'updated' => 'Updated',
         ],
+        'webhook' => [
+            'failed'         => 'Webhook not registered',
+            'failed_hint'    => 'The provider refused the last registration, so this channel receives no messages. Check the token, then register again or save the form.',
+            'failed_at'      => 'Refused :time',
+            'register_again' => 'Register webhook again',
+        ],
+        'register_webhook' => [
+            'done'     => 'Webhook registered.',
+            'failed'   => 'The webhook was not registered. Check the token and try again.',
+            'inactive' => 'Only an active channel has a webhook to register.',
+        ],
         'bot_pending' => 'Awaiting registration',
         'status'      => [
             'active'   => 'Active',
@@ -308,9 +319,9 @@ return [
         'rotated'         => 'Webhook hash rotated. New hash: :hash',
         'limit_reached'   => 'Channel limit reached',
         'provider_failed' => [
-            'saved'       => 'The channel is saved, but Telegram rejected the webhook registration. Check the token and save again.',
+            'saved'       => 'The channel is saved, but the webhook is not registered. Check the token and register it again from the list.',
             'deactivated' => 'The channel is saved as inactive, but Telegram did not confirm removing its webhook.',
-            'rotated'     => 'The webhook hash is changed, but Telegram rejected the webhook registration. Check the token and save the channel again.',
+            'rotated'     => 'The webhook hash is changed, but the webhook is not registered. Check the token and register it again.',
             'deleted'     => 'The channel is deleted, but Telegram did not confirm removing its webhook.',
         ],
     ],

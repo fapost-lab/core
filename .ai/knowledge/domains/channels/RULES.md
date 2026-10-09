@@ -31,7 +31,17 @@ broken.
   error (`conventions/queues.md`).
 - **On channel save, the Redis routing write happens before the provider webhook sync, and both
   run after commit** (`ChannelObserver`). Why: the provider must never deliver to a hash the
-  registry does not know.
+  registry does not know. A rotation follows the same order: `ChannelService::rotateWebhookHash` queues
+  its routing swap with `DB::afterCommit` ahead of the save, so the save's provider sync runs behind it.
+  Enforced: `ChannelWebhookConsistencyTest`.
+- **A provider refusal never fails a channel write; the register outcome is stored on the channel, a
+  deregister is best-effort** (`ChannelObserver` catches and reports, `SyncChannelWebhookJob` stores
+  `webhook_status`, `ChannelWebhookSyncOutcome` notes refusals for the request). Why: a refused write
+  used to leave a saved but dead channel behind a server error, and abort cascades (deactivating or
+  deleting an assistant) halfway. The error text is never stored; a rotation is not rolled back on a
+  refusal, because a leaked hash that stays valid is worse than a channel waiting for re-registration.
+  A driver's exception must already be redacted. Enforced: `ChannelWebhookConsistencyTest`,
+  `SyncChannelWebhookJobTest`, `ChannelsConsoleTest`.
 - **The webhook public hash is rotated only through `ChannelService`.**
 - **Rotating the webhook hash needs `Permission::RotateChannelToken` and access to the channel's
   assistant; `ManageAssistants` is not enough** (`ChannelPolicy::rotateWebhook`, admins through

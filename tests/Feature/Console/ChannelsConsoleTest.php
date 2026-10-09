@@ -7,6 +7,7 @@ namespace Tests\Feature\Console;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Enums\ChannelWebhookStatus;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
@@ -107,15 +108,17 @@ final class ChannelsConsoleTest extends InertiaConsoleTestCase
                 ->where('table.defaults', ['sort' => '-updated_at', 'perPage' => 25, 'perPageOptions' => [25, 50, 100]])
                 ->has('table.rows.1.id')
                 ->where('table.rows', fn ($rows) => collect($rows)->contains(fn (array $row): bool => [
-                    'id'        => (string) $channel->getKey(),
-                    'type'      => 'telegram',
-                    'typeLabel' => 'Telegram',
-                    'handle'    => '@help_bot',
-                    'url'       => 'https://t.me/help_bot',
-                    'isActive'  => true,
-                    'editUrl'   => "{$base}/{$channel->getKey()}/edit",
-                    'deleteUrl' => "{$base}/{$channel->getKey()}",
-                    'rotateUrl' => "{$base}/{$channel->getKey()}/rotate-webhook",
+                    'id'                 => (string) $channel->getKey(),
+                    'type'               => 'telegram',
+                    'typeLabel'          => 'Telegram',
+                    'handle'             => '@help_bot',
+                    'url'                => 'https://t.me/help_bot',
+                    'isActive'           => true,
+                    'webhook'            => null,
+                    'editUrl'            => "{$base}/{$channel->getKey()}/edit",
+                    'deleteUrl'          => "{$base}/{$channel->getKey()}",
+                    'rotateUrl'          => "{$base}/{$channel->getKey()}/rotate-webhook",
+                    'registerWebhookUrl' => "{$base}/{$channel->getKey()}/register-webhook",
                 ] === array_diff_key($row, ['updatedAt' => 1])))
                 ->where('limit', ['reached' => false, 'hint' => null])
                 ->where('can', ['create' => true, 'update' => true, 'delete' => true, 'rotate' => true])
@@ -357,15 +360,18 @@ final class ChannelsConsoleTest extends InertiaConsoleTestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('Console/Channels/Edit')
                 ->where('channel', [
-                    'id'            => (string) $channel->getKey(),
-                    'type'          => 'telegram',
-                    'typeLabel'     => 'Telegram',
-                    'isActive'      => true,
-                    'webhookHash'   => $channel->webhook_public_hash,
-                    'handle'        => '@help_bot',
-                    'url'           => 'https://t.me/help_bot',
-                    'telegram'      => ['allowedUpdates' => ['message'], 'maxConnections' => 12],
-                    'configEntries' => null,
+                    'id'                 => (string) $channel->getKey(),
+                    'type'               => 'telegram',
+                    'typeLabel'          => 'Telegram',
+                    'isActive'           => true,
+                    'webhook'            => null,
+                    'webhookAt'          => null,
+                    'registerWebhookUrl' => "/assistant/{$this->assistant->getKey()}/channels/{$channel->getKey()}/register-webhook",
+                    'webhookHash'        => $channel->webhook_public_hash,
+                    'handle'             => '@help_bot',
+                    'url'                => 'https://t.me/help_bot',
+                    'telegram'           => ['allowedUpdates' => ['message'], 'maxConnections' => 12],
+                    'configEntries'      => null,
                 ])
                 ->where('urls.submit', "/assistant/{$this->assistant->getKey()}/channels/{$channel->getKey()}")
                 ->etc());
@@ -523,8 +529,7 @@ final class ChannelsConsoleTest extends InertiaConsoleTestCase
     {
         $channel = $this->channel(['token' => self::TOKEN]);
 
-        Bus::swap($this->realBus);
-        Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'Unauthorized'], 401)]);
+        $this->refuseTheProvider();
 
         $this->actingAs($this->admin())
             ->put($this->listUrl("/{$channel->getKey()}"), $this->telegramPayload(['is_active' => false]))
@@ -550,9 +555,9 @@ final class ChannelsConsoleTest extends InertiaConsoleTestCase
         Bus::assertDispatchedSync(SyncChannelWebhookJob::class, fn (SyncChannelWebhookJob $job): bool => false === $job->register);
     }
 
-    public function test_a_save_that_runs_the_provider_job_in_the_request_still_answers_for_the_assistant(): void
+    public function test_a_save_that_runs_the_provider_job_in_the_request_leaves_the_assistant_of_the_request(): void
     {
-        // The job switches tenants, which resets the current assistant: the redirect must not need it afterwards.
+        // The job switches tenants inside the request: the assistant resolved for the request is still there after.
         Bus::swap($this->realBus);
         Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => ['username' => 'help_bot']])]);
 
@@ -564,46 +569,147 @@ final class ChannelsConsoleTest extends InertiaConsoleTestCase
         $channel = Channel::query()->sole();
 
         $this->assertSame('help_bot', $channel->telegram_bot_username);
+        $this->assertSame(ChannelWebhookStatus::Registered, $channel->webhook_status);
+        $this->assertNotNull($channel->webhook_status_at);
 
         $this->put($this->listUrl("/{$channel->getKey()}"), $this->telegramPayload(['is_active' => false]))->assertRedirect()->assertInertiaFlash('success');
+        $this->assertNull($channel->refresh()->webhook_status);
         $this->post($this->listUrl("/{$channel->getKey()}/rotate-webhook"))->assertRedirect()->assertInertiaFlash('success');
         $this->delete($this->listUrl("/{$channel->getKey()}"))->assertRedirect()->assertInertiaFlash('success', 'Channel deleted.');
     }
 
     public function test_a_provider_that_refuses_after_the_channel_is_stored_is_worded_without_the_exception(): void
     {
-        Bus::swap($this->realBus);
-        Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'Unauthorized'], 401)]);
+        $this->refuseTheProvider();
 
         $response = $this->actingAs($this->admin())
             ->post($this->listUrl(), $this->telegramPayload())
             ->assertRedirect("/assistant/{$this->assistant->getKey()}/channels")
-            ->assertInertiaFlash('error', 'The channel is saved, but Telegram rejected the webhook registration. Check the token and save again.');
+            ->assertInertiaFlash('error', 'The channel is saved, but the webhook is not registered. Check the token and register it again from the list.');
 
-        // The record is there for the user to correct, and nothing of the request, the token among it, is shown.
-        $this->assertSame(1, Channel::query()->count());
+        // The record is there for the user to correct, flagged, and nothing of the request, the token among it, is shown.
+        $channel = Channel::query()->sole();
+
+        $this->assertSame(ChannelWebhookStatus::Failed, $channel->webhook_status);
+        $this->assertNotNull($channel->webhook_status_at);
         $this->assertStringNotContainsString(self::TOKEN, (string) $response->getContent());
         $this->assertStringNotContainsString(self::TOKEN, json_encode(session()->all(), JSON_THROW_ON_ERROR));
+    }
+
+    public function test_a_refusal_while_saving_changes_is_a_toast_and_flags_the_channel(): void
+    {
+        $channel = $this->channel(['token' => self::TOKEN]);
+
+        $this->refuseTheProvider();
+
+        $this->actingAs($this->admin())
+            ->put($this->listUrl("/{$channel->getKey()}"), $this->telegramPayload(['token' => 'bot-token-NEW-333']))
+            ->assertRedirect()
+            ->assertInertiaFlash('error', 'The channel is saved, but the webhook is not registered. Check the token and register it again from the list.');
+
+        $this->assertSame(ChannelWebhookStatus::Failed, $channel->refresh()->webhook_status);
     }
 
     public function test_a_refusal_while_rotating_or_deleting_is_a_toast_not_a_server_error(): void
     {
         $channel = $this->channel(['token' => self::TOKEN]);
+        $old     = $channel->webhook_public_hash;
 
-        Bus::swap($this->realBus);
-        Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'Unauthorized'], 401)]);
+        $this->refuseTheProvider();
 
         $this->actingAs($this->admin());
 
         $this->post($this->listUrl("/{$channel->getKey()}/rotate-webhook"))
             ->assertRedirect()
-            ->assertInertiaFlash('error', 'The webhook hash is changed, but Telegram rejected the webhook registration. Check the token and save the channel again.');
+            ->assertInertiaFlash('error', 'The webhook hash is changed, but the webhook is not registered. Check the token and register it again.');
+
+        // The rotation stands: the leaked hash is revoked, the new route is written and the channel is flagged.
+        $channel->refresh();
+        $this->assertNotSame($old, $channel->webhook_public_hash);
+        $this->assertSame(ChannelWebhookStatus::Failed, $channel->webhook_status);
+        $this->assertSame([['remove', $old], ['set', $channel->webhook_public_hash]], array_slice($this->registry->calls, -2));
 
         $this->delete($this->listUrl("/{$channel->getKey()}"))
             ->assertRedirect()
             ->assertInertiaFlash('error', 'The channel is deleted, but Telegram did not confirm removing its webhook.');
 
         $this->assertModelMissing($channel);
+    }
+
+    public function test_the_list_flags_a_channel_whose_webhook_is_refused_without_a_secret(): void
+    {
+        $failed = $this->channel(['token' => self::TOKEN, 'webhook_status' => ChannelWebhookStatus::Failed->value, 'webhook_status_at' => now()]);
+        $this->channel(['webhook_status' => ChannelWebhookStatus::Registered->value]);
+        $this->channel(['is_active' => false, 'webhook_status' => ChannelWebhookStatus::Failed->value]);
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertOk()
+            ->assertDontSee(self::TOKEN)
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows', fn ($rows) => 1 === collect($rows)->where('webhook', 'failed')->count()
+                    && (string) $failed->getKey() === collect($rows)->firstWhere('webhook', 'failed')['id'])
+                ->etc());
+
+        $this->get($this->listUrl("/{$failed->getKey()}/edit"))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('channel.webhook', 'failed')
+                ->whereType('channel.webhookAt', 'string')
+                ->etc());
+    }
+
+    public function test_registering_again_stores_the_outcome(): void
+    {
+        $channel = $this->channel(['token' => self::TOKEN, 'webhook_status' => ChannelWebhookStatus::Failed->value]);
+
+        Bus::swap($this->realBus);
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => true, 'result' => ['username' => 'help_bot']])]);
+
+        $this->actingAs($this->admin())
+            ->from($this->listUrl('?sort=type'))
+            ->post($this->listUrl("/{$channel->getKey()}/register-webhook"))
+            ->assertRedirect($this->listUrl('?sort=type'))
+            ->assertInertiaFlash('success', 'Webhook registered.');
+
+        $this->assertSame(ChannelWebhookStatus::Registered, $channel->refresh()->webhook_status);
+    }
+
+    public function test_registering_again_that_is_refused_stays_flagged(): void
+    {
+        $channel = $this->channel(['token' => self::TOKEN, 'webhook_status' => ChannelWebhookStatus::Failed->value]);
+
+        $this->refuseTheProvider();
+
+        $response = $this->actingAs($this->admin())
+            ->post($this->listUrl("/{$channel->getKey()}/register-webhook"))
+            ->assertRedirect()
+            ->assertInertiaFlash('error', 'The webhook was not registered. Check the token and try again.');
+
+        $this->assertSame(ChannelWebhookStatus::Failed, $channel->refresh()->webhook_status);
+        $this->assertStringNotContainsString(self::TOKEN, (string) $response->getContent());
+    }
+
+    public function test_registering_again_is_not_offered_for_an_inactive_channel(): void
+    {
+        $channel = $this->channel(['is_active' => false]);
+
+        $this->actingAs($this->admin())
+            ->post($this->listUrl("/{$channel->getKey()}/register-webhook"))
+            ->assertRedirect()
+            ->assertInertiaFlash('error', 'Only an active channel has a webhook to register.');
+
+        Bus::assertNotDispatchedSync(SyncChannelWebhookJob::class);
+    }
+
+    public function test_registering_again_needs_the_update_permission(): void
+    {
+        $channel = $this->channel(['webhook_status' => ChannelWebhookStatus::Failed->value]);
+
+        $this->actingAs($this->userWith(Permission::RotateChannelToken));
+
+        $this->post($this->listUrl("/{$channel->getKey()}/register-webhook"))->assertForbidden();
+        $this->assertSame(ChannelWebhookStatus::Failed, $channel->refresh()->webhook_status);
     }
 
     public function test_a_channel_of_another_assistant_or_tenant_or_a_bad_id_is_not_found(): void
@@ -658,6 +764,15 @@ final class ChannelsConsoleTest extends InertiaConsoleTestCase
     public function test_a_guest_is_sent_to_the_login(): void
     {
         $this->get($this->listUrl())->assertRedirect(route('filament.admin.auth.login'));
+    }
+
+    /**
+     * The real bus, and Telegram answering every call with a refusal.
+     */
+    private function refuseTheProvider(): void
+    {
+        Bus::swap($this->realBus);
+        Http::fake(['api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'Unauthorized'], 401)]);
     }
 
     /**

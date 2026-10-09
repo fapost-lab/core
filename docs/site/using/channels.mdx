@@ -10,8 +10,9 @@ hear from anyone.
 ## The list
 
 Each channel shows its **platform**, its **bot** (a link to it, once the provider has
-registered the webhook), whether it is **active**, and when it was last **updated**. Three actions: **Edit**, **Rotate
-webhook hash**, **Delete**.
+registered the webhook), whether it is **active**, and when it was last **updated**. A channel whose webhook the provider
+refused carries a **Webhook not registered** badge. Actions: **Edit**, **Rotate webhook hash**, **Delete**, and, on a
+flagged channel, **Register webhook again**.
 
 ## Connecting one
 
@@ -32,14 +33,14 @@ platform needs beyond the two above.
 In the new console the platform is chosen when the channel is created and cannot be changed afterwards.
 
 <Warning>
-  Saving a channel contacts the provider and registers the webhook. A token that
-  does not belong to a real bot makes the registration fail, but the channel
-  itself is already saved by then. The new console tells you the provider
-  refused, and you correct the token and save again; the current admin screens
-  end in an error page instead, and the channel is still in the list.
+  Saving a channel contacts the provider and registers the webhook. Saving always
+  succeeds: if the provider refuses (a token that does not belong to a real bot,
+  for instance), the channel is stored and marked **Webhook not registered** in
+  the list and on its page, and you are told so. Correct the token and save again,
+  or use **Register webhook again**.
 
-  Have the token ready: until the provider accepts it, the channel does not
-  receive messages.
+  Until the provider accepts the registration, the channel does not receive
+  messages.
 </Warning>
 
 ## The webhook hash
@@ -51,7 +52,9 @@ this channel**, which is why it is shown only to those who may manage channels
 
 **Rotate webhook hash** issues a new one. For Telegram the webhook is registered
 again with the new hash automatically; for other platforms, update the address
-with the provider.
+with the provider. If the provider refuses, the hash is already changed (the old
+one is revoked, which is the point of rotating) and the channel is marked
+**Webhook not registered** until you register it again.
 
 <Warning>
   Rotating invalidates the URL the provider currently has. Where the webhook is
@@ -70,6 +73,10 @@ The permission to rotate is marked sensitive for exactly this reason — see
 Deactivating stops the channel serving without discarding it: the token, the
 hash, and the conversations that came through it all remain. Deleting removes the
 channel itself.
+
+Deactivating or deleting is never blocked by the provider: if it does not
+confirm taking the webhook down, you are told, and the old webhook is harmless
+because nothing is routed to it any more.
 
 Prefer deactivating. A deleted channel takes its identity with it, and
 reconnecting later means a new hash and a fresh registration with the provider.
