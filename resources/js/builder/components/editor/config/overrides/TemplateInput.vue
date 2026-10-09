@@ -68,7 +68,7 @@ const insert   = useInsertAtCursor(inputRef, (next) => emit('update:modelValue',
     font-family: var(--font-mono);
     font-size: 12px;
 }
-.field-input:focus { border-color: var(--primary); background: #fff; }
+.field-input:focus { border-color: var(--primary); background: var(--paper); }
 .template-picker {
     position: absolute;
     top: 5px;

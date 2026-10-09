@@ -183,10 +183,10 @@ function cancel() {
 .qa-btn--primary {
     background: var(--primary);
     border-color: var(--primary);
-    color: #fff;
+    color: var(--on-solid);
     font-weight: 500;
 }
-.qa-btn--primary:hover { background: var(--primary); border-color: var(--primary); color: #fff; opacity: .9; }
+.qa-btn--primary:hover { background: var(--primary); border-color: var(--primary); color: var(--on-solid); opacity: .9; }
 .qa-btn--primary:disabled {
     opacity: .4;
     cursor: not-allowed;

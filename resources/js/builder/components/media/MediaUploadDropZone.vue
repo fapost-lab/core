@@ -147,7 +147,7 @@ async function uploadFiles(files: File[]) {
     padding: 10px 16px;
     border: 1.5px dashed var(--border);
     border-radius: 8px;
-    background: var(--surface-2, #f8f9fa);
+    background: var(--surface-2);
     cursor: pointer;
     font-size: 12px;
     color: var(--text-3);
@@ -157,7 +157,7 @@ async function uploadFiles(files: File[]) {
 .mudz-zone:hover,
 .mudz-zone--drag {
     border-color: var(--primary);
-    background: var(--primary-bg, #eef2ee);
+    background: var(--primary-bg);
     color: var(--text-2);
 }
 .mudz-zone strong { font-weight: 600; color: var(--primary); }
@@ -196,8 +196,8 @@ async function uploadFiles(files: File[]) {
     color: var(--text-3);
     white-space: nowrap;
 }
-.mudz-progress-item--error .mudz-progress-label { color: var(--rose, #e53e3e); }
-.mudz-progress-item--done .mudz-progress-label { color: var(--success, #38a169); }
+.mudz-progress-item--error .mudz-progress-label { color: var(--rose); }
+.mudz-progress-item--done .mudz-progress-label { color: var(--sage); }
 
 .mudz-progress-bar-wrap {
     grid-column: 1 / -1;
@@ -213,6 +213,6 @@ async function uploadFiles(files: File[]) {
     border-radius: 2px;
     transition: width .15s;
 }
-.mudz-progress-item--error .mudz-progress-bar { background: var(--rose, #e53e3e); }
-.mudz-progress-item--done .mudz-progress-bar { background: var(--success, #38a169); }
+.mudz-progress-item--error .mudz-progress-bar { background: var(--rose); }
+.mudz-progress-item--done .mudz-progress-bar { background: var(--sage); }
 </style>

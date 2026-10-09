@@ -101,7 +101,7 @@ const inputClass = computed(() => [
     line-height: 1.5;
 }
 .json-field--error {
-    border-color: #e8c8c8;
+    border-color: var(--rose-border);
 }
 .json-field--error:focus {
     border-color: var(--rose);

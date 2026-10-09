@@ -221,7 +221,7 @@ function onTypeChange(newType: string) {
                     <div class="field-label">Button labels</div>
                     <div style="display:flex;flex-direction:column;gap:6px">
                         <div v-for="(btn, idx) in buttons" :key="btn.id" style="display:flex;align-items:center;gap:8px">
-                            <span style="font-size:11px;color:var(--color-text-muted,#888);width:28px;text-align:right;flex-shrink:0">
+                            <span style="font-size:11px;color:var(--text-3);width:28px;text-align:right;flex-shrink:0">
                                 {{ btn.value }}
                             </span>
                             <input
@@ -341,7 +341,7 @@ function onTypeChange(newType: string) {
                             normalized to E.164.
                         </p>
                     </template>
-                    <p v-else class="field-help" style="color: var(--amber, #9a6a00)">
+                    <p v-else class="field-help" style="color: var(--amber)">
                         No countries configured for this assistant. Add them in
                         <strong>Assistant settings → Served countries</strong> to validate phone formats.
                     </p>

@@ -135,35 +135,35 @@ function pick(next: string) {
 
 /* Neutral selected state (no accent / unknown accent). */
 .enum-cards-option--active {
-    border-color: var(--primary, #5a6e58);
-    background: color-mix(in srgb, var(--primary, #5a6e58) 8%, var(--surface));
+    border-color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 8%, var(--surface));
 }
 
 /* Per-accent selected states. */
 .enum-cards-option--active.enum-cards-option--accent-sage {
-    border-color: var(--sage, #5a6e58);
-    background: color-mix(in srgb, var(--sage, #5a6e58) 8%, var(--surface));
+    border-color: var(--sage);
+    background: color-mix(in srgb, var(--sage) 8%, var(--surface));
 }
 .enum-cards-option--active.enum-cards-option--accent-sage .enum-cards-icon {
-    background: var(--sage-bg, #e6ede4);
-    color: var(--sage, #5a6e58);
+    background: var(--sage-bg);
+    color: var(--sage);
 }
 
 .enum-cards-option--active.enum-cards-option--accent-amber {
-    border-color: var(--amber, #b07c2c);
-    background: color-mix(in srgb, var(--amber, #b07c2c) 8%, var(--surface));
+    border-color: var(--amber);
+    background: color-mix(in srgb, var(--amber) 8%, var(--surface));
 }
 .enum-cards-option--active.enum-cards-option--accent-amber .enum-cards-icon {
-    background: var(--amber-bg, #f6ecd6);
-    color: var(--amber, #b07c2c);
+    background: var(--amber-bg);
+    color: var(--amber);
 }
 
 .enum-cards-option--active.enum-cards-option--accent-rose {
-    border-color: var(--rose, #b94a4a);
-    background: color-mix(in srgb, var(--rose, #b94a4a) 8%, var(--surface));
+    border-color: var(--rose);
+    background: color-mix(in srgb, var(--rose) 8%, var(--surface));
 }
 .enum-cards-option--active.enum-cards-option--accent-rose .enum-cards-icon {
-    background: var(--rose-bg, #f3dada);
-    color: var(--rose, #b94a4a);
+    background: var(--rose-bg);
+    color: var(--rose);
 }
 </style>

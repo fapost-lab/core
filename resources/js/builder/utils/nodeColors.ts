@@ -32,7 +32,7 @@ export const NODE_TYPE_COLORS: Record<string, NodeColorScheme> = {
     branch:        { bg: 'var(--amber-bg)',  color: 'var(--amber)',  icon: '🔀' },
 
     // Timing
-    delay:         { bg: '#f0edf8',          color: '#7060a8',       icon: '⏱️' },
+    delay:         { bg: 'var(--plum-bg)',          color: 'var(--plum)',       icon: '⏱️' },
 
     // Looping (control flow — iteration)
     loop:          { bg: 'var(--amber-bg)',  color: 'var(--amber)',  icon: '🔁' },
@@ -43,22 +43,22 @@ export const NODE_TYPE_COLORS: Record<string, NodeColorScheme> = {
     emit_event:    { bg: 'var(--sky-bg)',    color: 'var(--sky)',    icon: '📡' },
 
     // Knowledge / RAG
-    rag_query:     { bg: '#fff4e6',          color: '#c2570c',       icon: '🧠' },
+    rag_query:     { bg: 'var(--orange-bg)',          color: 'var(--orange)',       icon: '🧠' },
 
     // Composition
-    subflow:       { bg: '#eef2ff',          color: '#4f46e5',       icon: '🪆' },
+    subflow:       { bg: 'var(--indigo-bg)',          color: 'var(--indigo)',       icon: '🪆' },
 
     // Access control / branching on auth result
     auth_request:  { bg: 'var(--amber-bg)',  color: 'var(--amber)',  icon: '🔐' },
 
     // Notify (staff / contacts)
-    notify:        { bg: '#eef4ff',          color: '#3538cd',       icon: '🔔' },
+    notify:        { bg: 'var(--blue-bg)',          color: 'var(--blue)',       icon: '🔔' },
 
     // Terminal
     end:           { bg: 'var(--rose-bg)',   color: 'var(--rose)',   icon: '🛑' },
 
     // Annotation — builder-only note, stripped on publish
-    comment:       { bg: '#fdf6dd',          color: '#a06a08',       icon: '🗒️' },
+    comment:       { bg: 'var(--note-bg)',          color: 'var(--note)',       icon: '🗒️' },
 
     _default:      { bg: 'var(--surface-2)', color: 'var(--text-2)', icon: '⚙️' },
 }

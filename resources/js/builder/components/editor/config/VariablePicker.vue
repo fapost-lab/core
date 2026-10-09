@@ -363,7 +363,7 @@ function onDragStart(v: PickerVariable, e: DragEvent) {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,.10);
+    box-shadow: var(--shadow-pop);
     overflow: hidden;
 }
 .vp-scroll {
@@ -424,7 +424,7 @@ function onDragStart(v: PickerVariable, e: DragEvent) {
     cursor: pointer;
     text-align: left;
 }
-.vp-group-label:hover { background: var(--surface-2, #f4f5f6); }
+.vp-group-label:hover { background: var(--surface-2); }
 .vp-chevron {
     display: inline-block;
     width: 8px;
@@ -438,7 +438,7 @@ function onDragStart(v: PickerVariable, e: DragEvent) {
 .vp-group-count {
     padding: 1px 6px;
     border-radius: 8px;
-    background: var(--surface-2, #f0f1f2);
+    background: var(--surface-2);
     color: var(--text-2);
     font-size: 10px;
     font-weight: 600;
@@ -463,7 +463,7 @@ function onDragStart(v: PickerVariable, e: DragEvent) {
     transition: background .1s;
 }
 .vp-item--nested { padding-left: 18px; }
-.vp-item:hover { background: var(--surface-2, #f4f5f6); }
+.vp-item:hover { background: var(--surface-2); }
 
 .vp-expand {
     flex-shrink: 0;
@@ -479,14 +479,14 @@ function onDragStart(v: PickerVariable, e: DragEvent) {
     flex-shrink: 0;
     font-size: 9.5px;
     color: var(--text-3);
-    background: var(--surface-2, #eef1f4);
+    background: var(--surface-2);
     border-radius: 8px;
     padding: 0 5px;
     margin-left: 6px;
 }
 .vp-item--json-child {
     padding-left: 26px;
-    background: color-mix(in srgb, var(--primary, #5b7fa6) 4%, transparent);
+    background: color-mix(in srgb, var(--primary) 4%, transparent);
 }
 .vp-key--rel { color: var(--text-2); font-size: 11px; }
 
@@ -504,7 +504,7 @@ function onDragStart(v: PickerVariable, e: DragEvent) {
     margin-left: 8px;
     transition: color .1s;
 }
-.vp-badge--ok { color: var(--success, #38a169); font-weight: 600; }
+.vp-badge--ok { color: var(--sage); font-weight: 600; }
 
 .vp-empty {
     padding: 10px;

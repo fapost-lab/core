@@ -54,12 +54,12 @@ const emit = defineEmits(['navigate'])
     text-align: left;
     width: 100%;
 }
-.mft-folder:hover { background: var(--surface-2, #f4f5f6); }
+.mft-folder:hover { background: var(--surface-2); }
 
 .mft-icon {
     width: 15px;
     height: 15px;
-    color: var(--amber, #d97706);
+    color: var(--amber);
     flex-shrink: 0;
 }
 

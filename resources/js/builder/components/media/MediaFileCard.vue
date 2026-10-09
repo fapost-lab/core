@@ -84,15 +84,15 @@ function iconPath(icon: string): string {
     width: 100%;
     overflow: hidden;
 }
-.mfc-card:hover { border-color: var(--primary); background: var(--primary-bg, #eef2ee); }
-.mfc-card--selected { border-color: var(--primary); background: var(--primary-bg, #eef2ee); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent); }
+.mfc-card:hover { border-color: var(--primary); background: var(--primary-bg); }
+.mfc-card--selected { border-color: var(--primary); background: var(--primary-bg); box-shadow: 0 0 0 2px color-mix(in srgb, var(--primary) 30%, transparent); }
 
 .mfc-thumb {
     width: 100%;
     aspect-ratio: 4/3;
     border-radius: 5px;
     overflow: hidden;
-    background: var(--surface-2, #f4f5f6);
+    background: var(--surface-2);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -131,7 +131,7 @@ function iconPath(icon: string): string {
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #fff;
-    box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    color: var(--on-solid);
+    box-shadow: var(--shadow-chip);
 }
 </style>

@@ -160,7 +160,7 @@ onUnmounted(() => {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-pop);
     max-height: 220px;
     overflow-y: auto;
 }
@@ -178,6 +178,6 @@ onUnmounted(() => {
     cursor: pointer;
 }
 .tag-option:hover {
-    background: var(--surface-2, #f4f5f6);
+    background: var(--surface-2);
 }
 </style>

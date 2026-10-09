@@ -47,7 +47,7 @@ final class BuilderAuthorizationTest extends FeatureTestCase
         $user  = $this->userWithFlowPermissions();
         $user->assistants()->attach($draft->assistant);
 
-        $this->actingAs($user)->get("/builder/flows/{$draft->flow_id}")->assertOk();
+        $this->actingAs($user)->get("/builder/flows/{$draft->flow_id}")->assertOk()->assertSee('fapost-theme', false);
         $this->actingAs($user)
             ->putJson("/builder/flows/{$draft->flow_id}/draft", $this->draftPayload($draft))
             ->assertOk();

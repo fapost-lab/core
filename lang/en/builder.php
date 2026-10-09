@@ -6,6 +6,10 @@ return [
     'topbar' => [
         'back'                   => 'Back',
         'language'               => 'Interface language',
+        'theme'                  => 'Theme',
+        'theme_light'            => 'Light',
+        'theme_dark'             => 'Dark',
+        'theme_system'           => 'System',
         'tab_builder'            => 'Builder',
         'tab_content'            => 'Content',
         'rollback'               => 'Rollback',

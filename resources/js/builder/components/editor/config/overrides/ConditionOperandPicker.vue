@@ -150,5 +150,5 @@ function clear() {
     flex-shrink: 0;
 }
 
-.clear-btn:hover { color: var(--rose, #e05252); }
+.clear-btn:hover { color: var(--rose); }
 </style>

@@ -47,6 +47,7 @@ final class ConsoleLoginTest extends InertiaConsoleTestCase
                 ->etc());
 
         $response->assertViewIs('console');
+        $response->assertSee('fapost-theme', false);
     }
 
     public function test_the_login_page_is_translated_by_the_interface_language(): void

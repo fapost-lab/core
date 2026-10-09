@@ -372,7 +372,7 @@ const layoutOpen   = ref(false)
     border: 1px solid var(--primary);
     border-radius: 6px;
     background: var(--primary);
-    color: #fff;
+    color: var(--on-solid);
     font-family: var(--font-sans);
     font-size: 12.5px;
     font-weight: 500;
@@ -452,7 +452,7 @@ const layoutOpen   = ref(false)
     flex: 0 1 40%;
     color: var(--text-2);
 }
-.kl-input--invalid { border-color: #e53e3e !important; }
+.kl-input--invalid { border-color: var(--error) !important; }
 
 .kl-del {
     width: 22px;
@@ -466,7 +466,7 @@ const layoutOpen   = ref(false)
     border-radius: 4px;
     transition: color .12s, background .12s;
 }
-.kl-del:hover { color: #e53e3e; background: var(--surface-2); }
+.kl-del:hover { color: var(--error); background: var(--surface-2); }
 
 /* Row separator */
 .kl-row-sep {
@@ -518,6 +518,6 @@ const layoutOpen   = ref(false)
 }
 .kl-error {
     font-size: 10.5px;
-    color: #e53e3e;
+    color: var(--error);
 }
 </style>

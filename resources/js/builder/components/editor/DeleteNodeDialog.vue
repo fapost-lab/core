@@ -193,7 +193,7 @@ function deleteEverything() {
 
 .delete-branch-handle {
     font-weight: 600;
-    color: var(--text-1);
+    color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -246,13 +246,13 @@ function deleteEverything() {
 }
 
 .delete-btn--ghost:hover {
-    color: var(--text-1);
+    color: var(--text);
 }
 
 .delete-btn--danger {
-    border-color: var(--rose, #e53e3e);
-    background: var(--rose, #e53e3e);
-    color: #fff;
+    border-color: var(--rose);
+    background: var(--rose);
+    color: var(--on-solid);
 }
 
 .delete-btn--danger:hover {

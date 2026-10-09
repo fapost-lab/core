@@ -260,7 +260,7 @@ onUnmounted(() => {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+    box-shadow: var(--shadow-pop);
     max-height: 240px;
     overflow-y: auto;
 }
@@ -282,10 +282,10 @@ onUnmounted(() => {
     transition: background 100ms;
 }
 .group-option:hover {
-    background: var(--surface-2, #f4f5f6);
+    background: var(--surface-2);
 }
 .group-option--active {
-    background: var(--primary-bg, rgba(0, 0, 0, 0.04));
+    background: var(--primary-bg);
     color: var(--text);
 }
 .group-option-mark {
@@ -309,7 +309,7 @@ onUnmounted(() => {
     color: var(--primary);
 }
 .group-option--create:hover {
-    background: var(--primary-bg, rgba(0, 0, 0, 0.04));
+    background: var(--primary-bg);
 }
 .group-option--create .group-option-mark {
     color: var(--primary);

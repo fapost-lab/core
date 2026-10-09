@@ -598,7 +598,7 @@ async function runTest() {
     color: var(--text);
     outline: none;
 }
-.field-input:focus { border-color: var(--primary); background: #fff; }
+.field-input:focus { border-color: var(--primary); background: var(--paper); }
 .field-input.mono { font-family: var(--font-mono); font-size: 12px; }
 .method-sel { flex: 0 0 92px; }
 .kv-key { flex: 0 0 38%; }
@@ -609,17 +609,17 @@ async function runTest() {
     flex: 1; padding: 5px; border: 1px solid var(--border); border-radius: 6px;
     background: var(--surface-2); font-size: 12px; color: var(--text-2); cursor: pointer;
 }
-.mode-pill.active { border-color: var(--primary); color: var(--primary); background: var(--primary-bg, #f0f4f8); }
+.mode-pill.active { border-color: var(--primary); color: var(--primary); background: var(--primary-bg); }
 .del-btn {
     background: transparent; border: none; color: var(--text-3); cursor: pointer;
     font-size: 16px; padding: 4px 2px 0; line-height: 1; flex-shrink: 0;
 }
-.del-btn:hover { color: var(--rose, #e05252); }
+.del-btn:hover { color: var(--rose); }
 .add-btn {
     width: 100%; padding: 6px; border: 1px dashed var(--border-2); border-radius: 6px;
     background: transparent; font-size: 12px; color: var(--text-3); cursor: pointer;
 }
-.add-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-bg, #f0f4f8); }
+.add-btn:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-bg); }
 .map-row {
     border: 1px solid var(--border); border-radius: 8px; padding: 8px; margin-bottom: 8px; background: var(--surface);
 }
@@ -639,18 +639,18 @@ async function runTest() {
     margin-bottom: 8px;
     padding: 7px 9px;
     border-radius: 6px;
-    background: var(--amber-bg, #fff8e1);
-    color: var(--amber, #9a6a00);
+    background: var(--amber-bg);
+    color: var(--amber);
     font-size: 11.5px;
     line-height: 1.4;
 }
 .test-btn {
     width: 100%;
     padding: 7px;
-    border: 1px solid var(--primary, #5b7fa6);
+    border: 1px solid var(--primary);
     border-radius: 6px;
-    background: var(--primary-bg, #eef2f7);
-    color: var(--primary, #5b7fa6);
+    background: var(--primary-bg);
+    color: var(--primary);
     font-size: 12.5px;
     font-weight: 600;
     cursor: pointer;
@@ -660,8 +660,8 @@ async function runTest() {
     margin-top: 8px;
     padding: 7px 9px;
     border-radius: 6px;
-    background: var(--rose-bg, #fdecec);
-    color: var(--rose, #c0392b);
+    background: var(--rose-bg);
+    color: var(--rose);
     font-size: 11.5px;
 }
 .test-result { margin-top: 10px; }
@@ -691,5 +691,5 @@ async function runTest() {
     border-top: 1px dashed var(--border);
 }
 .structure-btn { margin-top: 6px; }
-.structure-ok { color: var(--sage, #5a7d52); }
+.structure-ok { color: var(--sage); }
 </style>

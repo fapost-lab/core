@@ -430,7 +430,7 @@ function onGroupCreate(name: string) {
     line-height: 1.3;
 }
 .vse-hint--warn {
-    color: var(--amber, #d97706);
+    color: var(--amber);
 }
 .vse-hint--inline {
     padding-left: 8px;

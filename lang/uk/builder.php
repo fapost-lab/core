@@ -6,6 +6,10 @@ return [
     'topbar' => [
         'back'                   => 'Назад',
         'language'               => 'Мова інтерфейсу',
+        'theme'                  => 'Тема',
+        'theme_light'            => 'Світла',
+        'theme_dark'             => 'Темна',
+        'theme_system'           => 'Системна',
         'tab_builder'            => 'Конструктор',
         'tab_content'            => 'Контент',
         'rollback'               => 'Відкотити',

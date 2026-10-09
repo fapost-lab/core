@@ -67,12 +67,12 @@ function onCancel() {
 .btn-ghost:hover { color: var(--text); background: var(--surface-2); }
 .btn-primary {
     background: var(--primary);
-    color: #fff;
+    color: var(--on-solid);
 }
 .btn-primary:hover { filter: brightness(.95); }
 .btn-danger {
     background: var(--rose);
-    color: #fff;
+    color: var(--on-solid);
 }
 .btn-danger:hover { filter: brightness(.95); }
 </style>
