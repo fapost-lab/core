@@ -211,6 +211,7 @@ the label as its slug stops being served once the label is declared.
 | `Quota\Contracts\LimitRegistryInterface` | The limit keys the platform can enforce. Implemented by Core; Core and Solutions register keys, an operator package reads them |
 | `Quota\Contracts\TenantLimitsInterface` | How much of a key a tenant may use. Implemented by an operator package; Core's default allows everything |
 | `Quota\Contracts\RecordQuotaInterface` | Asking whether the current tenant may create one more record under a key. Implemented by Core; Core and Solutions call it |
+| `Quota\Contracts\UsageMeterInterface` | Counting use of a per-period key and saying whether it fits. Implemented by an operator package; Core's default allows everything and records nothing |
 
 `LimitRegistryInterface` has `register(LimitDefinition)`, `find(string $key)` and `all()` (ordered by
 key). Registering an already known key, or registering after boot has finished, throws a
@@ -246,8 +247,58 @@ Core registers four keys of kind `Records`:
 | `staff` | Staff accounts that are not deactivated, pending (invited) and suspended ones included. A deactivated account frees its place, so reactivating one needs a free place. The tenant's first administrator is created without the check, and still counts |
 
 Existing records are never removed when a limit drops
-below the current count: only creating more is refused. Limits that count usage over time or
-bytes have no enforcement contract yet.
+below the current count: only creating more is refused. Limits that count stored bytes have no
+enforcement contract yet.
+
+### Counting use over a period
+
+`UsageMeterInterface::consume(UsageUnit $unit): UsageDecision` serves keys of kind `PerPeriod`. Core
+calls it before the work is done, once per unit, and does the work only when the answer is allowed.
+The period belongs to the operator's subscription: Core never computes it and only says when the
+unit was used.
+
+- `Quota\DTO\UsageUnit` carries `tenantId`, `key`, `unitKey` (the unit's natural key, at most 191
+  characters) and `occurredAt` (a `DateTimeImmutable` that picks the period). Each unit counts as 1.
+- `Quota\DTO\UsageDecision` carries `allowed`, the `limit` for the period (`null` for no limit),
+  `used` (units counted after this call, `null` when unknown) and an optional English `message` for
+  people. Build it with `UsageDecision::allowed()` or `UsageDecision::refused($limit, $used, $message)`.
+- `Quota\Exceptions\VolumeLimitReachedException` (`key`, `limit`, `used`) is thrown by
+  `MessageSenderInterface::send()` when the tenant's outbound volume is used up. Nothing was sent;
+  do not retry.
+
+Your implementation:
+
+- **May** read and write its own tables, cache "already counted this period" per tenant, and
+  overshoot the limit by at most the number of parallel workers.
+- **Must** be idempotent by tenant, key, `unitKey` and the period containing `occurredAt`, so a
+  retried unit is counted once; never record a refused unit, so asking again succeeds once the limit
+  is raised or a new period starts; answer allowed for a key it has no limit for; derive the period
+  itself; and stay cheap, because Core calls it on every inbound message.
+- **Must not** throw to refuse, because a refusal is a result; call Core's classes or write Core's
+  tables or a tenant schema; dispatch jobs, send mail or call external services while it answers; or
+  keep one tenant's data in object properties between calls, because workers are long-lived and serve
+  many tenants.
+
+Callers pass a `unitKey` and `occurredAt` that are the same on every retry of the same unit where they
+have a stable time, and otherwise the current time (a retry that crosses a period boundary then
+counts one extra unit). They pass only registered `PerPeriod` keys, never put personal identifiers in
+`unitKey` (hash them), and never ask twice with different keys for one unit.
+
+Bind it in your package's service provider: Core binds its default only when nothing is bound yet.
+Core fails open: if your implementation throws, Core reports the exception and lets the work
+through, because an outage of the operator must not stop every tenant's bots at once. A key that is
+unregistered or not `PerPeriod` is a `LogicException`.
+
+Core registers one key of kind `PerPeriod`:
+
+| Key | What counts |
+|---|---|
+| `monthly_active_contacts` | Distinct contacts that sent at least one inbound message in the period. The unit key is `contact:` followed by the SHA-256 of `tenantId`, platform and the sender's id, so it is the same before and after the contact is created. The hash keeps messenger ids out of the operator's tables and the logs, and does not link one person across tenants by casual comparison; it is pseudonymous, not anonymous, because numeric messenger ids can be brute-forced by anyone who knows the tenant id. Core asks on every inbound message, including button presses; the implementation counts a contact once per period and answers allowed for one it has counted |
+
+When the answer is a refusal, the message is dropped before anything is stored: no contact, no
+transcript entry, no flow, and no reply to the sender. A contact who is already counted in the period
+keeps working until the period ends. Core keeps a count of refused messages per person (a pseudonymous hash), bot and
+day for 90 days and shows it to people who may see contacts on the assistant's overview.
 
 ## Retrieval
 

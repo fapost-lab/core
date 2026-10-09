@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Console;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Contact\Models\Contact;
+use App\Domains\Contact\Services\LimitRefusalReport;
 use App\Domains\Flow\Models\FlowLog;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\AssistantFlowActivity;
 use App\Http\Controllers\Controller;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,7 +21,7 @@ use Inertia\Response;
  */
 final class DashboardController extends Controller
 {
-    public function __invoke(CurrentAssistantInterface $currentAssistant, AssistantFlowActivity $activity): Response
+    public function __invoke(CurrentAssistantInterface $currentAssistant, AssistantFlowActivity $activity, LimitRefusalReport $refusals): Response
     {
         $assistant = $currentAssistant->get();
 
@@ -44,6 +47,14 @@ final class DashboardController extends Controller
                     ? route('filament.assistant.resources.flow-logs.index', ['tenant' => $id], false)
                     : null,
             ],
+            // Only for those who may see contacts, and only when someone was turned away lately.
+            'contactLimit' => Gate::allows('viewAny', Contact::class)
+                ? $refusals->monthlyActiveContacts(
+                    (string) $assistant->tenant_id,
+                    $assistant->channels()->pluck('id')->map(static fn ($id): string => (string) $id)->all(),
+                    CarbonImmutable::now(),
+                )
+                : null,
         ]);
     }
 }
