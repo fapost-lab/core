@@ -123,13 +123,13 @@ assistant console are served from the tenant's own host, `TENANT_SLUG` prefixed
 to it. With the values above that is `app.fapost.example.com` — two names, both
 of which must resolve to this host.
 
-`TENANCY_RESOLUTION=single` serves that one tenant. `host` serves any number of
-tenants, each from its own `<slug>.` host; it needs a wildcard name and certificate
-and is not covered by this Compose setup yet. In `host` mode the admin panel and the
-assistant console are served from every active tenant's host, and the base domain
-does not serve them at all. Panel domains are fixed when the routes are registered,
-so after changing `TENANCY_RESOLUTION` the route cache has to be rebuilt
-(`php artisan route:cache`, which the Docker entrypoint does on start).
+`TENANCY_RESOLUTION=single` serves that one tenant, whatever host the request
+names. `host` serves any number of tenants, each from its own
+`<slug>.<TENANCY_BASE_DOMAIN>` host; see [Several tenants](#several-tenants-host-mode)
+below for what that asks of DNS, certificates and sessions. Panel domains are
+fixed when the routes are registered, so after changing `TENANCY_RESOLUTION` the
+route cache has to be rebuilt (`php artisan route:cache`, which the Docker
+entrypoint does on start).
 
 **`APP_ENV=production` is not cosmetic.** The images are built with `--no-dev`,
 and development tooling registered for the `local` environment is absent from
@@ -248,6 +248,46 @@ While testing, switch to the staging CA by uncommenting the `acme_ca` line in th
 failed attempts per domain, and spending that budget on a typo in a DNS record
 locks you out for a week.
 
+### The client address behind a proxy
+
+Behind Caddy the application's own peer (PHP's `REMOTE_ADDR`) is Caddy, so without
+help every visitor would show up with Caddy's address, and anything limited per client
+(sign-up, login attempts) would count them all as one. `TRUSTED_PROXIES` lists the
+addresses allowed to say who the client is through `X-Forwarded-For`:
+
+- Unset, the Compose file trusts one address: the fixed one it gives the `caddy` service
+  on the compose network (`172.30.0.2` in `172.30.0.0/24`, outside the dynamic range
+  `172.30.0.128/25`; move all three with `CADDY_ADDRESS`, `COMPOSE_SUBNET` and
+  `COMPOSE_IP_RANGE` if the range collides with a network on your host or with a second
+  installation from the same file). Without the
+  `tls` profile nothing sits at that address, so nobody is trusted. Nothing else on the
+  network, and nobody reaching `HTTP_PORT` directly, can choose the address the
+  application sees.
+- A comma-separated list of addresses or CIDR ranges replaces it. An **empty** value
+  trusts nobody, and then every client has the proxy's address.
+- `*` trusts whoever connects directly. Use it only when nothing but your proxy can
+  reach the application.
+
+Set it in the `.env` beside `compose.yaml`: Compose interpolates the default from that
+file (or from `--env-file`), not from the file `ENV_FILE` points at, so a value that
+lives only in `ENV_FILE` is overridden by the default.
+
+Only the client address and scheme are believed from a trusted proxy. The host never
+is, because it selects the tenant, and neither is the port, which follows the scheme.
+
+**Behind Cloudflare** the client sits one hop further out. Add Cloudflare's published
+ranges (cloudflare.com/ips) to `TRUSTED_PROXIES` next to Caddy's address, and tell
+Caddy to keep the chain Cloudflare built by adding to the global block of the
+`caddyfile` config:
+
+```caddyfile
+servers {
+	trusted_proxies static <the same Cloudflare ranges>
+}
+```
+
+Core reads `X-Forwarded-For`, not Cloudflare's `CF-Connecting-IP`; Cloudflare sets both.
+
 ### Or terminate it yourself
 
 If you already run Traefik, nginx or a cloud load balancer, leave the profile off
@@ -276,6 +316,79 @@ GATEWAY_TRUSTED_PROXIES=172.16.0.0/12
 Check the actual subnet with `docker network inspect` if your daemon is
 configured with a different address pool. An entry the gateway cannot parse stops
 it from starting, rather than being dropped and leaving it trusting nothing.
+
+## Several tenants (host mode)
+
+`TENANCY_RESOLUTION=host` turns one installation into many tenants, each at
+`<slug>.<TENANCY_BASE_DOMAIN>`. The base domain itself serves platform pages with no
+tenant. Any other host under the base domain that names no active tenant answers 404, and a host outside the base domain is refused with 400. Four things have to be true of the
+deployment.
+
+**A wildcard DNS record and certificate.** Point `*.fapost.example.com` at this host.
+A wildcard certificate can only be issued through the DNS challenge, so Caddy needs a
+build with a module for your DNS provider; the stock image does not have one.
+
+```dockerfile
+FROM caddy:2-builder AS build
+RUN xcaddy build --with github.com/caddy-dns/cloudflare
+
+FROM caddy:2-alpine
+COPY --from=build /usr/bin/caddy /usr/bin/caddy
+```
+
+Point Compose at the image you built, and declare the wildcard site in a file under
+`caddy.d/` beside `compose.yaml` (`CADDY_SITES_DIR` moves the directory). The
+Caddyfile imports `*.caddy` from it, so with the directory empty nothing changes:
+
+```dotenv
+CADDY_IMAGE=registry.example.com/caddy-cloudflare:2
+CLOUDFLARE_API_TOKEN=<a token that may edit this zone's DNS>
+```
+
+```caddyfile
+# caddy.d/wildcard.caddy
+*.fapost.example.com {
+	tls {
+		dns cloudflare {env.CLOUDFLARE_API_TOKEN}
+	}
+	import application
+}
+```
+
+Add the token to the `caddy` service's environment in your own override file, as the
+Compose file does not know your provider. Sites declared by name, such as
+`GATEWAY_DOMAIN`, keep winning over the wildcard.
+
+On-demand certificates are not supported yet: Caddy would need an endpoint to ask
+whether a name belongs to a tenant before it requests a certificate, and Core does
+not provide one. Without it anyone could make Caddy request certificates for names
+you never meant to serve.
+
+**A session driver that is not `database`.** Platform pages run a session with no
+tenant, and the `database` driver keeps its table inside a tenant schema. The
+application refuses to serve web requests in this combination and says so; `redis`
+is the default in `.env.production.example`.
+
+**Host-only session cookies.** Leave `SESSION_DOMAIN` unset. A domain such as
+`.fapost.example.com` sends one tenant's session cookie to every other tenant's
+host, and the application refuses to start web requests with it set.
+
+**Ingress hosts under the base domain.** The application answers only hosts under
+`TENANCY_BASE_DOMAIN`, webhook ingress included, so `WEBHOOK_BASE_URL` and the
+gateway's public host must sit under it. A request to anything else, such as an
+internal probe by container name, gets 400. `php artisan about` lists a setting that
+breaks this. The gateway forwards the host the provider called when it falls back to
+the application, so that path is covered.
+
+Horizon (and Telescope in development) answer on the base domain and on declared
+platform subdomains only, never on a tenant's host. Both are closed until a user
+passes the `viewHorizon` gate, and platform pages carry no tenant sign-in, so for
+now watch the queues with `horizon:status` and the logs; an operator package that
+brings its own sign-in opens the dashboard.
+
+`php artisan install` asks for the mode when `.env` does not state one, and sets
+`SESSION_DRIVER=redis` for you if you choose `host`. Moving an existing install to
+`host` is described under [Upgrading](/self-hosting/upgrading#moving-to-host-mode).
 
 ## Building your own images
 

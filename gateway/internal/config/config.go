@@ -38,6 +38,12 @@ type Config struct {
 	Addr     string
 	Upstream *url.URL
 
+	// UpstreamPreserveHost sends the fallback request with the Host the caller used rather than the
+	// upstream URL's own. Off by default: an upstream that is the public application URL behind the same
+	// proxy that fronts the gateway would route a preserved gateway Host straight back here. On for an
+	// internal upstream (http://web:80) that serves every host, which host tenancy mode needs.
+	UpstreamPreserveHost bool
+
 	Redis Redis
 	Queue Queue
 	Log   Log
@@ -118,6 +124,9 @@ func Load(dotenvPath string) (Config, error) {
 	return Config{
 		Addr:     env("GATEWAY_ADDR", defaultAddr),
 		Upstream: upstream,
+
+		UpstreamPreserveHost: envBool("GATEWAY_UPSTREAM_PRESERVE_HOST", false),
+
 		Redis: Redis{
 			Addr:     fmt.Sprintf("%s:%s", env("REDIS_HOST", "127.0.0.1"), env("REDIS_PORT", "6379")),
 			Username: env("REDIS_USERNAME", ""),
@@ -247,6 +256,14 @@ func slug(value string) string {
 
 func env(key, fallback string) string {
 	if value, ok := os.LookupEnv(key); ok && value != "" {
+		return value
+	}
+
+	return fallback
+}
+
+func envBool(key string, fallback bool) bool {
+	if value, err := strconv.ParseBool(env(key, "")); err == nil {
 		return value
 	}
 

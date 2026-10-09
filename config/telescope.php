@@ -95,6 +95,7 @@ return [
     */
 
     'middleware' => [
+        App\Http\Middleware\OnlyOnPlatformHosts::class,
         'web',
         Authorize::class,
     ],

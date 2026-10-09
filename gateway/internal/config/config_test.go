@@ -93,6 +93,23 @@ func TestLoadResolvesUpstreamFromWebhookBaseURL(t *testing.T) {
 	}
 }
 
+func TestUpstreamPreserveHostIsOffUnlessAskedFor(t *testing.T) {
+	t.Setenv("WEBHOOK_BASE_URL", "https://app.example.com")
+	t.Setenv("GATEWAY_UPSTREAM_PRESERVE_HOST", "")
+
+	settings, err := Load("")
+	if err != nil || settings.UpstreamPreserveHost {
+		t.Fatalf("default: err=%v preserve=%v, want off", err, settings.UpstreamPreserveHost)
+	}
+
+	t.Setenv("GATEWAY_UPSTREAM_PRESERVE_HOST", "true")
+
+	settings, err = Load("")
+	if err != nil || !settings.UpstreamPreserveHost {
+		t.Fatalf("opted in: err=%v preserve=%v, want on", err, settings.UpstreamPreserveHost)
+	}
+}
+
 // Without an upstream the gateway has nowhere to fall back to on a cache miss,
 // which is the difference between degrading and dropping deliveries. Better to
 // refuse to start than to discover that during an outage.

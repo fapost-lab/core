@@ -8,6 +8,7 @@ use App\Console\Installer\InstallStep;
 use App\Console\Installer\Steps\ApplicationStep;
 use App\Console\Installer\Steps\DatabaseStep;
 use App\Console\Installer\Steps\RedisStep;
+use App\Console\Installer\Steps\TenancyStep;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Webhook\Deployment\EnvFile;
 use Illuminate\Console\Command;
@@ -92,6 +93,7 @@ final class InstallCommand extends Command
     {
         return [
             new ApplicationStep(),
+            new TenancyStep(),
             new DatabaseStep(),
             new RedisStep(),
         ];
