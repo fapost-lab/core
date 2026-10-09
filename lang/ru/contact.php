@@ -30,7 +30,11 @@ return [
         'header'        => 'Идентичность',
         'profile'       => 'Профиль',
         'from_platform' => 'От платформы',
-        'group_fields'  => '{1} :count поле|[2,4] :count поля|[5,*] :count полей',
+        'group_fields'  => ':count поле|:count поля|:count полей',
+    ],
+    'values' => [
+        'yes' => 'Да',
+        'no'  => 'Нет',
     ],
     'placeholders' => [
         'empty' => '—',

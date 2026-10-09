@@ -28,6 +28,14 @@ schema registry (`VariableSchemaRegistryInterface::get('contact', $group, $name)
 renders Yes/No. Fields without a registry entry (legacy) or of other types render as plain strings.
 The view is read-only.
 
+The Inertia console shows the same card, built by `App\Domains\Contact\Services\ContactCard`
+(`Console/Contacts/Show`). It sends properties as `{key, value}` lists, because a JSON object reorders numeric
+keys and Postgres `jsonb` reorders all of them. Keys are sorted alphabetically (natural, case-insensitive) in the
+profile, the groups, the fields of a group and the platform data. A list at the root of `attributes` is one profile
+field (its items joined with `, `), and an empty array is an empty field. `contact.values.yes|no` and the
+`ru`/`uk` plural forms of `contact.sections.group_fields` exist since the console was built; the Filament infolist
+is unchanged.
+
 ## Files
 
 - `app/Filament/Assistant/Resources/Contacts/ContactResource.php`

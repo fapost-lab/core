@@ -38,6 +38,8 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   strings from `page.props.translations.console.<screen>` (en, ru, uk together), and build from
   `@fapost/ui` components: `data-table`, `form-field`, `confirm-dialog`. Permission flags for
   buttons come from the controller as `can`.
+- **Dictionaries with keys from data** (contact attributes, platform meta) go into props as lists of
+  `{key, value}`: a JSON object reorders numeric keys in JS, and `jsonb` reorders all of them.
 - A bulk delete as one query skips model events; say so on the method, and delete model by model
   where observers matter. A delete with a guard (a group that still holds flows, a flow with live
   sessions) is always per record: the service throws a domain exception, the controller turns it
@@ -70,6 +72,8 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
 `DestroyContactGroupsRequest`, `resources/js/pages/Console/ContactGroups/*`,
 `tests/Feature/Console/ContactGroupsConsoleTest.php`. With filters, grouping, guards and an
 assistant-owned policy: `FlowController`, `FlowDraftService`, `resources/js/pages/Console/Flows/*`.
+A card with narrow writes (replace a set, no create or delete): `ContactController`,
+`AssistantContactService`, `ContactCard`, `resources/js/pages/Console/Contacts/*`.
 
 ## Rationale
 
