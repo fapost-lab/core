@@ -89,7 +89,8 @@ final class TrustedProxiesTest extends TestCase
             'X-Forwarded-Host'  => 'evil.example',
         ])
             ->assertJsonPath('secure', true)
-            ->assertJsonPath('port', 443)
+            // The port comes from the Host header (APP_URL's port, else 443 for https), never from X-Forwarded-Port.
+            ->assertJsonPath('port', parse_url((string) config('app.url'), PHP_URL_PORT) ?? 443)
             ->assertJsonPath('host', parse_url((string) config('app.url'), PHP_URL_HOST));
     }
 
