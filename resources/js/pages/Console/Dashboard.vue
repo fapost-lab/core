@@ -38,8 +38,8 @@ const status = computed(() => (props.assistant.isActive ? t.value.status_active 
 <template>
   <Head :title="t.title" />
 
-  <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
-    <h1 class="font-display text-2xl font-semibold tracking-wide uppercase">{{ t.title }}</h1>
+  <div class="flex w-full flex-col gap-5">
+    <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
 
     <div class="grid gap-4 md:grid-cols-2">
       <Card>

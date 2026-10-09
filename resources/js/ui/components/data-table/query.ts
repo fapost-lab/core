@@ -36,6 +36,35 @@ export type SortDirection = 'asc' | 'desc'
 
 export type TableQuery = Partial<{ search: string; sort: string; per_page: number; page: number; filter: Record<string, string>; group: string }>
 
+/**
+ * The page numbers a pager shows: the first and the last page, the current one with a neighbour on each side, and
+ * `null` where pages are skipped (an ellipsis). A short list shows every page.
+ */
+export function pageWindow(current: number, last: number): (number | null)[] {
+    if (last <= 7) {
+        return Array.from({length: last}, (_, index) => index + 1)
+    }
+
+    const pages = new Set([1, last, current - 1, current, current + 1])
+
+    if (current <= 3) {
+        [2, 3, 4].forEach((page) => pages.add(page))
+    }
+
+    if (current >= last - 2) {
+        [last - 3, last - 2, last - 1].forEach((page) => pages.add(page))
+    }
+
+    const sorted = [...pages].filter((page) => page >= 1 && page <= last).sort((a, b) => a - b)
+
+    return sorted.flatMap((page, index) => {
+        const gap = index > 0 ? page - sorted[index - 1] : 1
+
+        // An ellipsis for one missing page would be longer than the page itself.
+        return gap > 2 ? [null, page] : gap === 2 ? [page - 1, page] : [page]
+    })
+}
+
 /** The direction the table is sorted by this column in, or null when it is sorted by another one. */
 export function sortDirection(sort: string, column: string): SortDirection | null {
     if (sort === column) {

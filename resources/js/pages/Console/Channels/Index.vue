@@ -7,8 +7,9 @@ export default { layout: AppShell }
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Head, Link, router, usePage } from '@inertiajs/vue3'
-import { CircleCheck, CircleX, EllipsisVertical, ExternalLink, KeyRound, Pencil, Plus, Trash2 } from '@lucide/vue'
-import { Badge } from '@fapost/ui/components/badge'
+import { EllipsisVertical, ExternalLink, KeyRound, Pencil, Plus, SearchX, Trash2 } from '@lucide/vue'
+import { EmptyState } from '@fapost/ui/components/empty-state'
+import { Badge, StatusDot } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { ConfirmDialog } from '@fapost/ui/components/confirm-dialog'
 import { DataTable, type DataTableColumn, type TableDefaults, type TableMeta, type TableState } from '@fapost/ui/components/data-table'
@@ -74,10 +75,10 @@ function destroy(): void {
 <template>
   <Head :title="t.title" />
 
-  <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
+  <div class="flex w-full flex-col gap-5">
     <div class="flex flex-col gap-1">
-      <h1 class="font-display text-2xl font-semibold tracking-wide uppercase">{{ t.title }}</h1>
-      <p class="text-muted-foreground text-sm">{{ t.description }}</p>
+      <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+      <p class="text-muted-foreground">{{ t.description }}</p>
       <p v-if="limit.hint" class="text-destructive text-sm font-medium" role="status">{{ limit.hint }}</p>
     </div>
 
@@ -102,7 +103,7 @@ function destroy(): void {
       </template>
 
       <template #cell-type="{ row }">
-        <Badge variant="secondary">{{ row.typeLabel }}</Badge>
+        <Badge variant="info">{{ row.typeLabel }}</Badge>
       </template>
 
       <template #cell-handle="{ row }">
@@ -114,8 +115,7 @@ function destroy(): void {
       </template>
 
       <template #cell-isActive="{ row }">
-        <CircleCheck v-if="row.isActive" class="mx-auto size-5 text-green-600 dark:text-green-500" role="img" :aria-label="t.status.active" />
-        <CircleX v-else class="text-muted-foreground mx-auto size-5" role="img" :aria-label="t.status.inactive" />
+        <StatusDot :tone="row.isActive ? 'success' : 'neutral'">{{ row.isActive ? t.status.active : t.status.inactive }}</StatusDot>
       </template>
 
       <template #cell-updatedAt="{ row }">
@@ -152,11 +152,8 @@ function destroy(): void {
       </template>
 
       <template #empty="{ searching }">
-        <p v-if="searching" class="text-muted-foreground">{{ tableLabels.empty_search }}</p>
-        <div v-else class="flex flex-col items-center gap-1 text-center">
-          <p class="font-medium">{{ t.empty }}</p>
-          <p class="text-muted-foreground text-sm">{{ t.empty_hint }}</p>
-        </div>
+        <EmptyState v-if="searching" :icon="SearchX" :title="tableLabels.empty_search" />
+        <EmptyState v-else :title="t.empty" :description="t.empty_hint" />
       </template>
     </DataTable>
 

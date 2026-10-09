@@ -103,7 +103,7 @@ function submit(): void {
     <div v-else class="grid gap-2">
       <span class="text-sm leading-none font-medium">{{ t.fields.type }}</span>
       <div class="flex items-center gap-2">
-        <Badge variant="secondary">{{ channel?.typeLabel }}</Badge>
+        <Badge variant="info">{{ channel?.typeLabel }}</Badge>
         <a v-if="channel?.url" :href="channel.url" target="_blank" rel="noopener" class="text-sm underline-offset-4 hover:underline">{{ channel.handle }}</a>
       </div>
       <p class="text-muted-foreground text-sm">{{ t.fields.type_locked }}</p>

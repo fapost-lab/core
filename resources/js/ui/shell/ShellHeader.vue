@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'
-import { ChevronRight, Menu } from '@lucide/vue'
+import { Menu } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@fapost/ui/components/sheet'
 import LanguageMenu from './LanguageMenu.vue'
@@ -23,7 +23,7 @@ const crumbs = computed(() => {
 </script>
 
 <template>
-  <header class="bg-background/90 sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur">
+  <header class="bg-card/70 sticky top-0 z-10 flex min-h-14 shrink-0 items-center gap-3 border-b px-4 backdrop-blur sm:px-6 lg:px-8">
     <Sheet>
       <SheetTrigger as-child>
         <Button variant="ghost" size="icon-sm" class="lg:hidden" :aria-label="t.navigation.menu">
@@ -38,9 +38,9 @@ const crumbs = computed(() => {
     </Sheet>
 
     <nav aria-label="Breadcrumb" class="min-w-0 flex-1">
-      <ol class="text-muted-foreground flex items-center gap-1.5 text-sm">
-        <li v-for="(crumb, index) in crumbs" :key="`${index}-${crumb}`" class="flex min-w-0 items-center gap-1.5">
-          <ChevronRight v-if="index > 0" class="size-3.5 shrink-0" aria-hidden="true" />
+      <ol class="text-faint-foreground flex items-center gap-2 text-[13px]">
+        <li v-for="(crumb, index) in crumbs" :key="`${index}-${crumb}`" class="flex min-w-0 items-center gap-2">
+          <span v-if="index > 0" class="shrink-0" aria-hidden="true">/</span>
           <span :class="['truncate', index === crumbs.length - 1 ? 'text-foreground font-medium' : '']">{{ crumb }}</span>
         </li>
       </ol>
