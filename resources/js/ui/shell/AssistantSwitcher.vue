@@ -25,18 +25,18 @@ defineProps<{
     <DropdownMenuTrigger as-child>
       <button
         type="button"
-        class="bg-card hover:bg-accent/40 focus-visible:ring-ring/50 flex w-full items-center gap-2.5 rounded-lg border p-2 text-left shadow-xs transition-colors outline-none focus-visible:ring-3"
+        class="bg-card hover:bg-accent/40 focus-visible:ring-ring/30 flex min-h-12 w-full items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-colors outline-none focus-visible:ring-3"
       >
-        <Avatar class="size-8 rounded-md">
-          <AvatarFallback class="bg-primary text-primary-foreground rounded-md text-xs font-medium">
+        <Avatar class="size-[30px] rounded-lg">
+          <AvatarFallback class="bg-accent text-accent-foreground rounded-lg text-xs font-semibold">
             {{ initials(data.current.name) }}
           </AvatarFallback>
         </Avatar>
         <span class="min-w-0 flex-1">
-          <span class="text-muted-foreground block text-xs">{{ label }}</span>
-          <span class="block truncate text-sm font-medium">{{ data.current.name }}</span>
+          <span class="block truncate text-[13.5px] leading-tight font-semibold">{{ data.current.name }}</span>
+          <span class="text-faint-foreground block text-xs leading-tight">{{ label }}</span>
         </span>
-        <ChevronsUpDown class="text-muted-foreground size-4 shrink-0" aria-hidden="true" />
+        <ChevronsUpDown class="text-faint-foreground size-4 shrink-0" aria-hidden="true" />
       </button>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="start" class="w-64">

@@ -10,6 +10,7 @@ export interface ChannelsTranslations {
   bot_pending: string
   webhook: { failed: string; failed_hint: string; failed_at: string; register_again: string }
   status: { active: string; inactive: string }
+  sections: { connection: { title: string; description: string }; behaviour: { title: string; description: string } }
   fields: {
     type: string
     type_locked: string

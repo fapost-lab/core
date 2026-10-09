@@ -13,7 +13,10 @@ paths:
   - "app/Filament/Assistant/Resources/Contact*/**"
   - "database/migrations/tenant/*contact*"
   - "tests/*/Domains/Contact/**"
-reviewed_at: 2026-10-05
+  - "app/Http/Controllers/Console/Contact*"
+  - "resources/js/pages/Console/Contacts/**"
+  - "app/Http/Requests/Console/*Contact*"
+reviewed_at: 2026-10-09
 ---
 # Contact rules
 
@@ -33,6 +36,12 @@ broken.
   (`ContactSegmentResolver`).
 - **The notify fan-out runs once per `(session, node)`** (a `Cache::add` guard in
   `SendContactNotificationJob`).
+
+- **A contact is visible in an assistant's console only through `channel_contacts` to
+  `channels.assistant_id`, and every query filters `tenant_id` explicitly.** A contact belongs to the
+  tenant and has no assistant of its own; the console has no Filament tenancy scope, so a filter on
+  the tenant alone would show a sibling assistant's contacts. Enforced: `AssistantContactService`,
+  `ContactsConsoleTest`.
 
 ## Rules
 

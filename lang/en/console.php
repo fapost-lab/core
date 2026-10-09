@@ -103,6 +103,12 @@ return [
             'contacts'    => 'Contacts',
             'created_at'  => 'Created',
         ],
+        'sections' => [
+            'general' => [
+                'title'       => 'General',
+                'description' => 'The name and the description of the group.',
+            ],
+        ],
         'fields' => [
             'name'        => 'Name',
             'description' => 'Description',
@@ -134,6 +140,12 @@ return [
         'columns'      => [
             'name'  => 'Name',
             'flows' => 'Flows',
+        ],
+        'sections' => [
+            'general' => [
+                'title'       => 'General',
+                'description' => 'The name of the group.',
+            ],
         ],
         'fields' => [
             'name' => 'Name',
@@ -170,6 +182,16 @@ return [
             'group'      => 'Group',
             'visibility' => 'Visibility',
             'version'    => 'Version',
+        ],
+        'sections' => [
+            'general' => [
+                'title'       => 'General',
+                'description' => 'The name, the group and the description of the flow.',
+            ],
+            'behaviour' => [
+                'title'       => 'Behaviour',
+                'description' => 'Who can start the flow and what is recorded about its sessions.',
+            ],
         ],
         'fields' => [
             'name'                 => 'Name',
@@ -273,6 +295,16 @@ return [
             'active'   => 'Active',
             'inactive' => 'Inactive',
         ],
+        'sections' => [
+            'connection' => [
+                'title'       => 'Connection',
+                'description' => 'How the platform talks to the messenger. Secrets are stored encrypted.',
+            ],
+            'behaviour' => [
+                'title'       => 'Behaviour',
+                'description' => 'Whether the channel accepts incoming messages.',
+            ],
+        ],
         'fields' => [
             'type'                 => 'Channel',
             'type_locked'          => 'The type is chosen when the channel is created and cannot be changed.',
@@ -324,5 +356,71 @@ return [
             'rotated'     => 'The webhook hash is changed, but the webhook is not registered. Check the token and register it again.',
             'deleted'     => 'The channel is deleted, but Telegram did not confirm removing its webhook.',
         ],
+    ],
+
+    'contacts' => [
+        'title'        => 'Contacts',
+        'description'  => 'People who have written to this assistant\'s channels.',
+        'search_label' => 'Search by channel user ID',
+        'columns'      => [
+            'id'          => 'ID',
+            'platform'    => 'Channel',
+            'external_id' => 'Channel user ID',
+            'name'        => 'Name',
+            'language'    => 'Language',
+            'created_at'  => 'Created',
+        ],
+        'filters' => [
+            'platform'     => 'Channel',
+            'platform_all' => 'All channels',
+            'language'     => 'Language',
+            'language_all' => 'All languages',
+        ],
+        'platforms' => [
+            'telegram' => 'Telegram',
+            'whatsapp' => 'WhatsApp',
+            'email'    => 'Email',
+        ],
+        'open'       => 'Open',
+        'open_named' => 'Open :name',
+        'copy'       => 'Copy',
+        'copied'     => 'Copied',
+        'empty'      => 'No contacts yet.',
+        'empty_hint' => 'Contacts appear here after their first message to one of the assistant\'s channels.',
+        'back'       => 'Contacts',
+        'view'       => [
+            'identity'      => 'Identity',
+            'profile'       => 'Profile',
+            'from_platform' => 'From platform',
+            'platform'      => 'Channel',
+            'external_id'   => 'Channel user ID',
+            'language'      => 'Language',
+            'username'      => 'Username',
+            'created_at'    => 'Created',
+            'updated_at'    => 'Updated',
+            'tags'          => 'Tags',
+            'groups'        => 'Groups',
+            'no_tags'       => 'No tags',
+            'no_groups'     => 'No groups',
+            'manage_tags'   => 'Edit tags',
+            'manage_groups' => 'Edit groups',
+            'group_fields'  => ':count field|:count fields',
+            'empty_value'   => '—',
+        ],
+        'tags_dialog' => [
+            'title'        => 'Edit tags',
+            'description'  => 'Add tags to the contact or remove them. A tag set by a flow stays unless you remove it here.',
+            'placeholder'  => 'New tag',
+            'add'          => 'Add',
+            'remove_named' => 'Remove tag :tag',
+        ],
+        'groups_dialog' => [
+            'title'       => 'Edit groups',
+            'description' => 'Choose the groups the contact belongs to.',
+            'search'      => 'Search groups',
+            'empty'       => 'There are no contact groups yet.',
+        ],
+        'tags_updated'   => 'Tags saved.',
+        'groups_updated' => 'Groups saved.',
     ],
 ];

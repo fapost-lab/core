@@ -22,7 +22,14 @@ paths:
   - app/Http/Middleware/RefuseWritesWhenTenantStopped.php
   - tests/Unit/Architecture/RuntimeJobAccessModeTest.php
   - app/Filament/Support/AccessNoticeBanner.php
-reviewed_at: 2026-10-08
+  - app/Http/Middleware/OnlyOnPlatformHosts.php
+  - config/trustedproxy.php
+  - config/horizon.php
+  - config/telescope.php
+  - app/Providers/HorizonServiceProvider.php
+  - docker/compose.yaml
+  - "tests/Feature/Http/**"
+reviewed_at: 2026-10-09
 ---
 # Tenancy rules
 
@@ -56,6 +63,21 @@ broken.
   outside one (mail, queued jobs) must name the tenant host explicitly — through
   `TenantHost::urlFor()`, as the staff activation mail does. Enforced: `HostModePanelsTest`,
   `TenantMiddlewareOrderTest` (every `filament.*` route), `ActivationHostModeTest`.
+- **`host` mode needs a session that works with no tenant, and host-only cookies.** Platform pages run
+  `StartSession` with no tenant, so `SESSION_DRIVER=database` (a tenant-schema table) is refused, and a
+  `SESSION_DOMAIN` that spans subdomains would hand one tenant's cookie to the others. A web process refuses to
+  boot with either (`HostModeDeploymentCheck`, called from `DomainServiceProvider`); console and queue processes
+  boot anyway so `config:clear` still works. An ingress host (`WEBHOOK_BASE_URL`, gateway URL) outside the base
+  domain only warns (`php artisan about`): TrustHosts would answer it 400. Enforced: `HostModeDeploymentCheckTest`,
+  `HostModeBootTest`.
+- **Horizon and Telescope are never served on a tenant host.** `OnlyOnPlatformHosts` is first in their route
+  middleware (`config/horizon.php`, `config/telescope.php`) and answers 404 on a tenant host in `host` mode. Platform
+  hosts carry no tenant sign-in, so `viewHorizon` stays an empty allow-list until an operator package brings its own
+  sign-in and redefines the gate. Enforced: `PlatformHostOnlySurfacesTest`.
+- **Forwarded headers are believed only from `trustedproxy.proxies` (`TRUSTED_PROXIES`), and never the host.**
+  `bootstrap/app.php` trusts `X-Forwarded-For` and `-Proto`; the host and port are not (the host
+  selects the tenant, TrustHosts runs before TrustProxies, and no proxy of ours sets a port). Empty trusts nobody; the bundled Compose defaults to its pinned Caddy address, not
+  a range. Per-IP limits (sign-up) depend on this. Enforced: `TrustedProxiesTest`.
 - **A tenant switch always restores.** `runForTenant()` restores the connection, resets the
   context, runs restore hooks and context-hook exits and points the permission registrar back at the outer cache key even
   when the database restore itself throws. A context hook (`registerContextHook`) snapshots what it owns

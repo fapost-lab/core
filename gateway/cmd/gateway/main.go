@@ -86,14 +86,15 @@ func run(dotenvPath string) error {
 	limiter := ratelimit.New(settings.RatePerSecond, settings.RateBurst)
 
 	handler := ingress.New(ingress.Options{
-		Registry:       channels,
-		Publisher:      queue.New(client, settings.Queue.Name, settings.Redis.Timeout),
-		Limiter:        limiter,
-		Logger:         logger.Logger,
-		Upstream:       settings.Upstream,
-		MaxBodyBytes:   settings.MaxBodyBytes,
-		DedupTTL:       settings.DedupTTL,
-		TrustedProxies: settings.TrustedProxies,
+		Registry:             channels,
+		Publisher:            queue.New(client, settings.Queue.Name, settings.Redis.Timeout),
+		Limiter:              limiter,
+		Logger:               logger.Logger,
+		Upstream:             settings.Upstream,
+		UpstreamPreserveHost: settings.UpstreamPreserveHost,
+		MaxBodyBytes:         settings.MaxBodyBytes,
+		DedupTTL:             settings.DedupTTL,
+		TrustedProxies:       settings.TrustedProxies,
 	})
 
 	server := &http.Server{

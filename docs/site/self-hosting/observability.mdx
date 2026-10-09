@@ -17,6 +17,11 @@ inbound processing and conversation replies share dedicated processes, while
 broadcasts, logging and background synchronisation are worked elsewhere. See
 [Queues](/reference/queues).
 
+In `host` tenancy mode the dashboard is served on the base domain and on declared
+platform subdomains only, never on a tenant's host, and it stays closed until a user
+passes the `viewHorizon` gate; see
+[Several tenants](/self-hosting/docker-compose#several-tenants-host-mode).
+
 What to watch:
 
 - **Wait time on `flow.execution`** — this is how long a contact waits before the

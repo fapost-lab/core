@@ -65,6 +65,11 @@ describe('interpolate', () => {
         expect(interpolate('(:name, :email)', {name: 'Olga', email: 'o@x.io'})).toBe('(Olga, o@x.io)')
     })
 
+    it('fills a long name before a short one that starts it', () => {
+        expect(interpolate('Showing :from–:to of :total', {from: 1, to: 4, total: 4})).toBe('Showing 1–4 of 4')
+        expect(interpolate('Showing :from–:to of :total', {to: 4, from: 1, total: 12})).toBe('Showing 1–4 of 12')
+    })
+
     it('inserts a value verbatim', () => {
         expect(interpolate('Delete :name?', {name: "a$&b$'c"})).toBe("Delete a$&b$'c?")
     })

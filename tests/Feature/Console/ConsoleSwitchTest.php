@@ -41,6 +41,8 @@ final class ConsoleSwitchTest extends FeatureTestCase
     public function test_filament_answers_the_flow_and_flow_group_screens(): void
     {
         foreach ([
+            'filament.assistant.resources.contacts.index',
+            'filament.assistant.resources.contacts.view',
             'filament.assistant.resources.flows.index',
             'filament.assistant.resources.flows.create',
             'filament.assistant.resources.flows.edit',
@@ -66,6 +68,8 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'console.auth.login.attempt',
             'console.auth.logout',
             'console.locale.update',
+            'console.contacts.tags',
+            'console.contacts.groups',
             'console.flows.store',
             'console.flows.update',
             'console.flows.activity',

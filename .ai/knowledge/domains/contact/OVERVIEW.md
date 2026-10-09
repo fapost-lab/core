@@ -12,7 +12,10 @@ paths:
   - "app/Filament/Assistant/Resources/Contact*/**"
   - "database/migrations/tenant/*contact*"
   - "tests/*/Domains/Contact/**"
-reviewed_at: 2026-10-05
+  - "app/Http/Controllers/Console/Contact*"
+  - "app/Http/Requests/Console/*Contact*"
+  - "resources/js/pages/Console/Contacts/**"
+reviewed_at: 2026-10-09
 ---
 # Contact
 
@@ -45,5 +48,8 @@ and external id — and the link between a contact and a channel (`ChannelContac
   `Services/ContactSegmentResolver.php`.
 - `Jobs/SendContactNotificationJob.php` (queue `messaging.broadcast`).
 - Policies `ContactPolicy`, `ContactGroupPolicy`.
+- Inertia console: `App\Http\Controllers\Console\ContactController` with `Services/AssistantContactService.php`
+  (the assistant's contacts and the two writes, tags and groups) and `Services/ContactCard.php` (the card's
+  sections); pages in `resources/js/pages/Console/Contacts/`.
 - Admin UI: `app/Filament/Assistant/Resources/{Contacts,ContactGroups,ContactSegments}`; tag
   options for the builder: `app/Http/Controllers/Builder/ContactTagsController.php`.

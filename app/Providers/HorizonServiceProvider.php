@@ -29,7 +29,11 @@ final class HorizonServiceProvider extends HorizonApplicationServiceProvider
     /**
      * Register the Horizon gate.
      *
-     * This gate determines who can access Horizon in non-local environments.
+     * This gate determines who can access Horizon in non-local environments. The list is empty, so
+     * it is closed. In `host` tenancy mode Horizon is served on the base domain and platform
+     * subdomains only (see config/horizon.php), where no tenant is entered and so no tenant user
+     * is signed in: opening it there is the job of an operator package that brings its own
+     * sign-in and redefines this gate. Without one, run `horizon:status` and read the logs.
      */
     protected function gate(): void
     {

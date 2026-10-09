@@ -12,7 +12,11 @@
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 2px);
+  --radius-2xl: calc(var(--radius) + 4px);
+
+  --shadow-md: 0 8px 24px color-mix(in srgb, var(--shadow-ink) 18%, transparent);
+  --shadow-lg: 0 20px 48px color-mix(in srgb, var(--shadow-ink) 22%, transparent);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -22,6 +26,7 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
@@ -57,6 +62,25 @@
   --color-warning-foreground: var(--warning-foreground);
   --color-danger: var(--danger);
   --color-danger-foreground: var(--danger-foreground);
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-success-dot: var(--success-dot);
+  --color-warning-dot: var(--warning-dot);
+  --color-danger-dot: var(--danger-dot);
+  --color-neutral-dot: var(--neutral-dot);
+  --color-info-dot: var(--info-dot);
+  --color-danger-border: var(--danger-border);
+  --color-invalid: var(--invalid);
+  --color-faint-foreground: var(--faint-foreground);
+  --color-border-soft: var(--border-soft);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-border: var(--primary-soft-border);
+  --color-row-selected: var(--row-selected);
+  --color-scrim: var(--scrim);
+  --color-toast: var(--toast);
+  --color-toast-foreground: var(--toast-foreground);
+  --color-toast-muted-foreground: var(--toast-muted-foreground);
+  --color-toast-border: var(--toast-border);
   --color-subtle-foreground: var(--subtle-foreground);
   --color-surface-muted: var(--surface-muted);
 

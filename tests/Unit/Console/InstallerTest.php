@@ -7,6 +7,7 @@ namespace Tests\Unit\Console;
 use App\Console\Installer\Steps\ApplicationStep;
 use App\Console\Installer\Steps\DatabaseStep;
 use App\Console\Installer\Steps\RedisStep;
+use App\Console\Installer\Steps\TenancyStep;
 use App\Domains\Webhook\Deployment\EnvFile;
 use Illuminate\Console\Command;
 use Laravel\Prompts\Prompt;
@@ -91,6 +92,42 @@ final class InstallerTest extends TestCase
         $this->assertTrue((new RedisStep())->isPending($env), 'An unreachable Redis must count as pending.');
     }
 
+    public function test_tenancy_step_leaves_a_chosen_mode_alone(): void
+    {
+        $this->write("TENANCY_RESOLUTION=single\n");
+
+        $this->assertFalse((new TenancyStep())->isPending(new EnvFile($this->path)));
+    }
+
+    public function test_tenancy_step_writes_the_mode_and_makes_host_mode_session_safe(): void
+    {
+        $this->write("APP_URL=https://fapost.example.com\nTENANCY_BASE_DOMAIN=localhost\nSESSION_DRIVER=database\n");
+        $env = new EnvFile($this->path);
+        $this->assertTrue(($step = new TenancyStep())->isPending($env));
+
+        Prompt::fallbackWhen(true);
+        \Laravel\Prompts\SelectPrompt::fallbackUsing(static fn (): string => 'host');
+        // Accept the default offered for the base domain, which must come from APP_URL, not the stale value.
+        \Laravel\Prompts\TextPrompt::fallbackUsing(static fn (\Laravel\Prompts\TextPrompt $prompt): string => $prompt->default);
+
+        $command = new class () extends Command {
+            public $components;
+
+            public function __construct()
+            {
+                parent::__construct('test');
+                $this->components = new \Illuminate\Console\View\Components\Factory(
+                    new \Illuminate\Console\OutputStyle(new \Symfony\Component\Console\Input\ArrayInput([]), new \Symfony\Component\Console\Output\BufferedOutput()),
+                );
+            }
+        };
+
+        $this->assertTrue($step->run($command, $env));
+        $this->assertSame('host', $env->get('TENANCY_RESOLUTION'));
+        $this->assertSame('fapost.example.com', $env->get('TENANCY_BASE_DOMAIN'));
+        $this->assertSame('redis', $env->get('SESSION_DRIVER'));
+    }
+
     /**
      * The installer configures an existing environment file; it does not invent
      * one. Creating a file from nothing would hide the fact that .env.example was
@@ -117,7 +154,7 @@ final class InstallerTest extends TestCase
     {
         $titles = array_map(
             static fn (object $step): string => $step->title(),
-            [new ApplicationStep(), new DatabaseStep(), new RedisStep()],
+            [new ApplicationStep(), new TenancyStep(), new DatabaseStep(), new RedisStep()],
         );
 
         $this->assertSame($titles, array_unique($titles));

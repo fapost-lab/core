@@ -21,12 +21,19 @@ to FaPost, and the Laravel ones whose value matters here.
 | Variable | Default | Notes |
 |---|---|---|
 | `TENANCY_BASE_DOMAIN` | `localhost` | Base domain tenant hosts are derived from |
-| `TENANCY_RESOLUTION` | `single` | `single`: one tenant, named by `TENANT_SLUG`. `host`: the tenant is taken from the request host `<slug>.<TENANCY_BASE_DOMAIN>`, so one install serves many tenants; unknown hosts get 404 |
+| `TENANCY_RESOLUTION` | `single` | `single`: one tenant, named by `TENANT_SLUG`. `host`: the tenant is taken from the request host `<slug>.<TENANCY_BASE_DOMAIN>`, so one install serves many tenants; unknown hosts get 404, and hosts outside the base domain get 400. Needs a wildcard DNS name and certificate, `SESSION_DRIVER` other than `database`, and `SESSION_DOMAIN` unset; see [Several tenants](/self-hosting/docker-compose#several-tenants-host-mode) and the [upgrade note](/self-hosting/upgrading#moving-to-host-mode). Changing it needs the route cache rebuilt |
 | `TENANCY_PROVISIONING_LEASE_SECONDS` | `900` | How long a provisioning run holds a pending tenant before another run may take it over (at least 60; the run renews it between steps). A crashed run frees the tenant after this long |
 | `TENANT_SLUG` | `app` | The tenant served in `single` mode; ignored in `host` mode |
 | `WEBHOOK_BASE_URL` | `${APP_URL}` | The base providers will call back on |
 | `WEBHOOK_INGRESS_DRIVER` | `laravel` | `laravel` or `gateway` |
 | `WEBHOOK_GATEWAY_URL` | *empty* | Required when the driver is `gateway` |
+
+In `host` mode `WEBHOOK_BASE_URL` and the gateway host must sit under
+`TENANCY_BASE_DOMAIN`: the application answers no other host.
+
+The Compose file also reads `CADDY_IMAGE` (a Caddy build with your DNS provider's
+module) and `CADDY_SITES_DIR` (extra Caddy sites, `./caddy.d` by default); neither is
+read by the application.
 
 <Note>
   `WEBHOOK_INGRESS_DRIVER` applies to **newly registered channels only**. The
@@ -62,8 +69,10 @@ connections both depend on it. Tenant schemas are created on the tenant connecti
 | `REDIS_PASSWORD` | `null` | Set one on any non-local install |
 | `QUEUE_CONNECTION` | `redis` | Must be an asynchronous queue: on `sync`, `delay` nodes wait for the next inbound message and `send_message` timeouts never fire |
 | `CACHE_STORE` | `redis` | |
-| `SESSION_DRIVER` | `redis` | |
+| `SESSION_DRIVER` | `redis` | Not `database` in `host` tenancy mode: platform pages have no tenant schema to hold the table |
 | `SESSION_LIFETIME` | `120` | Minutes |
+| `SESSION_DOMAIN` | *unset* | Leave unset: cookies stay bound to the exact host. In `host` mode a value shared between subdomains is refused |
+| `TRUSTED_PROXIES` | *empty* (the Compose file defaults to the address it pins for Caddy, `172.30.0.2`) | Addresses or CIDR ranges allowed to set the client address and scheme through `X-Forwarded-*`, or `*` for whoever connects directly. Empty trusts nobody, so behind a proxy every client shares the proxy's address. The forwarded host and port are never believed. See [the client address behind a proxy](/self-hosting/docker-compose#the-client-address-behind-a-proxy) |
 
 Redis is not optional: it carries queues, cache, locks, and the webhook routing
 registry. The registry is what keeps the landlord database off the inbound hot

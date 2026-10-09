@@ -107,6 +107,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // the single-use token in its body is the proof (see SupportAccessController).
         $middleware->validateCsrfTokens(except: ['support/enter']);
 
+        // Which addresses may vouch for X-Forwarded-* is `trustedproxy.proxies` (TRUSTED_PROXIES), read per request.
+        // The client address and scheme are believed from such a proxy; the host, the port and the path prefix are
+        // not. The host selects the tenant (and TrustHosts runs on it before this middleware) and every proxy here
+        // preserves it anyway; no proxy of ours sets a port, so a client's X-Forwarded-Port would pass straight
+        // through and change the absolute URLs built in a request. The port follows the scheme.
+        $middleware->trustProxies(headers: Request::HEADER_X_FORWARDED_FOR | Request::HEADER_X_FORWARDED_PROTO);
+
         // Registered in every mode; the closure runs per request, after config is loaded, and
         // yields no patterns in `single` mode, which leaves every host trusted as before.
         $middleware->trustHosts(at: fn (): array => TenantHost::trustedHostPatterns(), subdomains: false);

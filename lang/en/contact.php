@@ -30,7 +30,11 @@ return [
         'header'        => 'Identity',
         'profile'       => 'Profile',
         'from_platform' => 'From platform',
-        'group_fields'  => '{1} :count field|[2,*] :count fields',
+        'group_fields'  => ':count field|:count fields',
+    ],
+    'values' => [
+        'yes' => 'Yes',
+        'no'  => 'No',
     ],
     'placeholders' => [
         'empty' => '—',

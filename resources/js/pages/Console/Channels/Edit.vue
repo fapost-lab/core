@@ -33,8 +33,8 @@ function registerAgain(): void {
 <template>
   <Head :title="t.edit_title" />
 
-  <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
-    <h1 class="font-display text-2xl font-semibold tracking-wide uppercase">{{ t.edit_title }}</h1>
+  <div class="flex w-full flex-col gap-5">
+    <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.edit_title }}</h1>
 
     <div v-if="channel.webhook === 'failed'" class="border-destructive/40 flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center" role="status">
       <div class="flex flex-1 flex-col gap-1">
