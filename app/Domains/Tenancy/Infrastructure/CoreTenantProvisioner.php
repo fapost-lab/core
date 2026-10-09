@@ -6,15 +6,15 @@ namespace App\Domains\Tenancy\Infrastructure;
 
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Exceptions\InvalidTenantSlugException;
+use App\Domains\Tenancy\Exceptions\TenantProvisioningException;
 use App\Domains\Tenancy\Services\TenantProvisioningService;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Support\TenantHost;
+use App\Domains\Tenancy\ValueObjects\ProvisioningProblem;
 use Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface;
 use Fapost\Foundation\Tenancy\DTO\ProvisionedTenant;
 use Fapost\Foundation\Tenancy\DTO\ProvisionTenant;
 use Fapost\Foundation\Tenancy\Exceptions\TenantProvisioningFailedException;
-use Illuminate\Database\UniqueConstraintViolationException;
-use Illuminate\Hashing\HashManager;
 use Throwable;
 
 /**
@@ -23,16 +23,17 @@ use Throwable;
  * Translates {@see TenantProvisioningService} into Foundation's request, result and failure
  * reasons, so a package that depends only on Foundation never sees Core exceptions or models.
  * Synchronous and slow (the full tenant schema is migrated): callers run it outside HTTP requests.
+ *
+ * After a `Failed` the slug is held by a Pending tenant whose id is on the exception; the caller continues
+ * it with {@see CoreTenantReservations::provision()}.
  */
 final readonly class CoreTenantProvisioner implements TenantProvisionerInterface
 {
-    private const string DEFAULT_ADMIN_NAME = 'Administrator';
-
     public function __construct(
         private TenantProvisioningService $provisioningService,
         private TenantRepositoryInterface $tenantRepository,
         private TenantSlugPolicy $slugPolicy,
-        private HashManager $hasher,
+        private FirstAdminCredentialsGuard $credentials,
     ) {
     }
 
@@ -40,26 +41,23 @@ final readonly class CoreTenantProvisioner implements TenantProvisionerInterface
     {
         $this->assertSlugAvailable($request->slug);
 
-        if ('' === mb_trim($request->adminEmail) || '' === $request->adminPasswordHash) {
-            throw TenantProvisioningFailedException::adminCredentialsMissing();
-        }
-
-        // The User model's `hashed` cast stores a hash as-is only when it matches the configured
-        // algorithm; anything else would be hashed a second time and the admin could not sign in.
-        if (! $this->hasher->isHashed($request->adminPasswordHash) || ! $this->hasher->verifyConfiguration($request->adminPasswordHash)) {
-            throw TenantProvisioningFailedException::adminPasswordHashInvalid();
-        }
+        $this->credentials->assertValid($request->adminEmail, $request->adminPasswordHash);
 
         try {
             $tenant = $this->provisioningService->provision(
                 $request->slug,
                 $request->adminEmail,
                 $request->adminPasswordHash,
-                '' === mb_trim($request->adminName) ? self::DEFAULT_ADMIN_NAME : $request->adminName,
+                $this->credentials->nameOrDefault($request->adminName),
             );
-        } catch (UniqueConstraintViolationException $exception) {
-            // Concurrent provisioning of one slug passed the check above and lost the race on save.
-            throw TenantProvisioningFailedException::slugTaken($request->slug, $exception);
+        } catch (TenantProvisioningException $exception) {
+            // A slug taken here lost a race on insert after the check above. Any other failure leaves
+            // the row Pending; its id lets the caller continue through TenantReservationInterface.
+            throw match ($exception->problem) {
+                ProvisioningProblem::SlugTaken => TenantProvisioningFailedException::slugTaken($request->slug, $exception),
+                ProvisioningProblem::Conflict  => TenantProvisioningFailedException::conflict((string) $exception->tenantId, $exception),
+                default                        => TenantProvisioningFailedException::failed($request->slug, $exception, $exception->tenantId),
+            };
         } catch (Throwable $throwable) {
             throw TenantProvisioningFailedException::failed($request->slug, $throwable);
         }

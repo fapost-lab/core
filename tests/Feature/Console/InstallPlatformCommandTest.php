@@ -10,17 +10,16 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
-use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
-use App\Domains\Tenancy\Models\Tenant;
+use App\Domains\Tenancy\Repositories\TenantRepository;
 use App\Domains\Tenancy\Services\TenantProvisioningService;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Mockery;
+use Psr\Log\NullLogger;
 use Spatie\Permission\PermissionRegistrar;
 use stdClass;
 use Symfony\Component\Console\Tester\CommandTester;
@@ -226,6 +225,7 @@ final class InstallPlatformCommandTest extends FeatureTestCase
                 new AclBootstrapService(),
                 Mockery::mock(ChannelWebhookRegistryInterface::class),
                 new TenantSlugPolicy(),
+                new NullLogger(),
             ),
         );
     }
@@ -239,16 +239,11 @@ final class InstallPlatformCommandTest extends FeatureTestCase
      */
     private function bindProvisioningServiceThatSucceeds(): void
     {
-        $tenantRepository = Mockery::mock(TenantRepositoryInterface::class);
-        $tenantRepository->shouldReceive('save')->twice()->andReturnUsing(static function (TenantInterface $tenant): void {
-            // The mocked repository persists nothing, so give the tenant the id a real save would assign.
-            if ($tenant instanceof Tenant && null === $tenant->id) {
-                $tenant->id = (string) Str::ulid();
-            }
-        });
+        // The real repository: the tenant row is reserved, leased and activated on the (transacted) landlord connection.
+        $tenantRepository = new TenantRepository();
 
         $databaseManager = Mockery::mock(TenantDatabaseManagerInterface::class);
-        $databaseManager->shouldReceive('schemaExists')->once()->andReturn(false);
+        $databaseManager->shouldReceive('schemaExists')->twice()->andReturn(false);
         $databaseManager->shouldReceive('createSchema')->once();
         $databaseManager->shouldReceive('switchTo')->once();
         $databaseManager->shouldReceive('runMigrations')->twice();
@@ -276,6 +271,7 @@ final class InstallPlatformCommandTest extends FeatureTestCase
                 new AclBootstrapService(),
                 $channelWebhookRegistry,
                 new TenantSlugPolicy(),
+                new NullLogger(),
             ),
         );
     }

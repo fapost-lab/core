@@ -6,6 +6,7 @@ namespace Tests\Unit\Domains\Tenancy;
 
 use App\Domains\Tenancy\Exceptions\InvalidTenantSlugException;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
+use App\Domains\Tenancy\ValueObjects\SlugRejection;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -55,6 +56,21 @@ final class TenantSlugPolicyTest extends TestCase
         return [
             '57 characters' => [str_repeat('a', 57)],
             '63 characters' => [str_repeat('a', 63)],
+        ];
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: SlugRejection}>
+     */
+    public static function rejections(): array
+    {
+        return [
+            'uppercase'     => ['Acme', SlugRejection::Malformed],
+            'trailing dash' => ['acme-', SlugRejection::Malformed],
+            'too long'      => [str_repeat('a', 57), SlugRejection::TooLong],
+            'punycode'      => ['xn--acme', SlugRejection::PunycodePrefix],
+            'double hyphen' => ['ac--me', SlugRejection::ConsecutiveHyphens],
+            'platform name' => ['webhook', SlugRejection::Reserved],
         ];
     }
 
@@ -262,6 +278,18 @@ final class TenantSlugPolicyTest extends TestCase
 
         foreach (['www', 'admin', 'mail', 'autodiscover', '_acme-challenge'] as $slug) {
             $this->assertContains($slug, $reserved);
+        }
+    }
+
+    #[DataProvider('rejections')]
+    public function test_a_refusal_carries_the_rule_that_caused_it(string $slug, SlugRejection $expected): void
+    {
+        try {
+            $this->policy()->assertAssignable($slug);
+            $this->fail('Expected the slug to be refused.');
+        } catch (InvalidTenantSlugException $exception) {
+            $this->assertSame($expected, $exception->reason);
+            $this->assertSame(SlugRejection::Reserved === $expected, $exception->reservedByPlatform);
         }
     }
 

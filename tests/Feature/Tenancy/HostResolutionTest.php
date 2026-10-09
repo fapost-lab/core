@@ -115,6 +115,13 @@ final class HostResolutionTest extends FeatureTestCase
         $this->getJson("http://main.{$this->base}/_probe/tenant")->assertOk();
     }
 
+    public function test_pending_tenant_host_is_404(): void
+    {
+        DB::connection('landlord')->table('tenants')->where('slug', 'second')->update(['status' => 'pending']);
+
+        $this->get("http://second.{$this->base}/_probe/tenant")->assertNotFound();
+    }
+
     public function test_reserved_slug_host_is_404_even_with_a_tenant_row(): void
     {
         DB::connection('landlord')->table('tenants')->where('slug', 'second')->update(['slug' => 'admin']);

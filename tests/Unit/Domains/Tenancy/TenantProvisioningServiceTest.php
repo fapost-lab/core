@@ -15,6 +15,7 @@ use App\Domains\Tenancy\Services\TenantProvisioningService;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Spatie\Permission\PermissionRegistrar;
 
 final class TenantProvisioningServiceTest extends TestCase
@@ -88,6 +89,7 @@ final class TenantProvisioningServiceTest extends TestCase
             new AclBootstrapService(),
             $this->createMock(ChannelWebhookRegistryInterface::class),
             new TenantSlugPolicy(['webhook', 'www', 'api']),
+            new NullLogger(),
         );
     }
 }

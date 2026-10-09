@@ -64,5 +64,16 @@ Which set of migration paths runs for a tenant: tenant, features, settings, or m
 
 ## TenantStatus
 
-`active`, `inactive`, `suspended`. A newly provisioned tenant becomes active only after its first
-admin exists.
+`pending`, `active`, `inactive`, `suspended`. A tenant is `pending` from its reservation until
+provisioning completes; it becomes active only after its first admin exists. Not to be confused with
+the Staff user status `pending` (an invited user who has not activated).
+
+## Reservation key
+
+The caller's id for a reservation (the operator package passes its signup id): `reserve` with the
+same key returns the same Pending tenant, so a caller that crashed after reserving finds it again.
+
+## Provisioning lease
+
+A time-limited claim in the tenant row that one run is provisioning it (`provisioning_lease_until`);
+every later write of that run is conditioned on it.
