@@ -6,6 +6,7 @@ namespace Tests\Feature\Console;
 
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
+use App\Http\Controllers\Console\ContactGroupController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\LocaleController;
 use Illuminate\Routing\Route as RoutingRoute;
@@ -27,9 +28,12 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
     public static function interceptedRoutes(): array
     {
         return [
-            'admin login'         => ['filament.admin.auth.login', LoginController::class, 'show', 'admin/login'],
-            'assistant login'     => ['filament.assistant.auth.login', LoginController::class, 'assistant', 'assistant/login'],
-            'assistant dashboard' => ['filament.assistant.pages.dashboard', DashboardController::class, '', 'assistant/{tenant}/dashboard'],
+            'admin login'           => ['filament.admin.auth.login', LoginController::class, 'show', 'admin/login'],
+            'assistant login'       => ['filament.assistant.auth.login', LoginController::class, 'assistant', 'assistant/login'],
+            'assistant dashboard'   => ['filament.assistant.pages.dashboard', DashboardController::class, '', 'assistant/{tenant}/dashboard'],
+            'contact groups list'   => ['filament.assistant.resources.contact-groups.index', ContactGroupController::class, 'index', 'assistant/{tenant}/contact-groups'],
+            'contact groups create' => ['filament.assistant.resources.contact-groups.create', ContactGroupController::class, 'create', 'assistant/{tenant}/contact-groups/create'],
+            'contact groups edit'   => ['filament.assistant.resources.contact-groups.edit', ContactGroupController::class, 'edit', 'assistant/{tenant}/contact-groups/{record}/edit'],
         ];
     }
 
@@ -59,6 +63,19 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
         $this->assertSame(LoginController::class . '@store', $this->route('console.auth.login.attempt')->getActionName());
         $this->assertSame(LogoutController::class, $this->route('console.auth.logout')->getActionName());
         $this->assertSame(LocaleController::class, $this->route('console.locale.update')->getActionName());
+
+        foreach ([
+            'store'        => ['POST', 'assistant/{tenant}/contact-groups'],
+            'update'       => ['PUT', 'assistant/{tenant}/contact-groups/{record}'],
+            'destroy'      => ['DELETE', 'assistant/{tenant}/contact-groups/{record}'],
+            'destroy-many' => ['DELETE', 'assistant/{tenant}/contact-groups'],
+        ] as $action => [$verb, $uri]) {
+            $route = $this->route("console.contact-groups.{$action}");
+
+            $this->assertSame(ContactGroupController::class . '@' . lcfirst(str_replace('-', '', ucwords($action, '-'))), $route->getActionName());
+            $this->assertContains($verb, $route->methods());
+            $this->assertSame($uri, $route->uri());
+        }
     }
 
     public function test_route_names_are_unique(): void

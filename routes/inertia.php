@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
+use App\Http\Controllers\Console\ContactGroupController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\LocaleController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
@@ -53,5 +54,14 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
     // An assistant's screens: `{tenant}` is the assistant, under the name Filament gave the parameter.
     Route::middleware('console')->group(function (): void {
         Route::get('assistant/{tenant}/dashboard', DashboardController::class)->name('filament.assistant.pages.dashboard');
+
+        // Contact groups: tenant-level, listed under the assistant's menu like Filament's resource was.
+        Route::get('assistant/{tenant}/contact-groups', [ContactGroupController::class, 'index'])->name('filament.assistant.resources.contact-groups.index');
+        Route::get('assistant/{tenant}/contact-groups/create', [ContactGroupController::class, 'create'])->name('filament.assistant.resources.contact-groups.create');
+        Route::get('assistant/{tenant}/contact-groups/{record}/edit', [ContactGroupController::class, 'edit'])->name('filament.assistant.resources.contact-groups.edit');
+        Route::post('assistant/{tenant}/contact-groups', [ContactGroupController::class, 'store'])->name('console.contact-groups.store');
+        Route::delete('assistant/{tenant}/contact-groups', [ContactGroupController::class, 'destroyMany'])->name('console.contact-groups.destroy-many');
+        Route::put('assistant/{tenant}/contact-groups/{record}', [ContactGroupController::class, 'update'])->name('console.contact-groups.update');
+        Route::delete('assistant/{tenant}/contact-groups/{record}', [ContactGroupController::class, 'destroy'])->name('console.contact-groups.destroy');
     });
 });

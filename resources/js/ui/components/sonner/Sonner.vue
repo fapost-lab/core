@@ -2,6 +2,7 @@
 import type { ToasterProps } from "vue-sonner"
 import { CircleCheckIcon, InfoIcon, Loader2Icon, OctagonXIcon, TriangleAlertIcon, XIcon } from "@lucide/vue"
 import { Toaster as Sonner } from "vue-sonner"
+import "vue-sonner/style.css"
 import { cn } from '@fapost/ui/lib/utils'
 
 const props = defineProps<ToasterProps>()
@@ -15,6 +16,12 @@ const props = defineProps<ToasterProps>()
       '--normal-text': 'var(--popover-foreground)',
       '--normal-border': 'var(--border)',
       '--border-radius': 'var(--radius)',
+      '--success-bg': 'var(--success)',
+      '--success-text': 'var(--success-foreground)',
+      '--success-border': 'var(--border)',
+      '--error-bg': 'var(--danger)',
+      '--error-text': 'var(--danger-foreground)',
+      '--error-border': 'var(--border)',
     }"
     v-bind="props"
   >
