@@ -440,8 +440,9 @@ final class FlowsConsoleTest extends InertiaConsoleTestCase
         $this->assertSame((string) $group->getKey(), $flow->flow_group_id);
         $this->assertFalse($flow->is_public);
         $this->assertTrue($flow->logging_enabled);
-        $this->assertSame([['id' => 'n1', 'type' => 'end']], $flow->nodes);
-        $this->assertSame([['from' => 'a', 'to' => 'b']], $flow->edges);
+        // jsonb on Postgres reorders keys, so the graph is compared without key order.
+        $this->assertEquals([['id' => 'n1', 'type' => 'end']], $flow->nodes);
+        $this->assertEquals([['from' => 'a', 'to' => 'b']], $flow->edges);
         $this->assertSame(7, $flow->draft_version);
         $this->assertFalse($flow->is_active);
     }
