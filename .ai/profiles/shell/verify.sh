@@ -280,15 +280,19 @@ _shell_caller_filters() {
 }
 
 # _shell_trim_ci — with `verify.full_run: ci` the project has said CI runs the
-# full set, so an ALL that sits beside filters is left to CI and the filters run
-# here. Alone, ALL stays: nothing would run otherwise, and a green that ran
-# nothing is the defect the filter check below exists to prevent. Works on the
-# global `filters`; sets ci_left=1 when ALL was dropped.
+# full set, and its owner wants it run there and nowhere else unasked (adr-0041,
+# amendment 2026-10-08). An ALL that sits beside filters is dropped and the
+# filters run here; an ALL alone, or a filter that selects nothing, is not run
+# either: the check's line says the full set is left to CI. Works on the global
+# `filters`; sets ci_full=1 under `ci`, and ci_left=1 when an ALL was dropped.
 ci_left=0
+ci_full=0
 _shell_trim_ci() {
   local rest
   ci_left=0
+  ci_full=0
   [ "${JIG_VERIFY_FULL_RUN:-}" = ci ] || return 0
+  ci_full=1
   case $'\n'"$filters"$'\n' in *$'\n'ALL$'\n'*) ;; *) return 0 ;; esac
   rest=$(printf '%s\n' "$filters" | sed -e '/^ALL$/d' -e '/^$/d')
   [ -n "$rest" ] || return 0
@@ -402,7 +406,7 @@ if [ "${JIG_VERIFY_EXPLAIN:-}" = 1 ]; then
     if [ -z "$scripts" ]; then
       jp_plan shellcheck skip "no shell scripts found"
     else
-      jp_plan shellcheck full ".shellcheckrc changed; whole script set"
+      jp_plan_full shellcheck ".shellcheckrc changed; whole script set"
     fi
   elif [ "$scoped" = 1 ]; then
     scripts=$(_shell_changed_scripts)
@@ -437,7 +441,9 @@ if [ "${JIG_VERIFY_EXPLAIN:-}" = 1 ]; then
 $filters
 EOF
     fi
-    if [ "$ci_left" = 1 ]; then
+    if [ "$filters" = ALL ]; then
+      jp_plan_full tests/run.sh "changed paths require the full set"
+    elif [ "$ci_left" = 1 ]; then
       jp_plan_selection tests/run.sh "$filters" "test filters, full set left to CI"
     else
       jp_plan_selection tests/run.sh "$filters" "test filters"
@@ -477,7 +483,13 @@ if jp_have shellcheck; then
     sc_wide=1
   fi
 
-  if [ "$scoped" = 1 ] && [ "$sc_wide" = 0 ]; then
+  # Under `verify.full_run: ci` the whole script set is CI's, as the full set
+  # of tests is: nothing is linted here and the line says so.
+  sc_ci=0
+  if [ "$sc_wide" = 1 ] && [ "${JIG_VERIFY_FULL_RUN:-}" = ci ]; then
+    sc_ci=1
+    : > "$list"
+  elif [ "$scoped" = 1 ] && [ "$sc_wide" = 0 ]; then
     _shell_changed_scripts > "$list"
   else
     _shell_all_scripts > "$list"
@@ -498,7 +510,9 @@ if jp_have shellcheck; then
   rm -f "$list"
   trap - EXIT INT TERM
 
-  if [ "$sc_checked" -eq 0 ]; then
+  if [ "$sc_ci" = 1 ]; then
+    echo "shell: shellcheck: skip (scope: .shellcheckrc changed; whole script set, full set left to CI)"
+  elif [ "$sc_checked" -eq 0 ]; then
     if [ "$scoped" = 1 ] && [ "$sc_wide" = 0 ]; then
       echo "shell: shellcheck: skip (scope: no changed shell scripts)"
     else
@@ -557,7 +571,9 @@ $filters
 EOF
     fi
 
-    if [ "$filters" = ALL ] || [ "$has_all" = 1 ]; then
+    if { [ "$filters" = ALL ] || [ "$has_all" = 1 ]; } && [ "$ci_full" = 1 ]; then
+      echo "shell: tests/run.sh: skip (scope: $reason, full set left to CI)"
+    elif [ "$filters" = ALL ] || [ "$has_all" = 1 ]; then
       ran_any=1
       t_rc=0
       jp_exec tests/run.sh || t_rc=$?

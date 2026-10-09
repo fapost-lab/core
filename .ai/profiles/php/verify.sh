@@ -10,7 +10,8 @@
 #
 # Narrowing (ADR-0041, adr-20260918-profiles-narrow-per-check-with-project-tools), per check: phpstan and pint each lint the
 # changed .php files; phpstan runs in full when its own configuration
-# changed. phpunit/pest run the test files the changed paths map to — a
+# changed, or under `verify.full_run: ci` leaves that to CI. phpunit/pest run
+# the test files the changed paths map to — a
 # changed *Test.php itself, or any FooTest.php under tests/ for a changed
 # Foo.php — and everything when a path maps to nothing or a file that can
 # affect any test (composer.json/lock, phpunit.xml*) changed. composer
@@ -169,7 +170,8 @@ if [ "${JIG_VERIFY_EXPLAIN:-}" = 1 ]; then
   if [ -z "$test_bin" ]; then
     jp_plan phpunit skip "$PHP_WHERE"
   else
-    filters=$(jp_decide _php_builtin)
+    jp_select _php_builtin
+    filters=$JP_SELECTION
     if [ -n "$filters" ] && [ "$filters" != ALL ]; then
       while IFS= read -r f; do
         [ -n "$f" ] || continue
@@ -183,7 +185,7 @@ EOF
     else
       why=
     fi
-    jp_plan_selection "$test_check" "$filters" "test files" "$why"
+    jp_plan_select "$test_check" "$filters" "test files" "$why"
   fi
 
   for check in phpstan pint; do
@@ -191,7 +193,7 @@ EOF
     if [ -z "$tool" ]; then
       jp_plan "$check" skip "$PHP_WHERE"
     elif [ "$check" = phpstan ] && jp_scoped && jp_changed_any phpstan.neon phpstan.neon.dist; then
-      jp_plan "$check" full "phpstan configuration changed"
+      jp_plan_full "$check" "phpstan configuration changed"
     elif jp_scoped; then
       files=$(jp_changed php)
       if [ -z "$files" ]; then
@@ -228,12 +230,14 @@ else
   if ! jp_scoped; then
     jp_run "$test_check" "$v" "$test_bin"
   else
-    filters=$(jp_decide _php_builtin)
+    jp_select _php_builtin
+    filters=$JP_SELECTION
     if [ -z "$filters" ]; then
       jp_skip "$test_check" "scope: no changed file maps to a test"
     elif [ "$filters" = ALL ]; then
       why=$(_php_all_reason "$(jp_decide_cause _php_builtin)")
-      jp_run "$test_check" "$v, scope: $why, ran full set" "$test_bin"
+      jp_full_left_to_ci "$test_check" "$why" \
+        || jp_run "$test_check" "$v, scope: $why, ran full set" "$test_bin"
     else
       IFS='
 '
@@ -243,9 +247,10 @@ else
       set +f
       IFS=$' \t\n'
       if missing=$(jp_first_missing "$@"); then
-        jp_run "$test_check" "$v, scope: filter '$missing' selects no tests, ran full set" "$test_bin"
+        jp_full_left_to_ci "$test_check" "filter '$missing' selects no tests" \
+          || jp_run "$test_check" "$v, scope: filter '$missing' selects no tests, ran full set" "$test_bin"
       else
-        jp_run "$test_check" "$v, scope: $# test files" "$test_bin" "$@"
+        jp_run "$test_check" "$v, scope: $# test files$JP_SELECTION_NOTE" "$test_bin" "$@"
       fi
     fi
   fi
@@ -275,7 +280,8 @@ else
       jp_run "phpstan" "$v, scope: $n files" "$phpstan" analyse --no-progress "$@"
     fi
   elif jp_scoped; then
-    jp_run "phpstan" "$v, scope: phpstan configuration changed, whole project" "$phpstan" analyse --no-progress
+    jp_full_left_to_ci "phpstan" "phpstan configuration changed" \
+      || jp_run "phpstan" "$v, scope: phpstan configuration changed, whole project" "$phpstan" analyse --no-progress
   else
     jp_run "phpstan" "$v" "$phpstan" analyse --no-progress
   fi

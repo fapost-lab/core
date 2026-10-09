@@ -150,7 +150,7 @@ comment repeats these rules.
 - **Shipping the declaration and the epic.** The line reaches the default branch with the spec:
   stage `.ai/specs/<id>/` and run `jig spec ship <id> --message-file <file>`; once that is merged,
   `jig spec epic <id>` cuts the branch and `jig spec ship <id>` pushes it. `spec ship` goes as far
-  as `agent.git` allows and says where it stopped; exit 3, or a stop, means the rest is the
+  as `agent.git` (in an unattended clone, `autopilot.git`) allows and says where it stopped; exit 3, or a stop, means the rest is the
   human's — say what is left, never finish it with git by hand. The same `spec ship` pushes the
   epic after the latest default branch was merged into it; resolve a conflict in that merge, then
   show the resolution to the human before pushing.
@@ -174,7 +174,7 @@ about — the trap this skill exists to close:
 .ai/scripts/jig spec ship <id> --message-file <file>
 ```
 
-It commits, and goes as far as `agent.git` allows from there; a stop or exit 3 means the
+It commits, and goes as far as `agent.git` (in an unattended clone, `autopilot.git`) allows from there; a stop or exit 3 means the
 rest — push, the pull request — is the human's, and the next step says so. Once it is
 merged, the next session opens with `jig spec resume <id>` (§1), never straight back onto
 the branch left behind.
@@ -237,7 +237,7 @@ item is checked later by `jig spec done`, called from consolidation — never by
   the version by it (propose one, and let the human confirm, when it says `not recorded`), stage the
   removal with the bump and run `jig spec ship <id> --message-file <file>`: it commits, pushes the
   epic's finish on a branch of its own, `finish/<id>` — the epic itself is not pushed — and opens the
-  pull request into the default branch from it as far as `agent.git` allows. Reviewing
+  pull request into the default branch from it as far as `agent.git` (in an unattended clone, `autopilot.git`) allows. Reviewing
   and merging that pull request is the human's — the merge is the release — except in an
   unattended run, below. If review needs a fix,
   `jig spec epic <id> --reopen` on the epic brings the spec back from git; fix it as an ordinary
@@ -248,7 +248,7 @@ item is checked later by `jig spec done`, called from consolidation — never by
   finished" and stop there. Drop fog, open questions and untested assumptions with
   `--leftovers-handled`, and quote each one verbatim in the pull request body under
   `## Dropped without you`. Raise the version by the recorded level, `minor` when none was
-  recorded. At `agent.git: merge`, `spec ship` merges with a merge commit once CI passed — unless
+  recorded. At level `merge` (`autopilot.git`, else `agent.git`), `spec ship` merges with a merge commit once CI passed — unless
   `release.merge` is `human` in this clone, which leaves every release to the person — and
   opens a `major` release as a draft that needs a human instead; `not merged: <why>` leaves the
   pull request open — say why.
