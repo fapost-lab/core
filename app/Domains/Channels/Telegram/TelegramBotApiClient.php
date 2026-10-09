@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Channels\Telegram;
 
+use App\Domains\Channels\SecretRedactor;
 use App\Domains\Channels\Telegram\Dto\SendDocumentDto;
 use App\Domains\Channels\Telegram\Dto\SendMessageDto;
 use App\Domains\Channels\Telegram\Dto\SendPhotoDto;
@@ -235,7 +236,7 @@ final readonly class TelegramBotApiClient
                 ->get(sprintf('%s/file/bot%s/%s', $this->apiBaseUrl, $this->token, $filePath))
                 ->throw();
         } catch (Throwable $exception) {
-            throw new TelegramApiException($exception->getMessage(), (int)$exception->getCode(), $exception);
+            throw $this->redacted($exception);
         }
 
         $stream = $response->toPsrResponse()->getBody()->detach();
@@ -279,7 +280,7 @@ final readonly class TelegramBotApiClient
                 )
                 ->throw();
         } catch (Throwable $exception) {
-            throw new TelegramApiException($exception->getMessage(), (int)$exception->getCode(), $exception);
+            throw $this->redacted($exception);
         }
 
         /** @var array<string, mixed> $data */
@@ -289,10 +290,28 @@ final readonly class TelegramBotApiClient
             $description = is_string($data['description'] ?? null)
                 ? $data['description']
                 : 'Telegram API request failed.';
-            throw new TelegramApiException($description);
+            throw new TelegramApiException(SecretRedactor::redact($description, $this->token));
         }
 
         return $data;
+    }
+
+    /**
+     * Wraps a transport failure into an exception that carries no bot token.
+     *
+     * The HTTP stack quotes the request URL (`/bot<token>/method`) in its messages, and the original
+     * exception, kept as `previous`, would carry the same text into logs, Sentry and `failed_jobs`.
+     * It is therefore not chained: its class and code are named in the message instead.
+     */
+    private function redacted(Throwable $exception): TelegramApiException
+    {
+        return new TelegramApiException(
+            SecretRedactor::redact(
+                sprintf('%s: %s', $exception::class, $exception->getMessage()),
+                $this->token,
+            ),
+            (int)$exception->getCode(),
+        );
     }
 
     /**
@@ -339,7 +358,7 @@ final readonly class TelegramBotApiClient
                 )
                 ->throw();
         } catch (Throwable $exception) {
-            throw new TelegramApiException($exception->getMessage(), (int)$exception->getCode(), $exception);
+            throw $this->redacted($exception);
         }
 
         /** @var array<string, mixed> $data */
@@ -349,7 +368,7 @@ final readonly class TelegramBotApiClient
             $description = is_string($data['description'] ?? null)
                 ? $data['description']
                 : 'Telegram API multipart request failed.';
-            throw new TelegramApiException($description);
+            throw new TelegramApiException(SecretRedactor::redact($description, $this->token));
         }
 
         return $data;

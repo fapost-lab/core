@@ -71,7 +71,10 @@ final class IngressMigratorTest extends FeatureTestCase
         Bus::assertDispatched(
             SyncChannelWebhookJob::class,
             static fn (SyncChannelWebhookJob $job): bool => $job->webhookPublicHash === $stale->webhook_public_hash
-                && $job->register,
+                && $job->register
+                && null === $job->token
+                && null === $job->secretToken
+                && ! str_contains(serialize($job), $stale->token),
         );
 
         Bus::assertNotDispatched(

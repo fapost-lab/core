@@ -148,6 +148,8 @@ final readonly class ChannelObserver
 
         $tenant = $this->tenantContext->get();
 
+        // Only a deregister (delete or deactivation) carries the credentials, a delete's row being gone by the time the job runs. A register job
+        // loads them from the channel, so they never sit in a payload that a failed job would record.
         DB::afterCommit(static function () use ($channel, $register, $tenant): void {
             SyncChannelWebhookJob::dispatchSync(
                 tenantId: $tenant->getId(),
@@ -155,8 +157,8 @@ final readonly class ChannelObserver
                 channelId: (string)$channel->getKey(),
                 channelType: $channel->type->value,
                 webhookPublicHash: $channel->webhook_public_hash,
-                token: $channel->token,
-                secretToken: $channel->secret_token,
+                token: $register ? null : $channel->token,
+                secretToken: $register ? null : $channel->secret_token,
                 config: is_array($channel->config) ? $channel->config : [],
                 register: $register,
             );

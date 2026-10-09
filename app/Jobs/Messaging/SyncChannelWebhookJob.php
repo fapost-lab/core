@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs\Messaging;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
@@ -16,8 +17,12 @@ use Illuminate\Foundation\Queue\Queueable;
 /**
  * Synchronizes provider-side webhooks outside of model persistence hooks.
  *
- * The job carries a snapshot of the transport credentials needed by the provider so that
- * deletes and post-commit updates do not depend on reloading a mutable database row.
+ * Only a deregister job (a delete, where the row is gone by the time it runs, or a deactivation) carries
+ * a snapshot of the credentials. It is dispatched synchronously, which keeps it out of `jobs`; inside a queue worker a
+ * failure of a synchronous job is still recorded in `failed_jobs` with its payload, snapshot included.
+ * A register job (the observer's and the ingress migrator's) names the channel and passes null
+ * credentials: it loads the credentials, hash and config from the channel when it runs
+ * ({@see self::$token}), so no secret is serialized into any payload.
  */
 final class SyncChannelWebhookJob implements ShouldQueue
 {
@@ -28,9 +33,11 @@ final class SyncChannelWebhookJob implements ShouldQueue
      * @param  string                $schema             Tenant schema name for context restoration.
      * @param  string                $channelType        Published channel identifier.
      * @param  string                $webhookPublicHash  Public routing hash used in inbound webhook URLs.
-     * @param  string                $token              Provider transport token (decrypted at dispatch time).
-     * @param  string                $secretToken        Provider-side webhook signature secret (decrypted at dispatch
-     *                                                   time).
+     * @param  string|null           $token              Provider transport token (decrypted at dispatch time), or null
+     *                                                   to load it from the channel when the job runs. Pass null
+     *                                                   whenever the job is queued.
+     * @param  string|null           $secretToken        Provider-side webhook signature secret, with the same
+     *                                                   null-means-load rule as the token.
      * @param  array<string, mixed>  $config             Transport-specific channel configuration snapshot.
      * @param  bool                  $register           True to create/update the provider webhook, false to delete
      *                                                   it.
@@ -41,8 +48,8 @@ final class SyncChannelWebhookJob implements ShouldQueue
         public readonly string $channelId,
         public readonly string $channelType,
         public readonly string $webhookPublicHash,
-        public readonly string $token,
-        public readonly string $secretToken,
+        public readonly ?string $token,
+        public readonly ?string $secretToken,
         public readonly array $config,
         public readonly bool $register,
     ) {
@@ -68,12 +75,31 @@ final class SyncChannelWebhookJob implements ShouldQueue
                 return;
             }
 
+            $token       = $this->token;
+            $secretToken = $this->secretToken;
+            $hash        = $this->webhookPublicHash;
+            $config      = $this->config;
+
+            if (null === $token || null === $secretToken) {
+                $channel = Channel::query()->find($this->channelId);
+
+                // Deleted since the job was queued: there is nothing left to register.
+                if (null === $channel) {
+                    return;
+                }
+
+                $token       = $channel->token;
+                $secretToken = $channel->secret_token;
+                $hash        = $channel->webhook_public_hash;
+                $config      = is_array($channel->config) ? $channel->config : [];
+            }
+
             $payload = new WebhookRegistrationPayload(
                 channelId: $this->channelId,
-                token: $this->token,
-                secretToken: $this->secretToken,
-                webhookPublicHash: $this->webhookPublicHash,
-                config: $this->config,
+                token: $token,
+                secretToken: $secretToken,
+                webhookPublicHash: $hash,
+                config: $config,
             );
 
             if ($this->register) {
@@ -83,7 +109,7 @@ final class SyncChannelWebhookJob implements ShouldQueue
                 // is no fact to record, and a failed registration must not look like a
                 // completed migration to the ingress drift report.
                 $registryWriter->recordIngress(
-                    $this->webhookPublicHash,
+                    $hash,
                     $urlGenerator->baseFor($this->channelType),
                 );
 
