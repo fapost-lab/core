@@ -25,7 +25,7 @@ visible changed, and the builder renders from the kit's tokens in light and dark
       authorization call in every action; the SaaS package's CI runs with the switch on (after:
       the current assistant — the shell's console routes resolve it; after: the kit — the shell
       is built from it)
-- [ ] `console-shell-layout` — The shell's look on the kit — the sidebar from a server-side
+- [x] `console-shell-layout` — The shell's look on the kit — the sidebar from a server-side
       navigation builder that repeats Filament's items, groups, order and visibility (unmigrated
       screens as plain links into Filament), the assistant switcher, the language switcher, the
       access-mode and support banners, sign-out, and room for the app rail of phase 4 (after:
@@ -35,7 +35,7 @@ visible changed, and the builder renders from the kit's tokens in light and dark
       `--accent` (which shadows the token of the same name) move onto the tokens, so the builder
       follows `.dark` like the console (after: `kit-and-tokens` — the tokens it moves onto; split
       out of it by the owner, 2026-10-08)
-- [ ] Pilot: contact groups end to end — the server-side data table (filters, sorting,
+- [ ] `contact-groups-pilot` — Pilot: contact groups end to end — the server-side data table (filters, sorting,
       pagination, bulk actions), form, confirmation, toasts; the patterns every later screen
       copies (after: `console-shell-layout` — the screen lives inside it)
 
