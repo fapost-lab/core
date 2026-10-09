@@ -6,6 +6,7 @@ namespace Tests\Feature\Console;
 
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
+use App\Http\Controllers\Console\ChannelController;
 use App\Http\Controllers\Console\ContactGroupController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
@@ -33,6 +34,9 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'admin login'           => ['filament.admin.auth.login', LoginController::class, 'show', 'admin/login'],
             'assistant login'       => ['filament.assistant.auth.login', LoginController::class, 'assistant', 'assistant/login'],
             'assistant dashboard'   => ['filament.assistant.pages.dashboard', DashboardController::class, '', 'assistant/{tenant}/dashboard'],
+            'channels list'         => ['filament.assistant.resources.channels.index', ChannelController::class, 'index', 'assistant/{tenant}/channels'],
+            'channels create'       => ['filament.assistant.resources.channels.create', ChannelController::class, 'create', 'assistant/{tenant}/channels/create'],
+            'channels edit'         => ['filament.assistant.resources.channels.edit', ChannelController::class, 'edit', 'assistant/{tenant}/channels/{record}/edit'],
             'contact groups list'   => ['filament.assistant.resources.contact-groups.index', ContactGroupController::class, 'index', 'assistant/{tenant}/contact-groups'],
             'contact groups create' => ['filament.assistant.resources.contact-groups.create', ContactGroupController::class, 'create', 'assistant/{tenant}/contact-groups/create'],
             'contact groups edit'   => ['filament.assistant.resources.contact-groups.edit', ContactGroupController::class, 'edit', 'assistant/{tenant}/contact-groups/{record}/edit'],
@@ -46,14 +50,18 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
     }
 
     /**
-     * The writes Filament had no routes for. `store-inline` and `activity` are not the camel-cased route name, so the
-     * action is spelled out.
+     * The writes Filament had no routes for. `store-inline`, `activity` and `rotate-webhook` are not the camel-cased route
+     * name, so the action is spelled out.
      *
      * @return array<string, array{0: string, 1: class-string, 2: string, 3: string, 4: string}>
      */
     public static function newRoutes(): array
     {
         return [
+            'channel store'           => ['console.channels.store', ChannelController::class, 'store', 'POST', 'assistant/{tenant}/channels'],
+            'channel update'          => ['console.channels.update', ChannelController::class, 'update', 'PUT', 'assistant/{tenant}/channels/{record}'],
+            'channel rotate webhook'  => ['console.channels.rotate-webhook', ChannelController::class, 'rotateWebhook', 'POST', 'assistant/{tenant}/channels/{record}/rotate-webhook'],
+            'channel destroy'         => ['console.channels.destroy', ChannelController::class, 'destroy', 'DELETE', 'assistant/{tenant}/channels/{record}'],
             'flow group store'        => ['console.flow-groups.store', FlowGroupController::class, 'store', 'POST', 'assistant/{tenant}/flow-groups'],
             'flow group store inline' => ['console.flow-groups.store-inline', FlowGroupController::class, 'storeInline', 'POST', 'assistant/{tenant}/flow-groups/inline'],
             'flow group update'       => ['console.flow-groups.update', FlowGroupController::class, 'update', 'PUT', 'assistant/{tenant}/flow-groups/{record}'],
@@ -109,7 +117,7 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
     }
 
     #[DataProvider('newRoutes')]
-    public function test_the_new_flow_routes_exist(string $name, string $controller, string $method, string $verb, string $uri): void
+    public function test_the_new_write_routes_exist(string $name, string $controller, string $method, string $verb, string $uri): void
     {
         $route = $this->route($name);
 

@@ -51,6 +51,14 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
 - **Filters and grouping** go through `DataTable`'s optional `filters` (`filter[key]`) and `groups`
   (`group=key`) — whitelisted closures; their keys appear in the props only on a table that
   declares them. The kit's `data-table` draws group headers from a `groupOf` callback.
+- **Secrets never reach the browser.** A token or key is in no prop, row or flash message (one deliberate exception:
+  the new webhook hash is flashed once after a rotation, to the one who may rotate): the edit form
+  shows it empty and an empty value means "keep what is stored". When an external provider refuses after the
+  record is saved, the controller catches the provider's exception, reports it and flashes a fixed, translated
+  error; the exception's own message can carry the request URL and with it the secret. Example:
+  `ChannelController`.
+- **Workaround, until `channel-webhook-consistency` lands: a write that runs a job inside the request loses the current assistant.** A synchronous job switches tenants, and
+  the switch resets `CurrentAssistant`; take the assistant and every URL before the write and pass them on.
 - **The builder is a separate Inertia app**: reach it with a plain `<a>` or `Inertia::location()`
   to the named route `builder.flows.show`, never a `<Link>` or a redirect. A related record
   created from inside a form (a flow's new group) uses its own `*-inline` route that redirects
