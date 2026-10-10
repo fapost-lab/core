@@ -46,14 +46,14 @@ visible changed, and the builder renders from the kit's tokens in light and dark
 Goal: the assistant console needs no Filament screen. Done when: with the switch on, every
 console menu entry is served by Inertia and the console's tests run against the new routes.
 
-- [ ] `console-flows` — Flow groups and flows — list with grouping, trigger hints, toggle and delete guards;
+- [x] `console-flows` — Flow groups and flows — list with grouping, trigger hints, toggle and delete guards;
       create and edit; links into the builder through typed routes and the builder's way back
       (after: the pilot — copies its table and form patterns)
-- [ ] `console-channels` — Channels — list, create, edit in a dialog, webhook rotation; the channel form shared with
+- [x] `console-channels` — Channels — list, create, edit in a dialog, webhook rotation; the channel form shared with
       the admin side (after: the pilot)
-- [ ] `console-contacts` — Contacts — list with filters, the contact view with grouped attributes, tags and groups
+- [x] `console-contacts` — Contacts — list with filters, the contact view with grouped attributes, tags and groups
       management (after: the pilot)
-- [ ] `console-contact-segments` — Contact segments — the rule builder with match all/any and typed conditions, size refresh
+- [x] `console-contact-segments` — Contact segments — the rule builder with match all/any and typed conditions, size refresh
       (after: the pilot; after: `close-policy-gaps` — the screen relies on the new policy)
 - [ ] `console-broadcasts` — Broadcasts — list with progress, send and cancel, the form with live reach and the
       base-language guard (after: the pilot; after: `close-policy-gaps` — the screen relies on
