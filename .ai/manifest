@@ -2,7 +2,7 @@
 jig.version: 0.24.0
 jig.source: /Users/bpartner/.local/share/jig
 jig.mode: copy
-installed_at: 2026-10-09
+installed_at: 2026-10-10
 adapters: [claude, codex]
 instructions.section: e858830f151e3929c98a29247b0f86cea7bbbcf5 AGENTS.md
 ---
