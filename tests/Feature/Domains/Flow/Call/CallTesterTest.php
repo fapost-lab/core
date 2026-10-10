@@ -43,4 +43,18 @@ final class CallTesterTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertSame('unknown_transport', $result['error_code']);
     }
+
+    public function test_builder_test_call_to_a_private_address_reports_egress_denied(): void
+    {
+        Http::fake();
+
+        $result = app(CallTester::class)->run(
+            ['transport' => 'http', 'target' => 'GET http://169.254.169.254/latest/meta-data/'],
+            [],
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('egress_denied', $result['error_code']);
+        Http::assertNothingSent();
+    }
 }

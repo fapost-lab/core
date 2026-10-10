@@ -106,6 +106,25 @@ After this upgrade **every web request fails** with a message naming the setting
 Before upgrading, switch to `SESSION_DRIVER=redis` and unset `SESSION_DOMAIN`; people
 sign in again once. Queue workers and console commands are not affected.
 
+## Flow calls to internal addresses are refused
+
+The `call` node no longer connects to private, loopback, link-local, reserved or
+cloud-metadata addresses, and this applies to every installation. A flow that calls an
+internal service (`http://crm.local`, `http://10.0.0.7/api`, a mock on `localhost`) now
+takes its `error` handle with `error_code = egress_denied` instead of getting a
+response. Redirects are checked on each hop, so a public URL that redirects to an
+internal one is refused too.
+
+Before upgrading, list the internal targets your flows rely on in `FLOW_EGRESS_ALLOW`
+(for example `FLOW_EGRESS_ALLOW=10.20.0.0/16,crm.internal`), then restart Horizon. Cloud
+metadata addresses cannot be listed.
+
+Calls also stop honouring the `HTTP_PROXY` and `HTTPS_PROXY` environment variables. If
+your calls leave the network through a proxy, set `FLOW_EGRESS_PROXY` to the same
+address; that proxy must refuse private ranges itself. Names from `/etc/hosts` or
+container aliases still resolve, but their addresses are checked like any other, so allow
+them by range or name (a mock on `localhost` needs `FLOW_EGRESS_ALLOW=127.0.0.1/32`). See [Configuration](/self-hosting/configuration#outbound-calls-from-flows).
+
 ## Downtime
 
 The application tolerates a short window where old and new run side by side —

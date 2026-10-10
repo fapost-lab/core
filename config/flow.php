@@ -29,4 +29,23 @@ return [
             'extend_to_seconds' => (int) env('FLOW_LOCK_HEARTBEAT_EXTEND_TO', 30),
         ],
     ],
+
+    /*
+     * Egress guard for the `call` node. A call never connects to a private, loopback,
+     * link-local, reserved or cloud-metadata address, however the address is reached
+     * (literal, DNS name, DNS rebinding, redirect). There is no switch to turn it off.
+     *
+     * allow: comma-separated CIDR ranges, addresses and host names the operator
+     *   trusts, e.g. "10.20.0.0/16,crm.internal". Empty by default. Cloud metadata
+     *   addresses (169.254.169.254 and friends) cannot be allowed. "0.0.0.0/0"
+     *   would defeat the guard and is logged as a warning.
+     * proxy: explicit egress proxy for calls. The HTTP_PROXY / HTTPS_PROXY
+     *   environment variables never apply to calls. The proxy must refuse private
+     *   ranges itself: the connection pin cannot be applied behind it.
+     */
+    'egress' => [
+        'allow'         => env('FLOW_EGRESS_ALLOW', ''),
+        'max_redirects' => 5,
+        'proxy'         => env('FLOW_EGRESS_PROXY'),
+    ],
 ];

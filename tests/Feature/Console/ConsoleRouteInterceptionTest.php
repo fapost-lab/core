@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
@@ -16,6 +17,7 @@ use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
 use App\Http\Controllers\Console\LocaleController;
+use App\Http\Controllers\Console\TranslationController;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -60,6 +62,9 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'broadcasts edit'       => ['filament.assistant.resources.broadcasts.edit', BroadcastController::class, 'edit', 'assistant/{tenant}/broadcasts/{record}/edit'],
             // Assistant settings.
             'assistant settings' => ['filament.assistant.pages.settings', AssistantSettingsController::class, 'edit', 'assistant/{tenant}/settings'],
+            // Translations: both panels.
+            'admin translations'     => ['filament.admin.pages.translations', AdminTranslationController::class, 'index', 'admin/translations'],
+            'assistant translations' => ['filament.assistant.pages.translations', TranslationController::class, 'index', 'assistant/{tenant}/translations'],
         ];
     }
 
@@ -102,6 +107,11 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             // Assistant settings.
             'settings update'     => ['console.settings.update', AssistantSettingsController::class, 'update', 'PUT', 'assistant/{tenant}/settings'],
             'settings store flow' => ['console.settings.store-flow', AssistantSettingsController::class, 'storeFlow', 'POST', 'assistant/{tenant}/settings/flows'],
+            // Translations: both panels.
+            'translation update'       => ['console.translations.update', TranslationController::class, 'update', 'PUT', 'assistant/{tenant}/translations/{key}'],
+            'translation reset'        => ['console.translations.reset', TranslationController::class, 'reset', 'DELETE', 'assistant/{tenant}/translations/{key}'],
+            'admin translation update' => ['console.admin.translations.update', AdminTranslationController::class, 'update', 'PUT', 'admin/translations/{key}'],
+            'admin translation reset'  => ['console.admin.translations.reset', AdminTranslationController::class, 'reset', 'DELETE', 'admin/translations/{key}'],
         ];
     }
 

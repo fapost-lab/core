@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domains\Tenancy\Support\TenantHost;
+use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
 use App\Http\Controllers\Console\LocaleController;
+use App\Http\Controllers\Console\TranslationController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\SetConsoleRootView;
 use Illuminate\Support\Facades\Route;
@@ -56,6 +58,11 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
     // Tenant-wide screens and the interface language, behind the `admin` stack.
     Route::middleware('admin')->group(function (): void {
         Route::post('console/locale', LocaleController::class)->name('console.locale.update');
+
+        // Translations: the tenant's overrides of the system catalog, one layer. `{key}` is a catalog key (dots included).
+        Route::get('admin/translations', [AdminTranslationController::class, 'index'])->name('filament.admin.pages.translations');
+        Route::put('admin/translations/{key}', [AdminTranslationController::class, 'update'])->name('console.admin.translations.update');
+        Route::delete('admin/translations/{key}', [AdminTranslationController::class, 'reset'])->name('console.admin.translations.reset');
     });
 
     // An assistant's screens: `{tenant}` is the assistant, under the name Filament gave the parameter.
@@ -135,5 +142,9 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::get('assistant/{tenant}/settings', [AssistantSettingsController::class, 'edit'])->name('filament.assistant.pages.settings');
         Route::put('assistant/{tenant}/settings', [AssistantSettingsController::class, 'update'])->name('console.settings.update');
         Route::post('assistant/{tenant}/settings/flows', [AssistantSettingsController::class, 'storeFlow'])->name('console.settings.store-flow');
+        // Translations: the assistant's own overrides of the system catalog, over the tenant's (shown as inherited).
+        Route::get('assistant/{tenant}/translations', [TranslationController::class, 'index'])->name('filament.assistant.pages.translations');
+        Route::put('assistant/{tenant}/translations/{key}', [TranslationController::class, 'update'])->name('console.translations.update');
+        Route::delete('assistant/{tenant}/translations/{key}', [TranslationController::class, 'reset'])->name('console.translations.reset');
     });
 });
