@@ -10,7 +10,7 @@ paths:
   - "app/Domains/Broadcasting/**"
   - "app/Domains/Messaging/**"
 summary: Queues are split by purpose (flow.execution, messaging.*, scheduled.triggers, sync.external); rate limits and backpressure are preventive, not reactive.
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-10
 ---
 # Messaging and queues
 
