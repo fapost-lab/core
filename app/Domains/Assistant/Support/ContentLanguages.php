@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Filament\Support;
+namespace App\Domains\Assistant\Support;
 
 /**
  * Practical set of content languages for assistant bots.

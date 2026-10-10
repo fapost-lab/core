@@ -52,6 +52,8 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'filament.assistant.resources.broadcasts.index',
             'filament.assistant.resources.broadcasts.create',
             'filament.assistant.resources.broadcasts.edit',
+            // Assistant settings.
+            'filament.assistant.pages.settings',
         ] as $name) {
             $action = $this->route($name)->getActionName();
 
@@ -86,6 +88,9 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'console.flow-groups.update',
             'console.flow-groups.destroy',
             'console.flow-groups.destroy-many',
+            // Assistant settings.
+            'console.settings.update',
+            'console.settings.store-flow',
         ] as $name) {
             $this->assertNull(Route::getRoutes()->getByName($name), $name);
         }
