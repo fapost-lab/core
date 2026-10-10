@@ -83,5 +83,11 @@ return [
         'storage_limit_title'   => 'Media storage is full',
         'storage_limit_reached' => 'Media storage is full: :used of :limit used, the file needs :needed. Delete unneeded files permanently (from the trash) to free space.',
         'storage_limit_saved'   => ':saved of :total file(s) were saved before the limit was reached.',
+        'folder'                => [
+            'not_found'        => 'Folder not found.',
+            'parent_not_found' => 'Parent folder not found.',
+            'own_subtree'      => 'Folder cannot be moved into its own subtree.',
+            'too_deep'         => 'Folder depth would exceed the configured limit (:max).',
+        ],
     ],
 ];

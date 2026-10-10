@@ -28,6 +28,9 @@ return [
     |--------------------------------------------------------------------------
     | Detected via finfo, never trusted from the upload extension alone. Anything
     | outside this list returns a 422 with the rejected mime in the response.
+    | Used by the REST upload, the admin media library and operator replies in
+    | the inbox. Never add image/svg+xml or text/html: the signed raw route serves
+    | files inline from the panel's origin, so they would run script there.
     */
     'allowed_mime_types' => [
         // images
@@ -35,24 +38,52 @@ return [
         'image/png',
         'image/gif',
         'image/webp',
+        'image/heic',
+        'image/heif',
+        'image/avif',
+        'image/bmp',
+        'image/x-ms-bmp',
+        'image/tiff',
         // videos
         'video/mp4',
         'video/quicktime',
         'video/webm',
+        'video/x-matroska',
+        'video/x-msvideo',
+        'video/3gpp',
         // audio
         'audio/mpeg',
         'audio/ogg',
         'audio/wav',
         'audio/x-wav',
+        'audio/mp4',
+        'audio/x-m4a',
+        'audio/aac',
+        'audio/x-aac',
+        'audio/flac',
+        'audio/x-flac',
         // documents
         'application/pdf',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'application/vnd.ms-excel',
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/vnd.oasis.opendocument.text',
+        'application/vnd.oasis.opendocument.spreadsheet',
+        'application/vnd.oasis.opendocument.presentation',
+        'application/rtf',
+        'text/rtf',
         'text/plain',
         'text/csv',
         'application/zip',
+        'application/x-7z-compressed',
+        'application/vnd.rar',
+        'application/x-rar',
+        'application/x-rar-compressed',
+        'application/gzip',
+        'application/x-gzip',
         'application/json',
     ],
 

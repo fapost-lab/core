@@ -103,6 +103,27 @@ final class MediaApiTest extends FeatureTestCase
         $this->deleteJson("/media/folders/{$folder->id}?force=true")->assertNoContent();
     }
 
+    public function test_forced_folder_delete_moves_nested_subfolders_to_the_root_with_their_paths(): void
+    {
+        $this->actingAs($this->makeAdmin());
+
+        $top   = $this->postJson('/media/folders', ['name' => 'Top'])->json('data.id');
+        $child = $this->postJson('/media/folders', ['name' => 'Child', 'parent_id' => $top])->json('data.id');
+        $leaf  = $this->postJson('/media/folders', ['name' => 'Leaf', 'parent_id' => $child])->json('data.id');
+
+        $this->deleteJson("/media/folders/{$top}")
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Folder is not empty. Pass ?force=true to delete it and move its files and subfolders to the root.');
+        $this->deleteJson("/media/folders/{$top}?force=true")->assertNoContent();
+
+        $this->assertNull(MediaFolder::query()->find($top));
+        $childFolder = MediaFolder::query()->findOrFail($child);
+        $this->assertNull($childFolder->parent_id);
+        $this->assertSame('/Child', $childFolder->path_cache);
+        $this->assertSame($child, MediaFolder::query()->findOrFail($leaf)->parent_id);
+        $this->assertSame('/Child/Leaf', MediaFolder::query()->findOrFail($leaf)->path_cache);
+    }
+
     public function test_upload_creates_file_blob_and_returns_signed_url(): void
     {
         $this->actingAs($this->makeAdmin());
@@ -358,7 +379,7 @@ final class MediaApiTest extends FeatureTestCase
         // Strip host so we can hit it as a relative path through the test client.
         $relative = parse_url($previewUrl, PHP_URL_PATH) . '?' . parse_url($previewUrl, PHP_URL_QUERY);
 
-        $this->get($relative)->assertOk();
+        $this->get($relative)->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
     }
 
     public function test_unsigned_raw_url_is_rejected(): void

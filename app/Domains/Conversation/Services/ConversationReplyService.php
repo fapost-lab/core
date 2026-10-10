@@ -16,6 +16,7 @@ use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Media\Exceptions\MediaDeletedException;
 use App\Domains\Media\Exceptions\MediaNotFoundException;
 use App\Domains\Media\Models\MediaFile;
+use App\Domains\Media\Services\DeliveryKind;
 use App\Domains\Messaging\OutboundVolumeGate;
 use Fapost\Foundation\Media\DTO\UploadContext;
 use Fapost\Foundation\Media\Enums\MediaKind;
@@ -123,7 +124,8 @@ final readonly class ConversationReplyService implements ConversationReplyServic
             context: new UploadContext(targetChatId: $chatId, caption: '' !== $caption ? $caption : null),
         );
 
-        $kind    = MediaKind::fromMimeType((string) ($media->blob->mime_type ?? ''));
+        // As the upload chose the method: a cached document id must not go out as a photo.
+        $kind    = DeliveryKind::of((string) ($media->blob->mime_type ?? ''));
         $message = $this->buildMessage(
             $conversation,
             $channel,
