@@ -145,7 +145,11 @@ return [
         'new'          => 'New segment',
         'create_title' => 'New segment',
         'edit_title'   => 'Edit segment',
-        'columns'      => [
+        'sections'     => [
+            'general' => ['title' => 'General', 'description' => 'The name by which the segment is listed.'],
+            'rules'   => ['title' => 'Rules', 'description' => 'Which contacts the segment includes.'],
+        ],
+        'columns' => [
             'name'       => 'Name',
             'conditions' => 'Conditions',
             'size'       => 'Size',

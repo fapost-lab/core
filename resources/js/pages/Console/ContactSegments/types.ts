@@ -7,6 +7,7 @@ export interface ContactSegmentsTranslations {
   new: string
   create_title: string
   edit_title: string
+  sections: { general: { title: string; description: string }; rules: { title: string; description: string } }
   columns: { name: string; conditions: string; size: string; counted_at: string }
   match_short: Record<string, string>
   fields: { name: string; match: string; conditions: string; type: string; key: string; operator: string; value: string }

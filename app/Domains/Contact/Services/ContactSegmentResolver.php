@@ -6,6 +6,7 @@ namespace App\Domains\Contact\Services;
 
 use App\Domains\Contact\Enums\SegmentConditionType;
 use App\Domains\Contact\Enums\SegmentMatch;
+use App\Domains\Contact\Enums\SegmentOperator;
 use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Contact\Models\ContactSegment;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
@@ -87,9 +88,9 @@ final class ContactSegmentResolver
 
         return $query->where(function (Builder $group) use ($conditions, $isAny, $tenantId): void {
             foreach ($conditions as $condition) {
-                if (is_array($condition)) {
-                    $this->applyCondition($group, $condition, $isAny, $tenantId);
-                }
+                is_array($condition)
+                    ? $this->applyCondition($group, $condition, $isAny, $tenantId)
+                    : $this->matchNothing($group, $isAny);
             }
         });
     }
@@ -103,6 +104,13 @@ final class ContactSegmentResolver
         $type     = SegmentConditionType::tryFrom((string) ($condition['type'] ?? ''));
         $operator = (string) ($condition['operator'] ?? '');
         $value    = $condition['value'] ?? null;
+
+        // An operator the type does not offer is not a looser reading of another one: it matches nobody.
+        if (null !== $type && ! in_array($operator, array_map(static fn (SegmentOperator $o): string => $o->value, $type->operators()), true)) {
+            $this->matchNothing($query, $or);
+
+            return;
+        }
 
         match ($type) {
             SegmentConditionType::Tag       => $this->applyTag($query, $operator, $value, $or),
@@ -215,12 +223,12 @@ final class ContactSegmentResolver
      */
     private function applyGroup(Builder $query, string $operator, mixed $value, bool $or, string $tenantId): void
     {
-        $ids = array_values(array_filter(
-            is_array($value) ? $value : [$value],
-            static fn ($v): bool => is_string($v) && '' !== $v,
-        ));
+        $entries = is_array($value) ? $value : [$value];
+        $ids     = array_values(array_filter($entries, static fn ($v): bool => is_string($v) && '' !== $v));
 
-        if ([] === $ids || ! $this->allGroupsExist(array_values(array_unique($ids)), $tenantId)) {
+        // An entry that is not an id (a number, an empty string) spoils the list: dropping it would change what the
+        // condition says.
+        if ([] === $ids || count($ids) !== count($entries) || ! $this->allGroupsExist(array_values(array_unique($ids)), $tenantId)) {
             $this->matchNothing($query, $or);
 
             return;

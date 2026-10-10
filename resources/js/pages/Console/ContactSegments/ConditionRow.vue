@@ -192,7 +192,7 @@ function setKey(value: string | number): void {
             :options="optionList"
             :pick-label="t.pick_values"
             :empty-label="t.no_options"
-            :missing-label="t.deleted_group"
+            :missing-label="condition.type === 'group' ? t.deleted_group : undefined"
             :remove-label="t.remove_value"
             :invalid="invalid"
             :described-by="describedBy"

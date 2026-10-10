@@ -15,7 +15,8 @@ const props = defineProps<{
   options: { value: string; label: string }[]
   pickLabel: string
   emptyLabel: string
-  missingLabel: string
+  /** What a chosen value the list lacks is called; without it the raw value shows. */
+  missingLabel?: string
   /** The accessible name of a chip's remove button, with `:value` for the chip's text. */
   removeLabel: string
   invalid?: boolean
@@ -28,7 +29,7 @@ const chips = computed(() =>
   selected.value.map((value) => {
     const option = props.options.find((candidate) => candidate.value === value)
 
-    return { value, label: option?.label ?? props.missingLabel, missing: option === undefined }
+    return { value, label: option?.label ?? props.missingLabel ?? value, missing: option === undefined }
   }),
 )
 
@@ -40,7 +41,7 @@ function toggle(value: string, on: boolean): void {
 <template>
   <div class="flex flex-col gap-2">
     <div v-if="chips.length" class="flex flex-wrap gap-1.5">
-      <Badge v-for="chip in chips" :key="chip.value" :variant="chip.missing ? 'destructive' : 'secondary'" class="gap-1 pr-1">
+      <Badge v-for="chip in chips" :key="chip.value" :variant="chip.missing ? 'danger' : 'secondary'" class="gap-1 pr-1">
         <span class="max-w-48 truncate">{{ chip.label }}</span>
         <button
           type="button"

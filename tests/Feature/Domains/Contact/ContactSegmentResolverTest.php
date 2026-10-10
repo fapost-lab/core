@@ -217,6 +217,52 @@ final class ContactSegmentResolverTest extends FeatureTestCase
         $this->assertSame([(string) $vip->getKey()], $this->resolver->resolveContactIds($segment));
     }
 
+    public function test_an_operator_the_type_does_not_offer_matches_nobody(): void
+    {
+        $group = $this->group();
+        $this->contact('en', ['vip'])->groups()->attach($group);
+        $this->contact('uk', []);
+
+        foreach ([
+            ['type' => 'language', 'operator' => 'not_in', 'value' => ['en']],
+            ['type' => 'language', 'operator' => 'has', 'value' => ['en']],
+            ['type' => 'group', 'operator' => 'has', 'value' => [$group->getKey()]],
+            ['type' => 'group', 'operator' => 'eq', 'value' => [$group->getKey()]],
+            ['type' => 'tag', 'operator' => 'in', 'value' => ['vip']],
+            ['type' => 'tag', 'operator' => '', 'value' => ['vip']],
+            ['type' => 'platform', 'operator' => 'not_in', 'value' => ['telegram']],
+            ['type' => 'attribute', 'key' => 'age', 'operator' => 'has', 'value' => ['1']],
+        ] as $condition) {
+            $this->assertSame([], $this->resolver->resolveContactIds($this->segment('all', [$condition])), json_encode($condition));
+        }
+    }
+
+    public function test_a_group_list_with_an_entry_that_is_not_an_id_matches_nobody(): void
+    {
+        $group = $this->group();
+        $this->contact('en', [])->groups()->attach($group);
+
+        foreach ([[$group->getKey(), 5], [$group->getKey(), ''], [$group->getKey(), null], [$group->getKey(), ['x']]] as $value) {
+            $segment = $this->segment('all', [['type' => 'group', 'operator' => 'in', 'value' => $value]]);
+
+            $this->assertSame([], $this->resolver->resolveContactIds($segment), json_encode($value));
+        }
+    }
+
+    public function test_a_condition_that_is_not_an_array_matches_nobody_under_all_and_does_not_widen_any(): void
+    {
+        $vip = $this->contact('en', ['vip']);
+        $this->contact('en', []);
+
+        $all  = $this->segment('all', ['broken', ['type' => 'tag', 'operator' => 'has', 'value' => ['vip']]]);
+        $any  = $this->segment('any', ['broken', ['type' => 'tag', 'operator' => 'has', 'value' => ['vip']]]);
+        $only = $this->segment('any', [42]);
+
+        $this->assertSame([], $this->resolver->resolveContactIds($all));
+        $this->assertSame([(string) $vip->getKey()], $this->resolver->resolveContactIds($any));
+        $this->assertSame([], $this->resolver->resolveContactIds($only));
+    }
+
     public function test_group_in_with_multiple_ids_matches_any_membership(): void
     {
         $groupA = $this->group('Group A');

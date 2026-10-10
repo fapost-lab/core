@@ -33,7 +33,10 @@ broken.
 - **A segment fails closed.** A condition the resolver cannot evaluate matches nobody; an empty
   rule set matches everyone. That includes a `group` condition that names a group which no longer
   exists (or is another tenant's), under `in` and `not_in` alike: `not_in` of a vanished group must
-  not match every contact. Why *(inferred)*: an unknown condition must never widen a broadcast's
+  not match every contact; a group list with an entry that is not an id; an operator the type does not
+  offer (`language` with `not_in`, `group` with `has`, an empty operator); and a condition that is not
+  an array at all (under `any` it adds nothing, under `all` it empties the result). The console form
+  keeps such a condition visible instead of dropping it on re-save. Why *(inferred)*: an unknown condition must never widen a broadcast's
   audience. Enforced: `ContactSegmentResolverTest`.
 - **`SegmentConditionType` decides which operators a condition type takes and how many values
   (`operators()`, `arity()`, `needsKey()`).** The Filament form offers them, the console sends them

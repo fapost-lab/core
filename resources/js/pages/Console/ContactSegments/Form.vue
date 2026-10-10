@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { Link, useForm, usePage } from '@inertiajs/vue3'
 import { Plus } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
+import { FormSection } from '@fapost/ui/components/form-section'
 import { FormField } from '@fapost/ui/components/form-field'
 import { Input } from '@fapost/ui/components/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
@@ -54,12 +55,14 @@ function submit(): void {
 </script>
 
 <template>
-  <form class="flex max-w-4xl flex-col gap-5" novalidate @submit.prevent="submit">
-    <div class="grid gap-5 sm:grid-cols-2">
+  <form class="flex flex-col gap-5" novalidate @submit.prevent="submit">
+    <FormSection :title="t.sections.general.title" :description="t.sections.general.description">
       <FormField id="name" :label="t.fields.name" :error="form.errors.name" v-slot="{ invalid, describedBy }">
         <Input id="name" v-model="form.name" name="name" required maxlength="255" autocomplete="off" :aria-invalid="invalid" :aria-describedby="describedBy" />
       </FormField>
+    </FormSection>
 
+    <FormSection :title="t.sections.rules.title" :description="t.sections.rules.description">
       <FormField id="match" :label="t.fields.match" :error="form.errors.match" v-slot="{ invalid, describedBy }">
         <Select v-model="form.match">
           <SelectTrigger id="match" class="w-full" :aria-invalid="invalid" :aria-describedby="describedBy">
@@ -70,7 +73,6 @@ function submit(): void {
           </SelectContent>
         </Select>
       </FormField>
-    </div>
 
     <fieldset class="flex flex-col gap-3">
       <legend class="mb-1 text-sm leading-none font-medium">{{ t.fields.conditions }}</legend>
@@ -96,6 +98,7 @@ function submit(): void {
         {{ t.add_condition }}
       </Button>
     </fieldset>
+    </FormSection>
 
     <div class="flex items-center gap-2">
       <Button type="submit" :disabled="form.processing">{{ form.processing ? common.saving : common.save }}</Button>

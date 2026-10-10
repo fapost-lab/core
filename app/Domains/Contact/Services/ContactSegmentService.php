@@ -165,6 +165,9 @@ final readonly class ContactSegmentService
 
         foreach (is_array($rules['conditions'] ?? null) ? $rules['conditions'] : [] as $condition) {
             if (! is_array($condition)) {
+                // Kept as a condition nobody can show, so a re-save fails on it instead of erasing it.
+                $conditions[] = ['type' => '', 'key' => '', 'operator' => '', 'value' => []];
+
                 continue;
             }
 

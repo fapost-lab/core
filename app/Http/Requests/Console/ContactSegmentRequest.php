@@ -90,17 +90,32 @@ final class ContactSegmentRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
-            if ($validator->errors()->isNotEmpty()) {
+            $input = $this->input('conditions');
+
+            if (! is_array($input) || $validator->errors()->has('conditions')) {
                 return;
             }
 
-            /** @var list<array<string, mixed>> $conditions */
-            $conditions = array_values((array) $this->input('conditions', []));
+            // Conditions are checked even when the name or another row failed; only a row whose own fields failed
+            // the shape rules is skipped, as the checks below assume a type and an operator.
+            $errorKeys  = $validator->errors()->keys();
+            $conditions = [];
 
-            $unchecked = $this->existingGroups($conditions);
+            foreach ($input as $index => $condition) {
+                $broken = ! is_array($condition) || [] !== array_filter(
+                    $errorKeys,
+                    static fn (string $key): bool => str_starts_with($key, "conditions.{$index}."),
+                );
+
+                if (! $broken) {
+                    $conditions[$index] = $condition;
+                }
+            }
+
+            $existing = $this->existingGroups($conditions);
 
             foreach ($conditions as $index => $condition) {
-                $this->checkCondition($validator, $index, $condition, $unchecked);
+                $this->checkCondition($validator, $index, $condition, $existing);
             }
         }];
     }
@@ -125,7 +140,7 @@ final class ContactSegmentRequest extends FormRequest
      * @param  array<string, mixed>   $condition
      * @param  array<string, true>    $existingGroups  ids of the tenant's groups that are referenced
      */
-    private function checkCondition(Validator $validator, int $index, array $condition, array $existingGroups): void
+    private function checkCondition(Validator $validator, int|string $index, array $condition, array $existingGroups): void
     {
         $type     = SegmentConditionType::from((string) $condition['type']);
         $operator = SegmentOperator::tryFrom((string) $condition['operator']);

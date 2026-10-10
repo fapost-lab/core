@@ -308,6 +308,41 @@ final class ContactSegmentsConsoleTest extends InertiaConsoleTestCase
             ->assertSessionDoesntHaveErrors(['conditions.0.type', 'conditions.0.operator', 'conditions.0.value']);
     }
 
+    public function test_conditions_are_checked_even_when_another_field_fails(): void
+    {
+        $this->actingAs($this->admin())
+            ->post($this->listUrl(), ['name' => '', 'match' => 'all', 'conditions' => [
+                ['type' => 'tag', 'operator' => 'has', 'value' => ['a', 'b']],
+                ['type' => 'weather', 'operator' => 'is', 'value' => ['x']],
+                ['type' => 'group', 'operator' => 'in', 'value' => ['00000000-0000-0000-0000-00000000dead']],
+            ]])
+            ->assertSessionHasErrors(['name', 'conditions.0.value', 'conditions.1.type', 'conditions.2.value']);
+    }
+
+    public function test_conditions_sent_with_sparse_keys_are_refused_not_crashed_on(): void
+    {
+        $this->actingAs($this->admin())
+            ->post($this->listUrl(), ['name' => 'X', 'match' => 'all', 'conditions' => [
+                5 => ['type' => 'bogus', 'operator' => 'has'],
+                9 => ['type' => 'tag', 'operator' => 'in', 'value' => ['a']],
+            ]])
+            ->assertSessionHasErrors(['conditions.5.type', 'conditions.9.operator']);
+
+        $this->assertSame(0, ContactSegment::query()->count());
+    }
+
+    public function test_a_condition_the_console_cannot_show_is_kept_for_the_form_not_dropped(): void
+    {
+        $segment = $this->segment('Odd', [['type' => 'tag', 'operator' => 'has', 'value' => ['a']], 'broken']);
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl("/{$segment->getKey()}/edit"))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('segment.conditions', 2)
+                ->where('segment.conditions.1', ['type' => '', 'key' => '', 'operator' => '', 'value' => []])
+                ->etc());
+    }
+
     public function test_changing_replaces_the_rules_and_keeps_the_stored_size(): void
     {
         $counted = Carbon::parse('2026-10-01 12:00:00');

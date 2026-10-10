@@ -145,7 +145,11 @@ return [
         'new'          => 'Новий сегмент',
         'create_title' => 'Новий сегмент',
         'edit_title'   => 'Зміна сегмента',
-        'columns'      => [
+        'sections'     => [
+            'general' => ['title' => 'Основне', 'description' => 'Назва, під якою сегмент видно в списку.'],
+            'rules'   => ['title' => 'Правила', 'description' => 'Які контакти входять до сегмента.'],
+        ],
+        'columns' => [
             'name'       => 'Назва',
             'conditions' => 'Умови',
             'size'       => 'Розмір',
