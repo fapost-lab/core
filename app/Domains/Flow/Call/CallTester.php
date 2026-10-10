@@ -74,12 +74,14 @@ final readonly class CallTester
 
         $tenantId = $this->tenantContext->isResolved() ? $this->tenantContext->get()->getId() : 'test-tenant';
 
+        $clickId = (string) Str::ulid();
+
         // The builder always runs inside a tenant; without one there is nobody to bill.
         if ($this->tenantContext->isResolved()) {
             // Every click is its own unit: there is no session, and a repeated test is a repeated call.
             $decision = $this->quota->consume(
                 CallNodeHandler::LIMIT_KEY,
-                UsageUnitKey::make('call_test:', (string) Str::ulid()),
+                UsageUnitKey::make('call_test:', $clickId),
                 CarbonImmutable::now(),
                 RefusedWork::CallExecution,
             );
@@ -115,7 +117,7 @@ final readonly class CallTester
             contactId: 'test-contact',
             sessionId: 'test-session',
             nodeId: 'test-node',
-            idempotencyKey: 'test:builder',
+            idempotencyKey: 'test:builder:' . $clickId,
         );
 
         $request = new CallRequest(

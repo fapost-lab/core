@@ -56,7 +56,7 @@ final readonly class CallResult
 ```
 
 `CallContext` carries identifiers, not a tenant or session object. The idempotency key is
-`{sessionId}:{nodeId}` (see [nodes/06-call.md](nodes/06-call.md)).
+the engine's execution key plus `:` and the node id (new on each loop pass, the same on a queue retry of the step) (see [nodes/06-call.md](nodes/06-call.md)).
 
 ## 4.3 Built-in transports
 

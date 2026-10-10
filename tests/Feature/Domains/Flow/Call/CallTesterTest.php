@@ -57,4 +57,19 @@ final class CallTesterTest extends TestCase
         $this->assertSame('egress_denied', $result['error_code']);
         Http::assertNothingSent();
     }
+
+    public function test_each_test_click_sends_its_own_idempotency_key(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response([], 200)]);
+
+        $config = ['transport' => 'http', 'target' => 'GET https://api.example.com/ping'];
+        app(CallTester::class)->run($config, []);
+        app(CallTester::class)->run($config, []);
+
+        $keys = Http::recorded()->map(static fn (array $pair): string => $pair[0]->header('Idempotency-Key')[0])->all();
+
+        $this->assertCount(2, $keys);
+        $this->assertNotSame($keys[0], $keys[1]);
+        $this->assertStringStartsWith('test:builder:', $keys[0]);
+    }
 }

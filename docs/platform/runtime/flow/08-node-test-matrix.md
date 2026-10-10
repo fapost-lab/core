@@ -66,7 +66,7 @@ suite, not with a plain `--filter` on a Feature test.
 ### D. External call
 
 - success, timeout / network failure, non-2xx response
-- retry-safe: the idempotency key (`{sessionId}:{nodeId}`) prevents duplicates on the remote side
+- retry-safe: the idempotency key (engine key + node id: new per loop pass, the same on a retry) prevents duplicates on the remote side
 
 ### E. Delay / async
 
