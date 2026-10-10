@@ -85,6 +85,15 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   does the step once. A list that shows live progress polls (`usePoll`, partial reload of `table` only)
   only while a row is running, and gives up after a fixed time. Example: `BroadcastController`,
   `BroadcastService`, `SendDialog.vue`.
+- **A screen that follows live activity** takes a `live` prop (`{channel, event}`) from its controller
+  and calls `useLiveUpdates`: Echo when a broadcaster delivers and a client is registered, polling
+  otherwise. The server announces only after the commit, only while a screen marks itself watched
+  (`FlowActivityWatchers`), throttled per assistant, and a failed announcement is reported, never
+  thrown into the flow step. The event carries no data: the page reloads its own props. Example:
+  `FlowSessionController`, `FlowActivityNotifier`, `resources/js/ui/lib/useLiveUpdates.ts`.
+- **Every `flow_logs` query has a time window** (the list a period, at most 30 days; a record ±5
+  minutes around the time in its ULID), so it touches the partitions it needs. Example:
+  `FlowLogInspector`.
 - **The builder is a separate Inertia app**: reach it with a plain `<a>` or `Inertia::location()`
   to the named route `builder.flows.show`, never a `<Link>` or a redirect. A related record
   created from inside a form (a flow's new group) uses its own `*-inline` route that redirects

@@ -16,6 +16,8 @@ use App\Http\Controllers\Console\ContactSegmentController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
+use App\Http\Controllers\Console\FlowLogController;
+use App\Http\Controllers\Console\FlowSessionController;
 use App\Http\Controllers\Console\LocaleController;
 use App\Http\Controllers\Console\TranslationController;
 use Illuminate\Routing\Route as RoutingRoute;
@@ -60,6 +62,10 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'broadcasts list'       => ['filament.assistant.resources.broadcasts.index', BroadcastController::class, 'index', 'assistant/{tenant}/broadcasts'],
             'broadcasts create'     => ['filament.assistant.resources.broadcasts.create', BroadcastController::class, 'create', 'assistant/{tenant}/broadcasts/create'],
             'broadcasts edit'       => ['filament.assistant.resources.broadcasts.edit', BroadcastController::class, 'edit', 'assistant/{tenant}/broadcasts/{record}/edit'],
+            'flow sessions list'    => ['filament.assistant.resources.flow-sessions.index', FlowSessionController::class, 'index', 'assistant/{tenant}/flow-sessions'],
+            'flow sessions view'    => ['filament.assistant.resources.flow-sessions.view', FlowSessionController::class, 'show', 'assistant/{tenant}/flow-sessions/{record}'],
+            'flow logs list'        => ['filament.assistant.resources.flow-logs.index', FlowLogController::class, 'index', 'assistant/{tenant}/flow-logs'],
+            'flow logs view'        => ['filament.assistant.resources.flow-logs.view', FlowLogController::class, 'show', 'assistant/{tenant}/flow-logs/{record}'],
             // Assistant settings.
             'assistant settings' => ['filament.assistant.pages.settings', AssistantSettingsController::class, 'edit', 'assistant/{tenant}/settings'],
             // Translations: both panels.

@@ -55,6 +55,9 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         }
     )
+    // Live updates: `/broadcasting/auth` answers in the tenant of the host, for a signed-in user who passes the console's
+    // account checks; each channel then checks its own subject (routes/channels.php).
+    ->withBroadcasting(__DIR__ . '/../routes/channels.php', ['middleware' => ['broadcasting']])
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->redirectGuestsTo(fn () => route('filament.admin.auth.login'));
 
@@ -91,6 +94,17 @@ return Application::configure(basePath: dirname(__DIR__))
         ];
 
         $middleware->group('admin', $admin);
+        // The authorization of private broadcast channels: the `admin` stack without the console's view and the write
+        // refusal of a stopped tenant (asking to listen changes nothing).
+        $middleware->group('broadcasting', [
+            'web',
+            'tenant',
+            ForgetInvalidAuthenticatedSession::class,
+            'auth',
+            AuthenticateSession::class,
+            EnsureUserIsActive::class,
+            EnsureCanAccessPanel::class,
+        ]);
         $middleware->group('console', [...$admin, ResolveCurrentAssistant::class . ':tenant']);
 
         $middleware->web(

@@ -8,7 +8,7 @@ description: "Every queue, what belongs on it, and why they stay separate."
 | `flow.execution` | Inbound message handling and the execution pipeline |
 | `messaging.transactional` | Reserved for replies delivered out of band; nothing dispatches to it today |
 | `messaging.broadcast` | Low-priority fan-out for broadcasts |
-| `messaging.system` | Service notifications |
+| `messaging.system` | Service notifications, and live-update announcements to open operator screens (only with a delivering `BROADCAST_CONNECTION`) |
 | `scheduled.triggers` | Scheduled and event trigger fan-out |
 | `sync.external` | External synchronisations |
 | `messaging.logging` | Conversation capture, written outside the delivery path |

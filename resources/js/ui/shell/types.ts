@@ -108,6 +108,8 @@ export interface ShellPageProps {
     auth: { user: ShellUser | null; permissions: string[] }
     accessState: { mode: string; notice: AccessNotice | null }
     supportAccess: { operatorName: string; operatorEmail: string; expiresAt: string } | null
+    /** Whether broadcasting delivers anywhere (`null` and `log` do not); live screens poll when it does not. */
+    broadcaster: { enabled: boolean; name: string }
     shell: ShellConfig
     navigation: ShellNavigation | null
     assistants: AssistantSwitcherData | null

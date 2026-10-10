@@ -15,6 +15,8 @@ use App\Http\Controllers\Console\ContactSegmentController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
+use App\Http\Controllers\Console\FlowLogController;
+use App\Http\Controllers\Console\FlowSessionController;
 use App\Http\Controllers\Console\LocaleController;
 use App\Http\Controllers\Console\TranslationController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
@@ -138,6 +140,11 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('assistant/{tenant}/broadcasts/{record}/cancel', [BroadcastController::class, 'cancel'])->name('console.broadcasts.cancel');
         Route::delete('assistant/{tenant}/broadcasts/{record}', [BroadcastController::class, 'destroy'])->name('console.broadcasts.destroy');
 
+        // Flow sessions and the flow log: read-only, kept current live or by polling. Every log read is bounded in time.
+        Route::get('assistant/{tenant}/flow-sessions', [FlowSessionController::class, 'index'])->name('filament.assistant.resources.flow-sessions.index');
+        Route::get('assistant/{tenant}/flow-sessions/{record}', [FlowSessionController::class, 'show'])->name('filament.assistant.resources.flow-sessions.view');
+        Route::get('assistant/{tenant}/flow-logs', [FlowLogController::class, 'index'])->name('filament.assistant.resources.flow-logs.index');
+        Route::get('assistant/{tenant}/flow-logs/{record}', [FlowLogController::class, 'show'])->name('filament.assistant.resources.flow-logs.view');
         // Assistant settings: one form saved as a whole. A flow made from inside it is saved with the form and opens in the builder.
         Route::get('assistant/{tenant}/settings', [AssistantSettingsController::class, 'edit'])->name('filament.assistant.pages.settings');
         Route::put('assistant/{tenant}/settings', [AssistantSettingsController::class, 'update'])->name('console.settings.update');

@@ -54,7 +54,8 @@ final class ConsoleDashboardTest extends InertiaConsoleTestCase
                 ->where('operations.liveSessions', 1)
                 ->where('operations.errors24h', 1)
                 ->where('operations.sessionsUrl', "/assistant/{$assistant->getKey()}/flow-sessions")
-                ->where('operations.logsUrl', "/assistant/{$assistant->getKey()}/flow-logs")
+                // The count is of errors over the last day, and the link opens the log on just those.
+                ->where('operations.logsUrl', "/assistant/{$assistant->getKey()}/flow-logs?filter%5Berrors%5D=1&filter%5Bperiod%5D=24h")
                 ->where('navigation.mode', 'console')
                 ->etc());
     }

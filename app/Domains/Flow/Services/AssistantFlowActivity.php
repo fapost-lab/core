@@ -21,11 +21,7 @@ final class AssistantFlowActivity
     {
         return FlowSession::query()
             ->where('assistant_id', $assistantId)
-            ->whereIn('status', [
-                FlowSessionStatus::Active->value,
-                FlowSessionStatus::WaitingInput->value,
-                FlowSessionStatus::PausedSubflow->value,
-            ])
+            ->whereIn('status', array_map(static fn (FlowSessionStatus $status): string => $status->value, FlowSessionStatus::live()))
             ->count();
     }
 

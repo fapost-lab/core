@@ -11,6 +11,7 @@ use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Live\FlowActivityNotifier;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Tenancy\Settings\TenantSettings;
 
@@ -37,6 +38,7 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
         private FallbackMessageServiceInterface $messenger,
         private ContentTranslatorInterface $translator,
         private TenantSettings $tenantSettings,
+        private FlowActivityNotifier $activity,
     ) {
     }
 
@@ -165,5 +167,8 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
                 'current_node_id' => null,
                 'updated_at'      => now(),
             ]);
+
+        // A query write raises no model event, so the live screens are told here.
+        $this->activity->touched($session);
     }
 }

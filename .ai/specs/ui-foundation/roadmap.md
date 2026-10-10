@@ -58,7 +58,7 @@ console menu entry is served by Inertia and the console's tests run against the 
 - [x] `console-broadcasts` — Broadcasts — list with progress, send and cancel, the form with live reach and the
       base-language guard (after: the pilot; after: `close-policy-gaps` — the screen relies on
       the new policy)
-- [ ] `console-live-updates` — Live updates with sessions and flow logs — the composable that subscribes through Echo
+- [x] `console-live-updates` — Live updates with sessions and flow logs — the composable that subscribes through Echo
       when a broadcaster is configured and polls otherwise; flow sessions and flow logs on it,
       every log query bounded to a time window (after: the pilot)
 - [ ] `realtime-self-hosted` — Realtime for self-hosters — `laravel/reverb` dormant in Core, the Echo client as a lazy
