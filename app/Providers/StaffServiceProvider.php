@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Domains\Staff\Listeners\CloseSupportAccessEntry;
 use App\Domains\Staff\Models\Role;
+use App\Domains\Staff\Models\SupportAccessEntry;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Notifications\Notifiers\EmailStaffNotifier;
 use App\Domains\Staff\Notifications\Notifiers\InAppStaffNotifier;
@@ -13,6 +14,7 @@ use App\Domains\Staff\Notifications\StaffNotifierRegistry;
 use App\Domains\Staff\Notifications\StaffRecipientResolver;
 use App\Domains\Staff\Policies\PlatformSupportProtection;
 use App\Domains\Staff\Policies\RolePolicy;
+use App\Domains\Staff\Policies\SupportAccessEntryPolicy;
 use App\Domains\Staff\Policies\UserPolicy;
 use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Staff\Services\RoleFormDataMapper;
@@ -81,6 +83,7 @@ final class StaffServiceProvider extends ServiceProvider
 
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);
+        Gate::policy(SupportAccessEntry::class, SupportAccessEntryPolicy::class);
 
         // Registered the way a Solution registers its keys: from boot(), before the registry is frozen.
         $this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(

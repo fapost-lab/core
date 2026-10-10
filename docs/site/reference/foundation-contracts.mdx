@@ -216,9 +216,9 @@ admin panel. Implemented by Core; a package only calls it.
   minute.
 - Entering signs the browser in as the tenant's **platform support user**: an administrator account
   with no password that Core creates on the first entry. Its session lasts 60 minutes, shows a
-  banner naming the operator and is recorded in the tenant's support access log. Until the new UI
-  shows that log, the tenant sees the platform support user, marked "Platform support", in its
-  users list.
+  banner naming the operator and is recorded in the tenant's support access log, which the tenant's
+  administrators read on the **Support access** page of the new admin interface. The platform support user
+  is also listed, marked "Platform support", in the tenant's users list.
 - Support access works only where tenants are resolved by host, and is off unless the platform
   enables it (`SUPPORT_ACCESS_ENABLED`, config `tenancy.support_access.enabled`). Off, `issue()`
   throws `Exceptions\SupportAccessUnavailableException::disabled()`; an unknown or inactive tenant

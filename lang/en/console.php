@@ -1193,4 +1193,20 @@ return [
             'has_errors' => 'has errors',
         ],
     ],
+
+    'support_access' => [
+        'title'       => 'Support access',
+        'description' => 'Every time platform support entered this workspace: who, from which IP, and when they entered and left. Entries are recorded automatically and cannot be changed.',
+        'columns'     => [
+            'operator'   => 'Operator',
+            'email'      => 'Email',
+            'ip'         => 'IP',
+            'entered_at' => 'Entered',
+            'left_at'    => 'Left',
+        ],
+        'in_progress'  => 'In progress',
+        'search_label' => 'Search by operator, email or IP',
+        'empty'        => 'Platform support has not entered this workspace.',
+        'empty_hint'   => 'When support signs in to help you, the entry appears here.',
+    ],
 ];

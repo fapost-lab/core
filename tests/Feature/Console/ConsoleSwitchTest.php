@@ -103,6 +103,7 @@ final class ConsoleSwitchTest extends FeatureTestCase
             // Assistant settings.
             'console.settings.update',
             'console.settings.store-flow',
+            'console.admin.support-access.index',
         ] as $name) {
             $this->assertNull(Route::getRoutes()->getByName($name), $name);
         }
