@@ -6,8 +6,8 @@ domains: []
 paths: []
 source: docs/site/extending/solutions.mdx
 summary: Writing a Solution and what of the Solution lifecycle is not product-complete
-source_hash: d2173b1bfd050f0c0d7eb827b6bcc1d6984bdea5
-reviewed_at: 2026-10-08
+source_hash: 1de566a66051829f756aacd2607ec2f439428ce4
+reviewed_at: 2026-10-10
 ---
 # Building a Solution
 
