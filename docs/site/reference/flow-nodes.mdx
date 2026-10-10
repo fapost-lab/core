@@ -40,6 +40,41 @@ Most nodes execute and return a handle. Four alter the shape of execution itself
 | `subflow` | Creates a child session and pauses the parent until it completes |
 | `input` | Returns `waiting`; the session pauses for the contact's reply |
 
+## The `call` node and outbound addresses
+
+A flow author controls the URL a `call` node requests, often through a template over
+live state, so Core treats the target as untrusted. A request never reaches a private,
+loopback, link-local, reserved or cloud-metadata address (for example `127.0.0.1`,
+`10.0.0.0/8`, `169.254.169.254`, `::1`, `fd00::/8`). The check holds however the
+address is reached: written directly, behind a DNS name, behind a name that answers
+differently the second time, or at the end of a redirect.
+
+- The host name is resolved by Core, every returned address must be public, and the
+  connection is then made to exactly those addresses.
+- Every redirect hop is checked again. Redirects stay on, up to 5, `http` and `https`
+  only.
+- Address forms that other software would read as an IPv4 address without being a
+  canonical one (`2130706433`, `0x7f.1`, `127.1`, `0177.0.0.1`) are refused.
+- Any port is allowed on a public address.
+
+A refused call takes the `error` handle with `error_code = egress_denied`. The node
+metadata and the builder test call carry the host and a reason (`private`, `loopback`,
+`link_local`, `reserved`, `multicast`, `unspecified`, `metadata`, `invalid_host` or
+`scheme_not_allowed`), never the resolved address. A name that does not resolve is
+still `transport_failure`. A refused call still counts as one call execution.
+
+An operator can allow trusted internal targets with `FLOW_EGRESS_ALLOW`; see
+[Configuration](/self-hosting/configuration#outbound-calls-from-flows). Cloud
+metadata addresses can never be allowed.
+
+<Note>
+  An extension that makes its own HTTP request from a flow parameter is not covered
+  by this check. Such a request must refuse private, loopback, link-local and
+  cloud-metadata addresses after the name is resolved and on every redirect hop. A
+  shared contract for this will arrive with the first Solution that needs outbound
+  HTTP; until then the extension carries the requirement itself.
+</Note>
+
 ## Declaring a node
 
 `type`, `version`, `label`, and `category` come from the handler. Core handlers

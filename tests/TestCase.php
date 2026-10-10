@@ -4,12 +4,31 @@ declare(strict_types=1);
 
 namespace Tests;
 
+use App\Domains\Flow\Call\Egress\HostResolverInterface;
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\ParallelTesting;
+use Tests\Support\FakeHostResolver;
 
 abstract class TestCase extends BaseTestCase
 {
+    /**
+     * Stands in for DNS in every test; see {@see FakeHostResolver}.
+     */
+    protected FakeHostResolver $hostResolver;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Pages are rendered without a Vite manifest: tests assert on
+        // responses, not on compiled assets, and CI has no public/build.
+        $this->withoutVite();
+
+        $this->hostResolver = new FakeHostResolver();
+        $this->app->instance(HostResolverInterface::class, $this->hostResolver);
+    }
+
     /**
      * The application is rebuilt for every test, and with it the config, so the
      * landlord connection is pointed at this process's database each time.
@@ -19,15 +38,6 @@ abstract class TestCase extends BaseTestCase
         parent::refreshApplication();
 
         $this->isolateLandlordPerParallelProcess();
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        // Pages are rendered without a Vite manifest: tests assert on
-        // responses, not on compiled assets, and CI has no public/build.
-        $this->withoutVite();
     }
 
     /**
