@@ -139,9 +139,11 @@ final readonly class MediaService implements MediaServiceInterface
         }
 
         // The row goes first: its foreign key (restrict) refuses the delete when a parallel upload
-        // of the same content just attached a new file, and then the object must stay.
+        // of the same content just attached a new file, and then the object must stay. The delete runs
+        // in its own (nested) transaction: PostgreSQL aborts the surrounding transaction on the
+        // violation, and the savepoint keeps a caller's transaction usable after it.
         try {
-            $blob->delete();
+            $blob->getConnection()->transaction(static fn (): ?bool => $blob->delete());
         } catch (QueryException $exception) {
             if ($this->isForeignKeyViolation($exception)) {
                 return;
