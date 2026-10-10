@@ -5,10 +5,11 @@ export default { layout: AppShell }
 </script>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount } from 'vue'
-import { Head, usePage, usePoll } from '@inertiajs/vue3'
-import { Activity, ArrowRightLeft, Clock, Rocket, ShieldCheck, Signal, Users } from '@lucide/vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
+import { Head, router, usePage, usePoll } from '@inertiajs/vue3'
+import { Activity, ArrowRightLeft, Clock, RefreshCw, Rocket, ShieldCheck, Signal, Users } from '@lucide/vue'
 import type { Component } from 'vue'
+import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@fapost/ui/components/card'
 import { EmptyState } from '@fapost/ui/components/empty-state'
 import { interpolate } from '@fapost/ui/shell'
@@ -57,9 +58,33 @@ const tiles = computed(() => {
 const number = computed(() => new Intl.NumberFormat(page.props.locale))
 const nothing = computed(() => tiles.value.length === 0 && props.activity === null)
 
-// The figures refresh as the Filament widgets polled; a page left open stops asking after an hour.
+// The figures refresh as the Filament widgets polled (Inertia slows polling in a background tab); a page left open
+// stops asking after an hour and says so, with a button that refreshes once and starts the hour again.
 const poll = usePoll(props.pollSeconds * 1000, { only: ['stats', 'activity'] })
-const deadline = setTimeout(() => poll.stop(), POLL_FOR_MS)
+const stopped = ref(false)
+const refreshing = ref(false)
+let deadline = setTimeout(expire, POLL_FOR_MS)
+
+function expire(): void {
+  poll.stop()
+  stopped.value = true
+}
+
+function refresh(): void {
+  refreshing.value = true
+  router.reload({
+    only: ['stats', 'activity'],
+    onFinish: () => {
+      refreshing.value = false
+    },
+    onSuccess: () => {
+      stopped.value = false
+      poll.start()
+      clearTimeout(deadline)
+      deadline = setTimeout(expire, POLL_FOR_MS)
+    },
+  })
+}
 
 onBeforeUnmount(() => {
   clearTimeout(deadline)
@@ -74,6 +99,14 @@ onBeforeUnmount(() => {
     <div class="flex flex-col gap-1">
       <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
       <p class="text-muted-foreground text-sm">{{ t.description }}</p>
+    </div>
+
+    <div v-if="stopped" class="bg-surface-muted flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm" role="status" data-test="poll-stopped">
+      <span class="text-muted-foreground">{{ t.stale }}</span>
+      <Button variant="outline" size="sm" :disabled="refreshing" @click="refresh">
+        <RefreshCw aria-hidden="true" :class="refreshing ? 'animate-spin' : ''" />
+        {{ t.refresh }}
+      </Button>
     </div>
 
     <EmptyState v-if="nothing" :title="t.empty" :description="t.empty_hint" :icon="Activity" class="rounded-xl border border-dashed py-12" />

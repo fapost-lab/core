@@ -164,9 +164,10 @@ onBeforeUnmount(() => {
           />
         </div>
 
-        <ListboxContent class="max-h-80 overflow-y-auto p-1">
-          <p v-if="message" class="text-muted-foreground px-2 py-6 text-center text-sm" role="status">{{ message }}</p>
+        <!-- Outside the list box: a status line is not an option, and the listbox may hold only its groups and items. -->
+        <p v-if="message" class="text-muted-foreground px-2 py-6 text-center text-sm" role="status" aria-live="polite">{{ message }}</p>
 
+        <ListboxContent v-show="groups.length > 0" class="max-h-80 overflow-y-auto p-1">
           <ListboxGroup v-for="group in groups" :key="group.key" class="p-1">
             <ListboxGroupLabel class="text-muted-foreground px-2 py-1.5 text-xs font-medium">{{ labels.groups[group.key] }}</ListboxGroupLabel>
             <ListboxItem

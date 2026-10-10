@@ -10,6 +10,7 @@ use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
 use App\Domains\Flow\Models\FlowDefinition;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowLog;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Staff\Enums\Permission;
@@ -107,6 +108,53 @@ final class AdminDashboardConsoleTest extends InertiaConsoleTestCase
                 ->etc());
     }
 
+    public function test_a_non_administrator_counts_only_the_assistants_they_may_list(): void
+    {
+        $now = CarbonImmutable::parse('2026-10-10 15:00:00', 'UTC');
+        CarbonImmutable::setTestNow($now);
+
+        $mine   = Assistant::factory()->create();
+        $theirs = Assistant::factory()->create();
+        $this->channel($mine, true);
+        $this->channel($theirs, true);
+        $this->channel($theirs, false);
+        $waiting = $this->flowSession($mine, FlowSessionStatus::WaitingInput);
+        $hidden  = $this->flowSession($theirs, FlowSessionStatus::Paused);
+        $this->flowSession($theirs, FlowSessionStatus::WaitingInput);
+        $this->log($waiting, 'executed', $now->subHour());
+        $this->log($hidden, 'failed', $now->subHour());
+
+        $user = User::factory()->create();
+        $user->givePermissionTo([
+            Permission::ManageAssistants->value,
+            Permission::ManageChannels->value,
+            Permission::ManageFlowDefinitions->value,
+            Permission::ViewFlowSessions->value,
+        ]);
+        $user->assistants()->attach($mine);
+
+        $this->actingAs($user)
+            ->get($this->panelUrl('/admin'))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('stats.assistants', ['total' => 1, 'active' => 1])
+                ->where('stats.channels', ['total' => 1, 'active' => 1])
+                ->where('stats.flows', ['published' => 1])
+                ->where('stats.sessions', ['waiting' => 1])
+                ->where('activity.13', ['date' => '2026-10-10', 'executed' => 1, 'failed' => 0])
+                ->etc());
+
+        // An administrator sees the tenant.
+        $this->actingAs($this->admin())
+            ->get($this->panelUrl('/admin'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('stats.channels', ['total' => 3, 'active' => 2])
+                ->where('stats.flows', ['published' => 3])
+                ->where('stats.sessions', ['waiting' => 3])
+                ->where('activity.13', ['date' => '2026-10-10', 'executed' => 1, 'failed' => 1])
+                ->etc());
+    }
+
     public function test_a_user_without_rights_gets_the_page_without_figures(): void
     {
         $this->actingAs(User::factory()->create())
@@ -165,9 +213,12 @@ final class AdminDashboardConsoleTest extends InertiaConsoleTestCase
     {
         $tenantId = (string) $assistant->tenant_id;
         $contact  = Contact::factory()->forTenant($tenantId)->create();
-        $flow     = FlowDefinition::query()->create([
+        $flowId   = (string) Str::uuid();
+        // A published version belongs to an assistant through its draft.
+        FlowDraft::factory()->create(['tenant_id' => $tenantId, 'assistant_id' => $assistant->getKey(), 'flow_id' => $flowId]);
+        $flow = FlowDefinition::query()->create([
             'tenant_id' => $tenantId,
-            'flow_id'   => (string) Str::uuid(),
+            'flow_id'   => $flowId,
             'version'   => 1,
             'name'      => 'Flow',
             'nodes'     => [],

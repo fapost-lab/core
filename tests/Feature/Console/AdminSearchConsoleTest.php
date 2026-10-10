@@ -13,6 +13,7 @@ use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
 use App\Http\Shell\AdminSearch;
+use App\Http\Shell\RouteOwnership;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Media\Enums\MediaKind;
 use Inertia\Testing\AssertableInertia;
@@ -68,13 +69,13 @@ final class AdminSearchConsoleTest extends InertiaConsoleTestCase
                     'url'      => "/admin/roles/{$role->getKey()}/edit",
                     'external' => false,
                 ]]],
-                // Media is still Filament's screen: a full page load, and no storage path.
+                // No storage path. `external` follows whoever answers the media screen's name (Filament until it moves).
                 ['key' => 'media', 'items' => [[
                     'id'       => (string) $file->getKey(),
                     'title'    => 'acme-logo.png',
                     'subtitle' => 'Image',
                     'url'      => "/admin/media/{$file->getKey()}",
-                    'external' => true,
+                    'external' => ! $this->app->make(RouteOwnership::class)->isMigrated('filament.admin.resources.media.view'),
                 ]]],
             ]]);
     }

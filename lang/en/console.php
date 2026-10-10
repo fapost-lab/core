@@ -1215,6 +1215,8 @@ return [
         'description' => 'The workspace at a glance. Figures refresh every minute.',
         'empty'       => 'Nothing to show yet',
         'empty_hint'  => 'Your role does not include any of the sections these figures come from.',
+        'stale'       => 'Figures stopped refreshing after an hour on this page.',
+        'refresh'     => 'Refresh',
         'stats'       => [
             'assistants'      => 'Assistants',
             'assistants_hint' => ':count active',

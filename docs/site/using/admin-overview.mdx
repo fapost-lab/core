@@ -16,7 +16,7 @@ that sits above it.
 
 ## The dashboard
 
-Opening the panel lands you on a set of counters, each linking to what it counts:
+Opening the panel lands you on a set of counters:
 
 - **Assistants** — how many exist, how many are active
 - **Contacts** — everyone the installation has ever talked to
@@ -27,10 +27,29 @@ Opening the panel lands you on a set of counters, each linking to what it counts
 
 Below them, **Flow Activity** charts the last 14 days.
 
+You see a counter only if your role lets you open that kind of record — channels
+need the permission to manage channels, staff users the permission to manage
+users, and so on. A user whose role opens none of them sees an empty dashboard.
+Administrators count the whole installation; everyone else counts only the
+assistants assigned to them, so their channels, published flows, waiting sessions
+and activity chart cover those assistants alone. Contacts and staff users are
+always the installation's totals.
+
+The figures refresh every minute while the page is open. After an hour they stop,
+and a **Refresh** button brings them up to date and starts the hour again.
+
 The counters are the fastest health check available. *Waiting sessions* climbing
 without *published flows* changing usually means a flow asks a question nobody is
 answering; *channels configured but not connected* means messages are arriving
 nowhere.
+
+## Search
+
+Press <kbd>⌘K</kbd> (macOS) or <kbd>Ctrl K</kbd> anywhere in the admin panel, or
+click **Search** in the header, to find assistants, users, roles and media files
+by name (users by email too). Type at least two characters; each group shows its
+first five matches, and choosing one opens it. You only find what your role lets
+you open — someone who sees only their assigned assistants finds only those.
 
 ## What lives here
 
@@ -63,5 +82,5 @@ particular assistant, so they are not in this panel at all. Open the assistant
 first — see [The assistant console](/using/console-overview).
 
 The one exception is counting: the dashboard totals contacts and channels across
-every assistant, because that is a question about the installation rather than
-about one of them.
+every assistant you may open, because that is a question about the installation
+rather than about one of them.

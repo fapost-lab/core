@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Logging\FlowLogStatus;
 use App\Domains\Flow\Models\FlowDefinition;
@@ -11,12 +12,14 @@ use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Query\Builder;
 use RuntimeException;
 
 /**
- * What the flows of the whole tenant are doing, for the admin dashboard: published flows, sessions waiting for
- * something, and node executions per day.
+ * What the flows of the tenant are doing, for the admin dashboard: published flows, sessions waiting for something,
+ * and node executions per day. Each figure is the whole tenant's, or only that of the given assistants (the ones a
+ * non-administrator may list).
  *
  * `flow_logs` has no tenant column (its entries are the tenant's through their session) and is range-partitioned by
  * month, so the daily read is bounded by `created_at` and scoped through `flow_sessions.tenant_id`.
@@ -36,21 +39,43 @@ final readonly class TenantFlowActivity
 
     /**
      * Flow versions published in the tenant (rows of `flow_definitions`), as the Filament stat counted them.
+     *
+     * With `$assistants` only the versions of flows whose draft belongs to one of those assistants: a definition has no
+     * assistant of its own, its draft (`flow_drafts.flow_id`) has.
+     *
+     * @param  EloquentBuilder<Assistant>|null  $assistants  the assistants to count for; `null` is the whole tenant
      */
-    public function publishedFlows(): int
+    public function publishedFlows(?EloquentBuilder $assistants = null): int
     {
-        return FlowDefinition::query()->where('tenant_id', $this->tenantId())->count();
+        $query = FlowDefinition::query()->where('tenant_id', $this->tenantId());
+
+        if (null !== $assistants) {
+            $query->whereIn('flow_id', fn (Builder $drafts): Builder => $drafts
+                ->select('flow_id')
+                ->from('flow_drafts')
+                ->where('tenant_id', $this->tenantId())
+                ->whereIn('assistant_id', $this->assistantIds($assistants)));
+        }
+
+        return $query->count();
     }
 
     /**
      * Sessions paused or waiting for the contact's input.
+     *
+     * @param  EloquentBuilder<Assistant>|null  $assistants  the assistants to count for; `null` is the whole tenant
      */
-    public function waitingSessions(): int
+    public function waitingSessions(?EloquentBuilder $assistants = null): int
     {
-        return FlowSession::query()
+        $query = FlowSession::query()
             ->where('tenant_id', $this->tenantId())
-            ->whereIn('status', [FlowSessionStatus::WaitingInput->value, FlowSessionStatus::Paused->value])
-            ->count();
+            ->whereIn('status', [FlowSessionStatus::WaitingInput->value, FlowSessionStatus::Paused->value]);
+
+        if (null !== $assistants) {
+            $query->whereIn('assistant_id', $this->assistantIds($assistants));
+        }
+
+        return $query->count();
     }
 
     /**
@@ -59,13 +84,17 @@ final readonly class TenantFlowActivity
      * `executed` counts `executed` and `terminal` entries (a terminal step is a normal completion), `failed` counts
      * `failed`; `conflict`, which the engine never writes today, counts in neither.
      *
-     * `app.timezone` is UTC and `created_at` is stored in UTC on every driver, so the day cut in SQL and the days
-     * built here are the same calendar days. PostgreSQL converts explicitly: `TO_CHAR` on a `timestamptz` renders in
-     * the session's TimeZone, which an installation may set to anything.
+     * The day cut is UTC on both drivers: SQLite stores `created_at` in the app timezone (UTC), and PostgreSQL converts
+     * explicitly (`AT TIME ZONE 'UTC'`), since `TO_CHAR` on a `timestamptz` renders in the session's TimeZone. The
+     * window's bounds are not converted: they are bound as timestamps without a zone, which PostgreSQL reads in the
+     * session's TimeZone, so the first and last day line up with UTC days only while that session TimeZone is UTC.
+     * Under another TimeZone the window shifts by the offset; the days themselves stay UTC days.
+     *
+     * @param  EloquentBuilder<Assistant>|null  $assistants  the assistants to count for; `null` is the whole tenant
      *
      * @return list<array{date: string, executed: int, failed: int}>
      */
-    public function daily(CarbonImmutable $now): array
+    public function daily(CarbonImmutable $now, ?EloquentBuilder $assistants = null): array
     {
         $now   = $now->utc();
         $start = $now->subDays(self::DAYS - 1)->startOfDay();
@@ -76,13 +105,15 @@ final readonly class TenantFlowActivity
             default  => throw new RuntimeException("TenantFlowActivity: unsupported database driver [{$driver}]."),
         };
 
+        $ids  = null === $assistants ? null : $this->assistantIds($assistants);
         $rows = $this->connection->table('flow_logs')
             ->selectRaw("{$day} AS day, status, COUNT(*) AS total")
             ->whereBetween('created_at', [$start, $now])
             ->whereIn('session_id', fn (Builder $sessions): Builder => $sessions
                 ->select('id')
                 ->from('flow_sessions')
-                ->where('tenant_id', $this->tenantId()))
+                ->where('tenant_id', $this->tenantId())
+                ->when(null !== $ids, static fn (Builder $scoped): Builder => $scoped->whereIn('assistant_id', $ids)))
             ->groupByRaw("{$day}, status")
             ->get();
 
@@ -110,6 +141,18 @@ final readonly class TenantFlowActivity
         }
 
         return array_values($days);
+    }
+
+    /**
+     * The ids of the given assistants, as a subquery.
+     *
+     * @param  EloquentBuilder<Assistant>  $assistants
+     *
+     * @return EloquentBuilder<Assistant>
+     */
+    private function assistantIds(EloquentBuilder $assistants): EloquentBuilder
+    {
+        return (clone $assistants)->select('assistants.id');
     }
 
     private function tenantId(): string

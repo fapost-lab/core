@@ -44,6 +44,11 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   A screen Filament never had (new screens in Filament are frozen) gets only a `console.*` route,
   and its menu item names that route in full; it exists only with the switch on. Example:
   `Admin\SupportAccessController`.
+  Figures and search results that span domains show only what the user may list: each group is
+  gated by its policy's `viewAny`, and for staff who are not administrators every assistant-owned
+  figure narrows to their assigned assistants. Search is a throttled JSON endpoint behind
+  `navigation.searchUrl`, which is null for anyone with nothing to search. Example: `AdminOverview`,
+  `AdminSearch`, `ShellSearch.vue`.
 - **After a write**, toast through `Inertia::flash()` (never the session `with()`: a shared prop
   is kept in history and replays on Back). Deletes go `back()` so the list keeps its state; forms
   go to the index.

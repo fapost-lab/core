@@ -27,7 +27,8 @@ use LogicException;
  *
  * Every signed-in staff user opens it, as they opened Filament's dashboard. Filament showed every figure to all of
  * them; here a figure is given only to a user who may list that kind of record (`viewAny` of its policy), and is
- * `null` otherwise.
+ * `null` otherwise. For anyone but an administrator, assistants, channels, flows, waiting sessions and the activity
+ * count only the assistants the user may list; contacts and staff are the tenant's.
  */
 final class DashboardController extends Controller
 {
@@ -45,18 +46,19 @@ final class DashboardController extends Controller
             throw new LogicException('The admin stack runs for a signed-in staff user.');
         }
 
-        $sees = static fn (string $model): bool => Gate::forUser($user)->allows('viewAny', $model);
+        $sees  = static fn (string $model): bool => Gate::forUser($user)->allows('viewAny', $model);
+        $scope = $overview->assistantScope($user);
 
         return Inertia::render('Console/AdminDashboard/Index', [
             'stats' => [
                 'assistants' => $sees(Assistant::class) ? $overview->assistants($user) : null,
                 'contacts'   => $sees(Contact::class) ? $overview->contacts() : null,
-                'channels'   => $sees(Channel::class) ? $overview->channels() : null,
-                'flows'      => $sees(FlowDraft::class) ? ['published' => $flows->publishedFlows()] : null,
-                'sessions'   => $sees(FlowSession::class) ? ['waiting' => $flows->waitingSessions()] : null,
+                'channels'   => $sees(Channel::class) ? $overview->channels($scope) : null,
+                'flows'      => $sees(FlowDraft::class) ? ['published' => $flows->publishedFlows($scope)] : null,
+                'sessions'   => $sees(FlowSession::class) ? ['waiting' => $flows->waitingSessions($scope)] : null,
                 'staff'      => $sees(User::class) ? $overview->staff() : null,
             ],
-            'activity'    => Gate::allows('viewAny', FlowLog::class) ? $flows->daily(CarbonImmutable::now()) : null,
+            'activity'    => Gate::allows('viewAny', FlowLog::class) ? $flows->daily(CarbonImmutable::now(), $scope) : null,
             'pollSeconds' => self::POLL_SECONDS,
         ]);
     }

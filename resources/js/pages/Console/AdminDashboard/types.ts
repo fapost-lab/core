@@ -22,6 +22,8 @@ export interface AdminDashboardTranslations {
   description: string
   empty: string
   empty_hint: string
+  stale: string
+  refresh: string
   stats: Record<
     | 'assistants'
     | 'assistants_hint'

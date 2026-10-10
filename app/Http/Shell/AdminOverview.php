@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Http\Shell;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Services\StaffAssistantService;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * The tenant's record counts on the admin dashboard, the ones Filament's `StatsOverview` showed (the flow figures are
@@ -46,13 +48,32 @@ final readonly class AdminOverview
     }
 
     /**
+     * The assistants whose figures a user sees: `null` (the whole tenant) for an administrator, otherwise the ones their
+     * list shows, so channels, flows and sessions of an assistant they may not open are not counted for them.
+     *
+     * @return Builder<Assistant>|null
+     */
+    public function assistantScope(User $user): ?Builder
+    {
+        return $user->isAdmin() ? null : $this->assistants->query($user);
+    }
+
+    /**
+     * @param  Builder<Assistant>|null  $assistants  the assistants to count for; `null` is the whole tenant
+     *
      * @return array{total: int, active: int}
      */
-    public function channels(): array
+    public function channels(?Builder $assistants = null): array
     {
+        $query = Channel::query()->where('tenant_id', $this->tenantId());
+
+        if (null !== $assistants) {
+            $query->whereIn('assistant_id', (clone $assistants)->select('assistants.id'));
+        }
+
         return [
-            'total'  => Channel::query()->where('tenant_id', $this->tenantId())->count(),
-            'active' => Channel::query()->where('tenant_id', $this->tenantId())->where('is_active', true)->count(),
+            'total'  => (clone $query)->count(),
+            'active' => $query->where('is_active', true)->count(),
         ];
     }
 
