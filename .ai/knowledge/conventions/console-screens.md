@@ -10,7 +10,7 @@ paths:
   - routes/inertia.php
   - "resources/js/pages/Console/**"
   - "resources/js/ui/**"
-reviewed_at: 2026-10-09
+reviewed_at: 2026-10-10
 ---
 # Console screens
 
@@ -69,6 +69,12 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   record is saved, the write still succeeds; the toast is a fixed, translated error chosen from the stored outcome
   (the channel's status, or the request's sync outcome), never from an exception, whose message can carry the
   request URL and with it the secret. Example: `ChannelController`.
+- **A step that reaches people carries what the person confirmed and is conditional on the status.**
+  The confirmation dialog holds the row's `revision`; the service locks the record, compares it, and
+  the write itself carries the status in its `WHERE`, so a double click, a second tab or a replayed POST
+  does the step once. A list that shows live progress polls (`usePoll`, partial reload of `table` only)
+  only while a row is running, and gives up after a fixed time. Example: `BroadcastController`,
+  `BroadcastService`, `SendDialog.vue`.
 - **The builder is a separate Inertia app**: reach it with a plain `<a>` or `Inertia::location()`
   to the named route `builder.flows.show`, never a `<Link>` or a redirect. A related record
   created from inside a form (a flow's new group) uses its own `*-inline` route that redirects
@@ -80,7 +86,8 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
 `DestroyContactGroupsRequest`, `resources/js/pages/Console/ContactGroups/*`,
 `tests/Feature/Console/ContactGroupsConsoleTest.php`. With filters, grouping, guards and an
 assistant-owned policy: `FlowController`, `FlowDraftService`, `resources/js/pages/Console/Flows/*`.
-A form with a tree of rules whose choices come from the domain: `ContactSegmentController`,
+With a confirmed irreversible step, a live reach count and a localized field: `BroadcastController`,
+`BroadcastService`, `resources/js/pages/Console/Broadcasts/*`. A form with a tree of rules whose choices come from the domain: `ContactSegmentController`,
 `ContactSegmentService`, `ContactSegmentRequest`, `resources/js/pages/Console/ContactSegments/*`. A card with narrow writes (replace a set, no create or delete): `ContactController`,
 `AssistantContactService`, `ContactCard`, `resources/js/pages/Console/Contacts/*`.
 

@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Filament\Assistant\Resources\Broadcasts\Pages;
 
+use App\Domains\Broadcasting\Enums\BroadcastStatus;
+use App\Domains\Broadcasting\Models\Broadcast;
+use App\Domains\Broadcasting\Support\BroadcastMessage;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use App\Filament\Assistant\Resources\Broadcasts\BroadcastResource;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 final class EditBroadcast extends EditRecord
 {
@@ -24,7 +29,7 @@ final class EditBroadcast extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        $data['message'] = $this->cleanLocalizedMessage($data['message'] ?? null);
+        $data['message'] = BroadcastMessage::clean($data['message'] ?? null);
 
         $this->guardBaseLanguage($data['message']);
 
@@ -32,26 +37,31 @@ final class EditBroadcast extends EditRecord
     }
 
     /**
-     * Drop blank locale entries so the JSON column stays canonical — mirrors
-     * AssistantSettings::cleanLocalized(), minus the flat-string legacy branch
-     * that field never had.
+     * Saves only while the broadcast is still a draft. The page checks that when it opens and on each request, but a
+     * run can start between that check and this write, and a started run reads the message for each recipient as it
+     * delivers: changing it then would change what the rest of the audience receives. So the row is locked and its
+     * status read again inside the write.
      *
-     * @return array<string, string>|null
+     * @param  array<string, mixed>  $data
      */
-    private function cleanLocalizedMessage(mixed $value): ?array
+    protected function handleRecordUpdate(Model $record, array $data): Model
     {
-        if (! is_array($value)) {
-            return null;
-        }
+        return DB::transaction(function () use ($record, $data): Model {
+            $locked = Broadcast::query()->whereKey($record->getKey())->lockForUpdate()->first();
 
-        $clean = [];
-        foreach ($value as $lang => $text) {
-            if (is_string($lang) && is_string($text) && '' !== mb_trim($text)) {
-                $clean[$lang] = $text;
+            if (! $locked instanceof Broadcast || BroadcastStatus::Draft !== $locked->status) {
+                Notification::make()
+                    ->danger()
+                    ->title(__('broadcast.errors.not_editable'))
+                    ->send();
+
+                $this->halt();
             }
-        }
 
-        return [] === $clean ? null : $clean;
+            $locked->update($data);
+
+            return $locked;
+        });
     }
 
     /**
@@ -60,9 +70,8 @@ final class EditBroadcast extends EditRecord
     private function guardBaseLanguage(?array $message): void
     {
         $baseLanguage = app(TenantSettings::class)->content_base_language;
-        $text         = $message[$baseLanguage] ?? null;
 
-        if (is_string($text) && '' !== mb_trim($text)) {
+        if (BroadcastMessage::hasBaseLanguageText($message, $baseLanguage)) {
             return;
         }
 

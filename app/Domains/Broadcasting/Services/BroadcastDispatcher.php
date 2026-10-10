@@ -34,7 +34,9 @@ final class BroadcastDispatcher
             return false;
         }
 
-        RunBroadcastJob::dispatch((string) $broadcast->tenant_id, (string) $broadcast->getKey());
+        // After the commit: a caller that starts inside a transaction would otherwise let the job run before the status
+        // is visible, find a draft and leave the broadcast Running with nobody working on it.
+        RunBroadcastJob::dispatch((string) $broadcast->tenant_id, (string) $broadcast->getKey())->afterCommit();
 
         return true;
     }

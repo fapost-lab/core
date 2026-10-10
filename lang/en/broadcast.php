@@ -50,6 +50,7 @@ return [
     ],
 
     'errors' => [
+        'not_editable'                   => 'This broadcast has already been started and can no longer be edited.',
         'message_required_base_language' => 'Add message text for :language — it is this tenant\'s base language and can\'t be empty.',
     ],
 ];

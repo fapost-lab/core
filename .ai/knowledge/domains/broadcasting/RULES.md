@@ -13,7 +13,12 @@ paths:
   - "app/Filament/Assistant/Resources/Broadcasts/**"
   - "database/migrations/tenant/*broadcast*"
   - "tests/Feature/Domains/Broadcasting/**"
-reviewed_at: 2026-10-05
+  - app/Http/Controllers/Console/BroadcastController.php
+  - "app/Http/Requests/Console/*Broadcast*"
+  - "resources/js/pages/Console/Broadcasts/**"
+  - tests/Feature/Console/BroadcastsConsoleTest.php
+  - tests/Feature/Filament/EditBroadcastTest.php
+reviewed_at: 2026-10-10
 ---
 # Broadcasting rules
 
@@ -24,6 +29,20 @@ broken.
 
 - **Only one caller starts a broadcast.** `Draft` → `Running` is a conditional UPDATE. Enforced:
   `BroadcastDispatcher`, `BroadcastDispatcherTest`.
+- **A broadcast is changed only while it is a draft, and the check is part of the write.** A
+  started run reads `message` for each recipient as it delivers, so a later edit would change what
+  the rest of the audience receives. The console's `BroadcastService::update()` and Filament's
+  `EditBroadcast::handleRecordUpdate()` lock the row and look at the status again. Enforced:
+  `BroadcastsConsoleTest`, `EditBroadcastTest`.
+- **The console sends only the revision a person confirmed.** `BroadcastService::send()` locks the
+  draft and refuses a stale revision (a hash of name, message, target; not `updated_at`), a base
+  language without text and an audience that no longer exists, then lets
+  `BroadcastDispatcher::start()` decide the single winner. Enforced: `BroadcastsConsoleTest`.
+- **The run is queued after the transaction commits** (`->afterCommit()` in
+  `BroadcastDispatcher::start()`), so a job never sees a draft that is already `Running` on the
+  other side. Enforced: `BroadcastDispatcherTest`.
+- **The reach shown to a person is `BroadcastRecipientResolver::count()`, equal to
+  `resolve()->count()`** (one shared query). Enforced: `BroadcastRecipientResolverCountTest`.
 - **Recipients are written once:** `insertOrIgnore` plus a unique `(broadcast_id, contact_id)`.
 - **Backpressure is checked before any recipient row is written;** the run re-queues itself with
   a 30-second delay (`RunBroadcastJob`). No test covers it.
