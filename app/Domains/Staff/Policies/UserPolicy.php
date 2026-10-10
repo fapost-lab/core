@@ -45,6 +45,9 @@ final class UserPolicy
         return ! ($user->isAdmin() && ! $authUser->isAdmin());
     }
 
+    /**
+     * Removing someone needs the same advantage as editing their profile: a higher priority (admins pass `Gate::before`).
+     */
     public function delete(AuthUser $authUser, User $user): bool
     {
         if (! $authUser->can(Permission::ManageUsers->value)) {
@@ -55,7 +58,11 @@ final class UserPolicy
             return false;
         }
 
-        return ! ($user->isAdmin() && ! $authUser->isAdmin());
+        if ($user->isAdmin() && ! $authUser->isAdmin()) {
+            return false;
+        }
+
+        return $this->actorOutranks($authUser, $user);
     }
 
     public function deleteAny(AuthUser $authUser): bool

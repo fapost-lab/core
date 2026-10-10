@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
+use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
@@ -68,6 +70,25 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::put('admin/translations/{key}', [AdminTranslationController::class, 'update'])->name('console.admin.translations.update');
         Route::delete('admin/translations/{key}', [AdminTranslationController::class, 'reset'])->name('console.admin.translations.reset');
 
+        // Staff users: an invitation instead of a password; the activation state is sent, not toggled, so a repeated request changes nothing.
+        Route::get('admin/users', [AdminUserController::class, 'index'])->name('filament.admin.resources.users.index');
+        Route::get('admin/users/create', [AdminUserController::class, 'create'])->name('filament.admin.resources.users.create');
+        Route::get('admin/users/{record}/edit', [AdminUserController::class, 'edit'])->name('filament.admin.resources.users.edit');
+        Route::post('admin/users', [AdminUserController::class, 'store'])->name('console.admin.users.store');
+        Route::delete('admin/users', [AdminUserController::class, 'destroyMany'])->name('console.admin.users.destroy-many');
+        Route::put('admin/users/{record}', [AdminUserController::class, 'update'])->name('console.admin.users.update');
+        Route::patch('admin/users/{record}/active', [AdminUserController::class, 'updateActivity'])->name('console.admin.users.activity');
+        Route::post('admin/users/{record}/resend-activation', [AdminUserController::class, 'resendActivation'])->name('console.admin.users.resend-activation');
+        Route::delete('admin/users/{record}', [AdminUserController::class, 'destroy'])->name('console.admin.users.destroy');
+
+        // Staff roles: permissions chosen from the catalogue; a system role keeps its name and is never deleted.
+        Route::get('admin/roles', [AdminRoleController::class, 'index'])->name('filament.admin.resources.roles.index');
+        Route::get('admin/roles/create', [AdminRoleController::class, 'create'])->name('filament.admin.resources.roles.create');
+        Route::get('admin/roles/{record}/edit', [AdminRoleController::class, 'edit'])->name('filament.admin.resources.roles.edit');
+        Route::post('admin/roles', [AdminRoleController::class, 'store'])->name('console.admin.roles.store');
+        Route::delete('admin/roles', [AdminRoleController::class, 'destroyMany'])->name('console.admin.roles.destroy-many');
+        Route::put('admin/roles/{record}', [AdminRoleController::class, 'update'])->name('console.admin.roles.update');
+        Route::delete('admin/roles/{record}', [AdminRoleController::class, 'destroy'])->name('console.admin.roles.destroy');
         // Assistants: the tenant's assistants with their channels. `{record}` is the assistant; a channel is created on
         // the assistant's console, as it was, and changed here on the console's channel form.
         Route::get('admin/assistants', [AdminAssistantController::class, 'index'])->name('filament.admin.resources.assistants.index');

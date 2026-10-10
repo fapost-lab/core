@@ -79,7 +79,7 @@ entry and the dashboard are served by Inertia.
 
 - [x] `admin-assistants` — Assistants with their channels — list, create, view, edit; the channels section on the
       shared channel form (after: channels in phase 2 — reuses its form)
-- [ ] `admin-users-roles` — Users and roles — user list with activation and deactivation, role assignment within the
+- [x] `admin-users-roles` — Users and roles — user list with activation and deactivation, role assignment within the
       actor's priority; roles with grouped permission checklists (after: the pilot)
 - [ ] `admin-media-library` — The media library — folder tree, upload, rename, move, references, soft delete and
       restore, bulk actions, file view with previews; folder deletion moved out of the page into

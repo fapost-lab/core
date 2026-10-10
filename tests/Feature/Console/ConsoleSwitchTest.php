@@ -116,6 +116,34 @@ final class ConsoleSwitchTest extends FeatureTestCase
         }
     }
 
+    public function test_filament_answers_the_users_and_roles_pages_and_their_writes_do_not_exist(): void
+    {
+        foreach (['users', 'roles'] as $resource) {
+            foreach (['index', 'create', 'edit'] as $page) {
+                $name   = "filament.admin.resources.{$resource}.{$page}";
+                $action = $this->route($name)->getActionName();
+
+                $this->assertStringNotContainsString('App\\Http\\Controllers', $action, $name);
+                $this->assertStringContainsString('Filament', $action, $name);
+            }
+        }
+
+        foreach ([
+            'console.admin.users.store',
+            'console.admin.users.update',
+            'console.admin.users.activity',
+            'console.admin.users.resend-activation',
+            'console.admin.users.destroy',
+            'console.admin.users.destroy-many',
+            'console.admin.roles.store',
+            'console.admin.roles.update',
+            'console.admin.roles.destroy',
+            'console.admin.roles.destroy-many',
+        ] as $name) {
+            $this->assertNull(Route::getRoutes()->getByName($name), $name);
+        }
+    }
+
     public function test_filament_answers_the_admin_assistant_screens_and_their_writes_do_not_exist(): void
     {
         foreach ([
