@@ -17,6 +17,7 @@ use App\Domains\Flow\Models\FlowLog;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\Role;
+use App\Domains\Staff\Models\SupportAccessEntry;
 use App\Domains\Staff\Models\User;
 use Closure;
 use Illuminate\Support\Facades\Gate;
@@ -26,7 +27,8 @@ use Illuminate\Support\Facades\Gate;
  * navigation it replaces: a model's `viewAny` policy or the permission the Filament page asks for, so a user sees an
  * item exactly when Filament showed it. Administrators pass every check through `Gate::before`.
  *
- * Items keep Filament's route names. An item whose screen has not moved off Filament yet is marked `external` and
+ * Items keep Filament's route names. A screen Filament never had is given by its full `console.*` route name, taken
+ * as is. An item whose screen has not moved off Filament yet is marked `external` and
  * rendered as a plain link (see {@see RouteOwnership}); an item whose route does not exist is left out.
  *
  * @phpstan-type Item array{key: string, label: string, href: string, icon: string, external: bool, badge: string|null}
@@ -94,6 +96,7 @@ final readonly class NavigationBuilder
             $this->entry(__('staff.assistants.label'), 'resources.assistants.index', __('staff.assistants.plural_label'), 'rocket', 0, $this->canViewAny($user, Assistant::class)),
             $this->entry($staff, 'resources.users.index', __('staff.users.plural_label'), 'users', 0, $this->canViewAny($user, User::class)),
             $this->entry($staff, 'resources.roles.index', __('staff.roles.plural_label'), 'shield-check', 0, $this->canViewAny($user, Role::class)),
+            $this->entry($staff, 'console.admin.support-access.index', __('console.support_access.title'), 'life-buoy', 10, $this->canViewAny($user, SupportAccessEntry::class)),
             $this->entry(
                 $media,
                 'resources.media.index',
@@ -132,7 +135,7 @@ final readonly class NavigationBuilder
     {
         $visible = array_values(array_filter(
             $entries,
-            fn (array $entry): bool => $entry['visible'] && $this->ownership->exists($prefix . $entry['route']),
+            fn (array $entry): bool => $entry['visible'] && $this->ownership->exists($this->routeName($prefix, $entry['route'])),
         ));
 
         /** @var array<string, list<array{sort: int, item: Item}>> $sorted */
@@ -140,7 +143,7 @@ final readonly class NavigationBuilder
         $labels = [];
 
         foreach ($visible as $entry) {
-            $name = $prefix . $entry['route'];
+            $name = $this->routeName($prefix, $entry['route']);
             $key  = $entry['group'] ?? '';
 
             $labels[$key]   = $entry['group'];
@@ -168,6 +171,14 @@ final readonly class NavigationBuilder
         usort($result, static fn (array $a, array $b): int => (null === $a['label'] ? 0 : 1) <=> (null === $b['label'] ? 0 : 1));
 
         return $result;
+    }
+
+    /**
+     * The full route name of an item: a Filament route under the panel's prefix, or a console route as given.
+     */
+    private function routeName(string $prefix, string $route): string
+    {
+        return str_starts_with($route, 'console.') ? $route : $prefix . $route;
     }
 
     /**

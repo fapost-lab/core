@@ -89,7 +89,7 @@ entry and the dashboard are served by Inertia.
 - [ ] `admin-dashboard-search` — The admin dashboard and search — stats and the activity chart on a query service, the ⌘K
       palette over assistants, users, roles and media (after: the pilot)
 
-- [ ] `support-access-log-screen` — The support access log — admins see which platform operator entered the tenant as support and when, read from `support_access_entries`; until then the support user's badge in the user list is all the tenant sees (after: Users and roles — it sits next to them)
+- [x] `support-access-log-screen` — The support access log — admins see which platform operator entered the tenant as support and when, read from `support_access_entries`; until then the support user's badge in the user list is all the tenant sees (after: Users and roles — it sits next to them)
 
 ## Phase 4 — Solutions add screens
 
