@@ -69,6 +69,29 @@ final class ConversationReplyServiceTest extends FeatureTestCase
         $this->assertSame('provider-1', $result->providerMessageId);
     }
 
+    public function test_a_submission_id_makes_the_idempotency_key_stable_across_retries(): void
+    {
+        [$conversation] = $this->threadWithLinkedContact();
+        $keys           = [];
+
+        $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock) use (&$keys): void {
+            $mock->shouldReceive('send')->andReturnUsing(function (OutboundMessage $message) use (&$keys): DeliveryResult {
+                $keys[] = $message->idempotencyKey;
+
+                return new DeliveryResult(sent: true);
+            });
+        });
+
+        $service = app(ConversationReplyServiceInterface::class);
+        $service->send($conversation, 'hi', 'staff-1', null, 'req-1');
+        $service->send($conversation, 'hi', 'staff-1', null, 'req-1');
+        $service->send($conversation, 'hi', 'staff-1');
+
+        $expected = 'staff_reply:' . $conversation->getKey() . ':req-1';
+        $this->assertSame([$expected, $expected], array_slice($keys, 0, 2));
+        $this->assertNotSame($expected, $keys[2]);
+    }
+
     public function test_send_throws_when_contact_has_no_channel_linkage(): void
     {
         $assistant = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);

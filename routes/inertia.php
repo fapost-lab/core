@@ -17,6 +17,7 @@ use App\Http\Controllers\Console\ChannelController;
 use App\Http\Controllers\Console\ContactController;
 use App\Http\Controllers\Console\ContactGroupController;
 use App\Http\Controllers\Console\ContactSegmentController;
+use App\Http\Controllers\Console\ConversationController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
@@ -182,6 +183,15 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('assistant/{tenant}/broadcasts/{record}/send', [BroadcastController::class, 'send'])->name('console.broadcasts.send');
         Route::post('assistant/{tenant}/broadcasts/{record}/cancel', [BroadcastController::class, 'cancel'])->name('console.broadcasts.cancel');
         Route::delete('assistant/{tenant}/broadcasts/{record}', [BroadcastController::class, 'destroy'])->name('console.broadcasts.destroy');
+
+        // Conversations: the inbox reaches real people. `reply` carries the id of the operator's submission and sends it at
+        // most once; the status is sent, not toggled; a takeover only takes a thread the bot answers.
+        Route::get('assistant/{tenant}/conversations', [ConversationController::class, 'index'])->name('filament.assistant.resources.conversations.index');
+        Route::get('assistant/{tenant}/conversations/{record}', [ConversationController::class, 'show'])->name('filament.assistant.resources.conversations.view');
+        Route::post('assistant/{tenant}/conversations/{record}/reply', [ConversationController::class, 'reply'])->middleware('throttle:30,1')->name('console.conversations.reply');
+        Route::post('assistant/{tenant}/conversations/{record}/takeover', [ConversationController::class, 'takeOver'])->name('console.conversations.takeover');
+        Route::post('assistant/{tenant}/conversations/{record}/return-to-bot', [ConversationController::class, 'returnToBot'])->name('console.conversations.return-to-bot');
+        Route::put('assistant/{tenant}/conversations/{record}/status', [ConversationController::class, 'updateStatus'])->name('console.conversations.status');
 
         // Flow sessions and the flow log: read-only, kept current live or by polling. Every log read is bounded in time.
         Route::get('assistant/{tenant}/flow-sessions', [FlowSessionController::class, 'index'])->name('filament.assistant.resources.flow-sessions.index');

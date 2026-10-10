@@ -6,6 +6,7 @@ namespace App\Filament\Assistant\Resources\Conversations;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Conversation\Models\Conversation;
+use App\Domains\Conversation\Services\ConversationInbox;
 use App\Domains\Staff\Models\User;
 use App\Filament\Assistant\Resources\Conversations\Pages\ListConversations;
 use App\Filament\Assistant\Resources\Conversations\Pages\ViewConversation;
@@ -84,17 +85,18 @@ final class ConversationResource extends Resource
     }
 
     /**
-     * Count of threads with unread messages in the current assistant scope.
-     * Reuses {@see getEloquentQuery()} so the count follows the exact same
-     * tenant/assistant scoping as the list itself.
+     * Count of threads with unread messages in the current assistant, through
+     * the same {@see ConversationInbox::unreadCount()} the console's menu uses.
      */
     public static function getNavigationBadge(): ?string
     {
-        if (! static::shouldRegisterNavigation()) {
+        $tenant = Filament::getTenant();
+
+        if (! $tenant instanceof Assistant || ! static::shouldRegisterNavigation()) {
             return null;
         }
 
-        $count = static::getEloquentQuery()->where('unread_count', '>', 0)->count();
+        $count = app(ConversationInbox::class)->unreadCount($tenant);
 
         return $count > 0 ? (string) $count : null;
     }
