@@ -71,6 +71,24 @@ final class BroadcastsConsoleTest extends InertiaConsoleTestCase
                 ->etc());
     }
 
+    public function test_a_draft_row_carries_a_short_plain_excerpt_of_the_base_language_text(): void
+    {
+        $this->broadcast('Long', ['message' => ['en' => '<b>' . str_repeat('word ', 100) . '</b>', 'ru' => 'Привет']]);
+
+        $excerpt = null;
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertInertia(function (AssertableInertia $page) use (&$excerpt): void {
+                $excerpt = $page->toArray()['props']['table']['rows'][0]['excerpt'];
+            });
+
+        $this->assertIsString($excerpt);
+        $this->assertLessThanOrEqual(283, mb_strlen($excerpt));
+        $this->assertStringStartsWith('word word', $excerpt);
+        $this->assertStringNotContainsString('<b>', $excerpt);
+    }
+
     public function test_each_row_offers_only_the_steps_its_status_allows(): void
     {
         $draft     = $this->broadcast('Draft');
@@ -99,6 +117,8 @@ final class BroadcastsConsoleTest extends InertiaConsoleTestCase
         $this->assertSame("{$base}/{$running->getKey()}/cancel", $rows['Running']['cancelUrl']);
         $this->assertSame(['running', 4, 10, 1, 2], [$rows['Running']['status'], $rows['Running']['sent'], $rows['Running']['total'], $rows['Running']['failed'], $rows['Running']['skipped']]);
 
+        $this->assertSame('Hello', $rows['Draft']['excerpt']);
+        $this->assertNull($rows['Running']['excerpt']);
         $this->assertNull($rows['Completed']['revision']);
         $this->assertNull($rows['Completed']['sendUrl'], 'A finished broadcast cannot be sent again.');
         $this->assertNull($rows['Completed']['editUrl']);

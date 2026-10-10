@@ -538,7 +538,7 @@ return [
         'sections' => [
             'message' => [
                 'title'       => 'Message',
-                'description' => 'Each recipient gets the text in their own language, or in the base language when yours is missing.',
+                'description' => 'Each recipient gets the text in their own language, or in the base language when theirs is missing.',
             ],
             'audience' => [
                 'title'       => 'Audience',
@@ -573,6 +573,7 @@ return [
             'description' => 'The message goes to everyone in the audience below. It cannot be recalled once it has started.',
             'name'        => 'Broadcast',
             'audience'    => 'Audience',
+            'message'     => 'Message',
             'confirm'     => 'Send',
             'sending'     => 'Sending…',
         ],

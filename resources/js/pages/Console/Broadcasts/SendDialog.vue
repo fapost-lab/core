@@ -18,7 +18,7 @@ import type { BroadcastRow, BroadcastsPageProps, SelectOption } from './types'
 
 /**
  * The confirmation a draft is sent from, and the only way to send one. It shows what is about to go out (the name, the
- * audience and, counted fresh when it opens, how many contacts that is) and says it cannot be recalled. The reach is
+ * base-language text, the audience and, counted fresh when it opens, how many contacts that is) and says it cannot be recalled. The reach is
  * advice: when it cannot be counted, sending stays possible and the server checks everything on its own.
  *
  * The send button is off while a send is on its way, and the dialog closes on the first click, so a second click has
@@ -92,8 +92,10 @@ const audience = computed(() => {
         <dd class="font-medium break-words">{{ row?.name }}</dd>
         <dt class="text-muted-foreground">{{ t.send.audience }}</dt>
         <dd class="break-words">{{ audience }}</dd>
+        <dt class="text-muted-foreground">{{ t.send.message }}</dt>
+        <dd class="break-words whitespace-pre-line">{{ row?.excerpt || '—' }}</dd>
         <dt class="text-muted-foreground">{{ t.fields.reach }}</dt>
-        <dd><ReachLine :state="reach.state.value" :count="reach.count.value" /></dd>
+        <dd><ReachLine :state="reach.state.value" :count="reach.count.value" :message="reach.message.value" /></dd>
       </dl>
 
       <AlertDialogFooter>

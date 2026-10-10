@@ -123,7 +123,7 @@ function submit(): void {
       </FormField>
 
       <FormField id="reach" :label="t.fields.reach" :hint="t.reach.note">
-        <ReachLine :state="reach.state.value" :count="reach.count.value" />
+        <ReachLine :state="reach.state.value" :count="reach.count.value" :message="reach.message.value" />
       </FormField>
     </FormSection>
 

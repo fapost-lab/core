@@ -24,6 +24,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -238,6 +239,8 @@ final class BroadcastController extends Controller
             'skipped' => $broadcast->skipped_count,
             // Only a draft carries the revision to confirm; nothing else can be sent.
             'revision' => $isDraft ? $this->broadcasts->revision($broadcast) : null,
+            // What the revision covers, for the confirmation to show: the base-language text, plain and short.
+            'excerpt' => $isDraft ? $this->excerpt($broadcast) : null,
             // What the confirmation dialog counts the reach of: the audience of the revision it shows.
             'targetTags'      => $isDraft ? array_values($broadcast->target_tags ?? []) : [],
             'targetSegmentId' => $isDraft ? $broadcast->target_segment_id : null,
@@ -247,6 +250,17 @@ final class BroadcastController extends Controller
             'cancelUrl'       => BroadcastStatus::Running === $broadcast->status && $can['cancel'] ? $this->url('cancel', ['record' => $id]) : null,
             'deleteUrl'       => BroadcastStatus::Running !== $broadcast->status && $can['delete'] ? $this->url('destroy', ['record' => $id]) : null,
         ];
+    }
+
+    /**
+     * The base-language text of a broadcast as a short plain excerpt; an empty string when there is none.
+     */
+    private function excerpt(Broadcast $broadcast): string
+    {
+        $message = is_array($broadcast->message) ? $broadcast->message : [];
+        $text    = $message[$this->broadcasts->baseLanguage()] ?? '';
+
+        return is_string($text) ? Str::limit(mb_trim(strip_tags($text)), 280) : '';
     }
 
     /**

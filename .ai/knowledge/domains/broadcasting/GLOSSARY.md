@@ -12,7 +12,7 @@ paths:
   - "app/Filament/Assistant/Resources/Broadcasts/**"
   - "database/migrations/tenant/*broadcast*"
   - "tests/Feature/Domains/Broadcasting/**"
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-10
 ---
 # Broadcasting glossary
 

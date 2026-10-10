@@ -3,10 +3,17 @@ import { useHttp } from '@inertiajs/vue3'
 import { isCountable } from './audience'
 import type { BroadcastAudience } from './types'
 
-export type ReachState = 'idle' | 'loading' | 'ready' | 'error'
+export type ReachState = 'idle' | 'loading' | 'ready' | 'invalid' | 'error'
 
 /** How long the form waits after the last change of the audience before it asks the server to count. */
 export const REACH_DEBOUNCE_MS = 500
+
+/** The first message the reach endpoint gave for a `target_*` field (a list item is `target_tags.0`), or null. */
+export function firstTargetError(errors: Record<string, string | undefined>): string | null {
+  const key = Object.keys(errors).find((name) => name.startsWith('target_') && errors[name])
+
+  return key === undefined ? null : (errors[key] ?? null)
+}
 
 /**
  * The reach of an audience: how many contacts would receive a broadcast to it now, counted by the server.
@@ -18,6 +25,8 @@ export const REACH_DEBOUNCE_MS = 500
 export function useReach(url: () => string, audience: () => BroadcastAudience, options: { debounce?: number; auto?: boolean } = {}) {
   const count = ref<number | null>(null)
   const state = ref<ReachState>('idle')
+  // The server's refusal of the audience (a tag or a segment that is gone), shown instead of "could not count".
+  const message = ref<string | null>(null)
   const http = useHttp<{ target_type: string; target_tags: string[]; target_segment_id: string }, { count: number }>({
     target_type: 'all',
     target_tags: [],
@@ -49,6 +58,7 @@ export function useReach(url: () => string, audience: () => BroadcastAudience, o
     }
 
     state.value = 'loading'
+    message.value = null
     http.target_type = current.targetType
     http.target_tags = current.targetType === 'tags' ? current.targetTags : []
     http.target_segment_id = current.targetType === 'segment' ? (current.targetSegmentId ?? '') : ''
@@ -64,8 +74,10 @@ export function useReach(url: () => string, audience: () => BroadcastAudience, o
           count.value = response.count
           state.value = 'ready'
         } else {
+          // `useHttp` resolves nothing on a 422 and keeps the validation errors on itself.
           count.value = null
-          state.value = 'error'
+          message.value = firstTargetError(http.errors)
+          state.value = message.value === null ? 'error' : 'invalid'
         }
       })
       .catch(() => {
@@ -83,6 +95,7 @@ export function useReach(url: () => string, audience: () => BroadcastAudience, o
     latest++
     state.value = isCountable(audience()) ? 'loading' : 'idle'
     count.value = null
+    message.value = null
     timer = setTimeout(refresh, options.debounce ?? REACH_DEBOUNCE_MS)
   }
 
@@ -97,5 +110,5 @@ export function useReach(url: () => string, audience: () => BroadcastAudience, o
     latest++
   })
 
-  return { count, state, refresh }
+  return { count, state, message, refresh }
 }

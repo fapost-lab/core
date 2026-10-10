@@ -14,6 +14,7 @@ import type { BroadcastsPageProps } from './types'
 const props = defineProps<{
   state: ReachState
   count: number | null
+  message?: string | null
 }>()
 
 const t = computed(() => usePage<BroadcastsPageProps>().props.translations.console.broadcasts.reach)
@@ -34,6 +35,7 @@ const text = computed(() => {
 <template>
   <div class="flex flex-col gap-1" aria-live="polite">
     <span v-if="state === 'loading'" class="text-muted-foreground text-sm">{{ t.loading }}</span>
+    <span v-else-if="state === 'invalid'" class="text-destructive text-sm">{{ message || t.unavailable }}</span>
     <span v-else-if="state === 'error'" class="text-muted-foreground text-sm">{{ t.unavailable }}</span>
     <span v-else-if="text === null" class="text-muted-foreground text-sm">—</span>
     <Badge v-else :variant="count === 0 ? 'warning' : 'success'" class="w-fit">{{ text }}</Badge>

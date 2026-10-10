@@ -18,7 +18,7 @@ paths:
   - "resources/js/pages/Console/Broadcasts/**"
   - tests/Feature/Console/BroadcastsConsoleTest.php
   - tests/Feature/Filament/EditBroadcastTest.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-10
 ---
 # Broadcasting rules
 

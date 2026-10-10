@@ -34,7 +34,7 @@ export interface BroadcastsTranslations {
     reach: string
   }
   reach: { none: string; one: string; many: string; unavailable: string; loading: string; note: string }
-  send: { title: string; description: string; name: string; audience: string; confirm: string; sending: string }
+  send: { title: string; description: string; name: string; audience: string; message: string; confirm: string; sending: string }
   cancel: { title: string; description: string; confirm: string; keep: string }
   delete: { title: string; description: string; confirm: string }
 }
@@ -60,6 +60,8 @@ export interface BroadcastRow extends Record<string, unknown> {
   skipped: number
   /** Only a draft has one: what the person confirms when sending. */
   revision: string | null
+  /** Only a draft has one: the base-language text, plain and short, shown in the send confirmation. */
+  excerpt: string | null
   targetTags: string[]
   targetSegmentId: string | null
   createdAt: string | null

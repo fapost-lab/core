@@ -16,7 +16,7 @@ paths:
   - "app/Http/Requests/Console/*Broadcast*"
   - "resources/js/pages/Console/Broadcasts/**"
   - tests/Feature/Console/BroadcastsConsoleTest.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-10
 ---
 # Broadcasting
 
