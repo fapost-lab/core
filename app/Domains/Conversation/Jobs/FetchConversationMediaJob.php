@@ -8,6 +8,7 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Conversation\Contracts\ConversationStoreInterface;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
 use App\Domains\Media\Enums\MediaSource;
+use App\Domains\Media\Exceptions\StorageLimitReachedException;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -20,7 +21,8 @@ use Throwable;
  * rewrites the message's media descriptors with the resolved `media_file_id`
  * (spec §6.1). Runs async on `messaging.logging`: the message text is already in
  * the transcript, so a failed download degrades the descriptor to `failed` while
- * keeping the provider file id — it never blocks the pipeline.
+ * keeping the provider file id — it never blocks the pipeline. A file the tenant has no storage
+ * left for degrades the same way, with `reason: storage_limit_reached`.
  */
 final class FetchConversationMediaJob implements ShouldQueue
 {
@@ -102,6 +104,14 @@ final class FetchConversationMediaJob implements ShouldQueue
                 'provider_file_id' => $providerFileId,
                 'status'           => 'ready',
             ];
+        } catch (StorageLimitReachedException) {
+            // The gate has logged the refusal. Retrying cannot help until the tenant frees space, so
+            // the descriptor degrades to failed with its reason and the job ends normally.
+            return [
+                'provider_file_id' => $providerFileId,
+                'status'           => 'failed',
+                'reason'           => StorageLimitReachedException::ERROR_KEY,
+            ] + $descriptor;
         } catch (Throwable $exception) {
             $logger->warning('conversation.media.fetch_failed', [
                 'channel_id'       => $this->channelId,

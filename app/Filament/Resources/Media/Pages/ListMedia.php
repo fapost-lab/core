@@ -7,6 +7,7 @@ namespace App\Filament\Resources\Media\Pages;
 use App\Domains\Media\Contracts\MediaServiceInterface;
 use App\Domains\Media\Contracts\MediaUploaderInterface;
 use App\Domains\Media\Enums\MediaSource;
+use App\Domains\Media\Exceptions\StorageLimitReachedException;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFolder;
 use App\Domains\Staff\Enums\Permission;
@@ -14,6 +15,7 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Filament\Resources\Media\MediaResource;
 use App\Filament\Resources\Media\Tables\MediaFilesTable;
+use App\Filament\Support\StorageLimit;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
@@ -317,8 +319,9 @@ final class ListMedia extends ListRecords
 
                     // Filament v5 FileUpload returns stored temporary paths (strings),
                     // not UploadedFile instances. Reconstruct from the local disk.
-                    $paths   = array_filter((array)($data['files'] ?? []), 'is_string');
+                    $paths   = array_values(array_filter((array)($data['files'] ?? []), 'is_string'));
                     $created = 0;
+                    $refused = null;
 
                     foreach ($paths as $storedPath) {
                         $fullPath = Storage::disk('local')->path($storedPath);
@@ -326,19 +329,34 @@ final class ListMedia extends ListRecords
                             continue;
                         }
 
-                        $originalName = basename($storedPath);
-                        $upload       = new \Illuminate\Http\UploadedFile($fullPath, $originalName, null, null, true);
+                        // After a refusal the rest of the batch is dropped, though a duplicate or a smaller file might
+                        // still fit: stopping at the first refusal is a deliberate choice, and the notice says how many were saved.
+                        if (null === $refused) {
+                            $originalName = basename($storedPath);
+                            $upload       = new \Illuminate\Http\UploadedFile($fullPath, $originalName, null, null, true);
 
-                        $uploader->uploadFromUploadedFile(
-                            file: $upload,
-                            folder: $folder,
-                            name: $originalName,
-                            source: MediaSource::Upload,
-                            uploadedBy: (string)Auth::id(),
-                        );
+                            try {
+                                $uploader->uploadFromUploadedFile(
+                                    file: $upload,
+                                    folder: $folder,
+                                    name: $originalName,
+                                    source: MediaSource::Upload,
+                                    uploadedBy: (string)Auth::id(),
+                                );
+                                ++$created;
+                            } catch (StorageLimitReachedException $exception) {
+                                $refused = $exception;
+                            }
+                        }
 
                         Storage::disk('local')->delete($storedPath);
-                        $created++;
+                    }
+
+                    if (null !== $refused) {
+                        StorageLimit::notifyRefused($refused, $created, count($paths));
+                        $this->resetTable();
+
+                        return;
                     }
 
                     Notification::make()

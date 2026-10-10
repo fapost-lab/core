@@ -19,9 +19,11 @@ use App\Domains\Tenancy\Infrastructure\CoreTenantDirectory;
 use App\Domains\Tenancy\Infrastructure\CoreTenantProvisioner;
 use App\Domains\Tenancy\Infrastructure\CoreTenantRenamer;
 use App\Domains\Tenancy\Infrastructure\CoreTenantReservations;
+use App\Domains\Tenancy\Infrastructure\CoreTenantUsage;
 use App\Domains\Tenancy\Infrastructure\EloquentWebhookRegistryReader;
 use App\Domains\Tenancy\Repositories\TenantRepository;
 use App\Domains\Tenancy\Services\AlwaysActiveAccessMode;
+use App\Domains\Tenancy\Services\ByteQuota;
 use App\Domains\Tenancy\Services\ConfigTenantResolver;
 use App\Domains\Tenancy\Services\CoreBootstrap;
 use App\Domains\Tenancy\Services\CurrentAccessState;
@@ -38,6 +40,7 @@ use App\Domains\Tenancy\Services\TenantProvisioningService;
 use App\Domains\Tenancy\Services\TenantSlugChanger;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use App\Domains\Tenancy\Services\TenantUsageCounters;
 use App\Domains\Tenancy\Services\UnlimitedTenantLimits;
 use App\Domains\Tenancy\Services\UnlimitedUsageMeter;
 use App\Domains\Tenancy\Services\WebhookRegistryWriter;
@@ -45,6 +48,7 @@ use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
+use Fapost\Foundation\Quota\Contracts\TenantUsageInterface;
 use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Tenancy\Contracts\SupportAccessInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
@@ -211,6 +215,12 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->bindIf(UsageMeterInterface::class, UnlimitedUsageMeter::class);
         // Not a singleton either: it reads the scoped tenant context.
         $this->app->bind(PeriodQuota::class);
+        // And the stored-bytes check, which reads the context the same way.
+        $this->app->bind(ByteQuota::class);
+        // The counters are closures filled by the domains at boot; they hold no tenant data.
+        $this->app->singleton(TenantUsageCounters::class);
+        // Plain bind: Core is the only implementation of the usage report, called by an operator package.
+        $this->app->bind(TenantUsageInterface::class, CoreTenantUsage::class);
     }
 
     /**

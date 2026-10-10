@@ -144,6 +144,12 @@ final class MediaFilesTable
                         if ($record->references()->exists()) {
                             throw new RuntimeException(__('media.errors.has_references'));
                         }
+                    })
+                    // Through the service, so the blob and its stored object go with the last file.
+                    ->using(static function (MediaFile $record, MediaServiceInterface $service): bool {
+                        $service->forceDelete($record);
+
+                        return true;
                     }),
             ])
             ->toolbarActions([

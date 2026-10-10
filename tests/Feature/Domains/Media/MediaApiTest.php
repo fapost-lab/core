@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Media;
 
+use App\Domains\Media\Contracts\MediaUploaderInterface;
 use App\Domains\Media\Models\MediaBlob;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFileReference;
@@ -15,8 +16,10 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
 use Illuminate\Http\UploadedFile;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\FakeTenantLimits;
 
 final class MediaApiTest extends FeatureTestCase
 {
@@ -152,8 +155,10 @@ final class MediaApiTest extends FeatureTestCase
     {
         $this->actingAs($this->makeAdmin());
 
-        // 11 MB > Telegram image limit (10 MB)
-        $upload = UploadedFile::fake()->image('big.jpg', 100, 100)->size(11 * 1024);
+        // 11 MB > Telegram image limit (10 MB). The size is measured from the bytes, so pad a real JPEG.
+        $small  = UploadedFile::fake()->image('small.jpg', 100, 100);
+        $jpeg   = (string) file_get_contents($small->getRealPath());
+        $upload = UploadedFile::fake()->createWithContent('big.jpg', $jpeg . str_repeat("\0", 11 * 1024 * 1024));
 
         $response = $this->postJson('/media/files', ['file' => $upload]);
 
@@ -190,6 +195,71 @@ final class MediaApiTest extends FeatureTestCase
 
         $this->deleteJson("/media/files/{$file->id}/force?force=true")->assertNoContent();
         $this->assertNull(MediaFile::withTrashed()->find($file->id));
+    }
+
+    public function test_upload_over_the_storage_limit_is_refused_with_the_numbers(): void
+    {
+        $this->actingAs($this->makeAdmin());
+        $this->app->instance(TenantLimitsInterface::class, new FakeTenantLimits(['media_storage' => 5]));
+        // The node handler registry builds an uploader at boot, with the default limits.
+        $this->app->forgetInstance(MediaUploaderInterface::class);
+
+        $response = $this->postJson('/media/files', [
+            'file' => UploadedFile::fake()->createWithContent('big.txt', 'twelve bytes'),
+        ]);
+
+        $response->assertUnprocessable()
+            ->assertJsonPath('error', 'storage_limit_reached')
+            ->assertJsonPath('limit', 5)
+            ->assertJsonPath('used', 0)
+            ->assertJsonPath('needed', 12);
+        $this->assertStringContainsString('Media storage is full', (string) $response->json('message'));
+        $this->assertSame(0, MediaBlob::query()->count());
+        $this->assertSame(0, MediaFile::query()->count());
+    }
+
+    public function test_force_delete_frees_the_blob_and_the_stored_object(): void
+    {
+        $this->actingAs($this->makeAdmin());
+
+        $fileId = $this->postJson('/media/files', [
+            'file' => UploadedFile::fake()->createWithContent('free-me.txt', 'free-me-' . uniqid()),
+        ])->assertCreated()->json('data.id');
+
+        $blob = MediaBlob::query()->firstOrFail();
+        $path = storage_path('app/' . $blob->storage_path);
+        $this->assertFileExists($path);
+
+        $this->deleteJson("/media/files/{$fileId}")->assertNoContent();
+        $this->deleteJson("/media/files/{$fileId}/force")->assertNoContent();
+
+        $this->assertSame(0, MediaBlob::query()->count());
+        $this->assertFileDoesNotExist($path);
+    }
+
+    public function test_force_delete_keeps_a_blob_another_file_still_uses(): void
+    {
+        $this->actingAs($this->makeAdmin());
+        $content = 'shared-' . uniqid();
+
+        $first  = $this->postJson('/media/files', ['file' => UploadedFile::fake()->createWithContent('a.txt', $content)])->json('data.id');
+        $second = $this->postJson('/media/files', ['file' => UploadedFile::fake()->createWithContent('b.txt', $content)])->json('data.id');
+
+        $blob = MediaBlob::query()->firstOrFail();
+        $path = storage_path('app/' . $blob->storage_path);
+
+        // The second file sits in the trash: it still holds the blob.
+        $this->deleteJson("/media/files/{$second}")->assertNoContent();
+        $this->deleteJson("/media/files/{$first}")->assertNoContent();
+        $this->deleteJson("/media/files/{$first}/force")->assertNoContent();
+
+        $this->assertSame(1, MediaBlob::query()->count());
+        $this->assertFileExists($path);
+
+        $this->deleteJson("/media/files/{$second}/force")->assertNoContent();
+
+        $this->assertSame(0, MediaBlob::query()->count());
+        $this->assertFileDoesNotExist($path);
     }
 
     public function test_references_endpoint_lists_snapshots(): void

@@ -7,9 +7,11 @@ namespace App\Http\Controllers\Media;
 use App\Domains\Media\Contracts\MediaServiceInterface;
 use App\Domains\Media\Contracts\MediaUploaderInterface;
 use App\Domains\Media\Enums\MediaSource;
+use App\Domains\Media\Exceptions\StorageLimitReachedException;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFolder;
 use App\Domains\Media\Services\ChannelLimitInspector;
+use App\Domains\Media\Services\StorageLimitMessage;
 use App\Domains\Media\Storage\TenantMediaDisk;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Http\Controllers\Controller;
@@ -83,13 +85,23 @@ final class FilesController extends Controller
         $folder   = $this->resolveFolder($folderId);
         $name     = (string)($request->input('name') ?? $upload->getClientOriginalName());
 
-        $media = $this->uploader->uploadFromUploadedFile(
-            file: $upload,
-            folder: $folder,
-            name: $name,
-            source: MediaSource::Upload,
-            uploadedBy: (string)$request->user()?->getAuthIdentifier(),
-        );
+        try {
+            $media = $this->uploader->uploadFromUploadedFile(
+                file: $upload,
+                folder: $folder,
+                name: $name,
+                source: MediaSource::Upload,
+                uploadedBy: (string)$request->user()?->getAuthIdentifier(),
+            );
+        } catch (StorageLimitReachedException $exception) {
+            return response()->json([
+                'message' => StorageLimitMessage::for($exception),
+                'error'   => StorageLimitReachedException::ERROR_KEY,
+                'limit'   => $exception->limit,
+                'used'    => $exception->used,
+                'needed'  => $exception->incoming,
+            ], 422);
+        }
 
         // Dedup detection: more than one MediaFile pointing at the same blob means the
         // uploader matched an existing blob instead of creating one.
@@ -159,7 +171,7 @@ final class FilesController extends Controller
             ], 409);
         }
 
-        $file->forceDelete();
+        $this->mediaService->forceDelete($file);
 
         return response()->json(status: 204);
     }

@@ -108,7 +108,8 @@
             "pages": [
               "self-hosting/configuration",
               "self-hosting/services",
-              "self-hosting/gateway"
+              "self-hosting/gateway",
+              "self-hosting/realtime"
             ]
           },
           {

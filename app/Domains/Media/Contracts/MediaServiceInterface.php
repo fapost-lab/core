@@ -41,6 +41,12 @@ interface MediaServiceInterface
 
     public function restore(MediaFile $file): MediaFile;
 
+    /**
+     * Delete a file permanently, and with it the blob and the stored object when no other file,
+     * trashed ones included, still uses them: this is what gives the tenant its storage back.
+     */
+    public function forceDelete(MediaFile $file): void;
+
     public function createFolder(string $name, ?MediaFolder $parent, ?string $createdBy = null): MediaFolder;
 
     public function renameFolder(MediaFolder $folder, string $newName): MediaFolder;

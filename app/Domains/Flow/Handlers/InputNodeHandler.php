@@ -20,6 +20,7 @@ use App\Domains\Flow\Validation\InputValidatorInterface;
 use App\Domains\Flow\Validation\ValidationResult;
 use App\Domains\Media\Contracts\MediaIngestorInterface;
 use App\Domains\Media\Contracts\MediaServiceInterface;
+use App\Domains\Media\Exceptions\StorageLimitReachedException;
 use Fapost\Foundation\DTO\IncomingMedia;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
@@ -456,6 +457,15 @@ final class InputNodeHandler extends AbstractVersionedHandler
                     channel: $channel,
                     providerFileId: $media->providerFileId,
                     folder: $folder,
+                );
+            } catch (StorageLimitReachedException) {
+                // No retries and no hint: asking the contact again cannot make room. The author's
+                // `invalid` branch decides what the contact is told.
+                return new NodeExecutionResult(
+                    status: NodeExecutionStatus::Executed,
+                    sourceHandle: self::INVALID_HANDLE,
+                    stateChanges: [$this->retryPath($context) => null],
+                    metadata: ['error_key' => StorageLimitReachedException::ERROR_KEY],
                 );
             } catch (Throwable $exception) {
                 throw new RuntimeException(

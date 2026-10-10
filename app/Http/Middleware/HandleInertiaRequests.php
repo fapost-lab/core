@@ -65,7 +65,7 @@ final class HandleInertiaRequests extends Middleware
                 'success' => $request->hasSession() ? $request->session()->get('success') : null,
                 'error'   => $request->hasSession() ? $request->session()->get('error') : null,
             ],
-            'broadcaster'   => fn (): array => $this->broadcaster(),
+            'broadcaster'   => fn (): array => $this->broadcaster($request),
             'supportAccess' => fn (): ?array => $this->supportAccess($request),
         ];
 
@@ -187,15 +187,21 @@ final class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * What the browser needs to decide whether live updates are possible. `null` is Laravel's "no broadcasting".
+     * What the browser needs to decide whether live updates are possible, and how to reach the websocket server when
+     * they are. `null` is Laravel's "no broadcasting". A guest gets no endpoint: there is no channel it may join, so the
+     * sign-in page never opens a socket (signing in is a full page load, which brings the endpoint).
      *
-     * @return array{enabled: bool, name: string}
+     * @return array{enabled: bool, name: string, client: array<string, mixed>|null}
      */
-    private function broadcaster(): array
+    private function broadcaster(Request $request): array
     {
         $status = app(BroadcasterStatus::class);
 
-        return ['enabled' => $status->enabled(), 'name' => $status->name()];
+        return [
+            'enabled' => $status->enabled(),
+            'name'    => $status->name(),
+            'client'  => null === $request->user() ? null : $status->client(),
+        ];
     }
 
     /**

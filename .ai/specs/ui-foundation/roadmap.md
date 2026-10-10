@@ -61,7 +61,7 @@ console menu entry is served by Inertia and the console's tests run against the 
 - [x] `console-live-updates` — Live updates with sessions and flow logs — the composable that subscribes through Echo
       when a broadcaster is configured and polls otherwise; flow sessions and flow logs on it,
       every log query bounded to a time window (after: the pilot)
-- [ ] `realtime-self-hosted` — Realtime for self-hosters — `laravel/reverb` dormant in Core, the Echo client as a lazy
+- [x] `realtime-self-hosted` — Realtime for self-hosters — `laravel/reverb` dormant in Core, the Echo client as a lazy
       chunk, an optional `reverb` service behind a Compose profile, a self-hosting "Realtime"
       page (after: live updates — it is what they switch on)
 - [ ] `console-inbox` — The conversation inbox — transcript paging, composer with attachments, take over and
