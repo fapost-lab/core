@@ -39,6 +39,7 @@ the quota contract.
 - [x] `count-limits-other-models` — Count limits on the other models — flows, channels, staff and the remaining countable models refuse creation when the contract denies it, with the architecture rule extended; the Create button is hidden in Filament by the task already in flight, and on the kit's screens when ui-foundation moves them (after: Quota contract with the assistant seam — they repeat its pattern)
 - [x] `inbound-active-contact-gate` — Inbound active-contact gate — an inbound message the contract refuses creates no contact and starts no flow, is logged, and the admin panel shows the refusal, a screen built on the kit (after: Quota contract with the assistant seam — the gate calls it; after: ui-foundation phase 3 — the admin screen is built on the kit)
 - [x] `outbound-volume-gate` — Outbound volume gate — outbound messages, broadcast sends and `call` executions consume volume through the contract and stop when refused (after: Quota contract with the assistant seam — the gate calls it)
+- [ ] Media storage gate — stored media bytes are a registered limit: an upload the contract refuses is not stored and the admin sees why, and Core reports a tenant's stored bytes so the shell can show them; bytes are state, not per-period volume, so it rides the record-limit contract, not the usage meter (split from the shell's Volume limits with the owner on 2026-10-10; after: Quota contract with the assistant seam — the same contract)
 
 ## Phase 3 — Tenant lifecycle
 
@@ -56,7 +57,7 @@ banner.
 
 1. Host-based tenant resolution; Operator provisioning contract; Quota contract with the assistant seam; Landlord ownership ADR; Tenant directory contract
 2. Tenant schema DDL on the connection that uses it; Landlord ownership narrowed to the operator package; Remove the unused PlatformSettings
-3. Panels on every tenant host; Activation on the tenant host; Deploy for several tenants; Pending reservation and resumable provisioning; Egress guard; Count limits on the other models; Inbound active-contact gate; Outbound volume gate; Runtime-stopped, read-only tenant; Solution entitlement seam; Support access contract; Tenant rename contract
+3. Panels on every tenant host; Activation on the tenant host; Deploy for several tenants; Pending reservation and resumable provisioning; Egress guard; Count limits on the other models; Inbound active-contact gate; Outbound volume gate; Media storage gate; Runtime-stopped, read-only tenant; Solution entitlement seam; Support access contract; Tenant rename contract
 
 <!--
 Rules (jig-idea §8):
