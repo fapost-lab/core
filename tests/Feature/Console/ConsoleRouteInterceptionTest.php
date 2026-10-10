@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
 use App\Http\Controllers\Console\BroadcastController;
@@ -15,6 +16,7 @@ use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
 use App\Http\Controllers\Console\LocaleController;
+use App\Http\Controllers\Console\TranslationController;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -57,6 +59,9 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'broadcasts list'       => ['filament.assistant.resources.broadcasts.index', BroadcastController::class, 'index', 'assistant/{tenant}/broadcasts'],
             'broadcasts create'     => ['filament.assistant.resources.broadcasts.create', BroadcastController::class, 'create', 'assistant/{tenant}/broadcasts/create'],
             'broadcasts edit'       => ['filament.assistant.resources.broadcasts.edit', BroadcastController::class, 'edit', 'assistant/{tenant}/broadcasts/{record}/edit'],
+            // Translations: both panels.
+            'admin translations'     => ['filament.admin.pages.translations', AdminTranslationController::class, 'index', 'admin/translations'],
+            'assistant translations' => ['filament.assistant.pages.translations', TranslationController::class, 'index', 'assistant/{tenant}/translations'],
         ];
     }
 
@@ -96,6 +101,11 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'broadcast send'           => ['console.broadcasts.send', BroadcastController::class, 'send', 'POST', 'assistant/{tenant}/broadcasts/{record}/send'],
             'broadcast cancel'         => ['console.broadcasts.cancel', BroadcastController::class, 'cancel', 'POST', 'assistant/{tenant}/broadcasts/{record}/cancel'],
             'broadcast destroy'        => ['console.broadcasts.destroy', BroadcastController::class, 'destroy', 'DELETE', 'assistant/{tenant}/broadcasts/{record}'],
+            // Translations: both panels.
+            'translation update'       => ['console.translations.update', TranslationController::class, 'update', 'PUT', 'assistant/{tenant}/translations/{key}'],
+            'translation reset'        => ['console.translations.reset', TranslationController::class, 'reset', 'DELETE', 'assistant/{tenant}/translations/{key}'],
+            'admin translation update' => ['console.admin.translations.update', AdminTranslationController::class, 'update', 'PUT', 'admin/translations/{key}'],
+            'admin translation reset'  => ['console.admin.translations.reset', AdminTranslationController::class, 'reset', 'DELETE', 'admin/translations/{key}'],
         ];
     }
 

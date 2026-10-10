@@ -604,4 +604,46 @@ return [
             'running_delete'   => 'This broadcast is running. Cancel it first.',
         ],
     ],
+
+    // The translations page of both panels: system catalog overrides by language.
+    'translations' => [
+        'title'               => 'Translations',
+        'description'         => 'System messages and labels the bot sends to end users. Catalog defaults apply until you override a language.',
+        'description_layered' => 'System messages and labels this assistant sends to end users. The assistant\'s own text wins over the workspace\'s, which wins over the catalog default.',
+        'search_label'        => 'Search translations by key or description',
+        'columns'             => [
+            'group'       => 'Group',
+            'key'         => 'Key',
+            'description' => 'Description',
+        ],
+        'filters' => [
+            'group'     => 'Group',
+            'group_all' => 'All groups',
+        ],
+        'status' => [
+            'override'  => 'Overridden',
+            'inherited' => 'Inherited',
+            'default'   => 'Default',
+        ],
+        'legend' => [
+            'override'  => 'Overridden here',
+            'inherited' => 'Overridden for the workspace',
+            'default'   => 'No badge: the catalog default',
+        ],
+        'edit_named'  => 'Edit :name',
+        'reset_named' => 'Reset :name',
+        'edit_dialog' => [
+            'description'    => 'Leave a language empty to use the text the next level gives.',
+            'default_hint'   => 'System default: ":default"',
+            'inherited_hint' => 'Workspace text: ":value"',
+        ],
+        'reset' => [
+            'title'       => 'Reset to defaults?',
+            'description' => 'The overrides of ":name" are removed in every language.',
+            'confirm'     => 'Reset',
+        ],
+        'empty'      => 'The catalog has no keys.',
+        'saved'      => 'Translations saved.',
+        'reset_done' => 'Overrides removed for this key.',
+    ],
 ];
