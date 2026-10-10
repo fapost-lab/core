@@ -171,7 +171,7 @@
                                                 @if ('pending' === $status)
                                                     &middot; {{ __('conversation.media.pending') }}
                                                 @elseif ('failed' === $status)
-                                                    &middot; {{ __('conversation.media.failed') }}
+                                                    &middot; {{ 'storage_limit_reached' === ($item['reason'] ?? null) ? __('conversation.media.storage_limit_reached') : __('conversation.media.failed') }}
                                                 @endif
                                             </span>
                                         </div>

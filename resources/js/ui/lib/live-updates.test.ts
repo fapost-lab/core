@@ -1,5 +1,16 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
-import { chooseTransport, createAnnouncementReloader, currentEchoClient, echoEventName, registerEchoClient, type EchoClientLike, type Timers } from './live-updates'
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
+import {
+  chooseTransport,
+  connectBroadcaster,
+  createAnnouncementReloader,
+  currentEchoClient,
+  disconnectBroadcaster,
+  echoEventName,
+  registerEchoClient,
+  type EchoClientLike,
+  type EchoConnection,
+  type Timers,
+} from './live-updates'
 
 const client: EchoClientLike = {
   private: () => ({ listen: () => undefined }),
@@ -18,6 +29,7 @@ describe('chooseTransport', () => {
     expect(chooseTransport({ broadcasterEnabled: true, live: null, client })).toBe('poll')
     expect(chooseTransport({ broadcasterEnabled: true, live: { channel: '', event: 'flow.activity' }, client })).toBe('poll')
     expect(chooseTransport({ broadcasterEnabled: true, live, client: null })).toBe('poll')
+    expect(chooseTransport({ broadcasterEnabled: true, live, client, subscriptionFailed: true })).toBe('poll')
   })
 })
 
@@ -98,5 +110,91 @@ describe('createAnnouncementReloader', () => {
     reloader.dispose()
     timers.run()
     expect(reload).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('connectBroadcaster', () => {
+  afterEach(() => disconnectBroadcaster())
+
+  const options = { driver: 'reverb' as const, key: 'app-key', cluster: null, host: null, port: null, scheme: null }
+
+  /** A connection whose socket state the test drives. */
+  function fakeConnection(): EchoConnection & { emit: (state: string) => void; disconnect: Mock<() => void> } {
+    let listener: (state: string) => void = () => undefined
+    let state = 'initialized'
+
+    return {
+      client,
+      onStateChange(callback) {
+        listener = callback
+        callback(state)
+      },
+      disconnect: vi.fn<() => void>(),
+      emit(next) {
+        state = next
+        listener(next)
+      },
+    }
+  }
+
+  it('never loads the client when nothing delivers or the browser has nowhere to connect', async () => {
+    const load = vi.fn()
+
+    await connectBroadcaster(undefined, load)
+    await connectBroadcaster({ enabled: false, client: options }, load)
+    await connectBroadcaster({ enabled: true, client: null }, load)
+    await connectBroadcaster({ enabled: true, client: { ...options, key: '' } }, load)
+    expect(load).not.toHaveBeenCalled()
+    expect(currentEchoClient()).toBeNull()
+  })
+
+  it('keeps polling while the socket never connects', async () => {
+    const connection = fakeConnection()
+    const createEchoConnection = vi.fn(() => connection)
+
+    await connectBroadcaster({ enabled: true, client: options }, async () => ({ createEchoConnection }))
+    expect(createEchoConnection).toHaveBeenCalledWith(options)
+    connection.emit('connecting')
+    connection.emit('unavailable')
+    expect(currentEchoClient()).toBeNull()
+    expect(chooseTransport({ broadcasterEnabled: true, live, client: currentEchoClient() })).toBe('poll')
+  })
+
+  it('registers the client once connected, and goes back to polling when the socket is lost', async () => {
+    const connection = fakeConnection()
+
+    await connectBroadcaster({ enabled: true, client: options }, async () => ({ createEchoConnection: () => connection }))
+    connection.emit('connected')
+    expect(currentEchoClient()).toBe(client)
+
+    for (const lost of ['unavailable', 'failed', 'disconnected']) {
+      connection.emit('connected')
+      connection.emit(lost)
+      expect(currentEchoClient(), lost).toBeNull()
+    }
+  })
+
+  it('leaves an unchanged connection alone and closes it when the prop says so', async () => {
+    const connection = fakeConnection()
+    const load = vi.fn(async () => ({ createEchoConnection: () => connection }))
+
+    await connectBroadcaster({ enabled: true, client: options }, load)
+    connection.emit('connected')
+    await connectBroadcaster({ enabled: true, client: { ...options } }, load)
+    expect(load).toHaveBeenCalledTimes(1)
+    expect(currentEchoClient()).toBe(client)
+
+    await connectBroadcaster({ enabled: true, client: null }, load)
+    expect(connection.disconnect).toHaveBeenCalled()
+    expect(currentEchoClient()).toBeNull()
+  })
+
+  it('stays on polling when the client fails to load', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    await connectBroadcaster({ enabled: true, client: options }, () => Promise.reject(new Error('chunk')))
+    expect(currentEchoClient()).toBeNull()
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 })

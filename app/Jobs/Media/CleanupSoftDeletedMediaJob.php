@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Jobs\Media;
 
-use App\Domains\Media\Models\MediaBlob;
+use App\Domains\Media\Contracts\MediaServiceInterface;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFileReference;
-use App\Domains\Media\Storage\TenantMediaDisk;
-use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Carbon\CarbonImmutable;
@@ -46,19 +44,16 @@ final class CleanupSoftDeletedMediaJob implements ShouldQueue
     public function handle(
         TenantRepositoryInterface $tenants,
         TenantSwitcher $switcher,
-        TenantContextInterface $tenantContext,
-        TenantMediaDisk $tenantMediaDisk,
+        MediaServiceInterface $mediaService,
     ): void {
         $threshold = CarbonImmutable::now()->subDays($this->retentionDays);
 
         foreach ($tenants->findAllActive() as $tenant) {
-            $switcher->runForTenant($tenant, function () use ($threshold, $tenantMediaDisk, $tenantContext): void {
-                $disk = $tenantMediaDisk->resolve($tenantContext->get());
-
+            $switcher->runForTenant($tenant, function () use ($threshold, $mediaService): void {
                 MediaFile::query()
                     ->onlyTrashed()
                     ->where('deleted_at', '<', $threshold)
-                    ->chunkById(100, function ($files) use ($disk): void {
+                    ->chunkById(100, function ($files) use ($mediaService): void {
                         foreach ($files as $file) {
                             $hasRefs = MediaFileReference::query()
                                 ->where('media_file_id', $file->id)
@@ -68,27 +63,7 @@ final class CleanupSoftDeletedMediaJob implements ShouldQueue
                                 continue;
                             }
 
-                            $blobId = $file->blob_id;
-
-                            $file->forceDelete();
-
-                            $remaining = MediaFile::query()
-                                ->withTrashed()
-                                ->where('blob_id', $blobId)
-                                ->exists();
-
-                            if ($remaining) {
-                                continue;
-                            }
-
-                            $blob = MediaBlob::query()->find($blobId);
-
-                            if (null === $blob) {
-                                continue;
-                            }
-
-                            $disk->delete($blob->storage_path);
-                            $blob->delete();
+                            $mediaService->forceDelete($file);
                         }
                     });
             });

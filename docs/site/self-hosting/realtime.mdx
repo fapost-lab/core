@@ -1,0 +1,168 @@
+---
+title: "Realtime"
+description: "Optional websocket live updates for the console, with Reverb or any Pusher-protocol server."
+---
+
+The console screens that follow live activity — flow sessions and flow logs — stay
+current either by polling or over a websocket.
+
+**Polling is the default and needs nothing.** With `BROADCAST_CONNECTION=null`
+the application broadcasts nothing, and each live screen reloads its data every
+few seconds. Turn websockets on when you want changes to show as they happen, or
+when many people keep those screens open and the polling adds up.
+
+Nothing about the installation changes when it is off: Reverb ships with Core but
+does not run, and the browser never downloads the websocket client.
+
+## How it works
+
+```
+flow step ──▶ application ──▶ Reverb ──▶ browser (Echo)
+                                            │
+                                            └──▶ reloads the screen's data
+```
+
+After a flow step is committed, the application announces it on a private
+channel of the assistant, at most once every couple of seconds. Each open screen
+listens on that channel and reloads its own data when it hears something. The
+announcement carries no data; the reload goes through the normal authorized
+request, so the websocket never sees what the screen shows.
+
+Who may listen is checked by the application at `/broadcasting/auth`, on the
+tenant's own host, with the same session and account checks as the console. The
+websocket server only relays.
+
+The browser learns whether to connect, and where, from the page itself at
+runtime — nothing is compiled into the front end, so the prebuilt images work on
+any domain.
+
+## Docker Compose
+
+Reverb runs as the `reverb` service behind the `realtime` profile. It uses the
+application image, and nginx (the `web` service) forwards browsers to it at
+`/app/` on the site's own origin, so TLS in front covers the websocket too and no
+extra port or certificate is needed.
+
+1. Generate three values — any random strings will do:
+
+   ```bash
+   echo "REVERB_APP_ID=$(openssl rand -hex 4)"
+   echo "REVERB_APP_KEY=$(openssl rand -hex 16)"
+   echo "REVERB_APP_SECRET=$(openssl rand -hex 32)"
+   ```
+
+2. Add them to the `.env` beside `compose.yaml`, and switch the broadcaster:
+
+   ```dotenv
+   BROADCAST_CONNECTION=reverb
+   REVERB_APP_ID=…
+   REVERB_APP_KEY=…
+   REVERB_APP_SECRET=…
+   ```
+
+   `REVERB_HOST`, `REVERB_PORT` and `REVERB_SCHEME` are set by `compose.yaml` to
+   the `reverb` service; leave them out of the `.env`.
+
+3. Start the stack with the profile — together with any other profiles you use:
+
+   ```bash
+   docker compose --profile realtime up -d
+   # with TLS:
+   docker compose --profile tls --profile realtime up -d
+   ```
+
+   Configuration is cached when the containers start, so `app`, `horizon` and
+   `scheduler` must be recreated to pick up the new values; `up -d` does that
+   when the `.env` changed.
+
+Open the flow sessions screen: its hint changes from "Refreshes every N s" to
+"Live".
+
+To turn it off again, set `BROADCAST_CONNECTION=null`, recreate the containers,
+and stop `reverb`.
+
+## Bare metal
+
+Run the server under your process supervisor next to Horizon:
+
+```bash
+php artisan reverb:start --host=127.0.0.1 --port=8080
+```
+
+Set the same `BROADCAST_CONNECTION` and `REVERB_APP_*` values as above, plus
+where the application publishes to it:
+
+```dotenv
+REVERB_HOST=127.0.0.1
+REVERB_PORT=8080
+REVERB_SCHEME=http
+```
+
+Then forward the websocket path in your web server, so browsers reach it on the
+site's own origin. For nginx, inside the site's `server` block:
+
+```nginx
+location /app/ {
+    proxy_pass http://127.0.0.1:8080;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_read_timeout 120s;
+}
+```
+
+Like Horizon, Reverb is a long-running PHP process holding the previous release
+in memory: restart it on every deploy (`php artisan reverb:restart`).
+
+## Configuration
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `BROADCAST_CONNECTION` | `null` | `null` or `log`: no broadcasting, the console polls. `reverb` or `pusher`: websocket updates. |
+| `REVERB_APP_ID`, `REVERB_APP_KEY`, `REVERB_APP_SECRET` | — | Shared by the application and Reverb. The key is sent to browsers; the secret never leaves the server. |
+| `REVERB_HOST`, `REVERB_PORT`, `REVERB_SCHEME` | set by Compose | Where the application publishes events to Reverb. |
+| `BROADCAST_CLIENT_HOST`, `BROADCAST_CLIENT_PORT`, `BROADCAST_CLIENT_SCHEME` | the page's origin | Where browsers connect, when that is not the site itself — Reverb on a host or port of its own, or a self-run Pusher-protocol server. |
+
+Reverb's own settings — connection limits, ping interval, scaling across several
+servers through Redis — are read from the `REVERB_*` variables described in the
+[Reverb documentation](https://laravel.com/docs/reverb). One Reverb process is
+plenty for a single installation.
+
+## Pusher, Soketi and other servers
+
+The browser speaks the Pusher protocol, so any server that does works in place of
+Reverb:
+
+- **Pusher:** `BROADCAST_CONNECTION=pusher` with `PUSHER_APP_ID`,
+  `PUSHER_APP_KEY`, `PUSHER_APP_SECRET` and `PUSHER_APP_CLUSTER`. No other
+  setting is needed.
+- **Soketi or another self-run Pusher-protocol server:** the same `pusher`
+  connection, with `PUSHER_HOST`, `PUSHER_PORT` and `PUSHER_SCHEME` for the
+  application, and `BROADCAST_CLIENT_HOST` (and port and scheme) for browsers.
+
+Other Laravel broadcasters (`redis`, `ably`) deliver on the server side, but the
+console has no client for them and keeps polling.
+
+## Troubleshooting
+
+**The live hint still says it refreshes.** The page decides when it loads: check
+that `php artisan config:show broadcasting.default` prints `reverb` inside the
+`app` container, and that the containers were recreated after the `.env` change.
+`REVERB_APP_KEY` must be set — without it the browser has nothing to connect
+with and polls.
+
+**The browser console shows a failed websocket connection.** `reverb` is not
+running (nginx answers `502` at `/app/`), or a proxy in front does not pass
+websocket upgrades. Caddy does by default; other proxies need it enabled for
+`/app/`.
+
+**Subscribing fails with 403.** The private channel was refused at
+`/broadcasting/auth`: the user is signed out, or no longer has access to the
+assistant. The screen falls back to its periodic reload.
+
+## Related
+
+- [Services](/self-hosting/services) — the processes an installation runs
+- [Docker Compose](/self-hosting/docker-compose) — profiles and the stack
+- [Configuration](/self-hosting/configuration) — the `.env` file

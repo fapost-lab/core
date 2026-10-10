@@ -30,9 +30,15 @@ use App\Domains\Media\Services\MediaDispatcher;
 use App\Domains\Media\Services\MediaIngestor;
 use App\Domains\Media\Services\MediaReferenceTracker;
 use App\Domains\Media\Services\MediaService;
+use App\Domains\Media\Services\MediaStorageGate;
 use App\Domains\Media\Services\MediaUploader;
+use App\Domains\Media\Services\StoredMediaBytes;
 use App\Domains\Media\Storage\StoragePathFactory;
 use App\Domains\Media\Storage\TenantMediaDisk;
+use App\Domains\Tenancy\Services\TenantUsageCounters;
+use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
+use Fapost\Foundation\Quota\DTO\LimitDefinition;
+use Fapost\Foundation\Quota\Enums\LimitKind;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -53,6 +59,7 @@ final class MediaServiceProvider extends ServiceProvider
         Gate::policy(MediaFolder::class, MediaFolderPolicy::class);
 
         $this->registerBuiltInPreviewTypes();
+        $this->registerStorageLimit();
     }
 
     public function register(): void
@@ -80,6 +87,10 @@ final class MediaServiceProvider extends ServiceProvider
         $this->app->singleton(MediaReferenceExtractorInterface::class, FlowDefinitionMediaReferenceExtractor::class);
         $this->app->singleton(MediaReferenceTrackerInterface::class, MediaReferenceTracker::class);
 
+        // Not singletons: both read the scoped tenant context.
+        $this->app->bind(StoredMediaBytes::class);
+        $this->app->bind(MediaStorageGate::class);
+
         $this->app->scoped(MediaUploaderInterface::class, MediaUploader::class);
         $this->app->scoped(MediaDispatcherInterface::class, MediaDispatcher::class);
         $this->app->scoped(MediaIngestorInterface::class, MediaIngestor::class);
@@ -96,6 +107,26 @@ final class MediaServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton(MediaPreviewRegistry::class);
+    }
+
+    /**
+     * The stored-bytes limit and the counter that reports it, registered the way a Solution
+     * registers its keys: from boot(), before the registry is frozen.
+     */
+    private function registerStorageLimit(): void
+    {
+        $this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(
+            key: MediaStorageGate::LIMIT_KEY,
+            label: 'Media storage',
+            unit: 'bytes',
+            kind: LimitKind::Bytes,
+            description: 'Stored media bytes, each unique file counted once; files in the trash count until deleted permanently. An upload over the limit is not stored.',
+        ));
+
+        $this->app->make(TenantUsageCounters::class)->register(
+            MediaStorageGate::LIMIT_KEY,
+            static fn (): int => app(StoredMediaBytes::class)->current(),
+        );
     }
 
     /**

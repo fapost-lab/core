@@ -10,6 +10,10 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Services\ChannelService;
 use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Media\Models\MediaBlob;
+use App\Domains\Media\Models\MediaFile;
+use App\Domains\Media\Repositories\EloquentMediaBlobRepository;
+use App\Domains\Media\Services\MediaUploader;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Staff\Services\CreatePendingUserService;
@@ -51,6 +55,24 @@ final class CountableModelCreationTest
             Channel::class,
             [ChannelService::class],
             'The tenant channel limit is checked in ChannelService::create(); constructing a Channel elsewhere bypasses it.',
+        );
+    }
+
+    public function test_media_blob_is_constructed_only_by_its_repository(): Rule
+    {
+        return $this->constructedOnlyBy(
+            MediaBlob::class,
+            [EloquentMediaBlobRepository::class],
+            'A blob holds the stored bytes the media storage limit counts; the uploader creates one through the repository only after the storage gate has passed.',
+        );
+    }
+
+    public function test_media_file_is_constructed_only_by_the_uploader(): Rule
+    {
+        return $this->constructedOnlyBy(
+            MediaFile::class,
+            [MediaUploader::class],
+            'The media storage limit is checked in MediaUploader before any byte is written; constructing a MediaFile elsewhere would attach a file to bytes that bypassed it.',
         );
     }
 

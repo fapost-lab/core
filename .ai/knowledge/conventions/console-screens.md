@@ -99,6 +99,10 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   (`FlowActivityWatchers`), throttled per assistant, and a failed announcement is reported, never
   thrown into the flow step. The event carries no data: the page reloads its own props. Example:
   `FlowSessionController`, `FlowActivityNotifier`, `resources/js/ui/lib/useLiveUpdates.ts`.
+  The browser learns how to reach the socket at runtime from the shared `broadcaster.client` prop
+  (never a secret, `null` for guests), not from `VITE_*` build variables: self-hosters run prebuilt
+  images. The Echo client is a lazy chunk and counts as registered only while its connection is
+  `connected`; a lost socket or a refused channel puts the screen back on polling.
 - **Every `flow_logs` query has a time window** (the list a period, at most 30 days; a record ±5
   minutes around the time in its ULID), so it touches the partitions it needs. Example:
   `FlowLogInspector`.

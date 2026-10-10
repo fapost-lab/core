@@ -63,6 +63,14 @@ services:
     environment: *dev-environment
     extra_hosts: *dev-hosts
 
+  # Only with --profile realtime, as in production.
+  reverb:
+    build: *dev-build
+    image: fapost/dev:local
+    volumes: *dev-volumes
+    environment: *dev-environment
+    extra_hosts: *dev-hosts
+
   web:
     # nginx serves from the mounted tree instead of a baked-in web root, so a
     # rebuilt asset appears without touching the image.
