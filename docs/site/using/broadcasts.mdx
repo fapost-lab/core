@@ -56,6 +56,12 @@ A broadcast is editable while it is still a draft. Once a run has started or
 finished, it is a record rather than a document — the message that went out
 cannot be revised after the fact.
 
+A broadcast counts against the tenant's outbound messages for the period, like any
+other message. If they run out part-way, the broadcast **stops**: it becomes
+*Cancelled*, the recipients not yet reached are marked *Skipped* with the reason
+`limit_reached`, and nothing more is sent. Starting the same broadcast again after
+the limit lifts would also reach the people who already received it.
+
 Large sends are split into batches and paced, so they cannot delay replies to
 people in live conversations. How aggressively is a tenant-wide setting; see
 [Settings](/using/tenant-settings).

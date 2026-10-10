@@ -157,6 +157,17 @@ broken.
   unit allowed — deliberately the opposite of `RecordQuota`, because no person is there to retry.
   Without an operator package `UnlimitedUsageMeter` (bound with `bindIf`) allows everything.
   Enforced: `PeriodQuotaTest`.
+- **Outbound volume is consumed before the side effect, never around it.** `outbound_messages`
+  through `OutboundVolumeGate` in `MessageSender::send` (after the idempotency reservation, which
+  a refusal releases) and before upload-as-send in `FlowMessageSender` and
+  `ConversationReplyService::sendMedia`; `call_executions` in `CallNodeHandler` before the
+  transport and in `CallTester`. Unit keys come from idempotency keys (`UsageUnitKey::make`), so
+  duplicates and retries spend nothing; edits and typing are free. A refusal is
+  `VolumeLimitReachedException`: "not sent, do not retry" — flow nodes take their `error` exit
+  (`limit_reached`), nodes without one fail the session (a child resumes its parent with failed),
+  jobs never retry it. A caller with a stable time passes it as metadata `volume_occurred_at`.
+  Enforced: `OutboundGateCoverageTest` (every deliver/upload/send/execute call is gated or behind
+  the funnel), `FlowEngineVolumeLimitTest`, `MessageSenderTest`.
 - **Limits are answered by the operator package and counted by Core.** Records live in the tenant's
   schema, which the package cannot see, so `RecordQuota` (Core's `RecordQuotaInterface`, for the tenant in `TenantContext`) takes the current count from the caller, and
   the service that owns creation is the only place a counted record is created: `AssistantService::create()`

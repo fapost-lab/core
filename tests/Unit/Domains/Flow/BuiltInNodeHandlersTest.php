@@ -45,8 +45,12 @@ use Fapost\Foundation\Flow\Call\CallRequest;
 use Fapost\Foundation\Flow\Call\CallResult;
 use Fapost\Foundation\Flow\Call\CallTransportInterface;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
+use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
+use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Mockery;
 use RuntimeException;
+use Tests\Support\FakeUsageMeter;
+use Tests\Support\UsageGates;
 use Tests\TestCase;
 
 final class BuiltInNodeHandlersTest extends TestCase
@@ -609,7 +613,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
     public function test_assign_writes_to_flow_state_or_contact_writer_by_target(): void
     {
-        $handler = new AssignNodeHandler(new TemplateRenderer(), new VariableResolver());
+        $handler = new AssignNodeHandler(new TemplateRenderer(), new VariableResolver(), UsageGates::quota());
 
         $writer = Mockery::mock(\Fapost\Foundation\Flow\Contracts\ContactWriterInterface::class);
         $writer->shouldReceive('write')->once()->with('contact.first_name', 'Jane');
@@ -631,7 +635,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
     public function test_assign_contact_language_aliases_route_to_canonical_path(): void
     {
-        $handler = new AssignNodeHandler(new TemplateRenderer(), new VariableResolver());
+        $handler = new AssignNodeHandler(new TemplateRenderer(), new VariableResolver(), UsageGates::quota());
 
         $writer = Mockery::mock(\Fapost\Foundation\Flow\Contracts\ContactWriterInterface::class);
         $writer->shouldReceive('write')->once()->with('contact.language', 'es');
@@ -866,7 +870,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $writer = Mockery::mock(\Fapost\Foundation\Flow\Contracts\ContactWriterInterface::class);
         $writer->shouldReceive('write')->once()->with('contact.first_name', 'Jane');
 
-        $handler = new AssignNodeHandler(new TemplateRenderer(), new VariableResolver());
+        $handler = new AssignNodeHandler(new TemplateRenderer(), new VariableResolver(), UsageGates::quota());
 
         $node = [
             'id'     => 'assign-multi',
@@ -1083,7 +1087,7 @@ final class BuiltInNodeHandlersTest extends TestCase
 
     public function test_call_unknown_transport_routes_to_error(): void
     {
-        $handler = new CallNodeHandler(new CallTransportRegistry(), new TemplateRenderer(), new VariableResolver());
+        $handler = new CallNodeHandler(new CallTransportRegistry(), new TemplateRenderer(), new VariableResolver(), UsageGates::quota());
 
         $result = $handler->execute([
             'id'     => 'call-u',
@@ -1289,6 +1293,81 @@ final class BuiltInNodeHandlersTest extends TestCase
         );
 
         $this->assertSame('Hi, Alice !', $resolved);
+    }
+
+    public function test_call_refused_by_the_volume_limit_goes_to_error_and_does_not_call_the_transport(): void
+    {
+        $transport = new FakeCallTransport('http', CallResult::ok(['ok' => true], ['status_code' => 200]));
+        $meter     = FakeUsageMeter::denying(100, 100);
+        $handler   = $this->makeCallHandler($transport, $meter);
+
+        $result = $handler->execute([
+            'id'     => 'call-x',
+            'config' => ['transport' => 'http', 'target' => 'GET https://x.test'],
+        ], [], $this->context(nodeId: 'call-x'));
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('error', $result->sourceHandle);
+        $this->assertSame('limit_reached', $result->metadata['error_type']);
+        $this->assertNull($transport->lastRequest);
+        $this->assertSame('call_executions', $meter->units[0]->key);
+    }
+
+    public function test_legacy_call_refused_by_the_volume_limit_goes_to_error_and_does_not_call_the_transport(): void
+    {
+        $transport = new FakeCallTransport('http', CallResult::ok(['ok' => true], ['status_code' => 200]));
+        $handler   = $this->makeCallHandler($transport, FakeUsageMeter::denying());
+
+        $result = $handler->execute([
+            'id'     => 'hook-legacy',
+            'config' => ['url' => 'https://example.test/hook'],
+        ], [], $this->context(nodeId: 'hook-legacy'));
+
+        $this->assertSame('error', $result->sourceHandle);
+        $this->assertSame('limit_reached', $result->metadata['error_type']);
+        $this->assertNull($transport->lastRequest);
+    }
+
+    public function test_call_unit_key_differs_per_pass_of_a_loop_and_repeats_on_a_retry(): void
+    {
+        $meter   = FakeUsageMeter::allowing();
+        $handler = $this->makeCallHandler(new FakeCallTransport('http', CallResult::ok([], ['status_code' => 200])), $meter);
+        $node    = ['id' => 'call-x', 'config' => ['transport' => 'http', 'target' => 'GET https://x.test']];
+
+        foreach (['session-1:call-x:3', 'session-1:call-x:4', 'session-1:call-x:3'] as $engineKey) {
+            $handler->execute($node, [], new NodeExecutionContext(
+                tenantId: 'tenant-1',
+                contactId: 'contact-1',
+                sessionId: 'session-1',
+                nodeId: 'call-x',
+                idempotencyKey: $engineKey,
+                platform: 'telegram',
+            ));
+        }
+
+        $keys = array_map(static fn ($unit): string => $unit->unitKey, $meter->units);
+
+        $this->assertSame('call:session-1:call-x:3:call-x', $keys[0]);
+        $this->assertNotSame($keys[0], $keys[1]);
+        $this->assertSame($keys[0], $keys[2]);
+    }
+
+    public function test_send_message_goes_to_the_error_handle_with_limit_reached_when_the_volume_is_used_up(): void
+    {
+        $sender = Mockery::mock(MessageSenderInterface::class);
+        $sender->shouldReceive('send')->once()->andThrow(new VolumeLimitReachedException('outbound_messages', 10, 10));
+
+        $translator = Mockery::mock(ContentTranslatorInterface::class);
+        $translator->shouldReceive('resolveField')->andReturn('hello');
+
+        $result = $this->makeHandler($sender, $translator)->execute([
+            'id'     => 'node-limit',
+            'config' => ['content_type' => 'text', 'text' => ['en' => 'hello']],
+        ], [], $this->context(nodeId: 'node-limit'));
+
+        $this->assertSame('error', $result->sourceHandle);
+        $this->assertSame('limit_reached', $result->metadata['error_type']);
+        $this->assertSame('Limit "outbound_messages" reached: 10 of 10 this period.', $result->metadata['error']);
     }
 
     public function test_send_message_returns_error_handle_when_sender_throws(): void
@@ -1529,12 +1608,12 @@ final class BuiltInNodeHandlersTest extends TestCase
         );
     }
 
-    private function makeCallHandler(CallTransportInterface $transport): CallNodeHandler
+    private function makeCallHandler(CallTransportInterface $transport, ?UsageMeterInterface $meter = null): CallNodeHandler
     {
         $registry = new CallTransportRegistry();
         $registry->register($transport);
 
-        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver());
+        return new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota($meter));
     }
 
     private function makeHandler(

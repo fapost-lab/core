@@ -41,6 +41,7 @@ use Fapost\Foundation\DTO\NodeExecutionContext as FoundationNodeExecutionContext
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
+use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\ConnectionInterface;
 use LogicException;
@@ -395,6 +396,16 @@ final readonly class FlowEngine implements FlowEngineInterface
 
             try {
                 $result = $handler->execute($node, $session->state ?? [], $handlerContext);
+            } catch (VolumeLimitReachedException $limitReached) {
+                // The node has no `error` exit to take (those catch this themselves). Retrying the job
+                // would only ask the operator again, so the session stops here and the job succeeds.
+                $this->markSessionFailed($session, $nodeId, $type, $version, $limitReached);
+
+                // A child must hand control back to its parent, as it does when it ends: the parent's
+                // `failed` exit is taken now instead of the parent waiting for the timeout sweeper.
+                $this->subflowResumer->resumeIfChild($session, EndStatus::Failed->value);
+
+                return;
             } catch (Throwable $handlerException) {
                 $this->markSessionFailed($session, $nodeId, $type, $version, $handlerException);
 

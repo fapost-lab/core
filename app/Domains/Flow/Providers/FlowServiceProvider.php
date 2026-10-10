@@ -173,6 +173,14 @@ final class FlowServiceProvider extends ServiceProvider
             description: 'How many flows a tenant can have at a time; published versions of a flow do not count.',
         ));
 
+        $this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(
+            key: CallNodeHandler::LIMIT_KEY,
+            label: 'Call executions',
+            unit: 'calls',
+            kind: LimitKind::PerPeriod,
+            description: 'Executions of the call node, over any transport, and test calls from the builder. A call over the limit is not made.',
+        ));
+
         // Seed Core's system translation keys. Features and Solutions register
         // their own keys through the same catalog from their providers.
         // Idempotent so the test bootstrap can boot the provider repeatedly.
@@ -245,6 +253,7 @@ final class FlowServiceProvider extends ServiceProvider
                 $app->make(MediaDispatcherInterface::class),
                 $app->make(\App\Domains\Conversation\Contracts\ConversationLoggerInterface::class),
                 $app->make(\App\Domains\Conversation\Capture\ConversationCaptureFactory::class),
+                $app->make(\App\Domains\Messaging\OutboundVolumeGate::class),
             )
         );
         $this->app->bind(LanguageResolverInterface::class, LanguageResolver::class);

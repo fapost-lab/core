@@ -17,6 +17,7 @@ use App\Domains\Media\DTO\DispatchResult;
 use App\Domains\Media\Exceptions\MediaDeletedException;
 use App\Domains\Media\Exceptions\MediaNotFoundException;
 use App\Domains\Media\Models\MediaFile;
+use App\Domains\Messaging\OutboundVolumeGate;
 use Fapost\Foundation\Flow\Enums\KeyboardMode;
 use Fapost\Foundation\Media\DTO\UploadContext;
 use Fapost\Foundation\Messaging\DeliveryResult;
@@ -32,6 +33,7 @@ final readonly class FlowMessageSender implements MessageSenderInterface
         private MediaDispatcherInterface $mediaDispatcher,
         private ConversationLoggerInterface $conversationLogger,
         private ConversationCaptureFactory $captureFactory,
+        private OutboundVolumeGate $volumeGate,
     ) {
     }
 
@@ -69,6 +71,11 @@ final readonly class FlowMessageSender implements MessageSenderInterface
         $contentType = SendMessageContentType::from((string)$payload['content_type']);
 
         if ($contentType->requiresMediaUrl()) {
+            // The upload below may deliver the message itself (Telegram, cache miss) and never reach
+            // MessageSender, so the unit is spent first. Under the message's own key: when the send does
+            // go on to MessageSender, the operator sees the same unit again and counts it once.
+            $this->volumeGate->admitKey($this->idempotencyKey($sessionId, $payload));
+
             $dispatch                    = $this->resolveMediaDispatch($payload, $channel, $chatId, $tenantId);
             $payload['provider_file_id'] = $dispatch->providerFileId;
 
@@ -96,6 +103,14 @@ final readonly class FlowMessageSender implements MessageSenderInterface
     }
 
     /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function idempotencyKey(string $sessionId, array $payload): string
+    {
+        return "{$sessionId}:{$payload['node_id']}:{$payload['idempotency_key']}";
+    }
+
+    /**
      * Assemble the outbound envelope, embedding the transcript-capture context
      * (contact/assistant identity, origin) in metadata — OutboundMessage carries
      * no identity of its own, so the builder passes it down for MessageSender /
@@ -114,7 +129,7 @@ final readonly class FlowMessageSender implements MessageSenderInterface
         SendMessageContentType $contentType,
     ): OutboundMessage {
         return new OutboundMessage(
-            idempotencyKey: "{$sessionId}:{$payload['node_id']}:{$payload['idempotency_key']}",
+            idempotencyKey: $this->idempotencyKey($sessionId, $payload),
             tenantId: $tenantId,
             channelId: (string)$channel->getKey(),
             channelType: $channel->type->value,

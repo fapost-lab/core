@@ -11,6 +11,7 @@ use App\Domains\Broadcasting\Models\BroadcastRecipient;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
+use App\Domains\Messaging\OutboundVolumeGate;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Queue\DefersWhenDroppedWhileStopped;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
@@ -21,6 +22,7 @@ use App\Domains\Tenancy\Settings\TenantSettings;
 use Fapost\Foundation\Messaging\MessagePayload;
 use Fapost\Foundation\Messaging\MessageSenderInterface;
 use Fapost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
@@ -108,7 +110,9 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
             $channel   = Channel::query()->find($recipient->channel_id);
 
             if (BroadcastStatus::Cancelled === $broadcast->status) {
-                $this->finish($recipient, RecipientStatus::Skipped, 'skipped_count');
+                // Also the way a run stopped by a limit ends for everyone after the first refusal: no send
+                // is attempted, so the operator is not asked once per remaining recipient.
+                $this->finish($recipient, RecipientStatus::Skipped, 'skipped_count', $broadcast->stop_reason);
 
                 return;
             }
@@ -135,6 +139,13 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
 
             try {
                 $result = $sender->send($this->buildMessage($broadcast, $recipient, $channel, $contact, $text));
+            } catch (VolumeLimitReachedException $exception) {
+                // The limit holds until the period ends, so the whole run stops at the first refusal.
+                // Cancelled first: finish() completes a run that is still Running once all are processed.
+                $this->stopBroadcast($recipient->broadcast_id, BroadcastStatus::STOP_REASON_LIMIT_REACHED);
+                $this->finish($recipient, RecipientStatus::Skipped, 'skipped_count', $exception->getMessage());
+
+                return;
             } catch (Throwable $exception) {
                 $this->finish($recipient, RecipientStatus::Failed, 'failed_count', $exception->getMessage());
 
@@ -172,8 +183,18 @@ final class SendBroadcastRecipientJob implements DefersWhenDroppedWhileStopped, 
                 'assistant_id' => (string) $broadcast->assistant_id,
                 'origin'       => MessageOrigin::Broadcast->value,
                 'origin_ref'   => ['broadcast_id' => (string) $broadcast->getKey()],
+                // The recipient row is created once, so a retry lands in the same usage period.
+                OutboundVolumeGate::OCCURRED_AT_METADATA => ($recipient->created_at ?? Carbon::now())->toIso8601String(),
             ],
         );
+    }
+
+    private function stopBroadcast(string $broadcastId, string $reason): void
+    {
+        Broadcast::query()
+            ->whereKey($broadcastId)
+            ->where('status', BroadcastStatus::Running->value)
+            ->update(['status' => BroadcastStatus::Cancelled->value, 'stop_reason' => $reason]);
     }
 
     /**

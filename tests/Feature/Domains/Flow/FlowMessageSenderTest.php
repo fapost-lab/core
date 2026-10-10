@@ -25,10 +25,13 @@ use App\Domains\Media\Models\MediaFile;
 use Fapost\Foundation\Media\Enums\MediaKind;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
+use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Illuminate\Support\Str;
 use Mockery;
 use Mockery\MockInterface;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\FakeUsageMeter;
+use Tests\Support\UsageGates;
 
 final class FlowMessageSenderTest extends FeatureTestCase
 {
@@ -94,6 +97,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
             Mockery::mock(MediaDispatcherInterface::class),
             $this->recordingLogger(),
             new ConversationCaptureFactory(),
+            UsageGates::gate(),
         );
 
         $providerMessageId = $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
@@ -175,6 +179,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
             Mockery::mock(MediaDispatcherInterface::class),
             $this->recordingLogger(),
             new ConversationCaptureFactory(),
+            UsageGates::gate(),
         );
 
         $providerMessageId = $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
@@ -271,7 +276,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
             new DispatchResult(providerFileId: 'cached-file-id', alreadyDelivered: false),
         );
 
-        $flowSender        = new FlowMessageSender($sender, $dispatcher, $this->recordingLogger(), new ConversationCaptureFactory());
+        $flowSender        = new FlowMessageSender($sender, $dispatcher, $this->recordingLogger(), new ConversationCaptureFactory(), UsageGates::gate());
         $providerMessageId = $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
             'node_id'         => 'node-img',
             'idempotency_key' => 'idem-img',
@@ -361,7 +366,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
         );
 
         $logger     = $this->recordingLogger();
-        $flowSender = new FlowMessageSender($sender, $dispatcher, $logger, new ConversationCaptureFactory());
+        $flowSender = new FlowMessageSender($sender, $dispatcher, $logger, new ConversationCaptureFactory(), UsageGates::gate());
 
         $providerMessageId = $flowSender->send($tenantId, (string)$contact->getKey(), (string)$session->getKey(), [
             'node_id'         => 'node-uas',
@@ -381,6 +386,134 @@ final class FlowMessageSenderTest extends FeatureTestCase
         $this->assertSame('999', $entry->providerMessageId);
         $this->assertSame((string)$contact->getKey(), $entry->contactId);
         $this->assertSame((string)$assistant->getKey(), $entry->assistantId);
+    }
+
+    public function test_media_send_refused_by_the_volume_limit_does_not_upload_or_deliver(): void
+    {
+        [$tenantId, $contact, $session, $mediaFile] = $this->mediaScenario('c');
+
+        $sender = $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('send');
+        });
+        $dispatcher = Mockery::mock(MediaDispatcherInterface::class);
+        $dispatcher->shouldNotReceive('ensureUploadedToChannel');
+
+        $meter      = FakeUsageMeter::denying(5, 5);
+        $flowSender = new FlowMessageSender($sender, $dispatcher, $this->recordingLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
+
+        try {
+            $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
+                'node_id'         => 'node-m',
+                'idempotency_key' => 'idem-m',
+                'session_id'      => (string) $session->getKey(),
+                'content_type'    => 'image',
+                'media_file_id'   => $mediaFile->id,
+                'caption'         => null,
+            ]);
+            $this->fail('Expected VolumeLimitReachedException.');
+        } catch (VolumeLimitReachedException $exception) {
+            $this->assertSame('outbound_messages', $exception->key);
+        }
+    }
+
+    public function test_media_send_asks_for_the_same_unit_before_the_upload_and_in_the_message_sender(): void
+    {
+        [$tenantId, $contact, $session, $mediaFile] = $this->mediaScenario('d');
+
+        $meter    = FakeUsageMeter::allowing();
+        $captured = null;
+        $sender   = $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock) use (&$captured): void {
+            $mock->shouldReceive('send')->once()->andReturnUsing(function ($message) use (&$captured): DeliveryResult {
+                $captured = $message->idempotencyKey;
+
+                return new DeliveryResult(sent: true, providerMessageId: 'p');
+            });
+        });
+        $dispatcher = Mockery::mock(MediaDispatcherInterface::class);
+        $dispatcher->shouldReceive('ensureUploadedToChannel')->once()->andReturn(
+            new DispatchResult(providerFileId: 'cached', alreadyDelivered: false),
+        );
+
+        $flowSender = new FlowMessageSender($sender, $dispatcher, $this->recordingLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
+
+        $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
+            'node_id'         => 'node-m',
+            'idempotency_key' => 'idem-m',
+            'session_id'      => (string) $session->getKey(),
+            'content_type'    => 'image',
+            'media_file_id'   => $mediaFile->id,
+            'caption'         => null,
+        ]);
+
+        // One unit asked for before the upload, under the very key the message carries on to MessageSender.
+        $this->assertCount(1, $meter->units);
+        $this->assertSame('msg:' . $captured, $meter->units[0]->unitKey);
+    }
+
+    /**
+     * @return array{0: string, 1: Contact, 2: FlowSession, 3: MediaFile}
+     */
+    private function mediaScenario(string $hash): array
+    {
+        $tenantId  = '00000000-0000-0000-0000-000000000001';
+        $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+        $contact   = Contact::factory()->forTenant($tenantId)->create(['external_id' => 'chat-' . $hash]);
+        $channel   = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $assistant->getKey(),
+            'tenant_id'    => $tenantId,
+            'type'         => ChannelTypeEnum::Telegram,
+            'token'        => 'bot-token',
+            'is_active'    => true,
+        ]));
+
+        ChannelContact::query()->create([
+            'contact_id'          => $contact->getKey(),
+            'channel_id'          => $channel->getKey(),
+            'last_interaction_at' => now(),
+        ]);
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Test Flow',
+            'nodes'     => [],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        $session = FlowSession::query()->create([
+            'tenant_id'          => $tenantId,
+            'contact_id'         => $contact->getKey(),
+            'assistant_id'       => $assistant->getKey(),
+            'flow_id'            => $definition->flow_id,
+            'flow_definition_id' => (string) $definition->getKey(),
+            'flow_version'       => 1,
+            'current_node_id'    => 'node-m',
+            'state'              => [],
+            'status'             => 'active',
+            'version'            => 1,
+        ]);
+
+        $blob = MediaBlob::query()->create([
+            'tenant_id'    => $tenantId,
+            'content_hash' => str_repeat($hash, 64),
+            'storage_path' => 'tenants/test/media/' . $hash . '.jpg',
+            'storage_disk' => 'local',
+            'size'         => 50,
+            'mime_type'    => 'image/jpeg',
+        ]);
+
+        $mediaFile = MediaFile::query()->create([
+            'tenant_id' => $tenantId,
+            'blob_id'   => $blob->id,
+            'name'      => $hash . '.jpg',
+            'kind'      => MediaKind::Image,
+            'metadata'  => [],
+            'source'    => MediaSource::Upload,
+        ]);
+
+        return [$tenantId, $contact, $session, $mediaFile];
     }
 
     private function recordingLogger(): ConversationLoggerInterface
