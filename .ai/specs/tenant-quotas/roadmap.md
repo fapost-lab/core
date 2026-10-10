@@ -35,7 +35,7 @@ Goal: Core can host untrusted tenants. Done when: a `call` node aimed at a priva
 metadata address fails on every install, and every countable record and volume unit goes through
 the quota contract.
 
-- [ ] `egress-guard` — Egress guard — the `call` node refuses private, loopback, link-local and metadata addresses after DNS resolution and on every redirect, for every install
+- [x] `egress-guard` — Egress guard — the `call` node refuses private, loopback, link-local and metadata addresses after DNS resolution and on every redirect, for every install
 - [x] `count-limits-other-models` — Count limits on the other models — flows, channels, staff and the remaining countable models refuse creation when the contract denies it, with the architecture rule extended; the Create button is hidden in Filament by the task already in flight, and on the kit's screens when ui-foundation moves them (after: Quota contract with the assistant seam — they repeat its pattern)
 - [x] `inbound-active-contact-gate` — Inbound active-contact gate — an inbound message the contract refuses creates no contact and starts no flow, is logged, and the admin panel shows the refusal, a screen built on the kit (after: Quota contract with the assistant seam — the gate calls it; after: ui-foundation phase 3 — the admin screen is built on the kit)
 - [x] `outbound-volume-gate` — Outbound volume gate — outbound messages, broadcast sends and `call` executions consume volume through the contract and stop when refused (after: Quota contract with the assistant seam — the gate calls it)
