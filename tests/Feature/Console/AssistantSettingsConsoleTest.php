@@ -148,12 +148,12 @@ final class AssistantSettingsConsoleTest extends InertiaConsoleTestCase
         $this->assertNull($assistant->default_flow_id);
         $this->assertSame(['en' => 'Sorry'], $assistant->fallback_message);
         $this->assertNull($assistant->busy_message);
-        $this->assertSame([
+        $this->assertSame($this->canonical([
             ['command' => '/stop', 'type' => 'terminate_session', 'response' => ['en' => 'Bye']],
             ['command' => '/go', 'type' => 'start_flow', 'flow_id' => $flow->flow_id],
             ['command' => '/help', 'type' => 'send_message', 'text' => ['ru' => 'Помощь']],
             ['command' => '/quiet', 'type' => 'terminate_session'],
-        ], $assistant->commands);
+        ]), $this->canonical($assistant->commands));
         $this->assertEqualsCanonicalizing(['tone' => 'formal', 'empty' => ''], $assistant->settings);
     }
 
@@ -304,10 +304,10 @@ final class AssistantSettingsConsoleTest extends InertiaConsoleTestCase
 
         $flow = FlowDraft::query()->where('name', 'Onboarding')->sole();
 
-        $this->assertSame([
+        $this->assertSame($this->canonical([
             ['command' => '/stop', 'type' => 'terminate_session'],
             ['command' => '/go', 'type' => 'start_flow', 'flow_id' => $flow->flow_id],
-        ], $this->assistant->fresh()?->commands);
+        ]), $this->canonical($this->assistant->fresh()?->commands));
         $this->assertNull($this->assistant->fresh()?->default_flow_id);
     }
 
@@ -403,6 +403,24 @@ final class AssistantSettingsConsoleTest extends InertiaConsoleTestCase
             'settings'            => [],
             ...$overrides,
         ];
+    }
+
+    /**
+     * Sorts keys at every level: `jsonb` stores an object's keys in its own order, the list order stays.
+     */
+    private function canonical(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $value = array_map(fn (mixed $item): mixed => $this->canonical($item), $value);
+
+        if (! array_is_list($value)) {
+            ksort($value);
+        }
+
+        return $value;
     }
 
     private function url(string $suffix = ''): string
