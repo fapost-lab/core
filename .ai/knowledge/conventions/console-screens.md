@@ -37,7 +37,10 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   shell renders it in admin mode with `NavigationBuilder::admin()`. A screen both panels share keeps
   one page and one domain service, and each controller fixes the scope it writes to (tenant or
   assistant) — the request never chooses it. Example: `Admin\TranslationController`,
-  `Console\TranslationController`, `TranslationOverrideEditor`, `TranslationScope`.
+  `Console\TranslationController`, `TranslationOverrideEditor`, `TranslationScope`. A record nested
+  under an admin screen (an assistant's channels at `admin/assistants/{record}/channels/{channel}`)
+  is found through its parent, so a mismatched pair is a 404, and reuses the console's page and
+  presenter (`PresentsChannels`) with admin URLs. Example: `Admin\AssistantChannelController`.
 - **After a write**, toast through `Inertia::flash()` (never the session `with()`: a shared prop
   is kept in history and replays on Back). Deletes go `back()` so the list keeps its state; forms
   go to the index.

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Domains\Tenancy\Support\TenantHost;
+use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
+use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
@@ -65,6 +67,21 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::get('admin/translations', [AdminTranslationController::class, 'index'])->name('filament.admin.pages.translations');
         Route::put('admin/translations/{key}', [AdminTranslationController::class, 'update'])->name('console.admin.translations.update');
         Route::delete('admin/translations/{key}', [AdminTranslationController::class, 'reset'])->name('console.admin.translations.reset');
+
+        // Assistants: the tenant's assistants with their channels. `{record}` is the assistant; a channel is created on
+        // the assistant's console, as it was, and changed here on the console's channel form.
+        Route::get('admin/assistants', [AdminAssistantController::class, 'index'])->name('filament.admin.resources.assistants.index');
+        Route::get('admin/assistants/create', [AdminAssistantController::class, 'create'])->name('filament.admin.resources.assistants.create');
+        Route::get('admin/assistants/{record}', [AdminAssistantController::class, 'show'])->name('filament.admin.resources.assistants.view');
+        Route::get('admin/assistants/{record}/edit', [AdminAssistantController::class, 'edit'])->name('filament.admin.resources.assistants.edit');
+        Route::post('admin/assistants', [AdminAssistantController::class, 'store'])->name('console.admin.assistants.store');
+        Route::put('admin/assistants/{record}', [AdminAssistantController::class, 'update'])->name('console.admin.assistants.update');
+        Route::delete('admin/assistants/{record}', [AdminAssistantController::class, 'destroy'])->name('console.admin.assistants.destroy');
+        Route::get('admin/assistants/{record}/channels/{channel}/edit', [AdminAssistantChannelController::class, 'edit'])->name('console.admin.assistants.channels.edit');
+        Route::put('admin/assistants/{record}/channels/{channel}', [AdminAssistantChannelController::class, 'update'])->name('console.admin.assistants.channels.update');
+        Route::post('admin/assistants/{record}/channels/{channel}/rotate-webhook', [AdminAssistantChannelController::class, 'rotateWebhook'])->name('console.admin.assistants.channels.rotate-webhook');
+        Route::post('admin/assistants/{record}/channels/{channel}/register-webhook', [AdminAssistantChannelController::class, 'registerWebhook'])->name('console.admin.assistants.channels.register-webhook');
+        Route::delete('admin/assistants/{record}/channels/{channel}', [AdminAssistantChannelController::class, 'destroy'])->name('console.admin.assistants.channels.destroy');
     });
 
     // An assistant's screens: `{tenant}` is the assistant, under the name Filament gave the parameter.
