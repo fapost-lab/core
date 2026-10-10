@@ -18,6 +18,7 @@ use App\Domains\Media\Enums\MediaSource;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Staff\Models\User;
 use App\Filament\Assistant\Resources\Conversations\ConversationResource;
+use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\Page;
@@ -324,6 +325,14 @@ final class ViewConversation extends Page
             Notification::make()
                 ->danger()
                 ->title(__('conversation.notifications.reply_undeliverable'))
+                ->send();
+
+            return;
+        } catch (VolumeLimitReachedException $exception) {
+            Notification::make()
+                ->danger()
+                ->title(__('conversation.notifications.reply_limit_reached'))
+                ->body($exception->getMessage())
                 ->send();
 
             return;

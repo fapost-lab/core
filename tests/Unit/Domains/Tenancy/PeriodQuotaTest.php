@@ -16,6 +16,7 @@ use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Log;
 use LogicException;
 use RuntimeException;
 use Tests\Support\FakeUsageMeter;
@@ -88,6 +89,29 @@ final class PeriodQuotaTest extends TestCase
 
         $this->assertTrue($decision->allowed);
         $this->assertSame(['operator is down'], $reported);
+    }
+
+    public function test_a_refusal_is_logged_without_the_unit_key(): void
+    {
+        Log::spy();
+
+        $this->quota(FakeUsageMeter::denying(5, 5))->consume('visits', 'contact:secret', new DateTimeImmutable());
+
+        Log::shouldHaveReceived('info')->once()->with('quota.volume.refused', [
+            'tenant_id' => self::TENANT_ID,
+            'key'       => 'visits',
+            'limit'     => 5,
+            'used'      => 5,
+        ]);
+    }
+
+    public function test_an_allowed_unit_is_not_logged(): void
+    {
+        Log::spy();
+
+        $this->quota(FakeUsageMeter::allowing())->consume('visits', 'u', new DateTimeImmutable());
+
+        Log::shouldNotHaveReceived('info');
     }
 
     public function test_the_default_meter_allows_everything(): void

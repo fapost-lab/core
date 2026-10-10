@@ -21,10 +21,12 @@ use App\Domains\Flow\Support\CallbackDataCodec;
 use Carbon\Carbon;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
+use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Fapost\Foundation\Flow\Contracts\ContactWriterInterface;
 use Fapost\Foundation\Flow\Enums\KeyboardMode;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
 use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
+use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Fapost\Support\Builder\Schema\Fields\NumberField;
 use Fapost\Support\Builder\Schema\Fields\ObjectArrayField;
 use Fapost\Support\Builder\Schema\Fields\ObjectField;
@@ -230,6 +232,13 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                 contactId: $context->contactId,
                 sessionId: $context->sessionId,
                 payload: $payload,
+            );
+        } catch (VolumeLimitReachedException $exception) {
+            return new NodeExecutionResult(
+                status: NodeExecutionStatus::Executed,
+                sourceHandle: 'error',
+                metadata: ['error' => $exception->getMessage(), 'error_type' => 'limit_reached'],
+                errorMessage: 'limit_reached: ' . $exception->getMessage(),
             );
         } catch (Throwable $exception) {
             return NodeExecutionResult::executed(

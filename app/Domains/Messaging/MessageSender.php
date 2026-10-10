@@ -19,7 +19,8 @@ use Throwable;
  * Generic outbound messaging engine.
  *
  * Applies idempotency and rate limiting before delegating delivery to the
- * channel-specific sender resolved from the shared channel registry.
+ * channel-specific sender resolved from the shared channel registry. The tenant's
+ * outbound volume is spent just before delivery ({@see OutboundVolumeGate}).
  */
 final readonly class MessageSender implements MessageSenderInterface
 {
@@ -32,6 +33,7 @@ final readonly class MessageSender implements MessageSenderInterface
         private int $rateLimitPerMinute,
         private ConversationLoggerInterface $conversationLogger,
         private ConversationCaptureFactory $captureFactory,
+        private OutboundVolumeGate $volumeGate,
     ) {
     }
 
@@ -54,6 +56,14 @@ final readonly class MessageSender implements MessageSenderInterface
         if (null === $provider) {
             $this->releaseIdempotency($message->idempotencyKey);
             throw new UnsupportedChannelException("Unsupported channel type [{$message->channelType}].");
+        }
+
+        // Last check before the side effect: a duplicate or a failed precondition above never spends a unit.
+        try {
+            $this->volumeGate->admit($message);
+        } catch (Throwable $exception) {
+            $this->releaseIdempotency($message->idempotencyKey);
+            throw $exception;
         }
 
         try {

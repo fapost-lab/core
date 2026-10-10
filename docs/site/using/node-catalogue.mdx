@@ -23,6 +23,12 @@ something rather different from a send.
 
 Message text is written per language on the builder's **Content** tab.
 
+If the send fails, the flow leaves through the block's **error** exit. When the
+tenant has used up its outbound messages for the period, the message is not sent
+and the flow leaves the same way, with the error type `limit_reached` (the flow
+log shows it as `limit_reached: ...` on the block); a block
+with nothing connected to its error exit ends the session.
+
 #### The keyboard
 
 Choosing *text with keyboard* reveals the keyboard section, and a **mode**:
@@ -95,6 +101,10 @@ It validates what comes back and stores it, so the value is available to every
 block after it. This is the only block that pauses a flow indefinitely: while it
 waits, the session stays open, and if nobody answers it eventually times out
 under the tenant's session lifetime.
+
+If the question, or the hint shown after an invalid answer, cannot be sent because
+the tenant has used up its outbound messages for the period, the session stops as
+failed and is not retried; an answer given after the limit lifts does not resume the stopped session.
 
 <Note>
   Input is where flows get stuck, and the *Current node* column in
@@ -184,6 +194,11 @@ Calls another system — an HTTP endpoint, or an internal action.
 It reports whether the call succeeded, so the flow can respond to a failure
 rather than pretending it did not happen. Failed calls are retried before the
 failure outcome is taken; how many times is a tenant setting.
+
+Each run of the block counts against the tenant's call executions for the
+period, and so does every **Test call** in the builder. When they are used up the
+call is not made and the flow takes the failure outcome, with the error type
+`limit_reached` (the flow log shows `limit_reached: ...` on the block).
 
 <Warning>
   A call reaches outside the platform, so it is the block most likely to be slow

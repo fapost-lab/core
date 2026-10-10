@@ -86,6 +86,30 @@ where you show errors. It works in the tenant context of the current request or 
 already exist stay when a limit drops: only creating more is refused. See
 [Foundation contracts](/reference/foundation-contracts#quota) for the interfaces.
 
+### Limiting how much a tenant does in a period
+
+For work that is counted over time rather than stored, such as messages sent or calls made, register
+the key from `boot()` the same way with `kind: LimitKind::PerPeriod`. Nothing is stored in a tenant
+schema; the operator package counts. Spend one unit before the work, with a natural key that is the
+same on every retry, and do the work only when the answer is allowed:
+
+```php
+use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
+use Fapost\Foundation\Quota\DTO\UsageUnit;
+
+$decision = $this->meter->consume(new UsageUnit($tenantId, 'candidate_imports', "import:{$importId}", $startedAt));
+
+if (! $decision->allowed) {
+    // Not done, and not retried: the limit holds until the period ends.
+}
+```
+
+Core wraps this call to fail open when the operator's implementation throws; your code is calling the
+interface directly, so catch `Throwable` around it, report it and let the work through, which is what
+Core does. Build the `UsageUnit` before anything irreversible, and never put a personal identifier in
+the unit key. See [Foundation contracts](/reference/foundation-contracts#counting-use-over-a-period)
+for what the implementation promises.
+
 ## Before you start
 
 Read [Choosing an extension type](/extending/choosing-an-extension-type) first. The

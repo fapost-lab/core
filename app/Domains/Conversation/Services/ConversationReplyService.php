@@ -16,6 +16,7 @@ use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Media\Exceptions\MediaDeletedException;
 use App\Domains\Media\Exceptions\MediaNotFoundException;
 use App\Domains\Media\Models\MediaFile;
+use App\Domains\Messaging\OutboundVolumeGate;
 use Fapost\Foundation\Media\DTO\UploadContext;
 use Fapost\Foundation\Media\Enums\MediaKind;
 use Fapost\Foundation\Messaging\DeliveryResult;
@@ -37,6 +38,7 @@ final readonly class ConversationReplyService implements ConversationReplyServic
         private MediaDispatcherInterface $mediaDispatcher,
         private ConversationLoggerInterface $conversationLogger,
         private ConversationCaptureFactory $captureFactory,
+        private OutboundVolumeGate $volumeGate,
     ) {
     }
 
@@ -108,6 +110,12 @@ final readonly class ConversationReplyService implements ConversationReplyServic
             throw MediaDeletedException::forId($mediaFileId);
         }
 
+        // The key is fixed before the upload, which may deliver the message itself and never reach
+        // MessageSender; the message carries the same key, so the operator counts the unit once.
+        $idempotencyKey = $this->newIdempotencyKey($conversation);
+
+        $this->volumeGate->admitKey($idempotencyKey);
+
         $dispatch = $this->mediaDispatcher->ensureUploadedToChannel(
             media: $media,
             channel: $channel,
@@ -121,6 +129,7 @@ final readonly class ConversationReplyService implements ConversationReplyServic
             $chatId,
             $this->mediaPayload($kind, (string) $dispatch->providerFileId, $caption),
             $staffUserId,
+            $idempotencyKey,
         );
 
         if ($dispatch->alreadyDelivered) {
@@ -148,15 +157,21 @@ final readonly class ConversationReplyService implements ConversationReplyServic
         };
     }
 
+    private function newIdempotencyKey(Conversation $conversation): string
+    {
+        return 'staff_reply:' . (string) $conversation->getKey() . ':' . Str::ulid();
+    }
+
     private function buildMessage(
         Conversation $conversation,
         Channel $channel,
         string $chatId,
         MessagePayload $payload,
         string $staffUserId,
+        ?string $idempotencyKey = null,
     ): OutboundMessage {
         return new OutboundMessage(
-            idempotencyKey: 'staff_reply:' . (string) $conversation->getKey() . ':' . Str::ulid(),
+            idempotencyKey: $idempotencyKey ?? $this->newIdempotencyKey($conversation),
             tenantId: (string) $conversation->tenant_id,
             channelId: (string) $channel->getKey(),
             channelType: $channel->type->value,

@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property list<string>|null               $target_tags
  * @property string|null                     $target_segment_id
  * @property BroadcastStatus                 $status
+ * @property string|null                     $stop_reason
  * @property int                             $total_recipients
  * @property int                             $sent_count
  * @property int                             $failed_count
@@ -55,6 +56,7 @@ final class Broadcast extends BaseModel
         'target_tags',
         'target_segment_id',
         'status',
+        'stop_reason',
         'total_recipients',
         'sent_count',
         'failed_count',
