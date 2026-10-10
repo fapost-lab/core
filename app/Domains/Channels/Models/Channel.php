@@ -164,11 +164,13 @@ final class Channel extends Model implements ChannelInterface
     }
 
     /**
-     * Whether the provider refused the last webhook registration. Unknown (null) is not a refusal.
+     * Whether the provider refused the last webhook registration of an active channel. Unknown (null) is not a
+     * refusal, and an inactive channel has no registration to refuse: a stale flag from before it was switched off
+     * does not count.
      */
     public function webhookRegistrationFailed(): bool
     {
-        return ChannelWebhookStatus::Failed === $this->webhook_status;
+        return $this->is_active && ChannelWebhookStatus::Failed === $this->webhook_status;
     }
 
     /**

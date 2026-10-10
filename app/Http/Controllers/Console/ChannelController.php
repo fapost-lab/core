@@ -242,7 +242,7 @@ final class ChannelController extends Controller
      */
     private function webhookState(Channel $channel): ?string
     {
-        return $channel->is_active && $channel->webhookRegistrationFailed() ? 'failed' : null;
+        return $channel->webhookRegistrationFailed() ? 'failed' : null;
     }
 
     /**

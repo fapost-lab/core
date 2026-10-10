@@ -85,8 +85,10 @@ final class TenantSwitcher
             }
         } catch (Throwable $exception) {
             // A hook that cannot enter leaves nothing switched yet; put back what the earlier ones took.
-            foreach (array_reverse($exits) as $exit) {
-                $exit();
+            try {
+                $this->runAll(array_reverse($exits));
+            } catch (Throwable) {
+                // The entry failure is the one to see; a failed undo must not replace it.
             }
 
             throw $exception;
@@ -107,13 +109,7 @@ final class TenantSwitcher
                 try {
                     $this->usePermissionCacheOf($previousTenant);
 
-                    foreach ($this->restoreHooks as $hook) {
-                        $hook();
-                    }
-
-                    foreach (array_reverse($exits) as $exit) {
-                        $exit();
-                    }
+                    $this->runAll([...$this->restoreHooks, ...array_reverse($exits)]);
                 } finally {
                     if (null !== $previousTenant) {
                         $this->tenantContext->set($previousTenant);
@@ -122,6 +118,29 @@ final class TenantSwitcher
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Runs every closure in order, each one even when an earlier one throws; the first failure is rethrown after
+     * the rest have run.
+     *
+     * @param  list<Closure>  $closures
+     */
+    private function runAll(array $closures): void
+    {
+        $failure = null;
+
+        foreach ($closures as $closure) {
+            try {
+                $closure();
+            } catch (Throwable $exception) {
+                $failure ??= $exception;
+            }
+        }
+
+        if (null !== $failure) {
+            throw $failure;
         }
     }
 

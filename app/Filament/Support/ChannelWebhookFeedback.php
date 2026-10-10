@@ -51,7 +51,7 @@ final class ChannelWebhookFeedback
             ->label(__('staff.channels.fields.webhook_status'))
             ->badge()
             ->color('danger')
-            ->state(static fn (Channel $record): ?string => $record->is_active && $record->webhookRegistrationFailed()
+            ->state(static fn (Channel $record): ?string => $record->webhookRegistrationFailed()
                 ? __('staff.channels.fields.webhook_failed')
                 : null);
     }
@@ -64,8 +64,7 @@ final class ChannelWebhookFeedback
         return Action::make('reregisterWebhook')
             ->label(__('staff.channels.actions.reregister_webhook'))
             ->icon(Heroicon::OutlinedArrowPath)
-            ->visible(static fn (Channel $record): bool => $record->is_active
-                && $record->webhookRegistrationFailed()
+            ->visible(static fn (Channel $record): bool => $record->webhookRegistrationFailed()
                 && Gate::allows('update', $record))
             ->action(static function (Channel $record): void {
                 Gate::authorize('update', $record);

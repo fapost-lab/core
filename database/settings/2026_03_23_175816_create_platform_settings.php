@@ -6,7 +6,7 @@ use Spatie\LaravelSettings\Migrations\SettingsMigration;
 
 return new class () extends SettingsMigration {
     /**
-     * @throws Spatie\LaravelSettings\Exceptions\SettingAlreadyExists
+     * @throws \Spatie\LaravelSettings\Exceptions\SettingAlreadyExists
      */
     public function up(): void
     {

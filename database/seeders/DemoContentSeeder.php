@@ -59,18 +59,18 @@ final class DemoContentSeeder extends Seeder
         $id = (string) Str::uuid7();
 
         DB::table('channels')->insert([
-            'id'                    => $id,
-            'assistant_id'          => $assistantId,
-            'tenant_id'             => $tenantId,
-            'type'                  => 'telegram',
-            'token'                 => 'demo:0000000000:AA-not-a-real-token',
-            'secret_token'          => Str::random(32),
-            'webhook_public_hash'   => Str::random(48),
+            'id'                   => $id,
+            'assistant_id'         => $assistantId,
+            'tenant_id'            => $tenantId,
+            'type'                 => 'telegram',
+            'token'                => 'demo:0000000000:AA-not-a-real-token',
+            'secret_token'         => Str::random(32),
+            'webhook_public_hash'  => Str::random(48),
             'telegram_bot_username' => 'demo_assistant_bot',
-            'config'                => json_encode(self::MARK, JSON_THROW_ON_ERROR),
-            'is_active'             => true,
-            'created_at'            => now(),
-            'updated_at'            => now(),
+            'config'               => json_encode(self::MARK, JSON_THROW_ON_ERROR),
+            'is_active'            => true,
+            'created_at'           => now(),
+            'updated_at'           => now(),
         ]);
 
         return $id;

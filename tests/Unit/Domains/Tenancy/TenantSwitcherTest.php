@@ -259,6 +259,80 @@ final class TenantSwitcherTest extends TestCase
         $this->assertFalse($context->isResolved());
     }
 
+    public function test_every_exit_runs_even_when_one_throws_and_the_first_failure_is_rethrown(): void
+    {
+        $tenant              = $this->tenant('t1');
+        $dbManager           = Mockery::mock(TenantDatabaseManagerInterface::class);
+        $permissionRegistrar = Mockery::mock(PermissionRegistrar::class);
+        $context             = new TenantContext();
+        $ran                 = [];
+
+        $dbManager->shouldReceive('switchTo')->once();
+        $dbManager->shouldReceive('restore')->once();
+        $permissionRegistrar->shouldReceive('clearPermissionsCollection');
+
+        $switcher = new TenantSwitcher($context, $dbManager, $permissionRegistrar);
+        $switcher->registerContextHook(function () use (&$ran): Closure {
+            return function () use (&$ran): void {
+                $ran[] = 'a';
+
+                throw new RuntimeException('exit a failed');
+            };
+        });
+        $switcher->registerContextHook(function () use (&$ran): Closure {
+            return function () use (&$ran): void {
+                $ran[] = 'b';
+
+                throw new RuntimeException('exit b failed');
+            };
+        });
+
+        try {
+            $switcher->runForTenant($tenant, fn (): string => 'ok');
+            $this->fail('The exit failure must propagate.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('exit b failed', $exception->getMessage());
+        }
+
+        $this->assertSame(['b', 'a'], $ran);
+        $this->assertFalse($context->isResolved());
+    }
+
+    public function test_a_failing_undo_does_not_hide_the_entry_failure(): void
+    {
+        $tenant              = $this->tenant('t1');
+        $dbManager           = Mockery::mock(TenantDatabaseManagerInterface::class);
+        $permissionRegistrar = Mockery::mock(PermissionRegistrar::class);
+        $context             = new TenantContext();
+        $ran                 = [];
+
+        $dbManager->shouldNotReceive('switchTo');
+
+        $switcher = new TenantSwitcher($context, $dbManager, $permissionRegistrar);
+        $switcher->registerContextHook(function () use (&$ran): Closure {
+            return function () use (&$ran): void {
+                $ran[] = 'a';
+            };
+        });
+        $switcher->registerContextHook(function () use (&$ran): Closure {
+            return function () use (&$ran): void {
+                $ran[] = 'b';
+
+                throw new RuntimeException('undo b failed');
+            };
+        });
+        $switcher->registerContextHook(fn () => throw new RuntimeException('cannot enter'));
+
+        try {
+            $switcher->runForTenant($tenant, fn (): string => 'ok');
+            $this->fail('The entry failure must propagate.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('cannot enter', $exception->getMessage());
+        }
+
+        $this->assertSame(['b', 'a'], $ran);
+    }
+
     private function tenant(string $id): TenantInterface
     {
         $tenant = Mockery::mock(TenantInterface::class);
