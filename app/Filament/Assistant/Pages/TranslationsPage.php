@@ -5,11 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Assistant\Pages;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
-use App\Domains\Flow\Contracts\AssistantTranslationRepositoryInterface;
-use App\Domains\Flow\Contracts\AssistantTranslationServiceInterface;
-use App\Domains\Flow\Contracts\TenantTranslationRepositoryInterface;
-use App\Domains\Flow\Contracts\TranslationOverrideRepositoryInterface;
-use App\Domains\Flow\Contracts\TranslationOverrideServiceInterface;
+use App\Domains\Flow\Translations\TranslationScope;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -46,39 +42,15 @@ final class TranslationsPage extends AbstractTranslationsPage
         return __('staff.tenant_translations.navigation');
     }
 
-    protected function scopeId(): string
-    {
-        return (string) app(CurrentAssistantInterface::class)->get()->getKey();
-    }
-
-    protected function repository(): TranslationOverrideRepositoryInterface
-    {
-        return app(AssistantTranslationRepositoryInterface::class);
-    }
-
-    protected function service(): TranslationOverrideServiceInterface
-    {
-        return app(AssistantTranslationServiceInterface::class);
-    }
-
     /**
-     * Two layers: the assistant's own overrides win first; tenant overrides
-     * surface as "inherited" so editors can see what the upper layer would
-     * have shown without committing an assistant-level row.
+     * The assistant's own overrides win first; tenant overrides surface as "inherited" so editors can see what the
+     * upper layer would have shown without committing an assistant-level row.
      */
-    protected function layers(): array
+    protected function scope(): TranslationScope
     {
-        $tenantId = app(TenantContextInterface::class)->get()->getId();
-
-        return [
-            [
-                'matrix' => $this->repository()->matrix($this->scopeId()),
-                'status' => 'override',
-            ],
-            [
-                'matrix' => app(TenantTranslationRepositoryInterface::class)->matrix($tenantId),
-                'status' => 'inherited',
-            ],
-        ];
+        return TranslationScope::assistant(
+            app(TenantContextInterface::class)->get()->getId(),
+            (string) app(CurrentAssistantInterface::class)->get()->getKey(),
+        );
     }
 }

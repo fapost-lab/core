@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Call\Transports;
 
+use App\Domains\Flow\Call\Egress\EgressDeniedException;
+use App\Domains\Flow\Call\Egress\GuardedHttpClient;
 use Fapost\Foundation\Flow\Call\CallContext;
 use Fapost\Foundation\Flow\Call\CallRequest;
 use Fapost\Foundation\Flow\Call\CallResult;
 use Fapost\Foundation\Flow\Call\CallTransportInterface;
 use Illuminate\Http\Client\ConnectionException;
-use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\PendingRequest;
 use JsonException;
+use Psr\Log\LoggerInterface;
 
 /**
  * Built-in HTTP transport for the {@code call} node.
@@ -33,13 +35,18 @@ use JsonException;
  * Idempotency-Key header is set automatically from {@code $context->idempotencyKey}
  * unless the caller supplied one explicitly. Transport-level failures (DNS, timeout,
  * TLS) always end in error regardless of success_when.
+ *
+ * Requests go through {@see GuardedHttpClient}: a target on a private, loopback,
+ * link-local, reserved or cloud-metadata address, directly, through DNS or through
+ * a redirect, ends in the `egress_denied` error code without a connection.
  */
 final readonly class HttpTransport implements CallTransportInterface
 {
     public const string ID = 'http';
 
     public function __construct(
-        private HttpFactory $http,
+        private GuardedHttpClient $http,
+        private LoggerInterface $logger,
     ) {
     }
 
@@ -72,7 +79,7 @@ final readonly class HttpTransport implements CallTransportInterface
             ? $request->options['body_raw']
             : null;
 
-        $client = $this->configureClient($this->http->withHeaders($headers)->timeout($timeout), $bearer, $basic);
+        $client = $this->configureClient($this->http->request()->withHeaders($headers)->timeout($timeout), $bearer, $basic);
 
         if (null !== $rawBody) {
             $client = $client->withBody($rawBody, 'application/json');
@@ -88,6 +95,21 @@ final readonly class HttpTransport implements CallTransportInterface
                 'PATCH'  => $client->patch($this->appendQuery($url, $query), $body),
                 default  => null,
             };
+        } catch (EgressDeniedException $exception) {
+            // The URL path and query are left out on purpose: they carry tokens.
+            $this->logger->warning('Call node request refused by the egress guard.', [
+                'tenant_id'  => $context->tenantId,
+                'session_id' => $context->sessionId,
+                'node_id'    => $context->nodeId,
+                'host'       => $exception->host,
+                'reason'     => $exception->reason,
+                'addresses'  => $exception->addresses,
+            ]);
+
+            return CallResult::error(
+                'egress_denied',
+                metadata: ['host' => $exception->host, 'reason' => $exception->reason],
+            );
         } catch (ConnectionException $exception) {
             return CallResult::error(
                 'transport_failure',

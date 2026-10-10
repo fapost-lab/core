@@ -56,6 +56,8 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'filament.assistant.resources.flow-sessions.view',
             'filament.assistant.resources.flow-logs.index',
             'filament.assistant.resources.flow-logs.view',
+            // Assistant settings.
+            'filament.assistant.pages.settings',
         ] as $name) {
             $action = $this->route($name)->getActionName();
 
@@ -90,11 +92,28 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'console.flow-groups.update',
             'console.flow-groups.destroy',
             'console.flow-groups.destroy-many',
+            // Assistant settings.
+            'console.settings.update',
+            'console.settings.store-flow',
         ] as $name) {
             $this->assertNull(Route::getRoutes()->getByName($name), $name);
         }
 
         $this->assertNotInstanceOf(LoginController::class, $this->route('filament.admin.auth.login')->getController());
+    }
+
+    public function test_filament_answers_the_translations_pages_and_their_writes_do_not_exist(): void
+    {
+        foreach (['filament.admin.pages.translations', 'filament.assistant.pages.translations'] as $name) {
+            $action = $this->route($name)->getActionName();
+
+            $this->assertStringNotContainsString('App\\Http\\Controllers', $action, $name);
+            $this->assertStringContainsString('Filament', $action, $name);
+        }
+
+        foreach (['console.translations.update', 'console.translations.reset', 'console.admin.translations.update', 'console.admin.translations.reset'] as $name) {
+            $this->assertNull(Route::getRoutes()->getByName($name), $name);
+        }
     }
 
     public function test_the_admin_login_is_still_the_livewire_page(): void

@@ -67,9 +67,9 @@ console menu entry is served by Inertia and the console's tests run against the 
 - [ ] `console-inbox` — The conversation inbox — transcript paging, composer with attachments, take over and
       return to bot, status, read marking after authorization, live through the composable
       (after: live updates — the inbox is its main consumer)
-- [ ] `console-assistant-settings` — Assistant settings — tabs, the commands repeater, localized text fields, the inline
+- [x] `console-assistant-settings` — Assistant settings — tabs, the commands repeater, localized text fields, the inline
       create-flow dialog (after: the pilot)
-- [ ] `console-translations` — The assistant dashboard and the translations page shared by both panels (after: the
+- [x] `console-translations` — The assistant dashboard and the translations page shared by both panels (after: the
       pilot)
 
 ## Phase 3 — The admin panel at parity

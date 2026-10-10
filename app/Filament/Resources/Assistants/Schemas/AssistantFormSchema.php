@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Assistants\Schemas;
 
-use App\Filament\Support\ContentLanguages;
+use App\Domains\Assistant\Support\ContentLanguages;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;

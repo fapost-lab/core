@@ -31,6 +31,13 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
 - **Lists use `App\Http\DataTable\DataTable`** with whitelisted sortable and searchable columns
   and a row-mapping callback; its prop shape (`rows`, `meta`, `state`, `defaults`) feeds the kit's
   `DataTable` component, which keeps search, sort, page and page size in the query string.
+  Rows that come from a catalogue rather than a table (translation keys) use
+  `App\Http\DataTable\ArrayDataTable`: same query string and props, filtering in memory.
+- **An admin-panel screen** is a controller in `App\Http\Controllers\Admin\` on the `admin` stack; the
+  shell renders it in admin mode with `NavigationBuilder::admin()`. A screen both panels share keeps
+  one page and one domain service, and each controller fixes the scope it writes to (tenant or
+  assistant) — the request never chooses it. Example: `Admin\TranslationController`,
+  `Console\TranslationController`, `TranslationOverrideEditor`, `TranslationScope`.
 - **After a write**, toast through `Inertia::flash()` (never the session `with()`: a shared prop
   is kept in history and replays on Back). Deletes go `back()` so the list keeps its state; forms
   go to the index.
@@ -50,6 +57,9 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   `ContactSegmentController::schema()`, `ContactSegmentRequest`, `resources/js/pages/Console/ContactSegments/rules.ts`.
 - **Dictionaries with keys from data** (contact attributes, platform meta) go into props as lists of
   `{key, value}`: a JSON object reorders numeric keys in JS, and `jsonb` reorders all of them.
+  When such a form shows stored values as text, a row whose key and shown value come back unchanged
+  keeps the stored value and its type; only an edited or new row is saved as a string, so saving
+  another tab never rewrites `3` as `"3"`. Example: `AssistantSettingsService::settingsMap()`.
 - A bulk delete as one query skips model events; say so on the method, and delete model by model
   where observers matter. A delete with a guard (a group that still holds flows, a flow with live
   sessions) is always per record: the service throws a domain exception, the controller turns it

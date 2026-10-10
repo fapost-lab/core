@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Domains\Flow\Contracts\SystemTranslationCatalogInterface;
-use App\Domains\Flow\Contracts\TranslationOverrideRepositoryInterface;
-use App\Domains\Flow\Contracts\TranslationOverrideServiceInterface;
-use App\Domains\Tenancy\Settings\TenantSettings;
+use App\Domains\Flow\Services\TranslationOverrideEditor;
+use App\Domains\Flow\Translations\TranslationScope;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
@@ -30,11 +29,8 @@ use Filament\Tables\Table;
  * the value is an override, an inherited value (only relevant for the
  * assistant scope, where tenant overrides also count) or the catalog default.
  *
- * Concrete subclasses are thin wrappers that decide:
- *  - which scope id to write under (tenant_id / assistant_id),
- *  - which override repository to read,
- *  - which service to call on save/reset,
- *  - whether to overlay the tenant layer when computing cell status.
+ * Concrete subclasses only name the layer they edit ({@see TranslationScope}); the rows, the layering and the
+ * writes are {@see TranslationOverrideEditor}'s, shared with the Inertia console's translations screens.
  */
 abstract class AbstractTranslationsPage extends Page implements HasActions, HasTable
 {
@@ -45,24 +41,7 @@ abstract class AbstractTranslationsPage extends Page implements HasActions, HasT
 
     protected string $view = 'filament.pages.translations';
 
-    abstract protected function scopeId(): string;
-
-    abstract protected function repository(): TranslationOverrideRepositoryInterface;
-
-    abstract protected function service(): TranslationOverrideServiceInterface;
-
-    /**
-     * Ordered list of override layers consulted top-down. Each layer is a
-     * pair `[matrix, status]` where `matrix` is `key → lang → value` and
-     * `status` is the badge tag rendered for cells satisfied by that layer.
-     *
-     * Tenant page returns one layer (its own override, status = "override").
-     * Assistant page returns two: assistant override ("override") then
-     * tenant override ("inherited"). The first non-empty hit wins.
-     *
-     * @return list<array{matrix: array<string, array<string, string>>, status: string}>
-     */
-    abstract protected function layers(): array;
+    abstract protected function scope(): TranslationScope;
 
     public function getTitle(): string
     {
@@ -130,18 +109,18 @@ abstract class AbstractTranslationsPage extends Page implements HasActions, HasT
                 Action::make('edit')
                     ->label(__('staff.tenant_translations.actions.edit'))
                     ->icon(Heroicon::OutlinedPencilSquare)
-                    ->modalHeading(static fn (array $arguments): string => $arguments['key'] ?? '')
+                    ->modalHeading(static fn (array $record): string => (string) ($record['key'] ?? ''))
                     ->modalSubmitActionLabel(__('staff.tenant_translations.actions.save'))
-                    ->fillForm(fn (array $arguments): array => $this->editFormDefaults((string) ($arguments['key'] ?? '')))
-                    ->schema(fn (array $arguments): array => $this->editFormSchema((string) ($arguments['key'] ?? '')))
-                    ->action(fn (array $data, array $arguments) => $this->saveOverrides((string) ($arguments['key'] ?? ''), $data)),
+                    ->fillForm(fn (array $record): array => $this->editFormDefaults((string) ($record['key'] ?? '')))
+                    ->schema(fn (array $record): array => $this->editFormSchema((string) ($record['key'] ?? '')))
+                    ->action(fn (array $data, array $record) => $this->saveOverrides((string) ($record['key'] ?? ''), $data)),
                 Action::make('reset')
                     ->label(__('staff.tenant_translations.actions.reset'))
                     ->icon(Heroicon::OutlinedArrowUturnLeft)
                     ->color('danger')
                     ->requiresConfirmation()
                     ->visible(static fn (array $record): bool => self::hasAnyOverride($record))
-                    ->action(fn (array $arguments) => $this->resetKey((string) ($arguments['key'] ?? ''))),
+                    ->action(fn (array $record) => $this->resetKey((string) ($record['key'] ?? ''))),
             ])
             ->paginated([25, 50, 100]);
     }
@@ -152,24 +131,13 @@ abstract class AbstractTranslationsPage extends Page implements HasActions, HasT
     }
 
     /**
-     * Stable list of locales rendered as columns. Always includes `en` as
-     * baseline because the catalog uses it as the last fallback before
-     * returning the bare key.
+     * The locales rendered as columns, `en` always among them.
      *
      * @return list<string>
      */
     protected function locales(): array
     {
-        $configured = app(TenantSettings::class)->available_languages;
-
-        if (!in_array('en', $configured, true)) {
-            $configured = array_merge(['en'], $configured);
-        }
-
-        /** @var list<string> $list */
-        $list = array_values(array_unique($configured));
-
-        return $list;
+        return $this->editor()->languages();
     }
 
     /**
@@ -189,48 +157,28 @@ abstract class AbstractTranslationsPage extends Page implements HasActions, HasT
     }
 
     /**
-     * @return array<int, array{key: string, group: string, description: string, locales: array<string, array{value: string, status: string}>}>
+     * @return array<string, array{key: string, group: string, description: string, locales: array<string, array{value: string, status: string}>}>
      */
     private function buildRows(): array
     {
-        $catalog = app(SystemTranslationCatalogInterface::class);
-        $locales = $this->locales();
-        $layers  = $this->layers();
-
         $rows = [];
-        foreach ($catalog->entries() as $entry) {
-            $localesPayload = [];
-            foreach ($locales as $lang) {
-                $default               = $entry->default($lang) ?? ($entry->default('en') ?? '');
-                $localesPayload[$lang] = $this->resolveCell($entry->key, $lang, $default, $layers);
+
+        foreach ($this->editor()->rows($this->scope(), app()->getLocale()) as $row) {
+            $locales = [];
+
+            foreach ($row['languages'] as $cell) {
+                $locales[$cell['language']] = ['value' => $cell['value'], 'status' => $cell['status']];
             }
 
-            $rows[] = [
-                'key'         => $entry->key,
-                'group'       => $entry->group,
-                'description' => $entry->getDescription(app()->getLocale()),
-                'locales'     => $localesPayload,
+            $rows[$row['key']] = [
+                'key'         => $row['key'],
+                'group'       => $row['group'],
+                'description' => $row['description'],
+                'locales'     => $locales,
             ];
         }
 
         return $rows;
-    }
-
-    /**
-     * @param  list<array{matrix: array<string, array<string, string>>, status: string}>  $layers
-     * @return array{value: string, status: string}
-     */
-    private function resolveCell(string $key, string $language, string $catalogDefault, array $layers): array
-    {
-        foreach ($layers as $layer) {
-            $value = $layer['matrix'][$key][$language] ?? null;
-
-            if (null !== $value) {
-                return ['value' => $value, 'status' => $layer['status']];
-            }
-        }
-
-        return ['value' => $catalogDefault, 'status' => 'default'];
     }
 
     /**
@@ -255,7 +203,7 @@ abstract class AbstractTranslationsPage extends Page implements HasActions, HasT
         }
 
         return [
-            Section::make($entry?->description ?? $key)
+            Section::make($entry?->getDescription(app()->getLocale()) ?? $key)
                 ->schema($components)
                 ->columns(1),
         ];
@@ -266,14 +214,7 @@ abstract class AbstractTranslationsPage extends Page implements HasActions, HasT
      */
     private function editFormDefaults(string $key): array
     {
-        $matrix = $this->repository()->matrix($this->scopeId());
-
-        $values = [];
-        foreach ($this->locales() as $lang) {
-            $values[$lang] = $matrix[$key][$lang] ?? '';
-        }
-
-        return ['values' => $values];
+        return ['values' => $this->editor()->overrides($this->scope(), $key)];
     }
 
     /**
@@ -281,19 +222,9 @@ abstract class AbstractTranslationsPage extends Page implements HasActions, HasT
      */
     private function saveOverrides(string $key, array $data): void
     {
-        $service = $this->service();
-        $scope   = $this->scopeId();
-        $values  = is_array($data['values'] ?? null) ? $data['values'] : [];
+        $values = is_array($data['values'] ?? null) ? $data['values'] : [];
 
-        foreach ($this->locales() as $lang) {
-            $value = is_string($values[$lang] ?? null) ? mb_trim($values[$lang]) : '';
-
-            if ('' === $value) {
-                $service->delete($scope, $key, $lang);
-            } else {
-                $service->upsert($scope, $key, $lang, $value);
-            }
-        }
+        $this->editor()->save($this->scope(), $key, $values);
 
         Notification::make()
             ->success()
@@ -303,16 +234,16 @@ abstract class AbstractTranslationsPage extends Page implements HasActions, HasT
 
     private function resetKey(string $key): void
     {
-        $service = $this->service();
-        $scope   = $this->scopeId();
-
-        foreach ($this->locales() as $lang) {
-            $service->delete($scope, $key, $lang);
-        }
+        $this->editor()->reset($this->scope(), $key);
 
         Notification::make()
             ->success()
             ->title(__('staff.tenant_translations.reset_done'))
             ->send();
+    }
+
+    private function editor(): TranslationOverrideEditor
+    {
+        return app(TranslationOverrideEditor::class);
     }
 }

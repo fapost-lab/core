@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
+use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
 use App\Http\Controllers\Console\BroadcastController;
@@ -17,6 +19,7 @@ use App\Http\Controllers\Console\FlowGroupController;
 use App\Http\Controllers\Console\FlowLogController;
 use App\Http\Controllers\Console\FlowSessionController;
 use App\Http\Controllers\Console\LocaleController;
+use App\Http\Controllers\Console\TranslationController;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -63,6 +66,11 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'flow sessions view'    => ['filament.assistant.resources.flow-sessions.view', FlowSessionController::class, 'show', 'assistant/{tenant}/flow-sessions/{record}'],
             'flow logs list'        => ['filament.assistant.resources.flow-logs.index', FlowLogController::class, 'index', 'assistant/{tenant}/flow-logs'],
             'flow logs view'        => ['filament.assistant.resources.flow-logs.view', FlowLogController::class, 'show', 'assistant/{tenant}/flow-logs/{record}'],
+            // Assistant settings.
+            'assistant settings' => ['filament.assistant.pages.settings', AssistantSettingsController::class, 'edit', 'assistant/{tenant}/settings'],
+            // Translations: both panels.
+            'admin translations'     => ['filament.admin.pages.translations', AdminTranslationController::class, 'index', 'admin/translations'],
+            'assistant translations' => ['filament.assistant.pages.translations', TranslationController::class, 'index', 'assistant/{tenant}/translations'],
         ];
     }
 
@@ -102,6 +110,14 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'broadcast send'           => ['console.broadcasts.send', BroadcastController::class, 'send', 'POST', 'assistant/{tenant}/broadcasts/{record}/send'],
             'broadcast cancel'         => ['console.broadcasts.cancel', BroadcastController::class, 'cancel', 'POST', 'assistant/{tenant}/broadcasts/{record}/cancel'],
             'broadcast destroy'        => ['console.broadcasts.destroy', BroadcastController::class, 'destroy', 'DELETE', 'assistant/{tenant}/broadcasts/{record}'],
+            // Assistant settings.
+            'settings update'     => ['console.settings.update', AssistantSettingsController::class, 'update', 'PUT', 'assistant/{tenant}/settings'],
+            'settings store flow' => ['console.settings.store-flow', AssistantSettingsController::class, 'storeFlow', 'POST', 'assistant/{tenant}/settings/flows'],
+            // Translations: both panels.
+            'translation update'       => ['console.translations.update', TranslationController::class, 'update', 'PUT', 'assistant/{tenant}/translations/{key}'],
+            'translation reset'        => ['console.translations.reset', TranslationController::class, 'reset', 'DELETE', 'assistant/{tenant}/translations/{key}'],
+            'admin translation update' => ['console.admin.translations.update', AdminTranslationController::class, 'update', 'PUT', 'admin/translations/{key}'],
+            'admin translation reset'  => ['console.admin.translations.reset', AdminTranslationController::class, 'reset', 'DELETE', 'admin/translations/{key}'],
         ];
     }
 
