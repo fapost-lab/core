@@ -320,6 +320,26 @@ final class ConversationsConsoleTest extends InertiaConsoleTestCase
         $this->assertSame([], $this->sent);
     }
 
+    public function test_a_duplicate_answer_from_the_outbound_path_is_not_confirmed_and_keeps_the_draft(): void
+    {
+        $calls = 0;
+        $this->fakeSender(function () use (&$calls): DeliveryResult {
+            $calls++;
+
+            // MessageSender answers so while its key is still marked in flight by an attempt that died mid-send.
+            return new DeliveryResult(sent: false, duplicate: true);
+        });
+        $thread    = $this->heldThread();
+        $requestId = (string) Str::uuid();
+
+        $this->actingAs($this->admin())
+            ->post($this->writeUrl($thread, 'reply'), ['request_id' => $requestId, 'text' => 'Hello'])
+            ->assertInertiaFlash('error', __('conversation.notifications.reply_unconfirmed'));
+
+        $this->assertSame(1, $calls);
+        $this->assertNotSame('sent', Cache::get($this->reservation($thread, $requestId)), 'nothing claims the reply was sent');
+    }
+
     public function test_a_definitely_failed_reply_is_released_for_a_retry_that_goes_out_once(): void
     {
         $attempts = 0;

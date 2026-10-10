@@ -46,7 +46,7 @@ use Throwable;
  * A reply reaches a real person, so one submission is one message: the screen sends a `requestId` that stays the same
  * across retries of one draft, the first request reserves it here before anything is stored or sent, and the same id
  * becomes the message's idempotency key on the outbound path (volume gate and transcript included). A double click, a
- * second tab or a replayed form sends nothing more. A definite failure releases the reservation for a retry; an
+ * retry or a replayed submit of the same draft sends nothing more (another tab writes its own draft, with its own id). A definite failure releases the reservation for a retry; an
  * ambiguous one (the provider may have the message) does not, and the operator is asked to check the transcript
  * ({@see self::reply()} has the exact rules).
  *
@@ -242,14 +242,15 @@ final readonly class ConversationInbox
      * The submission is reserved as `pending` (for {@see self::PENDING_SECONDS}) before anything is stored or sent, and
      * marked `sent` (for {@see self::SENT_SECONDS}) only once the provider confirmed it. A request that finds it `sent`
      * sends nothing ({@see ReplyOutcome::Duplicate}); one that finds it `pending` sends nothing either and says the
-     * outcome is not confirmed yet ({@see ReplyOutcome::Unconfirmed}).
+     * outcome is not confirmed yet ({@see ReplyOutcome::Unconfirmed}), as does an outbound path that answers the key is
+     * a duplicate (it may only be marked in flight by an attempt that died mid-send).
      *
      * A definite failure (the volume gate refused, no active channel, a missing file, the channel's rate limit, the
      * provider rejected the message) releases the reservation and removes the attachment it stored, so the operator can
      * retry. Any other failure may have happened after the provider took the message (a read timeout, a dropped
      * connection, a Telegram upload that is itself the send): it is reported, the reservation is left to expire and the
      * attachment kept, and the operator is told to check the transcript ({@see ReplyOutcome::Unconfirmed}). So a double
-     * click, a second tab or a replayed form never sends twice; after an unconfirmed attempt, a retry once the pending
+     * click, a retry or a replayed submit of the same draft never sends twice; after an unconfirmed attempt, a retry once the pending
      * mark has expired can send a second copy if the first did arrive.
      *
      * @throws ConversationNotHeldByStaffException     the bot answers the thread
@@ -307,11 +308,10 @@ final readonly class ConversationInbox
             return ReplyOutcome::Sent;
         }
 
-        // The outbound path already delivered this key (the reservation above was lost): it stays delivered.
+        // The outbound path holds this key already: delivered, or still marked in flight by an attempt that died
+        // mid-send. It cannot tell which, so neither can the inbox: nothing is recorded and the operator checks.
         if ($result->duplicate) {
-            $this->cache->put($reservation, self::SENT, self::SENT_SECONDS);
-
-            return ReplyOutcome::Duplicate;
+            return ReplyOutcome::Unconfirmed;
         }
 
         // The provider answered and refused: nothing went out.

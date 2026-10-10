@@ -40,7 +40,7 @@ outside the domain uses it, so delivery statuses are not updated in practice.
 
 Only the write side is behind a port. `ConversationStoreInterface` has one implementation,
 `Store/Postgres/PostgresConversationStore` (with `ConversationPartitionManager`), chosen by `config('conversation.driver')` (any other value
-throws). Reads — the Filament conversation view, ownership, operator replies — use the Eloquent
+throws). Reads — the Filament conversation view and the console inbox (`ConversationInbox`), ownership, operator replies — use the Eloquent
 models directly, and no read-side interface exists. The store's `ensureConversation` creates the
 Postgres `conversations` row that ownership, the inbox and unread counts depend on. *(inferred:
 a second storage backend would still need that row in Postgres)* There is no ClickHouse store, and a
@@ -78,3 +78,9 @@ inbound message. Operators reply through `ConversationReplyService`.
 - Jobs on `messaging.logging`: `PersistConversationMessageJob`, `FetchConversationMediaJob`,
   `UpdateConversationDeliveryStatusJob`.
 - Admin UI: `app/Filament/Assistant/Resources/Conversations`.
+- Console UI (`UI_INERTIA=true`): `app/Http/Controllers/Console/ConversationController.php` over
+  `Services/ConversationInbox.php` (list and unread count shared with the shell badge, transcript,
+  take over / return / status, a reply sent once per `request_id`); live updates through
+  `Live/ConversationActivityNotifier` on the private channel
+  `tenant.{tenant}.assistant.{assistant}.conversations`, announced from `PersistConversationMessageJob`
+  and inbox writes.

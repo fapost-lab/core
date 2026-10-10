@@ -88,6 +88,11 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   does the step once. A list that shows live progress polls (`usePoll`, partial reload of `table` only)
   only while a row is running, and gives up after a fixed time. Example: `BroadcastController`,
   `BroadcastService`, `SendDialog.vue`.
+  A free-form message to a person (an operator's reply) carries a `request_id` the client keeps for
+  one draft: the service reserves it as `pending` with a short TTL, marks it `sent` only after a
+  confirmed send, and passes it on as the outbound idempotency key. A definite refusal releases the
+  reservation; an ambiguous failure, or a duplicate answer from the outbound path, is "not confirmed":
+  the draft stays and nothing is resent until the reservation expires. Example: `ConversationInbox`.
 - **A screen that follows live activity** takes a `live` prop (`{channel, event}`) from its controller
   and calls `useLiveUpdates`: Echo when a broadcaster delivers and a client is registered, polling
   otherwise. The server announces only after the commit, only while a screen marks itself watched
