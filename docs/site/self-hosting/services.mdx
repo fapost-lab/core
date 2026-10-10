@@ -17,6 +17,7 @@ This document describes each service, why it exists, and how to supervise it.
 | Horizon   | `php artisan horizon`                     | Yes      | Messages queue up and nothing processes them |
 | Scheduler | `php artisan schedule:run` every minute   | Yes      | Scheduled triggers and cleanup never fire   |
 | Gateway   | `gateway --env .env`                       | No       | Webhooks stay on the PHP path — a supported mode |
+| Reverb    | `php artisan reverb:start`                 | No       | Live screens poll instead — the default ([Realtime](/self-hosting/realtime)) |
 
 ## Horizon
 

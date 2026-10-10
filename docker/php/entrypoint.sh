@@ -66,6 +66,12 @@ case "${ROLE}" in
             sleep $((60 - $(date +%S)))
         done
         ;;
+    reverb)
+        warm_caches
+        # The websocket server for live updates (the `realtime` compose profile).
+        # Listens on the compose network only; nginx forwards browsers to it.
+        exec php artisan reverb:start --host=0.0.0.0 --port=8080 --no-interaction
+        ;;
     php-fpm)
         warm_caches
         exec php-fpm

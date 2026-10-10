@@ -1,6 +1,6 @@
-import { computed, onBeforeUnmount, toValue, watch, type ComputedRef, type MaybeRefOrGetter } from 'vue'
+import { computed, onScopeDispose, shallowRef, toValue, watch, type ComputedRef, type MaybeRefOrGetter } from 'vue'
 import { router, usePage, usePoll } from '@inertiajs/vue3'
-import { chooseTransport, createAnnouncementReloader, currentEchoClient, echoEventName, type LiveChannel, type LiveTransport } from './live-updates'
+import { chooseTransport, createAnnouncementReloader, currentEchoClient, echoEventName, type BroadcasterProp, type LiveChannel, type LiveTransport } from './live-updates'
 
 /** Longer than the server's throttle window (FlowActivityNotifier::THROTTLE_SECONDS), see createAnnouncementReloader. */
 const TRAILING_RELOAD_MS = 3000
@@ -23,28 +23,35 @@ export interface LiveUpdatesOptions {
 }
 
 /**
- * Keeps a screen current: listens on the screen's private channel through Echo when the server has a broadcaster that
- * delivers and the app has an Echo client, and polls with Inertia otherwise. Either way it reloads only `only`.
+ * Keeps a screen current: listens on the screen's private channel through Echo while the server has a broadcaster that
+ * delivers and the app's socket is connected, and polls with Inertia otherwise — including when the socket drops or the
+ * server refuses the subscription. Either way it reloads only `only`.
  *
  * Returns which way it works, for a "live" or "refreshes every N s" hint.
  */
 export function useLiveUpdates(options: LiveUpdatesOptions): { transport: ComputedRef<LiveTransport> } {
-  const page = usePage<{ broadcaster?: { enabled: boolean } }>()
+  const page = usePage<{ broadcaster?: BroadcasterProp }>()
 
-  const transport = computed<LiveTransport>(() =>
-    chooseTransport({
+  /** The channel whose subscription the server refused (403/419): the screen polls for it from then on. */
+  const refusedChannel = shallowRef<string | null>(null)
+
+  const transport = computed<LiveTransport>(() => {
+    const live = toValue(options.live)
+
+    return chooseTransport({
       broadcasterEnabled: Boolean(page.props.broadcaster?.enabled),
-      live: toValue(options.live),
+      live,
       client: currentEchoClient(),
-    }),
-  )
+      subscriptionFailed: refusedChannel.value !== null && refusedChannel.value === live?.channel,
+    })
+  })
   const active = computed(() => (options.active === undefined ? true : toValue(options.active)))
 
   const poll = usePoll(options.pollMs, { only: options.only }, { autoStart: false })
   const reloader = createAnnouncementReloader(() => router.reload({ only: options.only }), TRAILING_RELOAD_MS)
 
   watch(
-    [transport, active, () => toValue(options.live)?.channel],
+    [transport, active, () => toValue(options.live)?.channel, () => currentEchoClient()],
     (_value, _previous, onCleanup) => {
       poll.stop()
 
@@ -62,7 +69,11 @@ export function useLiveUpdates(options: LiveUpdatesOptions): { transport: Comput
       }
 
       const event = echoEventName(live.event)
-      client.private(live.channel).listen(event, reloader.notify)
+      const channel = client.private(live.channel)
+      channel.listen(event, reloader.notify)
+      channel.error?.(() => {
+        refusedChannel.value = live.channel
+      })
       const heartbeat = setInterval(() => router.reload({ only: options.only }), HEARTBEAT_MS)
 
       onCleanup(() => {
@@ -75,7 +86,7 @@ export function useLiveUpdates(options: LiveUpdatesOptions): { transport: Comput
     { immediate: true },
   )
 
-  onBeforeUnmount(() => {
+  onScopeDispose(() => {
     poll.stop()
     reloader.dispose()
   })

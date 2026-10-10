@@ -28,10 +28,11 @@ Six services, defined in [`docker/compose.yaml`](https://github.com/fapost-lab/c
 | `postgres`  | `postgres:16-alpine`             | database |
 | `redis`     | `redis:7-alpine`                 | queues, cache, webhook registry |
 
-Two more sit behind Compose profiles: `caddy` for TLS with automatic
-certificates (`--profile tls`, see [step 6](#6-tls)), and the webhook gateway
-(`--profile gateway`, see [Webhook gateway](/self-hosting/gateway)). Both are optional — the
-first only if you do not already terminate TLS elsewhere.
+Three more sit behind Compose profiles: `caddy` for TLS with automatic
+certificates (`--profile tls`, see [step 6](#6-tls)), the webhook gateway
+(`--profile gateway`, see [Webhook gateway](/self-hosting/gateway)), and `reverb` for
+websocket live updates (`--profile realtime`, see [Realtime](/self-hosting/realtime)).
+All are optional — the first only if you do not already terminate TLS elsewhere.
 
 `app`, `horizon` and `scheduler` deliberately share one image: they run identical
 code and differ only in the command. Building them separately would let their
