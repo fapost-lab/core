@@ -7,9 +7,11 @@ namespace App\Http\Controllers\Console;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Services\LimitRefusalReport;
+use App\Domains\Flow\Enums\FlowActivityPeriod;
 use App\Domains\Flow\Models\FlowLog;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\AssistantFlowActivity;
+use App\Domains\Flow\Services\FlowLogInspector;
 use App\Http\Controllers\Controller;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Gate;
@@ -44,7 +46,11 @@ final class DashboardController extends Controller
                     ? route('filament.assistant.resources.flow-sessions.index', ['tenant' => $id], false)
                     : null,
                 'logsUrl' => Gate::allows('viewAny', FlowLog::class)
-                    ? route('filament.assistant.resources.flow-logs.index', ['tenant' => $id], false)
+                    ? route('filament.assistant.resources.flow-logs.index', [
+                        'tenant' => $id,
+                        // What the count counts: entries with an error over the last 24 hours.
+                        'filter' => ['errors' => FlowLogInspector::ERRORS_ONLY, 'period' => FlowActivityPeriod::LastDay->value],
+                    ], false)
                     : null,
             ],
             // Only for those who may see contacts, and only when someone was turned away lately.

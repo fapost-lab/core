@@ -52,6 +52,10 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'filament.assistant.resources.broadcasts.index',
             'filament.assistant.resources.broadcasts.create',
             'filament.assistant.resources.broadcasts.edit',
+            'filament.assistant.resources.flow-sessions.index',
+            'filament.assistant.resources.flow-sessions.view',
+            'filament.assistant.resources.flow-logs.index',
+            'filament.assistant.resources.flow-logs.view',
             // Assistant settings.
             'filament.assistant.pages.settings',
         ] as $name) {

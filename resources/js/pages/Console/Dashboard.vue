@@ -6,7 +6,7 @@ export default { layout: AppShell }
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Head, usePage } from '@inertiajs/vue3'
+import { Head, Link, usePage } from '@inertiajs/vue3'
 import { FileText, ListOrdered, UsersRound } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@fapost/ui/components/card'
@@ -94,18 +94,17 @@ const status = computed(() => (props.assistant.isActive ? t.value.status_active 
           <p v-if="!operations.logsUrl">{{ interpolate(t.errors_24h, { count: operations.errors24h }) }}</p>
         </CardContent>
         <CardFooter class="flex flex-wrap gap-2">
-          <!-- These lists are still Filament's: plain links, a full page load. -->
           <Button v-if="operations.sessionsUrl" as-child variant="outline">
-            <a :href="operations.sessionsUrl">
+            <Link :href="operations.sessionsUrl">
               <ListOrdered aria-hidden="true" />
               {{ interpolate(t.live_sessions, { count: operations.liveSessions }) }}
-            </a>
+            </Link>
           </Button>
           <Button v-if="operations.logsUrl" as-child variant="outline">
-            <a :href="operations.logsUrl">
+            <Link :href="operations.logsUrl">
               <FileText aria-hidden="true" />
               {{ interpolate(t.errors_24h, { count: operations.errors24h }) }}
-            </a>
+            </Link>
           </Button>
         </CardFooter>
       </Card>
