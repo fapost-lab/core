@@ -17,6 +17,7 @@ use App\Http\Controllers\Console\ChannelController;
 use App\Http\Controllers\Console\ContactController;
 use App\Http\Controllers\Console\ContactGroupController;
 use App\Http\Controllers\Console\ContactSegmentController;
+use App\Http\Controllers\Console\ConversationController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
@@ -70,6 +71,9 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'flow sessions view'    => ['filament.assistant.resources.flow-sessions.view', FlowSessionController::class, 'show', 'assistant/{tenant}/flow-sessions/{record}'],
             'flow logs list'        => ['filament.assistant.resources.flow-logs.index', FlowLogController::class, 'index', 'assistant/{tenant}/flow-logs'],
             'flow logs view'        => ['filament.assistant.resources.flow-logs.view', FlowLogController::class, 'show', 'assistant/{tenant}/flow-logs/{record}'],
+            // Conversations.
+            'conversations list' => ['filament.assistant.resources.conversations.index', ConversationController::class, 'index', 'assistant/{tenant}/conversations'],
+            'conversations view' => ['filament.assistant.resources.conversations.view', ConversationController::class, 'show', 'assistant/{tenant}/conversations/{record}'],
             // Assistant settings.
             'assistant settings' => ['filament.assistant.pages.settings', AssistantSettingsController::class, 'edit', 'assistant/{tenant}/settings'],
             // Translations: both panels.
@@ -126,6 +130,11 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'broadcast send'           => ['console.broadcasts.send', BroadcastController::class, 'send', 'POST', 'assistant/{tenant}/broadcasts/{record}/send'],
             'broadcast cancel'         => ['console.broadcasts.cancel', BroadcastController::class, 'cancel', 'POST', 'assistant/{tenant}/broadcasts/{record}/cancel'],
             'broadcast destroy'        => ['console.broadcasts.destroy', BroadcastController::class, 'destroy', 'DELETE', 'assistant/{tenant}/broadcasts/{record}'],
+            // Conversations.
+            'conversation reply'         => ['console.conversations.reply', ConversationController::class, 'reply', 'POST', 'assistant/{tenant}/conversations/{record}/reply'],
+            'conversation takeover'      => ['console.conversations.takeover', ConversationController::class, 'takeOver', 'POST', 'assistant/{tenant}/conversations/{record}/takeover'],
+            'conversation return to bot' => ['console.conversations.return-to-bot', ConversationController::class, 'returnToBot', 'POST', 'assistant/{tenant}/conversations/{record}/return-to-bot'],
+            'conversation status'        => ['console.conversations.status', ConversationController::class, 'updateStatus', 'PUT', 'assistant/{tenant}/conversations/{record}/status'],
             // Assistant settings.
             'settings update'     => ['console.settings.update', AssistantSettingsController::class, 'update', 'PUT', 'assistant/{tenant}/settings'],
             'settings store flow' => ['console.settings.store-flow', AssistantSettingsController::class, 'storeFlow', 'POST', 'assistant/{tenant}/settings/flows'],

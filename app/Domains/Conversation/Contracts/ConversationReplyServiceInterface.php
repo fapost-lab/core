@@ -18,6 +18,10 @@ interface ConversationReplyServiceInterface
     /**
      * @param  string|null  $mediaFileId  Attachment from the tenant media library;
      *                                    `$text` then travels as its caption.
+     * @param  string|null  $requestId    The operator's submission, stable across its retries: it becomes the
+     *                                    message's idempotency key, so the outbound funnel, the volume gate and
+     *                                    the transcript count a repeated submission once. Without it every call
+     *                                    is a new message.
      *
      * @throws ConversationReplyUndeliverableException  No active channel linkage to send through.
      */
@@ -26,5 +30,6 @@ interface ConversationReplyServiceInterface
         string $text,
         string $staffUserId,
         ?string $mediaFileId = null,
+        ?string $requestId = null,
     ): DeliveryResult;
 }

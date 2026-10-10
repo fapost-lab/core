@@ -7,6 +7,7 @@ namespace App\Domains\Conversation\Jobs;
 use App\Domains\Conversation\Contracts\ConversationStoreInterface;
 use App\Domains\Conversation\DTO\MessageLogEntry;
 use App\Domains\Conversation\Enums\MessageDirection;
+use App\Domains\Conversation\Live\ConversationActivityNotifier;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -32,15 +33,19 @@ final class PersistConversationMessageJob implements ShouldQueue
         ConversationStoreInterface $store,
         TenantRepositoryInterface $tenants,
         TenantSwitcher $switcher,
+        ConversationActivityNotifier $activity,
     ): void {
         $tenant = $tenants->getById($this->entry->tenantId);
 
-        $switcher->runForTenant($tenant, function () use ($store): void {
+        $switcher->runForTenant($tenant, function () use ($store, $activity): void {
             $conversationId = $store->ensureConversation($this->entry->ref());
             $messageId      = $store->appendMessage($conversationId, $this->entry);
 
             if (null !== $messageId) {
                 $this->fetchMediaIfNeeded($messageId);
+
+                // An open inbox shows the new message (and the unread count) without waiting for its next poll.
+                $activity->touched($this->entry->tenantId, $this->entry->assistantId);
             }
         });
     }

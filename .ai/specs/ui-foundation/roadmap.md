@@ -64,7 +64,7 @@ console menu entry is served by Inertia and the console's tests run against the 
 - [x] `realtime-self-hosted` — Realtime for self-hosters — `laravel/reverb` dormant in Core, the Echo client as a lazy
       chunk, an optional `reverb` service behind a Compose profile, a self-hosting "Realtime"
       page (after: live updates — it is what they switch on)
-- [ ] `console-inbox` — The conversation inbox — transcript paging, composer with attachments, take over and
+- [x] `console-inbox` — The conversation inbox — transcript paging, composer with attachments, take over and
       return to bot, status, read marking after authorization, live through the composable
       (after: live updates — the inbox is its main consumer)
 - [x] `console-assistant-settings` — Assistant settings — tabs, the commands repeater, localized text fields, the inline

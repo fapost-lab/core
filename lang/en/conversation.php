@@ -91,6 +91,9 @@ return [
         'reply_limit_reached'     => 'The reply was not sent: the outbound message limit for this period is reached.',
         'taken_over'              => 'You are now handling this conversation.',
         'returned_to_bot'         => 'Conversation returned to the assistant.',
+        'reply_duplicate'         => 'This reply was already sent.',
+        'already_taken_over'      => 'Another operator is already handling this conversation.',
+        'reply_unconfirmed'       => 'Sending this reply is not confirmed yet. Check the conversation before sending it again.',
     ],
 
     'media' => [
