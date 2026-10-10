@@ -9,8 +9,8 @@ paths:
   - "app/Domains/Flow/Action/**"
 source: docs/reference/specs/flow-engine/04-call-transport-layer.md
 summary: CallTransport and ActionHandler contracts and their fail-on-conflict registries
-source_hash: 8c9c193c885fac5aeaad28312d34a0711f2946ee
-reviewed_at: 2026-10-05
+source_hash: d521653d1333d67337fbc1eb02463ab8a757b0a1
+reviewed_at: 2026-10-10
 ---
 # 04. Call Transport Layer
 
