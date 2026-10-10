@@ -94,7 +94,8 @@ return [
     ],
 
     'media' => [
-        'pending' => 'Downloading…',
-        'failed'  => 'Failed to download',
+        'pending'               => 'Downloading…',
+        'failed'                => 'Failed to download',
+        'storage_limit_reached' => 'Not saved: media storage is full',
     ],
 ];

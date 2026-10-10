@@ -15,9 +15,11 @@ use App\Domains\Conversation\Models\ConversationMessage;
 use App\Domains\Media\Contracts\MediaServiceInterface;
 use App\Domains\Media\Contracts\MediaUploaderInterface;
 use App\Domains\Media\Enums\MediaSource;
+use App\Domains\Media\Exceptions\StorageLimitReachedException;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Staff\Models\User;
 use App\Filament\Assistant\Resources\Conversations\ConversationResource;
+use App\Filament\Support\StorageLimit;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification;
@@ -234,9 +236,16 @@ final class ViewConversation extends Page
             ],
         );
 
-        $mediaFileId = null !== $this->attachment
-            ? (string) $this->storeAttachment()->getKey()
-            : null;
+        try {
+            $mediaFileId = null !== $this->attachment
+                ? (string) $this->storeAttachment()->getKey()
+                : null;
+        } catch (StorageLimitReachedException $exception) {
+            // Nothing is sent and the composer keeps the text, so the operator can drop the file and resend.
+            StorageLimit::notifyRefused($exception);
+
+            return;
+        }
 
         $this->deliverReply($conversation, mb_trim($this->replyText), $mediaFileId);
 

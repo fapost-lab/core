@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Media\Contracts;
 
 use App\Domains\Media\Enums\MediaSource;
+use App\Domains\Media\Exceptions\StorageLimitReachedException;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFolder;
 use Illuminate\Http\UploadedFile;
@@ -17,6 +18,8 @@ interface MediaUploaderInterface
 {
     /**
      * Store an HTTP-uploaded file (Filament/REST entrypoint).
+     *
+     * @throws StorageLimitReachedException when the content is new and does not fit the tenant's storage limit
      */
     public function uploadFromUploadedFile(
         UploadedFile $file,
@@ -28,6 +31,8 @@ interface MediaUploaderInterface
 
     /**
      * Store a stream coming from a non-HTTP source (input-node ingest, internal API).
+     *
+     * @throws StorageLimitReachedException when the content is new and does not fit the tenant's storage limit
      */
     public function storeFromStream(
         StreamInterface $stream,

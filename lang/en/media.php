@@ -78,7 +78,10 @@ return [
     ],
 
     'errors' => [
-        'has_references' => 'Cannot force delete: file is referenced by one or more flows.',
-        'file_too_large' => 'File exceeds the maximum allowed size of :max MB.',
+        'has_references'        => 'Cannot force delete: file is referenced by one or more flows.',
+        'file_too_large'        => 'File exceeds the maximum allowed size of :max MB.',
+        'storage_limit_title'   => 'Media storage is full',
+        'storage_limit_reached' => 'Media storage is full: :used of :limit used, the file needs :needed. Delete unneeded files permanently (from the trash) to free space.',
+        'storage_limit_saved'   => ':saved of :total file(s) were saved before the limit was reached.',
     ],
 ];
