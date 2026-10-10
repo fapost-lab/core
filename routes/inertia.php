@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\SearchController as AdminSearchController;
 use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessController;
+use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Console\AssistantSettingsController;
@@ -113,6 +114,9 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::get('admin', AdminDashboardController::class)->name('filament.admin.pages.dashboard');
         Route::get('admin/search', AdminSearchController::class)->middleware('throttle:60,1')->name('console.admin.search');
 
+        // Tenant settings: languages with the base-language lock, runtime limits, broadcast pacing; one form saved whole.
+        Route::get('admin/tenant-settings', [AdminTenantSettingsController::class, 'edit'])->name('filament.admin.pages.tenant-settings');
+        Route::put('admin/tenant-settings', [AdminTenantSettingsController::class, 'update'])->name('console.admin.tenant-settings.update');
         // Support access log: read only, and never a Filament screen, so the name is the console's own.
         Route::get('admin/support-access', [AdminSupportAccessController::class, 'index'])->name('console.admin.support-access.index');
     });

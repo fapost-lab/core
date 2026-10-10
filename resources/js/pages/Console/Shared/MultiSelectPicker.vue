@@ -5,16 +5,21 @@ import { Badge } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@fapost/ui/components/dropdown-menu'
 import { Input } from '@fapost/ui/components/input'
-import type { SelectOption } from './types'
+
+/** One choice the picker offers: a stored value and the label shown for it. */
+interface PickerOption {
+  value: string
+  label: string
+}
 
 /**
- * Chooses some of a long list (the countries): a search field on top of the menu filters it, the menu stays open while
- * ticking, and the chosen ones show as removable badges under the button. Only offered values can be chosen; the
- * server holds to that as well.
+ * Chooses some of a long list (countries, languages): a search field on top of the menu filters it, the menu stays
+ * open while ticking, and the chosen ones show as removable badges under the button. Only offered values can be
+ * chosen; the server holds to that as well. Every label comes from the page, so the picker carries no text of its own.
  */
 const props = defineProps<{
   id: string
-  options: SelectOption[]
+  options: PickerOption[]
   placeholder: string
   searchLabel: string
   emptyLabel: string

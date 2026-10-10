@@ -84,7 +84,7 @@ entry and the dashboard are served by Inertia.
 - [ ] `admin-media-library` — The media library — folder tree, upload, rename, move, references, soft delete and
       restore, bulk actions, file view with previews; folder deletion moved out of the page into
       a service (after: the pilot)
-- [ ] `admin-tenant-settings` — Tenant settings — languages with their lock rules, runtime and broadcast limits (after:
+- [x] `admin-tenant-settings` — Tenant settings — languages with their lock rules, runtime and broadcast limits (after:
       the pilot)
 - [ ] `admin-dashboard-search` — The admin dashboard and search — stats and the activity chart on a query service, the ⌘K
       palette over assistants, users, roles and media (after: the pilot)

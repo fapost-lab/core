@@ -13,8 +13,10 @@
 >   assistant translation layer that the original text left open is built (`assistant_translations` table).
 > - Admin UI language files live in `lang/` (not `resources/lang/`).
 > - The handlers `language_selection` and `contact.update_language` do not exist.
-> - The `content_base_language` lock is a save-time validation in `TenantSettingsPage` (the field is disabled and a save
->   that changes it is rejected once any `flow_definitions` row exists), not a UI-only rule.
+> - The `content_base_language` lock is a save-time validation, not a UI-only rule: once any `flow_definitions` row (a
+>   published flow) exists, the field is disabled and a save that changes it is rejected — in Filament's
+>   `TenantSettingsPage`, and on the Inertia admin screen by `TenantSettingsRequest::after()`, with
+>   `TenantSettingsEditor::save()` keeping the stored value whatever it is passed.
 
 Апрель 2026 · Зафиксировано по результатам архитектурного ревью.
 
