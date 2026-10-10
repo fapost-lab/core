@@ -38,6 +38,14 @@ final class ConsoleSwitchTest extends FeatureTestCase
         $this->assertStringContainsString('Filament', $action);
     }
 
+    public function test_filament_answers_the_admin_dashboard(): void
+    {
+        $action = $this->route('filament.admin.pages.dashboard')->getActionName();
+
+        $this->assertStringNotContainsString('App\\Http\\Controllers', $action);
+        $this->assertStringContainsString('Filament', $action);
+    }
+
     public function test_filament_answers_the_flow_and_flow_group_screens(): void
     {
         foreach ([
@@ -104,6 +112,7 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'console.settings.update',
             'console.settings.store-flow',
             'console.admin.support-access.index',
+            'console.admin.search',
         ] as $name) {
             $this->assertNull(Route::getRoutes()->getByName($name), $name);
         }

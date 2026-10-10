@@ -8,6 +8,7 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Support\SupportAccessSession;
 use App\Domains\Tenancy\Services\CurrentAccessState;
+use App\Http\Shell\AdminSearch;
 use App\Http\Shell\AssistantSwitcher;
 use App\Http\Shell\NavigationBuilder;
 use App\Infrastructure\Broadcasting\BroadcasterStatus;
@@ -114,7 +115,7 @@ final class HandleInertiaRequests extends Middleware
     /**
      * The side menu: an assistant's screens under `assistant/{tenant}`, otherwise the tenant-wide ones.
      *
-     * @return array{mode: string, groups: list<array{label: string|null, items: list<array<string, mixed>>}>}|null
+     * @return array{mode: string, groups: list<array{label: string|null, items: list<array<string, mixed>>}>, searchUrl: string|null}|null
      */
     private function navigation(Request $request): ?array
     {
@@ -128,10 +129,15 @@ final class HandleInertiaRequests extends Middleware
         $assistants = app(CurrentAssistantInterface::class);
 
         if ($assistants->isResolved()) {
-            return ['mode' => 'console', 'groups' => $builder->console($user, $assistants->get())];
+            return ['mode' => 'console', 'groups' => $builder->console($user, $assistants->get()), 'searchUrl' => null];
         }
 
-        return ['mode' => 'admin', 'groups' => $builder->admin($user)];
+        // The search palette replaces Filament's global search, which only the admin panel had.
+        return [
+            'mode'      => 'admin',
+            'groups'    => $builder->admin($user),
+            'searchUrl' => app(AdminSearch::class)->isAvailableTo($user) ? route('console.admin.search', [], false) : null,
+        ];
     }
 
     /**

@@ -6,9 +6,11 @@ namespace Tests\Feature\Console;
 
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
+use App\Http\Controllers\Admin\SearchController as AdminSearchController;
 use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessController;
 use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
@@ -95,6 +97,8 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'admin assistants create' => ['filament.admin.resources.assistants.create', AdminAssistantController::class, 'create', 'admin/assistants/create'],
             'admin assistants view'   => ['filament.admin.resources.assistants.view', AdminAssistantController::class, 'show', 'admin/assistants/{record}'],
             'admin assistants edit'   => ['filament.admin.resources.assistants.edit', AdminAssistantController::class, 'edit', 'admin/assistants/{record}/edit'],
+            // Admin dashboard.
+            'admin dashboard' => ['filament.admin.pages.dashboard', AdminDashboardController::class, '', 'admin'],
 
             'admin media list'      => ['filament.admin.resources.media.index', AdminMediaController::class, 'index', 'admin/media'],
             'admin media view'      => ['filament.admin.resources.media.view', AdminMediaController::class, 'show', 'admin/media/{record}'],
@@ -185,6 +189,8 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'admin tenant settings update' => ['console.admin.tenant-settings.update', AdminTenantSettingsController::class, 'update', 'PUT', 'admin/tenant-settings'],
             // Support access log: never a Filament screen.
             'admin support access' => ['console.admin.support-access.index', AdminSupportAccessController::class, 'index', 'GET', 'admin/support-access'],
+            // Admin search palette: Filament's global search had no route.
+            'admin search' => ['console.admin.search', AdminSearchController::class, '', 'GET', 'admin/search'],
         ];
     }
 
@@ -234,7 +240,7 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
     {
         $route = $this->route($name);
 
-        $this->assertSame($controller . '@' . $method, $route->getActionName(), $name);
+        $this->assertSame('' === $method ? $controller : $controller . '@' . $method, $route->getActionName(), $name);
         $this->assertContains($verb, $route->methods(), $name);
         $this->assertSame($uri, $route->uri(), $name);
     }

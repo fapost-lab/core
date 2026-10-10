@@ -19,6 +19,8 @@ export interface NavGroup {
 export interface ShellNavigation {
     mode: 'console' | 'admin'
     groups: NavGroup[]
+    /** The search palette's endpoint: only in admin mode, for a user who may list something it searches. */
+    searchUrl: string | null
 }
 
 export interface SwitcherAssistant {
@@ -95,6 +97,17 @@ export interface ConsoleTranslations {
     theme: { label: string; light: string; dark: string; system: string }
     language: { label: string } & Record<string, string>
     user_menu: { label: string; sign_out: string }
+    search: {
+        open: string
+        placeholder: string
+        title: string
+        description: string
+        hint: string
+        loading: string
+        empty: string
+        error: string
+        groups: Record<'assistants' | 'users' | 'roles' | 'media', string>
+    }
     support: { banner: string; leave: string }
     dashboard: Record<string, string | Record<string, string>>
     table: TableTranslations
