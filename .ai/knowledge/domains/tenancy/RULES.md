@@ -175,7 +175,8 @@ broken.
   a refusal releases) and before upload-as-send in `FlowMessageSender` and
   `ConversationReplyService::sendMedia`; `call_executions` in `CallNodeHandler` before the
   transport and in `CallTester`. Unit keys come from idempotency keys (`UsageUnitKey::make`), so
-  duplicates and retries spend nothing; edits and typing are free. A refusal is
+  duplicates and retries spend nothing (a call's key is the engine's execution key plus the node id,
+  so each loop pass is a new unit and a retried step is the same one); edits and typing are free. A refusal is
   `VolumeLimitReachedException`: "not sent, do not retry" — flow nodes take their `error` exit
   (`limit_reached`), nodes without one fail the session (a child resumes its parent with failed),
   jobs never retry it. A caller with a stable time passes it as metadata `volume_occurred_at`.

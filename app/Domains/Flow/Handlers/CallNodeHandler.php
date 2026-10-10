@@ -340,15 +340,14 @@ final class CallNodeHandler extends AbstractVersionedHandler
     /**
      * Spends one call execution; on a refusal answers with the node's `error` handle and no call is made.
      *
-     * The unit is the engine's execution key plus the node id, not {@see CallContext::$idempotencyKey}
-     * (`{session}:{node}`): that one is the same on every pass of a loop, while the engine key changes
-     * with each persisted step and stays the same when the queue retries the step.
+     * The unit is the execution key ({@see self::executionKey()}), the same value the transport gets as
+     * {@see CallContext::$idempotencyKey}: new on every pass of a loop, unchanged when the queue retries the step.
      */
     private function refuseWhenVolumeUsedUp(NodeExecutionContext $context): ?NodeExecutionResult
     {
         $decision = $this->quota->consume(
             self::LIMIT_KEY,
-            UsageUnitKey::make('call:', $context->idempotencyKey . ':' . $context->nodeId),
+            UsageUnitKey::make('call:', $this->executionKey($context)),
             CarbonImmutable::now(),
             RefusedWork::CallExecution,
         );
@@ -378,8 +377,22 @@ final class CallNodeHandler extends AbstractVersionedHandler
             contactId: $context->contactId,
             sessionId: $context->sessionId,
             nodeId: $context->nodeId,
-            idempotencyKey: "{$context->sessionId}:{$context->nodeId}",
+            idempotencyKey: $this->executionKey($context),
         );
+    }
+
+    /**
+     * Identifies one execution of this node: the engine's key (it changes with each persisted step, so every
+     * pass of a loop gets its own, and it stays the same when the queue retries the step) plus the node id.
+     * The node id is a defensive suffix: for an inbound message the engine key is `update|session`, but only
+     * the first node of the run gets it, and the suffix keeps keys apart should that ever change.
+     *
+     * `{session}:{node}` would repeat on each loop iteration, and a transport or receiver that deduplicates
+     * by the key would swallow every call after the first.
+     */
+    private function executionKey(NodeExecutionContext $context): string
+    {
+        return $context->idempotencyKey . ':' . $context->nodeId;
     }
 
     /**

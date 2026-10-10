@@ -5,7 +5,7 @@ Calls an external or internal service. Combines Integration (HTTP) and Action (i
 **Type:** `call`
 **Version:** 1
 **Class:** `app/Domains/Flow/Handlers/CallNodeHandler.php` (category `Integration`)
-**Idempotent:** the call carries a stable idempotency key `{sessionId}:{nodeId}`
+**Idempotent:** the call carries an idempotency key: the engine's execution key plus `:` and the node id (new on each loop pass, the same on a queue retry of the step)
 
 ## Config
 
@@ -126,8 +126,9 @@ call still counts. `CallTester` (builder test call) uses the same transport and 
 3. Render `target`, `parameters` and `transport_options` through `TemplateRenderer` against the live
    state.
 4. Build `CallRequest{target, parameters, options}` and `CallContext{tenantId, contactId, sessionId,
-   nodeId, idempotencyKey = "{sessionId}:{nodeId}"}`. The key is static per node: there is no attempt
-   counter, because the node is never retried by the engine. Idempotency of the session run comes from
+   nodeId, idempotencyKey = "{engineKey}:{nodeId}"}`. The engine key changes with each persisted step, so
+   every pass of a loop gets a new key, and it stays the same when the queue retries the step; the node
+   id is a defensive suffix. There is no attempt counter. Idempotency of the session run comes from
    the session lock; remote de-duplication is up to the receiver through the `Idempotency-Key` header.
 5. Call `transport->execute()`; it returns a `CallResult`.
 6. Apply the response (see below), always, success or error.

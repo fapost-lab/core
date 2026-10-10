@@ -80,6 +80,12 @@ broken.
   effect, in a separate step (`FlowEngine`), so a crash between the two repeats the effect on
   retry. Check a marker before acting, and rely on a downstream idempotency key where one exists
   (`MessageSender`'s `msg:sent:*`). *(inferred from the code; proposed as a rule)*
+- **A `call` node's `CallContext::$idempotencyKey` is the engine's execution key plus the node id**
+  (`CallNodeHandler::executionKey()`), never `{session}:{node}`. Why: that value repeats on every
+  loop pass, so a transport or receiver deduplicating by it (`HttpTransport` sends it as
+  `Idempotency-Key`) would swallow every call after the first; the engine key changes with each
+  persisted step and survives a queue retry of the same step. The `call_executions` unit uses the
+  same value. Enforced: `CallNodeExecutionKeyTest`.
 - **Running the engine outside `FlowOrchestrator` requires the session lock** through
   `FlowExecutionGuard`, keyed like `MessageRouter` (`contact->tenant_id`, contact, assistant),
   with the session re-read under the lock; a busy lock throws `SessionLockTimeoutException` and

@@ -10,6 +10,9 @@ use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
 
@@ -248,5 +251,67 @@ final class LoopEngineTest extends FeatureTestCase
         // After loop exit the iterator key should be absent or null.
         $state = $session->state;
         $this->assertNull($state['flow']['iterator'] ?? null);
+    }
+
+    public function test_a_call_node_in_a_loop_sends_a_different_idempotency_key_on_each_pass(): void
+    {
+        Http::fake(['api.example.com/*' => Http::response([], 200)]);
+
+        $tenantId = (string) Str::uuid();
+        $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: $tenantId, schemaName: 'main'));
+
+        $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+        $contact   = Contact::factory()->forTenant($tenantId)->create();
+
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id'       => $tenantId,
+            'flow_id'         => (string) Str::uuid(),
+            'version'         => 1,
+            'name'            => 'Call In Loop',
+            'is_active'       => true,
+            'logging_enabled' => false,
+            'nodes'           => [
+                [
+                    'id'      => 'loop',
+                    'type'    => 'loop',
+                    'version' => 1,
+                    'config'  => [
+                        'mode'          => 'counted',
+                        'iterator_name' => 'iterator',
+                        'count_source'  => ['type' => 'literal', 'value' => 3],
+                    ],
+                ],
+                [
+                    'id'      => 'call',
+                    'type'    => 'call',
+                    'version' => 1,
+                    'config'  => ['transport' => 'http', 'target' => 'POST https://api.example.com/hook'],
+                ],
+                [
+                    'id'      => 'body',
+                    'type'    => 'loop_end',
+                    'version' => 1,
+                    'config'  => ['loop_node_id' => 'loop', 'iterator_name' => 'iterator'],
+                ],
+                ['id' => 'done', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            'edges' => [
+                ['id' => 'e1', 'from' => 'loop', 'to' => 'call', 'handle' => 'loop'],
+                ['id' => 'e2', 'from' => 'call', 'to' => 'body', 'handle' => 'success'],
+                ['id' => 'e3', 'from' => 'call', 'to' => 'body', 'handle' => 'error'],
+                ['id' => 'e4', 'from' => 'loop', 'to' => 'done', 'handle' => 'default'],
+            ],
+        ]);
+
+        $session = $this->app->make(FlowEngineInterface::class)->start($definition, $contact);
+
+        $this->assertSame(FlowSessionStatus::Ended, $session->status);
+
+        $keys = Http::recorded()->map(static fn (array $pair): string => $pair[0]->header('Idempotency-Key')[0])->all();
+
+        $this->assertCount(3, $keys);
+        $this->assertCount(3, array_unique($keys));
     }
 }
