@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
+use Throwable;
 
 /**
  * {@see TenantLimitsInterface} answering from an array, for tests. A key without an entry is unlimited.
@@ -18,6 +19,11 @@ final class FakeTenantLimits implements TenantLimitsInterface
     public int $unlimitedAnswers = 0;
 
     /**
+     * Thrown by every question, as an operator that is down.
+     */
+    public ?Throwable $failure = null;
+
+    /**
      * @param  array<string, int|null>  $limits
      */
     public function __construct(public array $limits = [])
@@ -26,6 +32,10 @@ final class FakeTenantLimits implements TenantLimitsInterface
 
     public function limitFor(string $tenantId, string $key): ?int
     {
+        if (null !== $this->failure) {
+            throw $this->failure;
+        }
+
         if ($this->unlimitedAnswers > 0) {
             $this->unlimitedAnswers--;
 

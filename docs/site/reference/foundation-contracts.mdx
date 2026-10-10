@@ -241,6 +241,7 @@ the label as its slug stops being served once the label is declared.
 | `Quota\Contracts\TenantLimitsInterface` | How much of a key a tenant may use. Implemented by an operator package; Core's default allows everything |
 | `Quota\Contracts\RecordQuotaInterface` | Asking whether the current tenant may create one more record under a key. Implemented by Core; Core and Solutions call it |
 | `Quota\Contracts\UsageMeterInterface` | Counting use of a per-period key and saying whether it fits. Implemented by an operator package; Core's default allows everything and records nothing |
+| `Quota\Contracts\TenantUsageInterface` | Reading how much of a `Records` or `Bytes` key a tenant uses now. Implemented by Core; an operator package calls it |
 
 `LimitRegistryInterface` has `register(LimitDefinition)`, `find(string $key)` and `all()` (ordered by
 key). Registering an already known key, or registering after boot has finished, throws a
@@ -276,8 +277,41 @@ Core registers four keys of kind `Records`:
 | `staff` | Staff accounts that are not deactivated, pending (invited) and suspended ones included. A deactivated account frees its place, so reactivating one needs a free place. The tenant's first administrator is created without the check, and still counts |
 
 Existing records are never removed when a limit drops
-below the current count: only creating more is refused. Limits that count stored bytes have no
-enforcement contract yet.
+below the current count: only creating more is refused.
+
+### Stored bytes
+
+Core registers one key of kind `Bytes`:
+
+| Key | What counts |
+|---|---|
+| `media_storage` | The bytes of media the tenant stores, in bytes. Each unique file counts once, however many library entries use it. Files in the trash count until they are deleted permanently. Everything counts: uploads by staff, files an input node collects and attachments saved with a transcript |
+
+The limit is a number of bytes (a 64-bit integer; `limitFor` returns a PHP `int`). Core compares what
+the tenant stores plus the new file with it before a byte is written, and refuses a file that does not
+fit; a file the tenant already stores adds nothing and is always accepted. Existing files stay when the
+limit drops below what is stored: only new bytes are refused. Nothing counts when `limitFor` answers
+`null`, and Core then runs no query for the check.
+
+Your `limitFor` is called on every upload of new content, so it follows the same rules as for records.
+When it throws, a staff upload fails (the person retries), while an inbound file, such as a contact's
+attachment, is stored and the exception is reported, because nobody is there to retry. Concurrent
+uploads can overshoot the limit by at most the files in flight.
+
+### Reading the usage
+
+`TenantUsageInterface::current(string $tenantId, string $key): ?int` returns how much of a `Records`
+or `Bytes` key the tenant uses now, counted by Core in the tenant's own schema: bytes for
+`media_storage`. It is for showing "used of limit", never for enforcing one. Core counts with the same
+code that enforces the limit, so a refusal and the figure you show cannot disagree.
+
+- It answers `null` for a key Core does not count (today only `media_storage`; `PerPeriod` keys are
+  always `null`, you count those), for a tenant that does not exist, and for one still being provisioned.
+  Treat `null` as "not reported", not as zero.
+- Call it outside a tenant context. Core switches to the tenant, counts and restores the context you
+  had, also when counting fails.
+- Each call switches to the tenant's schema and runs a query: cache the answer, and do not call it for
+  every row of a list.
 
 ### Counting use over a period
 

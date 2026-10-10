@@ -11,6 +11,7 @@ use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Fapost\Foundation\Media\Enums\MediaKind;
+use GuzzleHttp\Psr7\Utils;
 use Illuminate\Http\UploadedFile;
 use Tests\Feature\FeatureTestCase;
 
@@ -76,5 +77,21 @@ final class MediaUploaderTest extends FeatureTestCase
         $this->assertSame(2, MediaFile::query()->count());
         $this->assertSame($first->blob_id, $second->blob_id);
         $this->assertNotSame($first->id, $second->id);
+    }
+
+    public function test_stream_size_is_counted_in_bytes_not_characters(): void
+    {
+        // Two-byte UTF-8 sequences: mb_strlen() would report 4, the content is 8 bytes.
+        $content = str_repeat("\u{00E9}", 4);
+
+        $media = $this->app->make(MediaUploaderInterface::class)->storeFromStream(
+            stream: Utils::streamFor($content),
+            mimeType: 'text/plain',
+            originalFilename: 'accents.txt',
+            folder: null,
+            source: MediaSource::Conversation,
+        );
+
+        $this->assertSame(8, $media->blob->size);
     }
 }
