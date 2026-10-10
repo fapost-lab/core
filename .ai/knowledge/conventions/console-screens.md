@@ -44,6 +44,10 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   `success`, `warning`, `danger`); a form is a stack of `FormSection`s (title and description
   left, fields right); an empty list is `EmptyState`; a bulk delete is the `outline-danger`
   button. A new colour need becomes a token in `tokens.css` with its dark value.
+- **Choices that depend on another field** (a condition's operators by its type, how many values each
+  takes) reach the client as a prop built from one domain source (an enum's methods); the client holds
+  no literal of them, and the FormRequest validates the same pair from the same source. Example:
+  `ContactSegmentController::schema()`, `ContactSegmentRequest`, `resources/js/pages/Console/ContactSegments/rules.ts`.
 - **Dictionaries with keys from data** (contact attributes, platform meta) go into props as lists of
   `{key, value}`: a JSON object reorders numeric keys in JS, and `jsonb` reorders all of them.
 - A bulk delete as one query skips model events; say so on the method, and delete model by model
@@ -76,7 +80,8 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
 `DestroyContactGroupsRequest`, `resources/js/pages/Console/ContactGroups/*`,
 `tests/Feature/Console/ContactGroupsConsoleTest.php`. With filters, grouping, guards and an
 assistant-owned policy: `FlowController`, `FlowDraftService`, `resources/js/pages/Console/Flows/*`.
-A card with narrow writes (replace a set, no create or delete): `ContactController`,
+A form with a tree of rules whose choices come from the domain: `ContactSegmentController`,
+`ContactSegmentService`, `ContactSegmentRequest`, `resources/js/pages/Console/ContactSegments/*`. A card with narrow writes (replace a set, no create or delete): `ContactController`,
 `AssistantContactService`, `ContactCard`, `resources/js/pages/Console/Contacts/*`.
 
 ## Rationale

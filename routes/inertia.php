@@ -8,6 +8,7 @@ use App\Http\Controllers\Console\Auth\LogoutController;
 use App\Http\Controllers\Console\ChannelController;
 use App\Http\Controllers\Console\ContactController;
 use App\Http\Controllers\Console\ContactGroupController;
+use App\Http\Controllers\Console\ContactSegmentController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
@@ -84,6 +85,16 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::delete('assistant/{tenant}/contact-groups', [ContactGroupController::class, 'destroyMany'])->name('console.contact-groups.destroy-many');
         Route::put('assistant/{tenant}/contact-groups/{record}', [ContactGroupController::class, 'update'])->name('console.contact-groups.update');
         Route::delete('assistant/{tenant}/contact-groups/{record}', [ContactGroupController::class, 'destroy'])->name('console.contact-groups.destroy');
+
+        // Contact segments: tenant-level saved rules, listed under the assistant's menu like Filament's resource was.
+        Route::get('assistant/{tenant}/contact-segments', [ContactSegmentController::class, 'index'])->name('filament.assistant.resources.contact-segments.index');
+        Route::get('assistant/{tenant}/contact-segments/create', [ContactSegmentController::class, 'create'])->name('filament.assistant.resources.contact-segments.create');
+        Route::get('assistant/{tenant}/contact-segments/{record}/edit', [ContactSegmentController::class, 'edit'])->name('filament.assistant.resources.contact-segments.edit');
+        Route::post('assistant/{tenant}/contact-segments', [ContactSegmentController::class, 'store'])->name('console.contact-segments.store');
+        Route::put('assistant/{tenant}/contact-segments/{record}', [ContactSegmentController::class, 'update'])->name('console.contact-segments.update');
+        Route::delete('assistant/{tenant}/contact-segments/{record}', [ContactSegmentController::class, 'destroy'])->name('console.contact-segments.destroy');
+        // A recount writes the size snapshot, so it is a POST.
+        Route::post('assistant/{tenant}/contact-segments/{record}/count', [ContactSegmentController::class, 'refreshCount'])->name('console.contact-segments.count');
 
         // Flow groups and flows: both belong to the assistant in the URL. Creating a flow ends in the builder.
         Route::get('assistant/{tenant}/flow-groups', [FlowGroupController::class, 'index'])->name('filament.assistant.resources.flow-groups.index');

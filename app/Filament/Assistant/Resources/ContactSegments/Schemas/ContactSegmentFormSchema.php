@@ -97,29 +97,24 @@ final class ContactSegmentFormSchema
     }
 
     /**
+     * The operators {@see SegmentConditionType} accepts, labelled; the console offers the same list.
+     *
      * @return array<string, string>
      */
     private static function operatorOptions(string $type): array
     {
-        return match (SegmentConditionType::tryFrom($type)) {
-            SegmentConditionType::Tag => [
-                'has'     => __('segment.operators.has'),
-                'not_has' => __('segment.operators.not_has'),
-            ],
-            SegmentConditionType::Attribute => [
-                'eq'     => __('segment.operators.eq'),
-                'ne'     => __('segment.operators.ne'),
-                'exists' => __('segment.operators.exists'),
-            ],
-            SegmentConditionType::Group => [
-                'in'     => __('segment.operators.in'),
-                'not_in' => __('segment.operators.not_in'),
-            ],
-            default => [
-                'in' => __('segment.operators.in'),
-                'eq' => __('segment.operators.eq'),
-            ],
-        };
+        $conditionType = SegmentConditionType::tryFrom($type);
+
+        // No type yet: the form shows the same pair it always did.
+        $operators = $conditionType?->operators() ?? SegmentConditionType::Language->operators();
+
+        $options = [];
+
+        foreach ($operators as $operator) {
+            $options[$operator->value] = __('segment.operators.' . $operator->value);
+        }
+
+        return $options;
     }
 
     /**

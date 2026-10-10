@@ -41,6 +41,27 @@ final class ContactSegmentFormSchemaTest extends TestCase
         $this->assertSame(1, $span->invoke(null, $this->getReturning(SegmentConditionType::Attribute->value)));
     }
 
+    public function test_operator_options_per_type_are_unchanged(): void
+    {
+        $options = new ReflectionMethod(ContactSegmentFormSchema::class, 'operatorOptions');
+
+        $expected = [
+            'tag'       => ['has', 'not_has'],
+            'attribute' => ['eq', 'ne', 'exists'],
+            'group'     => ['in', 'not_in'],
+            'language'  => ['in', 'eq'],
+            'platform'  => ['in', 'eq'],
+            ''          => ['in', 'eq'],
+            'unknown'   => ['in', 'eq'],
+        ];
+
+        foreach ($expected as $type => $operators) {
+            $this->assertSame($operators, array_keys($options->invoke(null, (string) $type)), "type [{$type}]");
+        }
+
+        $this->assertSame(__('segment.operators.not_has'), $options->invoke(null, 'tag')['not_has']);
+    }
+
     /**
      * Minimal stand-in for the utility Filament injects into schema closures —
      * a real one needs a mounted Livewire component behind it.
