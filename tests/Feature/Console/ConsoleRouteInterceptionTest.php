@@ -6,6 +6,7 @@ namespace Tests\Feature\Console;
 
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
+use App\Http\Controllers\Console\BroadcastController;
 use App\Http\Controllers\Console\ChannelController;
 use App\Http\Controllers\Console\ContactController;
 use App\Http\Controllers\Console\ContactGroupController;
@@ -49,6 +50,9 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'flows list'            => ['filament.assistant.resources.flows.index', FlowController::class, 'index', 'assistant/{tenant}/flows'],
             'flows create'          => ['filament.assistant.resources.flows.create', FlowController::class, 'create', 'assistant/{tenant}/flows/create'],
             'flows edit'            => ['filament.assistant.resources.flows.edit', FlowController::class, 'edit', 'assistant/{tenant}/flows/{record}/edit'],
+            'broadcasts list'       => ['filament.assistant.resources.broadcasts.index', BroadcastController::class, 'index', 'assistant/{tenant}/broadcasts'],
+            'broadcasts create'     => ['filament.assistant.resources.broadcasts.create', BroadcastController::class, 'create', 'assistant/{tenant}/broadcasts/create'],
+            'broadcasts edit'       => ['filament.assistant.resources.broadcasts.edit', BroadcastController::class, 'edit', 'assistant/{tenant}/broadcasts/{record}/edit'],
         ];
     }
 
@@ -77,6 +81,12 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'flow activity'           => ['console.flows.activity', FlowController::class, 'updateActivity', 'PATCH', 'assistant/{tenant}/flows/{record}/active'],
             'flow destroy'            => ['console.flows.destroy', FlowController::class, 'destroy', 'DELETE', 'assistant/{tenant}/flows/{record}'],
             'flow destroy many'       => ['console.flows.destroy-many', FlowController::class, 'destroyMany', 'DELETE', 'assistant/{tenant}/flows'],
+            'broadcast reach'         => ['console.broadcasts.reach', BroadcastController::class, 'reach', 'GET', 'assistant/{tenant}/broadcasts/reach'],
+            'broadcast store'         => ['console.broadcasts.store', BroadcastController::class, 'store', 'POST', 'assistant/{tenant}/broadcasts'],
+            'broadcast update'        => ['console.broadcasts.update', BroadcastController::class, 'update', 'PUT', 'assistant/{tenant}/broadcasts/{record}'],
+            'broadcast send'          => ['console.broadcasts.send', BroadcastController::class, 'send', 'POST', 'assistant/{tenant}/broadcasts/{record}/send'],
+            'broadcast cancel'        => ['console.broadcasts.cancel', BroadcastController::class, 'cancel', 'POST', 'assistant/{tenant}/broadcasts/{record}/cancel'],
+            'broadcast destroy'       => ['console.broadcasts.destroy', BroadcastController::class, 'destroy', 'DELETE', 'assistant/{tenant}/broadcasts/{record}'],
         ];
     }
 

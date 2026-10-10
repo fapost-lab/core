@@ -67,6 +67,12 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   `ChannelController`.
 - **Workaround, until `channel-webhook-consistency` lands: a write that runs a job inside the request loses the current assistant.** A synchronous job switches tenants, and
   the switch resets `CurrentAssistant`; take the assistant and every URL before the write and pass them on.
+- **A step that reaches people carries what the person confirmed and is conditional on the status.**
+  The confirmation dialog holds the row's `revision`; the service locks the record, compares it, and
+  the write itself carries the status in its `WHERE`, so a double click, a second tab or a replayed POST
+  does the step once. A list that shows live progress polls (`usePoll`, partial reload of `table` only)
+  only while a row is running, and gives up after a fixed time. Example: `BroadcastController`,
+  `BroadcastService`, `SendDialog.vue`.
 - **The builder is a separate Inertia app**: reach it with a plain `<a>` or `Inertia::location()`
   to the named route `builder.flows.show`, never a `<Link>` or a redirect. A related record
   created from inside a form (a flow's new group) uses its own `*-inline` route that redirects
@@ -78,7 +84,8 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
 `DestroyContactGroupsRequest`, `resources/js/pages/Console/ContactGroups/*`,
 `tests/Feature/Console/ContactGroupsConsoleTest.php`. With filters, grouping, guards and an
 assistant-owned policy: `FlowController`, `FlowDraftService`, `resources/js/pages/Console/Flows/*`.
-A card with narrow writes (replace a set, no create or delete): `ContactController`,
+With a confirmed irreversible step, a live reach count and a localized field: `BroadcastController`,
+`BroadcastService`, `resources/js/pages/Console/Broadcasts/*`. A card with narrow writes (replace a set, no create or delete): `ContactController`,
 `AssistantContactService`, `ContactCard`, `resources/js/pages/Console/Contacts/*`.
 
 ## Rationale

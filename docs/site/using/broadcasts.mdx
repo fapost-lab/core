@@ -17,6 +17,10 @@ the message in **their own** language, falling back to the assistant's default
 when the contact's language is unknown or has no translation. Basic HTML is
 supported.
 
+The text in your tenant's **base language** is required. A recipient with no
+text in their own language gets the base one, so a broadcast without it would
+reach nobody; it cannot be saved without text in the base language.
+
 <Note>
   Filling only one language is normal and safe — everyone falls back to it. What
   is not safe is filling several and leaving one half-written: a contact whose
@@ -37,7 +41,8 @@ Three ways, in increasing precision:
 ## Reach
 
 As the audience is chosen, **Reach** shows how many contacts would actually
-receive the message.
+receive the message. It is counted as of now. The audience itself is fixed when
+the broadcast starts, so the number it is sent to can differ slightly.
 
 This is the number to read before sending, and it is not the same as the size of
 the audience. A contact is counted only if the assistant can still reach them —
@@ -50,11 +55,24 @@ people have blocked the bot or never opened a channel.
   nobody, or contacts who exist in the database but have no reachable channel.
 </Warning>
 
-## Running it
+## Sending and cancelling
 
-A broadcast is editable while it is still a draft. Once a run has started or
-finished, it is a record rather than a document — the message that went out
-cannot be revised after the fact.
+A broadcast is editable while it is a **draft**. Once it has started, the
+message that goes out cannot be revised: the text is read for each recipient as
+it is delivered, so editing it would change what the rest of the audience
+receives.
+
+**Send** asks for confirmation, and a send cannot be recalled. Sending twice
+starts it once: a broadcast that is already running or finished is never
+started again.
+
+A broadcast moves from **Draft** to **Running** to **Completed**.
+**Cancel** stops a running broadcast: what was already delivered stays
+delivered, and the recipients still waiting are skipped. A broadcast that has
+finished or been cancelled cannot be sent again; compose a new one.
+
+Any broadcast that is not running can be deleted, together with its delivery
+records. A running one has to be cancelled first.
 
 Large sends are split into batches and paced, so they cannot delay replies to
 people in live conversations. How aggressively is a tenant-wide setting; see

@@ -6,6 +6,7 @@ namespace App\Filament\Assistant\Resources\Broadcasts\Pages;
 
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Models\Broadcast;
+use App\Domains\Broadcasting\Support\BroadcastMessage;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use App\Filament\Assistant\Resources\Broadcasts\BroadcastResource;
@@ -30,7 +31,7 @@ final class CreateBroadcast extends CreateRecord
      */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $data['message'] = $this->cleanLocalizedMessage($data['message'] ?? null);
+        $data['message'] = BroadcastMessage::clean($data['message'] ?? null);
 
         $this->guardBaseLanguage($data['message']);
 
@@ -48,37 +49,13 @@ final class CreateBroadcast extends CreateRecord
     }
 
     /**
-     * Drop blank locale entries so the JSON column stays canonical — mirrors
-     * AssistantSettings::cleanLocalized(), minus the flat-string legacy branch
-     * that field never had.
-     *
-     * @return array<string, string>|null
-     */
-    private function cleanLocalizedMessage(mixed $value): ?array
-    {
-        if (! is_array($value)) {
-            return null;
-        }
-
-        $clean = [];
-        foreach ($value as $lang => $text) {
-            if (is_string($lang) && is_string($text) && '' !== mb_trim($text)) {
-                $clean[$lang] = $text;
-            }
-        }
-
-        return [] === $clean ? null : $clean;
-    }
-
-    /**
      * @param  array<string, string>|null  $message
      */
     private function guardBaseLanguage(?array $message): void
     {
         $baseLanguage = app(TenantSettings::class)->content_base_language;
-        $text         = $message[$baseLanguage] ?? null;
 
-        if (is_string($text) && '' !== mb_trim($text)) {
+        if (BroadcastMessage::hasBaseLanguageText($message, $baseLanguage)) {
             return;
         }
 

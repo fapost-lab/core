@@ -41,3 +41,13 @@ How many recipients are dispatched per second of delay.
 ## Message
 
 The broadcast body, stored as a map of locale to text.
+
+## Revision
+
+What a person confirms when sending from the console: a SHA-256 of a draft's name, message, target
+type, tags and segment. A send carries it, and the service refuses it when the draft changed since.
+
+## Reach
+
+How many contacts a broadcast to an audience would reach now (deliverable contacts, counted once
+each). An estimate shown before sending; the audience is fixed again when the run starts.

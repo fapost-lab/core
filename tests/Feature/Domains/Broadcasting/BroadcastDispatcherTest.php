@@ -9,7 +9,11 @@ use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Jobs\RunBroadcastJob;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Services\BroadcastDispatcher;
+use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 
 final class BroadcastDispatcherTest extends FeatureTestCase
@@ -43,6 +47,47 @@ final class BroadcastDispatcherTest extends FeatureTestCase
         $this->assertFalse($dispatcher->start($broadcast->fresh()), 'A already-running broadcast must not start twice.');
 
         Bus::assertDispatchedTimes(RunBroadcastJob::class, 1);
+    }
+
+    public function test_a_start_inside_a_transaction_that_rolls_back_queues_nothing(): void
+    {
+        $processed = 0;
+        Event::listen(JobProcessing::class, static function () use (&$processed): void {
+            ++$processed;
+        });
+        $broadcast = $this->draft();
+
+        try {
+            DB::transaction(function () use ($broadcast): void {
+                app(BroadcastDispatcher::class)->start($broadcast);
+
+                throw new RuntimeException('roll back');
+            });
+        } catch (RuntimeException) {
+            // The status change was rolled back with it.
+        }
+
+        $this->assertSame(0, $processed, 'The run was queued although the status change never committed.');
+        $this->assertSame(BroadcastStatus::Draft, $broadcast->fresh()->status);
+    }
+
+    public function test_a_start_inside_a_transaction_queues_the_run_once_it_commits(): void
+    {
+        $processed = 0;
+        Event::listen(JobProcessing::class, static function (JobProcessing $event) use (&$processed): void {
+            if (RunBroadcastJob::class === $event->job->resolveName()) {
+                ++$processed;
+            }
+        });
+        $broadcast = $this->draft();
+
+        DB::transaction(function () use ($broadcast, &$processed): void {
+            app(BroadcastDispatcher::class)->start($broadcast);
+
+            $this->assertSame(0, $processed, 'The run started before the transaction committed.');
+        });
+
+        $this->assertSame(1, $processed);
     }
 
     private function draft(): Broadcast

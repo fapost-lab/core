@@ -49,6 +49,9 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'filament.assistant.resources.flow-groups.index',
             'filament.assistant.resources.flow-groups.create',
             'filament.assistant.resources.flow-groups.edit',
+            'filament.assistant.resources.broadcasts.index',
+            'filament.assistant.resources.broadcasts.create',
+            'filament.assistant.resources.broadcasts.edit',
         ] as $name) {
             $action = $this->route($name)->getActionName();
 
@@ -71,6 +74,9 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'console.contacts.tags',
             'console.contacts.groups',
             'console.flows.store',
+            'console.broadcasts.store',
+            'console.broadcasts.send',
+            'console.broadcasts.reach',
             'console.flows.update',
             'console.flows.activity',
             'console.flows.destroy',

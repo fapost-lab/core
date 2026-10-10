@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
+use App\Http\Controllers\Console\BroadcastController;
 use App\Http\Controllers\Console\ChannelController;
 use App\Http\Controllers\Console\ContactController;
 use App\Http\Controllers\Console\ContactGroupController;
@@ -104,5 +105,17 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         // The state is sent (`active`), not toggled, so a repeated request changes nothing.
         Route::patch('assistant/{tenant}/flows/{record}/active', [FlowController::class, 'updateActivity'])->name('console.flows.activity');
         Route::delete('assistant/{tenant}/flows/{record}', [FlowController::class, 'destroy'])->name('console.flows.destroy');
+
+        // Broadcasts reach real people. `send` carries the revision the person confirmed and starts a draft at most once;
+        // `cancel` and `delete` are conditional on the status; `reach` is a read, throttled because each call counts in the database.
+        Route::get('assistant/{tenant}/broadcasts', [BroadcastController::class, 'index'])->name('filament.assistant.resources.broadcasts.index');
+        Route::get('assistant/{tenant}/broadcasts/create', [BroadcastController::class, 'create'])->name('filament.assistant.resources.broadcasts.create');
+        Route::get('assistant/{tenant}/broadcasts/reach', [BroadcastController::class, 'reach'])->middleware('throttle:30,1')->name('console.broadcasts.reach');
+        Route::get('assistant/{tenant}/broadcasts/{record}/edit', [BroadcastController::class, 'edit'])->name('filament.assistant.resources.broadcasts.edit');
+        Route::post('assistant/{tenant}/broadcasts', [BroadcastController::class, 'store'])->name('console.broadcasts.store');
+        Route::put('assistant/{tenant}/broadcasts/{record}', [BroadcastController::class, 'update'])->name('console.broadcasts.update');
+        Route::post('assistant/{tenant}/broadcasts/{record}/send', [BroadcastController::class, 'send'])->name('console.broadcasts.send');
+        Route::post('assistant/{tenant}/broadcasts/{record}/cancel', [BroadcastController::class, 'cancel'])->name('console.broadcasts.cancel');
+        Route::delete('assistant/{tenant}/broadcasts/{record}', [BroadcastController::class, 'destroy'])->name('console.broadcasts.destroy');
     });
 });

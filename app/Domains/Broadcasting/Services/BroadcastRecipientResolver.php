@@ -10,6 +10,7 @@ use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Contact\Services\ContactSegmentResolver;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
@@ -32,26 +33,55 @@ final readonly class BroadcastRecipientResolver
      */
     public function resolve(Broadcast $broadcast): Collection
     {
-        $contactIds = $this->targetContactIds($broadcast);
+        $query = $this->deliverableQuery($broadcast);
 
-        // Tag target that matched no contacts → nobody to deliver to.
-        if (null !== $contactIds && [] === $contactIds) {
+        // A target that matched no contacts → nobody to deliver to.
+        if (null === $query) {
             return new Collection();
         }
 
-        $query = ChannelContact::query()
+        return $query
             ->select('channel_contacts.*')
+            ->with(['channel', 'contact'])
+            ->orderByDesc('channel_contacts.last_interaction_at')
+            ->get()
+            ->unique('contact_id')
+            ->values();
+    }
+
+    /**
+     * How many contacts {@see resolve()} would return, counted in the database without loading any model: the reach a
+     * person sees before sending. Always equal to `resolve()->count()`.
+     */
+    public function count(Broadcast $broadcast): int
+    {
+        return $this->deliverableQuery($broadcast)?->distinct()->count('channel_contacts.contact_id') ?? 0;
+    }
+
+    /**
+     * The channel bindings that can be delivered to, narrowed by the target; null when the target matched nobody.
+     * Shared by {@see resolve()} and {@see count()} so the two cannot drift apart.
+     *
+     * @return Builder<ChannelContact>|null
+     */
+    private function deliverableQuery(Broadcast $broadcast): ?Builder
+    {
+        $contactIds = $this->targetContactIds($broadcast);
+
+        if (null !== $contactIds && [] === $contactIds) {
+            return null;
+        }
+
+        $query = ChannelContact::query()
             ->join('channels', 'channels.id', '=', 'channel_contacts.channel_id')
             ->where('channels.assistant_id', $broadcast->assistant_id)
-            ->where('channels.is_active', true)
-            ->with(['channel', 'contact'])
-            ->orderByDesc('channel_contacts.last_interaction_at');
+            ->where('channels.is_active', true);
 
         if (null !== $contactIds) {
             $query->whereIn('channel_contacts.contact_id', $contactIds);
         }
 
-        return $query->get()->unique('contact_id')->values();
+        return $query;
     }
 
     /**
