@@ -7,7 +7,10 @@ namespace App\Domains\Media\Services;
 use App\Domains\Media\Enums\MediaSource;
 use App\Domains\Media\Exceptions\StorageLimitReachedException;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Enums\RefusedWork;
 use App\Domains\Tenancy\Services\ByteQuota;
+use App\Domains\Tenancy\Services\LimitAnnouncer;
+use Fapost\Foundation\Quota\Enums\LimitKind;
 use Illuminate\Support\Facades\Log;
 use LogicException;
 
@@ -30,6 +33,7 @@ final readonly class MediaStorageGate
         private ByteQuota $quota,
         private StoredMediaBytes $stored,
         private TenantContextInterface $context,
+        private LimitAnnouncer $announcer,
     ) {
     }
 
@@ -61,6 +65,14 @@ final readonly class MediaStorageGate
             'incoming'  => $incoming,
             'source'    => $source->value,
         ]);
+
+        $this->announcer->refused(
+            self::LIMIT_KEY,
+            LimitKind::Bytes,
+            $limit,
+            $used,
+            $this->failsOpen($source) ? RefusedWork::InboundMedia : RefusedWork::MediaUpload,
+        );
 
         throw new StorageLimitReachedException(self::LIMIT_KEY, $limit, $used, $incoming);
     }

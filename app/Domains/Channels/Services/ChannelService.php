@@ -10,6 +10,7 @@ use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Services\RecordLimitWatch;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
@@ -30,6 +31,7 @@ final readonly class ChannelService implements ChannelServiceInterface
         private ChannelWebhookRegistryInterface $registry,
         private TenantContextInterface $tenantContext,
         private RecordQuotaInterface $recordQuota,
+        private RecordLimitWatch $limitWatch,
     ) {
     }
 
@@ -44,7 +46,9 @@ final readonly class ChannelService implements ChannelServiceInterface
      */
     public function create(Assistant $assistant, array $data): Channel
     {
-        $this->recordQuota->assertCanCreate(Channel::LIMIT_KEY, Channel::countForLimit());
+        $countBefore = Channel::countForLimit();
+
+        $this->recordQuota->assertCanCreate(Channel::LIMIT_KEY, $countBefore);
 
         $normalized = $this->normalizeInput($data);
 
@@ -58,6 +62,8 @@ final readonly class ChannelService implements ChannelServiceInterface
             'is_active'    => (bool)($normalized['is_active'] ?? true),
         ]);
         $channel->save();
+
+        $this->limitWatch->afterSaved(Channel::LIMIT_KEY, $countBefore);
 
         return $channel->fresh();
     }

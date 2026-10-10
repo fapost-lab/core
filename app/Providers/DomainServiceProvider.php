@@ -30,8 +30,11 @@ use App\Domains\Tenancy\Services\CurrentAccessState;
 use App\Domains\Tenancy\Services\DomainBootstrapper;
 use App\Domains\Tenancy\Services\HostModeDeploymentCheck;
 use App\Domains\Tenancy\Services\HostTenantResolver;
+use App\Domains\Tenancy\Services\LimitAnnouncer;
 use App\Domains\Tenancy\Services\LimitRegistry;
+use App\Domains\Tenancy\Services\NoLimitNotice;
 use App\Domains\Tenancy\Services\PeriodQuota;
+use App\Domains\Tenancy\Services\RecordLimitWatch;
 use App\Domains\Tenancy\Services\RecordQuota;
 use App\Domains\Tenancy\Services\RequestHostClassifier;
 use App\Domains\Tenancy\Services\SupportAccessTokenStore;
@@ -45,6 +48,7 @@ use App\Domains\Tenancy\Services\UnlimitedTenantLimits;
 use App\Domains\Tenancy\Services\UnlimitedUsageMeter;
 use App\Domains\Tenancy\Services\WebhookRegistryWriter;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
+use Fapost\Foundation\Quota\Contracts\LimitNoticeInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
@@ -213,6 +217,11 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->bind(RecordQuotaInterface::class, RecordQuota::class);
         // Same for the per-period usage meter: an operator's binding made earlier wins.
         $this->app->bindIf(UsageMeterInterface::class, UnlimitedUsageMeter::class);
+        // And the operator's wording of the limit notification: by default it has nothing to add.
+        $this->app->bindIf(LimitNoticeInterface::class, NoLimitNotice::class);
+        // Not a singleton: it reads the scoped tenant context.
+        $this->app->bind(LimitAnnouncer::class);
+        $this->app->bind(RecordLimitWatch::class);
         // Not a singleton either: it reads the scoped tenant context.
         $this->app->bind(PeriodQuota::class);
         // And the stored-bytes check, which reads the context the same way.

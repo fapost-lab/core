@@ -191,6 +191,17 @@ final class ConsoleShellTest extends InertiaConsoleTestCase
         $response->assertCookie('filament_language_switcher_locale', 'uk');
     }
 
+    public function test_the_language_is_kept_on_the_account_for_mail_and_notifications(): void
+    {
+        $user = $this->admin();
+
+        $this->actingAs($user)
+            ->post($this->panelUrl('/console/locale'), ['locale' => 'ru'], ['X-Inertia' => 'true']);
+
+        $this->assertSame('ru', $user->fresh()->locale);
+        $this->assertSame('ru', $user->fresh()->preferredLocale());
+    }
+
     public function test_a_language_the_console_does_not_speak_is_refused(): void
     {
         $this->actingAs($this->admin())

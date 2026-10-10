@@ -160,6 +160,16 @@ broken.
   unit allowed — deliberately the opposite of `RecordQuota`, because no person is there to retry.
   Without an operator package `UnlimitedUsageMeter` (bound with `bindIf`) allows everything.
   Enforced: `PeriodQuotaTest`.
+- **A limit that refuses work, or a record that fills a limit, is announced through `LimitAnnouncer`,
+  and only from `RecordQuota`, `PeriodQuota`, `MediaStorageGate` and `RecordLimitWatch` (review-enforced).** It dispatches the Core event
+  `LimitReached`; Staff reacts (`NotifyAdminsOfLimit`), Tenancy takes no outward dependency. The
+  announcer swallows and reports a failing listener, so telling people never changes the decision.
+  `canCreate()` announces nothing. A record limit also announces after the record that took the last
+  place is saved (`RecordLimitWatch::afterSaved()` from the five creation sites, on `afterCommit`, so a
+  rolled-back record announces nothing). A new gate calls `LimitAnnouncer`, not the event directly.
+  Only Core's five creation sites call the watch (a Solution's record key gets refusal notices only), and
+  two concurrent creates that both count N-2 miss the "filled" notice: accepted imprecision.
+  Enforced: `RecordQuotaTest`, `PeriodQuotaTest`, `LimitNotificationTest`; the "only from" part is review only.
 - **Outbound volume is consumed before the side effect, never around it.** `outbound_messages`
   through `OutboundVolumeGate` in `MessageSender::send` (after the idempotency reservation, which
   a refusal releases) and before upload-as-send in `FlowMessageSender` and

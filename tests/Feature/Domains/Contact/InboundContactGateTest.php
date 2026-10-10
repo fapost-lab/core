@@ -13,6 +13,8 @@ use App\Domains\Contact\Models\LimitRefusal;
 use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Conversation\DTO\MessageLogEntry;
 use App\Domains\Conversation\Enums\DeliveryStatus;
+use App\Domains\Tenancy\Enums\RefusedWork;
+use App\Domains\Tenancy\Events\LimitReached;
 use App\Domains\Webhook\Jobs\IncomingMessageJob;
 use Fapost\Foundation\DTO\InboundWebhookPayload;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
@@ -20,6 +22,7 @@ use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Quota\Enums\LimitKind;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Mockery;
 use Psr\Log\LoggerInterface;
 use RuntimeException;
@@ -190,6 +193,8 @@ final class InboundContactGateTest extends FeatureTestCase
     public function test_a_refusal_is_logged_without_the_senders_identity(): void
     {
         $this->meter(FakeUsageMeter::denying(100, 100));
+        // The admins' notification is not what this test is about; its own test covers it.
+        Event::fake([LimitReached::class]);
         $logger = Mockery::mock(LoggerInterface::class);
         $logger->shouldReceive('info')->once()->with('quota.inbound_refused', [
             'tenant_id'  => self::TENANT_ID,
@@ -201,6 +206,9 @@ final class InboundContactGateTest extends FeatureTestCase
         $this->app->instance(LoggerInterface::class, $logger);
 
         $this->run42();
+
+        Event::assertDispatched(LimitReached::class, static fn (LimitReached $event): bool => RefusedWork::InboundMessage === $event->refused
+            && 'monthly_active_contacts' === $event->key);
     }
 
     public function test_an_operator_failure_lets_the_message_through(): void

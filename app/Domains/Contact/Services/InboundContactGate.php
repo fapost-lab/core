@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Contact\Services;
 
 use App\Domains\Contact\Enums\PlatformEnum;
+use App\Domains\Tenancy\Enums\RefusedWork;
 use App\Domains\Tenancy\Services\PeriodQuota;
 use Carbon\CarbonImmutable;
 use Psr\Log\LoggerInterface;
@@ -46,7 +47,7 @@ final readonly class InboundContactGate
     ): bool {
         $subjectHash = hash('sha256', $tenantId . '|' . $platform->value . '|' . $externalUserId);
 
-        $decision = $this->quota->consume(self::LIMIT_KEY, 'contact:' . $subjectHash, $occurredAt);
+        $decision = $this->quota->consume(self::LIMIT_KEY, 'contact:' . $subjectHash, $occurredAt, RefusedWork::InboundMessage);
 
         if ($decision->allowed) {
             return true;

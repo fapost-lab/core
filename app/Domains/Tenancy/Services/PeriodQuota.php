@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Tenancy\Services;
 
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Enums\RefusedWork;
 use DateTimeImmutable;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
@@ -31,6 +32,7 @@ final readonly class PeriodQuota
         private LimitRegistryInterface $registry,
         private UsageMeterInterface $meter,
         private TenantContextInterface $context,
+        private LimitAnnouncer $announcer,
     ) {
     }
 
@@ -38,10 +40,11 @@ final readonly class PeriodQuota
      * @param  string  $key  a key registered with kind {@see LimitKind::PerPeriod}
      * @param  string  $unitKey  the unit's natural key, the same on every retry of the same unit
      * @param  DateTimeImmutable  $occurredAt  when the unit was used; picks the period
+     * @param  RefusedWork|null  $refused  what a refusal turns away, for the admins' notification
      *
      * @throws LogicException when the key is not registered or is not a per-period key
      */
-    public function consume(string $key, string $unitKey, DateTimeImmutable $occurredAt): UsageDecision
+    public function consume(string $key, string $unitKey, DateTimeImmutable $occurredAt, ?RefusedWork $refused = null): UsageDecision
     {
         $definition = $this->registry->find($key);
 
@@ -71,6 +74,17 @@ final readonly class PeriodQuota
                 'limit'     => $decision->limit,
                 'used'      => $decision->used,
             ]);
+
+            if (null !== $decision->limit) {
+                $this->announcer->refused(
+                    $key,
+                    LimitKind::PerPeriod,
+                    $decision->limit,
+                    $decision->used,
+                    $refused ?? RefusedWork::Other,
+                    $decision->periodEndsAt,
+                );
+            }
         }
 
         return $decision;

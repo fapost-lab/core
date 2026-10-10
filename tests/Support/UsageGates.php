@@ -6,6 +6,7 @@ namespace Tests\Support;
 
 use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Messaging\OutboundVolumeGate;
+use App\Domains\Tenancy\Services\LimitAnnouncer;
 use App\Domains\Tenancy\Services\LimitRegistry;
 use App\Domains\Tenancy\Services\PeriodQuota;
 use App\Domains\Tenancy\Services\TenantContext;
@@ -14,6 +15,7 @@ use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
+use Illuminate\Events\Dispatcher;
 
 /**
  * Builds the per-period quota wrappers by hand for tests that construct a service without the
@@ -32,7 +34,7 @@ final class UsageGates
         $context = new TenantContext();
         $context->set(new RuntimeTenant(id: self::TENANT_ID, schemaName: 'main'));
 
-        return new PeriodQuota($registry, $meter ?? new UnlimitedUsageMeter(), $context);
+        return new PeriodQuota($registry, $meter ?? new UnlimitedUsageMeter(), $context, new LimitAnnouncer(new Dispatcher(), $context));
     }
 
     public static function gate(?UsageMeterInterface $meter = null): OutboundVolumeGate

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Messaging;
 
+use App\Domains\Tenancy\Enums\RefusedWork;
 use App\Domains\Tenancy\Services\PeriodQuota;
 use App\Domains\Tenancy\Support\UsageUnitKey;
 use Carbon\CarbonImmutable;
@@ -64,6 +65,7 @@ final readonly class OutboundVolumeGate
             self::LIMIT_KEY,
             UsageUnitKey::make('msg:', $idempotencyKey),
             $occurredAt ?? CarbonImmutable::now(),
+            RefusedWork::OutboundMessage,
         );
 
         if ($decision->allowed) {

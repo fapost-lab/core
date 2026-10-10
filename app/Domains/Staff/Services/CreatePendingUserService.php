@@ -9,6 +9,7 @@ use App\Domains\Staff\Jobs\SendActivationEmailJob;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Services\RecordLimitWatch;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Support\Facades\DB;
@@ -23,6 +24,7 @@ final class CreatePendingUserService
         private readonly ActivationTokenService $activationTokenService,
         private readonly TenantContextInterface $tenantContext,
         private readonly RecordQuotaInterface $recordQuota,
+        private readonly RecordLimitWatch $limitWatch,
     ) {
     }
 
@@ -39,9 +41,11 @@ final class CreatePendingUserService
             throw ValidationException::withMessages(['email' => __('staff.support_access.reserved_email')]);
         }
 
-        $this->recordQuota->assertCanCreate(User::LIMIT_KEY, User::countForLimit());
+        $countBefore = User::countForLimit();
 
-        return DB::transaction(function () use ($actor, $data): User {
+        $this->recordQuota->assertCanCreate(User::LIMIT_KEY, $countBefore);
+
+        return DB::transaction(function () use ($actor, $data, $countBefore): User {
             $user = User::query()->create([
                 'name'     => $data['name'],
                 'email'    => $data['email'],
@@ -61,6 +65,9 @@ final class CreatePendingUserService
                 $user->getKey(),
                 $plain,
             );
+
+            // Waits for this transaction to commit: a rolled-back invitation fills nothing.
+            $this->limitWatch->afterSaved(User::LIMIT_KEY, $countBefore);
 
             return $user;
         });

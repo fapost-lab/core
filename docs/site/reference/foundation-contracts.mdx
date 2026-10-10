@@ -242,6 +242,7 @@ the label as its slug stops being served once the label is declared.
 | `Quota\Contracts\RecordQuotaInterface` | Asking whether the current tenant may create one more record under a key. Implemented by Core; Core and Solutions call it |
 | `Quota\Contracts\UsageMeterInterface` | Counting use of a per-period key and saying whether it fits. Implemented by an operator package; Core's default allows everything and records nothing |
 | `Quota\Contracts\TenantUsageInterface` | Reading how much of a `Records` or `Bytes` key a tenant uses now. Implemented by Core; an operator package calls it |
+| `Quota\Contracts\LimitNoticeInterface` | The operator's "what to do next" wording in the notification a tenant's admins get when a limit refuses work. Implemented by an operator package; Core's default returns `null` and Core writes its own text |
 
 `LimitRegistryInterface` has `register(LimitDefinition)`, `find(string $key)` and `all()` (ordered by
 key). Registering an already known key, or registering after boot has finished, throws a
@@ -324,7 +325,9 @@ unit was used.
   characters) and `occurredAt` (a `DateTimeImmutable` that picks the period). Each unit counts as 1.
 - `Quota\DTO\UsageDecision` carries `allowed`, the `limit` for the period (`null` for no limit),
   `used` (units counted after this call, `null` when unknown) and an optional English `message` for
-  people. Build it with `UsageDecision::allowed()` or `UsageDecision::refused($limit, $used, $message)`.
+  people. A refusal can also carry `periodEndsAt` (a `DateTimeImmutable`), when the period the decision
+  belongs to ends. Build it with `UsageDecision::allowed()` or
+  `UsageDecision::refused($limit, $used, $message, $periodEndsAt)`; the last two arguments are optional.
 - `Quota\Exceptions\VolumeLimitReachedException` (`key`, `limit`, `used`) is thrown by
   `MessageSenderInterface::send()` when the tenant's outbound volume is used up. Nothing was sent;
   do not retry.
@@ -377,6 +380,41 @@ For an inbound refusal the message is dropped before anything is stored: no cont
 transcript entry, no flow, and no reply to the sender. A contact who is already counted in the period
 keeps working until the period ends. Core keeps a count of refused messages per person (a pseudonymous hash), bot and
 day for 90 days and shows it to people who may see contacts on the assistant's overview.
+
+### Telling the tenant's admins
+
+When a limit uses up, Core tells the tenant's admins once per limit and period: one notification in
+the panel's `notifications` table and one email each, in the language each admin chose. It names the
+limit, writes "used of limit", says what was turned away and what happens next. A notification is sent
+when work is refused under any limit, and, for a `Records` limit, also when a saved record takes the
+last place; that second notice is sent only for records created by Core's own five creation paths (assistants, flows, channels, new staff and reactivated staff), while a Solution's own record keys get refusal notices only. Two creates running at the same time may both count the same number of existing records and so miss it. The platform support user and deactivated or suspended accounts are not told.
+
+"Once per limit and period" means:
+
+- a `PerPeriod` limit: once for the period your refusal reports in `UsageDecision::$periodEndsAt`, or
+  once per calendar month in UTC when it does not;
+- a `Records` or `Bytes` limit: once per limit value, and again at most every 7 days while work keeps
+  being refused. Raising the limit and reaching the new one speaks at once.
+
+`LimitNoticeInterface::noticeFor(string $tenantId, string $key, string $locale, LimitNoticeReason $reason): ?LimitNotice` lets
+your package replace the "to raise the limit, contact the platform administrator" block with its own:
+an upgrade offer and a button. `Quota\DTO\LimitNotice` carries a `message` and an optional action, an
+`actionLabel` and an absolute http(s) `actionUrl` given together. Core calls it from a worker, once per
+language of the recipients, never on the path that refuses the work. `Quota\Enums\LimitNoticeReason` says why you are asked: `Refused` (work was turned away) or `Reached` (a `Records` limit was just filled and nothing was refused yet), so you can word an offer differently; keep a default arm, reasons may be added in a minor release. Return `null` to let Core write
+its text.
+
+Your implementation:
+
+- **May** read its own tables (plan, subscription), answer in the requested locale or in English when
+  it has no translation, word the notice by the reason, and return `null`.
+- **Must** return text that replaces only the "what to do next" block, and an absolute http(s) action
+  URL.
+- **Must not** repeat the limit's name or the numbers, which Core writes; send mail, dispatch jobs or
+  call external services; call Core's classes or write Core's tables or a tenant schema; or keep one
+  tenant's data in object properties between calls.
+
+Core treats an exception as `null` and reports it: a faulty operator never stops the notification.
+Bind it in your package's service provider; Core binds its default only when nothing is bound yet.
 
 ## Retrieval
 

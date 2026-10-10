@@ -138,6 +138,23 @@ final class ConsoleLoginTest extends InertiaConsoleTestCase
         $this->assertSame(1, $logins);
     }
 
+    public function test_signing_in_remembers_the_language_only_when_none_is_kept(): void
+    {
+        $user = $this->user();
+
+        $this->withSession(['locale' => 'uk'])
+            ->post($this->panelUrl('/admin/login'), ['email' => $user->email, 'password' => self::PASSWORD]);
+
+        $this->assertSame('uk', $user->fresh()->locale);
+
+        $chosen = $this->user(['locale' => 'en']);
+
+        $this->withSession(['locale' => 'ru'])
+            ->post($this->panelUrl('/admin/login'), ['email' => $chosen->email, 'password' => self::PASSWORD]);
+
+        $this->assertSame('en', $chosen->fresh()->locale);
+    }
+
     public function test_every_refusal_gives_the_same_message_and_fires_failed(): void
     {
         $message = __('filament-panels::auth/pages/login.messages.failed');

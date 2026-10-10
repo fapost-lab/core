@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Tenancy;
 
+use App\Domains\Tenancy\Enums\RefusedWork;
+use App\Domains\Tenancy\Events\LimitReached;
+use App\Domains\Tenancy\Services\LimitAnnouncer;
 use App\Domains\Tenancy\Services\LimitRegistry;
 use App\Domains\Tenancy\Services\PeriodQuota;
 use App\Domains\Tenancy\Services\TenantContext;
@@ -15,7 +18,9 @@ use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
 use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use LogicException;
 use RuntimeException;
@@ -114,6 +119,55 @@ final class PeriodQuotaTest extends TestCase
         Log::shouldNotHaveReceived('info');
     }
 
+    public function test_a_refusal_announces_the_limit_with_what_was_turned_away_and_the_operators_period(): void
+    {
+        Event::fake([LimitReached::class]);
+        $end = new DateTimeImmutable('2026-11-01T00:00:00+00:00');
+
+        $this->quota(FakeUsageMeter::denying(5, 5, $end))
+            ->consume('visits', 'u', new DateTimeImmutable(), RefusedWork::InboundMessage);
+
+        Event::assertDispatchedTimes(LimitReached::class, 1);
+        Event::assertDispatched(LimitReached::class, static fn (LimitReached $event): bool => self::TENANT_ID === $event->tenantId
+            && 'visits' === $event->key
+            && LimitKind::PerPeriod === $event->kind
+            && 5 === $event->limit
+            && 5 === $event->used
+            && RefusedWork::InboundMessage === $event->refused
+            && $end === $event->periodEndsAt);
+    }
+
+    public function test_a_refusal_without_a_stated_kind_of_work_is_other(): void
+    {
+        Event::fake([LimitReached::class]);
+
+        $this->quota(FakeUsageMeter::denying(5, 5))->consume('visits', 'u', new DateTimeImmutable());
+
+        Event::assertDispatched(LimitReached::class, static fn (LimitReached $event): bool => RefusedWork::Other === $event->refused && null === $event->periodEndsAt);
+    }
+
+    public function test_an_allowed_unit_and_an_operator_failure_announce_nothing(): void
+    {
+        Event::fake([LimitReached::class]);
+
+        $this->quota(FakeUsageMeter::allowing())->consume('visits', 'u', new DateTimeImmutable());
+        $this->quota(FakeUsageMeter::failing(new RuntimeException('down')))->consume('visits', 'u', new DateTimeImmutable());
+
+        Event::assertNotDispatched(LimitReached::class);
+    }
+
+    public function test_a_failing_listener_does_not_change_the_refusal(): void
+    {
+        $this->app->make(ExceptionHandler::class)->reportable(static fn (RuntimeException $e): bool => false);
+        $this->app->make(Dispatcher::class)->listen(LimitReached::class, static function (): never {
+            throw new RuntimeException('listener is down');
+        });
+
+        $decision = $this->quota(FakeUsageMeter::denying(5, 5))->consume('visits', 'u', new DateTimeImmutable());
+
+        $this->assertFalse($decision->allowed);
+    }
+
     public function test_the_default_meter_allows_everything(): void
     {
         $this->assertTrue($this->quota(new UnlimitedUsageMeter())->consume('visits', 'u', new DateTimeImmutable())->allowed);
@@ -152,6 +206,6 @@ final class PeriodQuotaTest extends TestCase
         $context = new TenantContext();
         $context->set(new RuntimeTenant(id: self::TENANT_ID, schemaName: 'main'));
 
-        return new PeriodQuota($registry, $meter, $context);
+        return new PeriodQuota($registry, $meter, $context, new LimitAnnouncer($this->app->make(Dispatcher::class), $context));
     }
 }

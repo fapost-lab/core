@@ -8,6 +8,7 @@ use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Handlers\EndNodeHandler;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Services\RecordLimitWatch;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Support\Str;
@@ -24,6 +25,7 @@ final readonly class CreateFlowAction
     public function __construct(
         private TenantContextInterface $tenantContext,
         private RecordQuotaInterface $recordQuota,
+        private RecordLimitWatch $limitWatch,
     ) {
     }
 
@@ -36,9 +38,11 @@ final readonly class CreateFlowAction
      */
     public function execute(array $data): FlowDraft
     {
-        $this->recordQuota->assertCanCreate(FlowDraft::LIMIT_KEY, FlowDraft::countForLimit());
+        $countBefore = FlowDraft::countForLimit();
 
-        return FlowDraft::create([
+        $this->recordQuota->assertCanCreate(FlowDraft::LIMIT_KEY, $countBefore);
+
+        $draft = FlowDraft::create([
             'tenant_id'       => $this->tenantContext->get()->id,
             'flow_id'         => (string)Str::uuid(),
             'assistant_id'    => $data['assistant_id'],
@@ -58,5 +62,9 @@ final readonly class CreateFlowAction
             ],
             'edges' => $data['edges'] ?? [],
         ]);
+
+        $this->limitWatch->afterSaved(FlowDraft::LIMIT_KEY, $countBefore);
+
+        return $draft;
     }
 }
