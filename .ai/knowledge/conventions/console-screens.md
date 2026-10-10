@@ -38,6 +38,12 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   strings from `page.props.translations.console.<screen>` (en, ru, uk together), and build from
   `@fapost/ui` components: `data-table`, `form-field`, `confirm-dialog`. Permission flags for
   buttons come from the controller as `can`.
+- **The kit follows the approved mockups, not stock shadcn-vue** (the design canvas linked from the
+  `ui-foundation` spec): a page adds no colours or type of its own. A state (active, inactive)
+  is a `StatusDot`; a category or count is a soft `Badge` chosen by meaning (`info`, `neutral`,
+  `success`, `warning`, `danger`); a form is a stack of `FormSection`s (title and description
+  left, fields right); an empty list is `EmptyState`; a bulk delete is the `outline-danger`
+  button. A new colour need becomes a token in `tokens.css` with its dark value.
 - **Choices that depend on another field** (a condition's operators by its type, how many values each
   takes) reach the client as a prop built from one domain source (an enum's methods); the client holds
   no literal of them, and the FormRequest validates the same pair from the same source. Example:

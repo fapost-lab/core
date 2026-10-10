@@ -9,6 +9,7 @@ export interface ChannelsTranslations {
   columns: { type: string; bot: string; active: string; updated: string }
   bot_pending: string
   status: { active: string; inactive: string }
+  sections: { connection: { title: string; description: string }; behaviour: { title: string; description: string } }
   fields: {
     type: string
     type_locked: string

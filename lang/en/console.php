@@ -56,6 +56,13 @@ return [
         'operations_intro' => 'Diagnose live and recent flow executions.',
         'live_sessions'    => 'Live sessions (:count)',
         'errors_24h'       => 'Errors 24 h (:count)',
+        'contact_limit'    => [
+            'title'   => 'Contact limit reached',
+            'reached' => 'Not answered in the last 30 days: people :people, messages :messages. The limit of monthly active contacts (:limit) was reached.',
+            'lifted'  => 'Not answered in the last 30 days: people :people, messages :messages. The limit of monthly active contacts was reached; there is no such limit now.',
+            'unknown' => 'Not answered in the last 30 days: people :people, messages :messages. The limit of monthly active contacts was reached.',
+            'last'    => 'Last refusal: :time',
+        ],
     ],
 
     // Shared by every list screen built on the kit's DataTable.
@@ -102,6 +109,12 @@ return [
             'description' => 'Description',
             'contacts'    => 'Contacts',
             'created_at'  => 'Created',
+        ],
+        'sections' => [
+            'general' => [
+                'title'       => 'General',
+                'description' => 'The name and the description of the group.',
+            ],
         ],
         'fields' => [
             'name'        => 'Name',
@@ -193,6 +206,12 @@ return [
             'name'  => 'Name',
             'flows' => 'Flows',
         ],
+        'sections' => [
+            'general' => [
+                'title'       => 'General',
+                'description' => 'The name of the group.',
+            ],
+        ],
         'fields' => [
             'name' => 'Name',
         ],
@@ -228,6 +247,16 @@ return [
             'group'      => 'Group',
             'visibility' => 'Visibility',
             'version'    => 'Version',
+        ],
+        'sections' => [
+            'general' => [
+                'title'       => 'General',
+                'description' => 'The name, the group and the description of the flow.',
+            ],
+            'behaviour' => [
+                'title'       => 'Behaviour',
+                'description' => 'Who can start the flow and what is recorded about its sessions.',
+            ],
         ],
         'fields' => [
             'name'                 => 'Name',
@@ -319,6 +348,16 @@ return [
         'status'      => [
             'active'   => 'Active',
             'inactive' => 'Inactive',
+        ],
+        'sections' => [
+            'connection' => [
+                'title'       => 'Connection',
+                'description' => 'How the platform talks to the messenger. Secrets are stored encrypted.',
+            ],
+            'behaviour' => [
+                'title'       => 'Behaviour',
+                'description' => 'Whether the channel accepts incoming messages.',
+            ],
         ],
         'fields' => [
             'type'                 => 'Channel',

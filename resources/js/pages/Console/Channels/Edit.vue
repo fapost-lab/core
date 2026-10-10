@@ -24,8 +24,8 @@ const t = computed(() => usePage<ChannelsPageProps>().props.translations.console
 <template>
   <Head :title="t.edit_title" />
 
-  <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
-    <h1 class="font-display text-2xl font-semibold tracking-wide uppercase">{{ t.edit_title }}</h1>
+  <div class="flex w-full flex-col gap-5">
+    <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.edit_title }}</h1>
 
     <ChannelForm
       :key="channel.id"

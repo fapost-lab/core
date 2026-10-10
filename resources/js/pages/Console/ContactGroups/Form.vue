@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import { Link, useForm, usePage } from '@inertiajs/vue3'
 import { Button } from '@fapost/ui/components/button'
 import { FormField } from '@fapost/ui/components/form-field'
+import { FormSection } from '@fapost/ui/components/form-section'
 import { Input } from '@fapost/ui/components/input'
 import { Textarea } from '@fapost/ui/components/textarea'
 import type { ContactGroupsPageProps } from './types'
@@ -30,14 +31,16 @@ function submit(): void {
 </script>
 
 <template>
-  <form class="flex max-w-xl flex-col gap-5" novalidate @submit.prevent="submit">
-    <FormField id="name" :label="t.fields.name" :error="form.errors.name" v-slot="{ invalid, describedBy }">
-      <Input id="name" v-model="form.name" name="name" required maxlength="255" autocomplete="off" :aria-invalid="invalid" :aria-describedby="describedBy" />
-    </FormField>
+  <form class="flex flex-col gap-5" novalidate @submit.prevent="submit">
+    <FormSection :title="t.sections.general.title" :description="t.sections.general.description">
+      <FormField id="name" :label="t.fields.name" :error="form.errors.name" v-slot="{ invalid, describedBy }">
+        <Input id="name" v-model="form.name" name="name" required maxlength="255" autocomplete="off" :aria-invalid="invalid" :aria-describedby="describedBy" />
+      </FormField>
 
-    <FormField id="description" :label="t.fields.description" :error="form.errors.description" v-slot="{ invalid, describedBy }">
-      <Textarea id="description" v-model="form.description" name="description" rows="4" maxlength="1000" :aria-invalid="invalid" :aria-describedby="describedBy" />
-    </FormField>
+      <FormField id="description" :label="t.fields.description" :error="form.errors.description" v-slot="{ invalid, describedBy }">
+        <Textarea id="description" v-model="form.description" name="description" rows="4" maxlength="1000" :aria-invalid="invalid" :aria-describedby="describedBy" />
+      </FormField>
+    </FormSection>
 
     <div class="flex items-center gap-2">
       <Button type="submit" :disabled="form.processing">{{ form.processing ? common.saving : common.save }}</Button>

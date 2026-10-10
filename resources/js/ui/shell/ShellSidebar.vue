@@ -18,9 +18,10 @@ const active = computed(() => findActive(groups.value, page.url))
 </script>
 
 <template>
-  <div class="flex h-full flex-col gap-4 p-3">
-    <div class="px-2 pt-1">
-      <span class="font-display text-lg font-semibold tracking-wide uppercase">FaPost</span>
+  <div class="flex h-full flex-col gap-[18px] px-3 py-4">
+    <div class="flex items-center gap-2.5 px-2 py-1">
+      <span class="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-lg text-sm font-bold" aria-hidden="true">F</span>
+      <span class="font-display text-[19px] font-bold">FaPost</span>
     </div>
 
     <AssistantSwitcher
@@ -31,10 +32,10 @@ const active = computed(() => findActive(groups.value, page.url))
     />
 
     <nav class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto" aria-label="Main">
-      <div v-for="(group, index) in groups" :key="group.label ?? `group-${index}`" class="flex flex-col gap-1">
+      <div v-for="(group, index) in groups" :key="group.label ?? `group-${index}`" class="flex flex-col gap-0.5">
         <h2
           v-if="group.label"
-          class="font-display text-muted-foreground px-2.5 pt-1 text-xs font-medium tracking-wider uppercase"
+          class="font-display text-faint-foreground px-2.5 pb-1.5 text-[12.5px] font-semibold tracking-[0.04em] uppercase"
         >
           {{ group.label }}
         </h2>

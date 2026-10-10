@@ -20,8 +20,8 @@ const t = computed(() => usePage<ContactGroupsPageProps>().props.translations.co
 <template>
   <Head :title="t.create_title" />
 
-  <div class="mx-auto flex w-full max-w-5xl flex-col gap-6">
-    <h1 class="font-display text-2xl font-semibold tracking-wide uppercase">{{ t.create_title }}</h1>
+  <div class="flex w-full flex-col gap-5">
+    <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.create_title }}</h1>
 
     <ContactGroupForm :initial="{ name: '', description: null }" method="post" :submit-url="urls.submit" :cancel-url="urls.index" />
   </div>

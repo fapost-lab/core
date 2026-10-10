@@ -8,6 +8,7 @@ export interface FlowsTranslations {
   create_and_open: string
   edit_title: string
   columns: { name: string; group: string; visibility: string; version: string }
+  sections: { general: { title: string; description: string }; behaviour: { title: string; description: string } }
   fields: {
     name: string
     group: string

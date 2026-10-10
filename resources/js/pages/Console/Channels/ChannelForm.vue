@@ -5,6 +5,7 @@ import { Check, Copy } from '@lucide/vue'
 import { Badge } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { FormField } from '@fapost/ui/components/form-field'
+import { FormSection } from '@fapost/ui/components/form-section'
 import { Input } from '@fapost/ui/components/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
 import { Switch } from '@fapost/ui/components/switch'
@@ -88,58 +89,56 @@ function submit(): void {
 </script>
 
 <template>
-  <form class="flex max-w-xl flex-col gap-5" novalidate @submit.prevent="submit">
-    <FormField v-if="!editing" id="type" :label="t.fields.type" :error="form.errors.type" v-slot="{ invalid, describedBy }">
-      <Select v-model="form.type">
-        <SelectTrigger id="type" class="w-full" :aria-invalid="invalid" :aria-describedby="describedBy">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem v-for="option in types" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
-        </SelectContent>
-      </Select>
-    </FormField>
+  <form class="flex flex-col gap-5" novalidate @submit.prevent="submit">
+    <FormSection :title="t.sections.connection.title" :description="t.sections.connection.description">
+      <FormField v-if="!editing" id="type" :label="t.fields.type" :error="form.errors.type" v-slot="{ invalid, describedBy }">
+        <Select v-model="form.type">
+          <SelectTrigger id="type" class="w-full" :aria-invalid="invalid" :aria-describedby="describedBy">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="option in types" :key="option.value" :value="option.value">{{ option.label }}</SelectItem>
+          </SelectContent>
+        </Select>
+      </FormField>
 
-    <div v-else class="grid gap-2">
-      <span class="text-sm leading-none font-medium">{{ t.fields.type }}</span>
-      <div class="flex items-center gap-2">
-        <Badge variant="secondary">{{ channel?.typeLabel }}</Badge>
-        <a v-if="channel?.url" :href="channel.url" target="_blank" rel="noopener" class="text-sm underline-offset-4 hover:underline">{{ channel.handle }}</a>
+      <div v-else class="grid gap-2">
+        <span class="text-[13px] leading-none font-semibold">{{ t.fields.type }}</span>
+        <div class="flex items-center gap-2">
+          <Badge variant="info">{{ channel?.typeLabel }}</Badge>
+          <a v-if="channel?.url" :href="channel.url" target="_blank" rel="noopener" class="text-sm underline-offset-4 hover:underline">{{ channel.handle }}</a>
+        </div>
+        <p class="text-muted-foreground text-sm">{{ t.fields.type_locked }}</p>
       </div>
-      <p class="text-muted-foreground text-sm">{{ t.fields.type_locked }}</p>
-    </div>
 
-    <FormField id="token" :label="t.fields.token" :hint="editing ? t.fields.token_keep : undefined" :error="form.errors.token" v-slot="{ invalid, describedBy }">
-      <SecretInput id="token" v-model="form.token" name="bot_token" :required="!editing" :invalid="invalid" :described-by="describedBy" />
-    </FormField>
+      <FormField id="token" :label="t.fields.token" :hint="editing ? t.fields.token_keep : undefined" :error="form.errors.token" v-slot="{ invalid, describedBy }">
+        <SecretInput id="token" v-model="form.token" name="bot_token" :required="!editing" :invalid="invalid" :described-by="describedBy" />
+      </FormField>
 
-    <FormField
-      id="secret_token"
-      :label="t.fields.secret_token"
-      :hint="editing ? `${t.fields.secret_token_help} ${t.fields.secret_token_keep}` : t.fields.secret_token_help"
-      :error="form.errors.secret_token"
-      v-slot="{ invalid, describedBy }"
-    >
-      <SecretInput id="secret_token" v-model="form.secret_token" name="webhook_secret" generatable :required="!editing" :invalid="invalid" :described-by="describedBy" />
-    </FormField>
+      <FormField
+        id="secret_token"
+        :label="t.fields.secret_token"
+        :hint="editing ? `${t.fields.secret_token_help} ${t.fields.secret_token_keep}` : t.fields.secret_token_help"
+        :error="form.errors.secret_token"
+        v-slot="{ invalid, describedBy }"
+      >
+        <SecretInput id="secret_token" v-model="form.secret_token" name="webhook_secret" generatable :required="!editing" :invalid="invalid" :described-by="describedBy" />
+      </FormField>
 
-    <FormField id="is_active" :label="t.fields.is_active" :error="form.errors.is_active" v-slot="{ invalid, describedBy }">
-      <Switch id="is_active" v-model="form.is_active" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
-    </FormField>
+      <FormField v-if="editing && channel" id="webhook_hash" :label="t.fields.webhook_hash" :hint="t.fields.webhook_hash_help">
+        <div class="flex items-center gap-2">
+          <Input id="webhook_hash" :model-value="channel.webhookHash" readonly class="font-mono" aria-describedby="webhook_hash-hint" />
+          <Button type="button" variant="outline" class="shrink-0" @click="copyHash">
+            <Check v-if="copied" aria-hidden="true" />
+            <Copy v-else aria-hidden="true" />
+            {{ copied ? t.fields.copied : t.fields.copy }}
+          </Button>
+        </div>
+      </FormField>
 
-    <FormField v-if="editing && channel" id="webhook_hash" :label="t.fields.webhook_hash" :hint="t.fields.webhook_hash_help">
-      <div class="flex items-center gap-2">
-        <Input id="webhook_hash" :model-value="channel.webhookHash" readonly class="font-mono" aria-describedby="webhook_hash-hint" />
-        <Button type="button" variant="outline" class="shrink-0" @click="copyHash">
-          <Check v-if="copied" aria-hidden="true" />
-          <Copy v-else aria-hidden="true" />
-          {{ copied ? t.fields.copied : t.fields.copy }}
-        </Button>
-      </div>
-    </FormField>
+    </FormSection>
 
-    <fieldset class="flex flex-col gap-5 rounded-lg border p-4">
-      <legend class="px-2 text-sm font-medium">{{ t.fields.config }}</legend>
+    <FormSection :title="t.fields.config">
 
       <template v-if="isTelegram">
         <FormField id="allowed_updates" :label="t.fields.allowed_updates" :hint="t.fields.allowed_updates_help" :error="allowedUpdatesError">
@@ -170,7 +169,13 @@ function submit(): void {
       <FormField v-else id="config_entries" :label="t.fields.config" :error="form.errors.config_entries">
         <KeyValueField v-model="form.config_entries" id-prefix="config_entries" :errors="form.errors" />
       </FormField>
-    </fieldset>
+    </FormSection>
+
+    <FormSection :title="t.sections.behaviour.title" :description="t.sections.behaviour.description">
+      <FormField id="is_active" :label="t.fields.is_active" :error="form.errors.is_active" v-slot="{ invalid, describedBy }">
+        <Switch id="is_active" v-model="form.is_active" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
+      </FormField>
+    </FormSection>
 
     <div class="flex items-center gap-2">
       <Button type="submit" :disabled="form.processing">{{ form.processing ? common.saving : common.save }}</Button>

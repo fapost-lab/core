@@ -23,10 +23,10 @@ const describedBy = computed(() => [props.error ? errorId.value : null, props.hi
 </script>
 
 <template>
-  <div :class="cn('grid gap-2', props.class)">
+  <div :class="cn('grid gap-1.5', props.class)">
     <Label :for="id">{{ label }}</Label>
     <slot :id="id" :invalid="!!error" :described-by="describedBy" />
-    <p v-if="hint" :id="hintId" class="text-muted-foreground text-sm">{{ hint }}</p>
-    <p v-if="error" :id="errorId" role="alert" class="text-destructive text-sm">{{ error }}</p>
+    <p v-if="hint" :id="hintId" class="text-muted-foreground text-[13px]">{{ hint }}</p>
+    <p v-if="error" :id="errorId" role="alert" class="text-destructive text-[12.5px]">{{ error }}</p>
   </div>
 </template>
