@@ -191,10 +191,11 @@ final class FilesController extends Controller
             abort(404);
         }
 
+        // The browser must take the stored type as given and never guess a script out of the bytes.
         return $disk->response(
             $blob->storage_path,
             $file->name,
-            ['Content-Type' => $blob->mime_type],
+            ['Content-Type' => $blob->mime_type, 'X-Content-Type-Options' => 'nosniff'],
         );
     }
 

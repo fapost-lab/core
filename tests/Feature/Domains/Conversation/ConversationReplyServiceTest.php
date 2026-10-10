@@ -41,6 +41,17 @@ final class ConversationReplyServiceTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
+    /**
+     * @return array<string, array{string, string, string}>
+     */
+    public static function attachments(): array
+    {
+        return [
+            'jpeg goes as a photo'    => ['image/jpeg', 'photo', 'photo'],
+            'heic goes as a document' => ['image/heic', 'document', 'document'],
+        ];
+    }
+
     public function test_send_builds_staff_attributed_outbound_message_on_thread_channel(): void
     {
         [$conversation, $contact, $channel] = $this->threadWithLinkedContact();
@@ -193,7 +204,28 @@ final class ConversationReplyServiceTest extends FeatureTestCase
         $this->assertSame('msg:' . $sentKey, $meter->units[0]->unitKey);
     }
 
-    private function mediaFile(): MediaFile
+    #[\PHPUnit\Framework\Attributes\DataProvider('attachments')]
+    public function test_a_cached_attachment_goes_out_the_way_it_was_uploaded(string $mime, string $type, string $field): void
+    {
+        [$conversation] = $this->threadWithLinkedContact();
+        $mediaFile      = $this->mediaFile($mime);
+
+        $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: self::TENANT_ID, schemaName: 'main'));
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::allowing());
+        $this->mock(MediaDispatcherInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('ensureUploadedToChannel')->once()->andReturn(new DispatchResult(providerFileId: 'file-1', alreadyDelivered: false));
+        });
+        $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock) use ($type, $field): void {
+            $mock->shouldReceive('send')
+                ->once()
+                ->withArgs(fn (OutboundMessage $message): bool => $type === $message->payload->type && 'file-1' === ($message->payload->media[$field] ?? null))
+                ->andReturn(new DeliveryResult(sent: true, providerMessageId: 'p-1'));
+        });
+
+        app(ConversationReplyServiceInterface::class)->send($conversation, 'see attached', 'staff-1', (string) $mediaFile->getKey());
+    }
+
+    private function mediaFile(string $mime = 'image/jpeg'): MediaFile
     {
         $blob = MediaBlob::query()->create([
             'tenant_id'    => self::TENANT_ID,
@@ -201,7 +233,7 @@ final class ConversationReplyServiceTest extends FeatureTestCase
             'storage_path' => 'tenants/test/media/e.jpg',
             'storage_disk' => 'local',
             'size'         => 10,
-            'mime_type'    => 'image/jpeg',
+            'mime_type'    => $mime,
         ]);
 
         return MediaFile::query()->create([

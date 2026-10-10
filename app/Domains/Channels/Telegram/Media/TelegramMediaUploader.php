@@ -6,6 +6,7 @@ namespace App\Domains\Channels\Telegram\Media;
 
 use App\Domains\Channels\Telegram\TelegramBotApiClientFactory;
 use App\Domains\Media\Exceptions\MediaUploadFailedException;
+use App\Domains\Media\Services\DeliveryKind;
 use Fapost\Foundation\Channel\ChannelInterface;
 use Fapost\Foundation\Media\ChannelMediaUploaderInterface;
 use Fapost\Foundation\Media\DTO\UploadContext;
@@ -20,6 +21,8 @@ use Fapost\Foundation\Media\MediaBlobReadInterface;
  * a real send. The first call ships the bytes to the target chat (taken from
  * {@see UploadContext::$targetChatId}); subsequent sends short-circuit through the
  * cached file_id in {@see \App\Domains\Media\Models\MediaChannelRef}.
+ *
+ * The method follows {@see DeliveryKind}: a format the typed method refuses (HEIC, MKV, FLAC…) goes as a document.
  *
  * The resulting `deliveredMessageId` lets the dispatcher signal "already delivered" so
  * upstream handlers do not double-send to the same recipient.
@@ -63,7 +66,7 @@ final readonly class TelegramMediaUploader implements ChannelMediaUploaderInterf
         }
 
         try {
-            $response = match (MediaKind::fromMimeType($blob->getMimeType())) {
+            $response = match (DeliveryKind::of($blob->getMimeType())) {
                 MediaKind::Image => $client->sendPhotoMultipart(
                     $chatId,
                     $resource,
@@ -130,7 +133,7 @@ final readonly class TelegramMediaUploader implements ChannelMediaUploaderInterf
      */
     private function extractFileId(array $result, string $mimeType): ?string
     {
-        $kind = MediaKind::fromMimeType($mimeType);
+        $kind = DeliveryKind::of($mimeType);
 
         if (MediaKind::Image === $kind && isset($result['photo']) && is_array($result['photo'])) {
             $largest = end($result['photo']);

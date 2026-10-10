@@ -74,6 +74,26 @@ final class TelegramMediaUploaderTest extends TestCase
         $this->assertSame('doc-file-id', $result->providerFileId);
     }
 
+    public function test_a_heic_photo_goes_as_a_document_since_send_photo_refuses_it(): void
+    {
+        Http::fake([
+            'api.telegram.org/*sendDocument' => Http::response([
+                'ok'     => true,
+                'result' => ['message_id' => 12, 'document' => ['file_id' => 'heic-doc']],
+            ]),
+        ]);
+
+        $result = (new TelegramMediaUploader(new TelegramBotApiClientFactory()))->upload(
+            $this->makeBlob('image/heic'),
+            $this->makeChannel(),
+            new UploadContext('chat-1'),
+        );
+
+        $this->assertSame('heic-doc', $result->providerFileId);
+        Http::assertSent(static fn ($request): bool => str_contains($request->url(), '/sendDocument'));
+        Http::assertNotSent(static fn ($request): bool => str_contains($request->url(), '/sendPhoto'));
+    }
+
     public function test_throws_when_chat_id_is_missing(): void
     {
         Http::fake();

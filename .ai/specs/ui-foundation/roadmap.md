@@ -81,7 +81,7 @@ entry and the dashboard are served by Inertia.
       shared channel form (after: channels in phase 2 — reuses its form)
 - [x] `admin-users-roles` — Users and roles — user list with activation and deactivation, role assignment within the
       actor's priority; roles with grouped permission checklists (after: the pilot)
-- [ ] `admin-media-library` — The media library — folder tree, upload, rename, move, references, soft delete and
+- [x] `admin-media-library` — The media library — folder tree, upload, rename, move, references, soft delete and
       restore, bulk actions, file view with previews; folder deletion moved out of the page into
       a service (after: the pilot)
 - [x] `admin-tenant-settings` — Tenant settings — languages with their lock rules, runtime and broadcast limits (after:

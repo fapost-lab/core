@@ -379,7 +379,7 @@ final class MediaApiTest extends FeatureTestCase
         // Strip host so we can hit it as a relative path through the test client.
         $relative = parse_url($previewUrl, PHP_URL_PATH) . '?' . parse_url($previewUrl, PHP_URL_QUERY);
 
-        $this->get($relative)->assertOk();
+        $this->get($relative)->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
     }
 
     public function test_unsigned_raw_url_is_rejected(): void
