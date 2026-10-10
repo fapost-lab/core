@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessController;
+use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Console\AssistantSettingsController;
@@ -95,8 +96,9 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'admin assistants view'   => ['filament.admin.resources.assistants.view', AdminAssistantController::class, 'show', 'admin/assistants/{record}'],
             'admin assistants edit'   => ['filament.admin.resources.assistants.edit', AdminAssistantController::class, 'edit', 'admin/assistants/{record}/edit'],
 
-            'admin media list' => ['filament.admin.resources.media.index', AdminMediaController::class, 'index', 'admin/media'],
-            'admin media view' => ['filament.admin.resources.media.view', AdminMediaController::class, 'show', 'admin/media/{record}'],
+            'admin media list'      => ['filament.admin.resources.media.index', AdminMediaController::class, 'index', 'admin/media'],
+            'admin media view'      => ['filament.admin.resources.media.view', AdminMediaController::class, 'show', 'admin/media/{record}'],
+            'admin tenant settings' => ['filament.admin.pages.tenant-settings', AdminTenantSettingsController::class, 'edit', 'admin/tenant-settings'],
         ];
     }
 
@@ -170,16 +172,17 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'admin assistant channel register' => ['console.admin.assistants.channels.register-webhook', AdminAssistantChannelController::class, 'registerWebhook', 'POST', 'admin/assistants/{record}/channels/{channel}/register-webhook'],
             'admin assistant channel destroy'  => ['console.admin.assistants.channels.destroy', AdminAssistantChannelController::class, 'destroy', 'DELETE', 'admin/assistants/{record}/channels/{channel}'],
 
-            'admin media upload'         => ['console.admin.media.upload', AdminMediaController::class, 'upload', 'POST', 'admin/media'],
-            'admin media move'           => ['console.admin.media.move', AdminMediaController::class, 'move', 'PUT', 'admin/media/move'],
-            'admin media destroy many'   => ['console.admin.media.destroy-many', AdminMediaController::class, 'destroyMany', 'DELETE', 'admin/media'],
-            'admin media update'         => ['console.admin.media.update', AdminMediaController::class, 'update', 'PATCH', 'admin/media/{record}'],
-            'admin media destroy'        => ['console.admin.media.destroy', AdminMediaController::class, 'destroy', 'DELETE', 'admin/media/{record}'],
-            'admin media restore'        => ['console.admin.media.restore', AdminMediaController::class, 'restore', 'POST', 'admin/media/{record}/restore'],
-            'admin media force'          => ['console.admin.media.force', AdminMediaController::class, 'forceDestroy', 'DELETE', 'admin/media/{record}/force'],
-            'admin media folder store'   => ['console.admin.media.folders.store', AdminMediaFolderController::class, 'store', 'POST', 'admin/media/folders'],
-            'admin media folder update'  => ['console.admin.media.folders.update', AdminMediaFolderController::class, 'update', 'PUT', 'admin/media/folders/{folder}'],
-            'admin media folder destroy' => ['console.admin.media.folders.destroy', AdminMediaFolderController::class, 'destroy', 'DELETE', 'admin/media/folders/{folder}'],
+            'admin media upload'           => ['console.admin.media.upload', AdminMediaController::class, 'upload', 'POST', 'admin/media'],
+            'admin media move'             => ['console.admin.media.move', AdminMediaController::class, 'move', 'PUT', 'admin/media/move'],
+            'admin media destroy many'     => ['console.admin.media.destroy-many', AdminMediaController::class, 'destroyMany', 'DELETE', 'admin/media'],
+            'admin media update'           => ['console.admin.media.update', AdminMediaController::class, 'update', 'PATCH', 'admin/media/{record}'],
+            'admin media destroy'          => ['console.admin.media.destroy', AdminMediaController::class, 'destroy', 'DELETE', 'admin/media/{record}'],
+            'admin media restore'          => ['console.admin.media.restore', AdminMediaController::class, 'restore', 'POST', 'admin/media/{record}/restore'],
+            'admin media force'            => ['console.admin.media.force', AdminMediaController::class, 'forceDestroy', 'DELETE', 'admin/media/{record}/force'],
+            'admin media folder store'     => ['console.admin.media.folders.store', AdminMediaFolderController::class, 'store', 'POST', 'admin/media/folders'],
+            'admin media folder update'    => ['console.admin.media.folders.update', AdminMediaFolderController::class, 'update', 'PUT', 'admin/media/folders/{folder}'],
+            'admin media folder destroy'   => ['console.admin.media.folders.destroy', AdminMediaFolderController::class, 'destroy', 'DELETE', 'admin/media/folders/{folder}'],
+            'admin tenant settings update' => ['console.admin.tenant-settings.update', AdminTenantSettingsController::class, 'update', 'PUT', 'admin/tenant-settings'],
             // Support access log: never a Filament screen.
             'admin support access' => ['console.admin.support-access.index', AdminSupportAccessController::class, 'index', 'GET', 'admin/support-access'],
         ];

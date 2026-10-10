@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessController;
+use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Console\AssistantSettingsController;
@@ -121,6 +122,9 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::delete('admin/media/{record}', [AdminMediaController::class, 'destroy'])->name('console.admin.media.destroy');
         Route::post('admin/media/{record}/restore', [AdminMediaController::class, 'restore'])->name('console.admin.media.restore');
         Route::delete('admin/media/{record}/force', [AdminMediaController::class, 'forceDestroy'])->name('console.admin.media.force');
+        // Tenant settings: languages with the base-language lock, runtime limits, broadcast pacing; one form saved whole.
+        Route::get('admin/tenant-settings', [AdminTenantSettingsController::class, 'edit'])->name('filament.admin.pages.tenant-settings');
+        Route::put('admin/tenant-settings', [AdminTenantSettingsController::class, 'update'])->name('console.admin.tenant-settings.update');
         // Support access log: read only, and never a Filament screen, so the name is the console's own.
         Route::get('admin/support-access', [AdminSupportAccessController::class, 'index'])->name('console.admin.support-access.index');
     });
