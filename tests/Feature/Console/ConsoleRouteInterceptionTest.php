@@ -7,6 +7,7 @@ namespace Tests\Feature\Console;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
+use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Console\AssistantSettingsController;
@@ -163,6 +164,8 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'admin assistant channel rotate'   => ['console.admin.assistants.channels.rotate-webhook', AdminAssistantChannelController::class, 'rotateWebhook', 'POST', 'admin/assistants/{record}/channels/{channel}/rotate-webhook'],
             'admin assistant channel register' => ['console.admin.assistants.channels.register-webhook', AdminAssistantChannelController::class, 'registerWebhook', 'POST', 'admin/assistants/{record}/channels/{channel}/register-webhook'],
             'admin assistant channel destroy'  => ['console.admin.assistants.channels.destroy', AdminAssistantChannelController::class, 'destroy', 'DELETE', 'admin/assistants/{record}/channels/{channel}'],
+            // Support access log: never a Filament screen.
+            'admin support access' => ['console.admin.support-access.index', AdminSupportAccessController::class, 'index', 'GET', 'admin/support-access'],
         ];
     }
 

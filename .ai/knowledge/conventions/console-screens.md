@@ -41,6 +41,9 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   under an admin screen (an assistant's channels at `admin/assistants/{record}/channels/{channel}`)
   is found through its parent, so a mismatched pair is a 404, and reuses the console's page and
   presenter (`PresentsChannels`) with admin URLs. Example: `Admin\AssistantChannelController`.
+  A screen Filament never had (new screens in Filament are frozen) gets only a `console.*` route,
+  and its menu item names that route in full; it exists only with the switch on. Example:
+  `Admin\SupportAccessController`.
 - **After a write**, toast through `Inertia::flash()` (never the session `with()`: a shared prop
   is kept in history and replays on Back). Deletes go `back()` so the list keeps its state; forms
   go to the index.

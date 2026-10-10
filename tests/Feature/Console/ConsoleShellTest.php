@@ -106,7 +106,7 @@ final class ConsoleShellTest extends InertiaConsoleTestCase
         $this->assertNull($groups[0]['label']);
         $this->assertSame(['filament.admin.pages.dashboard', 'filament.admin.pages.tenant-settings'], $this->keys($groups[0]));
         $this->assertSame(['filament.admin.resources.assistants.index'], $this->keys($groups[1]));
-        $this->assertSame(['filament.admin.resources.users.index', 'filament.admin.resources.roles.index'], $this->keys($groups[2]));
+        $this->assertSame(['filament.admin.resources.users.index', 'filament.admin.resources.roles.index', 'console.admin.support-access.index'], $this->keys($groups[2]));
         $this->assertSame(['filament.admin.resources.media.index', 'filament.admin.pages.translations'], $this->keys($groups[3]));
     }
 
