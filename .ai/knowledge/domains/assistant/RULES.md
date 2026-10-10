@@ -20,7 +20,7 @@ paths:
   - tests/Feature/AssistantPanelTest.php
   - app/Http/Middleware/ResolveCurrentAssistant.php
   - app/Filament/Support/SetCurrentAssistantFromPanelTenant.php
-reviewed_at: 2026-10-08
+reviewed_at: 2026-10-10
 ---
 # Assistant rules
 
@@ -52,9 +52,10 @@ broken.
   replay it), or by a job from its payload. `CurrentAssistant` itself reads nothing ambient.
   Enforced: `CurrentAssistantTest`, `ResolveCurrentAssistantTest`, `AssistantPanelTest`.
 - **Change `is_active` through `AssistantService`,** never by updating the model. Why: only the
-  service cascades to channels. Only the admin edit form bypasses it today
-  (`EditAssistant.php` → `AssistantService::update`, which writes `is_active` without the channel
-  cascade); `AssistantSettings` has no assistant `is_active` field.
+  service cascades to channels. Only the admin edit form bypasses it today, in both panels
+  (`EditAssistant.php` and the Inertia admin's `StaffAssistantService::update` →
+  `AssistantService::update`, which writes `is_active` without the channel cascade);
+  `AssistantSettings` has no assistant `is_active` field.
   *(proposed)*
 - **A nested `runForTenant` hides the current assistant inside and returns it after.** A synchronous job in an
   HTTP request (the channel webhook sync) must not leave the request without its assistant, and the inner tenant

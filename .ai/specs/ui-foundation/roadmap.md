@@ -77,16 +77,16 @@ console menu entry is served by Inertia and the console's tests run against the 
 Goal: the admin panel needs no Filament screen. Done when: with the switch on, every admin menu
 entry and the dashboard are served by Inertia.
 
-- [ ] Assistants with their channels — list, create, view, edit; the channels section on the
+- [x] `admin-assistants` — Assistants with their channels — list, create, view, edit; the channels section on the
       shared channel form (after: channels in phase 2 — reuses its form)
-- [ ] Users and roles — user list with activation and deactivation, role assignment within the
+- [ ] `admin-users-roles` — Users and roles — user list with activation and deactivation, role assignment within the
       actor's priority; roles with grouped permission checklists (after: the pilot)
-- [ ] The media library — folder tree, upload, rename, move, references, soft delete and
+- [ ] `admin-media-library` — The media library — folder tree, upload, rename, move, references, soft delete and
       restore, bulk actions, file view with previews; folder deletion moved out of the page into
       a service (after: the pilot)
-- [ ] Tenant settings — languages with their lock rules, runtime and broadcast limits (after:
+- [ ] `admin-tenant-settings` — Tenant settings — languages with their lock rules, runtime and broadcast limits (after:
       the pilot)
-- [ ] The admin dashboard and search — stats and the activity chart on a query service, the ⌘K
+- [ ] `admin-dashboard-search` — The admin dashboard and search — stats and the activity chart on a query service, the ⌘K
       palette over assistants, users, roles and media (after: the pilot)
 
 - [ ] `support-access-log-screen` — The support access log — admins see which platform operator entered the tenant as support and when, read from `support_access_entries`; until then the support user's badge in the user list is all the tenant sees (after: Users and roles — it sits next to them)

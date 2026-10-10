@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
+use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
@@ -71,6 +73,11 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             // Translations: both panels.
             'admin translations'     => ['filament.admin.pages.translations', AdminTranslationController::class, 'index', 'admin/translations'],
             'assistant translations' => ['filament.assistant.pages.translations', TranslationController::class, 'index', 'assistant/{tenant}/translations'],
+            // Admin assistants.
+            'admin assistants list'   => ['filament.admin.resources.assistants.index', AdminAssistantController::class, 'index', 'admin/assistants'],
+            'admin assistants create' => ['filament.admin.resources.assistants.create', AdminAssistantController::class, 'create', 'admin/assistants/create'],
+            'admin assistants view'   => ['filament.admin.resources.assistants.view', AdminAssistantController::class, 'show', 'admin/assistants/{record}'],
+            'admin assistants edit'   => ['filament.admin.resources.assistants.edit', AdminAssistantController::class, 'edit', 'admin/assistants/{record}/edit'],
         ];
     }
 
@@ -118,6 +125,15 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'translation reset'        => ['console.translations.reset', TranslationController::class, 'reset', 'DELETE', 'assistant/{tenant}/translations/{key}'],
             'admin translation update' => ['console.admin.translations.update', AdminTranslationController::class, 'update', 'PUT', 'admin/translations/{key}'],
             'admin translation reset'  => ['console.admin.translations.reset', AdminTranslationController::class, 'reset', 'DELETE', 'admin/translations/{key}'],
+            // Admin assistants and their channels.
+            'admin assistant store'            => ['console.admin.assistants.store', AdminAssistantController::class, 'store', 'POST', 'admin/assistants'],
+            'admin assistant update'           => ['console.admin.assistants.update', AdminAssistantController::class, 'update', 'PUT', 'admin/assistants/{record}'],
+            'admin assistant destroy'          => ['console.admin.assistants.destroy', AdminAssistantController::class, 'destroy', 'DELETE', 'admin/assistants/{record}'],
+            'admin assistant channel edit'     => ['console.admin.assistants.channels.edit', AdminAssistantChannelController::class, 'edit', 'GET', 'admin/assistants/{record}/channels/{channel}/edit'],
+            'admin assistant channel update'   => ['console.admin.assistants.channels.update', AdminAssistantChannelController::class, 'update', 'PUT', 'admin/assistants/{record}/channels/{channel}'],
+            'admin assistant channel rotate'   => ['console.admin.assistants.channels.rotate-webhook', AdminAssistantChannelController::class, 'rotateWebhook', 'POST', 'admin/assistants/{record}/channels/{channel}/rotate-webhook'],
+            'admin assistant channel register' => ['console.admin.assistants.channels.register-webhook', AdminAssistantChannelController::class, 'registerWebhook', 'POST', 'admin/assistants/{record}/channels/{channel}/register-webhook'],
+            'admin assistant channel destroy'  => ['console.admin.assistants.channels.destroy', AdminAssistantChannelController::class, 'destroy', 'DELETE', 'admin/assistants/{record}/channels/{channel}'],
         ];
     }
 

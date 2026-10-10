@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Console;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
-use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Services\AssistantChannelService;
 use App\Domains\Channels\Services\ChannelWebhookSyncOutcome;
-use App\Domains\Channels\Telegram\TelegramWebhookOptions;
+use App\Http\Controllers\Concerns\PresentsChannels;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use App\Http\Requests\Console\ChannelRequest;
@@ -17,7 +16,6 @@ use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -40,6 +38,8 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 final class ChannelController extends Controller
 {
+    use PresentsChannels;
+
     public function __construct(
         private readonly AssistantChannelService $channels,
         private readonly CurrentAssistantInterface $assistant,
@@ -64,20 +64,7 @@ final class ChannelController extends Controller
             'table' => $table->respond(
                 $request,
                 $this->channels->query($assistant),
-                fn (Channel $channel): array => [
-                    'id'                 => (string) $channel->getKey(),
-                    'type'               => $channel->type->value,
-                    'typeLabel'          => trans($channel->type->labelKey()),
-                    'handle'             => $channel->publicHandle(),
-                    'url'                => $channel->publicUrl(),
-                    'isActive'           => $channel->is_active,
-                    'webhook'            => $this->webhookState($channel),
-                    'updatedAt'          => $channel->updated_at?->toIso8601String(),
-                    'editUrl'            => $this->url('edit', ['record' => $channel->getKey()]),
-                    'deleteUrl'          => $this->url('destroy', ['record' => $channel->getKey()]),
-                    'rotateUrl'          => $this->url('rotate-webhook', ['record' => $channel->getKey()]),
-                    'registerWebhookUrl' => $this->url('register-webhook', ['record' => $channel->getKey()]),
-                ],
+                fn (Channel $channel): array => $this->channelRow($channel, $this->url(...)),
             ),
             'limit' => [
                 'reached' => $limit->reached,
@@ -108,7 +95,7 @@ final class ChannelController extends Controller
         abort_if($this->channels->limit()->reached, HttpResponse::HTTP_FORBIDDEN);
 
         return Inertia::render('Console/Channels/Create', [
-            ...$this->options(),
+            ...$this->channelFormOptions(),
             'urls' => [
                 'index'  => $this->url('index'),
                 'submit' => $this->url('store'),
@@ -141,30 +128,9 @@ final class ChannelController extends Controller
 
         Gate::authorize('update', $channel);
 
-        $isTelegram = ChannelTypeEnum::Telegram === $channel->type;
-        $config     = is_array($channel->config) ? $channel->config : [];
-
         return Inertia::render('Console/Channels/Edit', [
-            'channel' => [
-                'id'                 => (string) $channel->getKey(),
-                'type'               => $channel->type->value,
-                'typeLabel'          => trans($channel->type->labelKey()),
-                'isActive'           => $channel->is_active,
-                'webhook'            => $this->webhookState($channel),
-                'webhookAt'          => $channel->webhook_status_at?->toIso8601String(),
-                'registerWebhookUrl' => $this->url('register-webhook', ['record' => $channel->getKey()]),
-                'webhookHash'        => $channel->webhook_public_hash,
-                'handle'             => $channel->publicHandle(),
-                'url'                => $channel->publicUrl(),
-                'telegram'           => $isTelegram ? [
-                    'allowedUpdates' => $this->allowedUpdates($config),
-                    'maxConnections' => is_numeric($config['max_connections'] ?? null)
-                        ? (int) $config['max_connections']
-                        : TelegramWebhookOptions::MAX_CONNECTIONS_DEFAULT,
-                ] : null,
-                'configEntries' => $isTelegram ? null : $this->entries($config),
-            ],
-            ...$this->options(),
+            'channel' => $this->editableChannel($channel, $this->url('register-webhook', ['record' => $channel->getKey()])),
+            ...$this->channelFormOptions(),
             'urls' => [
                 'index'  => $this->url('index'),
                 'submit' => $this->url('update', ['record' => $channel->getKey()]),
@@ -232,84 +198,6 @@ final class ChannelController extends Controller
         return $this->outcome->deregisterFailed((string) $channel->getKey())
             ? $this->backToList(trans('console.channels.provider_failed.deleted'), 'error')
             : $this->backToList(trans('console.channels.deleted'));
-    }
-
-    /**
-     * What the screen says about the webhook: null when nothing is to be said (unknown, registered, or the channel is
-     * off and has no webhook to register), `failed` when the provider refused the last registration.
-     *
-     * @return 'failed'|null
-     */
-    private function webhookState(Channel $channel): ?string
-    {
-        return $channel->webhookRegistrationFailed() ? 'failed' : null;
-    }
-
-    /**
-     * What the form offers: the channel types and the Telegram update types, labelled in the interface language
-     * from the labels the staff screens use, and the bounds of the delivery parallelism.
-     *
-     * @return array{types: list<array{value: string, label: string}>, telegramUpdates: list<array{value: string, label: string}>, maxConnections: array{min: int, max: int, default: int}}
-     */
-    private function options(): array
-    {
-        $types = [];
-
-        foreach (ChannelTypeEnum::cases() as $type) {
-            $types[] = ['value' => $type->value, 'label' => trans($type->labelKey())];
-        }
-
-        $updates = [];
-
-        foreach (TelegramWebhookOptions::ALLOWED_UPDATES as $update) {
-            $key       = "staff.channels.telegram_updates.{$update}";
-            $label     = trans($key);
-            $updates[] = ['value' => $update, 'label' => $label === $key ? Str::headline($update) : $label];
-        }
-
-        return [
-            'types'           => $types,
-            'telegramUpdates' => $updates,
-            'maxConnections'  => [
-                'min'     => TelegramWebhookOptions::MAX_CONNECTIONS_MIN,
-                'max'     => TelegramWebhookOptions::MAX_CONNECTIONS_MAX,
-                'default' => TelegramWebhookOptions::MAX_CONNECTIONS_DEFAULT,
-            ],
-        ];
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $config
-     *
-     * @return list<string>
-     */
-    private function allowedUpdates(array $config): array
-    {
-        $updates = is_array($config['allowed_updates'] ?? null) ? $config['allowed_updates'] : [];
-
-        // Only types the form offers: a stored one outside the list would fail validation with nothing to correct.
-        return array_values(array_filter($updates, static fn (mixed $update): bool => is_string($update) && in_array($update, TelegramWebhookOptions::ALLOWED_UPDATES, true)));
-    }
-
-    /**
-     * The settings of a channel without named ones, as the form lists them. Only scalar values can be shown; any
-     * other is left out (and is dropped when the form is saved, as the Filament form dropped it).
-     *
-     * @param  array<array-key, mixed>  $config
-     *
-     * @return list<array{key: string, value: string}>
-     */
-    private function entries(array $config): array
-    {
-        $entries = [];
-
-        foreach ($config as $key => $value) {
-            if (is_scalar($value)) {
-                $entries[] = ['key' => (string) $key, 'value' => (string) $value];
-            }
-        }
-
-        return $entries;
     }
 
     /**
