@@ -673,7 +673,10 @@ final readonly class FlowEngine implements FlowEngineInterface
      * The tick is bound to loop iterations rather than wall-clock time, which
      * is sufficient because the lock TTL only has to cover the gap between two
      * ticks — i.e. the slowest single node — not the whole run. Outbound calls
-     * cap out well below the TTL (`HttpTransport` defaults to a 10s timeout).
+     * cap out below the TTL (`HttpTransport` defaults to a 10s timeout), plus the egress guard's
+     * name lookup, which the HTTP timeout does not cover; the guard refuses a lookup that took
+     * longer than 8s, so a call is bounded by the resolver's own time, 8s at most for the check
+     * itself, and the 10s request.
      *
      * A false return means the TTL lapsed and another worker claimed the slot.
      * ADR Message Routing & Concurrency Control requires abandoning the run at

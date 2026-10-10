@@ -67,6 +67,34 @@ itself, `gateway` for the Go service.
   `php artisan ops:ingress-migrate --apply`.
 </Note>
 
+## Outbound calls from flows
+
+The `call` node refuses to connect to private, loopback, link-local, reserved and
+cloud-metadata addresses, on every installation and with no switch to turn it off.
+A refused call takes the node's `error` handle with `error_code = egress_denied`.
+See [the call node](/reference/flow-nodes#the-call-node-and-outbound-addresses).
+
+| | |
+|---|---|
+| `FLOW_EGRESS_ALLOW` | Empty by default. A comma-separated list of CIDR ranges, single addresses and host names that calls may reach even though they are not public, for example `10.20.0.0/16,crm.internal`. A listed host name skips the range check but is still resolved and pinned. Cloud metadata addresses (`169.254.169.254`, `169.254.170.2`, `fd00:ec2::254`, `100.100.100.200`, `168.63.129.16`) are refused whatever is listed. Entries that are neither a network nor a host name are ignored and logged. |
+| `FLOW_EGRESS_PROXY` | Optional. An explicit proxy for calls, for example `http://egress-proxy.internal:3128`. |
+
+For local development, `FLOW_EGRESS_ALLOW=127.0.0.1/32` lets a flow reach a mock
+server on the same machine. `0.0.0.0/0` would switch the guard off in practice, and
+Core logs a warning when it sees it.
+
+Calls ignore the `HTTP_PROXY` and `HTTPS_PROXY` environment variables: a proxy that
+resolves the name itself would bypass the check. Behind `FLOW_EGRESS_PROXY` Core still
+refuses what it resolves, but it cannot pin the connection, so the proxy must refuse
+private ranges itself (for example Smokescreen). Names are resolved with DNS first and then
+with the system resolver, so `/etc/hosts` entries and container `extra_hosts` work; whatever they
+resolve to is still checked, so a non-public result needs `FLOW_EGRESS_ALLOW` (for example
+`FLOW_EGRESS_ALLOW=127.0.0.1/32` for a mock on `localhost`).
+
+Network policy on the host (firewall rules, a restricted container network, IMDSv2 on
+cloud machines) is a worthwhile second layer, since it also covers code the guard does
+not.
+
 ## What must change for production
 
 The shipped `.env.example` is a development file. Four values are unsafe as they

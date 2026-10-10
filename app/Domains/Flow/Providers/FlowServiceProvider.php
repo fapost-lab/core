@@ -6,6 +6,11 @@ namespace App\Domains\Flow\Providers;
 
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Call\CallTransportRegistry;
+use App\Domains\Flow\Call\Egress\AddressClassifier;
+use App\Domains\Flow\Call\Egress\EgressGuardMiddleware;
+use App\Domains\Flow\Call\Egress\EgressPolicy;
+use App\Domains\Flow\Call\Egress\GuardedHttpClient;
+use App\Domains\Flow\Call\Egress\HostResolverInterface;
 use App\Domains\Flow\Call\Transports\HandlerTransport;
 use App\Domains\Flow\Call\Transports\HttpTransport;
 use App\Domains\Flow\Commands\BuiltinCommandsRegistry;
@@ -134,6 +139,7 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\ConnectionAfterCommitDispatcher;
 use App\Infrastructure\Flow\ContainerNodeHandlerFactory;
+use App\Infrastructure\Flow\DnsHostResolver;
 use App\Infrastructure\Flow\FlowExecutionGuard;
 use App\Infrastructure\Flow\QueuedDelayResumeScheduler;
 use App\Infrastructure\Flow\QueuedSendMessageTimeoutScheduler;
@@ -345,6 +351,33 @@ final class FlowServiceProvider extends ServiceProvider
         });
         $this->app->singleton(ActionHandlerRegistry::class);
         $this->app->singleton(RagAdapterRegistry::class);
+        // Egress guard of the call node. The policy is read once into a value object, so the
+        // singletons below never hold the config repository (worker-safety).
+        $this->app->singleton(EgressPolicy::class, function ($app): EgressPolicy {
+            $config = $app->make('config');
+            $policy = EgressPolicy::fromConfig(
+                is_string($config->get('flow.egress.allow')) ? $config->get('flow.egress.allow') : null,
+                (int) $config->get('flow.egress.max_redirects', 5),
+                is_string($config->get('flow.egress.proxy')) ? $config->get('flow.egress.proxy') : null,
+            );
+            $logger = $app->make(LoggerInterface::class);
+
+            if ($policy->allowsEverything()) {
+                $logger->warning('FLOW_EGRESS_ALLOW covers every address: the call node egress guard is effectively off.');
+            }
+
+            if ([] !== $policy->invalidEntries) {
+                $logger->warning('FLOW_EGRESS_ALLOW has entries that are neither a network nor a host name; they are ignored.', [
+                    'entries' => $policy->invalidEntries,
+                ]);
+            }
+
+            return $policy;
+        });
+        $this->app->singleton(AddressClassifier::class);
+        $this->app->singleton(HostResolverInterface::class, DnsHostResolver::class);
+        $this->app->singleton(EgressGuardMiddleware::class);
+        $this->app->singleton(GuardedHttpClient::class);
         $this->app->singleton(HttpTransport::class);
         $this->app->singleton(HandlerTransport::class);
         $this->app->singleton(BuiltinCommandsRegistry::class);

@@ -17,6 +17,7 @@ paths:
   - "tests/*/Domains/Flow/**"
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
+  - tests/Architecture/EgressGuardTest.php
 reviewed_at: 2026-10-05
 ---
 # Flow rules
@@ -31,6 +32,24 @@ broken.
   constructible and testable without a booted framework, and a hidden container lookup inside a
   worker resolves whatever tenant state is current. Enforced: `tests/Architecture/FlowRuntimeIsolationTest.php`.
   Not covered: `Concurrency`, `Call`, `Expression`, the rest of `Services`.
+- **Tenant-steered HTTP goes only through `GuardedHttpClient`.** The `call` node takes its target
+  from the flow author, often through a template over contact data, so a request never connects to a
+  private, loopback, link-local, reserved or cloud-metadata address: the guard resolves the name
+  itself, refuses the request if any address is not public, pins the connection to the checked
+  addresses (`CURLOPT_RESOLVE`) and re-checks every redirect hop. There is no switch to turn it off;
+  the operator widens it with `FLOW_EGRESS_ALLOW`, which can never cover the metadata addresses.
+  Why: without it a flow reads Redis, Postgres or the cloud credentials service from inside the
+  network. New Flow code that needs HTTP uses `GuardedHttpClient::request()`, not `Http::` or
+  Guzzle; hosts the operator chose (Telegram, captcha) are outside this rule. Enforced:
+  `tests/Architecture/EgressGuardTest.php` (Flow domain and builder controllers),
+  `EgressGuardMiddlewareTest`, `AddressClassifierTest`. Not covered: an extension action that makes
+  its own request. Accepted risk: the name lookup (`dns_get_record`, then `gethostbynamel`) has no
+  timeout of its own and runs before the HTTP timeout starts, so one `call` can take the system
+  resolver's time plus up to 10s; the guard refuses with `transport_failure` once a lookup took more
+  than 8s, which stops the HTTP request being added on top. The check runs after the lookup
+  returns, so it never cuts a slow lookup short, and a name whose DNS never answers pays the
+  resolver timeout twice (`dns_get_record`, then the `gethostbynamel` fallback); only a resolver
+  timeout well under the 30s lock TTL keeps that worst case inside it. Accepted at the design gate.
 - **Every class in `Handlers/` (except `Abstract` and `Support`) implements `NodeHandlerInterface`.**
   Enforced: `tests/Architecture/HandlerVersionContractTest.php`.
 - **Node handlers take collaborators as ordinary constructor dependencies.** The registry keeps

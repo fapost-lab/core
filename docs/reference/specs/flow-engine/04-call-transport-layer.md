@@ -72,8 +72,12 @@ Registered in `FlowServiceProvider` through `CallTransportRegistry`.
 - Response parsing: JSON when the `Content-Type` is JSON, otherwise raw text.
 - The success boundary is `options.success_when`: `2xx` (default), `any_response`, `2xx_or_4xx`.
   Transport-level failures (DNS, timeout, TLS) are always errors with code `transport_failure`.
-- Error codes: `invalid_target`, `invalid_method`, `transport_failure`, `http_4xx`, `http_5xx`,
-  `http_other`.
+- Error codes: `invalid_target`, `invalid_method`, `egress_denied`, `transport_failure`, `http_4xx`,
+  `http_5xx`, `http_other`.
+- The request goes through `GuardedHttpClient` (`app/Domains/Flow/Call/Egress/`), never the raw HTTP
+  client; a PHPat rule (`tests/Architecture/EgressGuardTest.php`) enforces it. The guard refuses
+  non-public addresses (see `nodes/06-call.md`, "Egress guard") and ends such a call with
+  `egress_denied`, metadata `{host, reason}`.
 
 **HandlerTransport** (`id() = 'handler'`, `app/Domains/Flow/Call/Transports/HandlerTransport.php`):
 

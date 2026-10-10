@@ -76,6 +76,7 @@ Metadata carries `status_code`, `error_code` and `idempotency_key` when present.
 | Kind | Handle |
 |------|--------|
 | Transport-level failure (DNS, connection refused, timeout, TLS) | **always `error`** (`error_code = transport_failure`) |
+| Target refused by the egress guard (non-public address, directly, via DNS or via a redirect) | **always `error`** (`error_code = egress_denied`, metadata `host` and `reason`, never the resolved IP) |
 | An HTTP response was received (any code) | per the `success_when` policy |
 
 The actual HTTP status is always in the result metadata (`status_code`). For a response that the policy
@@ -83,6 +84,39 @@ does not accept, the error code is `http_4xx`, `http_5xx` or `http_other`, usabl
 
 For the `handler` transport: an action that returns is `success`; an action that throws becomes
 `error_code = action_exception` and takes `error`.
+
+### Egress guard (HTTP transport)
+
+The `target` is tenant-steered, so the HTTP transport never connects to a non-public address.
+`GuardedHttpClient` installs `EgressGuardMiddleware` inside Guzzle's redirect middleware, so it runs for
+the first request and for every redirect hop (max 5, `http` and `https` only):
+
+1. Scheme other than `http`/`https`: `scheme_not_allowed`.
+2. Empty host, IPv6 zone id, or a numeric host that is not a canonical IPv4 address (`2130706433`,
+   `0x7f.1`, `127.1`, `0177.0.0.1`): `invalid_host`.
+3. An IP literal is classified directly. A name is resolved through `HostResolverInterface`
+   (`DnsHostResolver`: DNS A and AAAA, falling back to the system resolver for `/etc/hosts` names); **any** non-public address refuses the whole
+   request. A name that does not resolve is a `transport_failure`.
+4. The connection is pinned to the checked addresses with `CURLOPT_RESOLVE`, so curl never resolves the
+   name again (DNS rebinding) and SNI and certificate checks keep using the host name.
+
+`AddressClassifier` denies loopback, private, CGNAT, link-local, multicast, unspecified and reserved
+ranges for IPv4 and IPv6, and judges IPv4-mapped, IPv4-compatible, NAT64 and 6to4 addresses by the
+embedded IPv4 address; PHP's `FILTER_FLAG_GLOBAL_RANGE` is a second check that must agree. Reasons:
+`private`, `loopback`, `link_local`, `multicast`, `unspecified`, `reserved`, `metadata`.
+
+Operator settings (`config/flow.php`, `flow.egress`): `FLOW_EGRESS_ALLOW` (CIDR ranges, addresses,
+host names; empty by default) and `FLOW_EGRESS_PROXY`. A listed network lets its addresses through; a
+listed host name skips classification but is still resolved and pinned. Metadata addresses
+(`169.254.169.254`, `169.254.170.2`, `fd00:ec2::254`, `100.100.100.200`, `168.63.129.16`) are refused
+whatever is allowed. There is no on/off switch. `HTTP_PROXY`/`HTTPS_PROXY` from the environment never
+apply to calls (the request sets `proxy` explicitly); behind `FLOW_EGRESS_PROXY` the pin is skipped
+and the proxy must refuse private ranges itself.
+
+A refusal is logged as a warning (tenant, session, node, host, reason, resolved addresses; never the
+URL path or query). The `call_executions` unit is consumed before the transport runs, so a refused
+call still counts. `CallTester` (builder test call) uses the same transport and returns the same
+`error_code`.
 
 ## Behavior
 
