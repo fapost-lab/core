@@ -17,14 +17,14 @@ import { Switch } from '@fapost/ui/components/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@fapost/ui/components/tabs'
 import { Textarea } from '@fapost/ui/components/textarea'
 import { interpolate } from '@fapost/ui/shell'
-import CountriesPicker from '../Settings/CountriesPicker.vue'
+import MultiSelectPicker from '../Shared/MultiSelectPicker.vue'
 import { fallbackOptions, firstError, isTab, keptFallback, tabsWithErrors } from './form'
 import type { SelectOption, TenantSettingsPageProps, TenantSettingsState, TenantSettingsTab } from './types'
 
 /**
  * The tenant's settings: one form in three tabs, saved as a whole by one button under them. The open tab is kept in
  * the address (`?tab=`), and a tab holding a server error is marked and opened. The content base language is shown
- * locked once the tenant has flows; the server refuses a change to it as well.
+ * locked once a flow has been published (drafts do not lock it); the server refuses a change to it as well.
  */
 const props = defineProps<{
   settings: TenantSettingsState
@@ -131,7 +131,7 @@ function save(): void {
               :error="firstError(errors, 'available_languages')"
               v-slot="{ invalid, describedBy }"
             >
-              <CountriesPicker
+              <MultiSelectPicker
                 id="available_languages"
                 v-model="form.available_languages"
                 :options="options.languages"

@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@fapost/ui/components/tabs'
 import { interpolate } from '@fapost/ui/shell'
 import CommandsField from './CommandsField.vue'
-import CountriesPicker from './CountriesPicker.vue'
+import MultiSelectPicker from '../Shared/MultiSelectPicker.vue'
 import FlowSelect from './FlowSelect.vue'
 import KeyValueField from './KeyValueField.vue'
 import LocalizedTextField from './LocalizedTextField.vue'
@@ -170,7 +170,7 @@ function createFlow(name: string): void {
               :error="firstError(errors, 'available_countries')"
               v-slot="{ invalid, describedBy }"
             >
-              <CountriesPicker
+              <MultiSelectPicker
                 id="available_countries"
                 v-model="form.available_countries"
                 :options="options.countries"

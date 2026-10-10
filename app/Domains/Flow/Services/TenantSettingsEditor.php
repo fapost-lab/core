@@ -66,7 +66,7 @@ final readonly class TenantSettingsEditor
     }
 
     /**
-     * Whether the content base language may no longer change: the tenant has a flow definition.
+     * Whether the content base language may no longer change: the tenant has a flow definition (a published flow; drafts do not count).
      */
     public function baseLanguageLocked(): bool
     {

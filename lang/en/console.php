@@ -1167,8 +1167,8 @@ return [
         ],
         'fields' => [
             'content_base_language'        => 'Content base language',
-            'content_base_language_help'   => 'The language flows are authored in. Cannot be changed once the tenant has flows.',
-            'content_base_language_locked' => 'Locked: the tenant already has flows, and their texts are written in this language.',
+            'content_base_language_help'   => 'The language flows are authored in. Cannot be changed once a flow has been published; drafts do not lock it.',
+            'content_base_language_locked' => 'Locked: a flow has been published, and its texts are written in this language.',
             'available_languages'          => 'Available languages',
             'available_languages_help'     => 'Languages content can be translated into in the flow content manager.',
             'fallback_language'            => 'Fallback language',
