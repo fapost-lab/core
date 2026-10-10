@@ -950,4 +950,59 @@ return [
         'back'       => 'Back to conversations',
         'open_named' => 'Open conversation with :name',
     ],
+
+    // Assistants in the admin panel.
+    'assistants' => [
+        'title'        => 'Assistants',
+        'description'  => 'The workspace\'s assistants. Open one to see its channels, or manage it in its own console.',
+        'new'          => 'New assistant',
+        'create_title' => 'New assistant',
+        'edit_title'   => 'Edit assistant',
+        'columns'      => [
+            'name'     => 'Name',
+            'active'   => 'Status',
+            'language' => 'Default language',
+            'updated'  => 'Updated',
+        ],
+        'sections' => [
+            'general' => [
+                'title'       => 'General',
+                'description' => 'The name, the language of the content when a contact\'s own is unknown, and whether the assistant works.',
+            ],
+        ],
+        'fields' => [
+            'name'                 => 'Name',
+            'default_language'     => 'Default language',
+            'language_placeholder' => 'Choose a language',
+            'is_active'            => 'Active',
+            'is_active_help'       => 'Switching an assistant off here does not switch off its channels.',
+            'created'              => 'Created',
+            'updated'              => 'Updated',
+        ],
+        'status' => [
+            'active'   => 'Active',
+            'inactive' => 'Inactive',
+        ],
+        'details'       => 'Details',
+        'channels'      => 'Channels',
+        'channels_hint' => 'Channels are added in the assistant\'s console.',
+        'manage'        => 'Manage',
+        'view'          => 'View',
+        'back'          => 'All assistants',
+        'search_label'  => 'Search assistants',
+        'actions_for'   => 'Actions for :name',
+        'empty'         => 'No assistants yet.',
+        'empty_hint'    => 'Create an assistant, then connect a channel to it in its console.',
+        'delete_one'    => [
+            'title'       => 'Delete this assistant?',
+            'description' => 'The assistant ":name" will be deleted with its channels, conversations, broadcasts and sessions. This cannot be undone.',
+        ],
+        'created'         => 'Assistant created.',
+        'updated'         => 'Assistant saved.',
+        'deleted'         => 'Assistant deleted.',
+        'limit_reached'   => 'Assistant limit reached',
+        'provider_failed' => [
+            'deleted' => 'The assistant is deleted, but Telegram did not confirm removing the webhook of one of its channels.',
+        ],
+    ],
 ];

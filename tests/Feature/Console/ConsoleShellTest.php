@@ -134,7 +134,8 @@ final class ConsoleShellTest extends InertiaConsoleTestCase
         $this->assertSame("/assistant/{$mine->getKey()}/dashboard", $switcher['items'][0]['href']);
         $this->assertFalse($switcher['items'][0]['external']);
         $this->assertSame('/admin/assistants', $switcher['back']['href']);
-        $this->assertTrue($switcher['back']['external']);
+        // The admin assistant list moved into the shell too.
+        $this->assertFalse($switcher['back']['external']);
     }
 
     public function test_the_filament_tenant_list_is_the_same_list(): void
