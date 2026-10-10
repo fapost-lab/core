@@ -20,7 +20,7 @@ paths:
   - tests/Feature/AssistantPanelTest.php
   - app/Http/Middleware/ResolveCurrentAssistant.php
   - app/Filament/Support/SetCurrentAssistantFromPanelTenant.php
-reviewed_at: 2026-10-08
+reviewed_at: 2026-10-10
 ---
 # Assistant rules
 
