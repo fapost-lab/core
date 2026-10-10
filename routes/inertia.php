@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
+use App\Http\Controllers\Admin\SearchController as AdminSearchController;
 use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
@@ -105,6 +107,11 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('admin/assistants/{record}/channels/{channel}/rotate-webhook', [AdminAssistantChannelController::class, 'rotateWebhook'])->name('console.admin.assistants.channels.rotate-webhook');
         Route::post('admin/assistants/{record}/channels/{channel}/register-webhook', [AdminAssistantChannelController::class, 'registerWebhook'])->name('console.admin.assistants.channels.register-webhook');
         Route::delete('admin/assistants/{record}/channels/{channel}', [AdminAssistantChannelController::class, 'destroy'])->name('console.admin.assistants.channels.destroy');
+
+        // Dashboard and search: the admin home with the tenant's figures, and the shell's search palette (JSON, asked as
+        // the user types, so throttled). Filament's global search had no route; the palette's is the console's own.
+        Route::get('admin', AdminDashboardController::class)->name('filament.admin.pages.dashboard');
+        Route::get('admin/search', AdminSearchController::class)->middleware('throttle:60,1')->name('console.admin.search');
 
         // Support access log: read only, and never a Filament screen, so the name is the console's own.
         Route::get('admin/support-access', [AdminSupportAccessController::class, 'index'])->name('console.admin.support-access.index');

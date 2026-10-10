@@ -5,6 +5,7 @@ import { Menu } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@fapost/ui/components/sheet'
 import LanguageMenu from './LanguageMenu.vue'
+import ShellSearch from './ShellSearch.vue'
 import ShellSidebar from './ShellSidebar.vue'
 import ThemeToggle from './ThemeToggle.vue'
 import UserMenu from './UserMenu.vue'
@@ -47,6 +48,7 @@ const crumbs = computed(() => {
     </nav>
 
     <div class="flex items-center gap-1">
+      <ShellSearch v-if="page.props.navigation?.searchUrl" :url="page.props.navigation.searchUrl" :labels="t.search" />
       <LanguageMenu
         :url="page.props.shell.localeUrl"
         :current="page.props.locale"
