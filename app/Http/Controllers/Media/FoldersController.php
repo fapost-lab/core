@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Media;
 
-use App\Domains\Media\Contracts\MediaServiceInterface;
+use App\Domains\Media\Exceptions\MediaFolderRuleException;
 use App\Domains\Media\Models\MediaFolder;
+use App\Domains\Media\Services\MediaFolderService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Media\CreateFolderRequest;
@@ -14,12 +15,11 @@ use App\Http\Resources\Media\MediaFolderResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Validation\ValidationException;
 
 final class FoldersController extends Controller
 {
     public function __construct(
-        private readonly MediaServiceInterface $mediaService,
+        private readonly MediaFolderService $folders,
         private readonly TenantContextInterface $tenantContext,
     ) {
     }
@@ -51,14 +51,14 @@ final class FoldersController extends Controller
     {
         $this->authorize('create', MediaFolder::class);
 
-        $parent = $this->resolveParent($request->input('parent_id'));
-
-        $this->assertDepthAllowed($parent, addingChild: true);
-
-        $folder = $this->mediaService->createFolder(
-            name: (string)$request->input('name'),
-            parent: $parent,
-        );
+        try {
+            $folder = $this->folders->create(
+                name: (string)$request->input('name'),
+                parent: $this->folders->resolve($request->input('parent_id'), 'parent_id'),
+            );
+        } catch (MediaFolderRuleException $exception) {
+            throw $exception->toValidationException();
+        }
 
         return MediaFolderResource::make($folder)
             ->response()
@@ -69,46 +69,40 @@ final class FoldersController extends Controller
     {
         $this->authorize('update', $folder);
 
-        $newName     = $request->input('name');
-        $hasParent   = $request->has('parent_id');
-        $newParentId = $hasParent ? $request->input('parent_id') : null;
+        $newName = $request->input('name');
 
-        if (is_string($newName)) {
-            $folder = $this->mediaService->renameFolder($folder, $newName);
-        }
-
-        if ($hasParent) {
-            $newParent = null === $newParentId ? null : $this->resolveParent($newParentId);
-
-            if (null !== $newParent && $this->isDescendantOrSelf($newParent, $folder)) {
-                throw ValidationException::withMessages([
-                    'parent_id' => __('Folder cannot be moved into its own subtree.'),
-                ]);
+        try {
+            if (is_string($newName)) {
+                $folder = $this->folders->rename($folder, $newName);
             }
 
-            $this->assertDepthAllowed($newParent, addingChild: true);
-
-            $folder = $this->mediaService->moveFolder($folder, $newParent);
+            if ($request->has('parent_id')) {
+                $folder = $this->folders->move($folder, $this->folders->resolve($request->input('parent_id'), 'parent_id'));
+            }
+        } catch (MediaFolderRuleException $exception) {
+            throw $exception->toValidationException();
         }
 
         return MediaFolderResource::make($folder);
     }
 
+    /**
+     * A folder that is not empty needs `force=true`; its files and subfolders then move to the root.
+     */
     public function destroy(Request $request, MediaFolder $folder): JsonResponse
     {
         $this->authorize('delete', $folder);
 
-        $hasChildren = MediaFolder::query()->where('parent_id', $folder->id)->exists();
-        $hasFiles    = $folder->files()->exists();
+        $contents = $this->folders->contents($folder);
 
-        if (($hasChildren || $hasFiles) && ! $request->boolean('force')) {
+        if (($contents['files'] > 0 || $contents['folders'] > 0) && ! $request->boolean('force')) {
             return response()->json([
                 'error'   => 'folder_not_empty',
                 'message' => 'Folder is not empty. Pass ?force=true to delete recursively.',
             ], 409);
         }
 
-        $this->mediaService->deleteFolder($folder);
+        $this->folders->deleteMovingContents($folder, null);
 
         return response()->json(status: 204);
     }
@@ -127,63 +121,5 @@ final class FoldersController extends Controller
         }
 
         return $breadcrumbs;
-    }
-
-    private function resolveParent(?string $parentId): ?MediaFolder
-    {
-        if (null === $parentId || '' === $parentId) {
-            return null;
-        }
-
-        $tenantId = $this->tenantContext->get()->getId();
-
-        $parent = MediaFolder::query()
-            ->where('tenant_id', $tenantId)
-            ->whereKey($parentId)
-            ->first();
-
-        if (null === $parent) {
-            throw ValidationException::withMessages([
-                'parent_id' => __('Parent folder not found.'),
-            ]);
-        }
-
-        return $parent;
-    }
-
-    private function assertDepthAllowed(?MediaFolder $parent, bool $addingChild): void
-    {
-        $maxDepth = (int)config('media.folder.max_depth', 10);
-
-        if (null === $parent) {
-            return;
-        }
-
-        $depth = $this->folderDepth($parent) + ($addingChild ? 1 : 0);
-
-        if ($depth > $maxDepth) {
-            throw ValidationException::withMessages([
-                'parent_id' => sprintf('Folder depth would exceed the configured limit (%d).', $maxDepth),
-            ]);
-        }
-    }
-
-    private function folderDepth(MediaFolder $folder): int
-    {
-        $path = mb_trim($folder->path_cache, '/');
-
-        return '' === $path ? 1 : mb_substr_count($path, '/') + 1;
-    }
-
-    private function isDescendantOrSelf(MediaFolder $candidate, MediaFolder $folder): bool
-    {
-        if ($candidate->id === $folder->id) {
-            return true;
-        }
-
-        return str_starts_with(
-            (string)$candidate->path_cache,
-            mb_rtrim((string)$folder->path_cache, '/') . '/',
-        );
     }
 }

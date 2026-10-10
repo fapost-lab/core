@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
+use App\Http\Controllers\Admin\MediaController as AdminMediaController;
+use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
@@ -103,6 +105,20 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('admin/assistants/{record}/channels/{channel}/rotate-webhook', [AdminAssistantChannelController::class, 'rotateWebhook'])->name('console.admin.assistants.channels.rotate-webhook');
         Route::post('admin/assistants/{record}/channels/{channel}/register-webhook', [AdminAssistantChannelController::class, 'registerWebhook'])->name('console.admin.assistants.channels.register-webhook');
         Route::delete('admin/assistants/{record}/channels/{channel}', [AdminAssistantChannelController::class, 'destroy'])->name('console.admin.assistants.channels.destroy');
+
+        // The media library: files of the open folder (`filter[folder]`), the trash, folders; bytes only through signed `media.files.raw`.
+        Route::get('admin/media', [AdminMediaController::class, 'index'])->name('filament.admin.resources.media.index');
+        Route::post('admin/media', [AdminMediaController::class, 'upload'])->name('console.admin.media.upload');
+        Route::put('admin/media/move', [AdminMediaController::class, 'move'])->name('console.admin.media.move');
+        Route::delete('admin/media', [AdminMediaController::class, 'destroyMany'])->name('console.admin.media.destroy-many');
+        Route::post('admin/media/folders', [AdminMediaFolderController::class, 'store'])->name('console.admin.media.folders.store');
+        Route::put('admin/media/folders/{folder}', [AdminMediaFolderController::class, 'update'])->name('console.admin.media.folders.update');
+        Route::delete('admin/media/folders/{folder}', [AdminMediaFolderController::class, 'destroy'])->name('console.admin.media.folders.destroy');
+        Route::get('admin/media/{record}', [AdminMediaController::class, 'show'])->name('filament.admin.resources.media.view');
+        Route::patch('admin/media/{record}', [AdminMediaController::class, 'update'])->name('console.admin.media.update');
+        Route::delete('admin/media/{record}', [AdminMediaController::class, 'destroy'])->name('console.admin.media.destroy');
+        Route::post('admin/media/{record}/restore', [AdminMediaController::class, 'restore'])->name('console.admin.media.restore');
+        Route::delete('admin/media/{record}/force', [AdminMediaController::class, 'forceDestroy'])->name('console.admin.media.force');
     });
 
     // An assistant's screens: `{tenant}` is the assistant, under the name Filament gave the parameter.

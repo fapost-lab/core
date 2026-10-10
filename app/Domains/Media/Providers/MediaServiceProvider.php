@@ -27,6 +27,7 @@ use App\Domains\Media\Repositories\EloquentMediaBlobRepository;
 use App\Domains\Media\Repositories\EloquentMediaChannelRefRepository;
 use App\Domains\Media\Services\ChannelLimitInspector;
 use App\Domains\Media\Services\MediaDispatcher;
+use App\Domains\Media\Services\MediaFolderService;
 use App\Domains\Media\Services\MediaIngestor;
 use App\Domains\Media\Services\MediaReferenceTracker;
 use App\Domains\Media\Services\MediaService;
@@ -98,6 +99,9 @@ final class MediaServiceProvider extends ServiceProvider
         $this->app->when(MediaService::class)
             ->needs('$downloadUrlTtlSeconds')
             ->giveConfig('media.download_url_ttl_seconds', 300);
+        $this->app->when(MediaFolderService::class)
+            ->needs('$maxDepth')
+            ->giveConfig('media.folder.max_depth', 10);
 
         $this->app->singleton(
             ChannelLimitInspector::class,
