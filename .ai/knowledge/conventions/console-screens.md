@@ -31,6 +31,13 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
 - **Lists use `App\Http\DataTable\DataTable`** with whitelisted sortable and searchable columns
   and a row-mapping callback; its prop shape (`rows`, `meta`, `state`, `defaults`) feeds the kit's
   `DataTable` component, which keeps search, sort, page and page size in the query string.
+  Rows that come from a catalogue rather than a table (translation keys) use
+  `App\Http\DataTable\ArrayDataTable`: same query string and props, filtering in memory.
+- **An admin-panel screen** is a controller in `App\Http\Controllers\Admin\` on the `admin` stack; the
+  shell renders it in admin mode with `NavigationBuilder::admin()`. A screen both panels share keeps
+  one page and one domain service, and each controller fixes the scope it writes to (tenant or
+  assistant) — the request never chooses it. Example: `Admin\TranslationController`,
+  `Console\TranslationController`, `TranslationOverrideEditor`, `TranslationScope`.
 - **After a write**, toast through `Inertia::flash()` (never the session `with()`: a shared prop
   is kept in history and replays on Back). Deletes go `back()` so the list keeps its state; forms
   go to the index.
