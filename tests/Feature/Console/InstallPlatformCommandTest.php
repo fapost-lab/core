@@ -185,10 +185,12 @@ final class InstallPlatformCommandTest extends FeatureTestCase
 
     private function mockLandlordConnectionCheck(): void
     {
-        $connection = Mockery::mock();
+        // A proxy over the real landlord connection: the reachability check is stubbed, and everything
+        // provisioning does on landlord (the slug-claim transaction, queries) runs for real.
+        $connection = Mockery::mock(DB::connection('landlord'));
         $connection->shouldReceive('getPdo')->once()->andReturn(new stdClass());
 
-        DB::shouldReceive('connection')->once()->with('landlord')->andReturn($connection);
+        DB::shouldReceive('connection')->with('landlord')->andReturn($connection);
     }
 
     private function mockTenantExistsAny(bool $exists): void
