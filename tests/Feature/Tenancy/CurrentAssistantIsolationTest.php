@@ -44,4 +44,29 @@ final class CurrentAssistantIsolationTest extends FeatureTestCase
         $this->assertSame($second->getKey(), $seenBySecond);
         $this->assertFalse($current->isResolved());
     }
+
+    public function test_a_nested_run_hides_the_callers_assistant_and_gives_it_back_on_exit(): void
+    {
+        $outer  = Assistant::factory()->create();
+        $inner  = Assistant::factory()->create();
+        $tenant = Tenant::query()->firstOrFail();
+
+        $switcher = $this->app->make(TenantSwitcher::class);
+        $current  = $this->app->make(CurrentAssistantInterface::class);
+
+        $current->set($outer);
+
+        $switcher->runForTenant($tenant, function () use ($switcher, $tenant, $current, $inner): void {
+            $this->assertFalse($current->isResolved());
+            $current->set($inner);
+
+            $switcher->runForTenant($tenant, function () use ($current): void {
+                $this->assertFalse($current->isResolved());
+            });
+
+            $this->assertSame($inner->getKey(), $current->get()->getKey());
+        });
+
+        $this->assertSame($outer->getKey(), $current->get()->getKey());
+    }
 }

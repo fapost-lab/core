@@ -12,8 +12,11 @@ use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Http;
 use ReflectionMethod;
+use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeTenantLimits;
 
@@ -23,10 +26,13 @@ use Tests\Support\FakeTenantLimits;
  */
 final class LoadTestSeedFlowTest extends FeatureTestCase
 {
+    private Dispatcher $realBus;
+
     protected function setUp(): void
     {
         parent::setUp();
 
+        $this->realBus = Bus::getFacadeRoot();
         Bus::fake([SyncChannelWebhookJob::class]);
     }
 
@@ -48,6 +54,17 @@ final class LoadTestSeedFlowTest extends FeatureTestCase
         $this->app->instance(TenantLimitsInterface::class, new FakeTenantLimits(['flows' => 0]));
 
         $this->expectException(RecordLimitReachedException::class);
+
+        $this->seedInTenant();
+    }
+
+    public function test_seed_fails_when_the_provider_refuses_the_channel_webhook(): void
+    {
+        Bus::swap($this->realBus);
+        Http::fake(['*' => Http::response(['ok' => false, 'description' => 'Unauthorized'], 401)]);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('was refused');
 
         $this->seedInTenant();
     }

@@ -204,6 +204,8 @@ return [
             'config_key'           => 'Key',
             'config_value'         => 'Value',
             'config_add'           => 'Add setting',
+            'webhook_status'       => 'Webhook',
+            'webhook_failed'       => 'Not registered',
             'updated_at'           => 'Updated',
         ],
 
@@ -242,13 +244,19 @@ return [
         'actions' => [
             'rotate_webhook_hash'             => 'Rotate webhook hash',
             'rotate_webhook_hash_description' => 'The public webhook URL will change. Update the channel webhook configuration after rotation.',
+            'reregister_webhook'              => 'Register webhook again',
             'generate_secret_token'           => 'Generate',
             'select_all'                      => 'Select all',
             'clear_all'                       => 'Clear',
         ],
 
         'notifications' => [
-            'hash_rotated_title' => 'Webhook hash rotated',
+            'hash_rotated_title'              => 'Webhook hash rotated',
+            'webhook_failed_title'            => 'Webhook not registered',
+            'webhook_failed_body'             => 'The channel is saved, but the provider did not accept the webhook, so it receives no messages yet. Check the token and use "Register webhook again".',
+            'webhook_deregister_failed_title' => 'Webhook removal not confirmed',
+            'webhook_deregister_failed_body'  => 'The change is saved, but the provider did not confirm removing the old webhook. It is harmless: nothing is routed to it any more.',
+            'webhook_registered_title'        => 'Webhook registered',
         ],
     ],
 

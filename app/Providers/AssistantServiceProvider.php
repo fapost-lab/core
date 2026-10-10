@@ -16,9 +16,13 @@ use App\Domains\Assistant\Services\AssistantService;
 use App\Domains\Assistant\Services\CurrentAssistant;
 use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookStatusRecorderInterface;
 use App\Domains\Channels\Services\ChannelService;
 use App\Domains\Channels\Services\ChannelWebhookRegistry;
+use App\Domains\Channels\Services\ChannelWebhookStatusRecorder;
+use App\Domains\Channels\Services\ChannelWebhookSyncOutcome;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use Closure;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
@@ -42,6 +46,8 @@ final class AssistantServiceProvider extends ServiceProvider
         $this->app->bind(AssistantRepositoryInterface::class, AssistantRepository::class);
         $this->app->bind(AssistantServiceInterface::class, AssistantService::class);
         $this->app->bind(ChannelServiceInterface::class, ChannelService::class);
+        $this->app->bind(ChannelWebhookStatusRecorderInterface::class, ChannelWebhookStatusRecorder::class);
+        $this->app->scoped(ChannelWebhookSyncOutcome::class);
         $this->app->scoped(CurrentAssistant::class, CurrentAssistant::class);
         $this->app->scoped(
             CurrentAssistantInterface::class,
@@ -49,8 +55,18 @@ final class AssistantServiceProvider extends ServiceProvider
         );
 
         $this->app->afterResolving(TenantSwitcher::class, function (TenantSwitcher $switcher, $app): void {
-            $switcher->registerRestoreHook(function () use ($app): void {
-                $app->make(CurrentAssistantInterface::class)->reset();
+            // The inner tenant never sees the outer assistant, and the outer caller gets it back: a synchronous job
+            // inside an HTTP request must not leave the request without its assistant. At the top level of a worker
+            // there is nothing to put back, so the exit resets, as it always did.
+            $switcher->registerContextHook(function () use ($app): Closure {
+                $current  = $app->make(CurrentAssistantInterface::class);
+                $previous = $current->isResolved() ? $current->get() : null;
+
+                $current->reset();
+
+                return static function () use ($current, $previous): void {
+                    null === $previous ? $current->reset() : $current->set($previous);
+                };
             });
         });
     }

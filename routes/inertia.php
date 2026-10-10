@@ -66,6 +66,7 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('assistant/{tenant}/channels', [ChannelController::class, 'store'])->name('console.channels.store');
         Route::put('assistant/{tenant}/channels/{record}', [ChannelController::class, 'update'])->name('console.channels.update');
         Route::post('assistant/{tenant}/channels/{record}/rotate-webhook', [ChannelController::class, 'rotateWebhook'])->name('console.channels.rotate-webhook');
+        Route::post('assistant/{tenant}/channels/{record}/register-webhook', [ChannelController::class, 'registerWebhook'])->name('console.channels.register-webhook');
         Route::delete('assistant/{tenant}/channels/{record}', [ChannelController::class, 'destroy'])->name('console.channels.destroy');
 
         // Contacts: tenant-level records shown under the assistant whose channels they wrote to; read-only except tags and group membership.

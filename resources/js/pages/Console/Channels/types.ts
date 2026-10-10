@@ -8,6 +8,7 @@ export interface ChannelsTranslations {
   edit_title: string
   columns: { type: string; bot: string; active: string; updated: string }
   bot_pending: string
+  webhook: { failed: string; failed_hint: string; failed_at: string; register_again: string }
   status: { active: string; inactive: string }
   sections: { connection: { title: string; description: string }; behaviour: { title: string; description: string } }
   fields: {
@@ -59,8 +60,10 @@ export interface ChannelRow extends Record<string, unknown> {
   handle: string | null
   url: string | null
   isActive: boolean
+  webhook: 'failed' | null
   updatedAt: string | null
   editUrl: string
+  registerWebhookUrl: string
   deleteUrl: string
   rotateUrl: string
 }
@@ -87,6 +90,9 @@ export interface EditableChannel {
   type: string
   typeLabel: string
   isActive: boolean
+  webhook: 'failed' | null
+  webhookAt: string | null
+  registerWebhookUrl: string
   webhookHash: string
   handle: string | null
   url: string | null

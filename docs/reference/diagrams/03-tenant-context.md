@@ -44,7 +44,7 @@ sequenceDiagram
 | Class | Path | Role |
 |-------|------|------|
 | `TenantContextInterface` / `TenantContext` | `app/Domains/Tenancy/Contracts/`, `app/Domains/Tenancy/Services/TenantContext.php` | Holds the current tenant; `get()` throws `TenantNotResolvedException` when unset |
-| `TenantSwitcher` | `app/Domains/Tenancy/Services/TenantSwitcher.php` | `runForTenant(tenant, callback)` with a `finally` restore; nested calls restore the outer tenant; also resets cached permissions and runs restore hooks (for example `CurrentAssistant`) |
+| `TenantSwitcher` | `app/Domains/Tenancy/Services/TenantSwitcher.php` | `runForTenant(tenant, callback)` with a `finally` restore; nested calls restore the outer tenant; also resets cached permissions, runs restore hooks, and runs context hooks (`CurrentAssistant` hides the caller's assistant on entry and gives it back on exit) |
 | `TenantDatabaseManager` | `app/Domains/Tenancy/Database/TenantDatabaseManager.php` | `switchTo()` / `restore()`: pushes the previous connection on a stack, sets the tenant connection's PostgreSQL `search_path` to the tenant schema |
 | `TenantPostgresConnection` | `app/Domains/Tenancy/Database/TenantPostgresConnection.php` | pgsql connection class that lets `search_path` move while the connection stays open (no dropped transaction) |
 | `IncomingMessageJob` | `app/Domains/Webhook/Jobs/IncomingMessageJob.php` | Wraps all domain work in `TenantSwitcher::runForTenant()` |

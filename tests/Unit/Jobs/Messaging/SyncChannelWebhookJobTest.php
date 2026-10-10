@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Jobs\Messaging;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookStatusRecorderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
@@ -15,6 +16,7 @@ use App\Jobs\Messaging\SyncChannelWebhookJob;
 use Fapost\Foundation\Channel\WebhookRegistrarInterface;
 use Fapost\Foundation\Channel\WebhookRegistrationPayload;
 use Mockery\MockInterface;
+use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
@@ -50,7 +52,7 @@ final class SyncChannelWebhookJobTest extends TestCase
 
         $writer = $this->registryWriter(expected: 'https://app.example.com');
 
-        $job->handle($registry, $this->tenantSwitcher(), $this->urlGenerator(), $writer);
+        $job->handle($registry, $this->tenantSwitcher(), $this->urlGenerator(), $writer, $this->recorder(registered: true));
     }
 
     /**
@@ -84,6 +86,7 @@ final class SyncChannelWebhookJobTest extends TestCase
             $this->tenantSwitcher(),
             $this->urlGenerator(driver: IngressDriver::Gateway),
             $this->registryWriter(expected: 'https://webhook.example.com'),
+            $this->recorder(registered: true),
         );
     }
 
@@ -118,6 +121,7 @@ final class SyncChannelWebhookJobTest extends TestCase
             $this->tenantSwitcher(),
             $this->urlGenerator(),
             $this->registryWriter(expected: null),
+            $this->recorder(cleared: true),
         );
     }
 
@@ -143,9 +147,55 @@ final class SyncChannelWebhookJobTest extends TestCase
             $mock->shouldReceive('recordIngress')->never();
         });
 
-        $job->handle($registry, $this->tenantSwitcher(), $this->urlGenerator(), $writer);
+        $job->handle($registry, $this->tenantSwitcher(), $this->urlGenerator(), $writer, $this->recorder());
 
         $this->addToAssertionCount(1);
+    }
+
+    public function test_a_refused_registration_is_recorded_as_failed_and_still_thrown(): void
+    {
+        $registrar = $this->mock(WebhookRegistrarInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('register')->once()->andThrow(new RuntimeException('provider says no'));
+        });
+
+        $registry = $this->mock(ChannelRegistryInterface::class, function (MockInterface $mock) use ($registrar): void {
+            $mock->shouldReceive('webhookRegistrar')->once()->with('telegram')->andReturn($registrar);
+        });
+
+        $job = new SyncChannelWebhookJob(
+            tenantId: 'tenant-1',
+            schema: 'tenant_test',
+            channelId: 'channel-1',
+            channelType: 'telegram',
+            webhookPublicHash: 'hash-1',
+            token: 'token-1',
+            secretToken: 'secret-1',
+            config: [],
+            register: true,
+        );
+
+        $writer = $this->mock(WebhookRegistryWriterInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('recordIngress')->never();
+        });
+
+        try {
+            $job->handle($registry, $this->tenantSwitcher(), $this->urlGenerator(), $writer, $this->recorder(failed: true));
+            $this->fail('The refusal must reach the queue.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('provider says no', $exception->getMessage());
+        }
+    }
+
+    private function recorder(bool $registered = false, bool $failed = false, bool $cleared = false): ChannelWebhookStatusRecorderInterface
+    {
+        return $this->mock(
+            ChannelWebhookStatusRecorderInterface::class,
+            function (MockInterface $mock) use ($registered, $failed, $cleared): void {
+                $mock->shouldReceive('markRegistered')->times($registered ? 1 : 0)->with('channel-1');
+                $mock->shouldReceive('markFailed')->times($failed ? 1 : 0)->with('channel-1');
+                $mock->shouldReceive('clear')->times($cleared ? 1 : 0)->with('channel-1');
+            }
+        );
     }
 
     private function urlGenerator(IngressDriver $driver = IngressDriver::Laravel): WebhookUrlGenerator

@@ -10,10 +10,13 @@ use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Jobs\Messaging\SyncChannelWebhookJob;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Channel lifecycle service.
@@ -93,18 +96,59 @@ final readonly class ChannelService implements ChannelServiceInterface
     /**
      * Rotate `webhook_public_hash` and update Redis routing accordingly.
      *
-     * The old Redis key is removed, and the new channel identity is written using current tenant context.
+     * The old Redis key is removed, and the new channel identity is written using current tenant context. A refusal
+     * by the provider does not undo the rotation: the leaked hash stays revoked, and the channel waits, flagged, for
+     * {@see reregisterWebhook()}.
      */
     public function rotateWebhookHash(Channel $channel): Channel
     {
         $tenant  = $this->tenantContext->get();
         $oldHash = $channel->webhook_public_hash;
 
-        $channel->forceFill(['webhook_public_hash' => $this->generateWebhookPublicHash()]);
-        $channel->save();
+        // The routing swap is queued after the commit ahead of the save, so it runs before the provider
+        // synchronization that the save queues behind it: Redis before provider, as for any other write. The
+        // observer leaves the routing of a rotation to this method.
+        DB::transaction(function () use ($channel, $tenant, $oldHash): void {
+            DB::afterCommit(function () use ($channel, $tenant, $oldHash): void {
+                $this->registry->remove($oldHash);
+                $this->registry->set($channel, $tenant);
+            });
 
-        $this->registry->remove($oldHash);
-        $this->registry->set($channel->fresh(), $tenant);
+            $channel->forceFill(['webhook_public_hash' => $this->generateWebhookPublicHash()]);
+            $channel->save();
+        });
+
+        return $channel->fresh();
+    }
+
+    /**
+     * Registers the webhook at the provider again, with the channel's own hash and credentials: what saving the
+     * form once more would do, without changing anything. Synchronous; the provider's answer is the channel's
+     * stored webhook status on the returned copy. A refusal is reported, not thrown.
+     */
+    public function reregisterWebhook(Channel $channel): Channel
+    {
+        if (! $channel->is_active) {
+            return $channel;
+        }
+
+        $tenant = $this->tenantContext->get();
+
+        try {
+            SyncChannelWebhookJob::dispatchSync(
+                tenantId: $tenant->getId(),
+                schema: $tenant->getSchemaName(),
+                channelId: (string)$channel->getKey(),
+                channelType: $channel->type->value,
+                webhookPublicHash: $channel->webhook_public_hash,
+                token: null,
+                secretToken: null,
+                config: [],
+                register: true,
+            );
+        } catch (Throwable $exception) {
+            report($exception);
+        }
 
         return $channel->fresh();
     }

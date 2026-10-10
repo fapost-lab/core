@@ -236,7 +236,7 @@ final class ChannelObserverTest extends TestCase
             $mock->shouldReceive('get')->andReturn($tenant);
         });
 
-        return new ChannelObserver($webhookRegistry, $channelRegistry, $tenantContext);
+        return new ChannelObserver($webhookRegistry, $channelRegistry, $tenantContext, $this->app);
     }
 
     private function channel(bool $isActive = true): Channel
