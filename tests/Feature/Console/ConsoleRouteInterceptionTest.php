@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChann
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessController;
+use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Console\AssistantSettingsController;
@@ -92,6 +93,8 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'admin assistants create' => ['filament.admin.resources.assistants.create', AdminAssistantController::class, 'create', 'admin/assistants/create'],
             'admin assistants view'   => ['filament.admin.resources.assistants.view', AdminAssistantController::class, 'show', 'admin/assistants/{record}'],
             'admin assistants edit'   => ['filament.admin.resources.assistants.edit', AdminAssistantController::class, 'edit', 'admin/assistants/{record}/edit'],
+
+            'admin tenant settings' => ['filament.admin.pages.tenant-settings', AdminTenantSettingsController::class, 'edit', 'admin/tenant-settings'],
         ];
     }
 
@@ -164,6 +167,8 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'admin assistant channel rotate'   => ['console.admin.assistants.channels.rotate-webhook', AdminAssistantChannelController::class, 'rotateWebhook', 'POST', 'admin/assistants/{record}/channels/{channel}/rotate-webhook'],
             'admin assistant channel register' => ['console.admin.assistants.channels.register-webhook', AdminAssistantChannelController::class, 'registerWebhook', 'POST', 'admin/assistants/{record}/channels/{channel}/register-webhook'],
             'admin assistant channel destroy'  => ['console.admin.assistants.channels.destroy', AdminAssistantChannelController::class, 'destroy', 'DELETE', 'admin/assistants/{record}/channels/{channel}'],
+
+            'admin tenant settings update' => ['console.admin.tenant-settings.update', AdminTenantSettingsController::class, 'update', 'PUT', 'admin/tenant-settings'],
             // Support access log: never a Filament screen.
             'admin support access' => ['console.admin.support-access.index', AdminSupportAccessController::class, 'index', 'GET', 'admin/support-access'],
         ];

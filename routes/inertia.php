@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChann
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessController;
+use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Console\AssistantSettingsController;
@@ -106,6 +107,9 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('admin/assistants/{record}/channels/{channel}/register-webhook', [AdminAssistantChannelController::class, 'registerWebhook'])->name('console.admin.assistants.channels.register-webhook');
         Route::delete('admin/assistants/{record}/channels/{channel}', [AdminAssistantChannelController::class, 'destroy'])->name('console.admin.assistants.channels.destroy');
 
+        // Tenant settings: languages with the base-language lock, runtime limits, broadcast pacing; one form saved whole.
+        Route::get('admin/tenant-settings', [AdminTenantSettingsController::class, 'edit'])->name('filament.admin.pages.tenant-settings');
+        Route::put('admin/tenant-settings', [AdminTenantSettingsController::class, 'update'])->name('console.admin.tenant-settings.update');
         // Support access log: read only, and never a Filament screen, so the name is the console's own.
         Route::get('admin/support-access', [AdminSupportAccessController::class, 'index'])->name('console.admin.support-access.index');
     });
