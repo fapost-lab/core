@@ -6,12 +6,17 @@ namespace App\Domains\Media\Services;
 
 use App\Domains\Media\Contracts\MediaServiceInterface;
 use App\Domains\Media\Enums\MediaSource;
+use App\Domains\Media\Models\MediaBlob;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFolder;
+use App\Domains\Media\Storage\TenantMediaDisk;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
+use Throwable;
 
 /**
  * Tenant-facing CRUD over media files and folders.
@@ -28,6 +33,7 @@ final readonly class MediaService implements MediaServiceInterface
      */
     public function __construct(
         private TenantContextInterface $tenantContext,
+        private TenantMediaDisk $tenantMediaDisk,
         private int $downloadUrlTtlSeconds = 300,
     ) {
     }
@@ -116,6 +122,47 @@ final readonly class MediaService implements MediaServiceInterface
         return $file;
     }
 
+    public function forceDelete(MediaFile $file): void
+    {
+        $blobId = $file->blob_id;
+
+        $file->forceDelete();
+
+        if (MediaFile::query()->withTrashed()->where('blob_id', $blobId)->exists()) {
+            return;
+        }
+
+        $blob = MediaBlob::query()->find($blobId);
+
+        if (null === $blob) {
+            return;
+        }
+
+        // The row goes first: its foreign key (restrict) refuses the delete when a parallel upload
+        // of the same content just attached a new file, and then the object must stay.
+        try {
+            $blob->delete();
+        } catch (QueryException $exception) {
+            if ($this->isForeignKeyViolation($exception)) {
+                return;
+            }
+
+            throw $exception;
+        }
+
+        // The file is already gone, so a failing disk must not turn the delete into an error. The
+        // object is left behind and its path logged; the usage count no longer includes it.
+        try {
+            $this->tenantMediaDisk->resolve($this->tenantContext->get())->delete($blob->storage_path);
+        } catch (Throwable $exception) {
+            Log::warning('media.blob.object_delete_failed', [
+                'blob_id' => $blob->id,
+                'path'    => $blob->storage_path,
+                'error'   => $exception->getMessage(),
+            ]);
+        }
+    }
+
     public function renameFolder(MediaFolder $folder, string $newName): MediaFolder
     {
         DB::transaction(function () use ($folder, $newName): void {
@@ -167,6 +214,13 @@ final readonly class MediaService implements MediaServiceInterface
             ->where('source', '!=', MediaSource::Conversation->value)
             ->orderBy('name')
             ->get();
+    }
+
+    private function isForeignKeyViolation(QueryException $exception): bool
+    {
+        // 23503 is PostgreSQL's foreign_key_violation; SQLite reports a generic 23000 with this text.
+        return '23503' === (string) $exception->getCode()
+            || str_contains(mb_strtolower($exception->getMessage()), 'foreign key constraint failed');
     }
 
     private function buildFolderPath(?string $parentId, string $name): string

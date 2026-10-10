@@ -39,6 +39,28 @@ That also means the same file uploaded twice is two files, tracked separately.
 Where a document is genuinely shared, reference the one copy rather than
 uploading it per flow, or updating it later becomes a hunt.
 
+## Storage space
+
+An account can have a limit on how much media it stores. The limit counts the real
+size of the stored files, and a file that appears twice is counted once. Files in
+the trash still count: their bytes stay until the file is deleted permanently.
+
+<Warning>
+  When a file does not fit, it is not saved and you see why, with the space used,
+  the limit and the size the file needs. Delete files you no longer need
+  **permanently** (from the trash) to make room; deleting a file normally moves it
+  to the trash and frees nothing.
+</Warning>
+
+Uploading a file that is already stored always works, even when the space is full,
+because it adds no bytes. Files already stored are kept when a limit is lowered;
+only new files are refused.
+
+Files that contacts send to an assistant are saved the same way. When there is no
+room left, the conversation transcript shows "Not saved: media storage is full"
+under the attachment, and an input step that waits for a file takes its **invalid**
+exit straight away, without asking the contact again.
+
 ## Folders
 
 Folders are organisational only: they change where a file is found, not what may

@@ -188,6 +188,18 @@ broken.
   `Tests\Unit\Architecture\CountableModelCreationTest` (static creates; the countable models are
   listed once in `Tests\Support\CountableModels`).
 
+- **Stored bytes are asked of the operator only through `ByteQuota`, in the media upload funnel, and one
+  counter serves the gate and the report.** `ByteQuota::limit('media_storage')` requires a registered
+  `Bytes` key; `MediaStorageGate` (called by `MediaUploader` after hashing, before any byte reaches the
+  tenant's disk) refuses when `used + incoming > limit` and counts `StoredMediaBytes` (`SUM(media_blobs.size)`)
+  only when a limit is set. Content the tenant already stores (same sha256) is never gated. Staff paths
+  (`upload`, `api`) fail closed when the operator errors; inbound paths (`input_node`, `conversation`) fail open
+  with the error reported, because nobody is there to retry. Concurrent uploads of new content may overshoot by
+  the files in flight (accepted, as for records). The usage report is Foundation's `TenantUsageInterface`,
+  implemented by `CoreTenantUsage`: a per-key counter registered in `TenantUsageCounters` by the owning domain
+  (only `media_storage` today) and run inside `TenantSwitcher::runForTenant()`; unknown and Pending tenants and
+  uncounted keys answer `null`. Enforced: `MediaStorageGateTest`, `ByteQuotaTest`, `CoreTenantUsageTest`.
+
 - **Support access is off unless the flag is on, and a token is single use.** `issue()` throws
   when `tenancy.support_access.enabled` is false or the resolution mode is not `host`, and `POST /support/enter` answers 404 before it
   consumes anything. A token is stored hashed in the landlord `support_access_tokens`, lives 60

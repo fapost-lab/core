@@ -10,16 +10,24 @@ use App\Domains\Contact\Models\Contact;
 use App\Domains\Conversation\Contracts\ConversationReplyServiceInterface;
 use App\Domains\Conversation\Enums\ConversationOwner;
 use App\Domains\Conversation\Models\Conversation;
+use App\Domains\Media\Contracts\MediaUploaderInterface;
+use App\Domains\Media\Models\MediaFile;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Filament\Assistant\Resources\Conversations\Pages\ViewConversation;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Messaging\DeliveryResult;
+use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
+use Illuminate\Http\UploadedFile;
 use Livewire\Livewire;
+use LogicException;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\FakeTenantLimits;
 
 /**
  * Covers the operator inbox surface of {@see ViewConversation}:
@@ -177,6 +185,41 @@ final class ConversationInboxViewTest extends FeatureTestCase
                     ->title(__('conversation.notifications.reply_limit_reached'))
                     ->body('Limit "outbound_messages" reached: 10 of 10 this period.'),
             );
+    }
+
+    public function test_attachment_refused_by_the_storage_limit_sends_nothing_and_keeps_the_text(): void
+    {
+        $assistant    = Assistant::factory()->create();
+        $conversation = $this->createConversation($assistant, [
+            'owner_type'          => ConversationOwner::Staff,
+            'owner_staff_user_id' => (string) User::factory()->create()->getKey(),
+        ]);
+        $user = $this->userWithAssistantAccess($assistant, [Permission::ViewConversations, Permission::ReplyConversations]);
+
+        $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: self::TENANT_ID, schemaName: 'main'));
+        $this->app->instance(TenantLimitsInterface::class, new FakeTenantLimits(['media_storage' => 0]));
+        // The node handler registry builds an uploader at boot, with the default limits.
+        $this->app->forgetInstance(MediaUploaderInterface::class);
+        $this->app->instance(ConversationReplyServiceInterface::class, new class () implements ConversationReplyServiceInterface {
+            public function send(Conversation $conversation, string $text, string $staffUserId, ?string $mediaFileId = null): DeliveryResult
+            {
+                throw new LogicException('A refused attachment must not reach the reply service.');
+            }
+        });
+
+        $this->actingAs($user);
+        Filament::setCurrentPanel('assistant');
+        Filament::setTenant($assistant);
+
+        Livewire::actingAs($user)
+            ->test(ViewConversation::class, ['record' => $conversation->getKey()])
+            ->set('replyText', 'Hello')
+            ->set('attachment', UploadedFile::fake()->createWithContent('doc.txt', 'some bytes'))
+            ->call('sendComposerReply')
+            ->assertNotified(__('media.errors.storage_limit_title'))
+            ->assertSet('replyText', 'Hello');
+
+        $this->assertSame(0, MediaFile::query()->count());
     }
 
     /**
