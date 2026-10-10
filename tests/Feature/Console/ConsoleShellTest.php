@@ -74,7 +74,9 @@ final class ConsoleShellTest extends InertiaConsoleTestCase
         $this->assertFalse($groups[1]['items'][0]['external'], 'Channels moved.');
         $this->assertFalse($groups[2]['items'][0]['external'], 'Flows moved.');
         $this->assertFalse($groups[2]['items'][1]['external'], 'Flow groups moved.');
-        $this->assertTrue($groups[3]['items'][0]['external'], 'Flow sessions is still Filament.');
+        $this->assertFalse($groups[3]['items'][0]['external'], 'Flow sessions moved.');
+        $this->assertFalse($groups[3]['items'][1]['external'], 'The flow log moved.');
+        $this->assertTrue($groups[3]['items'][4]['external'], 'Conversations is still Filament.');
         $this->assertNull($groups[3]['items'][4]['badge'], 'No unread conversations, no badge.');
     }
 
@@ -132,7 +134,8 @@ final class ConsoleShellTest extends InertiaConsoleTestCase
         $this->assertSame("/assistant/{$mine->getKey()}/dashboard", $switcher['items'][0]['href']);
         $this->assertFalse($switcher['items'][0]['external']);
         $this->assertSame('/admin/assistants', $switcher['back']['href']);
-        $this->assertTrue($switcher['back']['external']);
+        // The admin assistant list moved into the shell too.
+        $this->assertFalse($switcher['back']['external']);
     }
 
     public function test_the_filament_tenant_list_is_the_same_list(): void

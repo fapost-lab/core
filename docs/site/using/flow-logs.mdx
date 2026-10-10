@@ -18,7 +18,14 @@ show *what happened* to get it there.
 | **Error** | What went wrong, when something did |
 | **Session** | Which session this belongs to |
 
-Filters narrow the view, with **Apply filters** and **Reset**.
+The list always covers a period: the last 24 hours unless you pick the last hour,
+7 days or 30 days. Entries are kept for 30 days, so there is no "all time". Beside
+the period, filters narrow the list by node type, by status and to errors only,
+and the search finds a node by its ID. Every choice is kept in the address, so a
+filtered view can be shared as a link.
+
+The list keeps itself current: it updates as steps run when your installation
+has live updates switched on, and refreshes every minute otherwise.
 
 ## Handle is the column to learn
 
@@ -55,4 +62,6 @@ it turned, or when the dashboard's error count is above zero and you want to kno
 what it counted.
 
 Start from the session, not from the log. The log is long by nature — one row per
-node per contact — and filtering it by session turns it back into a single story.
+node per contact — and filtering it by session turns it back into a single story:
+a session's page links to its own log, over the last 30 days. The dashboard's
+error count links to the log already filtered to the errors of the last 24 hours.

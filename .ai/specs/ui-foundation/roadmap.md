@@ -58,7 +58,7 @@ console menu entry is served by Inertia and the console's tests run against the 
 - [x] `console-broadcasts` — Broadcasts — list with progress, send and cancel, the form with live reach and the
       base-language guard (after: the pilot; after: `close-policy-gaps` — the screen relies on
       the new policy)
-- [ ] `console-live-updates` — Live updates with sessions and flow logs — the composable that subscribes through Echo
+- [x] `console-live-updates` — Live updates with sessions and flow logs — the composable that subscribes through Echo
       when a broadcaster is configured and polls otherwise; flow sessions and flow logs on it,
       every log query bounded to a time window (after: the pilot)
 - [ ] `realtime-self-hosted` — Realtime for self-hosters — `laravel/reverb` dormant in Core, the Echo client as a lazy
@@ -77,7 +77,7 @@ console menu entry is served by Inertia and the console's tests run against the 
 Goal: the admin panel needs no Filament screen. Done when: with the switch on, every admin menu
 entry and the dashboard are served by Inertia.
 
-- [ ] `admin-assistants` — Assistants with their channels — list, create, view, edit; the channels section on the
+- [x] `admin-assistants` — Assistants with their channels — list, create, view, edit; the channels section on the
       shared channel form (after: channels in phase 2 — reuses its form)
 - [ ] `admin-users-roles` — Users and roles — user list with activation and deactivation, role assignment within the
       actor's priority; roles with grouped permission checklists (after: the pilot)

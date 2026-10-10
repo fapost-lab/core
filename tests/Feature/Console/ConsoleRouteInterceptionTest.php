@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
+use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
@@ -18,6 +20,8 @@ use App\Http\Controllers\Console\ContactSegmentController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
+use App\Http\Controllers\Console\FlowLogController;
+use App\Http\Controllers\Console\FlowSessionController;
 use App\Http\Controllers\Console\LocaleController;
 use App\Http\Controllers\Console\TranslationController;
 use Illuminate\Routing\Route as RoutingRoute;
@@ -62,6 +66,10 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'broadcasts list'       => ['filament.assistant.resources.broadcasts.index', BroadcastController::class, 'index', 'assistant/{tenant}/broadcasts'],
             'broadcasts create'     => ['filament.assistant.resources.broadcasts.create', BroadcastController::class, 'create', 'assistant/{tenant}/broadcasts/create'],
             'broadcasts edit'       => ['filament.assistant.resources.broadcasts.edit', BroadcastController::class, 'edit', 'assistant/{tenant}/broadcasts/{record}/edit'],
+            'flow sessions list'    => ['filament.assistant.resources.flow-sessions.index', FlowSessionController::class, 'index', 'assistant/{tenant}/flow-sessions'],
+            'flow sessions view'    => ['filament.assistant.resources.flow-sessions.view', FlowSessionController::class, 'show', 'assistant/{tenant}/flow-sessions/{record}'],
+            'flow logs list'        => ['filament.assistant.resources.flow-logs.index', FlowLogController::class, 'index', 'assistant/{tenant}/flow-logs'],
+            'flow logs view'        => ['filament.assistant.resources.flow-logs.view', FlowLogController::class, 'show', 'assistant/{tenant}/flow-logs/{record}'],
             // Assistant settings.
             'assistant settings' => ['filament.assistant.pages.settings', AssistantSettingsController::class, 'edit', 'assistant/{tenant}/settings'],
             // Translations: both panels.
@@ -74,6 +82,11 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'roles list'   => ['filament.admin.resources.roles.index', AdminRoleController::class, 'index', 'admin/roles'],
             'roles create' => ['filament.admin.resources.roles.create', AdminRoleController::class, 'create', 'admin/roles/create'],
             'roles edit'   => ['filament.admin.resources.roles.edit', AdminRoleController::class, 'edit', 'admin/roles/{record}/edit'],
+            // Admin assistants.
+            'admin assistants list'   => ['filament.admin.resources.assistants.index', AdminAssistantController::class, 'index', 'admin/assistants'],
+            'admin assistants create' => ['filament.admin.resources.assistants.create', AdminAssistantController::class, 'create', 'admin/assistants/create'],
+            'admin assistants view'   => ['filament.admin.resources.assistants.view', AdminAssistantController::class, 'show', 'admin/assistants/{record}'],
+            'admin assistants edit'   => ['filament.admin.resources.assistants.edit', AdminAssistantController::class, 'edit', 'admin/assistants/{record}/edit'],
         ];
     }
 
@@ -132,6 +145,15 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'role update'            => ['console.admin.roles.update', AdminRoleController::class, 'update', 'PUT', 'admin/roles/{record}'],
             'role destroy'           => ['console.admin.roles.destroy', AdminRoleController::class, 'destroy', 'DELETE', 'admin/roles/{record}'],
             'role destroy many'      => ['console.admin.roles.destroy-many', AdminRoleController::class, 'destroyMany', 'DELETE', 'admin/roles'],
+            // Admin assistants and their channels.
+            'admin assistant store'            => ['console.admin.assistants.store', AdminAssistantController::class, 'store', 'POST', 'admin/assistants'],
+            'admin assistant update'           => ['console.admin.assistants.update', AdminAssistantController::class, 'update', 'PUT', 'admin/assistants/{record}'],
+            'admin assistant destroy'          => ['console.admin.assistants.destroy', AdminAssistantController::class, 'destroy', 'DELETE', 'admin/assistants/{record}'],
+            'admin assistant channel edit'     => ['console.admin.assistants.channels.edit', AdminAssistantChannelController::class, 'edit', 'GET', 'admin/assistants/{record}/channels/{channel}/edit'],
+            'admin assistant channel update'   => ['console.admin.assistants.channels.update', AdminAssistantChannelController::class, 'update', 'PUT', 'admin/assistants/{record}/channels/{channel}'],
+            'admin assistant channel rotate'   => ['console.admin.assistants.channels.rotate-webhook', AdminAssistantChannelController::class, 'rotateWebhook', 'POST', 'admin/assistants/{record}/channels/{channel}/rotate-webhook'],
+            'admin assistant channel register' => ['console.admin.assistants.channels.register-webhook', AdminAssistantChannelController::class, 'registerWebhook', 'POST', 'admin/assistants/{record}/channels/{channel}/register-webhook'],
+            'admin assistant channel destroy'  => ['console.admin.assistants.channels.destroy', AdminAssistantChannelController::class, 'destroy', 'DELETE', 'admin/assistants/{record}/channels/{channel}'],
         ];
     }
 

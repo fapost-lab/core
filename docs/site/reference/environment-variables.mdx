@@ -70,6 +70,7 @@ connections both depend on it. Tenant schemas are created on the tenant connecti
 | `REDIS_PASSWORD` | `null` | Set one on any non-local install |
 | `QUEUE_CONNECTION` | `redis` | Must be an asynchronous queue: on `sync`, `delay` nodes wait for the next inbound message and `send_message` timeouts never fire |
 | `CACHE_STORE` | `redis` | |
+| `BROADCAST_CONNECTION` | `log` | Live updates of the operator screens (sessions, flow log). `null` or `log` delivers nothing and the screens poll; a delivering connection (Pusher protocol) makes the server announce changes on private channels authorized at `/broadcasting/auth`, as jobs on `messaging.system`, and only while a screen is open |
 | `SESSION_DRIVER` | `redis` | Not `database` in `host` tenancy mode: platform pages have no tenant schema to hold the table |
 | `SESSION_LIFETIME` | `120` | Minutes |
 | `SESSION_DOMAIN` | *unset* | Leave unset: cookies stay bound to the exact host. In `host` mode a value shared between subdomains is refused |

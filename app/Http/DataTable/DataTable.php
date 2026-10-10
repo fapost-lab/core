@@ -45,6 +45,8 @@ final readonly class DataTable
      *         is no filter and is not echoed back)
      * @param  array<string, Closure(Builder<covariant Model>): void>  $groups  by key; orders the query so a group's
      *         rows sit together, applied before the sort
+     * @param  (Closure(Builder<covariant Model>, string): void)|null  $searchAlso  adds its own `orWhere` to the search
+     *         group, for a match the LIKE on a column cannot express (an exact id); gets the trimmed search text
      */
     public function __construct(
         private array $sortable,
@@ -53,6 +55,7 @@ final readonly class DataTable
         private array $perPageOptions = [25, 50, 100],
         private array $filters = [],
         private array $groups = [],
+        private ?Closure $searchAlso = null,
     ) {
     }
 
@@ -209,11 +212,15 @@ final readonly class DataTable
         $grammar = $query->getQuery()->getGrammar();
         $pattern = '%' . str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower($search)) . '%';
 
-        $query->where(function (Builder $group) use ($grammar, $pattern): void {
+        $query->where(function (Builder $group) use ($grammar, $pattern, $search): void {
             foreach ($this->searchable as $column) {
                 // LOWER() + LIKE rather than ILIKE, so one statement runs on both engines. Postgres lowercases any
                 // Unicode text; SQLite's LOWER() only touches ASCII, which matters for tests, not for production.
                 $group->orWhereRaw('LOWER(' . $grammar->wrap($column) . ") LIKE ? ESCAPE '!'", [$pattern]);
+            }
+
+            if (null !== $this->searchAlso) {
+                ($this->searchAlso)($group, $search);
             }
         });
     }

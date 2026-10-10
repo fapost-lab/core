@@ -138,6 +138,10 @@ final class FlowSession extends BaseModel
         $this->fill($attributes);
         $this->version++;
         $this->updated_at = $updatedAt;
+
+        // The write above is a query, which raises no model event; listeners of `updated` (the live announcement of
+        // the sessions screen) are told here.
+        $this->fireModelEvent('updated', false);
     }
 
     /**

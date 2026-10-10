@@ -52,6 +52,10 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'filament.assistant.resources.broadcasts.index',
             'filament.assistant.resources.broadcasts.create',
             'filament.assistant.resources.broadcasts.edit',
+            'filament.assistant.resources.flow-sessions.index',
+            'filament.assistant.resources.flow-sessions.view',
+            'filament.assistant.resources.flow-logs.index',
+            'filament.assistant.resources.flow-logs.view',
             // Assistant settings.
             'filament.assistant.pages.settings',
         ] as $name) {
@@ -135,6 +139,34 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'console.admin.roles.update',
             'console.admin.roles.destroy',
             'console.admin.roles.destroy-many',
+        ] as $name) {
+            $this->assertNull(Route::getRoutes()->getByName($name), $name);
+        }
+    }
+
+    public function test_filament_answers_the_admin_assistant_screens_and_their_writes_do_not_exist(): void
+    {
+        foreach ([
+            'filament.admin.resources.assistants.index',
+            'filament.admin.resources.assistants.create',
+            'filament.admin.resources.assistants.view',
+            'filament.admin.resources.assistants.edit',
+        ] as $name) {
+            $action = $this->route($name)->getActionName();
+
+            $this->assertStringNotContainsString('App\\Http\\Controllers', $action, $name);
+            $this->assertStringContainsString('Filament', $action, $name);
+        }
+
+        foreach ([
+            'console.admin.assistants.store',
+            'console.admin.assistants.update',
+            'console.admin.assistants.destroy',
+            'console.admin.assistants.channels.edit',
+            'console.admin.assistants.channels.update',
+            'console.admin.assistants.channels.rotate-webhook',
+            'console.admin.assistants.channels.register-webhook',
+            'console.admin.assistants.channels.destroy',
         ] as $name) {
             $this->assertNull(Route::getRoutes()->getByName($name), $name);
         }

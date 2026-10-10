@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Domains\Tenancy\Support\TenantHost;
+use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
+use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
@@ -17,6 +19,8 @@ use App\Http\Controllers\Console\ContactSegmentController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
+use App\Http\Controllers\Console\FlowLogController;
+use App\Http\Controllers\Console\FlowSessionController;
 use App\Http\Controllers\Console\LocaleController;
 use App\Http\Controllers\Console\TranslationController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
@@ -85,6 +89,20 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::delete('admin/roles', [AdminRoleController::class, 'destroyMany'])->name('console.admin.roles.destroy-many');
         Route::put('admin/roles/{record}', [AdminRoleController::class, 'update'])->name('console.admin.roles.update');
         Route::delete('admin/roles/{record}', [AdminRoleController::class, 'destroy'])->name('console.admin.roles.destroy');
+        // Assistants: the tenant's assistants with their channels. `{record}` is the assistant; a channel is created on
+        // the assistant's console, as it was, and changed here on the console's channel form.
+        Route::get('admin/assistants', [AdminAssistantController::class, 'index'])->name('filament.admin.resources.assistants.index');
+        Route::get('admin/assistants/create', [AdminAssistantController::class, 'create'])->name('filament.admin.resources.assistants.create');
+        Route::get('admin/assistants/{record}', [AdminAssistantController::class, 'show'])->name('filament.admin.resources.assistants.view');
+        Route::get('admin/assistants/{record}/edit', [AdminAssistantController::class, 'edit'])->name('filament.admin.resources.assistants.edit');
+        Route::post('admin/assistants', [AdminAssistantController::class, 'store'])->name('console.admin.assistants.store');
+        Route::put('admin/assistants/{record}', [AdminAssistantController::class, 'update'])->name('console.admin.assistants.update');
+        Route::delete('admin/assistants/{record}', [AdminAssistantController::class, 'destroy'])->name('console.admin.assistants.destroy');
+        Route::get('admin/assistants/{record}/channels/{channel}/edit', [AdminAssistantChannelController::class, 'edit'])->name('console.admin.assistants.channels.edit');
+        Route::put('admin/assistants/{record}/channels/{channel}', [AdminAssistantChannelController::class, 'update'])->name('console.admin.assistants.channels.update');
+        Route::post('admin/assistants/{record}/channels/{channel}/rotate-webhook', [AdminAssistantChannelController::class, 'rotateWebhook'])->name('console.admin.assistants.channels.rotate-webhook');
+        Route::post('admin/assistants/{record}/channels/{channel}/register-webhook', [AdminAssistantChannelController::class, 'registerWebhook'])->name('console.admin.assistants.channels.register-webhook');
+        Route::delete('admin/assistants/{record}/channels/{channel}', [AdminAssistantChannelController::class, 'destroy'])->name('console.admin.assistants.channels.destroy');
     });
 
     // An assistant's screens: `{tenant}` is the assistant, under the name Filament gave the parameter.
@@ -160,6 +178,11 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('assistant/{tenant}/broadcasts/{record}/cancel', [BroadcastController::class, 'cancel'])->name('console.broadcasts.cancel');
         Route::delete('assistant/{tenant}/broadcasts/{record}', [BroadcastController::class, 'destroy'])->name('console.broadcasts.destroy');
 
+        // Flow sessions and the flow log: read-only, kept current live or by polling. Every log read is bounded in time.
+        Route::get('assistant/{tenant}/flow-sessions', [FlowSessionController::class, 'index'])->name('filament.assistant.resources.flow-sessions.index');
+        Route::get('assistant/{tenant}/flow-sessions/{record}', [FlowSessionController::class, 'show'])->name('filament.assistant.resources.flow-sessions.view');
+        Route::get('assistant/{tenant}/flow-logs', [FlowLogController::class, 'index'])->name('filament.assistant.resources.flow-logs.index');
+        Route::get('assistant/{tenant}/flow-logs/{record}', [FlowLogController::class, 'show'])->name('filament.assistant.resources.flow-logs.view');
         // Assistant settings: one form saved as a whole. A flow made from inside it is saved with the form and opens in the builder.
         Route::get('assistant/{tenant}/settings', [AssistantSettingsController::class, 'edit'])->name('filament.assistant.pages.settings');
         Route::put('assistant/{tenant}/settings', [AssistantSettingsController::class, 'update'])->name('console.settings.update');
