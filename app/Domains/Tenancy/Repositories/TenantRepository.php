@@ -12,7 +12,10 @@ use App\Domains\Tenancy\Models\TenantStatus;
 use App\Domains\Tenancy\ValueObjects\ReleaseRefusal;
 use App\Domains\Tenancy\ValueObjects\TenantProvisioningState;
 use Carbon\CarbonInterface;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -22,6 +25,11 @@ use InvalidArgumentException;
  */
 final class TenantRepository implements TenantRepositoryInterface
 {
+    private const string ALIASES_TABLE = 'tenant_slug_aliases';
+
+    /** Key of the advisory lock that serializes slug claims (a rename and a reservation). */
+    private const int SLUG_CLAIMS_LOCK = 7_203_104_511;
+
     /**
      * Check if at least one tenant exists.
      */
@@ -98,10 +106,12 @@ final class TenantRepository implements TenantRepositoryInterface
     }
 
     /**
-     * Delete the tenant's landlord row.
+     * Delete the tenant's landlord row, and the slugs it gave up with it (the foreign key cascades on
+     * PostgreSQL; the explicit delete keeps the connections that do not enforce it in step).
      */
     public function delete(TenantInterface $tenant): void
     {
+        $this->aliases()->where('tenant_id', $tenant->getId())->delete();
         Tenant::on('landlord')->whereKey($tenant->getId())->delete();
     }
 
@@ -111,7 +121,7 @@ final class TenantRepository implements TenantRepositoryInterface
             ->where(static function (Builder $query) use ($slug, $schemaName): void {
                 $query->where('slug', $slug)->orWhere('schema_name', $schemaName);
             })
-            ->exists();
+            ->exists() || $this->aliases()->where('slug', $slug)->exists();
     }
 
     public function findByReservationKey(string $reservationKey): ?TenantInterface
@@ -217,6 +227,88 @@ final class TenantRepository implements TenantRepositoryInterface
         }
 
         return $state->schemaClaimed ? ReleaseRefusal::SchemaClaimed : ReleaseRefusal::InProgress;
+    }
+
+    public function transaction(Closure $callback): mixed
+    {
+        return DB::connection('landlord')->transaction($callback);
+    }
+
+    public function lockSlugClaims(): void
+    {
+        $connection = DB::connection('landlord');
+
+        if ('pgsql' === $connection->getDriverName()) {
+            $connection->select('select pg_advisory_xact_lock(?)', [self::SLUG_CLAIMS_LOCK]);
+        }
+    }
+
+    public function findForRename(string $id): ?TenantProvisioningState
+    {
+        $tenant = Tenant::on('landlord')->whereKey($id)->lockForUpdate()->first();
+
+        return $tenant instanceof Tenant
+            ? new TenantProvisioningState($tenant, $tenant->status, null !== $tenant->schema_claimed_at, $tenant->provisioning_lease_until)
+            : null;
+    }
+
+    public function isSlugClaimedByOther(string $slug, string $schemaName, string $exceptTenantId): bool
+    {
+        $held = Tenant::on('landlord')
+            ->whereKeyNot($exceptTenantId)
+            ->where(static function (Builder $query) use ($slug, $schemaName): void {
+                $query->where('slug', $slug)->orWhere('schema_name', $schemaName);
+            })
+            ->exists();
+
+        return $held || $this->aliases()->where('slug', $slug)->where('tenant_id', '!=', $exceptTenantId)->exists();
+    }
+
+    public function renameSlug(TenantInterface $tenant, string $newSlug, CarbonInterface $now): bool
+    {
+        if (! $tenant instanceof Tenant) {
+            throw new InvalidArgumentException(sprintf('Expected %s, got %s.', Tenant::class, $tenant::class));
+        }
+
+        $changed = Tenant::on('landlord')
+            ->whereKey($tenant->getId())
+            ->where('slug', $tenant->getSlug())
+            ->update(['slug' => $newSlug, 'updated_at' => $now]);
+
+        if (1 !== $changed) {
+            return false;
+        }
+
+        $tenant->forceFill(['slug' => $newSlug])->syncOriginal();
+
+        return true;
+    }
+
+    public function addFormerSlug(string $slug, string $tenantId, ?CarbonInterface $redirectUntil, CarbonInterface $now): void
+    {
+        $this->aliases()->insert([
+            'slug'           => $slug,
+            'tenant_id'      => $tenantId,
+            'redirect_until' => $redirectUntil,
+            'created_at'     => $now,
+        ]);
+    }
+
+    public function removeFormerSlug(string $slug, string $tenantId): void
+    {
+        $this->aliases()->where('slug', $slug)->where('tenant_id', $tenantId)->delete();
+    }
+
+    public function findByFormerSlug(string $slug, CarbonInterface $now): ?TenantInterface
+    {
+        $tenantId = $this->aliases()->where('slug', $slug)->where('redirect_until', '>', $now)->value('tenant_id');
+
+        return is_string($tenantId) ? $this->findById($tenantId) : null;
+    }
+
+    private function aliases(): QueryBuilder
+    {
+        return DB::connection('landlord')->table(self::ALIASES_TABLE);
     }
 
     /**
