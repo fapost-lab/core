@@ -94,7 +94,7 @@ final readonly class MediaLibraryService
      *
      * @return array{saved: int, total: int, refused: StorageLimitReachedException|null}
      */
-    public function upload(array $files, ?MediaFolder $folder, ?string $uploadedBy): array
+    public function store(array $files, ?MediaFolder $folder, ?string $uploadedBy): array
     {
         $saved = 0;
 

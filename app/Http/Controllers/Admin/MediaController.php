@@ -172,7 +172,7 @@ final class MediaController extends Controller
             throw $exception->toValidationException();
         }
 
-        $result = $this->library->upload($request->uploads(), $folder, (string) $request->user()?->getAuthIdentifier());
+        $result = $this->library->store($request->uploads(), $folder, (string) $request->user()?->getAuthIdentifier());
         $batch  = $request->batch();
         $saved  = $batch['savedBefore'] + $result['saved'];
 
