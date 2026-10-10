@@ -13,6 +13,8 @@ use App\Http\Controllers\Console\ContactSegmentController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
+use App\Http\Controllers\Console\FlowLogController;
+use App\Http\Controllers\Console\FlowSessionController;
 use App\Http\Controllers\Console\LocaleController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\SetConsoleRootView;
@@ -129,5 +131,11 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('assistant/{tenant}/broadcasts/{record}/send', [BroadcastController::class, 'send'])->name('console.broadcasts.send');
         Route::post('assistant/{tenant}/broadcasts/{record}/cancel', [BroadcastController::class, 'cancel'])->name('console.broadcasts.cancel');
         Route::delete('assistant/{tenant}/broadcasts/{record}', [BroadcastController::class, 'destroy'])->name('console.broadcasts.destroy');
+
+        // Flow sessions and the flow log: read-only, kept current live or by polling. Every log read is bounded in time.
+        Route::get('assistant/{tenant}/flow-sessions', [FlowSessionController::class, 'index'])->name('filament.assistant.resources.flow-sessions.index');
+        Route::get('assistant/{tenant}/flow-sessions/{record}', [FlowSessionController::class, 'show'])->name('filament.assistant.resources.flow-sessions.view');
+        Route::get('assistant/{tenant}/flow-logs', [FlowLogController::class, 'index'])->name('filament.assistant.resources.flow-logs.index');
+        Route::get('assistant/{tenant}/flow-logs/{record}', [FlowLogController::class, 'show'])->name('filament.assistant.resources.flow-logs.view');
     });
 });

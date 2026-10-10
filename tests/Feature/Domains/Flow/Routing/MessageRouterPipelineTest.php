@@ -11,6 +11,8 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Live\FlowActivityChanged;
+use App\Domains\Flow\Live\FlowActivityWatchers;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
@@ -25,6 +27,7 @@ use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
 
@@ -128,6 +131,45 @@ final class MessageRouterPipelineTest extends FeatureTestCase
         $session->refresh();
         $this->assertSame(FlowSessionStatus::TerminatedByUser, $session->status);
         $this->assertNull($session->current_node_id);
+    }
+
+    public function test_global_reset_command_announces_the_terminated_session_to_live_screens(): void
+    {
+        [$tenantId, $assistant, $contact, $channel] = $this->seedTenantWithFlow(
+            nodes: [
+                ['id' => 'rec-1', 'type' => 'recording_test', 'version' => 1, 'config' => ['marker' => 'persisted']],
+                ['id' => 'end-1', 'type' => 'end',            'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            edges: [
+                ['id' => 'e1', 'from' => 'rec-1', 'to' => 'end-1', 'handle' => 'default'],
+            ],
+        );
+
+        FlowSession::query()->create([
+            'tenant_id'          => $tenantId,
+            'assistant_id'       => $assistant->getKey(),
+            'contact_id'         => $contact->getKey(),
+            'flow_definition_id' => FlowDefinition::query()->where('tenant_id', $tenantId)->value('id'),
+            'flow_version'       => 1,
+            'current_node_id'    => 'rec-1',
+            'state'              => [],
+            'status'             => FlowSessionStatus::WaitingInput,
+            'version'            => 1,
+        ]);
+
+        // The terminating write is a query, not a model save: it announces itself explicitly.
+        config(['broadcasting.default' => 'pusher']);
+        $this->app->make(FlowActivityWatchers::class)->watch($tenantId, (string) $assistant->getKey());
+        Event::fake([FlowActivityChanged::class]);
+
+        $this->app->make(MessageRouter::class)->route(
+            contact: $contact,
+            message: $this->incoming('/reset'),
+            assistant: $assistant,
+            channel: $channel,
+        );
+
+        Event::assertDispatched(FlowActivityChanged::class, static fn (FlowActivityChanged $event): bool => $event->assistantId === (string) $assistant->getKey());
     }
 
     public function test_global_reset_command_terminates_a_paused_session_too(): void

@@ -18,7 +18,16 @@ them: what is running now, and what finished.
 | **Current node** | Where they are right now |
 | **Updated** | When it last moved |
 
-Filters narrow the view, with **Apply filters** and **Reset**.
+By default the list shows only **live** sessions — running, waiting for the
+contact's answer, or waiting for a subflow. The status filter switches to all
+sessions or to one status; a session sleeping in a delay node is found under its
+own status, *Paused*. Other filters narrow the list to one flow or to sessions
+started within the last hour, day, week or 30 days, and the search finds a
+session by the contact's channel user ID or contact ID.
+
+The list keeps itself current: it updates as sessions move when your
+installation has live updates switched on, and refreshes every 30 seconds
+otherwise. A live session's page does the same; a finished one no longer changes.
 
 ## Current node is the useful column
 

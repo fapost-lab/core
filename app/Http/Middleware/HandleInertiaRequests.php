@@ -10,6 +10,7 @@ use App\Domains\Staff\Support\SupportAccessSession;
 use App\Domains\Tenancy\Services\CurrentAccessState;
 use App\Http\Shell\AssistantSwitcher;
 use App\Http\Shell\NavigationBuilder;
+use App\Infrastructure\Broadcasting\BroadcasterStatus;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Inertia\Middleware;
@@ -192,9 +193,9 @@ final class HandleInertiaRequests extends Middleware
      */
     private function broadcaster(): array
     {
-        $name = (string) config('broadcasting.default', 'null');
+        $status = app(BroadcasterStatus::class);
 
-        return ['enabled' => ! in_array($name, ['', 'null', 'log'], true), 'name' => $name];
+        return ['enabled' => $status->enabled(), 'name' => $status->name()];
     }
 
     /**

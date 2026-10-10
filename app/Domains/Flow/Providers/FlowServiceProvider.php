@@ -71,6 +71,7 @@ use App\Domains\Flow\Handlers\Support\TemplateResolver;
 use App\Domains\Flow\History\DefaultHistoryWriter;
 use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\History\NoOpHistoryWriter;
+use App\Domains\Flow\Live\FlowSessionActivityObserver;
 use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
 use App\Domains\Flow\Logging\FlowLogPartitionManager;
 use App\Domains\Flow\Logging\FlowLogWriter;
@@ -163,6 +164,8 @@ final class FlowServiceProvider extends ServiceProvider
         Gate::policy(FlowGroup::class, FlowGroupPolicy::class);
         Gate::policy(FlowSession::class, FlowSessionPolicy::class);
         Gate::policy(FlowLog::class, FlowLogPolicy::class);
+
+        FlowSession::observe(FlowSessionActivityObserver::class);
 
         // Registered the way a Solution registers its keys: from boot(), before the registry is frozen.
         $this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(
