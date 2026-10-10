@@ -15,11 +15,14 @@ use App\Domains\Conversation\Live\ConversationActivityWatchers;
 use App\Domains\Conversation\Models\Conversation;
 use App\Domains\Conversation\Services\ConversationInbox;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
+use App\Domains\Media\Contracts\MediaUploaderInterface;
 use App\Domains\Media\DTO\DispatchResult;
 use App\Domains\Media\Enums\MediaSource;
+use App\Domains\Media\Exceptions\StorageLimitReachedException;
 use App\Domains\Media\Models\MediaBlob;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFolder;
+use App\Domains\Media\Services\StorageLimitMessage;
 use App\Domains\Messaging\Exceptions\RateLimitExceededException;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
@@ -42,6 +45,7 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Support\SessionKey;
 use Inertia\Testing\AssertableInertia;
+use Mockery;
 use Mockery\MockInterface;
 use RuntimeException;
 use Tests\Support\FakeUsageMeter;
@@ -481,6 +485,26 @@ final class ConversationsConsoleTest extends InertiaConsoleTestCase
         $this->assertSame('See this', $this->sent[0]->payload->text);
         $file = MediaFile::query()->where('tenant_id', self::TENANT_ID)->where('name', 'photo.jpg')->sole();
         $this->assertSame('Inbox', MediaFolder::query()->find($file->folder_id)?->name);
+    }
+
+    public function test_an_attachment_refused_by_the_storage_gate_says_so_sends_nothing_and_can_be_retried(): void
+    {
+        $this->fakeSender();
+        Exceptions::fake();
+        $refusal  = new StorageLimitReachedException('media_storage', 10, 10, 5);
+        $uploader = Mockery::mock(MediaUploaderInterface::class);
+        $uploader->shouldReceive('uploadFromUploadedFile')->twice()->andThrow($refusal);
+        $this->app->instance(MediaUploaderInterface::class, $uploader);
+        $thread    = $this->heldThread();
+        $requestId = (string) Str::uuid();
+        $submit    = fn () => $this->actingAs($this->admin())->post($this->writeUrl($thread, 'reply'), ['request_id' => $requestId, 'text' => 'See this', 'attachment' => UploadedFile::fake()->image('photo.jpg')]);
+
+        $submit()->assertInertiaFlash('error', StorageLimitMessage::for($refusal));
+        // The reservation was released: the same submission is tried again, not answered as a duplicate.
+        $submit()->assertInertiaFlash('error', StorageLimitMessage::for($refusal));
+
+        $this->assertSame([], $this->sent);
+        Exceptions::assertNotReported(StorageLimitReachedException::class);
     }
 
     public function test_an_attachment_outside_the_media_limits_is_refused_before_anything_is_sent(): void

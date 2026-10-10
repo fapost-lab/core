@@ -201,7 +201,7 @@ final class ConversationInboxViewTest extends FeatureTestCase
         // The node handler registry builds an uploader at boot, with the default limits.
         $this->app->forgetInstance(MediaUploaderInterface::class);
         $this->app->instance(ConversationReplyServiceInterface::class, new class () implements ConversationReplyServiceInterface {
-            public function send(Conversation $conversation, string $text, string $staffUserId, ?string $mediaFileId = null): DeliveryResult
+            public function send(Conversation $conversation, string $text, string $staffUserId, ?string $mediaFileId = null, ?string $requestId = null): DeliveryResult
             {
                 throw new LogicException('A refused attachment must not reach the reply service.');
             }

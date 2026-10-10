@@ -18,6 +18,8 @@ use App\Domains\Conversation\Live\ConversationActivityWatchers;
 use App\Domains\Conversation\Models\Conversation;
 use App\Domains\Conversation\Models\ConversationMessage;
 use App\Domains\Conversation\Services\ConversationInbox;
+use App\Domains\Media\Exceptions\StorageLimitReachedException;
+use App\Domains\Media\Services\StorageLimitMessage;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use App\Http\Requests\Console\ReplyConversationRequest;
@@ -195,6 +197,9 @@ final class ConversationController extends Controller
             return $this->back(trans('conversation.notifications.reply_undeliverable'), 'error');
         } catch (VolumeLimitReachedException $exception) {
             return $this->back(trans('conversation.notifications.reply_limit_reached') . ' ' . $exception->getMessage(), 'error');
+        } catch (StorageLimitReachedException $exception) {
+            // The media library is full: a refusal the operator acts on, not a failure to report. Nothing was sent.
+            return $this->back(StorageLimitMessage::for($exception), 'error');
         } catch (Throwable $exception) {
             report($exception);
 
