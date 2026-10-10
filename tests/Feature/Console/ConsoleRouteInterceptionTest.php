@@ -10,6 +10,7 @@ use App\Http\Controllers\Console\BroadcastController;
 use App\Http\Controllers\Console\ChannelController;
 use App\Http\Controllers\Console\ContactController;
 use App\Http\Controllers\Console\ContactGroupController;
+use App\Http\Controllers\Console\ContactSegmentController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
@@ -44,6 +45,9 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'contact groups list'   => ['filament.assistant.resources.contact-groups.index', ContactGroupController::class, 'index', 'assistant/{tenant}/contact-groups'],
             'contact groups create' => ['filament.assistant.resources.contact-groups.create', ContactGroupController::class, 'create', 'assistant/{tenant}/contact-groups/create'],
             'contact groups edit'   => ['filament.assistant.resources.contact-groups.edit', ContactGroupController::class, 'edit', 'assistant/{tenant}/contact-groups/{record}/edit'],
+            'segments list'         => ['filament.assistant.resources.contact-segments.index', ContactSegmentController::class, 'index', 'assistant/{tenant}/contact-segments'],
+            'segments create'       => ['filament.assistant.resources.contact-segments.create', ContactSegmentController::class, 'create', 'assistant/{tenant}/contact-segments/create'],
+            'segments edit'         => ['filament.assistant.resources.contact-segments.edit', ContactSegmentController::class, 'edit', 'assistant/{tenant}/contact-segments/{record}/edit'],
             'flow groups list'      => ['filament.assistant.resources.flow-groups.index', FlowGroupController::class, 'index', 'assistant/{tenant}/flow-groups'],
             'flow groups create'    => ['filament.assistant.resources.flow-groups.create', FlowGroupController::class, 'create', 'assistant/{tenant}/flow-groups/create'],
             'flow groups edit'      => ['filament.assistant.resources.flow-groups.edit', FlowGroupController::class, 'edit', 'assistant/{tenant}/flow-groups/{record}/edit'],
@@ -65,28 +69,33 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
     public static function newRoutes(): array
     {
         return [
-            'channel store'           => ['console.channels.store', ChannelController::class, 'store', 'POST', 'assistant/{tenant}/channels'],
-            'channel update'          => ['console.channels.update', ChannelController::class, 'update', 'PUT', 'assistant/{tenant}/channels/{record}'],
-            'channel rotate webhook'  => ['console.channels.rotate-webhook', ChannelController::class, 'rotateWebhook', 'POST', 'assistant/{tenant}/channels/{record}/rotate-webhook'],
-            'channel destroy'         => ['console.channels.destroy', ChannelController::class, 'destroy', 'DELETE', 'assistant/{tenant}/channels/{record}'],
-            'contact tags'            => ['console.contacts.tags', ContactController::class, 'updateTags', 'PUT', 'assistant/{tenant}/contacts/{record}/tags'],
-            'contact groups'          => ['console.contacts.groups', ContactController::class, 'updateGroups', 'PUT', 'assistant/{tenant}/contacts/{record}/groups'],
-            'flow group store'        => ['console.flow-groups.store', FlowGroupController::class, 'store', 'POST', 'assistant/{tenant}/flow-groups'],
-            'flow group store inline' => ['console.flow-groups.store-inline', FlowGroupController::class, 'storeInline', 'POST', 'assistant/{tenant}/flow-groups/inline'],
-            'flow group update'       => ['console.flow-groups.update', FlowGroupController::class, 'update', 'PUT', 'assistant/{tenant}/flow-groups/{record}'],
-            'flow group destroy'      => ['console.flow-groups.destroy', FlowGroupController::class, 'destroy', 'DELETE', 'assistant/{tenant}/flow-groups/{record}'],
-            'flow group destroy many' => ['console.flow-groups.destroy-many', FlowGroupController::class, 'destroyMany', 'DELETE', 'assistant/{tenant}/flow-groups'],
-            'flow store'              => ['console.flows.store', FlowController::class, 'store', 'POST', 'assistant/{tenant}/flows'],
-            'flow update'             => ['console.flows.update', FlowController::class, 'update', 'PUT', 'assistant/{tenant}/flows/{record}'],
-            'flow activity'           => ['console.flows.activity', FlowController::class, 'updateActivity', 'PATCH', 'assistant/{tenant}/flows/{record}/active'],
-            'flow destroy'            => ['console.flows.destroy', FlowController::class, 'destroy', 'DELETE', 'assistant/{tenant}/flows/{record}'],
-            'flow destroy many'       => ['console.flows.destroy-many', FlowController::class, 'destroyMany', 'DELETE', 'assistant/{tenant}/flows'],
-            'broadcast reach'         => ['console.broadcasts.reach', BroadcastController::class, 'reach', 'GET', 'assistant/{tenant}/broadcasts/reach'],
-            'broadcast store'         => ['console.broadcasts.store', BroadcastController::class, 'store', 'POST', 'assistant/{tenant}/broadcasts'],
-            'broadcast update'        => ['console.broadcasts.update', BroadcastController::class, 'update', 'PUT', 'assistant/{tenant}/broadcasts/{record}'],
-            'broadcast send'          => ['console.broadcasts.send', BroadcastController::class, 'send', 'POST', 'assistant/{tenant}/broadcasts/{record}/send'],
-            'broadcast cancel'        => ['console.broadcasts.cancel', BroadcastController::class, 'cancel', 'POST', 'assistant/{tenant}/broadcasts/{record}/cancel'],
-            'broadcast destroy'       => ['console.broadcasts.destroy', BroadcastController::class, 'destroy', 'DELETE', 'assistant/{tenant}/broadcasts/{record}'],
+            'channel store'            => ['console.channels.store', ChannelController::class, 'store', 'POST', 'assistant/{tenant}/channels'],
+            'channel update'           => ['console.channels.update', ChannelController::class, 'update', 'PUT', 'assistant/{tenant}/channels/{record}'],
+            'channel rotate webhook'   => ['console.channels.rotate-webhook', ChannelController::class, 'rotateWebhook', 'POST', 'assistant/{tenant}/channels/{record}/rotate-webhook'],
+            'channel register webhook' => ['console.channels.register-webhook', ChannelController::class, 'registerWebhook', 'POST', 'assistant/{tenant}/channels/{record}/register-webhook'],
+            'channel destroy'          => ['console.channels.destroy', ChannelController::class, 'destroy', 'DELETE', 'assistant/{tenant}/channels/{record}'],
+            'contact tags'             => ['console.contacts.tags', ContactController::class, 'updateTags', 'PUT', 'assistant/{tenant}/contacts/{record}/tags'],
+            'contact groups'           => ['console.contacts.groups', ContactController::class, 'updateGroups', 'PUT', 'assistant/{tenant}/contacts/{record}/groups'],
+            'flow group store'         => ['console.flow-groups.store', FlowGroupController::class, 'store', 'POST', 'assistant/{tenant}/flow-groups'],
+            'flow group store inline'  => ['console.flow-groups.store-inline', FlowGroupController::class, 'storeInline', 'POST', 'assistant/{tenant}/flow-groups/inline'],
+            'flow group update'        => ['console.flow-groups.update', FlowGroupController::class, 'update', 'PUT', 'assistant/{tenant}/flow-groups/{record}'],
+            'flow group destroy'       => ['console.flow-groups.destroy', FlowGroupController::class, 'destroy', 'DELETE', 'assistant/{tenant}/flow-groups/{record}'],
+            'flow group destroy many'  => ['console.flow-groups.destroy-many', FlowGroupController::class, 'destroyMany', 'DELETE', 'assistant/{tenant}/flow-groups'],
+            'flow store'               => ['console.flows.store', FlowController::class, 'store', 'POST', 'assistant/{tenant}/flows'],
+            'flow update'              => ['console.flows.update', FlowController::class, 'update', 'PUT', 'assistant/{tenant}/flows/{record}'],
+            'flow activity'            => ['console.flows.activity', FlowController::class, 'updateActivity', 'PATCH', 'assistant/{tenant}/flows/{record}/active'],
+            'flow destroy'             => ['console.flows.destroy', FlowController::class, 'destroy', 'DELETE', 'assistant/{tenant}/flows/{record}'],
+            'flow destroy many'        => ['console.flows.destroy-many', FlowController::class, 'destroyMany', 'DELETE', 'assistant/{tenant}/flows'],
+            'segment store'            => ['console.contact-segments.store', ContactSegmentController::class, 'store', 'POST', 'assistant/{tenant}/contact-segments'],
+            'segment update'           => ['console.contact-segments.update', ContactSegmentController::class, 'update', 'PUT', 'assistant/{tenant}/contact-segments/{record}'],
+            'segment destroy'          => ['console.contact-segments.destroy', ContactSegmentController::class, 'destroy', 'DELETE', 'assistant/{tenant}/contact-segments/{record}'],
+            'segment count'            => ['console.contact-segments.count', ContactSegmentController::class, 'refreshCount', 'POST', 'assistant/{tenant}/contact-segments/{record}/count'],
+            'broadcast reach'          => ['console.broadcasts.reach', BroadcastController::class, 'reach', 'GET', 'assistant/{tenant}/broadcasts/reach'],
+            'broadcast store'          => ['console.broadcasts.store', BroadcastController::class, 'store', 'POST', 'assistant/{tenant}/broadcasts'],
+            'broadcast update'         => ['console.broadcasts.update', BroadcastController::class, 'update', 'PUT', 'assistant/{tenant}/broadcasts/{record}'],
+            'broadcast send'           => ['console.broadcasts.send', BroadcastController::class, 'send', 'POST', 'assistant/{tenant}/broadcasts/{record}/send'],
+            'broadcast cancel'         => ['console.broadcasts.cancel', BroadcastController::class, 'cancel', 'POST', 'assistant/{tenant}/broadcasts/{record}/cancel'],
+            'broadcast destroy'        => ['console.broadcasts.destroy', BroadcastController::class, 'destroy', 'DELETE', 'assistant/{tenant}/broadcasts/{record}'],
         ];
     }
 

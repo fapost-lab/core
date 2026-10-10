@@ -50,6 +50,13 @@ broken.
   the broadcast to `Completed`, through a conditional update (`SendBroadcastRecipientJob`).
 - **Every job runs inside `TenantSwitcher::runForTenant()`.**
 
+- **A volume refusal cancels the run.** The first recipient refused for `outbound_messages` is
+  Skipped with the reason and the broadcast moves Running → Cancelled with `stop_reason`
+  (`limit_reached`), set by one conditional update; later recipient jobs of a Cancelled broadcast
+  skip without asking the operator. "Completed is set only by the last recipient" therefore holds
+  for runs that were not stopped. Notify sends (`BroadcastSendJob`) log the refusal and drop.
+  Enforced: `OutboundVolumeLimitTest`, `BroadcastSendJobTest`.
+
 ## Rules
 
 - **Send only through `MessageSenderInterface`.** Why: idempotency, the chat rate limit and the

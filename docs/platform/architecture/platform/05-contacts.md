@@ -44,7 +44,7 @@ Three ways to group contacts:
 
 - **Groups** — static, hand-managed lists (`contact_groups`).
 - **Tags** — set by the `set_tag` node or by staff (`contact_tags`).
-- **Segments** — saved rules: tag has / not has, language / platform in / equals, combined with all / any.
+- **Segments** — saved rules: tag has / not has, language / platform in / equals, attribute equals / not equals / is set (a dot-path key into the contact's attributes), group in / not in, combined with all / any. `SegmentConditionType` decides which operators a type takes and how many values (`operators()`, `arity()`).
 
 `ContactSegmentResolver` compiles segment rules into a tenant-scoped contact query and resolves broadcast recipients
 (`resolveContactIds`, `count`, `refreshCount`).

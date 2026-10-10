@@ -44,6 +44,10 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   `success`, `warning`, `danger`); a form is a stack of `FormSection`s (title and description
   left, fields right); an empty list is `EmptyState`; a bulk delete is the `outline-danger`
   button. A new colour need becomes a token in `tokens.css` with its dark value.
+- **Choices that depend on another field** (a condition's operators by its type, how many values each
+  takes) reach the client as a prop built from one domain source (an enum's methods); the client holds
+  no literal of them, and the FormRequest validates the same pair from the same source. Example:
+  `ContactSegmentController::schema()`, `ContactSegmentRequest`, `resources/js/pages/Console/ContactSegments/rules.ts`.
 - **Dictionaries with keys from data** (contact attributes, platform meta) go into props as lists of
   `{key, value}`: a JSON object reorders numeric keys in JS, and `jsonb` reorders all of them.
 - A bulk delete as one query skips model events; say so on the method, and delete model by model
@@ -62,11 +66,9 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
 - **Secrets never reach the browser.** A token or key is in no prop, row or flash message (one deliberate exception:
   the new webhook hash is flashed once after a rotation, to the one who may rotate): the edit form
   shows it empty and an empty value means "keep what is stored". When an external provider refuses after the
-  record is saved, the controller catches the provider's exception, reports it and flashes a fixed, translated
-  error; the exception's own message can carry the request URL and with it the secret. Example:
-  `ChannelController`.
-- **Workaround, until `channel-webhook-consistency` lands: a write that runs a job inside the request loses the current assistant.** A synchronous job switches tenants, and
-  the switch resets `CurrentAssistant`; take the assistant and every URL before the write and pass them on.
+  record is saved, the write still succeeds; the toast is a fixed, translated error chosen from the stored outcome
+  (the channel's status, or the request's sync outcome), never from an exception, whose message can carry the
+  request URL and with it the secret. Example: `ChannelController`.
 - **A step that reaches people carries what the person confirmed and is conditional on the status.**
   The confirmation dialog holds the row's `revision`; the service locks the record, compares it, and
   the write itself carries the status in its `WHERE`, so a double click, a second tab or a replayed POST
@@ -85,7 +87,8 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
 `tests/Feature/Console/ContactGroupsConsoleTest.php`. With filters, grouping, guards and an
 assistant-owned policy: `FlowController`, `FlowDraftService`, `resources/js/pages/Console/Flows/*`.
 With a confirmed irreversible step, a live reach count and a localized field: `BroadcastController`,
-`BroadcastService`, `resources/js/pages/Console/Broadcasts/*`. A card with narrow writes (replace a set, no create or delete): `ContactController`,
+`BroadcastService`, `resources/js/pages/Console/Broadcasts/*`. A form with a tree of rules whose choices come from the domain: `ContactSegmentController`,
+`ContactSegmentService`, `ContactSegmentRequest`, `resources/js/pages/Console/ContactSegments/*`. A card with narrow writes (replace a set, no create or delete): `ContactController`,
 `AssistantContactService`, `ContactCard`, `resources/js/pages/Console/Contacts/*`.
 
 ## Rationale

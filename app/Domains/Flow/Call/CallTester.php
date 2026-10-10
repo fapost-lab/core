@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Call;
 
+use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Services\PeriodQuota;
+use App\Domains\Tenancy\Support\UsageUnitKey;
+use Carbon\CarbonImmutable;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\Flow\Call\CallContext;
 use Fapost\Foundation\Flow\Call\CallRequest;
+use Illuminate\Support\Str;
 use Throwable;
 
 /**
@@ -30,6 +35,7 @@ final readonly class CallTester
         private CallTransportRegistry $transports,
         private TemplateRenderer $templates,
         private TenantContextInterface $tenantContext,
+        private PeriodQuota $quota,
     ) {
     }
 
@@ -66,6 +72,20 @@ final readonly class CallTester
         }
 
         $tenantId = $this->tenantContext->isResolved() ? $this->tenantContext->get()->getId() : 'test-tenant';
+
+        // The builder always runs inside a tenant; without one there is nobody to bill.
+        if ($this->tenantContext->isResolved()) {
+            // Every click is its own unit: there is no session, and a repeated test is a repeated call.
+            $decision = $this->quota->consume(
+                CallNodeHandler::LIMIT_KEY,
+                UsageUnitKey::make('call_test:', (string) Str::ulid()),
+                CarbonImmutable::now(),
+            );
+
+            if (! $decision->allowed) {
+                return $this->errorResult('limit_reached', 0, $decision->message ?? 'Call executions limit reached for this period.');
+            }
+        }
 
         $renderContext = new NodeExecutionContext(
             tenantId: $tenantId,
@@ -130,13 +150,13 @@ final readonly class CallTester
     /**
      * @return array{success: bool, status_code: int|null, headers: array<string, mixed>, body: mixed, error_code: string, duration_ms: int}
      */
-    private function errorResult(string $code, int $durationMs): array
+    private function errorResult(string $code, int $durationMs, ?string $message = null): array
     {
         return [
             'success'     => false,
             'status_code' => null,
             'headers'     => [],
-            'body'        => null,
+            'body'        => $message,
             'error_code'  => $code,
             'duration_ms' => $durationMs,
         ];

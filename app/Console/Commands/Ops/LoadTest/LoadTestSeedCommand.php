@@ -18,6 +18,7 @@ use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Support\Str;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -216,6 +217,12 @@ final class LoadTestSeedCommand extends Command
             'config'       => [],
             'is_active'    => true,
         ]);
+
+        // A refused registration no longer fails the create, so the seed has to notice it: a channel the stub did
+        // not accept would make every later step of the load test measure nothing.
+        if ($channel->webhookRegistrationFailed()) {
+            throw new RuntimeException("The webhook registration of the load-test channel for {$slug} was refused.");
+        }
 
         return [
             'assistant_id' => (string)$assistant->getKey(),

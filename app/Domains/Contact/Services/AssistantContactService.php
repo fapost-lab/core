@@ -32,7 +32,7 @@ final readonly class AssistantContactService
     /**
      * `contacts.language` is `string(10)`; a filter value outside this is no language.
      */
-    private const string LANGUAGE_PATTERN = '/^[A-Za-z0-9_-]{1,10}$/';
+    public const string LANGUAGE_PATTERN = '/^[A-Za-z0-9_-]{1,10}$/';
 
     public function __construct(
         private TenantContextInterface $tenants,

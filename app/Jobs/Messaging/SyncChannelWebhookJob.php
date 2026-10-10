@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs\Messaging;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookStatusRecorderInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
@@ -13,6 +14,7 @@ use App\Domains\Webhook\Services\WebhookUrlGenerator;
 use Fapost\Foundation\Channel\WebhookRegistrationPayload;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Throwable;
 
 /**
  * Synchronizes provider-side webhooks outside of model persistence hooks.
@@ -23,6 +25,10 @@ use Illuminate\Foundation\Queue\Queueable;
  * A register job (the observer's and the ingress migrator's) names the channel and passes null
  * credentials: it loads the credentials, hash and config from the channel when it runs
  * ({@see self::$token}), so no secret is serialized into any payload.
+ *
+ * What the provider answered to a registration is stored on the channel, and a refusal is still thrown, so a queued
+ * run keeps the queue's retry and `failed_jobs` handling. A synchronous caller (the channel observer) catches it: a
+ * provider refusal never fails the write that caused it.
  */
 final class SyncChannelWebhookJob implements ShouldQueue
 {
@@ -65,10 +71,11 @@ final class SyncChannelWebhookJob implements ShouldQueue
         TenantSwitcher $switcher,
         WebhookUrlGenerator $urlGenerator,
         WebhookRegistryWriterInterface $registryWriter,
+        ChannelWebhookStatusRecorderInterface $statusRecorder,
     ): void {
         $tenant = new RuntimeTenant(id: $this->tenantId, schemaName: $this->schema);
 
-        $switcher->runForTenant($tenant, function () use ($channelRegistry, $urlGenerator, $registryWriter): void {
+        $switcher->runForTenant($tenant, function () use ($channelRegistry, $urlGenerator, $registryWriter, $statusRecorder): void {
             $registrar = $channelRegistry->webhookRegistrar($this->channelType);
 
             if (null === $registrar) {
@@ -103,7 +110,15 @@ final class SyncChannelWebhookJob implements ShouldQueue
             );
 
             if ($this->register) {
-                $registrar->register($payload);
+                try {
+                    $registrar->register($payload);
+                } catch (Throwable $exception) {
+                    $statusRecorder->markFailed($this->channelId);
+
+                    throw $exception;
+                }
+
+                $statusRecorder->markRegistered($this->channelId);
 
                 // Recorded only after the provider accepted the URL: until then there
                 // is no fact to record, and a failed registration must not look like a
@@ -117,6 +132,10 @@ final class SyncChannelWebhookJob implements ShouldQueue
             }
 
             $registrar->deregister($payload);
+
+            // Deregistered and taken down: nothing is registered any more. A deleted channel has no row, which the
+            // recorder lets pass.
+            $statusRecorder->clear($this->channelId);
 
             $registryWriter->recordIngress($this->webhookPublicHash, null);
         });

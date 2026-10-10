@@ -9,6 +9,7 @@ use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Filament\Resources\Assistants\Schemas\ChannelFormSchema;
+use App\Filament\Support\ChannelWebhookFeedback;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\Contracts\HasActions;
@@ -69,6 +70,7 @@ final class ChannelsRelationManager extends RelationManager
                     ->label(__('staff.channels.fields.webhook_hash'))
                     ->copyable()
                     ->fontFamily('mono'),
+                ChannelWebhookFeedback::statusColumn(),
                 IconColumn::make('is_active')
                     ->label(__('staff.channels.fields.is_active'))
                     ->boolean(),
@@ -89,9 +91,10 @@ final class ChannelsRelationManager extends RelationManager
                             }
 
                             /** @var Channel $record */
-                            app(ChannelServiceInterface::class)->update($record, $data);
+                            ChannelWebhookFeedback::afterWrite(app(ChannelServiceInterface::class)->update($record, $data));
                         }
                     ),
+                ChannelWebhookFeedback::reregisterAction(),
                 Action::make('rotateWebhookHash')
                     ->label(__('staff.channels.actions.rotate_webhook_hash'))
                     ->icon(Heroicon::OutlinedArrowPath)
@@ -104,13 +107,18 @@ final class ChannelsRelationManager extends RelationManager
 
                         $channel = app(ChannelServiceInterface::class)->rotateWebhookHash($record);
 
+                        ChannelWebhookFeedback::afterWrite($channel);
+
                         Notification::make()
                             ->title(__('staff.channels.notifications.hash_rotated_title'))
                             ->body($channel->webhook_public_hash)
                             ->success()
                             ->send();
                     }),
-                DeleteAction::make(),
+                DeleteAction::make()
+                    ->after(static function (Channel $record): void {
+                        ChannelWebhookFeedback::afterDeregister($record);
+                    }),
             ]);
     }
 }

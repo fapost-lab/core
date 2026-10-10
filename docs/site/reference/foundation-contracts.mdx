@@ -318,13 +318,28 @@ Core fails open: if your implementation throws, Core reports the exception and l
 through, because an outage of the operator must not stop every tenant's bots at once. A key that is
 unregistered or not `PerPeriod` is a `LogicException`.
 
-Core registers one key of kind `PerPeriod`:
+Core registers three keys of kind `PerPeriod`:
 
 | Key | What counts |
 |---|---|
 | `monthly_active_contacts` | Distinct contacts that sent at least one inbound message in the period. The unit key is `contact:` followed by the SHA-256 of `tenantId`, platform and the sender's id, so it is the same before and after the contact is created. The hash keeps messenger ids out of the operator's tables and the logs, and does not link one person across tenants by casual comparison; it is pseudonymous, not anonymous, because numeric messenger ids can be brute-forced by anyone who knows the tenant id. Core asks on every inbound message, including button presses; the implementation counts a contact once per period and answers allowed for one it has counted |
+| `outbound_messages` | Every message delivered to a contact: flow replies and prompts, broadcasts, notifications, staff replies and fallback messages. The unit key is `msg:` followed by the message's idempotency key (or `msg:` and its SHA-256 when the key would not fit), so a retry or a duplicate is the same unit. Edits of a sent message (such as removing a keyboard) and typing indicators do not count. A message with a stable time, such as a broadcast recipient's creation, is counted at that time; any other at the moment it is sent |
+| `call_executions` | Every run of a `call` node over any transport, and every "Test call" in the builder. The unit key is `call:` followed by the engine's execution key and the node id, which differs on each pass of a loop and repeats when the queue retries the step; a test call is `call_test:` and a fresh ID |
 
-When the answer is a refusal, the message is dropped before anything is stored: no contact, no
+Core asks before the message is delivered or the call is made, so a refusal means nothing was sent.
+Outbound messages go through `MessageSenderInterface::send()`, which throws
+`VolumeLimitReachedException` for a refusal; if you send messages from your own code, treat it as
+"not sent, do not retry". A flow follows the node's `error` exit with `error_type` `limit_reached`, or
+stops the session when the node has none; a broadcast stops at the first refusal and is cancelled
+with the reason `limit_reached`.
+
+A caller that has a stable time for a message, such as a broadcast recipient's creation, puts it in
+the message's metadata as `volume_occurred_at` (ISO 8601). Core's gate is the only reader: it uses it
+as `occurredAt` so a retry lands in the same period, and otherwise uses the moment of sending. The
+key is passed on to the provider sender and the transcript capture untouched, and is not a field of
+`OutboundMessage` yet.
+
+For an inbound refusal the message is dropped before anything is stored: no contact, no
 transcript entry, no flow, and no reply to the sender. A contact who is already counted in the period
 keeps working until the period ends. Core keeps a count of refused messages per person (a pseudonymous hash), bot and
 day for 90 days and shows it to people who may see contacts on the assistant's overview.

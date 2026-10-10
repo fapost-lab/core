@@ -12,15 +12,20 @@ use App\Domains\Conversation\Enums\DeliveryStatus;
 use App\Domains\Messaging\Exceptions\RateLimitExceededException;
 use App\Domains\Messaging\Exceptions\UnsupportedChannelException;
 use App\Domains\Messaging\MessageSender;
+use Carbon\CarbonImmutable;
 use Closure;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessagePayload;
 use Fapost\Foundation\Messaging\OutboundMessage;
 use Fapost\Foundation\Messaging\ProviderSenderInterface;
+use Fapost\Foundation\Quota\DTO\UsageDecision;
+use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use Illuminate\Redis\Connections\Connection;
 use Mockery;
 use Mockery\MockInterface;
+use Tests\Support\FakeUsageMeter;
+use Tests\Support\UsageGates;
 use Tests\TestCase;
 
 final class MessageSenderTest extends TestCase
@@ -34,7 +39,7 @@ final class MessageSenderTest extends TestCase
         $redis = $this->redisFactory($connection);
 
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory());
+        $sender   = new MessageSender($this->registry($provider), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
 
         $result = $sender->send($this->message(idempotencyKey: 'idem-1'));
 
@@ -53,7 +58,7 @@ final class MessageSenderTest extends TestCase
         $redis = $this->redisFactory($connection);
 
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory());
+        $sender   = new MessageSender($this->registry($provider), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
 
         $this->expectException(RateLimitExceededException::class);
 
@@ -69,7 +74,7 @@ final class MessageSenderTest extends TestCase
         });
         $redis = $this->redisFactory($connection);
 
-        $sender = new MessageSender($this->registry(null), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory());
+        $sender = new MessageSender($this->registry(null), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
 
         $this->expectException(UnsupportedChannelException::class);
 
@@ -86,7 +91,7 @@ final class MessageSenderTest extends TestCase
         $redis = $this->redisFactory($connection);
 
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory());
+        $sender   = new MessageSender($this->registry($provider), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
 
         $result = $sender->send($this->message(idempotencyKey: 'idem-4'));
 
@@ -114,7 +119,7 @@ final class MessageSenderTest extends TestCase
         $redis = $this->redisFactory($connection);
 
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory());
+        $sender   = new MessageSender($this->registry($provider), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
 
         $sender->send($this->message(idempotencyKey: 'idem-5'));
     }
@@ -130,7 +135,7 @@ final class MessageSenderTest extends TestCase
 
         $logger   = new RecordingConversationLogger();
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $redis, 30, $logger, new ConversationCaptureFactory());
+        $sender   = new MessageSender($this->registry($provider), $redis, 30, $logger, new ConversationCaptureFactory(), UsageGates::gate());
 
         $message = new OutboundMessage(
             idempotencyKey: 'idem-6',
@@ -169,13 +174,170 @@ final class MessageSenderTest extends TestCase
 
         $logger   = new RecordingConversationLogger();
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $redis, 30, $logger, new ConversationCaptureFactory());
+        $sender   = new MessageSender($this->registry($provider), $redis, 30, $logger, new ConversationCaptureFactory(), UsageGates::gate());
 
         // Bare message (no contact/assistant metadata) — e.g. an internal system
         // message that is not part of a contact transcript.
         $sender->send($this->message(idempotencyKey: 'idem-7'));
 
         $this->assertCount(0, $logger->entries);
+    }
+
+    public function test_a_refused_volume_never_reaches_the_provider_and_releases_the_idempotency_key(): void
+    {
+        $connection = $this->mock(Connection::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('set')->once()->with('msg:sent:idem-8', 'processing', 'EX', 86400, 'NX')->andReturn(true);
+            $mock->shouldReceive('pipeline')->once()->andReturn([1, true]);
+            $mock->shouldReceive('del')->once()->with('msg:sent:idem-8');
+        });
+        $provider = new InMemoryProviderSender();
+        $meter    = FakeUsageMeter::denying(1000, 1000);
+        $sender   = new MessageSender($this->registry($provider), $this->redisFactory($connection), 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
+
+        try {
+            $sender->send($this->message(idempotencyKey: 'idem-8'));
+            $this->fail('Expected VolumeLimitReachedException.');
+        } catch (VolumeLimitReachedException $exception) {
+            $this->assertSame('outbound_messages', $exception->key);
+            $this->assertSame(1000, $exception->limit);
+            $this->assertSame(1000, $exception->used);
+            $this->assertSame('Limit reached.', $exception->getMessage());
+        }
+
+        $this->assertSame(0, $provider->calls);
+        $this->assertCount(1, $meter->units);
+        $this->assertSame('msg:idem-8', $meter->units[0]->unitKey);
+        $this->assertSame('outbound_messages', $meter->units[0]->key);
+    }
+
+    public function test_a_refusal_without_an_operator_text_gets_a_readable_message(): void
+    {
+        $meter = new FakeUsageMeter(UsageDecision::refused(1000, 1000));
+
+        try {
+            UsageGates::gate($meter)->admitKey('idem');
+            $this->fail('Expected VolumeLimitReachedException.');
+        } catch (VolumeLimitReachedException $exception) {
+            $this->assertSame('Outbound messages limit reached: 1000 of 1000 this period.', $exception->getMessage());
+        }
+    }
+
+    public function test_a_duplicate_does_not_spend_volume(): void
+    {
+        $connection = $this->mock(Connection::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('set')->once()->with('msg:sent:idem-9', 'processing', 'EX', 86400, 'NX')->andReturn(false);
+        });
+        $meter  = FakeUsageMeter::denying();
+        $sender = new MessageSender($this->registry(new InMemoryProviderSender()), $this->redisFactory($connection), 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
+
+        $result = $sender->send($this->message(idempotencyKey: 'idem-9'));
+
+        $this->assertTrue($result->duplicate);
+        $this->assertSame([], $meter->units);
+    }
+
+    public function test_rate_limited_and_unsupported_sends_do_not_spend_volume(): void
+    {
+        $meter      = FakeUsageMeter::allowing();
+        $connection = $this->mock(Connection::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('set')->twice()->andReturn(true);
+            $mock->shouldReceive('pipeline')->twice()->andReturn([31, true], [1, true]);
+            $mock->shouldReceive('del')->twice();
+        });
+
+        $limited = new MessageSender($this->registry(new InMemoryProviderSender()), $this->redisFactory($connection), 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
+
+        try {
+            $limited->send($this->message(idempotencyKey: 'a'));
+            $this->fail('Expected RateLimitExceededException.');
+        } catch (RateLimitExceededException) {
+        }
+
+        $unsupported = new MessageSender($this->registry(null), $this->redisFactory($connection), 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
+
+        try {
+            $unsupported->send($this->message(idempotencyKey: 'b'));
+            $this->fail('Expected UnsupportedChannelException.');
+        } catch (UnsupportedChannelException) {
+        }
+
+        $this->assertSame([], $meter->units);
+    }
+
+    public function test_edits_of_a_sent_message_do_not_spend_volume(): void
+    {
+        $meter = FakeUsageMeter::denying();
+        $gate  = UsageGates::gate($meter);
+
+        foreach ([
+            new MessagePayload(type: 'remove_keyboard', text: ''),
+            new MessagePayload(type: 'text', text: 'edited'),
+        ] as $index => $payload) {
+            $gate->admit(new OutboundMessage(
+                idempotencyKey: "edit-{$index}",
+                tenantId: 'tenant-1',
+                channelId: 'channel-1',
+                channelType: 'telegram',
+                transportToken: null,
+                chatId: 'chat-1',
+                payload: $payload,
+                metadata: 0 === $index ? [] : ['edit_message_id' => '77'],
+            ));
+        }
+
+        $this->assertSame([], $meter->units);
+    }
+
+    public function test_a_unit_key_longer_than_the_contract_allows_is_hashed(): void
+    {
+        $meter = FakeUsageMeter::allowing();
+        $long  = str_repeat('k', 300);
+
+        UsageGates::gate($meter)->admitKey($long);
+        UsageGates::gate($meter)->admitKey($long);
+
+        $this->assertSame('msg:' . hash('sha256', $long), $meter->units[0]->unitKey);
+        $this->assertLessThanOrEqual(191, mb_strlen($meter->units[0]->unitKey));
+        $this->assertSame($meter->units[0]->unitKey, $meter->units[1]->unitKey);
+    }
+
+    public function test_the_time_is_now_unless_the_message_carries_a_stable_one(): void
+    {
+        CarbonImmutable::setTestNow('2026-10-20 10:00:00');
+        $meter = FakeUsageMeter::allowing();
+        $gate  = UsageGates::gate($meter);
+
+        $gate->admit($this->message(idempotencyKey: 'now'));
+        $gate->admit(new OutboundMessage(
+            idempotencyKey: 'stable',
+            tenantId: 'tenant-1',
+            channelId: 'channel-1',
+            channelType: 'telegram',
+            transportToken: null,
+            chatId: 'chat-1',
+            payload: new MessagePayload(type: 'text', text: 'Hello'),
+            metadata: ['volume_occurred_at' => '2026-09-30T23:59:00+00:00'],
+        ));
+
+        $this->assertSame('2026-10-20 10:00:00', $meter->units[0]->occurredAt->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-09-30 23:59:00', $meter->units[1]->occurredAt->format('Y-m-d H:i:s'));
+
+        CarbonImmutable::setTestNow();
+    }
+
+    public function test_without_an_operator_a_send_touches_redis_only_for_its_own_keys(): void
+    {
+        // The strict mock allows exactly the idempotency reservation, the rate counter and the sent mark.
+        $connection = $this->mock(Connection::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('set')->once()->with('msg:sent:idem-10', 'processing', 'EX', 86400, 'NX')->andReturn(true);
+            $mock->shouldReceive('pipeline')->once()->andReturn([1, true]);
+            $mock->shouldReceive('set')->once()->with('msg:sent:idem-10', '1', 'EX', 86400);
+        });
+        $provider = new InMemoryProviderSender();
+        $sender   = new MessageSender($this->registry($provider), $this->redisFactory($connection), 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
+
+        $this->assertTrue($sender->send($this->message(idempotencyKey: 'idem-10'))->sent);
+        $this->assertSame(1, $provider->calls);
     }
 
     private function nullConversationLogger(): ConversationLoggerInterface

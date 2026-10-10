@@ -33,6 +33,31 @@ now.
   whether to send based on a number that no longer describes anything.
 </Warning>
 
+## What the size counts
+
+The size counts every contact of the workspace that matches the conditions, whichever
+assistant they talked to. A [broadcast](/using/broadcasts) reaches fewer people than the
+size says: only those of them who can be delivered to through the assistant's channels.
+
+## Writing conditions
+
+A segment holds any number of conditions, joined by **all conditions** (every one must
+hold) or **any condition** (at least one). A segment with no conditions includes every
+contact.
+
+- A **tag** condition checks one tag. To match several tags, add a condition for each
+  and choose **any condition**.
+- An **attribute** condition compares one value. **Not equals** leaves out contacts that
+  have no value for the attribute.
+- A **group** condition that names a group which has since been deleted matches nobody,
+  so a segment never grows wider because a group disappeared.
+
+## Deleting a segment
+
+A segment can be deleted even when a broadcast that has not been sent yet is aimed at it.
+That broadcast is left without an audience and reaches nobody until you choose another
+segment. A broadcast that is already sending is not affected.
+
 ## Segments and groups
 
 Both narrow the contact base, and they are not interchangeable:

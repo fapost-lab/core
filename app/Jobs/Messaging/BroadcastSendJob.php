@@ -12,8 +12,10 @@ use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Fapost\Foundation\Messaging\MessageSenderInterface;
 use Fapost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -61,7 +63,8 @@ final class BroadcastSendJob implements ShouldQueue, TenantAccessGatedJob
     }
 
     /**
-     * Deliver the message and bubble non-duplicate failures for queue retries.
+     * Deliver the message and bubble non-duplicate failures for queue retries; an exhausted outbound
+     * volume is the exception, which is final and ends the job quietly.
      */
     public function handle(
         MessageSenderInterface $sender,
@@ -78,7 +81,20 @@ final class BroadcastSendJob implements ShouldQueue, TenantAccessGatedJob
                 return;
             }
 
-            $result = $sender->send($this->withToken($this->message, $channel->token));
+            try {
+                $result = $sender->send($this->withToken($this->message, $channel->token));
+            } catch (VolumeLimitReachedException $exception) {
+                // Final for the period: a retry would only ask the operator again. These notifications
+                // keep no per-recipient record, so the refusal is logged and the message is dropped.
+                Log::info('Broadcast message dropped: outbound message limit reached.', [
+                    'tenant_id' => $this->message->tenantId,
+                    'key'       => $exception->key,
+                    'limit'     => $exception->limit,
+                    'used'      => $exception->used,
+                ]);
+
+                return;
+            }
 
             if (! $result->sent && ! $result->duplicate) {
                 throw new RuntimeException($result->error ?? 'Broadcast message delivery failed.');
