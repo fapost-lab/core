@@ -54,7 +54,11 @@ Messaging, and its tests still use the `Tests\Unit\Domains\Messaging\Telegram` n
 - `ChannelRegistry.php`, `ChannelIntegrationDefinition.php` (tagged `channels.integration`).
 - `Telegram/TelegramChannelServiceProvider.php` — the reference integration; tags
   `channels.telegram_delivery`, `media.channel.uploader`, `media.channel.downloader`.
-- `Services/ChannelService.php`, `Observers/ChannelObserver.php`.
+- `Services/ChannelService.php`, `Observers/ChannelObserver.php`. `ChannelService::reregisterWebhook` is the
+  manual retry of a refused registration.
+- `Services/ChannelWebhookStatusRecorder.php` writes `channels.webhook_status` / `webhook_status_at` straight to
+  the row (no model events); `Services/ChannelWebhookSyncOutcome.php` is a scoped note of the refusals of the
+  current request or job, read by the screens after a delete or deactivation.
 - `Services/AssistantChannelService.php` — reads and writes the channels of an assistant the caller names (tenant
   and assistant bounded explicitly, no Filament scope); the Inertia console and, later, the admin use it. The
   type of a channel is chosen at creation and does not change in the console: changing it would leave the old

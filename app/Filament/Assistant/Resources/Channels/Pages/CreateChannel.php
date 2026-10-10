@@ -10,6 +10,7 @@ use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Filament\Assistant\Resources\Channels\ChannelResource;
+use App\Filament\Support\ChannelWebhookFeedback;
 use App\Filament\Support\ChecksRecordLimitOnMount;
 use App\Filament\Support\RecordLimit;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
@@ -55,7 +56,11 @@ final class CreateChannel extends CreateRecord
         }
 
         try {
-            return $this->channelService->create($owner, $this->normalizeConfigPayload($data));
+            $channel = $this->channelService->create($owner, $this->normalizeConfigPayload($data));
+
+            ChannelWebhookFeedback::afterWrite($channel);
+
+            return $channel;
         } catch (RecordLimitReachedException $e) {
             RecordLimit::notifyReached($e, 'staff.channels.limit');
 

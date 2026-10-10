@@ -9,6 +9,8 @@ use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Contracts\TenantResolverInterface;
 use App\Domains\Tenancy\Exceptions\TenantNotActiveException;
 use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
+use App\Domains\Tenancy\Exceptions\TenantSlugMovedException;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 
 /**
@@ -16,7 +18,8 @@ use Illuminate\Http\Request;
  *
  * The Host header chooses the tenant, so everything that is not an active, ordinary
  * tenant slug fails the same way a missing tenant does: a reserved name is never served
- * as a tenant even if a row exists for it.
+ * as a tenant even if a row exists for it. The order is: reserved name, current slug, former slug; a
+ * current slug always wins over a former one.
  */
 final readonly class HostTenantResolver implements TenantResolverInterface
 {
@@ -44,6 +47,14 @@ final readonly class HostTenantResolver implements TenantResolverInterface
         $tenant = $this->tenantRepository->findBySlug($slug);
 
         if (null === $tenant) {
+            // A slug the tenant gave up redirects to the tenant for a while; an expired one or one whose
+            // tenant is not active is an unknown host like any other.
+            $moved = $this->tenantRepository->findByFormerSlug($slug, CarbonImmutable::now());
+
+            if (null !== $moved && $moved->isActive()) {
+                throw new TenantSlugMovedException($slug, $moved);
+            }
+
             throw TenantNotFoundException::forSlug($slug);
         }
 

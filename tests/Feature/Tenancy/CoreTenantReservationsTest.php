@@ -13,6 +13,7 @@ use App\Domains\Tenancy\Models\TenantStatus;
 use App\Domains\Tenancy\Repositories\TenantRepository;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use Carbon\CarbonImmutable;
+use Fapost\Foundation\Tenancy\Contracts\TenantRenamerInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantReservationInterface;
 use Fapost\Foundation\Tenancy\DTO\TenantAdmin;
 use Fapost\Foundation\Tenancy\Enums\ProvisioningFailure;
@@ -160,6 +161,34 @@ final class CoreTenantReservationsTest extends FeatureTestCase
         $this->assertSame(1, Tenant::on('landlord')->where('slug', 'taken')->count());
     }
 
+    public function test_a_former_slug_of_a_renamed_tenant_is_taken_by_check_and_reserve(): void
+    {
+        $tenant = Tenant::on('landlord')->create(['slug' => 'acme', 'schema_name' => 'tenant_legacy_acme', 'status' => TenantStatus::Active, 'config' => []]);
+        config(['tenancy.resolution' => 'host']);
+        $this->app->make(TenantRenamerInterface::class)->rename($tenant->getId(), 'acme-new');
+        $count = Tenant::on('landlord')->count();
+
+        $this->assertSame(SlugAvailability::Taken, $this->reservations()->check('acme')->availability);
+        $this->assertReserveFails(ProvisioningFailure::SlugTaken, 'acme', 'signup-former');
+        $this->assertSame($count, Tenant::on('landlord')->count());
+    }
+
+    public function test_reserve_takes_the_slug_claim_lock_before_it_checks_the_slug(): void
+    {
+        $order      = [];
+        $repository = new FailingTenantRepository();
+        $repository->before('lockSlugClaims', static function () use (&$order): void {
+            $order[] = 'lock';
+        });
+        $repository->before('isSlugOrSchemaTaken', static function () use (&$order): void {
+            $order[] = 'check';
+        });
+
+        $this->provisioningService($repository)->reserveSlug('locked-slug', 'lock-key');
+
+        $this->assertSame(['lock', 'check'], $order);
+    }
+
     public function test_an_orphan_schema_makes_the_slug_taken(): void
     {
         $this->provisioningService();
@@ -230,10 +259,43 @@ final class CoreTenantReservationsTest extends FeatureTestCase
         $this->assertSame(1, Tenant::on('landlord')->where('slug', 'acme')->count());
     }
 
+    public function test_a_reservation_with_the_same_key_made_while_waiting_for_the_lock_is_returned(): void
+    {
+        $repository = new FailingTenantRepository();
+        $winner     = null;
+        // The other run commits its reservation while this one waits for the slug-claim lock.
+        $repository->before('lockSlugClaims', function () use (&$winner): void {
+            $winner = Tenant::on('landlord')->create([
+                'slug'   => 'acme', 'schema_name' => 'tenant_acme', 'status' => TenantStatus::Pending,
+                'config' => [], 'reservation_key' => 'signup-1',
+            ]);
+        });
+
+        $tenant = $this->provisioningService($repository)->reserveSlug('acme', 'signup-1');
+
+        $this->assertSame($winner->id, $tenant->getId());
+        $this->assertSame(1, Tenant::on('landlord')->where('slug', 'acme')->count());
+    }
+
+    public function test_a_reservation_with_the_same_key_for_another_slug_made_while_waiting_is_refused(): void
+    {
+        $repository = new FailingTenantRepository();
+        $repository->before('lockSlugClaims', static function (): void {
+            Tenant::on('landlord')->create([
+                'slug'   => 'other', 'schema_name' => 'tenant_other', 'status' => TenantStatus::Pending,
+                'config' => [], 'reservation_key' => 'signup-1',
+            ]);
+        });
+
+        $this->expectException(InvalidArgumentException::class);
+
+        $this->provisioningService($repository)->reserveSlug('acme', 'signup-1');
+    }
+
     public function test_a_real_unique_violation_against_another_key_is_slug_taken(): void
     {
         $repository = new FailingTenantRepository();
-        $repository->after('isSlugOrSchemaTaken', static function (): void {
+        $repository->before('transaction', static function (): void {
             Tenant::on('landlord')->create([
                 'slug'   => 'acme', 'schema_name' => 'tenant_acme', 'status' => TenantStatus::Pending,
                 'config' => [], 'reservation_key' => 'someone-else',
@@ -247,7 +309,8 @@ final class CoreTenantReservationsTest extends FeatureTestCase
             $this->assertSame(ProvisioningFailure::SlugTaken, $e->reason);
         }
 
-        $this->assertSame(1, Tenant::on('landlord')->where('slug', 'acme')->count());
+        $this->assertSame(1, Tenant::on('landlord')->where('slug', 'acme')->where('reservation_key', 'someone-else')->count(), 'The competitor keeps the slug.');
+        $this->assertSame(0, Tenant::on('landlord')->where('reservation_key', 'signup-1')->count(), 'Ours was not kept.');
     }
 
     public function test_release_deletes_an_untouched_pending_tenant(): void

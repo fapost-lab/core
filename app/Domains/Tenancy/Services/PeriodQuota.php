@@ -11,6 +11,7 @@ use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Quota\DTO\UsageDecision;
 use Fapost\Foundation\Quota\DTO\UsageUnit;
 use Fapost\Foundation\Quota\Enums\LimitKind;
+use Illuminate\Support\Facades\Log;
 use LogicException;
 use Throwable;
 
@@ -55,11 +56,23 @@ final readonly class PeriodQuota
         $unit = new UsageUnit($this->context->get()->getId(), $key, $unitKey, $occurredAt);
 
         try {
-            return $this->meter->consume($unit);
+            $decision = $this->meter->consume($unit);
         } catch (Throwable $exception) {
             report($exception);
 
             return UsageDecision::allowed();
         }
+
+        if (! $decision->allowed) {
+            // One place for every per-period gate; no unit key, which can name a contact.
+            Log::info('quota.volume.refused', [
+                'tenant_id' => $unit->tenantId,
+                'key'       => $key,
+                'limit'     => $decision->limit,
+                'used'      => $decision->used,
+            ]);
+        }
+
+        return $decision;
     }
 }

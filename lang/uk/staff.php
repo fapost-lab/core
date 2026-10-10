@@ -204,6 +204,8 @@ return [
             'config_key'           => 'Ключ',
             'config_value'         => 'Значення',
             'config_add'           => 'Додати',
+            'webhook_status'       => 'Вебхук',
+            'webhook_failed'       => 'Не зареєстровано',
             'updated_at'           => 'Оновлено',
         ],
 
@@ -242,13 +244,19 @@ return [
         'actions' => [
             'rotate_webhook_hash'             => 'Ротувати webhook hash',
             'rotate_webhook_hash_description' => 'Публічний URL webhook зміниться. Оновіть налаштування webhook у каналі після ротації.',
+            'reregister_webhook'              => 'Зареєструвати вебхук знову',
             'generate_secret_token'           => 'Згенерувати',
             'select_all'                      => 'Вибрати всі',
             'clear_all'                       => 'Очистити',
         ],
 
         'notifications' => [
-            'hash_rotated_title' => 'Webhook hash оновлено',
+            'hash_rotated_title'              => 'Webhook hash оновлено',
+            'webhook_failed_title'            => 'Вебхук не зареєстровано',
+            'webhook_failed_body'             => 'Канал збережено, але провайдер не прийняв вебхук, тому повідомлення поки не надходять. Перевірте токен і оберіть «Зареєструвати вебхук знову».',
+            'webhook_deregister_failed_title' => 'Зняття вебхука не підтверджено',
+            'webhook_deregister_failed_body'  => 'Зміну збережено, але провайдер не підтвердив зняття старого вебхука. Це безпечно: на нього більше нічого не маршрутизується.',
+            'webhook_registered_title'        => 'Вебхук зареєстровано',
         ],
     ],
 

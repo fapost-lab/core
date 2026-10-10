@@ -6,6 +6,7 @@ namespace Tests\Feature\Jobs\Messaging;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Channels\Contracts\ChannelWebhookStatusRecorderInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
@@ -48,7 +49,7 @@ final class SyncChannelWebhookJobCredentialsTest extends FeatureTestCase
             $mock->shouldReceive('recordIngress')->once()->with($channel->webhook_public_hash, 'https://app.example.com');
         });
 
-        $job->handle($this->registry($registrar), $this->tenantSwitcher(), $this->urlGenerator(), $writer);
+        $job->handle($this->registry($registrar), $this->tenantSwitcher(), $this->urlGenerator(), $writer, $this->app->make(ChannelWebhookStatusRecorderInterface::class));
     }
 
     public function test_a_job_without_credentials_also_takes_the_hash_and_config_from_the_channel(): void
@@ -77,7 +78,7 @@ final class SyncChannelWebhookJobCredentialsTest extends FeatureTestCase
             $mock->shouldReceive('recordIngress')->once()->with($channel->webhook_public_hash, 'https://app.example.com');
         });
 
-        $job->handle($this->registry($registrar), $this->tenantSwitcher(), $this->urlGenerator(), $writer);
+        $job->handle($this->registry($registrar), $this->tenantSwitcher(), $this->urlGenerator(), $writer, $this->app->make(ChannelWebhookStatusRecorderInterface::class));
     }
 
     public function test_a_job_without_credentials_does_nothing_when_the_channel_is_gone(): void
@@ -95,7 +96,7 @@ final class SyncChannelWebhookJobCredentialsTest extends FeatureTestCase
             $mock->shouldReceive('recordIngress')->never();
         });
 
-        $job->handle($this->registry($registrar), $this->tenantSwitcher(), $this->urlGenerator(), $writer);
+        $job->handle($this->registry($registrar), $this->tenantSwitcher(), $this->urlGenerator(), $writer, $this->app->make(ChannelWebhookStatusRecorderInterface::class));
 
         $this->addToAssertionCount(1);
     }

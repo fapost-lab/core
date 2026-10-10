@@ -17,6 +17,7 @@ use App\Domains\Tenancy\Database\TenantPostgresConnection;
 use App\Domains\Tenancy\Infrastructure\CoreSupportAccess;
 use App\Domains\Tenancy\Infrastructure\CoreTenantDirectory;
 use App\Domains\Tenancy\Infrastructure\CoreTenantProvisioner;
+use App\Domains\Tenancy\Infrastructure\CoreTenantRenamer;
 use App\Domains\Tenancy\Infrastructure\CoreTenantReservations;
 use App\Domains\Tenancy\Infrastructure\EloquentWebhookRegistryReader;
 use App\Domains\Tenancy\Repositories\TenantRepository;
@@ -34,6 +35,7 @@ use App\Domains\Tenancy\Services\RequestHostClassifier;
 use App\Domains\Tenancy\Services\SupportAccessTokenStore;
 use App\Domains\Tenancy\Services\TenantContext;
 use App\Domains\Tenancy\Services\TenantProvisioningService;
+use App\Domains\Tenancy\Services\TenantSlugChanger;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Services\UnlimitedTenantLimits;
@@ -48,6 +50,7 @@ use Fapost\Foundation\Tenancy\Contracts\SupportAccessInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantDirectoryInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface;
+use Fapost\Foundation\Tenancy\Contracts\TenantRenamerInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantReservationInterface;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Database\Connection;
@@ -105,12 +108,18 @@ final class DomainServiceProvider extends ServiceProvider
         // Plain bind as well: Core is the only implementation of slug reservation, and nothing in Core calls it.
         $this->app->bind(TenantReservationInterface::class, CoreTenantReservations::class);
         $this->app->bind(TenantDirectoryInterface::class, CoreTenantDirectory::class);
+        // Plain bind: Core is the only implementation of renaming a tenant, and nothing in Core calls it.
+        $this->app->bind(TenantRenamerInterface::class, CoreTenantRenamer::class);
 
         // Core is the only implementation of support access, so a plain bind: an operator package
         // calls the contract and never replaces it. Without the package the feature stays off
         // (`tenancy.support_access.enabled`), not unbound.
         $this->app->bind(SupportAccessInterface::class, CoreSupportAccess::class);
         $this->app->bind(SupportAccessRedeemerInterface::class, SupportAccessTokenStore::class);
+
+        $this->app->when(TenantSlugChanger::class)
+            ->needs('$redirectDays')
+            ->giveConfig('tenancy.rename.redirect_days', 30);
 
         $this->app->when(TenantProvisioningService::class)
             ->needs('$leaseSeconds')

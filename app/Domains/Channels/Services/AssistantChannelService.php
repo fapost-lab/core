@@ -106,6 +106,11 @@ final readonly class AssistantChannelService
         return $this->channels->rotateWebhookHash($channel);
     }
 
+    public function reregisterWebhook(Channel $channel): Channel
+    {
+        return $this->channels->reregisterWebhook($channel);
+    }
+
     /**
      * Deletes the channel itself, not through a query: the observer takes the webhook routing out and deregisters the
      * webhook at the provider, and a single `DELETE` would skip it.

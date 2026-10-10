@@ -88,6 +88,7 @@ return [
         'reply_sent'              => 'Reply sent.',
         'reply_failed'            => 'Could not send the reply. Please try again.',
         'reply_undeliverable'     => 'This contact has no active channel to reply on.',
+        'reply_limit_reached'     => 'The reply was not sent: the outbound message limit for this period is reached.',
         'taken_over'              => 'You are now handling this conversation.',
         'returned_to_bot'         => 'Conversation returned to the assistant.',
     ],

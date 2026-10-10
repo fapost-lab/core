@@ -16,6 +16,8 @@ use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessagePayload;
 use Fapost\Foundation\Messaging\MessageSenderInterface;
 use Fapost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
+use Illuminate\Support\Facades\Log;
 use Mockery\MockInterface;
 use RuntimeException;
 use Spatie\Permission\PermissionRegistrar;
@@ -86,6 +88,24 @@ final class BroadcastSendJobTest extends FeatureTestCase
         $this->expectExceptionMessage('provider unavailable');
 
         $job->handle($sender, $this->tenantRepository(), $this->tenantSwitcher());
+    }
+
+    public function test_a_refused_outbound_volume_ends_the_job_quietly_without_a_retry(): void
+    {
+        Log::spy();
+
+        $sender = $this->mock(MessageSenderInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('send')->once()->andThrow(new VolumeLimitReachedException('outbound_messages', 10, 10));
+        });
+
+        $job = new BroadcastSendJob($this->message($this->channel()));
+
+        $job->handle($sender, $this->tenantRepository(), $this->tenantSwitcher());
+
+        Log::shouldHaveReceived('info')->once()->with(
+            'Broadcast message dropped: outbound message limit reached.',
+            ['tenant_id' => 'tenant-1', 'key' => 'outbound_messages', 'limit' => 10, 'used' => 10],
+        );
     }
 
     public function test_unsent_non_duplicate_result_throws_for_retry(): void

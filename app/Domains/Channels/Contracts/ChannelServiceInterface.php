@@ -28,6 +28,12 @@ interface ChannelServiceInterface
     public function rotateWebhookHash(Channel $channel): Channel;
 
     /**
+     * Register the channel's webhook at the provider again, synchronously. The result is on the returned channel's
+     * webhook status; a refusal is reported and never thrown. An inactive channel is returned as it is.
+     */
+    public function reregisterWebhook(Channel $channel): Channel;
+
+    /**
      * Deactivate a channel (sets {@see Channel::$is_active} to false).
      */
     public function deactivate(Channel $channel): void;

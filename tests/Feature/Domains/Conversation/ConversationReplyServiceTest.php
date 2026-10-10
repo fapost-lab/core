@@ -13,11 +13,22 @@ use App\Domains\Conversation\Contracts\ConversationReplyServiceInterface;
 use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Conversation\Exceptions\ConversationReplyUndeliverableException;
 use App\Domains\Conversation\Models\Conversation;
+use App\Domains\Media\Contracts\MediaDispatcherInterface;
+use App\Domains\Media\DTO\DispatchResult;
+use App\Domains\Media\Enums\MediaSource;
+use App\Domains\Media\Models\MediaBlob;
+use App\Domains\Media\Models\MediaFile;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use Fapost\Foundation\Media\Enums\MediaKind;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Fapost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
+use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Mockery\MockInterface;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\FakeUsageMeter;
 
 /**
  * Covers {@see \App\Domains\Conversation\Services\ConversationReplyService} —
@@ -109,6 +120,75 @@ final class ConversationReplyServiceTest extends FeatureTestCase
         $this->expectException(ConversationReplyUndeliverableException::class);
 
         app(ConversationReplyServiceInterface::class)->send($conversation, 'hi', 'staff-1');
+    }
+
+    public function test_media_reply_refused_by_the_volume_limit_is_not_uploaded_or_sent(): void
+    {
+        [$conversation] = $this->threadWithLinkedContact();
+        $mediaFile      = $this->mediaFile();
+
+        $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: self::TENANT_ID, schemaName: 'main'));
+
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::denying(10, 10));
+        $this->mock(MediaDispatcherInterface::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('ensureUploadedToChannel');
+        });
+        $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock): void {
+            $mock->shouldNotReceive('send');
+        });
+
+        $this->expectException(VolumeLimitReachedException::class);
+
+        app(ConversationReplyServiceInterface::class)->send($conversation, 'see attached', 'staff-1', (string) $mediaFile->getKey());
+    }
+
+    public function test_media_reply_spends_one_unit_under_the_key_the_message_carries(): void
+    {
+        [$conversation] = $this->threadWithLinkedContact();
+        $mediaFile      = $this->mediaFile();
+
+        $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: self::TENANT_ID, schemaName: 'main'));
+        $meter   = FakeUsageMeter::allowing();
+        $sentKey = null;
+
+        $this->app->instance(UsageMeterInterface::class, $meter);
+        $this->mock(MediaDispatcherInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('ensureUploadedToChannel')->once()->andReturn(new DispatchResult(providerFileId: 'file-1', alreadyDelivered: false));
+        });
+        $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock) use (&$sentKey): void {
+            $mock->shouldReceive('send')->once()->andReturnUsing(function (OutboundMessage $message) use (&$sentKey): DeliveryResult {
+                $sentKey = $message->idempotencyKey;
+
+                return new DeliveryResult(sent: true, providerMessageId: 'p-1');
+            });
+        });
+
+        app(ConversationReplyServiceInterface::class)->send($conversation, 'see attached', 'staff-1', (string) $mediaFile->getKey());
+
+        $this->assertCount(1, $meter->units);
+        $this->assertSame('outbound_messages', $meter->units[0]->key);
+        $this->assertSame('msg:' . $sentKey, $meter->units[0]->unitKey);
+    }
+
+    private function mediaFile(): MediaFile
+    {
+        $blob = MediaBlob::query()->create([
+            'tenant_id'    => self::TENANT_ID,
+            'content_hash' => str_repeat('e', 64),
+            'storage_path' => 'tenants/test/media/e.jpg',
+            'storage_disk' => 'local',
+            'size'         => 10,
+            'mime_type'    => 'image/jpeg',
+        ]);
+
+        return MediaFile::query()->create([
+            'tenant_id' => self::TENANT_ID,
+            'blob_id'   => $blob->id,
+            'name'      => 'e.jpg',
+            'kind'      => MediaKind::Image,
+            'metadata'  => [],
+            'source'    => MediaSource::Upload,
+        ]);
     }
 
     /**

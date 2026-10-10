@@ -8,6 +8,7 @@ use App\Domains\Staff\Http\Middleware\EndExpiredSupportSession;
 use App\Domains\Staff\Http\Middleware\EnsureUserIsActive;
 use App\Domains\Tenancy\Exceptions\TenantNotActiveException;
 use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
+use App\Domains\Tenancy\Exceptions\TenantSlugMovedException;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Middleware\EnsureCanAccessPanel;
@@ -119,6 +120,20 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustHosts(at: fn (): array => TenantHost::trustedHostPatterns(), subdomains: false);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // A slug a tenant gave up redirects to its new host for a while, but only for requests that can safely be
+        // repeated there. 302 on purpose: a browser keeps no 302, so a tenant that takes its slug back or a redirect
+        // that expires is not stuck behind a cached one. Any other method gets the 404 a missing tenant gets. Not an
+        // error, so not reported.
+        $exceptions->dontReport(TenantSlugMovedException::class);
+
+        $exceptions->render(function (TenantSlugMovedException $exception, Request $request) {
+            if (! $request->isMethod('GET') && ! $request->isMethod('HEAD')) {
+                return app(ExceptionHandler::class)->render($request, new NotFoundHttpException('', $exception));
+            }
+
+            return redirect()->away(TenantHost::urlFor($exception->tenant, $request->getRequestUri()), 302);
+        });
+
         // In host mode a host that names no servable tenant is "not found" to the client. Only the
         // response changes: the exception is still reported, so a queued job that loses its tenant
         // stays visible. In single mode the host names nothing, so a missing tenant is a

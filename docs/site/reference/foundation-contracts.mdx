@@ -80,6 +80,7 @@ DTOs: `UploadContext`, `UploadResult`, `DownloadResult`. Enum: `MediaKind`.
 |---|---|
 | `Tenancy\Contracts\TenantProvisionerInterface` | Creating a tenant with its first administrator. Implemented by Core; a package only calls it |
 | `Tenancy\Contracts\TenantReservationInterface` | Holding a slug for a tenant that does not exist yet, then completing it by id. Implemented by Core; a package only calls it |
+| `Tenancy\Contracts\TenantRenamerInterface` | Changing a tenant's slug, and so its host. Implemented by Core; a package only calls it |
 
 `provision(ProvisionTenant): ProvisionedTenant` creates the tenant record, its database schema,
 runs the migrations and creates the first admin.
@@ -111,7 +112,7 @@ directory with status `Pending`. It is completed later, by id.
   `SlugCheck` carries `availability` (`Enums\SlugAvailability`: `Available`, `Invalid`, `Reserved`,
   `Taken`) and, for `Invalid` only, `problem` (`Enums\SlugProblem`: `Malformed`, `TooLong`,
   `PunycodePrefix`, `ConsecutiveHyphens`). The problem is a code: the text a person reads is the
-  caller's, in the caller's language. A slug held by any tenant, `Pending` ones included, is `Taken`.
+  caller's, in the caller's language. A slug held by any tenant, `Pending` ones included, or given up by a renamed tenant (see below), is `Taken`.
 - `reserve(string $slug, string $reservationKey): ReservedTenant` creates the `Pending` tenant and
   returns its `id` and `slug`. The key is a stable string of 1 to 64 characters that the caller stores
   before calling, such as the id of its own sign-up record. Reserving again with the same key returns
@@ -134,6 +135,34 @@ directory with status `Pending`. It is completed later, by id.
   (inactive or suspended) will not go away on a repeat, and neither will `Conflict`: a schema of the
   tenant's name that the tenant never claimed, or a user already in the tenant besides the first
   administrator. The tenant stays `Pending` until an operator resolves it; do not queue a retry.
+
+`Tenancy\Contracts\TenantRenamerInterface` changes the slug of an existing tenant, which is the
+host `<slug>.<base domain>` it is served on. Nothing else moves: the tenant's schema, data, channel
+webhooks and tokens stay as they are.
+
+- `rename(string $tenantId, string $newSlug): RenamedTenant` runs in one landlord transaction and is
+  fast enough for an HTTP request. `RenamedTenant` carries `id`, `slug`, `previousSlug`, `changed`,
+  `url` and `loginUrl` (on the new host, as in `TenantSummary`) and `redirectUntil`. Renaming to the
+  slug the tenant already has succeeds with `changed` false and writes nothing, so a caller that
+  crashed after the call can repeat it. `Active`, `Inactive` and `Suspended` tenants can be renamed.
+- The slug is checked as at creation. A refusal is a `TenantRenameFailedException` with a `reason`
+  (`Enums\RenameFailure`): `SlugInvalid` (with `problem`, the same `SlugProblem` as `check()`),
+  `SlugReserved`, `SlugTaken` (also a lost race with another claim), `TenantNotFound`, `TenantPending`
+  (an unfinished registration holds the slug), `Unavailable` (the installation does not resolve tenants
+  by host, so a slug is not an address) and `Failed`. `isInputError()` is true for every reason except
+  `Failed`, and only `Failed` is worth repeating.
+- The old host redirects `GET` and `HEAD` requests to the same path and query on the new host with
+  HTTP 302 until `redirectUntil`, and only while the tenant is `Active`: the old host of an `Inactive` or `Suspended` tenant, which can be renamed, answers 404 (30 days by default, `TENANCY_RENAME_REDIRECT_DAYS`; `null` when
+  the redirect is switched off). Any other method gets 404 at once, so a link issued before the
+  rename, such as a staff activation or a password reset, still works through the redirect during that
+  period; a support-access grant does not and must be issued again.
+- A slug a tenant gave up stays reserved for that tenant for good, redirect or not: `check()` and
+  `reserve()` answer `Taken` for it, and no other tenant can be renamed to it. The tenant itself can
+  take it back.
+- Staff are signed out, because the session cookie belongs to the old host (host mode requires `SESSION_DOMAIN` to be empty, so it is host-only). Core notifies nobody
+  and keeps no history of renames: telling the tenant's staff the new address and recording the
+  change are the caller's job. Read `url` and `loginUrl` again from the directory instead of keeping
+  old copies, and address the tenant by id, never by slug.
 
 `Enums\TenantStatus` gains `Pending`. New statuses and reasons may appear in a minor release, so
 branch on them with a default arm.
@@ -289,13 +318,28 @@ Core fails open: if your implementation throws, Core reports the exception and l
 through, because an outage of the operator must not stop every tenant's bots at once. A key that is
 unregistered or not `PerPeriod` is a `LogicException`.
 
-Core registers one key of kind `PerPeriod`:
+Core registers three keys of kind `PerPeriod`:
 
 | Key | What counts |
 |---|---|
 | `monthly_active_contacts` | Distinct contacts that sent at least one inbound message in the period. The unit key is `contact:` followed by the SHA-256 of `tenantId`, platform and the sender's id, so it is the same before and after the contact is created. The hash keeps messenger ids out of the operator's tables and the logs, and does not link one person across tenants by casual comparison; it is pseudonymous, not anonymous, because numeric messenger ids can be brute-forced by anyone who knows the tenant id. Core asks on every inbound message, including button presses; the implementation counts a contact once per period and answers allowed for one it has counted |
+| `outbound_messages` | Every message delivered to a contact: flow replies and prompts, broadcasts, notifications, staff replies and fallback messages. The unit key is `msg:` followed by the message's idempotency key (or `msg:` and its SHA-256 when the key would not fit), so a retry or a duplicate is the same unit. Edits of a sent message (such as removing a keyboard) and typing indicators do not count. A message with a stable time, such as a broadcast recipient's creation, is counted at that time; any other at the moment it is sent |
+| `call_executions` | Every run of a `call` node over any transport, and every "Test call" in the builder. The unit key is `call:` followed by the engine's execution key and the node id, which differs on each pass of a loop and repeats when the queue retries the step; a test call is `call_test:` and a fresh ID |
 
-When the answer is a refusal, the message is dropped before anything is stored: no contact, no
+Core asks before the message is delivered or the call is made, so a refusal means nothing was sent.
+Outbound messages go through `MessageSenderInterface::send()`, which throws
+`VolumeLimitReachedException` for a refusal; if you send messages from your own code, treat it as
+"not sent, do not retry". A flow follows the node's `error` exit with `error_type` `limit_reached`, or
+stops the session when the node has none; a broadcast stops at the first refusal and is cancelled
+with the reason `limit_reached`.
+
+A caller that has a stable time for a message, such as a broadcast recipient's creation, puts it in
+the message's metadata as `volume_occurred_at` (ISO 8601). Core's gate is the only reader: it uses it
+as `occurredAt` so a retry lands in the same period, and otherwise uses the moment of sending. The
+key is passed on to the provider sender and the transcript capture untouched, and is not a field of
+`OutboundMessage` yet.
+
+For an inbound refusal the message is dropped before anything is stored: no contact, no
 transcript entry, no flow, and no reply to the sender. A contact who is already counted in the period
 keeps working until the period ends. Core keeps a count of refused messages per person (a pseudonymous hash), bot and
 day for 90 days and shows it to people who may see contacts on the assistant's overview.

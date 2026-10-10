@@ -10,6 +10,9 @@ use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableStorage;
+use App\Domains\Tenancy\Services\PeriodQuota;
+use App\Domains\Tenancy\Support\UsageUnitKey;
+use Carbon\CarbonImmutable;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
@@ -47,6 +50,11 @@ final class CallNodeHandler extends AbstractVersionedHandler
 {
     final public const string TYPE = 'call';
 
+    /**
+     * Per-period limit key spent by every execution, before the transport is called.
+     */
+    final public const string LIMIT_KEY = 'call_executions';
+
     private const string ERROR_META           = 'error';
     private const string ERROR_TYPE_META      = 'error_type';
     private const string ERROR_CODE_META      = 'error_code';
@@ -62,6 +70,7 @@ final class CallNodeHandler extends AbstractVersionedHandler
         private readonly CallTransportRegistry $transports,
         private readonly TemplateRenderer $templates,
         private readonly VariableResolverInterface $variableResolver,
+        private readonly PeriodQuota $quota,
     ) {
     }
 
@@ -160,6 +169,12 @@ final class CallNodeHandler extends AbstractVersionedHandler
         $rawOptions = is_array($config['transport_options'] ?? null) ? $config['transport_options'] : [];
         $options    = $this->templates->render($rawOptions, $context, $state);
         $options    = is_array($options) ? $options : [];
+
+        $refused = $this->refuseWhenVolumeUsedUp($context);
+
+        if (null !== $refused) {
+            return $refused;
+        }
 
         $callContext = $this->buildContext($context);
         $request     = new CallRequest(target: $target, parameters: $parameters, options: $options);
@@ -288,6 +303,12 @@ final class CallNodeHandler extends AbstractVersionedHandler
             ],
         );
 
+        $refused = $this->refuseWhenVolumeUsedUp($context);
+
+        if (null !== $refused) {
+            return $refused;
+        }
+
         $callContext = $this->buildContext($context);
         $result      = $this->transports->get(self::DEFAULT_TRANSPORT)->execute($request, $callContext);
 
@@ -312,6 +333,39 @@ final class CallNodeHandler extends AbstractVersionedHandler
                 self::ERROR_CODE_META      => $result->errorCode,
                 self::IDEMPOTENCY_KEY_META => $callContext->idempotencyKey,
             ], static fn (mixed $v): bool => null !== $v),
+        );
+    }
+
+    /**
+     * Spends one call execution; on a refusal answers with the node's `error` handle and no call is made.
+     *
+     * The unit is the engine's execution key plus the node id, not {@see CallContext::$idempotencyKey}
+     * (`{session}:{node}`): that one is the same on every pass of a loop, while the engine key changes
+     * with each persisted step and stays the same when the queue retries the step.
+     */
+    private function refuseWhenVolumeUsedUp(NodeExecutionContext $context): ?NodeExecutionResult
+    {
+        $decision = $this->quota->consume(
+            self::LIMIT_KEY,
+            UsageUnitKey::make('call:', $context->idempotencyKey . ':' . $context->nodeId),
+            CarbonImmutable::now(),
+        );
+
+        if ($decision->allowed) {
+            return null;
+        }
+
+        $message = $decision->message ?? 'Call executions limit reached for this period.';
+
+        return new NodeExecutionResult(
+            status: NodeExecutionStatus::Executed,
+            sourceHandle: self::HANDLE_ERROR,
+            metadata: [
+                self::ERROR_TYPE_META => 'limit_reached',
+                self::ERROR_META      => $message,
+            ],
+            // The flow log keeps only this field, so the reason is visible there.
+            errorMessage: 'limit_reached: ' . $message,
         );
     }
 

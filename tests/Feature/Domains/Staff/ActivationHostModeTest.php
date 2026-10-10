@@ -11,6 +11,7 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\ActivationTokenService;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use Fapost\Foundation\Tenancy\Contracts\TenantRenamerInterface;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Tests\Feature\Concerns\RunsInHostMode;
@@ -70,6 +71,31 @@ final class ActivationHostModeTest extends FeatureTestCase
             ->assertOk()
             ->assertViewIs('staff.activate');
 
+        $this->post("{$host}/activate", [
+            'token'                 => $query['token'],
+            'password'              => 'a-long-password',
+            'password_confirmation' => 'a-long-password',
+        ])->assertRedirect("{$host}/admin");
+
+        $this->assertSame(UserStatus::Active, $user->fresh()->status);
+    }
+
+    public function test_a_link_issued_before_a_rename_still_activates_on_the_new_host(): void
+    {
+        [$user, $url] = $this->sendActivationMail('main');
+        $this->app->make(TenantRenamerInterface::class)->rename('00000000-0000-0000-0000-000000000001', 'main-new');
+
+        $path = (string) parse_url($url, PHP_URL_PATH) . '?' . parse_url($url, PHP_URL_QUERY);
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+        // The old host sends the link on to the new one with the token intact.
+        $this->get("http://main.{$this->base}{$path}")
+            ->assertStatus(302)
+            ->assertRedirect($this->expectedOrigin('main-new') . $path);
+
+        $host = "http://main-new.{$this->base}";
+
+        $this->get($host . $path)->assertOk()->assertViewIs('staff.activate');
         $this->post("{$host}/activate", [
             'token'                 => $query['token'],
             'password'              => 'a-long-password',

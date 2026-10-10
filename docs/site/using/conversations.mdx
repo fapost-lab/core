@@ -41,6 +41,10 @@ Where a person replies from — the operator inbox — the message goes out **un
 the assistant's identity**. The contact sees the assistant, not the individual
 typing.
 
+A reply counts against the tenant's outbound messages for the period. When they
+are used up the reply is not sent, and the inbox says so instead of showing a
+generic failure.
+
 That is usually what you want, and it is exactly why the permission to do it is
 marked sensitive: reading transcripts and speaking as the company are two
 separate grants, and neither is routine. See

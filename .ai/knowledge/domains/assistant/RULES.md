@@ -56,6 +56,10 @@ broken.
   (`EditAssistant.php` → `AssistantService::update`, which writes `is_active` without the channel
   cascade); `AssistantSettings` has no assistant `is_active` field.
   *(proposed)*
+- **A nested `runForTenant` hides the current assistant inside and returns it after.** A synchronous job in an
+  HTTP request (the channel webhook sync) must not leave the request without its assistant, and the inner tenant
+  never sees the outer one. At the top level of a job there is nothing to return, so it resets as before.
+  Enforced: `CurrentAssistantIsolationTest`.
 - **Never capture `CurrentAssistantInterface` in a singleton.** Source: `conventions/worker-safety.md`. Every
   service that holds it today is `scoped`, and node handlers (with `CachedContentTranslator`) are
   built per scope (ADR-0001). Enforced for the sequence of jobs by `CurrentAssistantIsolationTest`;
