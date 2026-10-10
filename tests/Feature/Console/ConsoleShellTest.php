@@ -76,7 +76,7 @@ final class ConsoleShellTest extends InertiaConsoleTestCase
         $this->assertFalse($groups[2]['items'][1]['external'], 'Flow groups moved.');
         $this->assertFalse($groups[3]['items'][0]['external'], 'Flow sessions moved.');
         $this->assertFalse($groups[3]['items'][1]['external'], 'The flow log moved.');
-        $this->assertTrue($groups[3]['items'][4]['external'], 'Conversations is still Filament.');
+        $this->assertFalse($groups[3]['items'][4]['external'], 'Conversations moved.');
         $this->assertNull($groups[3]['items'][4]['badge'], 'No unread conversations, no badge.');
     }
 

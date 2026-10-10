@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domains\Conversation\Live\ConversationActivityChannel;
 use App\Domains\Flow\Live\FlowActivityChannel;
 use Illuminate\Support\Facades\Broadcast;
 
@@ -16,3 +17,4 @@ use Illuminate\Support\Facades\Broadcast;
 */
 
 Broadcast::channel(FlowActivityChannel::PATTERN, FlowActivityChannel::class);
+Broadcast::channel(ConversationActivityChannel::PATTERN, ConversationActivityChannel::class);

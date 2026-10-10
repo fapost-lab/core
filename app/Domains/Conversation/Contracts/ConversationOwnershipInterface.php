@@ -36,6 +36,14 @@ interface ConversationOwnershipInterface
     public function assign(string $conversationId, ConversationOwner $owner, ?string $staffUserId = null): void;
 
     /**
+     * Hand a thread the bot answers to this operator. Conditional: a thread another operator already holds stays
+     * theirs, so two operators clicking at once (or a stale tab) never take it from each other silently.
+     *
+     * @return bool whether this call took the thread over
+     */
+    public function takeOver(string $conversationId, string $staffUserId): bool;
+
+    /**
      * Clear the unread counter after an operator has read the thread.
      */
     public function markRead(string $conversationId): void;
