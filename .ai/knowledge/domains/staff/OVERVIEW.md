@@ -21,7 +21,10 @@ paths:
   - "database/migrations/tenant/*roles*"
   - "database/migrations/tenant/*activation_tokens*"
   - "database/migrations/tenant/*notifications_table*"
-reviewed_at: 2026-10-05
+  - app/Http/Controllers/Admin/UserController.php
+  - app/Http/Controllers/Admin/RoleController.php
+  - "app/Http/Requests/Admin/**"
+reviewed_at: 2026-10-10
 ---
 # Staff
 
@@ -50,4 +53,7 @@ email) raised by Flow's staff-notify node.
 - Notifications: `Jobs/SendStaffNotificationJob.php` (queue `messaging.system`), the staff
   notifier registry.
 - `Http/Middleware/EnsureUserIsActive.php` (both panels), `database/seeders/RoleSeeder.php`.
-- Admin UI: `app/Filament/Resources/{Users,Roles}`.
+- Admin UI: with `UI_INERTIA=true`, `app/Http/Controllers/Admin/{UserController,RoleController}.php`
+  over `Services/StaffUserService.php` and `Services/StaffRoleService.php` (roles are written by
+  `RoleWriterService`), pages in `resources/js/pages/Console/{Users,Roles}`; with it off,
+  `app/Filament/Resources/{Users,Roles}`.

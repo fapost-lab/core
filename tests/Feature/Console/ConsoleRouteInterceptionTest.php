@@ -6,7 +6,9 @@ namespace Tests\Feature\Console;
 
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
+use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
@@ -77,6 +79,13 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             // Translations: both panels.
             'admin translations'     => ['filament.admin.pages.translations', AdminTranslationController::class, 'index', 'admin/translations'],
             'assistant translations' => ['filament.assistant.pages.translations', TranslationController::class, 'index', 'assistant/{tenant}/translations'],
+            // Staff users and roles.
+            'users list'   => ['filament.admin.resources.users.index', AdminUserController::class, 'index', 'admin/users'],
+            'users create' => ['filament.admin.resources.users.create', AdminUserController::class, 'create', 'admin/users/create'],
+            'users edit'   => ['filament.admin.resources.users.edit', AdminUserController::class, 'edit', 'admin/users/{record}/edit'],
+            'roles list'   => ['filament.admin.resources.roles.index', AdminRoleController::class, 'index', 'admin/roles'],
+            'roles create' => ['filament.admin.resources.roles.create', AdminRoleController::class, 'create', 'admin/roles/create'],
+            'roles edit'   => ['filament.admin.resources.roles.edit', AdminRoleController::class, 'edit', 'admin/roles/{record}/edit'],
             // Admin assistants.
             'admin assistants list'   => ['filament.admin.resources.assistants.index', AdminAssistantController::class, 'index', 'admin/assistants'],
             'admin assistants create' => ['filament.admin.resources.assistants.create', AdminAssistantController::class, 'create', 'admin/assistants/create'],
@@ -134,6 +143,17 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'translation reset'        => ['console.translations.reset', TranslationController::class, 'reset', 'DELETE', 'assistant/{tenant}/translations/{key}'],
             'admin translation update' => ['console.admin.translations.update', AdminTranslationController::class, 'update', 'PUT', 'admin/translations/{key}'],
             'admin translation reset'  => ['console.admin.translations.reset', AdminTranslationController::class, 'reset', 'DELETE', 'admin/translations/{key}'],
+            // Staff users and roles.
+            'user store'             => ['console.admin.users.store', AdminUserController::class, 'store', 'POST', 'admin/users'],
+            'user update'            => ['console.admin.users.update', AdminUserController::class, 'update', 'PUT', 'admin/users/{record}'],
+            'user activity'          => ['console.admin.users.activity', AdminUserController::class, 'updateActivity', 'PATCH', 'admin/users/{record}/active'],
+            'user resend activation' => ['console.admin.users.resend-activation', AdminUserController::class, 'resendActivation', 'POST', 'admin/users/{record}/resend-activation'],
+            'user destroy'           => ['console.admin.users.destroy', AdminUserController::class, 'destroy', 'DELETE', 'admin/users/{record}'],
+            'user destroy many'      => ['console.admin.users.destroy-many', AdminUserController::class, 'destroyMany', 'DELETE', 'admin/users'],
+            'role store'             => ['console.admin.roles.store', AdminRoleController::class, 'store', 'POST', 'admin/roles'],
+            'role update'            => ['console.admin.roles.update', AdminRoleController::class, 'update', 'PUT', 'admin/roles/{record}'],
+            'role destroy'           => ['console.admin.roles.destroy', AdminRoleController::class, 'destroy', 'DELETE', 'admin/roles/{record}'],
+            'role destroy many'      => ['console.admin.roles.destroy-many', AdminRoleController::class, 'destroyMany', 'DELETE', 'admin/roles'],
             // Admin assistants and their channels.
             'admin assistant store'            => ['console.admin.assistants.store', AdminAssistantController::class, 'store', 'POST', 'admin/assistants'],
             'admin assistant update'           => ['console.admin.assistants.update', AdminAssistantController::class, 'update', 'PUT', 'admin/assistants/{record}'],

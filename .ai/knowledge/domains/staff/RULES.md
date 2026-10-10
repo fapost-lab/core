@@ -15,7 +15,10 @@ paths:
   - "app/Filament/Resources/Roles/**"
   - database/seeders/RoleSeeder.php
   - "tests/*/Domains/Staff/**"
-reviewed_at: 2026-10-08
+  - app/Http/Controllers/Admin/UserController.php
+  - app/Http/Controllers/Admin/RoleController.php
+  - "app/Http/Requests/Admin/**"
+reviewed_at: 2026-10-10
 ---
 # Staff rules
 
@@ -24,7 +27,22 @@ broken.
 
 ## Invariants
 
-- **You cannot deactivate yourself or the last active admin** (`UserService`).
+- **You cannot deactivate or delete yourself or the last active admin** (`UserService`,
+  `StaffUserService`). The last-admin check runs inside the transaction that removes the admin and
+  locks the active admins' rows (`UserService::isLastActiveAdmin()`), so two admins removing each
+  other at once cannot both pass. Only accepted accounts count (status Active and `is_active`): a
+  pending admin invitation does not keep the tenant reachable. Enforced: `AdminUsersConsoleTest`.
+- **Nobody changes their own roles, admins included** (`StaffUserService`; the console form shows
+  one's own roles read-only, and sending them back unchanged is no change). Enforced:
+  `AdminUsersConsoleTest`.
+- **Roles are given and taken within the actor's reach.** An admin gives and takes any staff role,
+  the admin role included (owner's decision, 2026-10-10; Filament never offered it), but never from
+  themselves and never from the last active admin. Everyone else gives and takes only roles below
+  their highest priority, and only on users they outrank (`UserPolicy::updateRoles()`,
+  `StaffUserService::assignableRoles()`). Enforced: `AdminUsersConsoleTest`.
+- **Someone else's profile and account need a higher priority:** `update` plus `updateProfile` to
+  edit name, email, phone or password, and `delete` requires outranking the target as well
+  (`UserPolicy`; admins pass through `Gate::before`). Enforced: `AdminUsersConsoleTest`.
 - **Deactivating a user deletes their sessions** (`UserService`).
 - **Activation tokens are stored hashed, expire after 72 hours, and can be resent at most once
   every 5 minutes** (`ActivationTokenService`, `ResendActivationService`).

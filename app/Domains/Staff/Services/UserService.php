@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Staff\Services;
 
 use App\Domains\Staff\Enums\RoleEnum;
+use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\User;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
@@ -36,13 +37,13 @@ final class UserService
             ]);
         }
 
-        if ($this->isLastActiveAdmin($target)) {
-            throw ValidationException::withMessages([
-                'user' => __('Cannot deactivate the last active administrator account.'),
-            ]);
-        }
-
         DB::transaction(function () use ($target): void {
+            if ($this->isLastActiveAdmin($target)) {
+                throw ValidationException::withMessages([
+                    'user' => __('Cannot deactivate the last active administrator account.'),
+                ]);
+            }
+
             $target->update([
                 'is_active'      => false,
                 'remember_token' => null,
@@ -72,6 +73,29 @@ final class UserService
         $target->update(['is_active' => true]);
     }
 
+    /**
+     * Returns true when $target is the only active admin left in the tenant: active, invitation accepted (status Active).
+     * The platform support user is an admin too, but it is not one of the tenant's people.
+     *
+     * Call it inside the transaction that removes the admin (deactivation, deletion, taking the role away): the active
+     * admins' rows are locked, so two such removals running at once cannot both see the other admin and leave none.
+     * Deleting a user and changing roles ask the same question ({@see StaffUserService}).
+     */
+    public function isLastActiveAdmin(User $target): bool
+    {
+        $activeAdminIds = User::query()
+            ->withoutPlatformSupport()
+            ->where('is_active', true)
+            // A pending invitation cannot sign in yet, so it does not keep the tenant reachable.
+            ->where('status', UserStatus::Active->value)
+            ->whereHas('roles', fn ($q) => $q->where('name', RoleEnum::Admin->value))
+            ->lockForUpdate()
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => (string) $id);
+
+        return 1 === $activeAdminIds->count() && $activeAdminIds->first() === (string) $target->getKey();
+    }
+
     private function assertCanChangeStatus(User $actor, User $target, string $ability): void
     {
         // The Gate refuses this for admins too; the service is also reached without it.
@@ -88,24 +112,5 @@ final class UserService
         throw ValidationException::withMessages([
             'user' => __('You are not allowed to change user activation status.'),
         ]);
-    }
-
-    /**
-     * Returns true when $target is the only active admin left in the tenant.
-     * The platform support user is an admin too, but it is not one of the tenant's people.
-     */
-    private function isLastActiveAdmin(User $target): bool
-    {
-        if (! $target->isAdmin()) {
-            return false;
-        }
-
-        $activeAdminCount = User::query()
-            ->withoutPlatformSupport()
-            ->where('is_active', true)
-            ->whereHas('roles', fn ($q) => $q->where('name', RoleEnum::Admin->value))
-            ->count();
-
-        return $activeAdminCount <= 1;
     }
 }
