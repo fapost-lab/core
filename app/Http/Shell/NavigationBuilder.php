@@ -11,6 +11,7 @@ use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Conversation\Models\Conversation;
+use App\Domains\Conversation\Services\ConversationInbox;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Flow\Models\FlowLog;
@@ -36,6 +37,7 @@ final readonly class NavigationBuilder
 {
     public function __construct(
         private RouteOwnership $ownership,
+        private ConversationInbox $inbox,
     ) {
     }
 
@@ -179,14 +181,11 @@ final readonly class NavigationBuilder
     }
 
     /**
-     * Threads with unread messages for the assistant, as the Filament resource counts them.
+     * Threads with unread messages for the assistant, counted by the inbox over the query its list uses.
      */
     private function unreadConversations(Assistant $assistant): ?string
     {
-        $count = Conversation::query()
-            ->where('assistant_id', $assistant->getKey())
-            ->where('unread_count', '>', 0)
-            ->count();
+        $count = $this->inbox->unreadCount($assistant);
 
         return $count > 0 ? (string) $count : null;
     }

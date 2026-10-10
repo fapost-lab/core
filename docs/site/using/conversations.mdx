@@ -11,7 +11,9 @@ Each row summarises one conversation: which **contact**, over which **channel**,
 the **last message**, how many are **unread**, the total **messages**, the
 **status**, and when it was **last active**.
 
-**View** opens the full transcript.
+**View** opens the full transcript. The list and an open conversation stay
+current on their own: live when the install has a websocket broadcaster, otherwise
+by refreshing every few seconds.
 
 <Note>
   A contact is identified by the id the messaging platform gave them until the
@@ -27,6 +29,11 @@ human, and it does not go down on its own.
 
 **Status** is the conversation's state — open, or closed. Open means the exchange
 is considered ongoing, whether or not a flow is currently running inside it.
+**Close** and **Reopen** set it; closing a conversation someone already closed
+changes nothing.
+
+Opening a conversation marks it read. New messages that arrive while it is open
+are counted until it is opened again.
 
 <Note>
   A conversation and a [session](/using/sessions) are different things and are
@@ -40,6 +47,18 @@ is considered ongoing, whether or not a flow is currently running inside it.
 Where a person replies from — the operator inbox — the message goes out **under
 the assistant's identity**. The contact sees the assistant, not the individual
 typing.
+
+Replying starts with **Take over**: while you hold the conversation the flows
+stand down and incoming messages wait for you. You can take over only a
+conversation the assistant is answering — if another operator already holds it,
+it stays theirs. **Return to assistant** hands it back to the flows.
+
+Each press of **Send** is one message. Pressing it twice, retrying, or sending
+the same draft from a second tab does not send it again; the inbox says the
+reply was already sent. If the inbox cannot confirm a reply went out — the
+connection to the messenger broke mid-send — it says so and keeps your draft:
+check the transcript before sending it again. An operator can send up to 30
+replies a minute.
 
 A reply counts against the tenant's outbound messages for the period. When they
 are used up the reply is not sent, and the inbox says so instead of showing a

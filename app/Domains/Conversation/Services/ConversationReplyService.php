@@ -47,6 +47,7 @@ final readonly class ConversationReplyService implements ConversationReplyServic
         string $text,
         string $staffUserId,
         ?string $mediaFileId = null,
+        ?string $requestId = null,
     ): DeliveryResult {
         $channel = Channel::query()->find($conversation->channel_id);
 
@@ -68,16 +69,17 @@ final readonly class ConversationReplyService implements ConversationReplyServic
             );
         }
 
-        $chatId = (string) $channelContact->contact->external_id;
+        $chatId         = (string) $channelContact->contact->external_id;
+        $idempotencyKey = $this->idempotencyKey($conversation, $requestId);
 
         if (null === $mediaFileId) {
             return $this->sender->send($this->buildMessage($conversation, $channel, $chatId, new MessagePayload(
                 type: 'text',
                 text: $text,
-            ), $staffUserId));
+            ), $staffUserId, $idempotencyKey));
         }
 
-        return $this->sendMedia($conversation, $channel, $chatId, $text, $staffUserId, $mediaFileId);
+        return $this->sendMedia($conversation, $channel, $chatId, $text, $staffUserId, $mediaFileId, $idempotencyKey);
     }
 
     /**
@@ -95,6 +97,7 @@ final readonly class ConversationReplyService implements ConversationReplyServic
         string $caption,
         string $staffUserId,
         string $mediaFileId,
+        string $idempotencyKey,
     ): DeliveryResult {
         $media = MediaFile::query()
             ->withTrashed()
@@ -112,8 +115,6 @@ final readonly class ConversationReplyService implements ConversationReplyServic
 
         // The key is fixed before the upload, which may deliver the message itself and never reach
         // MessageSender; the message carries the same key, so the operator counts the unit once.
-        $idempotencyKey = $this->newIdempotencyKey($conversation);
-
         $this->volumeGate->admitKey($idempotencyKey);
 
         $dispatch = $this->mediaDispatcher->ensureUploadedToChannel(
@@ -157,9 +158,12 @@ final readonly class ConversationReplyService implements ConversationReplyServic
         };
     }
 
-    private function newIdempotencyKey(Conversation $conversation): string
+    /**
+     * The operator's submission when there is one (a retry of it is then the same message), else a new key.
+     */
+    private function idempotencyKey(Conversation $conversation, ?string $requestId): string
     {
-        return 'staff_reply:' . (string) $conversation->getKey() . ':' . Str::ulid();
+        return 'staff_reply:' . (string) $conversation->getKey() . ':' . ($requestId ?? (string) Str::ulid());
     }
 
     private function buildMessage(
@@ -168,10 +172,10 @@ final readonly class ConversationReplyService implements ConversationReplyServic
         string $chatId,
         MessagePayload $payload,
         string $staffUserId,
-        ?string $idempotencyKey = null,
+        string $idempotencyKey,
     ): OutboundMessage {
         return new OutboundMessage(
-            idempotencyKey: $idempotencyKey ?? $this->newIdempotencyKey($conversation),
+            idempotencyKey: $idempotencyKey,
             tenantId: (string) $conversation->tenant_id,
             channelId: (string) $channel->getKey(),
             channelType: $channel->type->value,
