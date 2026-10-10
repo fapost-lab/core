@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Domains\Tenancy\Services;
 
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Enums\RefusedWork;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
+use Fapost\Foundation\Quota\Enums\LimitKind;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use LogicException;
 
@@ -17,6 +19,9 @@ use LogicException;
  * The operator package answers how much is allowed ({@see TenantLimitsInterface}); the caller
  * counts what exists, because records live in the tenant's own schema. The tenant is the one in
  * {@see TenantContextInterface}, so callers outside a request run inside a tenant switch.
+ *
+ * A refusal is announced ({@see LimitAnnouncer}) so the tenant's admins hear about it; `canCreate()`
+ * only hides a button and announces nothing.
  */
 final readonly class RecordQuota implements RecordQuotaInterface
 {
@@ -24,6 +29,7 @@ final readonly class RecordQuota implements RecordQuotaInterface
         private LimitRegistryInterface $registry,
         private TenantLimitsInterface $limits,
         private TenantContextInterface $context,
+        private LimitAnnouncer $announcer,
     ) {
     }
 
@@ -39,6 +45,8 @@ final readonly class RecordQuota implements RecordQuotaInterface
         $limit = $this->limit($key);
 
         if (null !== $limit && $current >= $limit) {
+            $this->announcer->refused($key, LimitKind::Records, $limit, $current, RefusedWork::RecordCreation);
+
             throw new RecordLimitReachedException($key, $this->registry->find($key)->label ?? $key, $limit, $current);
         }
     }

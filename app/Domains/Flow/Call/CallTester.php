@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Call;
 use App\Domains\Flow\Handlers\CallNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Enums\RefusedWork;
 use App\Domains\Tenancy\Services\PeriodQuota;
 use App\Domains\Tenancy\Support\UsageUnitKey;
 use Carbon\CarbonImmutable;
@@ -80,6 +81,7 @@ final readonly class CallTester
                 CallNodeHandler::LIMIT_KEY,
                 UsageUnitKey::make('call_test:', (string) Str::ulid()),
                 CarbonImmutable::now(),
+                RefusedWork::CallExecution,
             );
 
             if (! $decision->allowed) {

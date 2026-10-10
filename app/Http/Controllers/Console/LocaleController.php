@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Console;
 
+use App\Domains\Staff\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Http\Request;
@@ -16,7 +17,7 @@ use Symfony\Component\HttpFoundation\Response;
  * Sets the interface language of the signed-in user: the same session value and the same long-lived cookie that
  * {@see SetLocale} reads and the Filament language switcher writes.
  *
- * It changes the browser's own preference, not a record, so there is no ability to check (listed as an exemption in
+ * It changes the user's own preference (also kept as `users.locale` for mail and notifications), not a record about anyone else, so there is no ability to check (listed as an exemption in
  * ConsoleAuthorizationTest). The answer is a full page visit: the shared translations of every screen change with it.
  */
 final class LocaleController extends Controller
@@ -28,6 +29,14 @@ final class LocaleController extends Controller
         ]);
 
         $request->session()->put('locale', $validated['locale']);
+
+        // Kept on the account too: queued jobs and mail have no session to read the language from.
+        $user = $request->user();
+
+        if ($user instanceof User) {
+            $user->forceFill(['locale' => $validated['locale']])->saveQuietly();
+        }
+
         Cookie::queue(SetLocale::LOCALE_COOKIE, $validated['locale'], SetLocale::COOKIE_MINUTES);
 
         return Inertia::location($this->returnUrl($request));

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use DateTimeImmutable;
 use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Quota\DTO\UsageDecision;
 use Fapost\Foundation\Quota\DTO\UsageUnit;
@@ -30,9 +31,9 @@ final class FakeUsageMeter implements UsageMeterInterface
         return new self(UsageDecision::allowed());
     }
 
-    public static function denying(int $limit = 10, int $used = 10): self
+    public static function denying(int $limit = 10, int $used = 10, ?DateTimeImmutable $periodEndsAt = null): self
     {
-        return new self(UsageDecision::refused($limit, $used, 'Limit reached.'));
+        return new self(UsageDecision::refused($limit, $used, 'Limit reached.', $periodEndsAt));
     }
 
     public static function failing(Throwable $failure): self

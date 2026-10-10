@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Notifications;
 
+use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\StaffNotifyTarget;
 use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\User;
@@ -35,6 +36,16 @@ final class StaffRecipientResolver
             StaffNotifyTarget::Role      => $this->forRole($query, $config),
             StaffNotifyTarget::Users     => $this->forUsers($query, $config),
         };
+    }
+
+    /**
+     * The tenant's administrators who can sign in: the people a limit notification goes to.
+     *
+     * @return Collection<int, User>
+     */
+    public function admins(): Collection
+    {
+        return $this->activeStaff()->role(RoleEnum::Admin->value)->get();
     }
 
     /**

@@ -10,6 +10,7 @@ use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\Variables\Variable;
 use App\Domains\Flow\State\Variables\VariableStorage;
+use App\Domains\Tenancy\Enums\RefusedWork;
 use App\Domains\Tenancy\Services\PeriodQuota;
 use App\Domains\Tenancy\Support\UsageUnitKey;
 use Carbon\CarbonImmutable;
@@ -349,6 +350,7 @@ final class CallNodeHandler extends AbstractVersionedHandler
             self::LIMIT_KEY,
             UsageUnitKey::make('call:', $context->idempotencyKey . ':' . $context->nodeId),
             CarbonImmutable::now(),
+            RefusedWork::CallExecution,
         );
 
         if ($decision->allowed) {

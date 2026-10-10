@@ -13,6 +13,7 @@ use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -71,6 +72,8 @@ use Spatie\Permission\Traits\HasRoles;
  *                   $updated_at
  * @property string|null
  *                   $phone
+ * @property string|null
+ *                   $locale
  * @property bool
  *                   $is_active
  * @property bool
@@ -96,7 +99,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|User whereUpdatedAt($value)
  * @mixin \Eloquent
  */
-final class User extends Authenticatable implements FilamentUser, HasTenants
+final class User extends Authenticatable implements FilamentUser, HasLocalePreference, HasTenants
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory;
@@ -117,6 +120,7 @@ final class User extends Authenticatable implements FilamentUser, HasTenants
         'email',
         'password',
         'phone',
+        'locale',
         'status',
         'is_active',
     ];
@@ -168,6 +172,15 @@ final class User extends Authenticatable implements FilamentUser, HasTenants
     public function scopeCountedForLimit(Builder $query): Builder
     {
         return $query->where('is_active', true)->withoutPlatformSupport();
+    }
+
+    /**
+     * The language of this person's notifications and mail, which a worker cannot read from a session.
+     * Set when they pick a language or sign in; the platform default until then.
+     */
+    public function preferredLocale(): string
+    {
+        return is_string($this->locale) && '' !== $this->locale ? $this->locale : (string) config('app.locale');
     }
 
     public function isAdmin(): bool

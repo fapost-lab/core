@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Domains\Staff\Listeners\CloseSupportAccessEntry;
+use App\Domains\Staff\Listeners\NotifyAdminsOfLimit;
+use App\Domains\Staff\Listeners\RememberUserLocale;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\SupportAccessEntry;
 use App\Domains\Staff\Models\User;
@@ -20,9 +22,11 @@ use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Staff\Services\RoleFormDataMapper;
 use App\Domains\Staff\Services\RoleWriterService;
 use App\Domains\Staff\Services\UserService;
+use App\Domains\Tenancy\Events\LimitReached;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
+use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
@@ -80,6 +84,8 @@ final class StaffServiceProvider extends ServiceProvider
         });
 
         Event::listen(Logout::class, CloseSupportAccessEntry::class);
+        Event::listen(Login::class, RememberUserLocale::class);
+        Event::listen(LimitReached::class, NotifyAdminsOfLimit::class);
 
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);

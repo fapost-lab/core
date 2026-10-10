@@ -7,6 +7,7 @@ namespace App\Domains\Staff\Services;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\User;
+use App\Domains\Tenancy\Services\RecordLimitWatch;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +20,7 @@ final class UserService
 {
     public function __construct(
         private readonly RecordQuotaInterface $recordQuota,
+        private readonly RecordLimitWatch $limitWatch,
     ) {
     }
 
@@ -66,11 +68,19 @@ final class UserService
     {
         $this->assertCanChangeStatus($actor, $target, 'activate');
 
+        $countBefore = null;
+
         if (! $target->is_active) {
-            $this->recordQuota->assertCanCreate(User::LIMIT_KEY, User::countForLimit());
+            $countBefore = User::countForLimit();
+
+            $this->recordQuota->assertCanCreate(User::LIMIT_KEY, $countBefore);
         }
 
         $target->update(['is_active' => true]);
+
+        if (null !== $countBefore) {
+            $this->limitWatch->afterSaved(User::LIMIT_KEY, $countBefore);
+        }
     }
 
     /**

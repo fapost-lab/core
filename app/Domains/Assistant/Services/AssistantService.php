@@ -10,6 +10,7 @@ use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
+use App\Domains\Tenancy\Services\RecordLimitWatch;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Support\Arr;
@@ -30,6 +31,7 @@ final readonly class AssistantService implements AssistantServiceInterface
         private ChannelWebhookRegistryInterface $channelWebhookRegistry,
         private RecordQuotaInterface $recordQuota,
         private TenantContextInterface $tenantContext,
+        private RecordLimitWatch $limitWatch,
     ) {
     }
 
@@ -49,7 +51,9 @@ final readonly class AssistantService implements AssistantServiceInterface
             throw new LogicException('Assistants can be created only for the current tenant context.');
         }
 
-        $this->recordQuota->assertCanCreate(Assistant::LIMIT_KEY, Assistant::query()->count());
+        $countBefore = Assistant::query()->count();
+
+        $this->recordQuota->assertCanCreate(Assistant::LIMIT_KEY, $countBefore);
 
         $assistant = new Assistant([
             'tenant_id'        => $tenant->getId(),
@@ -63,6 +67,8 @@ final readonly class AssistantService implements AssistantServiceInterface
             'settings' => is_array($data['settings'] ?? null) ? $data['settings'] : [],
         ]);
         $assistant->save();
+
+        $this->limitWatch->afterSaved(Assistant::LIMIT_KEY, $countBefore);
 
         return $assistant;
     }

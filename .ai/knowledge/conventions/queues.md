@@ -57,6 +57,7 @@ Queue assignment by purpose, as it exists in the codebase today:
   notification that runs on the low-priority broadcast queue.
 - `messaging.system`: `app/Jobs/Messaging/SyncChannelWebhookJob.php`,
   `app/Domains/Staff/Jobs/SendStaffNotificationJob.php`,
+  `app/Domains/Staff/Jobs/SendLimitNoticeJob.php`,
   `app/Jobs/Media/CleanupSoftDeletedMediaJob.php`, and the broadcast job of
   `app/Domains/Flow/Live/FlowActivityChanged.php` (live updates of the sessions and flow log screens). Its cost
   is bounded on purpose: none without a delivering broadcaster, none while no screen watches the assistant, and at

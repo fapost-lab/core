@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Tenancy;
 
+use App\Domains\Tenancy\Enums\RefusedWork;
+use App\Domains\Tenancy\Events\LimitReached;
+use App\Domains\Tenancy\Services\LimitAnnouncer;
 use App\Domains\Tenancy\Services\LimitRegistry;
 use App\Domains\Tenancy\Services\RecordQuota;
 use App\Domains\Tenancy\Services\TenantContext;
@@ -14,8 +17,12 @@ use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
+use Illuminate\Contracts\Debug\ExceptionHandler;
+use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Event;
 use LogicException;
+use RuntimeException;
 use Tests\Support\FakeTenantLimits;
 use Tests\TestCase;
 
@@ -112,6 +119,58 @@ final class RecordQuotaTest extends TestCase
         $this->assertSame($fake, $app->make(TenantLimitsInterface::class));
     }
 
+    public function test_a_refusal_announces_the_limit(): void
+    {
+        Event::fake([LimitReached::class]);
+
+        try {
+            $this->quota(new FakeTenantLimits(['assistants' => 3]))->assertCanCreate('assistants', 3);
+            $this->fail('Expected RecordLimitReachedException.');
+        } catch (RecordLimitReachedException) {
+        }
+
+        Event::assertDispatchedTimes(LimitReached::class, 1);
+        Event::assertDispatched(LimitReached::class, static fn (LimitReached $event): bool => self::TENANT_ID === $event->tenantId
+            && 'assistants' === $event->key
+            && LimitKind::Records === $event->kind
+            && 3 === $event->limit
+            && 3 === $event->used
+            && RefusedWork::RecordCreation === $event->refused
+            && null === $event->periodEndsAt);
+    }
+
+    public function test_an_allowed_creation_and_a_button_check_announce_nothing(): void
+    {
+        Event::fake([LimitReached::class]);
+
+        $quota = $this->quota(new FakeTenantLimits(['assistants' => 3]));
+        $quota->assertCanCreate('assistants', 2);
+        $quota->canCreate('assistants', 3);
+        $this->quota(new UnlimitedTenantLimits())->assertCanCreate('assistants', 1_000);
+
+        Event::assertNotDispatched(LimitReached::class);
+    }
+
+    public function test_a_failing_listener_does_not_change_the_refusal(): void
+    {
+        $reported = [];
+        $this->app->make(ExceptionHandler::class)->reportable(function (RuntimeException $e) use (&$reported): void {
+            $reported[] = $e->getMessage();
+        });
+        $this->app->make(Dispatcher::class)->listen(LimitReached::class, static function (): never {
+            throw new RuntimeException('listener is down');
+        });
+
+        try {
+            $this->quota(new FakeTenantLimits(['assistants' => 1]))->assertCanCreate('assistants', 1);
+            $this->fail('Expected RecordLimitReachedException.');
+        } catch (RecordLimitReachedException $e) {
+            $this->assertSame(1, $e->limit);
+        }
+
+        $this->assertContains('listener is down', $reported);
+    }
+
     private function quota(TenantLimitsInterface $limits): RecordQuota
     {
         $registry = new LimitRegistry();
@@ -120,7 +179,7 @@ final class RecordQuotaTest extends TestCase
         $context = new TenantContext();
         $context->set($this->tenant());
 
-        return new RecordQuota($registry, $limits, $context);
+        return new RecordQuota($registry, $limits, $context, new LimitAnnouncer($this->app->make(Dispatcher::class), $context));
     }
 
     private function tenant(): RuntimeTenant

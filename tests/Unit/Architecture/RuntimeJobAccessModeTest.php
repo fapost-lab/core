@@ -11,6 +11,7 @@ use App\Domains\Conversation\Jobs\FetchConversationMediaJob;
 use App\Domains\Conversation\Jobs\PersistConversationMessageJob;
 use App\Domains\Conversation\Jobs\UpdateConversationDeliveryStatusJob;
 use App\Domains\Staff\Jobs\SendActivationEmailJob;
+use App\Domains\Staff\Jobs\SendLimitNoticeJob;
 use App\Domains\Staff\Jobs\SendStaffNotificationJob;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
 use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
@@ -70,6 +71,7 @@ final class RuntimeJobAccessModeTest extends TestCase
         FetchConversationMediaJob::class,
         SyncChannelWebhookJob::class,
         SendActivationEmailJob::class,
+        SendLimitNoticeJob::class,
         CleanupSoftDeletedMediaJob::class,
     ];
 

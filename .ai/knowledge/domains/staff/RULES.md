@@ -59,6 +59,22 @@ broken.
   `Logout` listener. Enforced: `SupportAccessEntryTest`.
 - **Staff notifications are delivered at most once:** the idempotency guard is set before
   delivery (`SendStaffNotificationJob`).
+- **Admins hear about a limit once per limit and episode, and a broken path never changes the
+  gate.** `NotifyAdminsOfLimit` (synchronous, on the hot path) does one atomic `Cache::add` on the
+  `LimitEpisode` key and queues `SendLimitNoticeJob` only for the first refusal of an episode:
+  per-period = the operator's `periodEndsAt` or the UTC calendar month; records/bytes = the limit
+  value, repeated at most every 7 days. Any error is reported, never thrown, and the cache key is
+  released when queueing fails. The job (`messaging.system`, keeps running in a stopped tenant) runs
+  inside `runForTenant` and sends with `notifyNow`, never a queued notification, whose
+  `SerializesModels` would restore the `User` outside the tenant. Recipients are active admins with
+  status Active, the platform support user excluded (`StaffRecipientResolver::admins()`); the
+  recipient's language is `users.locale`: an explicit switch (`LocaleController`) always updates it, sign-in (`RememberUserLocale`) fills it only while empty.
+  Enforced: `LimitNotificationTest`, `LimitEpisodeTest`, `RuntimeJobAccessModeTest`.
+- **`LimitNoticeInterface` (Foundation) replaces only the "what to do next" block of the limit
+  notification.** It may read the operator's tables and answer in the asked locale; it must not repeat
+  the limit's name or numbers, send mail, dispatch jobs, call Core's classes or keep tenant data between
+  calls. Core asks from the worker once per recipient locale, treats an exception as `null` and falls
+  back to "contact the platform administrator" (`NoLimitNotice` is the `bindIf` default). Review only.
 
 - **Who may use the console is decided in one place, `User::canAccessConsole()`** (status Active
   and `is_active`); Filament's `canAccessPanel()` delegates to it, the Inertia sign-in and
