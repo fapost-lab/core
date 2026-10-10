@@ -18,6 +18,7 @@ use App\Domains\Tenancy\Repositories\TenantRepository;
 use App\Domains\Tenancy\Services\TenantProvisioningService;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use Closure;
 use Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface;
 use Fapost\Foundation\Tenancy\DTO\ProvisionTenant;
 use Fapost\Foundation\Tenancy\Enums\ProvisioningFailure;
@@ -151,6 +152,8 @@ final class CoreTenantProvisionerTest extends FeatureTestCase
     {
         $repository = Mockery::mock(TenantRepositoryInterface::class);
         $repository->shouldReceive('findBySlug')->once()->andReturnNull();
+        $repository->shouldReceive('transaction')->once()->andReturnUsing(static fn (Closure $callback): mixed => $callback());
+        $repository->shouldReceive('lockSlugClaims')->once();
         $repository->shouldReceive('isSlugOrSchemaTaken')->once()->andReturnFalse();
         $repository->shouldReceive('reserve')->once()->andThrow(
             new UniqueConstraintViolationException('pgsql', 'insert into tenants', [], new RuntimeException('duplicate key')),

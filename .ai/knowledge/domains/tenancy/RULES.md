@@ -51,7 +51,11 @@ broken.
   tenant, and neither does a declared platform subdomain (`tenancy.platform_subdomains`, filled by
   an operator package): it runs with no tenant like the base domain, its tenant panels answer 404,
   and its label is reserved as a slug. Any other host, an unknown, inactive or reserved slug is a
-  404, and the default-slug exemption from the reserved list applies only in `single` mode.
+  404, and the default-slug exemption from the reserved list applies only in `single` mode. One
+  exception: a tenant's former slug (`tenant_slug_aliases`) answers GET/HEAD with a 302 to the new
+  host while `redirect_until` is ahead and the tenant is Active (`TenantSlugMovedException`,
+  rendered before the generic not-found; it is deliberately not a `TenantNotFoundException`
+  subclass because Pint's `final_class`); other methods and expired aliases are 404.
   Enforced: `RequestHostClassifierTest`, `HostTenantResolverTest`, `HostResolutionTest`,
   `HostModePanelsTest::test_platform_subdomain_runs_without_a_tenant_and_serves_no_panels`,
   `TenantSlugPolicyTest::test_platform_subdomains_are_reserved`.
@@ -125,6 +129,15 @@ broken.
   iterations skip it. Why: a half-provisioned tenant must not accept traffic, and a killed worker
   must not orphan a slug or a schema. Enforced: `CoreTenantReservationsTest`,
   `ResumableProvisioningTest`, `PostgresProvisioningTest` (pgsql), `CreateFirstAdminIdempotencyTest`.
+- **A slug changes only through `TenantRenamerInterface`, and a former slug is its tenant's forever.**
+  `schema_name` is set once at provisioning and never derived from the slug again, so a rename is
+  one conditional UPDATE of `tenants.slug` plus a `tenant_slug_aliases` row, in one landlord
+  transaction. A former slug stays reserved for that tenant permanently (`check()`/`reserve()`
+  answer Taken); only its redirect window ends (`TENANCY_RENAME_REDIRECT_DAYS`, default 30). Every
+  slug claim — rename and `reserveSlug` — takes the same `pg_advisory_xact_lock` on pgsql, and
+  `reserve()` re-reads its reservation key after taking it. Rename is refused for Pending tenants
+  and outside host mode. Enforced: `CoreTenantRenamerTest`, `HostResolutionTest`,
+  `PostgresRenameTest` (pgsql), `CoreTenantReservationsTest`.
 - **`TenantReservationInterface` is Core's alone, bound with a plain `bind`.** Core never calls it;
   only an operator package does. Without a package nothing changes.
 - **The landlord table is the source of truth for the webhook registry; Redis is a cache.**

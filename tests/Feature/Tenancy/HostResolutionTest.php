@@ -6,7 +6,9 @@ namespace Tests\Feature\Tenancy;
 
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
+use App\Domains\Tenancy\Exceptions\TenantSlugMovedException;
 use Closure;
+use Fapost\Foundation\Tenancy\Contracts\TenantRenamerInterface;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\DB;
@@ -39,6 +41,7 @@ final class HostResolutionTest extends FeatureTestCase
 
         Route::middleware('web')->get('/_probe/tenant', fn (): array => $this->probe());
         Route::middleware(['web', 'tenant'])->get('/_probe/tenant-required', fn (): array => $this->probe());
+        Route::middleware('web')->any('/_probe/any', fn (): array => $this->probe());
         Route::middleware('web')->get('/_probe/platform', fn (): array => $this->probe());
     }
 
@@ -137,6 +140,84 @@ final class HostResolutionTest extends FeatureTestCase
         $this->get("http://app.{$this->base}/_probe/tenant")->assertNotFound();
     }
 
+    public function test_a_former_host_redirects_get_and_head_with_302_keeping_path_and_query(): void
+    {
+        $this->renameSecond('second-new');
+
+        $this->get("http://second.{$this->base}/_probe/tenant?a=1&b=two")
+            ->assertStatus(302)
+            ->assertRedirect($this->expectedOrigin('second-new') . '/_probe/tenant?a=1&b=two');
+
+        $this->call('HEAD', "http://second.{$this->base}/_probe/tenant")
+            ->assertStatus(302);
+    }
+
+    public function test_a_former_host_answers_404_to_any_other_method(): void
+    {
+        $this->renameSecond('second-new');
+
+        foreach (['POST', 'PUT', 'PATCH', 'DELETE'] as $method) {
+            $this->call($method, "http://second.{$this->base}/_probe/any")->assertNotFound();
+        }
+    }
+
+    public function test_the_former_host_is_404_once_the_redirect_period_has_ended(): void
+    {
+        $this->renameSecond('second-new');
+        DB::connection('landlord')->table('tenant_slug_aliases')->update(['redirect_until' => now()->subMinute()]);
+
+        $this->get("http://second.{$this->base}/_probe/tenant")->assertNotFound();
+    }
+
+    public function test_the_former_host_is_404_when_redirects_are_switched_off(): void
+    {
+        config(['tenancy.rename.redirect_days' => 0]);
+        $this->renameSecond('second-new');
+
+        $this->get("http://second.{$this->base}/_probe/tenant")->assertNotFound();
+    }
+
+    public function test_the_former_host_is_404_while_the_tenant_is_not_active(): void
+    {
+        $this->renameSecond('second-new');
+        DB::connection('landlord')->table('tenants')->where('slug', 'second-new')->update(['status' => 'suspended']);
+
+        $this->get("http://second.{$this->base}/_probe/tenant")->assertNotFound();
+    }
+
+    public function test_the_new_host_serves_the_tenant_and_a_redirect_is_not_reported(): void
+    {
+        Exceptions::fake();
+        $this->renameSecond('second-new');
+
+        $this->getJson("http://second-new.{$this->base}/_probe/tenant")
+            ->assertOk()
+            ->assertJsonPath('slug', 'second-new');
+        $this->get("http://second.{$this->base}/_probe/tenant")->assertStatus(302);
+
+        Exceptions::assertNotReported(TenantSlugMovedException::class);
+    }
+
+    public function test_the_tenant_required_stack_redirects_too(): void
+    {
+        $this->renameSecond('second-new');
+
+        $this->get("http://second.{$this->base}/_probe/tenant-required")
+            ->assertStatus(302)
+            ->assertRedirect($this->expectedOrigin('second-new') . '/_probe/tenant-required');
+    }
+
+    public function test_a_current_slug_wins_over_a_former_one_of_another_tenant(): void
+    {
+        $this->renameSecond('second-new');
+        // Not reachable through Core, which reserves a former slug forever; a manual change must still be served right.
+        DB::connection('landlord')->table('tenants')->where('slug', 'main')->update(['slug' => 'second']);
+
+        $this->getJson("http://second.{$this->base}/_probe/tenant")
+            ->assertOk()
+            ->assertJsonPath('slug', 'second');
+    }
+
     public function test_unresolvable_tenant_host_is_still_reported(): void
     {
         Exceptions::fake();
@@ -189,6 +270,20 @@ final class HostResolutionTest extends FeatureTestCase
 
         $this->postJson("http://ghost.{$this->base}{$path}", [], $headers)->assertNotFound();
         $this->postJson("http://example.com{$path}", [], $headers)->assertNotFound();
+    }
+
+    private function renameSecond(string $slug): void
+    {
+        $this->app->make(TenantRenamerInterface::class)->rename('00000000-0000-0000-0000-000000000002', $slug);
+    }
+
+    private function expectedOrigin(string $slug): string
+    {
+        $appUrl = (string) config('app.url');
+        $scheme = parse_url($appUrl, PHP_URL_SCHEME) ?: 'https';
+        $port   = parse_url($appUrl, PHP_URL_PORT);
+
+        return "{$scheme}://{$slug}.{$this->base}" . (null === $port ? '' : ':' . $port);
     }
 
     private function provisionSecondTenant(): void

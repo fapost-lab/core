@@ -86,6 +86,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Renaming a tenant
+    |--------------------------------------------------------------------------
+    |
+    | redirect_days - how long the old host of a renamed tenant answers GET and
+    |                 HEAD requests with a redirect to the new host. 0 switches
+    |                 the redirect off (the old host is a 404 at once). The value
+    |                 is read when a tenant is renamed and stored with the former
+    |                 slug, so changing it does not move redirects already issued.
+    |                 The former slug stays reserved for the tenant either way.
+    |
+    */
+    'rename' => [
+        'redirect_days' => max(0, (int) env('TENANCY_RENAME_REDIRECT_DAYS', 30)),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Reserved tenant slugs
     |--------------------------------------------------------------------------
     |

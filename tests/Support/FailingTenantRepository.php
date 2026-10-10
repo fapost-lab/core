@@ -168,6 +168,62 @@ final class FailingTenantRepository implements TenantRepositoryInterface
         return $this->inner->releaseUnclaimedPending($id, $now);
     }
 
+    public function transaction(Closure $callback): mixed
+    {
+        $this->hook(__FUNCTION__);
+
+        return $this->inner->transaction($callback);
+    }
+
+    public function lockSlugClaims(): void
+    {
+        $this->hook(__FUNCTION__);
+
+        $this->inner->lockSlugClaims();
+    }
+
+    public function findForRename(string $id): ?TenantProvisioningState
+    {
+        $this->hook(__FUNCTION__);
+
+        return $this->inner->findForRename($id);
+    }
+
+    public function isSlugClaimedByOther(string $slug, string $schemaName, string $exceptTenantId): bool
+    {
+        $this->hook(__FUNCTION__);
+
+        return $this->inner->isSlugClaimedByOther($slug, $schemaName, $exceptTenantId);
+    }
+
+    public function renameSlug(TenantInterface $tenant, string $newSlug, CarbonInterface $now): bool
+    {
+        $this->hook(__FUNCTION__);
+
+        return $this->inner->renameSlug($tenant, $newSlug, $now);
+    }
+
+    public function addFormerSlug(string $slug, string $tenantId, ?CarbonInterface $redirectUntil, CarbonInterface $now): void
+    {
+        $this->hook(__FUNCTION__);
+
+        $this->inner->addFormerSlug($slug, $tenantId, $redirectUntil, $now);
+    }
+
+    public function removeFormerSlug(string $slug, string $tenantId): void
+    {
+        $this->hook(__FUNCTION__);
+
+        $this->inner->removeFormerSlug($slug, $tenantId);
+    }
+
+    public function findByFormerSlug(string $slug, CarbonInterface $now): ?TenantInterface
+    {
+        $this->hook(__FUNCTION__);
+
+        return $this->inner->findByFormerSlug($slug, $now);
+    }
+
     /**
      * @param  Closure(): void  $hook  runs after the real call returned
      */

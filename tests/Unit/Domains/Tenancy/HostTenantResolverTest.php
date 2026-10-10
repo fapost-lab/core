@@ -8,6 +8,7 @@ use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Exceptions\TenantNotActiveException;
 use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
+use App\Domains\Tenancy\Exceptions\TenantSlugMovedException;
 use App\Domains\Tenancy\Services\HostTenantResolver;
 use App\Domains\Tenancy\Services\RequestHostClassifier;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
@@ -41,10 +42,74 @@ final class HostTenantResolverTest extends TestCase
     {
         $repository = $this->repository();
         $repository->shouldReceive('findBySlug')->once()->with('ghost')->andReturn(null);
+        $repository->shouldReceive('findByFormerSlug')->once()->andReturn(null);
 
         $this->expectException(TenantNotFoundException::class);
 
         $this->resolver($repository)->resolve(Request::create('http://ghost.fapost.test/'));
+    }
+
+    public function test_a_former_slug_in_its_redirect_period_names_the_new_tenant(): void
+    {
+        $tenant = Mockery::mock(TenantInterface::class);
+        $tenant->shouldReceive('isActive')->andReturn(true);
+        $tenant->shouldReceive('getSlug')->andReturn('acme-new');
+        $repository = $this->repository();
+        $repository->shouldReceive('findBySlug')->once()->with('acme')->andReturn(null);
+        $repository->shouldReceive('findByFormerSlug')->once()->with('acme', Mockery::any())->andReturn($tenant);
+
+        try {
+            $this->resolver($repository)->resolve(Request::create('http://acme.fapost.test/'));
+            $this->fail('Expected a moved slug.');
+        } catch (TenantSlugMovedException $e) {
+            $this->assertSame($tenant, $e->tenant);
+        }
+    }
+
+    public function test_a_current_slug_wins_over_a_former_one(): void
+    {
+        $tenant = Mockery::mock(TenantInterface::class);
+        $tenant->shouldReceive('isActive')->andReturn(true);
+        $repository = $this->repository();
+        $repository->shouldReceive('findBySlug')->once()->with('acme')->andReturn($tenant);
+        $repository->shouldNotReceive('findByFormerSlug');
+
+        $this->assertSame($tenant, $this->resolver($repository)->resolve(Request::create('http://acme.fapost.test/')));
+    }
+
+    public function test_a_reserved_slug_never_redirects(): void
+    {
+        $repository = $this->repository();
+        $repository->shouldNotReceive('findBySlug');
+        $repository->shouldNotReceive('findByFormerSlug');
+
+        $this->expectException(TenantNotFoundException::class);
+
+        $this->resolver($repository)->resolve(Request::create('http://admin.fapost.test/'));
+    }
+
+    public function test_an_expired_former_slug_is_not_found(): void
+    {
+        $repository = $this->repository();
+        $repository->shouldReceive('findBySlug')->once()->with('acme')->andReturn(null);
+        $repository->shouldReceive('findByFormerSlug')->once()->andReturn(null);
+
+        $this->expectException(TenantNotFoundException::class);
+
+        $this->resolver($repository)->resolve(Request::create('http://acme.fapost.test/'));
+    }
+
+    public function test_a_former_slug_of_an_inactive_tenant_is_not_found(): void
+    {
+        $tenant = Mockery::mock(TenantInterface::class);
+        $tenant->shouldReceive('isActive')->andReturn(false);
+        $repository = $this->repository();
+        $repository->shouldReceive('findBySlug')->once()->with('acme')->andReturn(null);
+        $repository->shouldReceive('findByFormerSlug')->once()->andReturn($tenant);
+
+        $this->expectException(TenantNotFoundException::class);
+
+        $this->resolver($repository)->resolve(Request::create('http://acme.fapost.test/'));
     }
 
     public function test_inactive_tenant_is_not_active(): void

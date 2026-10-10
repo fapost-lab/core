@@ -6,6 +6,7 @@ namespace App\Domains\Tenancy\Contracts;
 
 use App\Domains\Tenancy\Exceptions\TenantNotActiveException;
 use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
+use App\Domains\Tenancy\Exceptions\TenantSlugMovedException;
 use Illuminate\Http\Request;
 
 /**
@@ -18,6 +19,7 @@ interface TenantResolverInterface
     /**
      * @throws TenantNotFoundException when tenant cannot be resolved.
      * @throws TenantNotActiveException when resolved tenant must not run.
+     * @throws TenantSlugMovedException when the host is a former slug of an active tenant that still redirects (host resolution only).
      */
     public function resolve(Request $request): TenantInterface;
 }

@@ -26,8 +26,14 @@ The shared `public` schema, reached through the `landlord` connection, that hold
 
 ## Tenant schema
 
-The per-tenant PostgreSQL schema, named `tenant_<slug>` at provisioning. Selected by switching
-the connection's `search_path`; every domain model lives here.
+The per-tenant PostgreSQL schema, named `tenant_<slug>` from the slug the tenant had at
+provisioning; a later rename never changes it. Selected by switching the connection's
+`search_path`; every domain model lives here.
+
+## Former slug
+
+A slug a tenant gave up by a rename (`tenant_slug_aliases`). It stays reserved for that tenant and
+redirects to the current host for a limited window.
 
 ## Tenant context
 

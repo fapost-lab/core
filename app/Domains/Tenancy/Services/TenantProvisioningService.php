@@ -122,44 +122,11 @@ final readonly class TenantProvisioningService
 
         $this->slugPolicy->assertAssignable($slug);
 
-        $schemaName = $this->slugPolicy->schemaNameFor($slug);
-
-        if ($this->tenantRepository->isSlugOrSchemaTaken($slug, $schemaName)) {
-            throw TenantProvisioningException::slugTaken($slug);
-        }
-
-        // A schema nobody owns: whose data it holds is unknown, so it is never adopted.
-        if ($this->databaseManager->schemaExists(new RuntimeTenant('', $schemaName, $slug, false))) {
-            $this->logger->warning('Tenant slug cannot be reserved: an orphan schema exists.', [
-                'slug'        => $slug,
-                'schema_name' => $schemaName,
-            ]);
-
-            throw TenantProvisioningException::orphanSchema($slug, $schemaName);
-        }
-
-        $tenant = new Tenant([
-            'slug'            => $slug,
-            'schema_name'     => $schemaName,
-            'status'          => TenantStatus::Pending,
-            'config'          => $config,
-            'reservation_key' => $reservationKey,
-        ]);
-
-        try {
-            $this->tenantRepository->reserve($tenant);
-        } catch (UniqueConstraintViolationException $exception) {
-            // Lost a race on the slug, the schema name or the key.
-            $existing = null === $reservationKey ? null : $this->tenantRepository->findByReservationKey($reservationKey);
-
-            if ($existing instanceof TenantInterface) {
-                return $this->sameSlugOrFail($existing, $slug);
-            }
-
-            throw TenantProvisioningException::slugTaken($slug, $exception);
-        }
-
-        return $tenant;
+        // The check and the insert run under the slug-claim lock (PostgreSQL), so a rename cannot give
+        // this slug away as a former slug in between.
+        return $this->tenantRepository->transaction(
+            fn (): TenantInterface => $this->insertReservation($slug, $reservationKey, $config),
+        );
     }
 
     /**
@@ -274,6 +241,63 @@ final readonly class TenantProvisioningService
         }
 
         return $this->tenantRepository->getById($tenantId);
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function insertReservation(string $slug, ?string $reservationKey, array $config): TenantInterface
+    {
+        $this->tenantRepository->lockSlugClaims();
+
+        // The same key may have been reserved while this call waited for the lock: answer with that tenant,
+        // not with the slug it now holds being taken.
+        if (null !== $reservationKey) {
+            $existing = $this->tenantRepository->findByReservationKey($reservationKey);
+
+            if ($existing instanceof TenantInterface) {
+                return $this->sameSlugOrFail($existing, $slug);
+            }
+        }
+
+        $schemaName = $this->slugPolicy->schemaNameFor($slug);
+
+        if ($this->tenantRepository->isSlugOrSchemaTaken($slug, $schemaName)) {
+            throw TenantProvisioningException::slugTaken($slug);
+        }
+
+        // A schema nobody owns: whose data it holds is unknown, so it is never adopted.
+        if ($this->databaseManager->schemaExists(new RuntimeTenant('', $schemaName, $slug, false))) {
+            $this->logger->warning('Tenant slug cannot be reserved: an orphan schema exists.', [
+                'slug'        => $slug,
+                'schema_name' => $schemaName,
+            ]);
+
+            throw TenantProvisioningException::orphanSchema($slug, $schemaName);
+        }
+
+        $tenant = new Tenant([
+            'slug'            => $slug,
+            'schema_name'     => $schemaName,
+            'status'          => TenantStatus::Pending,
+            'config'          => $config,
+            'reservation_key' => $reservationKey,
+        ]);
+
+        try {
+            $this->tenantRepository->reserve($tenant);
+        } catch (UniqueConstraintViolationException $exception) {
+            // Lost a race on the slug, the schema name or the key.
+            $existing = null === $reservationKey ? null : $this->tenantRepository->findByReservationKey($reservationKey);
+
+            if ($existing instanceof TenantInterface) {
+                return $this->sameSlugOrFail($existing, $slug);
+            }
+
+            throw TenantProvisioningException::slugTaken($slug, $exception);
+        }
+
+        return $tenant;
     }
 
     private function claimSchema(TenantProvisioningState $state, ProvisioningLease $lease): void

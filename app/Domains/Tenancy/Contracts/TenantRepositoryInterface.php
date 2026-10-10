@@ -8,6 +8,7 @@ use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
 use App\Domains\Tenancy\ValueObjects\ReleaseRefusal;
 use App\Domains\Tenancy\ValueObjects\TenantProvisioningState;
 use Carbon\CarbonInterface;
+use Closure;
 
 interface TenantRepositoryInterface
 {
@@ -43,7 +44,8 @@ interface TenantRepositoryInterface
     public function delete(TenantInterface $tenant): void;
 
     /**
-     * Whether any row holds the slug or the schema name, in any status (Pending included).
+     * Whether any row holds the slug or the schema name, in any status (Pending included), or the
+     * slug is a tenant's former slug.
      */
     public function isSlugOrSchemaTaken(string $slug, string $schemaName): bool;
 
@@ -93,4 +95,58 @@ interface TenantRepositoryInterface
      * Returns null when the row was deleted or never existed, and the reason when it exists and was kept.
      */
     public function releaseUnclaimedPending(string $id, CarbonInterface $now): ?ReleaseRefusal;
+
+    /**
+     * Runs the callback in a transaction on the landlord connection (a savepoint when the caller already
+     * has one). An exception rolls it back and propagates.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $callback
+     * @return T
+     */
+    public function transaction(Closure $callback): mixed;
+
+    /**
+     * Serializes everyone who claims a slug (a rename, a reservation) until the current transaction ends:
+     * a transaction-scoped advisory lock on PostgreSQL, nothing elsewhere. Call it first inside
+     * {@see self::transaction()}, before reading what the slug is checked against.
+     */
+    public function lockSlugClaims(): void;
+
+    /**
+     * The tenant row, locked with FOR UPDATE until the current transaction ends, with its status; null when
+     * there is none.
+     */
+    public function findForRename(string $id): ?TenantProvisioningState;
+
+    /**
+     * Whether the slug, or the schema name derived from it, belongs to a tenant other than `$exceptTenantId`:
+     * as its slug, as its schema name (its original slug) or as its former slug.
+     */
+    public function isSlugClaimedByOther(string $slug, string $schemaName, string $exceptTenantId): bool;
+
+    /**
+     * One conditional UPDATE of the slug, only while the row still carries the slug the tenant has. On success
+     * the given tenant carries the new slug. False when it changed no row.
+     *
+     * @throws \Illuminate\Database\UniqueConstraintViolationException
+     */
+    public function renameSlug(TenantInterface $tenant, string $newSlug, CarbonInterface $now): bool;
+
+    /**
+     * Records a slug the tenant gave up. It stays reserved for the tenant; it redirects until `$redirectUntil`
+     * (never when null).
+     */
+    public function addFormerSlug(string $slug, string $tenantId, ?CarbonInterface $redirectUntil, CarbonInterface $now): void;
+
+    /**
+     * Forgets a former slug of this tenant (it takes the slug back). Another tenant's record is not touched.
+     */
+    public function removeFormerSlug(string $slug, string $tenantId): void;
+
+    /**
+     * The tenant a slug moved away from, while the redirect period has not ended; null otherwise.
+     */
+    public function findByFormerSlug(string $slug, CarbonInterface $now): ?TenantInterface;
 }

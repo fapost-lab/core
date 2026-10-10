@@ -53,6 +53,25 @@ final class TenantDecommissionerTest extends FeatureTestCase
         }
     }
 
+    public function test_it_removes_the_former_slugs_of_the_tenant_with_it(): void
+    {
+        $doomed = $this->insertTenant('loadtest-doomed');
+        $kept   = $this->insertTenant('keep-me');
+        $now    = now();
+
+        $tenants = $this->app->make(TenantRepositoryInterface::class);
+        $tenants->addFormerSlug('loadtest-old', $doomed->getId(), $now->copy()->addDay(), $now);
+        $tenants->addFormerSlug('keep-old', $kept->getId(), null, $now);
+
+        $databases = $this->createMock(TenantDatabaseManagerInterface::class);
+        $databases->method('schemaExists')->willReturn(false);
+        $this->app->instance(TenantDatabaseManagerInterface::class, $databases);
+
+        $this->app->make(TenantDecommissioner::class)->decommission($doomed);
+
+        $this->assertSame(['keep-old'], DB::connection('landlord')->table('tenant_slug_aliases')->pluck('slug')->all());
+    }
+
     public function test_find_by_slug_prefix_matches_the_prefix_literally(): void
     {
         $this->insertTenant('loadtest-abc-1');
