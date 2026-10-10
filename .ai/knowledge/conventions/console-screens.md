@@ -57,6 +57,9 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   `ContactSegmentController::schema()`, `ContactSegmentRequest`, `resources/js/pages/Console/ContactSegments/rules.ts`.
 - **Dictionaries with keys from data** (contact attributes, platform meta) go into props as lists of
   `{key, value}`: a JSON object reorders numeric keys in JS, and `jsonb` reorders all of them.
+  When such a form shows stored values as text, a row whose key and shown value come back unchanged
+  keeps the stored value and its type; only an edited or new row is saved as a string, so saving
+  another tab never rewrites `3` as `"3"`. Example: `AssistantSettingsService::settingsMap()`.
 - A bulk delete as one query skips model events; say so on the method, and delete model by model
   where observers matter. A delete with a guard (a group that still holds flows, a flow with live
   sessions) is always per record: the service throws a domain exception, the controller turns it

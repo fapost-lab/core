@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Assistant\Pages;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Assistant\Support\ContentLanguages;
 use App\Domains\Assistant\Support\CountryCatalog;
 use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Domains\Flow\Commands\CommandActionType;
@@ -13,7 +14,6 @@ use App\Domains\Flow\Validation\AssistantCommandsValidator;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
 use App\Filament\Assistant\Resources\Flows\FlowResource;
-use App\Filament\Support\ContentLanguages;
 use App\Filament\Support\LocalizedTextarea;
 use App\Filament\Support\RecordLimit;
 use BackedEnum;

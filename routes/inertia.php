@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
+use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
 use App\Http\Controllers\Console\BroadcastController;
@@ -137,6 +138,10 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('assistant/{tenant}/broadcasts/{record}/cancel', [BroadcastController::class, 'cancel'])->name('console.broadcasts.cancel');
         Route::delete('assistant/{tenant}/broadcasts/{record}', [BroadcastController::class, 'destroy'])->name('console.broadcasts.destroy');
 
+        // Assistant settings: one form saved as a whole. A flow made from inside it is saved with the form and opens in the builder.
+        Route::get('assistant/{tenant}/settings', [AssistantSettingsController::class, 'edit'])->name('filament.assistant.pages.settings');
+        Route::put('assistant/{tenant}/settings', [AssistantSettingsController::class, 'update'])->name('console.settings.update');
+        Route::post('assistant/{tenant}/settings/flows', [AssistantSettingsController::class, 'storeFlow'])->name('console.settings.store-flow');
         // Translations: the assistant's own overrides of the system catalog, over the tenant's (shown as inherited).
         Route::get('assistant/{tenant}/translations', [TranslationController::class, 'index'])->name('filament.assistant.pages.translations');
         Route::put('assistant/{tenant}/translations/{key}', [TranslationController::class, 'update'])->name('console.translations.update');

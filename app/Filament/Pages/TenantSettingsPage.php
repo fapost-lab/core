@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Domains\Assistant\Support\ContentLanguages;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Settings\TenantSettings;
-use App\Filament\Support\ContentLanguages;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
