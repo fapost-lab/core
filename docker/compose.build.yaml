@@ -32,6 +32,9 @@ services:
   scheduler:
     build: *core-build
 
+  reverb:
+    build: *core-build
+
   web:
     build:
       context: ..

@@ -11,6 +11,11 @@
 # supported setup without it:
 #   docker compose --profile gateway up -d
 #
+# So is the websocket server for live updates (Reverb). Without it the console
+# polls; with it, and BROADCAST_CONNECTION=reverb plus the REVERB_APP_* keys in
+# the .env, screens update as things happen:
+#   docker compose --profile realtime up -d
+#
 # Images are pulled from the registry. To build them locally instead — which is
 # what you need when shipping Solutions or Plugins of your own, since those are
 # Composer packages that must live inside the application image — merge the build
@@ -43,6 +48,12 @@ x-app: &app
     DB_PORT: 5432
     REDIS_HOST: redis
     REDIS_PORT: 6379
+    # Where the application publishes broadcast events: the reverb service, over
+    # the compose network. Used only with BROADCAST_CONNECTION=reverb and the
+    # realtime profile; browsers reach the same server through nginx at /app/.
+    REVERB_HOST: reverb
+    REVERB_PORT: 8080
+    REVERB_SCHEME: http
     # Who may vouch for the client address (X-Forwarded-For). PHP's peer is whoever connected to
     # nginx, which is Caddy, so the default trusts that one address, pinned below on the compose
     # network. Without the tls profile nothing sits at that address and nobody is trusted. Set it
@@ -99,6 +110,17 @@ services:
     # Exactly one replica. Two schedulers means every scheduled trigger fires twice.
     deploy:
       replicas: 1
+
+  # Websocket server for live updates, behind a profile: the console polls
+  # without it, and nothing else depends on it. The same image as app, so its
+  # Laravel and its configuration are the application's own. Not published:
+  # browsers reach it through nginx (web) at /app/, on the site's own origin.
+  reverb:
+    <<: *app
+    profiles: ["realtime"]
+    command: ["entrypoint", "reverb"]
+    expose:
+      - "8080"
 
   postgres:
     image: postgres:16-alpine

@@ -125,8 +125,33 @@ final class ConsoleStackTest extends InertiaConsoleTestCase
                 ->where('flash.error', null)
                 ->where('locale', 'en')
                 ->where('broadcaster.enabled', false)
+                ->where('broadcaster.client', null)
                 ->where('accessState.mode', 'active')
                 ->where('supportAccess', null)
+                ->etc());
+    }
+
+    public function test_only_a_signed_in_user_is_told_where_the_websocket_is(): void
+    {
+        config([
+            'broadcasting.default'            => 'reverb',
+            'broadcasting.connections.reverb' => ['driver' => 'reverb', 'key' => 'app-key', 'secret' => 'app-secret', 'app_id' => '1'],
+        ]);
+
+        $this->get($this->panelUrl('/admin/login'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->component('Auth/Login')
+                ->where('broadcaster.enabled', true)
+                ->where('broadcaster.client', null)
+                ->etc());
+
+        $this->actingAs($this->user())
+            ->get($this->panelUrl('/admin/_probe'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('broadcaster.enabled', true)
+                ->where('broadcaster.client.driver', 'reverb')
+                ->where('broadcaster.client.key', 'app-key')
+                ->missing('broadcaster.client.secret')
                 ->etc());
     }
 

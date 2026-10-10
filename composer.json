@@ -27,6 +27,7 @@
         "inertiajs/inertia-laravel": "^3.0",
         "laravel/framework": "^12.0",
         "laravel/horizon": "^5.45",
+        "laravel/reverb": "^1.12",
         "laravel/tinker": "^3.0",
         "phpunit/phpunit": "^13.3",
         "romanzipp/laravel-queue-monitor": "^5.4",
