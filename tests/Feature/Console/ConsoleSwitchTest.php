@@ -56,6 +56,9 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'filament.assistant.resources.flow-sessions.view',
             'filament.assistant.resources.flow-logs.index',
             'filament.assistant.resources.flow-logs.view',
+            // Conversations.
+            'filament.assistant.resources.conversations.index',
+            'filament.assistant.resources.conversations.view',
             // Assistant settings.
             'filament.assistant.pages.settings',
         ] as $name) {
@@ -92,9 +95,15 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'console.flow-groups.update',
             'console.flow-groups.destroy',
             'console.flow-groups.destroy-many',
+            // Conversations.
+            'console.conversations.reply',
+            'console.conversations.takeover',
+            'console.conversations.return-to-bot',
+            'console.conversations.status',
             // Assistant settings.
             'console.settings.update',
             'console.settings.store-flow',
+            'console.admin.support-access.index',
         ] as $name) {
             $this->assertNull(Route::getRoutes()->getByName($name), $name);
         }

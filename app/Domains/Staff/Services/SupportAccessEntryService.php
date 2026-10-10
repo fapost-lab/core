@@ -10,6 +10,7 @@ use App\Domains\Staff\Support\SupportAccessSession;
 use App\Domains\Tenancy\Contracts\SupportAccessRedeemerInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use SensitiveParameter;
 
 /**
@@ -47,6 +48,27 @@ final class SupportAccessEntryService
         ]);
 
         return ['user' => $user, 'entry' => $entry];
+    }
+
+    /**
+     * The log as the tenant's administrators read it. The table lives in the tenant's schema, so the current tenant's
+     * entries are all there is; the list screen adds its own sort.
+     *
+     * @return Builder<SupportAccessEntry>
+     */
+    public function query(): Builder
+    {
+        return SupportAccessEntry::query();
+    }
+
+    /**
+     * Whether the entry's session may still be going: not left, and within the hour a support session lasts. An entry
+     * left open past that hour was abandoned and is closed by {@see closeAbandoned()}.
+     */
+    public function isOpen(SupportAccessEntry $entry): bool
+    {
+        return null === $entry->left_at
+            && $entry->entered_at->greaterThan(CarbonImmutable::now()->subMinutes(SupportAccessSession::LIFETIME_MINUTES));
     }
 
     /**

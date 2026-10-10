@@ -43,6 +43,20 @@ final readonly class ConversationOwnership implements ConversationOwnershipInter
             ]);
     }
 
+    public function takeOver(string $conversationId, string $staffUserId): bool
+    {
+        return Conversation::query()
+            ->whereKey($conversationId)
+            ->where(static fn ($query) => $query
+                ->whereNull('owner_type')
+                ->orWhere('owner_type', '<>', ConversationOwner::Staff->value))
+            ->update([
+                'owner_type'          => ConversationOwner::Staff->value,
+                'owner_staff_user_id' => $staffUserId,
+                'updated_at'          => Carbon::now(),
+            ]) > 0;
+    }
+
     public function markRead(string $conversationId): void
     {
         Conversation::query()

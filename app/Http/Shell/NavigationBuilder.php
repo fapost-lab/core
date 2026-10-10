@@ -11,12 +11,14 @@ use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Conversation\Models\Conversation;
+use App\Domains\Conversation\Services\ConversationInbox;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Flow\Models\FlowLog;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\Role;
+use App\Domains\Staff\Models\SupportAccessEntry;
 use App\Domains\Staff\Models\User;
 use Closure;
 use Illuminate\Support\Facades\Gate;
@@ -26,7 +28,8 @@ use Illuminate\Support\Facades\Gate;
  * navigation it replaces: a model's `viewAny` policy or the permission the Filament page asks for, so a user sees an
  * item exactly when Filament showed it. Administrators pass every check through `Gate::before`.
  *
- * Items keep Filament's route names. An item whose screen has not moved off Filament yet is marked `external` and
+ * Items keep Filament's route names. A screen Filament never had is given by its full `console.*` route name, taken
+ * as is. An item whose screen has not moved off Filament yet is marked `external` and
  * rendered as a plain link (see {@see RouteOwnership}); an item whose route does not exist is left out.
  *
  * @phpstan-type Item array{key: string, label: string, href: string, icon: string, external: bool, badge: string|null}
@@ -36,6 +39,7 @@ final readonly class NavigationBuilder
 {
     public function __construct(
         private RouteOwnership $ownership,
+        private ConversationInbox $inbox,
     ) {
     }
 
@@ -94,6 +98,7 @@ final readonly class NavigationBuilder
             $this->entry(__('staff.assistants.label'), 'resources.assistants.index', __('staff.assistants.plural_label'), 'rocket', 0, $this->canViewAny($user, Assistant::class)),
             $this->entry($staff, 'resources.users.index', __('staff.users.plural_label'), 'users', 0, $this->canViewAny($user, User::class)),
             $this->entry($staff, 'resources.roles.index', __('staff.roles.plural_label'), 'shield-check', 0, $this->canViewAny($user, Role::class)),
+            $this->entry($staff, 'console.admin.support-access.index', __('console.support_access.title'), 'life-buoy', 10, $this->canViewAny($user, SupportAccessEntry::class)),
             $this->entry(
                 $media,
                 'resources.media.index',
@@ -132,7 +137,7 @@ final readonly class NavigationBuilder
     {
         $visible = array_values(array_filter(
             $entries,
-            fn (array $entry): bool => $entry['visible'] && $this->ownership->exists($prefix . $entry['route']),
+            fn (array $entry): bool => $entry['visible'] && $this->ownership->exists($this->routeName($prefix, $entry['route'])),
         ));
 
         /** @var array<string, list<array{sort: int, item: Item}>> $sorted */
@@ -140,7 +145,7 @@ final readonly class NavigationBuilder
         $labels = [];
 
         foreach ($visible as $entry) {
-            $name = $prefix . $entry['route'];
+            $name = $this->routeName($prefix, $entry['route']);
             $key  = $entry['group'] ?? '';
 
             $labels[$key]   = $entry['group'];
@@ -171,6 +176,14 @@ final readonly class NavigationBuilder
     }
 
     /**
+     * The full route name of an item: a Filament route under the panel's prefix, or a console route as given.
+     */
+    private function routeName(string $prefix, string $route): string
+    {
+        return str_starts_with($route, 'console.') ? $route : $prefix . $route;
+    }
+
+    /**
      * @param  class-string  $model
      */
     private function canViewAny(User $user, string $model): bool
@@ -179,14 +192,11 @@ final readonly class NavigationBuilder
     }
 
     /**
-     * Threads with unread messages for the assistant, as the Filament resource counts them.
+     * Threads with unread messages for the assistant, counted by the inbox over the query its list uses.
      */
     private function unreadConversations(Assistant $assistant): ?string
     {
-        $count = Conversation::query()
-            ->where('assistant_id', $assistant->getKey())
-            ->where('unread_count', '>', 0)
-            ->count();
+        $count = $this->inbox->unreadCount($assistant);
 
         return $count > 0 ? (string) $count : null;
     }

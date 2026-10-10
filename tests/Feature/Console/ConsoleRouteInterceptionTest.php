@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
+use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Console\AssistantSettingsController;
@@ -19,6 +20,7 @@ use App\Http\Controllers\Console\ChannelController;
 use App\Http\Controllers\Console\ContactController;
 use App\Http\Controllers\Console\ContactGroupController;
 use App\Http\Controllers\Console\ContactSegmentController;
+use App\Http\Controllers\Console\ConversationController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
@@ -72,6 +74,9 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'flow sessions view'    => ['filament.assistant.resources.flow-sessions.view', FlowSessionController::class, 'show', 'assistant/{tenant}/flow-sessions/{record}'],
             'flow logs list'        => ['filament.assistant.resources.flow-logs.index', FlowLogController::class, 'index', 'assistant/{tenant}/flow-logs'],
             'flow logs view'        => ['filament.assistant.resources.flow-logs.view', FlowLogController::class, 'show', 'assistant/{tenant}/flow-logs/{record}'],
+            // Conversations.
+            'conversations list' => ['filament.assistant.resources.conversations.index', ConversationController::class, 'index', 'assistant/{tenant}/conversations'],
+            'conversations view' => ['filament.assistant.resources.conversations.view', ConversationController::class, 'show', 'assistant/{tenant}/conversations/{record}'],
             // Assistant settings.
             'assistant settings' => ['filament.assistant.pages.settings', AssistantSettingsController::class, 'edit', 'assistant/{tenant}/settings'],
             // Translations: both panels.
@@ -131,6 +136,11 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'broadcast send'           => ['console.broadcasts.send', BroadcastController::class, 'send', 'POST', 'assistant/{tenant}/broadcasts/{record}/send'],
             'broadcast cancel'         => ['console.broadcasts.cancel', BroadcastController::class, 'cancel', 'POST', 'assistant/{tenant}/broadcasts/{record}/cancel'],
             'broadcast destroy'        => ['console.broadcasts.destroy', BroadcastController::class, 'destroy', 'DELETE', 'assistant/{tenant}/broadcasts/{record}'],
+            // Conversations.
+            'conversation reply'         => ['console.conversations.reply', ConversationController::class, 'reply', 'POST', 'assistant/{tenant}/conversations/{record}/reply'],
+            'conversation takeover'      => ['console.conversations.takeover', ConversationController::class, 'takeOver', 'POST', 'assistant/{tenant}/conversations/{record}/takeover'],
+            'conversation return to bot' => ['console.conversations.return-to-bot', ConversationController::class, 'returnToBot', 'POST', 'assistant/{tenant}/conversations/{record}/return-to-bot'],
+            'conversation status'        => ['console.conversations.status', ConversationController::class, 'updateStatus', 'PUT', 'assistant/{tenant}/conversations/{record}/status'],
             // Assistant settings.
             'settings update'     => ['console.settings.update', AssistantSettingsController::class, 'update', 'PUT', 'assistant/{tenant}/settings'],
             'settings store flow' => ['console.settings.store-flow', AssistantSettingsController::class, 'storeFlow', 'POST', 'assistant/{tenant}/settings/flows'],
@@ -170,6 +180,8 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'admin media folder store'   => ['console.admin.media.folders.store', AdminMediaFolderController::class, 'store', 'POST', 'admin/media/folders'],
             'admin media folder update'  => ['console.admin.media.folders.update', AdminMediaFolderController::class, 'update', 'PUT', 'admin/media/folders/{folder}'],
             'admin media folder destroy' => ['console.admin.media.folders.destroy', AdminMediaFolderController::class, 'destroy', 'DELETE', 'admin/media/folders/{folder}'],
+            // Support access log: never a Filament screen.
+            'admin support access' => ['console.admin.support-access.index', AdminSupportAccessController::class, 'index', 'GET', 'admin/support-access'],
         ];
     }
 
