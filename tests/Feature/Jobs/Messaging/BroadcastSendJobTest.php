@@ -98,7 +98,7 @@ final class BroadcastSendJobTest extends FeatureTestCase
             $mock->shouldReceive('send')->once()->andThrow(new VolumeLimitReachedException('outbound_messages', 10, 10));
         });
 
-        $job = new BroadcastSendJob($this->message());
+        $job = new BroadcastSendJob($this->message($this->channel()));
 
         $job->handle($sender, $this->tenantRepository(), $this->tenantSwitcher());
 
