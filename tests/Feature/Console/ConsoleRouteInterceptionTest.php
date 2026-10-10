@@ -9,6 +9,7 @@ use App\Http\Controllers\Console\Auth\LogoutController;
 use App\Http\Controllers\Console\ChannelController;
 use App\Http\Controllers\Console\ContactController;
 use App\Http\Controllers\Console\ContactGroupController;
+use App\Http\Controllers\Console\ContactSegmentController;
 use App\Http\Controllers\Console\DashboardController;
 use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
@@ -43,6 +44,9 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'contact groups list'   => ['filament.assistant.resources.contact-groups.index', ContactGroupController::class, 'index', 'assistant/{tenant}/contact-groups'],
             'contact groups create' => ['filament.assistant.resources.contact-groups.create', ContactGroupController::class, 'create', 'assistant/{tenant}/contact-groups/create'],
             'contact groups edit'   => ['filament.assistant.resources.contact-groups.edit', ContactGroupController::class, 'edit', 'assistant/{tenant}/contact-groups/{record}/edit'],
+            'segments list'         => ['filament.assistant.resources.contact-segments.index', ContactSegmentController::class, 'index', 'assistant/{tenant}/contact-segments'],
+            'segments create'       => ['filament.assistant.resources.contact-segments.create', ContactSegmentController::class, 'create', 'assistant/{tenant}/contact-segments/create'],
+            'segments edit'         => ['filament.assistant.resources.contact-segments.edit', ContactSegmentController::class, 'edit', 'assistant/{tenant}/contact-segments/{record}/edit'],
             'flow groups list'      => ['filament.assistant.resources.flow-groups.index', FlowGroupController::class, 'index', 'assistant/{tenant}/flow-groups'],
             'flow groups create'    => ['filament.assistant.resources.flow-groups.create', FlowGroupController::class, 'create', 'assistant/{tenant}/flow-groups/create'],
             'flow groups edit'      => ['filament.assistant.resources.flow-groups.edit', FlowGroupController::class, 'edit', 'assistant/{tenant}/flow-groups/{record}/edit'],
@@ -67,6 +71,10 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'channel destroy'         => ['console.channels.destroy', ChannelController::class, 'destroy', 'DELETE', 'assistant/{tenant}/channels/{record}'],
             'contact tags'            => ['console.contacts.tags', ContactController::class, 'updateTags', 'PUT', 'assistant/{tenant}/contacts/{record}/tags'],
             'contact groups'          => ['console.contacts.groups', ContactController::class, 'updateGroups', 'PUT', 'assistant/{tenant}/contacts/{record}/groups'],
+            'segment store'           => ['console.contact-segments.store', ContactSegmentController::class, 'store', 'POST', 'assistant/{tenant}/contact-segments'],
+            'segment update'          => ['console.contact-segments.update', ContactSegmentController::class, 'update', 'PUT', 'assistant/{tenant}/contact-segments/{record}'],
+            'segment destroy'         => ['console.contact-segments.destroy', ContactSegmentController::class, 'destroy', 'DELETE', 'assistant/{tenant}/contact-segments/{record}'],
+            'segment count'           => ['console.contact-segments.count', ContactSegmentController::class, 'refreshCount', 'POST', 'assistant/{tenant}/contact-segments/{record}/count'],
             'flow group store'        => ['console.flow-groups.store', FlowGroupController::class, 'store', 'POST', 'assistant/{tenant}/flow-groups'],
             'flow group store inline' => ['console.flow-groups.store-inline', FlowGroupController::class, 'storeInline', 'POST', 'assistant/{tenant}/flow-groups/inline'],
             'flow group update'       => ['console.flow-groups.update', FlowGroupController::class, 'update', 'PUT', 'assistant/{tenant}/flow-groups/{record}'],

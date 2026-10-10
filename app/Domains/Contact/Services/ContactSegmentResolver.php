@@ -6,10 +6,12 @@ namespace App\Domains\Contact\Services;
 
 use App\Domains\Contact\Enums\SegmentConditionType;
 use App\Domains\Contact\Enums\SegmentMatch;
+use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Contact\Models\ContactSegment;
 use Illuminate\Contracts\Database\Query\Builder as QueryBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 /**
  * Compiles a {@see ContactSegment}'s declarative rules into a tenant-scoped
@@ -32,6 +34,11 @@ use Illuminate\Support\Carbon;
  */
 final class ContactSegmentResolver
 {
+    /**
+     * A dot-path of identifier segments; only such keys are allowed into the JSON selector.
+     */
+    public const string ATTRIBUTE_KEY_PATTERN = '/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$/';
+
     /**
      * @return list<string>
      */
@@ -69,6 +76,7 @@ final class ContactSegmentResolver
         $query = \App\Domains\Contact\Models\Contact::query()
             ->where('tenant_id', $segment->tenant_id);
 
+        $tenantId   = $segment->tenant_id;
         $rules      = $segment->rules;
         $conditions = is_array($rules['conditions'] ?? null) ? $rules['conditions'] : [];
         $isAny      = SegmentMatch::Any->value === ($rules['match'] ?? SegmentMatch::All->value);
@@ -77,10 +85,10 @@ final class ContactSegmentResolver
             return $query;
         }
 
-        return $query->where(function (Builder $group) use ($conditions, $isAny): void {
+        return $query->where(function (Builder $group) use ($conditions, $isAny, $tenantId): void {
             foreach ($conditions as $condition) {
                 if (is_array($condition)) {
-                    $this->applyCondition($group, $condition, $isAny);
+                    $this->applyCondition($group, $condition, $isAny, $tenantId);
                 }
             }
         });
@@ -90,7 +98,7 @@ final class ContactSegmentResolver
      * @param  Builder<\App\Domains\Contact\Models\Contact>  $query
      * @param  array<string, mixed>                          $condition
      */
-    private function applyCondition(Builder $query, array $condition, bool $or): void
+    private function applyCondition(Builder $query, array $condition, bool $or, string $tenantId): void
     {
         $type     = SegmentConditionType::tryFrom((string) ($condition['type'] ?? ''));
         $operator = (string) ($condition['operator'] ?? '');
@@ -101,7 +109,7 @@ final class ContactSegmentResolver
             SegmentConditionType::Language  => $this->applyColumn($query, 'language', $operator, $value, $or),
             SegmentConditionType::Platform  => $this->applyColumn($query, 'platform', $operator, $value, $or),
             SegmentConditionType::Attribute => $this->applyAttribute($query, $condition, $operator, $value, $or),
-            SegmentConditionType::Group     => $this->applyGroup($query, $operator, $value, $or),
+            SegmentConditionType::Group     => $this->applyGroup($query, $operator, $value, $or, $tenantId),
             null                            => $this->matchNothing($query, $or),
         };
     }
@@ -139,7 +147,7 @@ final class ContactSegmentResolver
         $key = (string) ($condition['key'] ?? '');
 
         // Only allow safe dot-path identifiers into the JSON selector.
-        if (1 !== preg_match('/^[a-zA-Z0-9_]+(\.[a-zA-Z0-9_]+)*$/', $key)) {
+        if (1 !== preg_match(self::ATTRIBUTE_KEY_PATTERN, $key)) {
             $this->matchNothing($query, $or);
 
             return;
@@ -196,19 +204,23 @@ final class ContactSegmentResolver
     }
 
     /**
-     * Filter on membership in one or more {@see \App\Domains\Contact\Models\ContactGroup}.
+     * Filter on membership in one or more {@see ContactGroup}.
      * Value is a list of group ids (Filament Select, multiple).
+     *
+     * A group that no longer exists (deleted since the segment was saved) makes the whole condition match nobody,
+     * under `in` and `not_in` alike: `not_in` of a vanished group would otherwise match every contact, widening a
+     * broadcast's audience. The rule is the same as for any condition the resolver cannot evaluate.
      *
      * @param  Builder<\App\Domains\Contact\Models\Contact>  $query
      */
-    private function applyGroup(Builder $query, string $operator, mixed $value, bool $or): void
+    private function applyGroup(Builder $query, string $operator, mixed $value, bool $or, string $tenantId): void
     {
         $ids = array_values(array_filter(
             is_array($value) ? $value : [$value],
             static fn ($v): bool => is_string($v) && '' !== $v,
         ));
 
-        if ([] === $ids) {
+        if ([] === $ids || ! $this->allGroupsExist(array_values(array_unique($ids)), $tenantId)) {
             $this->matchNothing($query, $or);
 
             return;
@@ -229,6 +241,20 @@ final class ContactSegmentResolver
         $or
             ? $query->orWhereHas('groups', $constraint)
             : $query->whereHas('groups', $constraint);
+    }
+
+    /**
+     * @param  list<string>  $ids
+     */
+    private function allGroupsExist(array $ids, string $tenantId): bool
+    {
+        foreach ($ids as $id) {
+            if (! Str::isUuid($id)) {
+                return false;
+            }
+        }
+
+        return ContactGroup::query()->where('tenant_id', $tenantId)->whereIn('id', $ids)->count() === count($ids);
     }
 
     /**

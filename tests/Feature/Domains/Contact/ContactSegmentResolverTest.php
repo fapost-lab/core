@@ -159,6 +159,64 @@ final class ContactSegmentResolverTest extends FeatureTestCase
         $this->assertSame([(string) $nonMember->getKey()], $this->resolver->resolveContactIds($segment));
     }
 
+    public function test_group_not_in_of_a_deleted_group_matches_nobody(): void
+    {
+        $kept = $this->group('Kept');
+        $gone = $this->group('Gone');
+        $this->contact('en', []);
+        $this->contact('en', [])->groups()->attach($kept);
+        $gone->delete();
+
+        // Alone, or next to a group that still exists: a vanished reference must not widen the audience.
+        foreach ([[$gone->getKey()], [$kept->getKey(), $gone->getKey()]] as $ids) {
+            $segment = $this->segment('all', [['type' => 'group', 'operator' => 'not_in', 'value' => $ids]]);
+
+            $this->assertSame([], $this->resolver->resolveContactIds($segment));
+        }
+    }
+
+    public function test_group_in_of_a_deleted_group_matches_nobody(): void
+    {
+        $kept   = $this->group('Kept');
+        $gone   = $this->group('Gone');
+        $member = $this->contact('en', []);
+        $member->groups()->attach($kept);
+        $gone->delete();
+
+        $segment = $this->segment('all', [['type' => 'group', 'operator' => 'in', 'value' => [$kept->getKey(), $gone->getKey()]]]);
+
+        $this->assertSame([], $this->resolver->resolveContactIds($segment));
+    }
+
+    public function test_group_of_another_tenant_or_a_malformed_id_matches_nobody(): void
+    {
+        $foreign = ContactGroup::query()->create(['tenant_id' => '00000000-0000-0000-0000-0000000000ff', 'name' => 'Foreign']);
+        $this->contact('en', []);
+
+        foreach (['not_in', 'in'] as $operator) {
+            foreach ([$foreign->getKey(), 'not-an-id'] as $id) {
+                $segment = $this->segment('all', [['type' => 'group', 'operator' => $operator, 'value' => [$id]]]);
+
+                $this->assertSame([], $this->resolver->resolveContactIds($segment));
+            }
+        }
+    }
+
+    public function test_a_deleted_group_in_one_condition_leaves_an_any_match_alternative_working(): void
+    {
+        $gone = $this->group('Gone');
+        $gone->delete();
+        $vip = $this->contact('en', ['vip']);
+        $this->contact('en', []);
+
+        $segment = $this->segment('any', [
+            ['type' => 'group', 'operator' => 'not_in', 'value' => [$gone->getKey()]],
+            ['type' => 'tag', 'operator' => 'has', 'value' => ['vip']],
+        ]);
+
+        $this->assertSame([(string) $vip->getKey()], $this->resolver->resolveContactIds($segment));
+    }
+
     public function test_group_in_with_multiple_ids_matches_any_membership(): void
     {
         $groupA = $this->group('Group A');
