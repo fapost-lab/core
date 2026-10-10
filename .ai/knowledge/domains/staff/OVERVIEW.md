@@ -24,7 +24,7 @@ paths:
   - app/Http/Controllers/Admin/UserController.php
   - app/Http/Controllers/Admin/RoleController.php
   - "app/Http/Requests/Admin/**"
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-10
 ---
 # Staff
 

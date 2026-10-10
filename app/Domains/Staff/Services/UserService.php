@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Staff\Services;
 
 use App\Domains\Staff\Enums\RoleEnum;
+use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\User;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
@@ -73,7 +74,7 @@ final class UserService
     }
 
     /**
-     * Returns true when $target is the only active admin left in the tenant.
+     * Returns true when $target is the only active admin left in the tenant: active, invitation accepted (status Active).
      * The platform support user is an admin too, but it is not one of the tenant's people.
      *
      * Call it inside the transaction that removes the admin (deactivation, deletion, taking the role away): the active
@@ -85,6 +86,8 @@ final class UserService
         $activeAdminIds = User::query()
             ->withoutPlatformSupport()
             ->where('is_active', true)
+            // A pending invitation cannot sign in yet, so it does not keep the tenant reachable.
+            ->where('status', UserStatus::Active->value)
             ->whereHas('roles', fn ($q) => $q->where('name', RoleEnum::Admin->value))
             ->lockForUpdate()
             ->pluck('id')

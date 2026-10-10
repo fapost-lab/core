@@ -18,7 +18,7 @@ paths:
   - app/Http/Controllers/Admin/UserController.php
   - app/Http/Controllers/Admin/RoleController.php
   - "app/Http/Requests/Admin/**"
-reviewed_at: 2026-10-08
+reviewed_at: 2026-10-10
 ---
 # Staff rules
 
@@ -30,7 +30,8 @@ broken.
 - **You cannot deactivate or delete yourself or the last active admin** (`UserService`,
   `StaffUserService`). The last-admin check runs inside the transaction that removes the admin and
   locks the active admins' rows (`UserService::isLastActiveAdmin()`), so two admins removing each
-  other at once cannot both pass. Enforced: `AdminUsersConsoleTest`.
+  other at once cannot both pass. Only accepted accounts count (status Active and `is_active`): a
+  pending admin invitation does not keep the tenant reachable. Enforced: `AdminUsersConsoleTest`.
 - **Nobody changes their own roles, admins included** (`StaffUserService`; the console form shows
   one's own roles read-only, and sending them back unchanged is no change). Enforced:
   `AdminUsersConsoleTest`.

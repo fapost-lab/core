@@ -45,9 +45,12 @@ tables (`HasRoles` on the `User` model); the platform adds columns to them.
 The seeder is reached through `TenantAclSeeder`, `AclBootstrapService` (a thin proxy used by tenant provisioning) and the
 `ops:tenants-seed-acl` command for existing tenants.
 
-A role priority hierarchy applies (`UserPolicy`): a user cannot assign a role whose priority is greater than or equal
-to their own maximum, and cannot change their own roles at all. Custom roles created in the UI must have a priority
-strictly below the creator's. System roles cannot be deleted.
+A role priority hierarchy applies (`UserPolicy`, `StaffUserService`). An admin grants and removes any staff role,
+the admin role included, but never to or from themselves and never from the last active admin. Everyone else grants and
+removes only roles whose priority is below their own maximum, and only on users they outrank. Nobody changes their own
+roles. Editing someone else's profile (`updateProfile`) and deleting someone both need a higher priority than the
+target's; admins pass both. Custom roles created in the UI must have a priority strictly below the creator's. System
+roles cannot be deleted.
 
 ---
 
@@ -57,7 +60,8 @@ strictly below the creator's. System roles cannot be deleted.
   the user's rows from `sessions`.
 - The `EnsureUserIsActive` middleware runs on every authenticated panel request: a deactivated user is logged out and gets
   401 even with a live session.
-- A user cannot deactivate themselves, and the last active admin cannot be deactivated.
+- A user cannot deactivate or delete themselves, and the last active admin (an accepted, active account; pending
+  invitations do not count) cannot be deactivated, deleted or lose the admin role.
 - Only an admin holding `manage_users` can deactivate or reactivate; a reactivated user must log in again.
 
 ---

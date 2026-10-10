@@ -505,6 +505,38 @@ final class AdminUsersConsoleTest extends InertiaConsoleTestCase
         }
     }
 
+    public function test_a_pending_administrator_invitation_does_not_count_as_another_administrator(): void
+    {
+        $only    = $this->admin();
+        $support = $this->app->make(PlatformSupportUserService::class)->ensure();
+        $this->staff(RoleEnum::Admin, ['status' => UserStatus::Pending, 'password' => null]);
+
+        $refusals = [
+            fn () => $this->app->make(StaffUserService::class)->update($support, $only, ['name' => $only->name, 'email' => $only->email, 'phone' => null, 'password' => null], [$this->roleId(RoleEnum::Analyst)]),
+            fn () => $this->app->make(StaffUserService::class)->delete($support, $only),
+        ];
+
+        foreach ($refusals as $attempt) {
+            try {
+                $attempt();
+                $this->fail('The last accepted administrator was removed.');
+            } catch (StaffChangeRefusedException $exception) {
+                $this->assertSame(StaffChangeRefusedException::LAST_ADMIN, $exception->reason);
+            }
+        }
+
+        try {
+            $this->app->make(UserService::class)->deactivate($support, $only);
+            $this->fail('The last accepted administrator was deactivated.');
+        } catch (ValidationException $exception) {
+            $this->assertStringContainsString('last active administrator', $exception->getMessage());
+        }
+
+        $only->refresh();
+        $this->assertTrue($only->is_active);
+        $this->assertTrue($only->isAdmin());
+    }
+
     public function test_two_administrators_cannot_delete_each_other_one_after_the_other(): void
     {
         $first  = $this->admin();
