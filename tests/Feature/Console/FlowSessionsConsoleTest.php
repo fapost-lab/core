@@ -184,11 +184,12 @@ final class FlowSessionsConsoleTest extends InertiaConsoleTestCase
                 ->where('session.parentId', (string) $parent->getKey())
                 ->where('session.parentResumeNodeId', 'after-child')
                 ->where('session.isLive', true)
+                // Sorted by key: `jsonb` keeps no key order, so the written order is not what comes back.
                 ->where('state', [
                     ['key' => 'flow.name', 'value' => 'Anna'],
                     ['key' => 'flow.tags', 'value' => '["a","b"]'],
-                    ['key' => 'system.language', 'value' => 'ru'],
                     ['key' => 'system.count', 'value' => '3'],
+                    ['key' => 'system.language', 'value' => 'ru'],
                 ])
                 ->where('history', null)
                 ->where('urls', [

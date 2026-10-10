@@ -123,7 +123,8 @@ final class FlowLogController extends Controller
     }
 
     /**
-     * A JSON object as a list of `{key, value}`, values as one line of text; the order survives JSON and the browser.
+     * A JSON object as a list of `{key, value}` sorted by key (`jsonb` keeps no key order), values as one line of text;
+     * as a list, the order survives JSON and the browser.
      *
      * @param  array<array-key, mixed>|null  $map
      *
@@ -137,7 +138,7 @@ final class FlowLogController extends Controller
             $pairs[] = ['key' => (string) $key, 'value' => FlowSessionInspector::stringify($value)];
         }
 
-        return $pairs;
+        return FlowSessionInspector::sortByKey($pairs);
     }
 
     /**

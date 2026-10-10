@@ -58,6 +58,21 @@ final readonly class FlowSessionInspector
     }
 
     /**
+     * Sorts `{key, value}` rows by key, byte order: the order a `jsonb` object comes back in is no order at all (Postgres
+     * keeps neither the written order nor an alphabetical one), so a screen sorts what it shows.
+     *
+     * @param  list<array{key: string, value: string}>  $rows
+     *
+     * @return list<array{key: string, value: string}>
+     */
+    public static function sortByKey(array $rows): array
+    {
+        usort($rows, static fn (array $left, array $right): int => strcmp($left['key'], $right['key']));
+
+        return $rows;
+    }
+
+    /**
      * The assistant's sessions, narrowed by the status filter (`live` when none or an unknown one is asked for), with the
      * contact's external id as `contact_external_id` so the list can search and show it without loading contacts.
      *
@@ -212,14 +227,24 @@ final readonly class FlowSessionInspector
     }
 
     /**
-     * The namespaced session state flattened to `namespace.path → value` (a list stays one value), as a list so the
-     * order survives JSON and the browser.
+     * The namespaced session state flattened to `namespace.path → value` (a list stays one value), sorted by key so the
+     * order is the same on every driver, and as a list so it survives JSON and the browser.
      *
      * @param  array<array-key, mixed>  $state
      *
      * @return list<array{key: string, value: string}>
      */
-    public function flattenState(array $state, string $prefix = ''): array
+    public function flattenState(array $state): array
+    {
+        return self::sortByKey($this->flatten($state, ''));
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $state
+     *
+     * @return list<array{key: string, value: string}>
+     */
+    private function flatten(array $state, string $prefix): array
     {
         $flat = [];
 
@@ -227,7 +252,7 @@ final readonly class FlowSessionInspector
             $path = '' === $prefix ? (string) $key : "{$prefix}.{$key}";
 
             if (is_array($value) && [] !== $value && ! array_is_list($value)) {
-                $flat = [...$flat, ...$this->flattenState($value, $path)];
+                $flat = [...$flat, ...$this->flatten($value, $path)];
 
                 continue;
             }

@@ -7,6 +7,7 @@ namespace Tests\Feature\Console;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Enums\FlowSessionStatus;
+use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowLog;
@@ -154,7 +155,8 @@ final class FlowLogsConsoleTest extends InertiaConsoleTestCase
                 ->where('log.nodeType', 'send_message')
                 ->where('log.nodeVersion', 1)
                 ->where('stateChanges', [['key' => 'flow.name', 'value' => 'Anna']])
-                ->where('resolved', [['key' => 'text', 'value' => 'Hello, Anna'], ['key' => 'count', 'value' => '2']])
+                // Sorted by key: `jsonb` keeps no key order.
+                ->where('resolved', [['key' => 'count', 'value' => '2'], ['key' => 'text', 'value' => 'Hello, Anna']])
                 ->where('error', [['key' => 'message', 'value' => 'Timeout'], ['key' => 'retry', 'value' => 'true']])
                 ->where('urls', [
                     'index'   => "/assistant/{$this->assistant->getKey()}/flow-logs",
@@ -236,6 +238,10 @@ final class FlowLogsConsoleTest extends InertiaConsoleTestCase
      */
     private function entry(CarbonImmutable $at, array $attributes = [], ?FlowSession $session = null, ?string $id = null): FlowLog
     {
+        // On Postgres `flow_logs` is partitioned by month and only the months around the migration exist; a no-op on
+        // SQLite, where it is a plain table.
+        $this->app->make(FlowLogPartitionManagerInterface::class)->ensureMonthlyPartition($at);
+
         return FlowLog::query()->create([
             'id'           => $id ?? (new Ulid(Ulid::generate($at)))->toRfc4122(),
             'session_id'   => ($session ?? $this->session)->getKey(),
