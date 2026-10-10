@@ -61,14 +61,17 @@ final class MediaFolderController extends Controller
     }
 
     /**
-     * Moves the folder's files and subfolders into the chosen folder (or the root), deletes it, and opens the folder
-     * that received them, so the list never shows a folder that is gone.
+     * Moves the folder's files and subfolders into the chosen folder (or the root) and deletes it. The list stays on
+     * the folder it had open, unless that was the deleted folder or inside it: then it opens the folder that received
+     * the contents, so it never shows a folder that is gone.
      */
     public function destroy(DeleteMediaFolderRequest $request, string $folder): RedirectResponse
     {
         $record = $this->folders->find($folder);
 
         Gate::authorize('delete', $record);
+
+        $open = $this->openFolder($request->openFolder());
 
         try {
             $target = $this->folders->resolve($request->moveTo(), 'move_to');
@@ -79,7 +82,23 @@ final class MediaFolderController extends Controller
 
         Inertia::flash('success', __('media.notifications.folder_deleted'));
 
+        if (null === $open || ! $this->folders->isInSubtree($open, $record)) {
+            return redirect()->back(fallback: $this->index());
+        }
+
         return redirect()->to($this->index(null === $target ? [] : ['filter' => ['folder' => $target->id]]));
+    }
+
+    /**
+     * The folder the list had open; one that is not (or no longer) in the tenant counts as none.
+     */
+    private function openFolder(?string $id): ?MediaFolder
+    {
+        try {
+            return $this->folders->resolve($id, 'open_folder');
+        } catch (MediaFolderRuleException) {
+            return null;
+        }
     }
 
     /**

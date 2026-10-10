@@ -8,8 +8,12 @@ use App\Domains\Media\Models\MediaFile;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * Files uploaded to the media library in one go, with the same size and type limits as the REST upload
- * (`config/media.php`); one file outside them refuses the batch before anything is stored.
+ * Files uploaded to the media library, with the same size and type limits as the REST upload (`config/media.php`); one
+ * file outside them refuses the request before anything is stored.
+ *
+ * The screen sends one file per request (a request is capped by the server's `post_max_size`, a batch is not) and
+ * says where the request stands in the batch the person picked: `batch_total` files in all, `batch_saved` stored by
+ * the requests before it. The answer then speaks for the whole batch.
  */
 final class UploadMediaFilesRequest extends FormRequest
 {
@@ -33,9 +37,11 @@ final class UploadMediaFilesRequest extends FormRequest
         }
 
         return [
-            'files'     => ['required', 'array', 'min:1', 'max:' . self::MAX_FILES],
-            'files.*'   => $file,
-            'folder_id' => ['nullable', 'string', 'uuid'],
+            'files'       => ['required', 'array', 'min:1', 'max:' . self::MAX_FILES],
+            'files.*'     => $file,
+            'folder_id'   => ['nullable', 'string', 'uuid'],
+            'batch_total' => ['nullable', 'integer', 'min:1', 'max:' . self::MAX_FILES],
+            'batch_saved' => ['nullable', 'integer', 'min:0', 'lt:batch_total'],
         ];
     }
 
@@ -70,6 +76,23 @@ final class UploadMediaFilesRequest extends FormRequest
         $id = $this->validated('folder_id');
 
         return is_string($id) ? $id : null;
+    }
+
+    /**
+     * The batch this request belongs to: how many files it has and how many earlier requests stored. Without batch
+     * fields the request is its own batch.
+     *
+     * @return array{total: int, savedBefore: int}
+     */
+    public function batch(): array
+    {
+        $total = $this->validated('batch_total');
+
+        if (null === $total) {
+            return ['total' => count($this->uploads()), 'savedBefore' => 0];
+        }
+
+        return ['total' => (int) $total, 'savedBefore' => (int) ($this->validated('batch_saved') ?? 0)];
     }
 
     private function maxKilobytes(): int

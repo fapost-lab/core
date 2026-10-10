@@ -23,8 +23,19 @@ final class DeleteMediaFolderRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'move_to' => ['nullable', 'string', 'uuid'],
+            'move_to'     => ['nullable', 'string', 'uuid'],
+            'open_folder' => ['nullable', 'string', 'uuid'],
         ];
+    }
+
+    /**
+     * The folder the list had open when the delete was asked for, if any.
+     */
+    public function openFolder(): ?string
+    {
+        $id = $this->validated('open_folder');
+
+        return is_string($id) ? $id : null;
     }
 
     public function moveTo(): ?string

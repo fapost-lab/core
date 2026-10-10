@@ -1199,6 +1199,9 @@ return [
             'files'       => 'Files',
             'folder'      => 'Folder',
             'submit'      => 'Upload',
+            'too_many'    => 'Pick :count files at most.',
+            'too_large'   => 'Larger than :size: :names.',
+            'progress'    => 'Uploading :current of :total…',
         ],
         'folder_dialog' => [
             'create_title' => 'New folder',

@@ -25,7 +25,7 @@ export interface MediaTranslations {
   actions: { view: string; rename: string; move: string; references: string; delete: string; restore: string; force_delete: string; download: string }
   move_selected: string
   delete_selected: string
-  upload_dialog: { title: string; description: string; files: string; folder: string; submit: string }
+  upload_dialog: { title: string; description: string; files: string; folder: string; submit: string; too_many: string; too_large: string; progress: string }
   folder_dialog: { create_title: string; rename_title: string; name: string; parent: string }
   rename_dialog: { title: string; name: string }
   move_dialog: Dialog & { folder: string; submit: string }

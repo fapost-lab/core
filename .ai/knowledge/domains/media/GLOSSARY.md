@@ -18,7 +18,10 @@ paths:
   - config/media.php
   - "database/migrations/tenant/*media*"
   - "tests/*/Domains/Media/**"
-reviewed_at: 2026-10-05
+  - "app/Http/Controllers/Admin/Media*Controller.php"
+  - "app/Http/Requests/Admin/*Media*"
+  - "resources/js/pages/Console/Media/**"
+reviewed_at: 2026-10-10
 ---
 # Media glossary
 

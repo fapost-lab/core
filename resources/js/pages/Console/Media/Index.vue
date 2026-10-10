@@ -52,7 +52,7 @@ const props = defineProps<{
   breadcrumbs: { id: string; name: string }[]
   tree: FolderNode[]
   kinds: Option[]
-  upload: { maxFiles: number; maxSize: string; accept: string }
+  upload: { maxFiles: number; maxBytes: number; maxSize: string; accept: string }
   can: { manage: boolean }
   urls: { index: string; upload: string; move: string; destroyMany: string; storeFolder: string }
 }>()
@@ -343,7 +343,7 @@ const deleteDescription = computed(() => {
 
     <UploadDialog v-model:open="uploadOpen" :url="urls.upload" :tree="tree" :folder-id="currentFolderId" :limits="upload" />
     <FolderDialog v-model:open="folderOpen" :tree="tree" :folder="folderToEdit" :store-url="urls.storeFolder" :parent-id="currentFolderId" />
-    <DeleteFolderDialog v-model:open="deleteFolderOpen" :folder="folderToDelete" :tree="tree" />
+    <DeleteFolderDialog v-model:open="deleteFolderOpen" :folder="folderToDelete" :tree="tree" :open-folder-id="currentFolderId" />
     <RenameDialog v-model:open="renameOpen" :row="rowInFocus" />
     <MoveDialog v-model:open="moveOpen" :url="urls.move" :ids="idsToMove" :tree="tree" :folder-id="currentFolderId" />
 

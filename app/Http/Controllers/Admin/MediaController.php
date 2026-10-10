@@ -28,6 +28,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Number;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\File\UploadedFile as SymfonyUploadedFile;
 
 /**
  * The media library in the admin panel, inside the console shell's admin mode, with the behaviour of the Filament
@@ -103,7 +104,8 @@ final class MediaController extends Controller
             ),
             'upload' => [
                 'maxFiles' => UploadMediaFilesRequest::MAX_FILES,
-                'maxSize'  => Number::fileSize((int) config('media.max_size_bytes', 100 * 1024 * 1024)),
+                'maxBytes' => self::maxUploadBytes(),
+                'maxSize'  => Number::fileSize(self::maxUploadBytes()),
                 'accept'   => implode(',', (array) config('media.allowed_mime_types', [])),
             ],
             'can'  => ['manage' => $canManage],
@@ -171,18 +173,25 @@ final class MediaController extends Controller
         }
 
         $result = $this->library->upload($request->uploads(), $folder, (string) $request->user()?->getAuthIdentifier());
+        $batch  = $request->batch();
+        $saved  = $batch['savedBefore'] + $result['saved'];
 
         if (null !== $result['refused']) {
             $message = StorageLimitMessage::for($result['refused']);
 
-            if ($result['total'] > 1) {
-                $message .= ' ' . __('media.errors.storage_limit_saved', ['saved' => $result['saved'], 'total' => $result['total']]);
+            if ($batch['total'] > 1) {
+                $message .= ' ' . __('media.errors.storage_limit_saved', ['saved' => $saved, 'total' => $batch['total']]);
             }
 
             return $this->back($message, 'error');
         }
 
-        return $this->back(__('media.notifications.uploaded', ['count' => $result['saved']]));
+        // A request in the middle of a batch says nothing: the last one reports the whole batch.
+        if ($saved < $batch['total']) {
+            return redirect()->back(fallback: $this->url('index'));
+        }
+
+        return $this->back(__('media.notifications.uploaded', ['count' => $saved]));
     }
 
     public function update(RenameMediaFileRequest $request, string $record): RedirectResponse
@@ -262,6 +271,18 @@ final class MediaController extends Controller
     }
 
     /**
+     * The largest file the screen may send: the media limit, or less when one request of the server cannot carry it
+     * (`upload_max_filesize`, `post_max_size`).
+     */
+    private static function maxUploadBytes(): int
+    {
+        $media   = (int) config('media.max_size_bytes', 100 * 1024 * 1024);
+        $request = (int) SymfonyUploadedFile::getMaxFilesize();
+
+        return $request > 0 ? min($media, $request) : $media;
+    }
+
+    /**
      * A reference as Filament's usage modal showed it: what points at the file, by the names it had when it was saved.
      *
      * @return array{id: string, type: string, name: string, node: string|null}
@@ -281,12 +302,15 @@ final class MediaController extends Controller
     }
 
     /**
-     * The open folder from `filter[folder]`: the root when it is absent or not a folder of this tenant.
+     * The open folder from `filter[folder]` (or Filament's `folder`): the root when it is absent or not a folder of this
+     * tenant.
      */
     private function openFolder(Request $request): ?MediaFolder
     {
         $filters = $request->query('filter');
-        $id      = is_array($filters) && is_string($filters['folder'] ?? null) ? mb_trim($filters['folder']) : '';
+        // `?folder=` is how Filament's links named it; old bookmarks keep working.
+        $value = is_array($filters) && array_key_exists('folder', $filters) ? $filters['folder'] : $request->query('folder');
+        $id    = is_string($value) ? mb_trim($value) : '';
 
         if ('' === $id) {
             return null;

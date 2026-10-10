@@ -1199,6 +1199,9 @@ return [
             'files'       => 'Файлы',
             'folder'      => 'Папка',
             'submit'      => 'Загрузить',
+            'too_many'    => 'Выберите не больше :count файлов.',
+            'too_large'   => 'Больше :size: :names.',
+            'progress'    => 'Загрузка :current из :total…',
         ],
         'folder_dialog' => [
             'create_title' => 'Новая папка',

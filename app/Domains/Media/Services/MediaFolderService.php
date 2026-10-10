@@ -114,7 +114,7 @@ final readonly class MediaFolderService
 
     /**
      * Deletes a folder after moving its direct files (those in the trash too, so a restore brings them back where the
-     * rest went) and its direct subfolders into `$target`, or to the root. Subfolders move through
+     * rest went; one UPDATE, so no model events) and its direct subfolders into `$target`, or to the root. Subfolders move through
      * {@see MediaServiceInterface::moveFolder()}, which rewrites their descendants' paths; the database alone would
      * leave them at the root with a stale `path_cache`. All of it or nothing.
      *
@@ -127,11 +127,13 @@ final readonly class MediaFolderService
         }
 
         $folder->getConnection()->transaction(function () use ($folder, $target): void {
+            // One statement, not a walk in chunks: paging by offset over the column being changed skips rows, and the
+            // skipped files would fall to the root through the foreign key. A file has no observers to miss.
             MediaFile::query()
                 ->withTrashed()
                 ->where('tenant_id', $folder->tenant_id)
                 ->where('folder_id', $folder->id)
-                ->each(fn (MediaFile $file): MediaFile => $this->media->move($file, $target));
+                ->update(['folder_id' => $target?->id]);
 
             $this->children($folder)
                 ->get()
@@ -186,6 +188,15 @@ final readonly class MediaFolderService
     }
 
     /**
+     * Whether `$candidate` is `$folder` itself or lies inside it.
+     */
+    public function isInSubtree(MediaFolder $candidate, MediaFolder $folder): bool
+    {
+        return $candidate->id === $folder->id
+            || str_starts_with($candidate->path_cache, mb_rtrim($folder->path_cache, '/') . '/');
+    }
+
+    /**
      * @return Builder<MediaFolder>
      */
     private function children(MediaFolder $folder): Builder
@@ -215,11 +226,5 @@ final readonly class MediaFolderService
         $path = mb_trim($folder->path_cache, '/');
 
         return '' === $path ? 1 : mb_substr_count($path, '/') + 1;
-    }
-
-    private function isInSubtree(MediaFolder $candidate, MediaFolder $folder): bool
-    {
-        return $candidate->id === $folder->id
-            || str_starts_with($candidate->path_cache, mb_rtrim($folder->path_cache, '/') . '/');
     }
 }

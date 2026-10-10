@@ -12,11 +12,14 @@ import type { FolderNode, MediaPageProps } from './types'
 
 /**
  * Deletes a folder. What it holds (files, those in the trash too, and subfolders) first moves to the folder chosen
- * here, its own subtree excluded, or to the root; the server opens that folder afterwards.
+ * here, its own subtree excluded, or to the root. The list stays on its open folder, unless that one is gone: then the
+ * server opens the folder that received the contents.
  */
 const props = defineProps<{
   folder: FolderNode | null
   tree: readonly FolderNode[]
+  /** The folder the list has open, so the server can stay on it. */
+  openFolderId: string | null
 }>()
 
 const open = defineModel<boolean>('open', { default: false })
@@ -25,7 +28,7 @@ const page = usePage<MediaPageProps>()
 const t = computed(() => page.props.translations.console.media)
 const common = computed(() => page.props.translations.console.form)
 
-const form = useForm<{ move_to: string | null }>({ move_to: null })
+const form = useForm<{ move_to: string | null; open_folder: string | null }>({ move_to: null, open_folder: null })
 const targets = computed(() => (props.folder ? moveTargets(props.tree, props.folder) : []))
 const hasContents = computed(() => (props.folder?.files ?? 0) + (props.folder?.folders ?? 0) > 0)
 
@@ -33,6 +36,7 @@ watch(open, (isOpen) => {
   if (isOpen) {
     form.clearErrors()
     form.move_to = props.folder?.parentId ?? null
+    form.open_folder = props.openFolderId
   }
 })
 

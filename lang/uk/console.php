@@ -1199,6 +1199,9 @@ return [
             'files'       => 'Файли',
             'folder'      => 'Папка',
             'submit'      => 'Завантажити',
+            'too_many'    => 'Виберіть не більше :count файлів.',
+            'too_large'   => 'Більше :size: :names.',
+            'progress'    => 'Завантаження :current з :total…',
         ],
         'folder_dialog' => [
             'create_title' => 'Нова папка',

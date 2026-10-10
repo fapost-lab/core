@@ -98,7 +98,7 @@ final class FoldersController extends Controller
         if (($contents['files'] > 0 || $contents['folders'] > 0) && ! $request->boolean('force')) {
             return response()->json([
                 'error'   => 'folder_not_empty',
-                'message' => 'Folder is not empty. Pass ?force=true to delete recursively.',
+                'message' => 'Folder is not empty. Pass ?force=true to delete it and move its files and subfolders to the root.',
             ], 409);
         }
 

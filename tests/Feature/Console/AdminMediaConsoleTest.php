@@ -328,7 +328,7 @@ final class AdminMediaConsoleTest extends InertiaConsoleTestCase
             ->assertSessionHasErrors(['move_to' => __('media.errors.folder.own_subtree')]);
         $this->assertNotNull($old->fresh());
 
-        $this->actingAs($admin)->delete($this->url("/folders/{$old->id}"), ['move_to' => $target->id])
+        $this->actingAs($admin)->delete($this->url("/folders/{$old->id}"), ['move_to' => $target->id, 'open_folder' => $sub->id])
             ->assertRedirect($this->url('?' . http_build_query(['filter' => ['folder' => $target->id]])))
             ->assertInertiaFlash('success', __('media.notifications.folder_deleted'));
 
@@ -339,10 +339,95 @@ final class AdminMediaConsoleTest extends InertiaConsoleTestCase
         $this->assertSame('/Target/Sub', $sub->fresh()?->path_cache);
         $this->assertSame('/Target/Sub/Deep', $deep->fresh()?->path_cache);
 
-        // Without a target, the contents go to the root.
-        $this->actingAs($admin)->delete($this->url("/folders/{$target->id}"))->assertRedirect($this->url());
+        // Without a target, the contents go to the root; the list stays on the folder it had open elsewhere.
+        $other = $this->folder('Other');
+        $this->actingAs($admin)
+            ->from($this->url('?filter[folder]=' . $other->id))
+            ->delete($this->url("/folders/{$target->id}"), ['open_folder' => $other->id])
+            ->assertRedirect($this->url('?filter[folder]=' . $other->id));
         $this->assertNull($file->fresh()?->folder_id);
         $this->assertSame('/Sub', $sub->fresh()?->path_cache);
+    }
+
+    public function test_a_batch_sent_one_file_per_request_reports_once_for_the_whole_batch(): void
+    {
+        $this->app->instance(TenantLimitsInterface::class, new FakeTenantLimits(['media_storage' => 10]));
+        $this->app->forgetInstance(MediaUploaderInterface::class);
+        $admin = $this->admin();
+
+        // The first of three: stored, and nothing is said yet.
+        $this->actingAs($admin)->from($this->url())
+            ->post($this->url(), ['files' => [UploadedFile::fake()->createWithContent('one.txt', '123456')], 'batch_total' => 3, 'batch_saved' => 0])
+            ->assertRedirect($this->url())
+            ->assertInertiaFlashMissing('success')
+            ->assertInertiaFlashMissing('error');
+
+        // The second does not fit: the refusal speaks for the batch.
+        $this->actingAs($admin)->from($this->url())
+            ->post($this->url(), ['files' => [UploadedFile::fake()->createWithContent('two.txt', 'abcdef')], 'batch_total' => 3, 'batch_saved' => 1])
+            ->assertInertiaFlash('error', StorageLimitMessage::for(new StorageLimitReachedException('media_storage', limit: 10, used: 6, incoming: 6))
+                . ' ' . __('media.errors.storage_limit_saved', ['saved' => 1, 'total' => 3]));
+
+        $this->assertSame(['one.txt'], MediaFile::query()->pluck('name')->all());
+    }
+
+    public function test_the_last_file_of_a_batch_reports_the_batch(): void
+    {
+        $this->actingAs($this->admin())->from($this->url())
+            ->post($this->url(), ['files' => [UploadedFile::fake()->createWithContent('last.txt', 'last-' . uniqid())], 'batch_total' => 2, 'batch_saved' => 1])
+            ->assertInertiaFlash('success', __('media.notifications.uploaded', ['count' => 2]));
+    }
+
+    public function test_the_extended_type_list_takes_phone_photos_and_still_refuses_svg(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->post($this->url(), ['files' => [UploadedFile::fake()->create('photo.heic', 1, 'image/heic')]])
+            ->assertSessionHasNoErrors();
+        $this->actingAs($admin)->post($this->url(), ['files' => [UploadedFile::fake()->create('logo.svg', 1, 'image/svg+xml')]])
+            ->assertSessionHasErrors('files.0');
+        $this->actingAs($admin)->post($this->url(), ['files' => [UploadedFile::fake()->create('page.html', 1, 'text/html')]])
+            ->assertSessionHasErrors('files.0');
+
+        $this->assertSame(['photo.heic'], MediaFile::query()->pluck('name')->all());
+    }
+
+    public function test_a_filament_folder_link_opens_the_folder(): void
+    {
+        $folder = $this->folder('Bookmarked');
+
+        $this->actingAs($this->admin())
+            ->get($this->url('?folder=' . $folder->id))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('folder.id', $folder->id)->etc());
+    }
+
+    public function test_deleting_a_folder_moves_every_file_however_many(): void
+    {
+        $old    = $this->folder('Crowded');
+        $target = $this->folder('Roomy');
+        $blobId = $this->upload('seed.txt', $old)->blob_id;
+        $now    = now();
+
+        // Past the 1000-row page a chunked walk would use.
+        foreach (array_chunk(range(1, 1100), 250) as $chunk) {
+            MediaFile::query()->insert(array_map(fn (int $n): array => [
+                'id'         => (string) Str::uuid(),
+                'tenant_id'  => $this->tenantId,
+                'blob_id'    => $blobId,
+                'folder_id'  => $old->id,
+                'name'       => "f{$n}.txt",
+                'kind'       => MediaKind::Document->value,
+                'metadata'   => '[]',
+                'source'     => MediaSource::Upload->value,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], $chunk));
+        }
+
+        $this->actingAs($this->admin())->delete($this->url("/folders/{$old->id}"), ['move_to' => $target->id])->assertRedirect();
+
+        $this->assertSame(1101, MediaFile::query()->where('folder_id', $target->id)->count());
+        $this->assertSame(0, MediaFile::query()->whereNull('folder_id')->count());
     }
 
     private function url(string $suffix = ''): string

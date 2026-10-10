@@ -8,27 +8,49 @@ here, referenced from anywhere.
 
 ## The library
 
-Files are organised in folders, starting at **Root**. **Upload files** adds them;
-**Create folder** organises them.
+Files are organised in folders: the tree on the left opens one, **All files** is
+the root. **Upload files** adds them; **New folder** organises them. Opening a file
+shows a preview (images, video, audio and PDF), its details and where it is used,
+with a **Download** button.
 
 Each file shows its **type**, **name**, **size**, when it was **uploaded** — and
-**Used in**.
+**Used in**. Tick several files to move them to another folder or to the trash at
+once.
+
+## What can be uploaded
+
+Up to 20 files at a time, each no larger than the size shown in the upload dialog
+(100 MB by default, less when the server accepts smaller requests). The file's
+real content decides its type, not its extension. Accepted: images (JPEG, PNG, GIF,
+WebP, HEIC/HEIF, AVIF, BMP, TIFF), video (MP4, MOV, WebM, MKV, AVI, 3GP), audio
+(MP3, OGG, WAV, M4A/AAC, FLAC), documents (PDF, Word, Excel, PowerPoint,
+OpenDocument, RTF, plain text, CSV, JSON) and archives (ZIP, 7z, RAR, gzip). SVG and
+HTML files are refused. A file outside these limits is refused with a message; the
+files uploaded before it stay.
 
 ## Used in is the column that matters
 
 It lists where the file is referenced. That is what turns the library from a
 folder into something safe to tidy.
 
-<Warning>
-  A file that is used somewhere cannot simply be removed. Deletion is blocked
-  while references exist, because the alternative is a flow that sends a broken
-  attachment to a contact and nobody finding out until they complain.
-
-  To remove such a file, first change whatever references it.
-</Warning>
-
 Before deleting anything, read *Used in*. An empty value means nothing points at
 it; anything else is a list of things that would break.
+
+## Trash, restore and delete permanently
+
+**Move to trash** hides a file from the library and keeps its bytes. Show the trash
+with the **Trash** filter; from there a file can be **restored** or **deleted
+permanently**, which also frees its storage.
+
+<Warning>
+  A file that is used somewhere can be moved to the trash — the dialog says where
+  it is used — but a flow that sends it fails on that step until the file is
+  restored. Deleting it **permanently** is blocked while references exist, because
+  the alternative is a flow that sends a broken attachment to a contact and nobody
+  finding out until they complain.
+
+  To remove such a file for good, first change whatever references it.
+</Warning>
 
 ## Uploading once, sending many times
 
@@ -64,7 +86,12 @@ exit straight away, without asking the contact again.
 ## Folders
 
 Folders are organisational only: they change where a file is found, not what may
-use it. Any flow can reference any file regardless of folder.
+use it. Any flow can reference any file regardless of folder. Folders nest up to
+ten levels deep.
+
+Deleting a folder deletes only the folder: its files (those in the trash too) and
+its subfolders first move to the folder you choose, or to the root. Nothing inside
+it is deleted.
 
 ## Access
 
