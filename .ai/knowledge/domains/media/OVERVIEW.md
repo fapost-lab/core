@@ -18,7 +18,10 @@ paths:
   - config/media.php
   - "database/migrations/tenant/*media*"
   - "tests/*/Domains/Media/**"
-reviewed_at: 2026-10-05
+  - "app/Http/Controllers/Admin/Media*Controller.php"
+  - "app/Http/Requests/Admin/*Media*"
+  - "resources/js/pages/Console/Media/**"
+reviewed_at: 2026-10-10
 ---
 # Media
 
@@ -51,4 +54,6 @@ definitions reference which file, so a file in use is not deleted silently.
 - HTTP: `routes/media.php` (`auth`, `tenant`, `verified`; the signed raw-file route drops
   `auth`), controllers in `app/Http/Controllers/Media`.
 - `app/Jobs/Media/CleanupSoftDeletedMediaJob.php` (queue `messaging.system`, daily).
-- Admin UI: `app/Filament/Resources/Media`.
+- Admin UI: `app/Http/Controllers/Admin/MediaController.php` and `MediaFolderController.php` on the
+  `admin` stack (pages `resources/js/pages/Console/Media`), over `MediaLibraryService` and
+  `MediaFolderService`; `app/Filament/Resources/Media` still serves it when `UI_INERTIA=false`.

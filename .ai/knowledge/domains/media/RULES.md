@@ -19,7 +19,10 @@ paths:
   - config/media.php
   - "database/migrations/tenant/*media*"
   - "tests/*/Domains/Media/**"
-reviewed_at: 2026-10-05
+  - "app/Http/Controllers/Admin/Media*Controller.php"
+  - "app/Http/Requests/Admin/*Media*"
+  - "resources/js/pages/Console/Media/**"
+reviewed_at: 2026-10-10
 ---
 # Media rules
 
@@ -43,7 +46,8 @@ broken.
   uploader asks `MediaStorageGate` before it writes a byte for new content.** Order: stream into a local
   buffer, hash and measure, look the hash up (a known blob writes nothing), gate, then write. A refusal
   (`StorageLimitReachedException`) leaves no blob, no file and nothing on the tenant's disk. Callers word the
-  refusal for their surface: REST 422, Filament danger notification, transcript descriptor `failed` with
+  refusal for their surface: REST 422, Filament danger notification, admin screen error toast (one file per request, the last answer
+  speaks for the batch: "saved N of M"), transcript descriptor `failed` with
   `reason: storage_limit_reached`, input node `invalid` exit with `error_key: storage_limit_reached`.
   Enforced: `MediaStorageGateTest`, PHPat and unit `CountableModelCreationTest`.
 - **Blob size is the byte count of the buffer (`ftell`), never `mb_strlen`/`strlen` of a chunk.** Pint's
@@ -66,6 +70,11 @@ broken.
 - **Filter media queries by `tenant_id` as well as relying on the schema switch** — the existing
   queries do both. `media_channel_refs` and `media_file_references` have no `tenant_id`.
   Review only. *(proposed)*
-- **Folder rules live in `FoldersController`, not in the service:** depth at most 10, no move
-  into the folder's own subtree, deleting a non-empty folder needs `force=true`. A new entry
-  point must apply them, or move them into the service first. *(proposed)*
+- **Folder rules live in `MediaFolderService`:** a folder is found inside the current tenant only,
+  depth at most `media.folder.max_depth`, no move into the folder's own subtree, and deleting a
+  folder first moves its files (trashed ones too, in one UPDATE) and direct subfolders (through
+  `moveFolder`, so `path_cache` follows) into a target or the root. Each entry point decides when to
+  ask: REST `DELETE /media/folders/{id}` answers 409 for a non-empty folder without `force=true`
+  and then moves the contents to the root; the admin screen asks where the contents go. A refusal
+  is `MediaFolderRuleException`, a 422 on the named field. Enforced: `MediaApiTest`,
+  `AdminMediaConsoleTest`.
