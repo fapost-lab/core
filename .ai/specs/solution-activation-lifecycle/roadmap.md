@@ -10,9 +10,9 @@ Goal: the platform knows what an installed package claims to provide, and refuse
 claims it wrongly. Done when: `platform:update` fails on a malformed manifest naming the offending
 field, and passes on a valid one.
 
-- [ ] `solution-manifest` — A Solution declares its identity, its Foundation constraint and what it registers in a
+- [x] `solution-manifest` — A Solution declares its identity, its Foundation constraint and what it registers in a
       manifest that is validated at `platform:update`
-- [ ] Per-tenant activation storage and registry: a Solution is on or off for one tenant, and the
+- [ ] `solution-activation-storage` — Per-tenant activation storage and registry: a Solution is on or off for one tenant, and the
       state survives a worker restart without leaking between tenants (after: the manifest — there
       is nothing to store the activation of until a package declares an identity)
 
