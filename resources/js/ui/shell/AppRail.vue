@@ -4,7 +4,7 @@ import { Link, usePage } from '@inertiajs/vue3'
 import { Grip } from '@lucide/vue'
 import { cn } from '@fapost/ui/lib/utils'
 import AllApplicationsDialog from './AllApplicationsDialog.vue'
-import { iconFor } from './icons'
+import ShellIcon from './ShellIcon.vue'
 import { railApplications } from './rail'
 import type { ShellPageProps } from './types'
 
@@ -46,7 +46,7 @@ const itemClass = (active: boolean): string =>
         :class="['absolute top-3.5 -left-2 h-6 w-1 rounded-r-[3px]', item.key === data.current ? 'bg-primary' : 'bg-transparent']"
         aria-hidden="true"
       />
-      <component :is="iconFor(item.icon)" class="size-5" aria-hidden="true" />
+      <ShellIcon :name="item.icon" class="size-5" aria-hidden="true" />
       <span class="max-w-full truncate px-0.5 text-[10px] leading-none font-semibold" aria-hidden="true">{{ item.short }}</span>
     </component>
 

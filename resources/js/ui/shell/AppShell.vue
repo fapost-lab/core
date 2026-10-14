@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { inject } from 'vue'
 import { Toaster } from '@fapost/ui/components/sonner'
 import AppRail from './AppRail.vue'
 import ShellBanners from './ShellBanners.vue'
 import ShellHeader from './ShellHeader.vue'
 import ShellSidebar from './ShellSidebar.vue'
+import { SHELL_SLOT } from './slots'
 import { useFlashToasts } from './useFlashToasts'
 import { useIsDark } from './useIsDark'
 
@@ -16,6 +18,8 @@ import { useIsDark } from './useIsDark'
  */
 useFlashToasts()
 const dark = useIsDark()
+// What the application adds to the shell's slots (`slots.ts`); nothing without a provider.
+const slotted = inject(SHELL_SLOT, null)
 </script>
 
 <template>
@@ -37,6 +41,8 @@ const dark = useIsDark()
         </div>
       </main>
     </div>
+
+    <component :is="slotted" v-if="slotted" place="floating" />
 
     <Toaster :theme="dark ? 'dark' : 'light'" position="bottom-right" close-button />
   </div>

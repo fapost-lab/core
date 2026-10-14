@@ -3,8 +3,8 @@ import { createApp, h } from 'vue'
 import { createInertiaApp, router } from '@inertiajs/vue3'
 import { createPinia } from 'pinia'
 import { connectBroadcaster, type BroadcasterProp } from '@fapost/ui/lib/live-updates'
-import { AppShell } from '@fapost/ui/shell'
-import { isSolutionName, resolveSolutionPage } from './solutions'
+import { AppShell, SHELL_SLOT } from '@fapost/ui/shell'
+import { isSolutionName, resolveSolutionPage, SolutionShellSlot } from './solutions'
 
 createInertiaApp({
     resolve: (name) => {
@@ -24,6 +24,8 @@ createInertiaApp({
         createApp({ render: () => h(App, props) })
             .use(plugin)
             .use(createPinia())
+            // The Solutions' shell elements, in the shell's `floating` and `header` slots.
+            .provide(SHELL_SLOT, SolutionShellSlot)
             .mount(el)
 
         // Live updates over a websocket only when the server says a broadcaster delivers and someone is signed in; the

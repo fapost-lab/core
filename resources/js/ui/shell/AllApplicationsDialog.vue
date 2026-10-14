@@ -5,7 +5,7 @@ import { toast } from 'vue-sonner'
 import { ChevronDown, ChevronUp, Pin, PinOff, Search } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@fapost/ui/components/dialog'
-import { iconFor } from './icons'
+import ShellIcon from './ShellIcon.vue'
 import { interpolate } from './nav'
 import { filterApplications, move, togglePin } from './rail'
 import type { ApplicationsTranslations, ShellApplication, ShellApplications } from './types'
@@ -95,7 +95,7 @@ function isPinned(item: ShellApplication): boolean {
             @click="open = false"
           >
             <span class="bg-accent text-accent-foreground flex size-11 items-center justify-center rounded-xl">
-              <component :is="iconFor(item.icon)" class="size-[22px]" aria-hidden="true" />
+              <ShellIcon :name="item.icon" class="size-[22px]" aria-hidden="true" />
             </span>
             <span class="text-center text-[12.5px] leading-tight font-semibold">{{ item.label }}</span>
             <span class="text-faint-foreground text-center text-[11px] leading-tight">{{ item.scope }}</span>
@@ -122,7 +122,7 @@ function isPinned(item: ShellApplication): boolean {
         <p v-if="pinned.length === 0" class="text-muted-foreground text-sm">{{ labels.rail_empty }}</p>
         <ol v-else class="flex flex-col gap-1">
           <li v-for="(item, index) in pinned" :key="item.key" class="flex min-h-9 items-center gap-2 rounded-md border px-2.5" :data-test="`rail-order-${item.key}`">
-            <component :is="iconFor(item.icon)" class="text-sidebar-foreground size-4 shrink-0" aria-hidden="true" />
+            <ShellIcon :name="item.icon" class="text-sidebar-foreground size-4 shrink-0" aria-hidden="true" />
             <span class="min-w-0 flex-1 truncate text-sm">{{ item.label }}</span>
             <Button
               variant="ghost"

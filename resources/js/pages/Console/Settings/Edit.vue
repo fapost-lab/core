@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@fapost/ui/components/tabs'
 import { interpolate } from '@fapost/ui/shell'
 import CommandsField from './CommandsField.vue'
+import { SolutionMount, tabFromQuery, useExtensions } from '../../../console/solutions'
 import MultiSelectPicker from '../Shared/MultiSelectPicker.vue'
 import FlowSelect from './FlowSelect.vue'
 import KeyValueField from './KeyValueField.vue'
@@ -56,13 +57,18 @@ const form = useForm<SettingsFormData>({
 const errors = computed(() => form.errors as Record<string, string | undefined>)
 const errorTabs = computed(() => tabsWithErrors(errors.value))
 
-function tabFromUrl(): SettingsTab {
-  const tab = new URL(page.url, 'http://localhost').searchParams.get('tab')
+// Tabs Solutions add come after Core's; each is its own form with its own routes, outside Core's form.
+const { items: solutionTabs, assistantId } = useExtensions('tabs', 'assistant')
+const isSolutionTab = computed(() => solutionTabs.value.some((extra) => extra.id === tab.value))
 
-  return isTab(tab) ? tab : 'general'
+/** Core's tab or a Solution's (`<id>.<key>`). */
+type OpenTab = SettingsTab | string
+
+function tabFromUrl(): OpenTab {
+  return tabFromQuery(new URL(page.url, 'http://localhost').searchParams.get('tab'), isTab, solutionTabs.value, 'general')
 }
 
-const tab = ref<SettingsTab>(tabFromUrl())
+const tab = ref<OpenTab>(tabFromUrl())
 
 // The tab goes into the address without a visit, keeping Inertia's history state, so a reload opens it again.
 watch(tab, (value) => {
@@ -78,7 +84,7 @@ watch(tab, (value) => {
 })
 
 watch(errorTabs, (tabs) => {
-  if (tabs.length > 0 && !tabs.includes(tab.value)) {
+  if (tabs.length > 0 && !(tabs as string[]).includes(tab.value)) {
     tab.value = tabs[0]
   }
 })
@@ -130,17 +136,18 @@ function createFlow(name: string): void {
       <p class="text-muted-foreground mt-1 text-sm">{{ t.description }}</p>
     </div>
 
-    <form class="flex flex-col gap-5" novalidate @submit.prevent="save">
-      <Tabs v-model="tab" class="gap-5">
-        <TabsList>
-          <TabsTrigger v-for="name in ['general', 'commands', 'advanced'] as const" :key="name" :value="name" :aria-invalid="errorTabs.includes(name)">
-            {{ t.tabs[name] }}
-            <Badge v-if="name === 'commands' && form.commands.length > 0" variant="neutral">{{ form.commands.length }}</Badge>
-            <span v-if="errorTabs.includes(name)" class="bg-destructive size-1.5 rounded-full" :title="t.errors.has_errors" />
-            <span v-if="errorTabs.includes(name)" class="sr-only">({{ t.errors.has_errors }})</span>
-          </TabsTrigger>
-        </TabsList>
+    <Tabs v-model="tab" class="gap-5">
+      <TabsList>
+        <TabsTrigger v-for="name in ['general', 'commands', 'advanced'] as const" :key="name" :value="name" :aria-invalid="errorTabs.includes(name)">
+          {{ t.tabs[name] }}
+          <Badge v-if="name === 'commands' && form.commands.length > 0" variant="neutral">{{ form.commands.length }}</Badge>
+          <span v-if="errorTabs.includes(name)" class="bg-destructive size-1.5 rounded-full" :title="t.errors.has_errors" />
+          <span v-if="errorTabs.includes(name)" class="sr-only">({{ t.errors.has_errors }})</span>
+        </TabsTrigger>
+        <TabsTrigger v-for="extra in solutionTabs" :key="extra.id" :value="extra.id" :data-solution-tab="extra.id">{{ extra.label }}</TabsTrigger>
+      </TabsList>
 
+      <form v-show="!isSolutionTab" class="flex flex-col gap-5" novalidate @submit.prevent="save">
         <TabsContent value="general" class="flex flex-col gap-5">
           <FormSection :title="t.sections.language.title" :description="t.sections.language.description">
             <FormField
@@ -238,12 +245,16 @@ function createFlow(name: string): void {
             <KeyValueField v-model="form.settings" :errors="errors" />
           </FormSection>
         </TabsContent>
-      </Tabs>
 
-      <div class="flex items-center gap-2">
-        <Button type="submit" :disabled="form.processing">{{ form.processing ? common.saving : common.save }}</Button>
-      </div>
-    </form>
+        <div class="flex items-center gap-2">
+          <Button type="submit" :disabled="form.processing">{{ form.processing ? common.saving : common.save }}</Button>
+        </div>
+      </form>
+
+      <TabsContent v-for="extra in solutionTabs" :key="extra.id" :value="extra.id">
+        <SolutionMount :component="extra.component" :assistant-id="assistantId" />
+      </TabsContent>
+    </Tabs>
 
     <NewFlowDialog v-if="can.createFlow" v-model:open="newFlowOpen" :processing="form.processing" :error="errors.new_flow_name ?? errors.command_index" @submit="createFlow" />
   </div>

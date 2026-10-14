@@ -13,6 +13,7 @@ import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@fapost/ui/components/card'
 import { EmptyState } from '@fapost/ui/components/empty-state'
 import { interpolate } from '@fapost/ui/shell'
+import { SolutionWidgets } from '../../../console/solutions'
 import ActivityChart from './ActivityChart.vue'
 import type { ActivityDay, AdminDashboardPageProps, AdminStats } from './types'
 
@@ -123,6 +124,8 @@ onBeforeUnmount(() => {
         <CardContent class="text-muted-foreground text-[13px]">{{ tile.hint }}</CardContent>
       </Card>
     </div>
+
+    <SolutionWidgets target="admin" :columns="3" />
 
     <Card v-if="activity">
       <CardHeader>

@@ -1408,4 +1408,8 @@ return [
         'description' => 'The application that provides it is not active or failed to load. Try again later or contact your administrator.',
         'back'        => 'Go back',
     ],
+    // What Solutions add to Core's screens (extension-contract).
+    'extensions' => [
+        'row_actions' => 'More actions: :name',
+    ],
 ];

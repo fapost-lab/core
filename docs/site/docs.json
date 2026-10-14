@@ -170,6 +170,7 @@
             "group": "Extension surfaces",
             "pages": [
               "extending/builder-ui",
+              "extending/console-ui",
               "extending/channel-drivers",
               "extending/data-accessors",
               "extending/multilingual"

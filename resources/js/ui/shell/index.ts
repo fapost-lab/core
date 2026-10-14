@@ -1,5 +1,6 @@
 export { default as AppShell } from './AppShell.vue'
 export { applyTheme, isDark, readPreference, writePreference, type ThemePreference } from './theme'
 export { useTheme } from './useTheme'
+export { SHELL_SLOT, type ShellSlotPlace } from './slots'
 export { breadcrumbs, findActive, interpolate } from './nav'
 export type * from './types'

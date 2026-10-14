@@ -16,6 +16,7 @@ import type { LiveChannel } from '@fapost/ui/lib/live-updates'
 import { useLiveUpdates } from '@fapost/ui/lib/useLiveUpdates'
 import { interpolate } from '@fapost/ui/shell'
 import { exceedsSize, formatSize, newRequestId } from './draft'
+import { SolutionActions } from '../../../console/solutions'
 import LiveHint from './LiveHint.vue'
 import { deliveryGlyph, groupByDay, isToday, timeLabel } from './transcript'
 import { STATUS_TONES, type Abilities, type ConversationDetails, type ConversationsPageProps, type Message, type Paging } from './types'
@@ -208,6 +209,7 @@ function toggleStatus(): void {
           <Button v-if="can.setStatus" variant="outline" size="sm" :disabled="busy" @click="toggleStatus">
             {{ conversation.status === 'open' ? t.actions.close : t.actions.reopen }}
           </Button>
+          <SolutionActions target="conversation.view" :record-id="conversation.id" />
         </div>
       </div>
     </div>

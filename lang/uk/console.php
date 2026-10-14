@@ -1408,4 +1408,8 @@ return [
         'description' => 'Застосунок, якому вона належить, не активний або не завантажився. Спробуйте пізніше або зверніться до адміністратора.',
         'back'        => 'Назад',
     ],
+    // What Solutions add to Core's screens (extension-contract).
+    'extensions' => [
+        'row_actions' => 'Ще дії: :name',
+    ],
 ];

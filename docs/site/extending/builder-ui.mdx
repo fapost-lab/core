@@ -43,8 +43,8 @@ renderer in Core, not to work around it.
 
 **Solution components go to the console, not the builder.** A Solution's
 front-end code ships prebuilt and is loaded by the console at run time, with no
-rebuild of Core — never by writing into the application's source tree. That
-contract is being built and is not available yet. A Solution registers action
+rebuild of Core — never by writing into the application's source tree; see
+[Console UI](/extending/console-ui). A Solution registers action
 handlers rather than node types, and they are configured in the `call` node
 through schema.
 

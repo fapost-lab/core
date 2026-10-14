@@ -21,6 +21,27 @@ published flow keeps reaching the handler version it was built against — see
 **State namespaces.** The meaning of `system.*`, `flow.*`, `rag.*`, and `module.*`
 is fixed, along with who may write each.
 
+**The console's run-time interface for Solutions.** What a prebuilt Solution bundle
+runs against in the browser — see [Console UI](/extending/console-ui):
+
+- `@fapost/ui`, the console kit, at the public subpaths that page lists. It follows
+  strict semver from its first published version, `0.1.0`, which is not released
+  yet (see [Not ready yet](/extending/console-ui#not-ready-yet)); an installation
+  serves exactly one version of it.
+- The `fapost-ui.json` schema.
+- Page and component names, `<id>::<Path>`, and the string values of the console
+  targets (`contact.view`, `floating`, `admin`, …).
+
+## Experimental extension points
+
+Some contracts are published before a real extension has exercised them. They are
+marked `@experimental` in their PHPDoc and on this site, and they are the one
+exception to "not broken within a major version": an experimental contract may
+change in a minor release of `fapost/foundation`, and the change is described in
+its changelog. The [console UI](/extending/console-ui) contract is experimental
+today. While the platform is pre-1.0 a constraint such as `^0.15` accepts one
+minor only, so such a change reaches your package when you raise the constraint.
+
 ## What is not covered
 
 **Everything under `App\…`.** Core's domains, models, services, and jobs are
@@ -37,9 +58,10 @@ expected to break.
 domains. Read module data through a
 [data accessor](/extending/data-accessors), not through a query.
 
-**The compiled front end.** The builder's internal component structure is not a
-contract. Configure nodes through schema — see
-[Builder UI extensions](/extending/builder-ui).
+**The compiled front end.** The internal structure of the console and the
+builder — their components, stores, routes in the browser and chunks — is not a
+contract, apart from the run-time interface listed above. Configure nodes through
+schema — see [Builder UI extensions](/extending/builder-ui).
 
 ## Where the line is enforced
 

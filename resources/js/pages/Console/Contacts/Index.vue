@@ -13,8 +13,10 @@ import { EmptyState } from '@fapost/ui/components/empty-state'
 import { Button } from '@fapost/ui/components/button'
 import { DataTable, type DataTableColumn, type TableDefaults, type TableMeta, type TableState } from '@fapost/ui/components/data-table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
+import ValueCell from '@fapost/ui/components/data-table/ValueCell.vue'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { interpolate } from '@fapost/ui/shell'
+import { rowValue, SolutionActions, useSolutionColumns } from '../../../console/solutions'
 import CopyButton from './CopyButton.vue'
 import type { ContactRow, ContactsPageProps } from './types'
 
@@ -32,7 +34,7 @@ const page = usePage<ContactsPageProps>()
 const t = computed(() => page.props.translations.console.contacts)
 const tableLabels = computed(() => page.props.translations.console.table)
 
-const columns = computed<DataTableColumn[]>(() => [
+const coreColumns = computed<DataTableColumn[]>(() => [
   { key: 'shortId', label: t.value.columns.id, class: 'hidden md:table-cell' },
   { key: 'platform', label: t.value.columns.platform },
   { key: 'externalId', label: t.value.columns.external_id },
@@ -40,6 +42,9 @@ const columns = computed<DataTableColumn[]>(() => [
   { key: 'language', label: t.value.columns.language, class: 'hidden sm:table-cell' },
   { key: 'createdAt', sortKey: 'created_at', label: t.value.columns.created_at, sortable: true, class: 'hidden md:table-cell' },
 ])
+
+// Columns Solutions add come after Core's.
+const { columns, extra } = useSolutionColumns('contacts', coreColumns)
 
 function platformLabel(value: string): string {
   return t.value.platforms[value] ?? value
@@ -122,8 +127,13 @@ function label(row: ContactRow): string {
         <span v-if="row.createdAt" class="text-muted-foreground" :title="row.createdAt">{{ relativeTime(row.createdAt, page.props.locale) }}</span>
       </template>
 
+      <template v-for="column in extra" :key="column.id" #[`cell-${column.id}`]="{ row }">
+        <ValueCell :type="column.cell" :value="rowValue(row, column.id)" :locale="page.props.locale" :tones="column.tones" />
+      </template>
+
       <template #actions="{ row }">
-        <div class="flex justify-end">
+        <div class="flex justify-end gap-1">
+          <SolutionActions target="contact.row" variant="row" :record-id="row.id" :name="label(row)" />
           <Button as-child variant="ghost" size="icon-sm">
             <Link :href="row.viewUrl" :aria-label="interpolate(t.open_named, { name: label(row) })">
               <Eye aria-hidden="true" />

@@ -11,6 +11,7 @@ paths:
   - "app/Http/Shell/**"
   - vite.config.ts
 summary: "How a Solution adds to the console: server-side declarations on named Core targets, pages by <id>::Path, a prebuilt dist/ on Core's shared Vue, Inertia and kit through an import map; supersedes ADR-06 for Solutions"
+reviewed_at: 2026-10-14
 ---
 # A Solution adds to the console through server-side declarations and a prebuilt bundle on Core's shared modules
 
@@ -183,3 +184,12 @@ Why:      one Vue instance and one kit are what make prebuilt bundles work witho
   page names, URLs, asset paths and pins.
 - Every kit change after `0.1.0` is a change to a run-time interface installed Solutions depend on.
 - How long an old kit major stays served after 1.0 is left open (spec `ui-foundation`, the version-story fog item).
+
+## Amendments
+
+**2026-10-14, extension contract (approved at its T3 gate).** Two details are settled more precisely than above:
+
+- Targets are enums in Foundation (`Fapost\Foundation\Console\Enums`), one per kind of point, not string constants;
+  an unknown target cannot be expressed at all, so "a registration error" above is a type error in practice.
+- A `::` name missing from the map, or a bundle that fails to load, renders Core's `Errors/SolutionUnavailable` page
+  inside the shell rather than Inertia's generic error page.

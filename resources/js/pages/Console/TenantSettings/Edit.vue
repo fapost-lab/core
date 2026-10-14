@@ -17,6 +17,7 @@ import { Switch } from '@fapost/ui/components/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@fapost/ui/components/tabs'
 import { Textarea } from '@fapost/ui/components/textarea'
 import { interpolate } from '@fapost/ui/shell'
+import { SolutionMount, tabFromQuery, useExtensions } from '../../../console/solutions'
 import MultiSelectPicker from '../Shared/MultiSelectPicker.vue'
 import { fallbackOptions, firstError, isTab, keptFallback, tabsWithErrors } from './form'
 import type { SelectOption, TenantSettingsPageProps, TenantSettingsState, TenantSettingsTab } from './types'
@@ -51,13 +52,18 @@ watch(
   },
 )
 
-function tabFromUrl(): TenantSettingsTab {
-  const tab = new URL(page.url, 'http://localhost').searchParams.get('tab')
+// Tabs Solutions add come after Core's; each is its own form with its own routes, outside Core's form.
+const { items: solutionTabs, assistantId } = useExtensions('tabs', 'tenant')
+const isSolutionTab = computed(() => solutionTabs.value.some((extra) => extra.id === tab.value))
 
-  return isTab(tab) ? tab : 'languages'
+/** Core's tab or a Solution's (`<id>.<key>`). */
+type OpenTab = TenantSettingsTab | string
+
+function tabFromUrl(): OpenTab {
+  return tabFromQuery(new URL(page.url, 'http://localhost').searchParams.get('tab'), isTab, solutionTabs.value, 'languages')
 }
 
-const tab = ref<TenantSettingsTab>(tabFromUrl())
+const tab = ref<OpenTab>(tabFromUrl())
 
 // The tab goes into the address without a visit, keeping Inertia's history state, so a reload opens it again.
 watch(tab, (value) => {
@@ -73,7 +79,7 @@ watch(tab, (value) => {
 })
 
 watch(errorTabs, (withErrors) => {
-  if (withErrors.length > 0 && !withErrors.includes(tab.value)) {
+  if (withErrors.length > 0 && !(withErrors as string[]).includes(tab.value)) {
     tab.value = withErrors[0]
   }
 })
@@ -92,16 +98,17 @@ function save(): void {
       <p class="text-muted-foreground mt-1 text-sm">{{ t.description }}</p>
     </div>
 
-    <form class="flex flex-col gap-5" novalidate @submit.prevent="save">
-      <Tabs v-model="tab" class="gap-5">
-        <TabsList>
-          <TabsTrigger v-for="name in tabs" :key="name" :value="name" :aria-invalid="errorTabs.includes(name)">
-            {{ t.tabs[name] }}
-            <span v-if="errorTabs.includes(name)" class="bg-destructive size-1.5 rounded-full" :title="t.errors.has_errors" />
-            <span v-if="errorTabs.includes(name)" class="sr-only">({{ t.errors.has_errors }})</span>
-          </TabsTrigger>
-        </TabsList>
+    <Tabs v-model="tab" class="gap-5">
+      <TabsList>
+        <TabsTrigger v-for="name in tabs" :key="name" :value="name" :aria-invalid="errorTabs.includes(name)">
+          {{ t.tabs[name] }}
+          <span v-if="errorTabs.includes(name)" class="bg-destructive size-1.5 rounded-full" :title="t.errors.has_errors" />
+          <span v-if="errorTabs.includes(name)" class="sr-only">({{ t.errors.has_errors }})</span>
+        </TabsTrigger>
+        <TabsTrigger v-for="extra in solutionTabs" :key="extra.id" :value="extra.id" :data-solution-tab="extra.id">{{ extra.label }}</TabsTrigger>
+      </TabsList>
 
+      <form v-show="!isSolutionTab" class="flex flex-col gap-5" novalidate @submit.prevent="save">
         <TabsContent value="languages">
           <FormSection :title="t.sections.languages.title" :description="t.sections.languages.description">
             <FormField
@@ -255,11 +262,15 @@ function save(): void {
             </FormField>
           </FormSection>
         </TabsContent>
-      </Tabs>
 
-      <div class="flex items-center gap-2">
-        <Button type="submit" :disabled="form.processing">{{ form.processing ? common.saving : common.save }}</Button>
-      </div>
-    </form>
+        <div class="flex items-center gap-2">
+          <Button type="submit" :disabled="form.processing">{{ form.processing ? common.saving : common.save }}</Button>
+        </div>
+      </form>
+
+      <TabsContent v-for="extra in solutionTabs" :key="extra.id" :value="extra.id">
+        <SolutionMount :component="extra.component" :assistant-id="assistantId" />
+      </TabsContent>
+    </Tabs>
   </div>
 </template>

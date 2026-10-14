@@ -38,7 +38,7 @@ sessions. The platform is extended from outside through public contracts, not by
 | `media` | `app/Domains/Media` | Media storage, deduplication, channel asset cache | — |
 | `assistant` | `app/Domains/Assistant` | The assistant aggregate and the current-assistant context | — |
 | `staff` | `app/Domains/Staff` | Staff users, roles, staff notifications | — |
-| `solution` | `app/Domains/Solution` | Installed Solution packages: manifest discovery and validation, the catalog and its cache, `platform:update`, per-tenant activation (`ActiveSolutions`, `SolutionActivator`) | Depend on a domain other than the Tenancy contracts, or on the database outside `Infrastructure` |
+| `solution` | `app/Domains/Solution` | Installed Solution packages: manifest discovery and validation, the catalog and its cache, `platform:update`, per-tenant activation (`ActiveSolutions`, `SolutionActivator`), the console extension registry (`Console/ConsoleExtensionRegistry`) and the check and publication of a Solution's prebuilt console UI (`SolutionUiBundleReader`, `SolutionUiPublisher`, `PublishedSolutionUi`) | Depend on a domain other than the Tenancy contracts, or on the database outside `Infrastructure` |
 
 `Presale` (the public site's lead form) and `Shared` (base model concerns) carry no domain
 logic and have no knowledge pack.
@@ -55,7 +55,7 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   Foundation, a primitive with no domain meaning into Support, anything with one domain's meaning
   stays in Core (ADR-05).
 - **The extension packages are separate repositories.** Core consumes them through VCS
-  repositories (`fapost/foundation ^0.13`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
+  repositories (`fapost/foundation ^0.15`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
   symlinked over `vendor/` by `composer dev:link` (`tools/dev-link-packages.php`).
   Until 1.0 a package that depends on another FaPost package accepts its whole 0.x line
   (`fapost/support` requires `fapost/foundation >=0.2 <1.0`), so a Foundation minor needs no release
@@ -72,8 +72,15 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   (`adr-20261014-solution-console-ui`). The Solution manifest, a data
   block in the package's `composer.json`, is read and validated by `platform:update` (`solution`
   domain). A tenant's Solution activation is stored in its schema and read only through `ActiveSolutions`
-  (`adr-20261014-solution-activation-in-tenant-schema`). Absent: a Core implementation of
-  `CoreRegistrarInterface`, the activation screen and the entitlement check.
+  (`adr-20261014-solution-activation-in-tenant-schema`). The console extension contract is built
+  (`adr-20261014-solution-console-ui`, experimental): Foundation's `ConsoleExtensionsInterface` is
+  implemented by `ConsoleExtensionRegistry` in the `solution` domain, filtered per request and
+  rendered by `app/Http/Shell` (`SolutionExtensions`, `SolutionRoutes`, `SolutionImportMap`,
+  `SolutionUi`) and `resources/js/console/solutions/`, and `platform:update` publishes the
+  prebuilt bundles; its rules are `conventions/solution-console-ui.md`. Absent: a Core
+  implementation of `CoreRegistrarInterface`, the activation screen, the entitlement check, and
+  the author's half of Solution UI (the Vite preset, the kit-range check, the derived-image
+  recipe — `first-solution` phase 0).
 - **Landlord data is reached only through Tenancy.** Other domains depend on
   `Tenancy/Contracts`; the `landlord` connection is opened only inside Tenancy infrastructure. Only the SaaS operator
   package may open it, for its own prefixed tables and never for Core's; Plugin and Solution packages may not

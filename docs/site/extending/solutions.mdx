@@ -25,9 +25,10 @@ Its public contracts belong in `fapost/foundation`. Primitives with no Core
 dependency belong in `fapost/support`. Neither package may reference `App\…`, and neither may
 absorb business logic that belongs to Core.
 
-Front-end components are possible, but only through the agreed build and publish
-contract. A Solution cannot drop Vue files into a running application — the
-builder front end is compiled ahead of time.
+Screens in the console go through the [console UI contract](/extending/console-ui):
+the Solution declares them in PHP and ships its front end prebuilt, loaded at run
+time on the console's own Vue and kit. A Solution cannot drop Vue files into Core's
+source tree — Core's front end is compiled ahead of time.
 
 ## The manifest
 
@@ -65,6 +66,7 @@ package's `require`; neither is repeated in the manifest.
 | `extra.fapost.description` | no | Up to 280 characters |
 | `extra.fapost.provider` | yes | The class name of your service provider; the class must exist and extend `Fapost\Foundation\Lifecycle\AbstractSolutionServiceProvider` |
 | `extra.fapost.actions` | no | The action ids you register, each starting with `<id>.`, no duplicates |
+| `extra.fapost.ui` | no | The path of your `fapost-ui.json` relative to the package root, ending in `.json`; from `fapost/foundation` 0.15, experimental — see [Console UI](/extending/console-ui) |
 | `extra.fapost.x-*` | no | Ignored, for your own tooling |
 | `require.fapost/foundation` | yes | The Foundation range you need; Composer enforces it when the package is installed |
 | `require.fapost/core` | forbidden | A Solution depends on contracts, never on Core |
@@ -112,7 +114,7 @@ Prints every problem, not just the first, and exits with code 1:
 ```
 acme/fapost-feedback: extra.fapost.id: required
 acme/fapost-feedback: extra.fapost.actions[1]: "score" must start with "feedback."
-acme/fapost-feedback: extra.fapost.migrations: unknown field (schema 1 allows: schema, id, name, description, provider, actions); a newer fapost/foundation may be required
+acme/fapost-feedback: extra.fapost.migrations: unknown field (schema 1 allows: schema, id, name, description, provider, actions, ui); a newer fapost/foundation may be required
 acme/one, acme/two: extra.fapost.id: "feedback" is declared by both packages
 ```
 
@@ -138,8 +140,8 @@ installs quietly without part of its behaviour. A new optional field arrives in 
 `fapost/foundation`; to use it, require that version, and Composer then refuses to install your
 Solution on a platform that does not have it. A breaking change gets a new `schema` number;
 Foundation reads the current schema and the previous one within one major version, and refuses
-anything else. A field not in schema 1 yet, for example the UI of a Solution or its migrations, is
-added the same way when its contract is settled.
+anything else. A field not in schema 1 yet, for example a Solution's migrations, is added the same
+way when its contract is settled, as `ui` was in 0.15.
 
 ## What a Solution typically contains
 
@@ -154,6 +156,9 @@ Most Solutions are a combination of pieces documented elsewhere in this section:
   </Card>
   <Card title="Builder configuration" href="/extending/builder-ui">
     So your nodes can be configured on the canvas.
+  </Card>
+  <Card title="Console UI" href="/extending/console-ui">
+    So staff work with your domain in its own application and on Core's screens.
   </Card>
   <Card title="Migrations" href="/extending/plugins">
     Subject to the same migration isolation rules as Core.
