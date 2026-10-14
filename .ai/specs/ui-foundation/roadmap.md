@@ -98,10 +98,10 @@ suite registers an application in the switcher with its own menu and pages, a co
 on a Core screen, an element in the shell's slot, a dashboard widget, a settings tab and a table
 column, each rendered in the console with pages resolved by name.
 
-- [ ] An ADR that supersedes ADR-06's "Filament resources: Solution ✓" and its build-time-only
+- [ ] `solution-ui-adr` — An ADR that supersedes ADR-06's "Filament resources: Solution ✓" and its build-time-only
       rule — what a Solution may add to the console, pages referenced by name, UI shipped
       prebuilt with the shared modules from Core's import map
-- [ ] The app switcher — the rail with the Console, the Admin panel and pinned Solutions, "All
+- [ ] `app-switcher` — The app switcher — the rail with the Console, the Admin panel and pinned Solutions, "All
       applications" with search, per-user pinning and order, ⌘K across applications, the
       assistant switcher only where an application works per assistant (after: the shell in phase
       1 — the rail wraps it)
