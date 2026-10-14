@@ -18,8 +18,9 @@
 >   manual deploy step today.
 > - Runtime plugin installation from a zip in the admin panel is not implemented either; the Plugin rows describe a target.
 >
-> The vendor glob for Solution Vue components is implemented in `resources/js/builder/utils/vendorComponents.ts` (static,
-> eager `import.meta.glob`; it resolves to empty maps when no Solution is installed).
+> The vendor glob for Solution Vue components (`resources/js/builder/utils/vendorComponents.ts`, a static, eager
+> `import.meta.glob`) was built and then removed (2026-10-14) under adr-20261014-solution-console-ui; the builder
+> resolves a config panel as Core override, then the schema renderer.
 
 ## Статус
 

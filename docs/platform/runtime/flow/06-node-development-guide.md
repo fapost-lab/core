@@ -327,9 +327,10 @@ Minimum:
 
 `ConfigPanel.vue` (`resources/js/builder/components/editor/ConfigPanel.vue`) has an `OVERRIDES` map
 of Core components for some types: `send_message`, `input`, `condition` / `branch`, `assign`, `call`,
-`set_tag`, `notify`, `auth_request`, `loop`, `loop_end`. Resolution order: Core override -> vendor
-override (`vendorConfigs`, Solution components through a Vite glob) -> the generic
-`SchemaConfigRenderer`, which draws a form from `configSchema()`.
+`set_tag`, `notify`, `auth_request`, `loop`, `loop_end`. A type without an override gets the generic
+`SchemaConfigRenderer`, which draws a form from `configSchema()`. Solutions do not ship builder Vue
+components: they register action handlers reached through the `call` node
+(adr-20261014-solution-console-ui).
 
 Recommendation:
 

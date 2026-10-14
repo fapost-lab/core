@@ -62,7 +62,7 @@ touches or the stage it is in. Read the document, not a summary of it.
 | Proposing a release after a merge | `conventions/release-proposals.md` (stage: consolidate) |
 | Explicit tenant context, landlord access only through Tenancy | `domains/tenancy/RULES.md` |
 | Flow runtime isolation, handler registry and versioning, state namespaces | `domains/flow/RULES.md` |
-| Builder: schema-driven rendering, overrides, vendor components | `domains/flow-builder/RULES.md` |
+| Builder: schema-driven rendering, overrides | `domains/flow-builder/RULES.md` |
 | Domains, boundaries and dependency direction, including the extension packages | `ARCHITECTURE.md` |
 | What holds system-wide and what enforces each rule | `RULES.md` |
 
