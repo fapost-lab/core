@@ -44,11 +44,12 @@ final readonly class NavigationBuilder
     }
 
     /**
-     * The menu of an assistant's screens (`assistant/{tenant}/*`).
+     * The menu of an assistant's screens (`assistant/{tenant}/*`). Without badges it asks no counts: the search
+     * palette lists the pages of an application it is not in, and a count there would be a query nobody sees.
      *
      * @return list<Group>
      */
-    public function console(User $user, Assistant $assistant): array
+    public function console(User $user, Assistant $assistant, bool $badges = true): array
     {
         $overview   = __('assistant.navigation.groups.overview');
         $channels   = __('assistant.navigation.groups.channels');
@@ -72,7 +73,7 @@ final readonly class NavigationBuilder
                 'messages-square',
                 75,
                 $this->canViewAny($user, Conversation::class),
-                fn (): ?string => $this->unreadConversations($assistant),
+                $badges ? fn (): ?string => $this->unreadConversations($assistant) : null,
             ),
             $this->entry($operations, 'resources.contact-segments.index', __('segment.plural_label'), 'funnel', 78, $this->canViewAny($user, ContactSegment::class)),
             $this->entry($operations, 'resources.broadcasts.index', __('broadcast.plural_label'), 'megaphone', 80, $this->canViewAny($user, Broadcast::class)),

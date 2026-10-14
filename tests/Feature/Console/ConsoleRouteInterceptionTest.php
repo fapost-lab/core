@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessCont
 use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Console\ApplicationRailController;
 use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
@@ -191,6 +192,8 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
             'admin support access' => ['console.admin.support-access.index', AdminSupportAccessController::class, 'index', 'GET', 'admin/support-access'],
             // Admin search palette: Filament's global search had no route.
             'admin search' => ['console.admin.search', AdminSearchController::class, '', 'GET', 'admin/search'],
+            // App switcher: the user's own rail, in both panels.
+            'application rail' => ['console.applications.rail.update', ApplicationRailController::class, '', 'PUT', 'console/applications/rail'],
         ];
     }
 

@@ -113,6 +113,8 @@ final class ConsoleSwitchTest extends FeatureTestCase
             'console.settings.store-flow',
             'console.admin.support-access.index',
             'console.admin.search',
+            // App switcher.
+            'console.applications.rail.update',
         ] as $name) {
             $this->assertNull(Route::getRoutes()->getByName($name), $name);
         }

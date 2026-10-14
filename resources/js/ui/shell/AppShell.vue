@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Toaster } from '@fapost/ui/components/sonner'
+import AppRail from './AppRail.vue'
 import ShellBanners from './ShellBanners.vue'
 import ShellHeader from './ShellHeader.vue'
 import ShellSidebar from './ShellSidebar.vue'
@@ -7,13 +8,11 @@ import { useFlashToasts } from './useFlashToasts'
 import { useIsDark } from './useIsDark'
 
 /**
- * The frame of every console page: side menu, header with breadcrumbs and the language, theme and user controls,
- * and the banners above the page. Pages choose it as a persistent layout (`defineOptions({ layout: AppShell })`),
+ * The frame of every console page: the application rail (the app switcher), the side menu of the current application,
+ * the header with breadcrumbs, search and the language, theme and user controls, and the banners above the page. Pages choose it as a persistent layout (`defineOptions({ layout: AppShell })`),
  * so the menu keeps its state while the page changes.
  *
  * Inertia's flash data (`success`, `error`) is shown here as toasts, after every visit; they follow the console's theme.
- *
- * The `rail` slot, left of the menu, is reserved for the application strip of a later phase; it is empty now.
  */
 useFlashToasts()
 const dark = useIsDark()
@@ -21,9 +20,11 @@ const dark = useIsDark()
 
 <template>
   <div class="bg-background text-foreground flex min-h-screen">
-    <slot name="rail" />
+    <div class="sticky top-0 hidden h-screen shrink-0 lg:block">
+      <AppRail />
+    </div>
 
-    <aside class="bg-sidebar text-sidebar-foreground border-sidebar-border sticky top-0 hidden h-screen w-[248px] shrink-0 border-r lg:block">
+    <aside class="bg-sidebar text-sidebar-foreground border-sidebar-border sticky top-0 hidden h-screen w-[236px] shrink-0 border-r lg:block">
       <ShellSidebar />
     </aside>
 

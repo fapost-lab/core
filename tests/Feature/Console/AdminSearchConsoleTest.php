@@ -19,8 +19,9 @@ use Fapost\Foundation\Media\Enums\MediaKind;
 use Inertia\Testing\AssertableInertia;
 
 /**
- * The admin shell's search palette, in place of Filament's global search: what each user may find, inside the tenant,
- * a few hits per group, links to the screens that open them, and no storage path.
+ * The records of the shell's search palette, in place of Filament's global search: what each user may find, inside the
+ * tenant, a few hits per group, links to the screens that open them, and no storage path. Applications and pages:
+ * AppSwitcherConsoleTest.
  */
 final class AdminSearchConsoleTest extends InertiaConsoleTestCase
 {
@@ -137,17 +138,18 @@ final class AdminSearchConsoleTest extends InertiaConsoleTestCase
         $this->getJson($this->url(str_repeat('z', 101)))->assertUnprocessable()->assertJsonValidationErrors('q');
     }
 
-    public function test_a_user_with_nothing_to_search_is_refused_and_gets_no_palette(): void
+    public function test_a_user_who_may_list_nothing_finds_no_records_but_still_has_the_palette(): void
     {
+        Assistant::factory()->create(['name' => 'Acme support']);
         $user = User::factory()->create();
 
-        $this->actingAs($user)->getJson($this->url('acme'))->assertForbidden();
+        $this->actingAs($user)->getJson($this->url('acme'))->assertOk()->assertExactJson(['groups' => []]);
 
         $this->get($this->panelUrl('/admin'))
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('navigation.searchUrl', null)->etc());
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('navigation.searchUrl', '/admin/search')->etc());
     }
 
-    public function test_the_admin_shell_offers_the_palette_and_an_assistant_console_does_not(): void
+    public function test_both_shells_offer_the_palette(): void
     {
         $assistant = Assistant::factory()->create();
 
@@ -155,8 +157,9 @@ final class AdminSearchConsoleTest extends InertiaConsoleTestCase
             ->get($this->panelUrl('/admin'))
             ->assertInertia(fn (AssertableInertia $page) => $page->where('navigation.searchUrl', '/admin/search')->etc());
 
+        // An assistant's page names its assistant, so the Console's pages it finds are that tab's.
         $this->get($this->panelUrl("/assistant/{$assistant->getKey()}/dashboard"))
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('navigation.searchUrl', null)->etc());
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('navigation.searchUrl', "/admin/search?assistant={$assistant->getKey()}")->etc());
     }
 
     public function test_the_search_is_throttled(): void

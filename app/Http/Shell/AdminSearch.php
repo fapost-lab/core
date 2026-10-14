@@ -18,8 +18,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * The admin shell's search palette, in place of Filament's global search over the same four resources: assistants,
- * staff users, roles and media files.
+ * The records of the shell's search palette, in place of Filament's global search over the same four resources:
+ * assistants, staff users, roles and media files. They follow the applications and pages of {@see ApplicationSearch}.
  *
  * Each group is searched only for a user who may list that kind of record, through the same bounded query its list
  * uses (assistants: all for an administrator, the assigned ones otherwise; media: the current tenant's), and returns at
@@ -45,22 +45,6 @@ final readonly class AdminSearch
         private StaffRoleService $roles,
         private RouteOwnership $ownership,
     ) {
-    }
-
-    /**
-     * Whether the user may search anything at all: the shell shows the palette only then.
-     */
-    public function isAvailableTo(User $user): bool
-    {
-        $gate = Gate::forUser($user);
-
-        foreach ([Assistant::class, User::class, Role::class, MediaFile::class] as $model) {
-            if ($gate->allows('viewAny', $model)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**
