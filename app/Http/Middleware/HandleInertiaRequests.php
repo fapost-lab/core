@@ -8,7 +8,8 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Support\SupportAccessSession;
 use App\Domains\Tenancy\Services\CurrentAccessState;
-use App\Http\Shell\AdminSearch;
+use App\Http\Shell\ApplicationRail;
+use App\Http\Shell\ApplicationRegistry;
 use App\Http\Shell\AssistantSwitcher;
 use App\Http\Shell\NavigationBuilder;
 use App\Infrastructure\Broadcasting\BroadcasterStatus;
@@ -79,6 +80,7 @@ final class HandleInertiaRequests extends Middleware
         $shared['shell']                   = fn (): array => $this->shell();
         $shared['navigation']              = fn (): ?array => $this->navigation($request);
         $shared['assistants']              = fn (): ?array => $this->assistants($request);
+        $shared['applications']            = fn (): ?array => $this->applications($request);
 
         return $shared;
     }
@@ -115,7 +117,7 @@ final class HandleInertiaRequests extends Middleware
     /**
      * The side menu: an assistant's screens under `assistant/{tenant}`, otherwise the tenant-wide ones.
      *
-     * @return array{mode: string, groups: list<array{label: string|null, items: list<array<string, mixed>>}>, searchUrl: string|null}|null
+     * @return array{mode: string, groups: list<array{label: string|null, items: list<array<string, mixed>>}>, searchUrl: string}|null
      */
     private function navigation(Request $request): ?array
     {
@@ -128,16 +130,48 @@ final class HandleInertiaRequests extends Middleware
         $builder    = app(NavigationBuilder::class);
         $assistants = app(CurrentAssistantInterface::class);
 
+        // The search palette (applications, their pages, then records) replaces Filament's global search, which only the
+        // admin panel had; every user has applications to find.
+        $searchUrl = route('console.admin.search', [], false);
+
         if ($assistants->isResolved()) {
-            return ['mode' => 'console', 'groups' => $builder->console($user, $assistants->get()), 'searchUrl' => null];
+            return ['mode' => 'console', 'groups' => $builder->console($user, $assistants->get()), 'searchUrl' => $searchUrl];
         }
 
-        // The search palette replaces Filament's global search, which only the admin panel had.
-        return [
-            'mode'      => 'admin',
-            'groups'    => $builder->admin($user),
-            'searchUrl' => app(AdminSearch::class)->isAvailableTo($user) ? route('console.admin.search', [], false) : null,
-        ];
+        return ['mode' => 'admin', 'groups' => $builder->admin($user), 'searchUrl' => $searchUrl];
+    }
+
+    /**
+     * The application rail: the applications the user may open, the pinned ones in the user's order and the current one.
+     * On an assistant's screen the assistant is remembered in the session, so the Console opens on it again from the
+     * Admin panel.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function applications(Request $request): ?array
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        $assistants = app(CurrentAssistantInterface::class);
+        $current    = $assistants->isResolved() ? $assistants->get() : null;
+        $session    = $request->hasSession() ? $request->session() : null;
+
+        if (null !== $current) {
+            $session?->put(ApplicationRegistry::LAST_ASSISTANT, (string) $current->getKey());
+        }
+
+        $last         = $session?->get(ApplicationRegistry::LAST_ASSISTANT);
+        $applications = app(ApplicationRegistry::class)->for($user, $current, is_string($last) ? $last : null);
+
+        return app(ApplicationRail::class)->props(
+            $user,
+            $applications,
+            null === $current ? ApplicationRegistry::ADMIN : ApplicationRegistry::CONSOLE,
+        );
     }
 
     /**

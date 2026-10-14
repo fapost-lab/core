@@ -7,25 +7,31 @@ import { findActive } from './nav'
 import type { ShellPageProps } from './types'
 
 /**
- * The side menu: brand, the assistant switcher (assistant screens only) and the grouped navigation.
- * Used both in the fixed sidebar and in the mobile sheet.
+ * The side menu of the current application: its name and what it works on, the assistant switcher (only in an
+ * application that works per assistant) and the grouped navigation. Used both in the fixed sidebar and in the mobile
+ * sheet, next to the rail.
  */
 const page = usePage<ShellPageProps>()
 
 const t = computed(() => page.props.translations.console)
 const groups = computed(() => page.props.navigation?.groups ?? [])
 const active = computed(() => findActive(groups.value, page.url))
+const application = computed(() => {
+  const data = page.props.applications
+
+  return data?.items.find((item) => item.key === data.current) ?? null
+})
 </script>
 
 <template>
   <div class="flex h-full flex-col gap-[18px] px-3 py-4">
-    <div class="flex items-center gap-2.5 px-2 py-1">
-      <span class="bg-primary text-primary-foreground flex size-7 items-center justify-center rounded-lg text-sm font-bold" aria-hidden="true">F</span>
-      <span class="font-display text-[19px] font-bold">FaPost</span>
+    <div class="flex flex-col gap-0.5 px-2 py-1">
+      <span class="font-display text-foreground text-xl leading-tight font-semibold">{{ application?.label ?? 'FaPost' }}</span>
+      <span v-if="application" class="text-faint-foreground text-xs">{{ application.scope }}</span>
     </div>
 
     <AssistantSwitcher
-      v-if="page.props.assistants"
+      v-if="page.props.assistants && (application === null || application.perAssistant)"
       :data="page.props.assistants"
       :label="t.switcher.label"
       :back-label="t.switcher.back_to_admin"

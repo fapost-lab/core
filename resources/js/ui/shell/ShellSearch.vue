@@ -8,8 +8,9 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { SEARCH_DEBOUNCE_MS, hitValue, isPaletteShortcut, searchable, type SearchGroup, type SearchHit } from './search'
 
 /**
- * The admin shell's search palette (⌘K / Ctrl+K), in place of Filament's global search: the server searches what the
- * user may see and answers a few hits per group; nothing is filtered here. A question still on its way is cancelled
+ * The shell's search palette (⌘K / Ctrl+K) in both panels: the applications the user may open, the pages of each, then
+ * the records Filament's global search found. The server searches what the user may see and answers a few hits per
+ * group; nothing is filtered here. A question still on its way is cancelled
  * by the next one, and only the latest answer is shown.
  */
 const props = defineProps<{
@@ -138,9 +139,9 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <Button variant="outline" size="sm" class="text-muted-foreground gap-2" :aria-label="labels.open" aria-keyshortcuts="Meta+K Control+K" @click="open = true">
+  <Button variant="outline" size="sm" class="text-muted-foreground gap-2 lg:min-w-[280px] lg:justify-start" :aria-label="labels.open" aria-keyshortcuts="Meta+K Control+K" @click="open = true">
     <Search aria-hidden="true" />
-    <span class="hidden sm:inline">{{ labels.open }}</span>
+    <span class="hidden flex-1 text-left sm:inline">{{ labels.open }}</span>
     <kbd class="bg-muted text-faint-foreground hidden rounded px-1.5 font-sans text-[11px] sm:inline">{{ shortcut }}</kbd>
   </Button>
 

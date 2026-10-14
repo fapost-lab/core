@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessCont
 use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Console\ApplicationRailController;
 use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
@@ -71,6 +72,9 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
     // Tenant-wide screens and the interface language, behind the `admin` stack.
     Route::middleware('admin')->group(function (): void {
         Route::post('console/locale', LocaleController::class)->name('console.locale.update');
+
+        // App switcher: the user's own rail (which applications are pinned, in what order), in both panels.
+        Route::put('console/applications/rail', ApplicationRailController::class)->name('console.applications.rail.update');
 
         // Translations: the tenant's overrides of the system catalog, one layer. `{key}` is a catalog key (dots included).
         Route::get('admin/translations', [AdminTranslationController::class, 'index'])->name('filament.admin.pages.translations');
