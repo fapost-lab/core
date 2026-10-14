@@ -123,10 +123,12 @@ decisions above settle. Kept here as input, not as decisions:
   plus a derived image, with no Node. Decided in `first-solution` phase 0 and `ui-foundation`
   (supersedes ADR-06's build-time-only rule). Cost: the kit becomes a run-time interface, and the
   activation screen must say why a Solution with a mismatched kit range is not activated.
-- What happens to a tenant's running sessions when a Solution is deactivated mid-flow — fail the
-  session, or let the current session finish on the handler it started with.
-- Whether a Solution may declare a Foundation version constraint that activation checks, or whether
-  Composer's own resolution is the only gate.
+- Resolved 2026-10-14 (owner, at the gate of `solution-core-registrar`): what happens to a
+  tenant's running sessions when a Solution is deactivated mid-flow. The session does not fail and
+  does not keep the handler it started with: the next `call` to that Solution's action ends on the
+  node's `error` handle with `solution_inactive`, and the flow decides what to do.
+- Resolved 2026-10-14 (owner, at the gate of `solution-manifest`): Composer's own resolution is the
+  only Foundation gate; activation does not re-check a constraint.
 - Cross-Solution migration conflicts: a linter in CI, or a check at `platform:update`.
 - What happens to a Solution's tables when it is deactivated or removed: kept, or soft-deleted.
 - Role and permission names from two Solutions colliding: namespaced by Solution, or rejected at
