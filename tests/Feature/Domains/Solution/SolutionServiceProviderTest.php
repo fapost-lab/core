@@ -34,19 +34,6 @@ final class SolutionServiceProviderTest extends TestCase
         parent::tearDown();
     }
 
-    private function installedSolutions(): InstalledSolutions
-    {
-        $this->vendor->write();
-
-        return new InstalledSolutions(
-            new SolutionCache(dirname($this->vendor->path) . '/fapost-solutions.php'),
-            new SolutionDiscoverer(
-                new InstalledPackagesReader($this->vendor->path),
-                new SolutionManifestValidator(new ManifestParser()),
-            ),
-        );
-    }
-
     public function test_core_boots_the_provider_of_a_valid_solution(): void
     {
         $this->vendor->package(FakeVendor::solutionComposer());
@@ -88,5 +75,18 @@ final class SolutionServiceProviderTest extends TestCase
     public function test_the_application_boots_with_no_solutions_installed(): void
     {
         $this->assertSame([], $this->app->make(InstalledSolutionCatalogInterface::class)->all());
+    }
+
+    private function installedSolutions(): InstalledSolutions
+    {
+        $this->vendor->write();
+
+        return new InstalledSolutions(
+            new SolutionCache(dirname($this->vendor->path) . '/fapost-solutions.php'),
+            new SolutionDiscoverer(
+                new InstalledPackagesReader($this->vendor->path),
+                new SolutionManifestValidator(new ManifestParser()),
+            ),
+        );
     }
 }

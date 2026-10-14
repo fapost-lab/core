@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands\Platform;
 
+use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
 use Illuminate\Console\Command;
@@ -19,7 +20,7 @@ final class CacheSolutionsCommand extends Command
     /** @var string */
     protected $description = 'Cache the catalog of installed Solutions';
 
-    public function handle(SolutionDiscoverer $discoverer, SolutionCache $cache): int
+    public function handle(SolutionDiscoverer $discoverer, SolutionCache $cache, PublishedSolutionUi $published): int
     {
         $discovery = $discoverer->discover();
 
@@ -33,7 +34,9 @@ final class CacheSolutionsCommand extends Command
             return self::FAILURE;
         }
 
-        $cache->write($discovery);
+        // Records what is published; publishing itself is platform:update's.
+        $computed = $published->compute($discovery->valid);
+        $cache->write($discovery, array_values($computed['bundles']), $computed['watched']);
         $this->components->info(sprintf('Solution catalog cached (%d installed).', count($discovery->valid)));
 
         return self::SUCCESS;

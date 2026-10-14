@@ -15,6 +15,8 @@ final readonly class InstalledSolution
      * @param  string  $id  stable key of the Solution; never changes
      * @param  list<string>  $actions  action ids the manifest declares
      * @param  string|null  $composerPath  composer.json the manifest was read from; the cache watches it
+     * @param  string|null  $ui  `extra.fapost.ui`: the Solution's `fapost-ui.json` relative to the package root, or null
+     *                           when it adds no console UI
      */
     public function __construct(
         public string $id,
@@ -26,6 +28,7 @@ final readonly class InstalledSolution
         public string $provider,
         public array $actions,
         public ?string $composerPath,
+        public ?string $ui = null,
     ) {
     }
 
@@ -41,6 +44,7 @@ final readonly class InstalledSolution
             provider: $manifest->provider,
             actions: $manifest->actions,
             composerPath: $composerPath,
+            ui: $manifest->ui,
         );
     }
 
@@ -59,7 +63,20 @@ final readonly class InstalledSolution
             provider: (string) $data['provider'],
             actions: array_values(array_map(strval(...), (array) $data['actions'])),
             composerPath: isset($data['composerPath']) ? (string) $data['composerPath'] : null,
+            ui: isset($data['ui']) ? (string) $data['ui'] : null,
         );
+    }
+
+    /**
+     * Absolute path of the Solution's `fapost-ui.json`, or null when it declares none or its package directory is unknown.
+     */
+    public function uiPath(): ?string
+    {
+        if (null === $this->ui || null === $this->composerPath) {
+            return null;
+        }
+
+        return dirname($this->composerPath) . '/' . $this->ui;
     }
 
     /**
@@ -77,6 +94,7 @@ final readonly class InstalledSolution
             'provider'             => $this->provider,
             'actions'              => $this->actions,
             'composerPath'         => $this->composerPath,
+            'ui'                   => $this->ui,
         ];
     }
 }

@@ -17,6 +17,7 @@
 /public/build
 /public/core
 /public/hot
+/public/solutions
 /public/storage
 /storage/*.key
 /storage/pail

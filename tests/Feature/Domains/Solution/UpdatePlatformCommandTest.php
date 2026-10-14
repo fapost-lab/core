@@ -31,9 +31,9 @@ final class UpdatePlatformCommandTest extends TestCase
     {
         parent::setUp();
 
-        $this->vendor = new FakeVendor();
-        $this->cache = new SolutionCache(dirname($this->vendor->path) . '/fapost-solutions.php');
-        $this->migrations = 0;
+        $this->vendor            = new FakeVendor();
+        $this->cache             = new SolutionCache(dirname($this->vendor->path) . '/fapost-solutions.php');
+        $this->migrations        = 0;
         $this->migrationsSucceed = true;
 
         $this->app->instance(SolutionCache::class, $this->cache);
@@ -41,7 +41,7 @@ final class UpdatePlatformCommandTest extends TestCase
             new InstalledPackagesReader($this->vendor->path),
             new SolutionManifestValidator(new ManifestParser()),
         ));
-        $this->app->instance(PlatformMigratorInterface::class, new class($this) implements PlatformMigratorInterface {
+        $this->app->instance(PlatformMigratorInterface::class, new class ($this) implements PlatformMigratorInterface {
             public function __construct(private readonly UpdatePlatformCommandTest $test)
             {
             }

@@ -7,15 +7,18 @@ namespace App\Console\Commands\Platform;
 use App\Console\Platform\PlatformMigratorInterface;
 use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\DTO\SolutionDiscovery;
+use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
+use App\Domains\Solution\Services\SolutionUiPublisher;
 use Illuminate\Console\Command;
 
 /**
- * The one command of an upgrade: check the installed Solutions, migrate, remember the result.
+ * The one command of an upgrade: check the installed Solutions, migrate, publish their console UI, remember the result.
  *
- * Validation comes first and decides everything: a manifest with a violation stops the command before
- * the database or the cache is touched. `--validate-only` stops after that check and needs no database,
+ * Validation comes first and decides everything: a manifest with a violation, or a console UI that does not hold up
+ * (`fapost-ui.json`, the files it lists, the components the Solution's PHP declarations name), stops the command before
+ * the database, `public/` or the cache is touched. `--validate-only` stops after that check and needs no database,
  * so an extension's CI and a derived image's build can run it.
  */
 final class UpdatePlatformCommand extends Command
@@ -31,6 +34,8 @@ final class UpdatePlatformCommand extends Command
         SolutionDiscoverer $discoverer,
         SolutionCache $cache,
         PlatformMigratorInterface $migrator,
+        SolutionUiPublisher $publisher,
+        PublishedSolutionUi $published,
     ): int {
         $discovery = $discoverer->discover();
 
@@ -40,6 +45,22 @@ final class UpdatePlatformCommand extends Command
 
         if (!$discovery->isValid()) {
             $this->reportViolations($discovery);
+
+            return self::FAILURE;
+        }
+
+        $ui = $publisher->check($discovery->valid);
+
+        foreach ($ui['warnings'] as $warning) {
+            $this->components->warn($warning);
+        }
+
+        if ([] !== $ui['problems']) {
+            $this->components->error(sprintf('%d console UI problem(s). Nothing was changed.', count($ui['problems'])));
+
+            foreach ($ui['problems'] as $problem) {
+                $this->line('  ' . $problem);
+            }
 
             return self::FAILURE;
         }
@@ -57,7 +78,14 @@ final class UpdatePlatformCommand extends Command
             return self::FAILURE;
         }
 
-        $cache->write($discovery);
+        $bundles = $publisher->publish($ui['sources']);
+
+        if ([] !== $bundles) {
+            $this->components->info(sprintf('Console UI published (%d Solution(s)).', count($bundles)));
+        }
+
+        $computed = $published->compute($discovery->valid);
+        $cache->write($discovery, array_values($computed['bundles']), $computed['watched']);
         $this->components->info('Solution catalog cached.');
         $this->line('Restart the queue workers so they run the new code: php artisan horizon:terminate');
 

@@ -105,7 +105,7 @@ column, each rendered in the console with pages resolved by name.
       applications" with search, per-user pinning and order, ⌘K across applications, the
       assistant switcher only where an application works per assistant (after: the shell in phase
       1 — the rail wraps it)
-- [ ] The extension contract — a Foundation contract to register an application with its menu
+- [ ] `extension-contract` — The extension contract — a Foundation contract to register an application with its menu
       and pages, contextual actions, shell-slot elements, dashboard widgets, settings tabs and
       table columns; the run-time half of prebuilt delivery (moved here from first-solution
       phase 0 by the owner, 2026-10-14): the `<id>::<Page>` resolver, the import map, Core's

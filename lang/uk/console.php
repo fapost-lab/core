@@ -1401,4 +1401,11 @@ return [
             'admin'   => ['label' => 'Адмінка', 'short' => 'Адмін', 'scope' => 'Уся організація'],
         ],
     ],
+
+    // The page shown inside the shell when a Solution page cannot be loaded (extension-contract).
+    'solution_unavailable' => [
+        'title'       => 'Сторінка недоступна',
+        'description' => 'Застосунок, якому вона належить, не активний або не завантажився. Спробуйте пізніше або зверніться до адміністратора.',
+        'back'        => 'Назад',
+    ],
 ];

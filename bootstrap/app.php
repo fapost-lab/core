@@ -12,6 +12,8 @@ use App\Domains\Tenancy\Exceptions\TenantSlugMovedException;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Middleware\EnsureCanAccessPanel;
+use App\Http\Middleware\EnsureSolutionActive;
+use App\Http\Middleware\EnsureSolutionPage;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RedirectTenantRootToAdmin;
@@ -106,6 +108,11 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureCanAccessPanel::class,
         ]);
         $middleware->group('console', [...$admin, ResolveCurrentAssistant::class . ':tenant']);
+
+        // Routes of Solutions (App\Http\Shell\SolutionRoutes): the console's stacks, then 404 unless the Solution is
+        // served to the tenant, and a check that the route renders only the Solution's own pages.
+        $middleware->group('solution', [...$admin, EnsureSolutionActive::class, EnsureSolutionPage::class]);
+        $middleware->group('solution.assistant', [...$admin, ResolveCurrentAssistant::class . ':tenant', EnsureSolutionActive::class, EnsureSolutionPage::class]);
 
         $middleware->web(
             append: [

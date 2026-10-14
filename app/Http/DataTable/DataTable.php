@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\DataTable;
 
 use Closure;
+use Fapost\Foundation\Console\Enums\TableTarget;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -28,6 +29,9 @@ use Illuminate\Http\Request;
  * query, the table only decides whether the request names one and what to echo back. A table that declares neither
  * has no `filters` or `group` in its `state` and `defaults`, so the shape of the screens that do not use them stays.
  *
+ * A table Solutions may add columns to names its target with {@see self::extend()}: the rows of each page then carry the
+ * values of the columns the user sees, under `<id>.<key>` ({@see SolutionColumns}).
+ *
  * Typical use, in a controller: `(new DataTable(sortable: ['name'], searchable: ['name'], defaultSort: 'name'))
  * ->respond($request, $query, fn (Group $group): array => [...])`.
  */
@@ -47,6 +51,7 @@ final readonly class DataTable
      *         rows sit together, applied before the sort
      * @param  (Closure(Builder<covariant Model>, string): void)|null  $searchAlso  adds its own `orWhere` to the search
      *         group, for a match the LIKE on a column cannot express (an exact id); gets the trimmed search text
+     * @param  TableTarget|null  $extensionTarget  the table Solutions add columns to; set through {@see self::extend()}
      */
     public function __construct(
         private array $sortable,
@@ -56,7 +61,16 @@ final readonly class DataTable
         private array $filters = [],
         private array $groups = [],
         private ?Closure $searchAlso = null,
+        private ?TableTarget $extensionTarget = null,
     ) {
+    }
+
+    /**
+     * The same table, open to the columns Solutions declare on the target. Rows must carry their record id under `id`.
+     */
+    public function extend(TableTarget $target): self
+    {
+        return new self($this->sortable, $this->searchable, $this->defaultSort, $this->perPageOptions, $this->filters, $this->groups, $this->searchAlso, $target);
     }
 
     /**
@@ -95,8 +109,14 @@ final readonly class DataTable
             $paginator = $query->paginate($perPage, ['*'], 'page', $paginator->lastPage());
         }
 
+        $rows = $paginator->getCollection()->map($map)->values()->all();
+
+        if (null !== $this->extensionTarget) {
+            $rows = app(SolutionColumns::class)->fill($this->extensionTarget, $rows, $request->user());
+        }
+
         return [
-            'rows' => $paginator->getCollection()->map($map)->values()->all(),
+            'rows' => $rows,
             'meta' => [
                 'total'       => $paginator->total(),
                 'perPage'     => $paginator->perPage(),

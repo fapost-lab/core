@@ -15,6 +15,7 @@ use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use App\Http\Requests\Console\UpdateContactGroupsRequest;
 use App\Http\Requests\Console\UpdateContactTagsRequest;
+use Fapost\Foundation\Console\Enums\TableTarget;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,7 +57,7 @@ final class ContactController extends Controller
         );
 
         return Inertia::render('Console/Contacts/Index', [
-            'table' => $table->respond(
+            'table' => $table->extend(TableTarget::Contacts)->respond(
                 $request,
                 $this->contacts->query($assistant),
                 fn (Contact $contact): array => [

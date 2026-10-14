@@ -1,0 +1,21 @@
+{
+    "schema": 1,
+    "solution": "showcase",
+    "kit": "^0.1",
+    "vue": "^3.5",
+    "inertia": "^3.0",
+    "pages": {
+        "Board/Index": "assets/board-index-4c1d2a.js",
+        "Contact/Show": "assets/contact-show-9b3e70.js"
+    },
+    "components": {
+        "Actions/Note": "assets/actions-note-2f6a11.js",
+        "Shell/Helper": "assets/shell-helper-7d0c45.js",
+        "Shell/Status": "assets/shell-status-1e8b93.js",
+        "Widgets/Stats": "assets/widgets-stats-5a2f08.js",
+        "Settings/Assistant": "assets/settings-assistant-c47d19.js",
+        "Settings/Tenant": "assets/settings-tenant-0e91b6.js"
+    },
+    "css": ["assets/showcase-8f3d2c.css"],
+    "x-note": "Hand-written ES modules standing in for a build (design D5); vue, @inertiajs/vue3 and @fapost/ui come from Core's import map."
+}
