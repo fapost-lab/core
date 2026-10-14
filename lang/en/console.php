@@ -1395,6 +1395,7 @@ return [
         'rail_title'  => 'In the rail',
         'rail_empty'  => 'Nothing is pinned: the rail shows only the application you are in.',
         'note'        => 'Pinned applications stay in the rail on the left, in your order. You see only the applications you may open.',
+        'save_failed' => 'The rail could not be saved. Refresh the page and try again.',
         'apps'        => [
             'console' => ['label' => 'Console', 'short' => 'Console', 'scope' => 'Per assistant'],
             'admin'   => ['label' => 'Admin panel', 'short' => 'Admin', 'scope' => 'The whole organization'],

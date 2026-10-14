@@ -157,8 +157,9 @@ final class AdminSearchConsoleTest extends InertiaConsoleTestCase
             ->get($this->panelUrl('/admin'))
             ->assertInertia(fn (AssertableInertia $page) => $page->where('navigation.searchUrl', '/admin/search')->etc());
 
+        // An assistant's page names its assistant, so the Console's pages it finds are that tab's.
         $this->get($this->panelUrl("/assistant/{$assistant->getKey()}/dashboard"))
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('navigation.searchUrl', '/admin/search')->etc());
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('navigation.searchUrl', "/admin/search?assistant={$assistant->getKey()}")->etc());
     }
 
     public function test_the_search_is_throttled(): void

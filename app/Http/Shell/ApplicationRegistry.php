@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Http\Shell;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Assistant\Services\StaffAssistantService;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\AccessibleAssistants;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Str;
 
 /**
  * The applications of the shell's rail a user may open, in a fixed order, and the menu of each.
@@ -18,7 +21,7 @@ use App\Domains\Staff\Services\AccessibleAssistants;
  *
  * @phpstan-import-type Group from NavigationBuilder
  */
-final readonly class ApplicationRegistry
+final class ApplicationRegistry
 {
     public const string CONSOLE = 'console';
 
@@ -33,27 +36,37 @@ final readonly class ApplicationRegistry
 
     private const string ADMIN_ROUTE = 'filament.admin.pages.dashboard';
 
+    /**
+     * Assistants this instance already found, by user and wished-for ids.
+     *
+     * @var array<string, Assistant|null>
+     */
+    private array $found = [];
+
     public function __construct(
-        private AccessibleAssistants $assistants,
-        private RouteOwnership $ownership,
-        private NavigationBuilder $navigation,
+        private readonly StaffAssistantService $assistants,
+        private readonly RouteOwnership $ownership,
+        private readonly NavigationBuilder $navigation,
     ) {
     }
 
     /**
      * The applications the user may open. The Console opens on the current assistant when there is one, otherwise on
-     * the one the user last worked in when they may still open it, otherwise on the first by name.
+     * the first of the wished-for ones (the assistant of the tab that asks, then the one last worked in) the user may
+     * still open, otherwise on the first by name.
+     *
+     * @param  list<string|null>  $wishedAssistantIds
      *
      * @return list<ShellApplication>
      */
-    public function for(User $user, ?Assistant $current = null, ?string $lastAssistantId = null): array
+    public function for(User $user, ?Assistant $current = null, array $wishedAssistantIds = []): array
     {
         if (! $user->canAccessConsole()) {
             return [];
         }
 
         $applications = [];
-        $assistant    = $current ?? $this->consoleAssistant($user, $lastAssistantId);
+        $assistant    = $current ?? $this->consoleAssistant($user, $wishedAssistantIds);
 
         if (null !== $assistant) {
             $applications[] = $this->application(self::CONSOLE, 'message-square', self::CONSOLE_ROUTE, ['tenant' => $assistant->getKey()], $assistant);
@@ -76,12 +89,33 @@ final readonly class ApplicationRegistry
             : $this->navigation->console($user, $application->assistant, false);
     }
 
-    private function consoleAssistant(User $user, ?string $lastAssistantId): ?Assistant
+    /**
+     * The same rule as {@see AccessibleAssistants} (the `view` ability: the permission to manage assistants, and an
+     * assignment unless the user is an administrator), as one ability check and bounded queries.
+     *
+     * @param  list<string|null>  $wishedIds
+     */
+    private function consoleAssistant(User $user, array $wishedIds): ?Assistant
     {
-        $assistants = $this->assistants->for($user);
+        $ids = array_values(array_unique(array_filter($wishedIds, static fn (?string $id): bool => null !== $id && Str::isUuid($id))));
+        $key = $user->getKey() . '|' . implode(',', $ids);
 
-        return $assistants->first(static fn (Assistant $assistant): bool => (string) $assistant->getKey() === $lastAssistantId)
-            ?? $assistants->first();
+        if (array_key_exists($key, $this->found)) {
+            return $this->found[$key];
+        }
+
+        $assistant = null;
+
+        if (Gate::forUser($user)->allows('viewAny', Assistant::class)) {
+            if ([] !== $ids) {
+                $wished    = $this->assistants->query($user)->whereKey($ids)->get()->keyBy(static fn (Assistant $candidate): string => (string) $candidate->getKey());
+                $assistant = collect($ids)->map(static fn (string $id): ?Assistant => $wished->get($id))->first(static fn (?Assistant $candidate): bool => null !== $candidate);
+            }
+
+            $assistant ??= $this->assistants->query($user)->orderBy('name')->first();
+        }
+
+        return $this->found[$key] = $assistant;
     }
 
     /**

@@ -24,9 +24,11 @@ final readonly class ApplicationSearch
     }
 
     /**
+     * @param  list<string|null>  $wishedAssistantIds  Where the Console opens, best first (see {@see ApplicationRegistry::for()}).
+     *
      * @return list<array{key: string, items: list<array{id: string, title: string, subtitle: string|null, url: string, external: bool}>}>
      */
-    public function search(User $user, string $text, ?string $lastAssistantId): array
+    public function search(User $user, string $text, array $wishedAssistantIds = []): array
     {
         $text = mb_trim($text);
 
@@ -34,7 +36,7 @@ final readonly class ApplicationSearch
             return [];
         }
 
-        $applications = $this->registry->for($user, null, $lastAssistantId);
+        $applications = $this->registry->for($user, null, $wishedAssistantIds);
         $found        = [];
         $pages        = [];
 

@@ -135,7 +135,15 @@ final class HandleInertiaRequests extends Middleware
         $searchUrl = route('console.admin.search', [], false);
 
         if ($assistants->isResolved()) {
-            return ['mode' => 'console', 'groups' => $builder->console($user, $assistants->get()), 'searchUrl' => $searchUrl];
+            $assistant = $assistants->get();
+
+            // The tab's own assistant, so the Console's pages it finds are this assistant's even when another tab
+            // worked in another one since.
+            return [
+                'mode'      => 'console',
+                'groups'    => $builder->console($user, $assistant),
+                'searchUrl' => route('console.admin.search', ['assistant' => (string) $assistant->getKey()], false),
+            ];
         }
 
         return ['mode' => 'admin', 'groups' => $builder->admin($user), 'searchUrl' => $searchUrl];
@@ -165,7 +173,7 @@ final class HandleInertiaRequests extends Middleware
         }
 
         $last         = $session?->get(ApplicationRegistry::LAST_ASSISTANT);
-        $applications = app(ApplicationRegistry::class)->for($user, $current, is_string($last) ? $last : null);
+        $applications = app(ApplicationRegistry::class)->for($user, $current, [is_string($last) ? $last : null]);
 
         return app(ApplicationRail::class)->props(
             $user,

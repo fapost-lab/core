@@ -28,8 +28,20 @@ final class SearchRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'q' => ['nullable', 'string', 'max:' . self::MAX_LENGTH],
+            'q'         => ['nullable', 'string', 'max:' . self::MAX_LENGTH],
+            'assistant' => ['nullable', 'string', 'max:64'],
         ];
+    }
+
+    /**
+     * The assistant of the tab that asks, as an assistant's page put it into the search URL; unchecked here,
+     * the registry finds it only among the assistants the user may open.
+     */
+    public function assistant(): ?string
+    {
+        $assistant = $this->validated('assistant');
+
+        return is_string($assistant) && '' !== $assistant ? $assistant : null;
     }
 
     public function text(): string

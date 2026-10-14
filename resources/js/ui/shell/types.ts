@@ -67,6 +67,7 @@ export interface ApplicationsTranslations {
     rail_title: string
     rail_empty: string
     note: string
+    save_failed: string
 }
 
 export interface SwitcherAssistant {

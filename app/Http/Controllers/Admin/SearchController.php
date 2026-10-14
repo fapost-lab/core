@@ -31,8 +31,9 @@ final class SearchController extends Controller
         $text = $request->text();
         $last = $request->session()->get(ApplicationRegistry::LAST_ASSISTANT);
 
+        // The asking tab's assistant first (checked like any other), the one last worked in as the fallback.
         return response()->json(['groups' => [
-            ...$applications->search($user, $text, is_string($last) ? $last : null),
+            ...$applications->search($user, $text, [$request->assistant(), is_string($last) ? $last : null]),
             ...$records->search($user, $text),
         ]]);
     }

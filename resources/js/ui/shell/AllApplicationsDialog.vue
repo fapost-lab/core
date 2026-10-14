@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
+import { toast } from 'vue-sonner'
 import { ChevronDown, ChevronUp, Pin, PinOff, Search } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@fapost/ui/components/dialog'
@@ -12,7 +13,7 @@ import type { ApplicationsTranslations, ShellApplication, ShellApplications } fr
 /**
  * "All applications": every application the user may open, searchable, each with a pin toggle, and the pinned ones in
  * the rail's order with buttons to move them. A change is shown at once and sent as the whole new rail; the shell
- * redraws from the answer.
+ * redraws from the answer, and a refused change is undone with an error toast.
  */
 const props = defineProps<{
   data: ShellApplications
@@ -42,7 +43,20 @@ const pinned = computed(() => rail.value.flatMap((key) => props.data.items.find(
 
 function save(next: string[]): void {
   rail.value = next
-  router.put(props.data.railUrl, { applications: next }, { preserveScroll: true, preserveState: true, only: ['applications'] })
+  router.put(
+    props.data.railUrl,
+    { applications: next },
+    {
+      preserveScroll: true,
+      preserveState: true,
+      only: ['applications'],
+      // Refused (an application the user may no longer open): the rail goes back to what the server holds.
+      onError: () => {
+        rail.value = [...props.data.rail]
+        toast.error(props.labels.save_failed)
+      },
+    },
+  )
 }
 
 function isPinned(item: ShellApplication): boolean {
