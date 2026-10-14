@@ -431,13 +431,14 @@ to be checked out.
 
 ```bash
 docker compose pull
+docker compose run --rm app php artisan platform:update --validate-only
 docker compose up -d
-docker compose exec app php artisan migrate --database=landlord --force
-docker compose exec app php artisan ops:tenants-migrate
+docker compose exec app php artisan platform:update
 docker compose exec app php artisan horizon:terminate
 ```
 
-`horizon:terminate` lets running jobs finish and exits; Compose restarts the
+The first command checks the installed Solutions in the new image while the old containers still run, so a wrong manifest stops the upgrade before anything is replaced. `platform:update` repeats the check, runs the landlord and tenant migrations and
+caches the Solution catalog. `horizon:terminate` lets running jobs finish and exits; Compose restarts the
 container with the new code. Workers hold the previous release in memory until
 this happens.
 

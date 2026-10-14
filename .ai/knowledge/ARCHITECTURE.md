@@ -38,6 +38,7 @@ sessions. The platform is extended from outside through public contracts, not by
 | `media` | `app/Domains/Media` | Media storage, deduplication, channel asset cache | — |
 | `assistant` | `app/Domains/Assistant` | The assistant aggregate and the current-assistant context | — |
 | `staff` | `app/Domains/Staff` | Staff users, roles, staff notifications | — |
+| `solution` | `app/Domains/Solution` | Installed Solution packages: manifest discovery and validation, the catalog and its cache, `platform:update` | Depend on another domain, or on the database in discovery code |
 
 `Presale` (the public site's lead form) and `Shared` (base model concerns) carry no domain
 logic and have no knowledge pack.
@@ -54,7 +55,7 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   Foundation, a primitive with no domain meaning into Support, anything with one domain's meaning
   stays in Core (ADR-05).
 - **The extension packages are separate repositories.** Core consumes them through VCS
-  repositories (`fapost/foundation ^0.4`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
+  repositories (`fapost/foundation ^0.13`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
   symlinked over `vendor/` by `composer dev:link` (`tools/dev-link-packages.php`).
   Until 1.0 a package that depends on another FaPost package accepts its whole 0.x line
   (`fapost/support` requires `fapost/foundation >=0.2 <1.0`), so a Foundation minor needs no release
@@ -67,9 +68,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   an extension's CI.
 - **The extension surface is partly built.** Present: the action handler registry
   (`Flow/Action/ActionHandlerRegistry`) and the builder's vendor-component contract, a static Vite
-  glob in `resources/js/builder/utils/vendorComponents.ts`. Absent: a Core implementation of
-  `CoreRegistrarInterface`, Solution activation, and manifest validation. The registered
-  `HrSolutionServiceProvider` is an empty stub on the framework's own provider.
+  glob in `resources/js/builder/utils/vendorComponents.ts`. The Solution manifest, a data
+  block in the package's `composer.json`, is read and validated by `platform:update` (`solution`
+  domain). Absent: a Core implementation of `CoreRegistrarInterface` and Solution activation.
 - **Landlord data is reached only through Tenancy.** Other domains depend on
   `Tenancy/Contracts`; the `landlord` connection is opened only inside Tenancy infrastructure. Only the SaaS operator
   package may open it, for its own prefixed tables and never for Core's; Plugin and Solution packages may not

@@ -263,7 +263,7 @@ discovered.
   The overlay changes nothing in Core's repository, so your extension must work
   through public contracts only. Core never checks whether an extension is
   installed; it binds its own defaults for every contract, and your service provider
-  replaces them through package discovery.
+  replaces them (a Plugin's through package discovery, a Solution's through its manifest).
 </Warning>
 
 ### In your extension's CI
@@ -278,6 +278,15 @@ composer overlay -- --require-overlay
 Then run your package's tests inside the Core application. Testing against the real
 Core, rather than a stand-in framework, catches contract drift as soon as Core
 changes.
+
+If the package is a Solution, also check its manifest the way an upgrade will:
+
+```bash
+php artisan platform:update --validate-only
+```
+
+It needs no database, prints one `<package>: <field>: <message>` line per problem and exits with
+code 1 when the manifest is wrong. See [The Solution manifest](/extending/solutions#the-manifest).
 
 ### In an image built from Core
 
@@ -299,9 +308,13 @@ RUN php tools/composer-overlay.php --require-overlay -- --no-dev --no-scripts --
     && chown -R www-data:www-data vendor bootstrap/cache composer.local.json composer.local.lock \
     && rm -f /usr/bin/composer
 USER www-data
+
+# Fail the build when a Solution's manifest is wrong; needs no database.
+RUN php artisan platform:update --validate-only
 ```
 
-`post-autoload-dump` runs package discovery, so your service provider is found.
+`post-autoload-dump` runs package discovery, so a Plugin's service provider is found. A
+Solution's provider is not: Core boots it from the manifest, and only when the manifest is valid.
 A private package repository needs Composer credentials at build time; pass them as
 a build secret (`COMPOSER_AUTH`), never as a file copied into the image.
 

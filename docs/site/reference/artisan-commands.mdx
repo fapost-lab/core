@@ -21,6 +21,20 @@ Commands FaPost Core registers, beyond Laravel's own.
 | `ops:tenants-migrate` | Run `database/migrations/tenant` for all active tenants |
 | `ops:tenants-seed-acl` | Run `TenantAclSeeder` — domain permissions and default roles — for selected active tenants |
 
+## Platform update
+
+| Command | Does |
+|---|---|
+| `platform:update` | The one upgrade command: validate the installed Solutions' manifests, run the landlord migrations and `ops:tenants-migrate`, then cache the Solution catalog |
+| `platform:update --validate-only` | Only validate the manifests. Needs no database and changes nothing; exit code 1 and one `<package>: <field>: <message>` line per problem when a manifest is wrong |
+| `solutions:cache` | Compile the Solution catalog into `bootstrap/cache/fapost-solutions.php` (part of `optimize`) |
+| `solutions:clear` | Remove that file (part of `optimize:clear`) |
+
+<Note>
+  The cache is an accelerator only: when it is missing or older than the installed packages, the
+  catalog is built from the package files. See [Upgrading and rollback](/self-hosting/upgrading).
+</Note>
+
 <Note>
   `migrate:smart` reports; it does not migrate. It exists so you can see what a
   release would apply before applying it. See
