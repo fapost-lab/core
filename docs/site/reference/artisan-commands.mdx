@@ -30,6 +30,17 @@ Commands FaPost Core registers, beyond Laravel's own.
 | `solutions:cache` | Compile the Solution catalog into `bootstrap/cache/fapost-solutions.php` (part of `optimize`) |
 | `solutions:clear` | Remove that file (part of `optimize:clear`) |
 
+### Solutions
+
+Activation is per tenant, so each command takes a required `--tenant=<slug>` and refuses to run without
+it. There is no "every tenant" form. A Solution is off until activated.
+
+| Command | Does |
+|---|---|
+| `solutions:activate {solution} --tenant=<slug>` | Turn an installed Solution on for the tenant. Refused (exit code 1) when the id is not installed with a valid manifest. Repeating it changes nothing |
+| `solutions:deactivate {solution} --tenant=<slug> [--reason=]` | Turn it off for the tenant. Its data is kept. Allowed for a Solution that is no longer installed, to put out a stale record. The optional reason is kept in the activation journal |
+| `solutions:list --tenant=<slug>` | List the Solutions installed in this image and the tenant's stored activation, orphans included, with the effective state. Changes nothing |
+
 <Note>
   The cache is an accelerator only: when it is missing or older than the installed packages, the
   catalog is built from the package files. See [Upgrading and rollback](/self-hosting/upgrading).

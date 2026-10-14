@@ -38,7 +38,7 @@ sessions. The platform is extended from outside through public contracts, not by
 | `media` | `app/Domains/Media` | Media storage, deduplication, channel asset cache | — |
 | `assistant` | `app/Domains/Assistant` | The assistant aggregate and the current-assistant context | — |
 | `staff` | `app/Domains/Staff` | Staff users, roles, staff notifications | — |
-| `solution` | `app/Domains/Solution` | Installed Solution packages: manifest discovery and validation, the catalog and its cache, `platform:update` | Depend on another domain, or on the database in discovery code |
+| `solution` | `app/Domains/Solution` | Installed Solution packages: manifest discovery and validation, the catalog and its cache, `platform:update`, per-tenant activation (`ActiveSolutions`, `SolutionActivator`) | Depend on a domain other than the Tenancy contracts, or on the database outside `Infrastructure` |
 
 `Presale` (the public site's lead form) and `Shared` (base model concerns) carry no domain
 logic and have no knowledge pack.
@@ -70,7 +70,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   (`Flow/Action/ActionHandlerRegistry`) and the builder's vendor-component contract, a static Vite
   glob in `resources/js/builder/utils/vendorComponents.ts`. The Solution manifest, a data
   block in the package's `composer.json`, is read and validated by `platform:update` (`solution`
-  domain). Absent: a Core implementation of `CoreRegistrarInterface` and Solution activation.
+  domain). A tenant's Solution activation is stored in its schema and read only through `ActiveSolutions`
+  (`adr-20261014-solution-activation-in-tenant-schema`). Absent: a Core implementation of
+  `CoreRegistrarInterface`, the activation screen and the entitlement check.
 - **Landlord data is reached only through Tenancy.** Other domains depend on
   `Tenancy/Contracts`; the `landlord` connection is opened only inside Tenancy infrastructure. Only the SaaS operator
   package may open it, for its own prefixed tables and never for Core's; Plugin and Solution packages may not
