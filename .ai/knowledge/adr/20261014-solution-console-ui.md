@@ -9,7 +9,6 @@ paths:
   - resources/views/console.blade.php
   - app/Http/Middleware/HandleInertiaRequests.php
   - "app/Http/Shell/**"
-  - resources/js/builder/utils/vendorComponents.ts
   - vite.config.ts
 summary: "How a Solution adds to the console: server-side declarations on named Core targets, pages by <id>::Path, a prebuilt dist/ on Core's shared Vue, Inertia and kit through an import map; supersedes ADR-06 for Solutions"
 ---

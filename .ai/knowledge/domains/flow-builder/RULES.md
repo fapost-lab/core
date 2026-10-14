@@ -2,7 +2,7 @@
 id: rule-flow-builder
 type: rule
 status: active
-summary: Override lookup order, unvalidated drafts, schema-first node UI; the Solution vendor-component glob is superseded by adr-20261014-solution-console-ui
+summary: Override lookup order, unvalidated drafts, schema-first node UI; extensions ship no builder Vue components (adr-20261014-solution-console-ui)
 domains:
   - flow-builder
 topics: []
@@ -28,8 +28,7 @@ broken.
 
 ## Invariants
 
-- **Config panel lookup order is: core override, then vendor component, then schema renderer**
-  (`ConfigPanel.vue`).
+- **Config panel lookup order is: core override, then schema renderer** (`ConfigPanel.vue`).
 - **A schema section references only fields the schema declares.** Enforced:
   `tests/Unit/Domains/Flow/NodeHandlerSchemaSectionsTest.php`.
 - **Saving a draft never validates; validate and publish do.** A stale `draft_version` returns
@@ -57,11 +56,11 @@ broken.
   Review only.
 - **A new schema field type needs a `FIELD_COMPONENTS` entry.** An unknown type silently renders
   as a text field. Review only. *(proposed)*
-- **Plugins cannot ship Vue components at runtime** — only through the vendor glob and a
-  rebuild. Source: ADR-06. *Superseded for Solutions by `adr-20261014-solution-console-ui`:*
-  Solutions add no builder Vue (no node types; their action handlers are configured in the `call`
-  node through schema), and their UI goes to the console prebuilt. The vendor glob stays in code
-  until the `extension contract` task removes it; build nothing new on it.
+- **Extensions ship no builder Vue components.** Solutions add no node types: their action
+  handlers are configured in the `call` node through schema, and their UI goes to the console as
+  a prebuilt bundle. Source: `adr-20261014-solution-console-ui`. The build-time vendor glob of
+  ADR-06 (`vendorComponents.ts`) was removed; do not bring back a per-extension hook in
+  `ConfigPanel.vue` or `FlowNodeCard.vue`. Review only.
 - **A button or select `value` is language-agnostic; only its label is translated.** Source:
   `conventions/multilingual.md`. Review only.
 - **Storage-choice controls (`StorageRadio.vue`) use the Profile/Temporary vocabulary, never

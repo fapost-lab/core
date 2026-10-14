@@ -8,7 +8,6 @@ import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 import {useMoveNode} from '@builder/composables/useMoveNode'
 import {useDeleteNode} from '@builder/composables/useDeleteNode'
 import NodeIcon from '@builder/components/NodeIcon.vue'
-import {vendorPreviews} from '@builder/utils/vendorComponents'
 
 const props = defineProps({
     treeNode: { type: Object, required: true },
@@ -28,13 +27,6 @@ const typeLabel = computed(() => {
     if (handlerMeta.value?.label) return handlerMeta.value.label
     return props.treeNode.node.type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
 })
-
-/**
- * Vendor (Solution) card-preview override for this node type, if one is
- * published (ADR-06). When present it replaces the default summary body;
- * the card head (icon + label) is always Core-rendered.
- */
-const vendorPreview = computed<object | null>(() => vendorPreviews[props.treeNode.node.type] ?? null)
 
 /**
  * For `end` nodes, surface the configured completion status as a colour accent
@@ -220,11 +212,7 @@ function openMoveDialog() {
             <button v-if="canDelete" class="node-delete-btn" title="Delete node" @click.stop="deleteNode">×</button>
         </div>
 
-        <div v-if="vendorPreview" class="node-card-body">
-            <component :is="vendorPreview" :node="treeNode.node" />
-        </div>
-
-        <div v-else-if="commentText !== null" class="node-card-body">
+        <div v-if="commentText !== null" class="node-card-body">
             <p v-if="commentText.trim() !== ''" class="node-comment-text">{{ commentText }}</p>
             <p v-else class="node-comment-text node-comment-text--empty">Empty note — click to write one</p>
         </div>

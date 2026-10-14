@@ -2,7 +2,7 @@
 id: glossary-flow-builder
 type: glossary
 status: active
-summary: Draft, draft_version, config_schema, override, vendor component, field renderer, handle
+summary: Draft, draft_version, config_schema, override, field renderer, handle
 domains:
   - flow-builder
 topics: []
@@ -51,12 +51,6 @@ A handler's form description, produced by `configSchema()`.
 
 A core Vue config panel that replaces the schema renderer for one node type; listed in the
 override map in `ConfigPanel.vue`.
-
-## Vendor component
-
-A Solution's `*Config.vue` or `*Preview.vue`, picked up by the Vite glob. Superseded by
-`adr-20261014-solution-console-ui` (Solutions add no builder Vue); the term goes when
-`vendorComponents.ts` is removed.
 
 ## Field renderer
 
