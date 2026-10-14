@@ -30,9 +30,9 @@ together with ADR-06's rule that Solution Vue is published into `vendor/`, picke
 The owner decided in `ui-foundation` and `first-solution` (2026-10-07) that a Solution is an independent application
 on top of Core, that it adds an application to the app switcher plus contextual actions, a shell slot, dashboard
 widgets, settings tabs and table columns, that its pages are referenced by name, and that its UI ships prebuilt with
-Vue, Inertia and the kit shared from Core through an import map. The Solution manifest (`solution-manifest`, gate
-2026-10-10) made the manifest data in the package's `composer.json` (`extra.fapost`, immutable `id`) and left `ui` out
-of schema 1. The SaaS package sells Solutions as add-ons (`packages/fapost-saas`,
+Vue, Inertia and the kit shared from Core through an import map. The Solution manifest
+(`adr-20261010-solution-manifest-is-data-in-composer-json`) made the manifest data in the package's `composer.json`
+(`extra.fapost`, immutable `id`) and left `ui` out of schema 1. The SaaS package sells Solutions as add-ons (`packages/fapost-saas`,
 `adr-20261010-solutions-sold-as-add-ons`): losing an entitlement deactivates a Solution in Core, so its UI must
 disappear without a rebuild or restart. This ADR fixes the shapes those decisions left open. Decided with the owner
 at the T3 gate of task `solution-ui-adr` on 2026-10-14.
@@ -50,7 +50,8 @@ the browser is never the access check.
 **Every declaration targets a named point Core lists in Foundation** (constants such as `ConsoleTarget::ContactView`).
 The list is closed and grows in Foundation minors; an unknown target is a registration error. Labels are translation
 keys in the Solution's namespace (`feedback::console.menu.board`) translated by Core on the server; icons are lucide
-names; `order` places Core's elements first, Solutions after them by `id`. Every component Core mounts inside its
+names; Core's elements come first among items with the same `order`, and Solutions with the same `order` follow by
+`id`. Every component Core mounts inside its
 own screens is wrapped so that a load failure, timeout or thrown error hides that element and leaves the screen
 working. The points, in priority order:
 
@@ -104,7 +105,9 @@ its version is Foundation's, gated by Composer. Every point is `@experimental` i
 until `first-solution` has exercised it, and may change in a Foundation minor with a changelog entry. `@fapost/ui` is a
 run-time interface with strict semver from `0.1.0`, and an installation serves exactly one kit. A Solution's kit range
 is checked in PHP with `composer/semver`, so ranges use the syntax it understands (`^`, `~`, `>=,<`); Vue and Inertia
-are checked by major. `platform:update` warns about a mismatch and the activation screen refuses activation with the
+are checked by major. This is an npm range Composer never sees, so it is not the run-time check of the Foundation
+constraint that `adr-20261010-solution-manifest-is-data-in-composer-json` rejects; that constraint stays gated by
+Composer alone. `platform:update` warns about a mismatch and the activation screen refuses activation with the
 reason. A Solution already active when a Core upgrade makes its kit range fail keeps its activation, data, flows and
 PHP, but its UI is not served and the switcher marks it as needing an update.
 
@@ -138,7 +141,9 @@ Why:      one Vue instance and one kit are what make prebuilt bundles work witho
   Solutions: a Solution registers action handlers, not node types (spec `solution-activation-lifecycle`), configured in
   the `call` node through schema. `resources/js/builder/utils/vendorComponents.ts` is removed by the extension
   contract task.
-- ADR-06's Plugin rules and the rest of its capability table stand.
+- The row "NodeHandler: Solution ✓" narrows: a Solution registers action handlers reached through the `call` node,
+  not node types.
+- ADR-06's Plugin rules stand.
 
 ## Alternatives
 
@@ -168,10 +173,12 @@ Why:      one Vue instance and one kit are what make prebuilt bundles work witho
   per-request filter, the props, the client renderers of the six points, the `solution` route group and the fixture
   Solution — and also the run-time half of delivery: the `::` resolver, the import map, the shared Vite entries,
   `dist/` publication in `platform:update` and the Inertia version; the fixture carries a committed built `dist/`. It
-  adds `composer/semver` to Core's `require`, adds `extra.fapost.ui` to the manifest schema as an additive Foundation
-  minor, removes `vendorComponents.ts`, and publishes an experimental "Console UI" page on docs.fapost.in.
+  adds `extra.fapost.ui` to the manifest schema as an additive Foundation minor, removes `vendorComponents.ts`,
+  publishes an experimental "Console UI" page on docs.fapost.in, and updates `docs/site/extending/stability-policy.mdx`:
+  experimental extension points are the stated exception to "no break within a major", and `@fapost/ui`, the
+  `fapost-ui.json` schema and `<id>::<Name>` names become covered surface, unlike the rest of the compiled front end.
 - `first-solution` phase 0 keeps the author half: the npm preset, the extracted `@fapost/ui`, and the kit-range check
-  on activation.
+  on activation, which adds `composer/semver` to Core's `require` (approved by the owner on 2026-10-14).
 - The app switcher's source of applications accepts `{id, label, icon, href, perAssistant, visible}`; pins store the
   application id, which is the Solution `id`, so the manifest's rule that an `id` never changes now also protects
   page names, URLs, asset paths and pins.

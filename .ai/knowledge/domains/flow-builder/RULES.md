@@ -2,7 +2,7 @@
 id: rule-flow-builder
 type: rule
 status: active
-summary: Override lookup order, unvalidated drafts, schema-first node UI, vendor components need a rebuild
+summary: Override lookup order, unvalidated drafts, schema-first node UI; the Solution vendor-component glob is superseded by adr-20261014-solution-console-ui
 domains:
   - flow-builder
 topics: []
@@ -19,7 +19,7 @@ paths:
   - app/Domains/Flow/Services/ValidateFlowService.php
   - app/Domains/Flow/Services/LoadBuilderFlowService.php
   - "app/Domains/Flow/Validation/**"
-reviewed_at: 2026-10-09
+reviewed_at: 2026-10-14
 ---
 # Flow builder rules
 
@@ -58,7 +58,10 @@ broken.
 - **A new schema field type needs a `FIELD_COMPONENTS` entry.** An unknown type silently renders
   as a text field. Review only. *(proposed)*
 - **Plugins cannot ship Vue components at runtime** — only through the vendor glob and a
-  rebuild. Source: ADR-06.
+  rebuild. Source: ADR-06. *Superseded for Solutions by `adr-20261014-solution-console-ui`:*
+  Solutions add no builder Vue (no node types; their action handlers are configured in the `call`
+  node through schema), and their UI goes to the console prebuilt. The vendor glob stays in code
+  until the `extension contract` task removes it; build nothing new on it.
 - **A button or select `value` is language-agnostic; only its label is translated.** Source:
   `conventions/multilingual.md`. Review only.
 - **Storage-choice controls (`StorageRadio.vue`) use the Profile/Temporary vocabulary, never

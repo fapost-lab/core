@@ -68,7 +68,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   an extension's CI.
 - **The extension surface is partly built.** Present: the action handler registry
   (`Flow/Action/ActionHandlerRegistry`) and the builder's vendor-component contract, a static Vite
-  glob in `resources/js/builder/utils/vendorComponents.ts`. The Solution manifest, a data
+  glob in `resources/js/builder/utils/vendorComponents.ts` — superseded by
+  `adr-20261014-solution-console-ui` (Solution UI goes to the console prebuilt) and removed by the
+  `extension contract` task. The Solution manifest, a data
   block in the package's `composer.json`, is read and validated by `platform:update` (`solution`
   domain). Absent: a Core implementation of `CoreRegistrarInterface` and Solution activation.
 - **Landlord data is reached only through Tenancy.** Other domains depend on

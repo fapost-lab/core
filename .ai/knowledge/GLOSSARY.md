@@ -58,7 +58,7 @@ The named spot in one of Core's screens an extension point attaches to — `cont
 the `assistant` settings, the `contacts` table. Targets are constants in Foundation; Core
 lists them, a Solution only chooses among them.
 
-Informal synonyms: slot, hook point.
+Informal synonyms: hook point.
 Use in: source code, documentation.
 
 ## Plugin

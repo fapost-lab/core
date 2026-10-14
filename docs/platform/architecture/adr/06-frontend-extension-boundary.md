@@ -7,8 +7,9 @@
 > extension contract"), the Solution ✓ in the rows "Custom Vue config component", "Custom preview renderer" and
 > "Custom field renderer" (now ✗: Solutions register action handlers, not node types), the section "Solution — может
 > поставлять Vue компоненты (с перебилдом)" with its naming convention, the consequences about `npm run build` and
-> `vendor:publish` for JS, and the rejection of "Runtime dynamic import (Б2)", which is now the chosen path. The Plugin
-> rules and the rest of the capability table stand.
+> `vendor:publish` for JS, and the rejection of "Runtime dynamic import (Б2)", which is now the chosen path. The row
+> "NodeHandler: Solution ✓" narrows: a Solution registers action handlers reached through the `call` node, not node
+> types. The Plugin rules stand.
 >
 > **Superseded in part (2026-10).** Two things this ADR describes are not built:
 >
@@ -41,7 +42,7 @@ Flow builder требует возможности рендерить config pan
 
 | Capability | Core | Plugin | Solution | SaaS-only |
 | --- | --- | --- | --- | --- |
-| NodeHandler | ✓ | ✓ | ✓ | ✗ |
+| NodeHandler | ✓ | ✓ | action handlers via `call` only (superseded 2026-10-14) | ✗ |
 | DataAccessor | ✓ | ✓ | ✓ | ✗ |
 | Flow template | ✓ | ✓ | ✓ | ✗ |
 | Tenant migrations | ✓ | ✗ | ✓ | ✗ |
