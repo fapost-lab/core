@@ -27,8 +27,15 @@ domain rules named as its source; this file is the index of what holds and how i
   `App\Domains` and `App\Services`; helpers such as `config()`, `env()` and `app()` are review only.
 - **Tenant-schema models use ULID primary keys in `uuid` columns** through `HasUlidPrimaryKey`,
   with no database default. Source: ADR-03 (`docs/platform/architecture/adr/03-id-strategy-ulid.md`).
-  Enforced: `tests/Architecture/IdStrategyTest.php` (models in `App\Domains\*\Models`, with named
+  Enforced: `tests/Architecture/IdStrategyTest.php` (models in `App\Domains\*\Models` and Eloquent models in `App\Domains\*\Infrastructure`, with named
   exceptions such as the composite-key `FlowCallgraphEdge`).
+- **A tenant's effective Solution activation is answered only by `ActiveSolutions`.** It is bound `scoped`,
+  memoised per tenant id, and answers stored-active AND installed with a valid manifest; no other code
+  decides "is it on" from `solution_activations` or keeps activation in a singleton, a static or a cross-process cache.
+  Raw rows and the journal are read only through `SolutionActivationStoreInterface` (`all()`, `events()`, used by
+  `solutions:list` and later screens), and only `SolutionActivator` writes them. Source: `adr-20261014-solution-activation-in-tenant-schema`,
+  `conventions/worker-safety.md`. Enforced: `SolutionBoundariesTest` (the domain touches the database only in
+  `Infrastructure`); the rest is covered by `ActiveSolutionsTest` and `PostgresSolutionActivationTest`, otherwise review only.
 - **Extension packages never depend on Core.** `fapost/foundation` requires no FaPost package,
   `fapost/support` requires only `fapost/foundation`, and neither imports `App\…`. Source: `ARCHITECTURE.md` § Boundaries and dependency direction, ADR-05. Enforced: the packages are separate repositories
   with their own Composer requirements, so a Core import cannot autoload there.

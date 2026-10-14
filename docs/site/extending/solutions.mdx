@@ -8,9 +8,10 @@ domain behaviour — distributed as a Composer package under your own vendor.
 
 <Note>
   The external Solution lifecycle is partly built in Core. The manifest below is
-  read and validated by `platform:update` today; activation per tenant, the
-  registrar that mounts what a Solution declares, and the release tooling around
-  them are still being built. Treat this page as the contract you will be held to,
+  read and validated by `platform:update` today, and a tenant's activation of a
+  Solution is stored and switched with `solutions:activate` and `solutions:deactivate`;
+  the registrar that mounts what a Solution declares, the activation screen and the
+  release tooling around them are still being built. Treat this page as the contract you will be held to,
   not as a finished walkthrough.
 </Note>
 
@@ -59,7 +60,7 @@ package's `require`; neither is repeated in the manifest.
 |---|---|---|
 | `type` | yes | `fapost-solution` (`fapost-plugin` is reserved) |
 | `extra.fapost.schema` | yes | An integer; `1` is the only supported number |
-| `extra.fapost.id` | yes | `^[a-z][a-z0-9_]{1,31}$`, and not `core`, `platform`, `fapost`, `app`, `system`, `flow`, `module` or `rag` |
+| `extra.fapost.id` | yes | `^[a-z][a-z0-9_]{1,31}$`, and not `core`, `platform`, `fapost`, `app`, `system`, `flow`, `module`, `rag`, `solution` or `solutions` |
 | `extra.fapost.name` | yes | One line, 1 to 60 characters, in English |
 | `extra.fapost.description` | no | Up to 280 characters |
 | `extra.fapost.provider` | yes | The class name of your service provider; the class must exist and extend `Fapost\Foundation\Lifecycle\AbstractSolutionServiceProvider` |
@@ -67,6 +68,9 @@ package's `require`; neither is repeated in the manifest.
 | `extra.fapost.x-*` | no | Ignored, for your own tooling |
 | `require.fapost/foundation` | yes | The Foundation range you need; Composer enforces it when the package is installed |
 | `require.fapost/core` | forbidden | A Solution depends on contracts, never on Core |
+
+`solution` and `solutions` are reserved from `fapost/foundation` 0.14; use neither, whatever version
+you build against, because Core's own tables carry that prefix.
 
 **The id never changes.** Plans, activations, action ids, permissions and limits all hang on it. A
 different id is a different Solution, and moving a customer's data across is your job.
@@ -79,6 +83,23 @@ loading it.
 only for a Solution whose manifest is valid; Laravel's package discovery would boot any provider
 listed there regardless. Any entry is a manifest violation (`extra.laravel.providers: a Solution's
 provider is booted by Core; remove this block`); an empty list is accepted.
+
+### Activation
+
+Installing a Solution does not turn it on. Activation belongs to a tenant and is stored in that tenant's
+own schema, so it goes with the tenant's backup and is removed with the tenant.
+
+- A Solution is **off by default** for every tenant, new or existing, until it is activated.
+- It counts as active only while the tenant has it activated **and** it is installed in the image with a
+  valid manifest. Remove the package, or break its manifest, and it is inactive for every tenant; bring it
+  back and it is active again where the tenant had left it on. Nothing is written in between.
+- Deactivating never touches the Solution's data. The activation record stays, and every change is
+  journalled with who made it, when, and why.
+- A change is seen by the next request or job of any process; a job already running keeps the answer it
+  was given at its first question.
+
+An operator switches it with `solutions:activate` and `solutions:deactivate`, each with a required
+`--tenant=<slug>`; see the [command reference](/reference/artisan-commands#solutions).
 
 ### Checking it
 
