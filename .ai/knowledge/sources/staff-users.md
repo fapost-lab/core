@@ -8,8 +8,8 @@ paths:
   - "app/Domains/Staff/**"
 source: docs/platform/architecture/platform/03-staff-users.md
 summary: Staff users, roles and permissions schema and deactivation semantics
-source_hash: 7338095696bc0c66f0f9ed65f4e65e4bbb128d40
-reviewed_at: 2026-10-05
+source_hash: 2f410f5a2f4e4ede4d5d11c904ded9d763648707
+reviewed_at: 2026-10-14
 ---
 # 03 — Staff Users
 
