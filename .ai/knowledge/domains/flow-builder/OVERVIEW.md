@@ -43,11 +43,10 @@ The Telegram mini app (`resources/js/tma`) is a separate surface and not part of
 - Node forms come from each handler's `configSchema()`, built with the support package's
   `Fapost\Support\Builder\Schema\Schema`. `NodeTypesController` walks the handler registry and
   serves them at `GET /builder/node-types`.
-- Solution components are discovered at build time by the Vite glob
-  `vendor/fapost/*/resources/js/builder/*{Config,Preview}.vue`
-  (`resources/js/builder/utils/vendorComponents.ts`, ADR-06); adding one needs a frontend rebuild.
-  Superseded by `adr-20261014-solution-console-ui`: no Solution uses it, it is removed by the
-  `extension contract` task, and Solution UI goes to the console as a prebuilt bundle.
+- The builder renders only Core components. The build-time Vite glob for Solution
+  `*{Config,Preview}.vue` (ADR-06, `vendorComponents.ts`) was removed under
+  `adr-20261014-solution-console-ui`: Solutions configure their action handlers in the `call` node
+  through schema, and their UI goes to the console as a prebuilt bundle.
 
 ## Entry points
 

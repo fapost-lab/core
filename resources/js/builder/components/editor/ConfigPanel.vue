@@ -19,10 +19,9 @@ import SetTagConfig from './config/overrides/SetTagConfig.vue'
 import LoopConfig from './config/overrides/LoopConfig.vue'
 import LoopEndConfig from './config/overrides/LoopEndConfig.vue'
 import TriggerConfig from './config/overrides/TriggerConfig.vue'
-import {vendorConfigs} from '@builder/utils/vendorComponents'
 
-// Core bespoke config panels. Resolution order is Core → vendor (Solution)
-// → generic schema renderer, so Core always wins on a type collision.
+// Core bespoke config panels. A type without an override falls back to the
+// generic schema renderer.
 const OVERRIDES: Record<string, object> = {
     send_message: SendMessageConfig,
     input: InputConfig,
@@ -65,7 +64,7 @@ const handlerMeta = computed(() =>
 const configComponent = computed(() => {
     if (!selectedNode.value) return null
     const type = selectedNode.value.type
-    return OVERRIDES[type] ?? vendorConfigs[type] ?? SchemaConfigRenderer
+    return OVERRIDES[type] ?? SchemaConfigRenderer
 })
 
 const colors = computed(() =>

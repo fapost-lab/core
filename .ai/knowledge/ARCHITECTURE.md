@@ -67,10 +67,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   never move a Core version. The same script serves local development, images derived from Core and
   an extension's CI.
 - **The extension surface is partly built.** Present: the action handler registry
-  (`Flow/Action/ActionHandlerRegistry`) and the builder's vendor-component contract, a static Vite
-  glob in `resources/js/builder/utils/vendorComponents.ts` — superseded by
-  `adr-20261014-solution-console-ui` (Solution UI goes to the console prebuilt) and removed by the
-  `extension contract` task. The Solution manifest, a data
+  (`Flow/Action/ActionHandlerRegistry`). The builder's former vendor-component glob
+  (`vendorComponents.ts`) is removed: Solution UI goes to the console prebuilt
+  (`adr-20261014-solution-console-ui`). The Solution manifest, a data
   block in the package's `composer.json`, is read and validated by `platform:update` (`solution`
   domain). A tenant's Solution activation is stored in its schema and read only through `ActiveSolutions`
   (`adr-20261014-solution-activation-in-tenant-schema`). Absent: a Core implementation of
