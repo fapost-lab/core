@@ -41,9 +41,11 @@ by design: it would mean shipping unreviewed code into a running admin surface. 
 the schema renderer cannot express what your node needs, the fix is to extend the
 renderer in Core, not to work around it.
 
-**Solution components need the approved build and publish contract.** A Solution
-may contribute front-end code, but through the agreed Vite glob and publish
-contract — not by writing into the application's source tree.
+**Solution components go to the console, not the builder.** A Solution's
+front-end code ships prebuilt and is loaded by the console at run time, with no
+rebuild of Core — never by writing into the application's source tree. That
+contract is being built and is not available yet. In the builder, a Solution's
+nodes are configured through schema like everyone else's.
 
 ## When the renderer is not enough
 

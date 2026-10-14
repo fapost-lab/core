@@ -7,9 +7,9 @@ domains:
 paths:
   - resources/js/builder/utils/vendorComponents.ts
 source: docs/platform/architecture/adr/06-frontend-extension-boundary.md
-summary: Plugins get schema-driven builder UI only; Solutions may ship Vue through vendor:publish and a rebuild
-source_hash: 9c1ad671b588ce5c9259e39802155b66c0fb3551
-reviewed_at: 2026-10-05
+summary: Plugins get schema-driven builder UI only; its Solution rules (Vue through vendor:publish and a rebuild) are superseded by adr-20261014-solution-console-ui
+source_hash: 9ac7bb118528c869cd372f28ce09e01ec4721ffc
+reviewed_at: 2026-10-14
 ---
 # ADR-06 — Frontend Extension Boundary: Plugin vs Solution
 
