@@ -1401,4 +1401,11 @@ return [
             'admin'   => ['label' => 'Admin panel', 'short' => 'Admin', 'scope' => 'The whole organization'],
         ],
     ],
+
+    // The page shown inside the shell when a Solution page cannot be loaded (extension-contract).
+    'solution_unavailable' => [
+        'title'       => 'This page is unavailable',
+        'description' => 'The application that provides it is not active or failed to load. Try again later or contact your administrator.',
+        'back'        => 'Go back',
+    ],
 ];

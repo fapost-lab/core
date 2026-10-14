@@ -3,10 +3,20 @@ import { createApp, h } from 'vue'
 import { createInertiaApp, router } from '@inertiajs/vue3'
 import { createPinia } from 'pinia'
 import { connectBroadcaster, type BroadcasterProp } from '@fapost/ui/lib/live-updates'
+import { AppShell } from '@fapost/ui/shell'
+import { isSolutionName, resolveSolutionPage } from './solutions'
 
 createInertiaApp({
     resolve: (name) => {
         const pages = import.meta.glob<{ default: DefineComponent }>('../pages/**/*.vue', { eager: true })
+
+        // `<id>::<Path>` is a Solution page from its prebuilt bundle (ADR solution-console-ui); everything else is Core's.
+        if (isSolutionName(name)) {
+            return resolveSolutionPage(name, {
+                layout: AppShell,
+                unavailable: pages['../pages/Errors/SolutionUnavailable.vue'].default,
+            }) as Promise<DefineComponent>
+        }
 
         return pages[`../pages/${name}.vue`]
     },

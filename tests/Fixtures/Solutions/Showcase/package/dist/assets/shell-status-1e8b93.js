@@ -1,0 +1,13 @@
+import { defineComponent, h } from 'vue'
+import { Badge } from '@fapost/ui/components/badge'
+
+export default defineComponent({
+    name: 'ShowcaseStatus',
+    props: { recordId: { type: String, default: null }, assistantId: { type: String, default: null } },
+    setup(props) {
+        return () => h('div', { class: 'showcase-panel', 'data-showcase': 'status' }, [
+            h(Badge, { variant: 'secondary' }, () => 'Status'),
+            props.recordId ? h('span', { class: 'showcase-mark' }, props.recordId) : null,
+        ])
+    },
+})

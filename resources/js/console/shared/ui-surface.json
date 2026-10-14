@@ -1,0 +1,32 @@
+{
+    "subpaths": [
+        "components/alert-dialog",
+        "components/avatar",
+        "components/badge",
+        "components/button",
+        "components/card",
+        "components/checkbox",
+        "components/command",
+        "components/confirm-dialog",
+        "components/data-table",
+        "components/dialog",
+        "components/dropdown-menu",
+        "components/empty-state",
+        "components/form-field",
+        "components/form-section",
+        "components/input",
+        "components/label",
+        "components/select",
+        "components/separator",
+        "components/sheet",
+        "components/skeleton",
+        "components/sonner",
+        "components/switch",
+        "components/table",
+        "components/tabs",
+        "components/textarea",
+        "components/tooltip",
+        "lib/utils",
+        "lib/relative-time"
+    ]
+}

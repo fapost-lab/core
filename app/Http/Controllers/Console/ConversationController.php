@@ -24,6 +24,7 @@ use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use App\Http\Requests\Console\ReplyConversationRequest;
 use App\Http\Requests\Console\UpdateConversationStatusRequest;
+use Fapost\Foundation\Console\Enums\TableTarget;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -92,7 +93,7 @@ final class ConversationController extends Controller
         );
 
         return Inertia::render('Console/Conversations/Index', [
-            'table' => $table->respond(
+            'table' => $table->extend(TableTarget::Conversations)->respond(
                 $request,
                 $this->inbox->query($assistant)->with('contact'),
                 fn (Conversation $conversation): array => [

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>FaPost</title>
     @include('partials.theme-script')
+    @solutionImports
     @vite(['resources/css/ui.css', 'resources/js/console/app.ts'])
     @inertiaHead
 </head>

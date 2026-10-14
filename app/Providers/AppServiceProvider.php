@@ -8,9 +8,14 @@ use App\Console\Platform\ArtisanPlatformMigrator;
 use App\Console\Platform\PlatformMigratorInterface;
 use App\Domains\Flow\Logging\DatabaseAnalyticsWriter;
 use App\Domains\Shared\Infrastructure\ModelAttributeRegistry;
+use App\Http\Shell\SolutionExtensions;
+use App\Http\Shell\SolutionImportMap;
+use App\Http\Shell\SolutionUi;
+use App\Http\Shell\SolutionUiMapInterface;
 use Fapost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
 use Fapost\Foundation\Contracts\ModelAttributeResolverInterface;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 
@@ -41,6 +46,10 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ModelAttributeResolverInterface::class, ModelAttributeRegistry::class);
         $this->app->scoped(DatabaseAnalyticsWriter::class);
         $this->app->scoped(AnalyticsWriterInterface::class, DatabaseAnalyticsWriter::class);
+        // Per request: what a Solution adds depends on the tenant's active Solutions and on the user.
+        $this->app->scoped(SolutionUi::class);
+        $this->app->scoped(SolutionUiMapInterface::class, static fn ($app): SolutionUi => $app->make(SolutionUi::class));
+        $this->app->scoped(SolutionExtensions::class);
 
         // Telescope is a dev dependency, so a production install does not have it.
         // The class check matters beyond that: an image built with --no-dev but
@@ -62,6 +71,9 @@ final class AppServiceProvider extends ServiceProvider
         );
 
         $this->loadMigrationsFrom(database_path('migrations/landlord'));
+
+        // The console root view's import map and Solution bundle map; it must precede `@vite`.
+        Blade::directive('solutionImports', static fn (): string => '<?php echo app(\\' . SolutionImportMap::class . '::class)->render(); ?>');
 
         $this->app->booted(function (): void {
             $this->app->make(ModelAttributeRegistry::class)->freeze();

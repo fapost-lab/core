@@ -12,6 +12,9 @@ use App\Http\Shell\ApplicationRail;
 use App\Http\Shell\ApplicationRegistry;
 use App\Http\Shell\AssistantSwitcher;
 use App\Http\Shell\NavigationBuilder;
+use App\Http\Shell\ShellApplication;
+use App\Http\Shell\SolutionExtensions;
+use App\Http\Shell\SolutionUiMapInterface;
 use App\Infrastructure\Broadcasting\BroadcasterStatus;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
@@ -29,13 +32,24 @@ final class HandleInertiaRequests extends Middleware
     protected $rootView = 'app';
 
     /**
+     * The applications of this request's user, once worked out ({@see self::applicationList()}).
+     *
+     * @var list<ShellApplication>|null
+     */
+    private ?array $applicationList = null;
+
+    /**
      * Determines the current asset version.
      *
      * @see https://inertiajs.com/asset-versioning
      */
     public function version(Request $request): ?string
     {
-        return parent::version($request);
+        $version = parent::version($request);
+        // The tenant's Solution bundles: activating, deactivating or updating one reloads the console on the next visit.
+        $solutions = app(SolutionUiMapInterface::class)->versionSuffix();
+
+        return '' === $solutions ? $version : $version . $solutions;
     }
 
     /**
@@ -81,6 +95,8 @@ final class HandleInertiaRequests extends Middleware
         $shared['navigation']              = fn (): ?array => $this->navigation($request);
         $shared['assistants']              = fn (): ?array => $this->assistants($request);
         $shared['applications']            = fn (): ?array => $this->applications($request);
+        // What the Solutions served to the tenant add to Core's screens (extension-contract).
+        $shared['extensions'] = fn (): ?array => $request->user() instanceof User ? app(SolutionExtensions::class)->props($request->user(), $request) : null;
 
         return $shared;
     }
@@ -129,6 +145,19 @@ final class HandleInertiaRequests extends Middleware
 
         $builder    = app(NavigationBuilder::class);
         $assistants = app(CurrentAssistantInterface::class);
+        $solution   = $this->solutionOf($request);
+
+        // A Solution's page shows its application's menu.
+        if (null !== $solution) {
+            $application = $this->solutionApplication($request, $user, $solution);
+            $parameters  = $assistants->isResolved() ? ['assistant' => (string) $assistants->get()->getKey()] : [];
+
+            return [
+                'mode'      => $assistants->isResolved() ? 'console' : 'admin',
+                'groups'    => null === $application ? [] : app(ApplicationRegistry::class)->menu($user, $application),
+                'searchUrl' => route('console.admin.search', $parameters, false),
+            ];
+        }
 
         // The search palette (applications, their pages, then records) replaces Filament's global search, which only the
         // admin panel had; every user has applications to find.
@@ -165,6 +194,27 @@ final class HandleInertiaRequests extends Middleware
         }
 
         $assistants = app(CurrentAssistantInterface::class);
+
+        return app(ApplicationRail::class)->props(
+            $user,
+            $this->applicationList($request, $user),
+            $this->solutionOf($request) ?? ($assistants->isResolved() ? ApplicationRegistry::CONSOLE : ApplicationRegistry::ADMIN),
+        );
+    }
+
+    /**
+     * The applications the user may open, worked out once per request: the rail and, on a Solution's page, the menu
+     * both need them. On an assistant's screen the assistant is remembered in the session first.
+     *
+     * @return list<ShellApplication>
+     */
+    private function applicationList(Request $request, User $user): array
+    {
+        if (null !== $this->applicationList) {
+            return $this->applicationList;
+        }
+
+        $assistants = app(CurrentAssistantInterface::class);
         $current    = $assistants->isResolved() ? $assistants->get() : null;
         $session    = $request->hasSession() ? $request->session() : null;
 
@@ -172,14 +222,31 @@ final class HandleInertiaRequests extends Middleware
             $session?->put(ApplicationRegistry::LAST_ASSISTANT, (string) $current->getKey());
         }
 
-        $last         = $session?->get(ApplicationRegistry::LAST_ASSISTANT);
-        $applications = app(ApplicationRegistry::class)->for($user, $current, [is_string($last) ? $last : null]);
+        $last = $session?->get(ApplicationRegistry::LAST_ASSISTANT);
 
-        return app(ApplicationRail::class)->props(
-            $user,
-            $applications,
-            null === $current ? ApplicationRegistry::ADMIN : ApplicationRegistry::CONSOLE,
-        );
+        return $this->applicationList = app(ApplicationRegistry::class)->for($user, $current, [is_string($last) ? $last : null]);
+    }
+
+    /**
+     * The Solution whose route answers the request: Core names every Solution route `solutions.<id>.*`.
+     */
+    private function solutionOf(Request $request): ?string
+    {
+        return EnsureSolutionActive::solutionOf($request);
+    }
+
+    /**
+     * The application of the Solution the request is in, as the rail offers it to the user.
+     */
+    private function solutionApplication(Request $request, User $user, string $solution): ?ShellApplication
+    {
+        foreach ($this->applicationList($request, $user) as $application) {
+            if ($application->key === $solution) {
+                return $application;
+            }
+        }
+
+        return null;
     }
 
     /**

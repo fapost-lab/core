@@ -14,10 +14,12 @@ use Illuminate\Support\Str;
 /**
  * The applications of the shell's rail a user may open, in a fixed order, and the menu of each.
  *
- * Today Core's two: the Console, which works per assistant, and the Admin panel, tenant-wide. Their visibility is the
+ * Core's two first: the Console, which works per assistant, and the Admin panel, tenant-wide. Their visibility is the
  * panel access of today: both need an account that may use the console ({@see User::canAccessConsole()}), and the
  * Console needs an assistant the user may open ({@see AccessibleAssistants}, the list of the assistant switcher and of
- * Filament's tenant menu). This is the seam the Solution extension contract will feed; it is internal until then.
+ * Filament's tenant menu). Then the applications of the Solutions served to the tenant, by Solution id
+ * ({@see SolutionExtensions}); a per-assistant one opens on the Console's assistant. The menu of each is chosen by its
+ * key, not by whether it carries an assistant.
  *
  * @phpstan-import-type Group from NavigationBuilder
  */
@@ -47,6 +49,7 @@ final class ApplicationRegistry
         private readonly StaffAssistantService $assistants,
         private readonly RouteOwnership $ownership,
         private readonly NavigationBuilder $navigation,
+        private readonly SolutionExtensions $solutions,
     ) {
     }
 
@@ -74,7 +77,7 @@ final class ApplicationRegistry
 
         $applications[] = $this->application(self::ADMIN, 'shield', self::ADMIN_ROUTE, []);
 
-        return $applications;
+        return [...$applications, ...$this->solutions->applications($user, $assistant)];
     }
 
     /**
@@ -84,9 +87,11 @@ final class ApplicationRegistry
      */
     public function menu(User $user, ShellApplication $application): array
     {
-        return null === $application->assistant
-            ? $this->navigation->admin($user)
-            : $this->navigation->console($user, $application->assistant, false);
+        return match (true) {
+            self::ADMIN === $application->key                                       => $this->navigation->admin($user),
+            self::CONSOLE === $application->key && null !== $application->assistant => $this->navigation->console($user, $application->assistant, false),
+            default                                                                 => $this->solutions->menu($user, $application),
+        };
     }
 
     /**

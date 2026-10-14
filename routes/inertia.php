@@ -33,6 +33,7 @@ use App\Http\Controllers\Console\LocaleController;
 use App\Http\Controllers\Console\TranslationController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\SetConsoleRootView;
+use App\Http\Shell\SolutionRoutes;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -56,7 +57,8 @@ use Illuminate\Support\Facades\Route;
 |
 | Stacks (defined in bootstrap/app.php):
 |  - `admin`   : web + tenant + session checks + account checks, for tenant-wide screens (`admin/*`);
-|  - `console` : `admin` + ResolveCurrentAssistant:tenant, for `assistant/{tenant}/*`.
+|  - `console` : `admin` + ResolveCurrentAssistant:tenant, for `assistant/{tenant}/*`;
+|  - `solution`, `solution.assistant` : the two above for the routes of Solutions, registered at the end.
 | Every new action authorizes (see ConsoleAuthorizationTest).
 */
 
@@ -237,3 +239,7 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::delete('assistant/{tenant}/translations/{key}', [TranslationController::class, 'reset'])->name('console.translations.reset');
     });
 });
+
+// Solutions (extension-contract): the routes they declared, under `apps/<id>/` and `assistant/{tenant}/apps/<id>/`,
+// named `solutions.<id>.*`, behind the `solution` stacks. The registrar sets the panel domain itself.
+app(SolutionRoutes::class)->register();

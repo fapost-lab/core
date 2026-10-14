@@ -1,0 +1,19 @@
+{
+    "name": "acme/fapost-showcase",
+    "description": "Fixture Solution that declares console UI on every extension point (extension-contract tests).",
+    "type": "fapost-solution",
+    "require": {
+        "fapost/foundation": "^0.15"
+    },
+    "extra": {
+        "fapost": {
+            "schema": 1,
+            "id": "showcase",
+            "name": "Showcase",
+            "description": "Shows every point of the console extension contract.",
+            "provider": "Tests\\Fixtures\\Solutions\\Showcase\\ShowcaseServiceProvider",
+            "actions": [],
+            "ui": "dist/fapost-ui.json"
+        }
+    }
+}

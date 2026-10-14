@@ -6,6 +6,7 @@ namespace App\Domains\Solution\Services;
 
 use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\DTO\SolutionDiscovery;
+use App\Domains\Solution\DTO\SolutionUiBundle;
 use RuntimeException;
 use Throwable;
 
@@ -16,6 +17,9 @@ use Throwable;
  * missing, unreadable or stale it is ignored and the catalog is built in memory. It records the size
  * and modification time of installed.json and of the composer.json of every candidate package, valid or not; any difference makes
  * it stale. A request never writes it.
+ *
+ * Beside the catalog it keeps the published console UI bundles ({@see PublishedSolutionUi}), so a request reads
+ * neither `fapost-ui.json` nor `public/solutions/`.
  */
 final class SolutionCache
 {
@@ -33,23 +37,13 @@ final class SolutionCache
      */
     public function read(): ?array
     {
-        if (!is_file($this->path)) {
+        $data = $this->load();
+
+        if (null === $data) {
             return null;
         }
 
         try {
-            $data = (static fn (string $path): mixed => require $path)($this->path);
-
-            if (!is_array($data) || !is_array($data['files'] ?? null) || !is_array($data['solutions'] ?? null)) {
-                return null;
-            }
-
-            foreach ($data['files'] as $file => $stamp) {
-                if (!is_string($file) || $stamp !== $this->stamp($file)) {
-                    return null;
-                }
-            }
-
             return array_values(array_map(
                 static fn (mixed $solution): InstalledSolution => InstalledSolution::fromArray((array) $solution),
                 $data['solutions'],
@@ -59,17 +53,51 @@ final class SolutionCache
         }
     }
 
-    public function write(SolutionDiscovery $discovery): void
+    /**
+     * The published console UI bundles the cache recorded, by Solution id.
+     *
+     * @return array<string, SolutionUiBundle>|null null when there is no usable, fresh cache
+     */
+    public function bundles(): ?array
+    {
+        $data = $this->load();
+
+        // A cache written before Core published bundles says nothing about them.
+        if (null === $data || !is_array($data['bundles'] ?? null)) {
+            return null;
+        }
+
+        try {
+            $bundles = [];
+
+            foreach ($data['bundles'] as $bundle) {
+                $bundle                       = SolutionUiBundle::fromArray((array) $bundle);
+                $bundles[$bundle->solutionId] = $bundle;
+            }
+
+            return $bundles;
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  list<SolutionUiBundle>  $bundles  the published console UI bundles
+     * @param  list<string>  $watchedFiles  more files whose change makes the cache stale: the `fapost-ui.json` of each
+     *                                      Solution, so a new build is not taken for the published one
+     */
+    public function write(SolutionDiscovery $discovery, array $bundles = [], array $watchedFiles = []): void
     {
         $files = [$discovery->installedJsonPath => $this->stamp($discovery->installedJsonPath)];
 
-        foreach ($discovery->watchedFiles as $file) {
+        foreach ([...$discovery->watchedFiles, ...$watchedFiles] as $file) {
             $files[$file] = $this->stamp($file);
         }
 
         $contents = '<?php return ' . var_export([
             'files'     => $files,
             'solutions' => array_map(static fn (InstalledSolution $solution): array => $solution->toArray(), $discovery->valid),
+            'bundles'   => array_map(static fn (SolutionUiBundle $bundle): array => $bundle->toArray(), $bundles),
         ], true) . ";\n";
 
         $temporary = $this->path . '.' . bin2hex(random_bytes(4)) . '.tmp';
@@ -88,6 +116,37 @@ final class SolutionCache
     public function forget(): bool
     {
         return !is_file($this->path) || @unlink($this->path);
+    }
+
+    /**
+     * The cached data when the file is there, readable and fresh.
+     *
+     * @return array{files: array<string, mixed>, solutions: array<mixed>, bundles?: array<mixed>}|null
+     */
+    private function load(): ?array
+    {
+        if (!is_file($this->path)) {
+            return null;
+        }
+
+        try {
+            $data = (static fn (string $path): mixed => require $path)($this->path);
+
+            if (!is_array($data) || !is_array($data['files'] ?? null) || !is_array($data['solutions'] ?? null)) {
+                return null;
+            }
+
+            foreach ($data['files'] as $file => $stamp) {
+                if (!is_string($file) || $stamp !== $this->stamp($file)) {
+                    return null;
+                }
+            }
+
+            /** @var array{files: array<string, mixed>, solutions: array<mixed>, bundles?: array<mixed>} $data */
+            return $data;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     /**
