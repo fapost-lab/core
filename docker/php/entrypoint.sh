@@ -48,6 +48,9 @@ warm_caches() {
     php artisan config:cache --no-interaction || true
     php artisan route:cache --no-interaction || true
     php artisan event:cache --no-interaction || true
+    # The Solution catalog is rebuilt from installed.json when this is missing or stale; the cache only
+    # saves a request from parsing it. platform:update writes the same file after an upgrade.
+    php artisan solutions:cache --no-interaction || true
 }
 
 case "${ROLE}" in

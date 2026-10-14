@@ -10,9 +10,12 @@ What changes between releases and in what order to apply it.
 Four things happen, and the order is not interchangeable:
 
 1. New code arrives (new image, or new checkout plus `composer install`)
-2. **Landlord** migrations run — platform-wide tables, including any that the SaaS operator package adds
-3. **Tenant** migrations run — once per tenant schema
+2. The installed Solutions are checked, ideally with `platform:update --validate-only` before the running containers are replaced: a manifest that is wrong stops the upgrade here, before anything is changed
+3. **Landlord** migrations run — platform-wide tables, including any that the SaaS operator package adds — and then **tenant** migrations, once per tenant schema
 4. Queue workers restart, so they stop running the previous release from memory
+
+`php artisan platform:update` repeats the check and does step 3 in one command and then caches the catalog of
+installed Solutions. Step 4 stays yours.
 
 Step 4 is the one most often forgotten. Horizon workers are long-lived PHP
 processes: until they are restarted they keep executing the old code against the
@@ -22,10 +25,10 @@ new database schema, which is the worst combination of the two.
 
 ```bash
 docker compose pull
+docker compose run --rm app php artisan platform:update --validate-only   # new image, old containers still running
 docker compose up -d
 
-docker compose exec app php artisan migrate --database=landlord --force
-docker compose exec app php artisan ops:tenants-migrate
+docker compose exec app php artisan platform:update
 
 docker compose exec app php artisan horizon:terminate
 ```
@@ -42,9 +45,34 @@ rather than an event:
 APP_VERSION=1.4.2
 ```
 
+## Solutions are checked first
+
+A Solution is a Composer package whose `composer.json` carries a manifest (see
+[The Solution manifest](/extending/solutions#the-manifest)). `platform:update` reads the manifest of
+every installed Solution before it touches the database. If any is wrong it prints one line per
+problem, for example
+
+```
+acme/fapost-feedback: extra.fapost.id: must match ^[a-z][a-z0-9_]{1,31}$
+```
+
+changes nothing and exits with code 1. A package with a wrong manifest, and both packages when two
+declare the same id, are not used by Core even if you start it anyway. To check without upgrading,
+for example in a pipeline or when building a derived image:
+
+```bash
+php artisan platform:update --validate-only
+```
+
+This needs no database. After a successful update the catalog of Solutions is cached in
+`bootstrap/cache/fapost-solutions.php`; if that file is missing or older than the installed
+packages, Core builds the catalog from the package files instead, so a stale cache cannot hide a
+Solution.
+
 ## Two schemas, two migration commands
 
-Tenant isolation is schema-per-tenant, so a migration touching tenant tables must
+`platform:update` runs both of the commands below, in that order. They remain available on their
+own. Tenant isolation is schema-per-tenant, so a migration touching tenant tables must
 run once per tenant. `ops:tenants-migrate` iterates active tenants and runs each tenant's schema
 migrations and then its settings migrations; plain `artisan migrate` does not and will leave every
 tenant schema untouched.

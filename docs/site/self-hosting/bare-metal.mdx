@@ -212,8 +212,8 @@ git pull
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build
 
-php artisan migrate --database=landlord --force
-php artisan ops:tenants-migrate
+php artisan platform:update --validate-only   # stop here if a Solution manifest is wrong
+php artisan platform:update        # checks Solutions, migrates landlord and tenants, caches the catalog
 
 php artisan horizon:terminate      # workers pick up the new code on restart
 sudo systemctl reload php8.4-fpm

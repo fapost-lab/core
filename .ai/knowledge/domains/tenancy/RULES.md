@@ -238,7 +238,8 @@ broken.
 - **Open the `landlord` connection only inside `app/Domains/Tenancy`.** Other domains depend on
   a `Tenancy/Contracts` interface. Why: tenant isolation stays auditable in one place.
   Review only — no PHPat rule covers it. Known exceptions: the install and
-  migrate console commands (`InstallPlatformCommand`, `InstallCommand`, `MigrateSmartCommand`) open
+  migrate console commands (`InstallPlatformCommand`, `InstallCommand`, `MigrateSmartCommand`) and
+  `App\Console\Platform\ArtisanPlatformMigrator` (run by `platform:update`) open
   the connection to run platform migrations (`migrate --database=landlord --force`, no `--path`,
   so every registered migration path runs; `database/settings` is not one of them — the settings
   migrations are tenant-scoped, so `config/settings.php` leaves `migrations_paths` empty and they

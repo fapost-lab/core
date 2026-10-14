@@ -1,0 +1,18 @@
+{
+    "name": "acme/fapost-feedback",
+    "description": "Fixture Solution used by the manifest tests.",
+    "type": "fapost-solution",
+    "require": {
+        "fapost/foundation": "^0.13"
+    },
+    "extra": {
+        "fapost": {
+            "schema": 1,
+            "id": "feedback",
+            "name": "Feedback",
+            "description": "Collect and route customer feedback from flows.",
+            "provider": "Tests\\Fixtures\\Solution\\FeedbackServiceProvider",
+            "actions": ["feedback.submit", "feedback.score"]
+        }
+    }
+}
