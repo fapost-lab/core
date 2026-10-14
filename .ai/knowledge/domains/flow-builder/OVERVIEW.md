@@ -23,7 +23,7 @@ paths:
   - app/Http/Requests/SaveDraftRequest.php
   - app/Http/Requests/ValidateFlowRequest.php
   - app/Http/Requests/CallTestRequest.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-14
 ---
 # Flow builder
 
@@ -46,6 +46,8 @@ The Telegram mini app (`resources/js/tma`) is a separate surface and not part of
 - Solution components are discovered at build time by the Vite glob
   `vendor/fapost/*/resources/js/builder/*{Config,Preview}.vue`
   (`resources/js/builder/utils/vendorComponents.ts`, ADR-06); adding one needs a frontend rebuild.
+  Superseded by `adr-20261014-solution-console-ui`: no Solution uses it, it is removed by the
+  `extension contract` task, and Solution UI goes to the console as a prebuilt bundle.
 
 ## Entry points
 

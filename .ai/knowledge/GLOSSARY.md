@@ -37,11 +37,29 @@ Use in: documentation.
 ## Solution
 
 A vertical product module (for example HR) in its own Composer package, with its own domain,
-tables and screens. Its front end goes through the build-and-publish contract; it never lives
-under `app/Solutions` in Core.
+tables and screens. It adds to the console through extension points and ships its UI prebuilt
+(`adr-20261014-solution-console-ui`); it never lives under `app/Solutions` in Core.
 
 Informal synonyms: niche module.
 Use in: documentation, source code (`AbstractSolutionServiceProvider`).
+
+## Extension point
+
+A place in Core's console where a Solution may add UI: an application in the app switcher,
+a contextual action, a shell element, a dashboard widget, a settings tab or a table column.
+Declared server-side in PHP; its component is referenced by name, `<solution id>::<Name>`
+(`adr-20261014-solution-console-ui`).
+
+Use in: documentation, discussion.
+
+## Console target
+
+The named spot in one of Core's screens an extension point attaches to — `contact.view`,
+the `assistant` settings, the `contacts` table. Targets are constants in Foundation; Core
+lists them, a Solution only chooses among them.
+
+Informal synonyms: hook point.
+Use in: source code, documentation.
 
 ## Plugin
 

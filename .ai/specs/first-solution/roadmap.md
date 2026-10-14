@@ -12,10 +12,14 @@ with a prebuilt page is installed into an image derived from Core's published im
 and no change to Core's files, activated, and its page renders inside the console's shell on
 Core's Vue and kit.
 
-- [ ] Prebuilt Solution UI — the Vite preset for Solutions, the import map for the shared
-      modules, Inertia pages resolved from a Solution's manifest, asset publishing at install, and
-      the kit-range check that refuses activation on a mismatch (after: ui-foundation's kit
-      extracted — authors build against the published `@fapost/ui`)
+- [ ] Prebuilt Solution UI, the author's half — the npm Vite preset for Solutions
+      (`@fapost/vite-plugin-solution`), building against the extracted `@fapost/ui`, and the
+      kit-range check that refuses activation on a mismatch, with `composer/semver` added to
+      Core's `require` for it (approved by the owner, 2026-10-14); the run-time half (import map,
+      `<id>::<Page>` resolver, asset publishing) moved to ui-foundation's extension contract
+      (owner, 2026-10-14) (after: ui-foundation's kit extracted — authors build against the
+      published `@fapost/ui`; after: ui-foundation's extension contract — the run time the preset
+      builds for)
 - [ ] The derived-image recipe — `FROM` Core's image, the overlay, `composer install`, assets
       published; documented for self-hosters and used by the SaaS (after: prebuilt Solution UI —
       the recipe has no Node step only because of it)

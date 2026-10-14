@@ -1,5 +1,16 @@
 # ADR-06 — Frontend Extension Boundary: Plugin vs Solution
 
+> **Superseded for Solutions (2026-10-14)** by
+> [adr-20261014-solution-console-ui](../../../../.ai/knowledge/adr/20261014-solution-console-ui.md). A Solution adds to
+> the console through server-side declarations and a prebuilt `dist/` bundle on Core's shared Vue, Inertia and kit
+> (import map), with no rebuild of Core. Superseded here: the row "Filament resources" (now "Console UI through the
+> extension contract"), the Solution ✓ in the rows "Custom Vue config component", "Custom preview renderer" and
+> "Custom field renderer" (now ✗: Solutions register action handlers, not node types), the section "Solution — может
+> поставлять Vue компоненты (с перебилдом)" with its naming convention, the consequences about `npm run build` and
+> `vendor:publish` for JS, and the rejection of "Runtime dynamic import (Б2)", which is now the chosen path. The row
+> "NodeHandler: Solution ✓" narrows: a Solution registers action handlers reached through the `call` node, not node
+> types. The Plugin rules stand.
+>
 > **Superseded in part (2026-10).** Two things this ADR describes are not built:
 >
 > - The `platform:update` command (Task 25) does not exist; the `Platform` commands are `InstallCommand`,
@@ -31,17 +42,17 @@ Flow builder требует возможности рендерить config pan
 
 | Capability | Core | Plugin | Solution | SaaS-only |
 | --- | --- | --- | --- | --- |
-| NodeHandler | ✓ | ✓ | ✓ | ✗ |
+| NodeHandler | ✓ | ✓ | action handlers via `call` only (superseded 2026-10-14) | ✗ |
 | DataAccessor | ✓ | ✓ | ✓ | ✗ |
 | Flow template | ✓ | ✓ | ✓ | ✗ |
 | Tenant migrations | ✓ | ✗ | ✓ | ✗ |
 | Landlord access | ✗ | ✗ | ✗ | ✓ |
 | Queue jobs | ✓ | limited | ✓ | ✗ |
 | Scheduled jobs | ✓ | limited | ✓ | ✗ |
-| Custom Vue config component | ✓ | ✗ | ✓ | ✗ |
-| Custom preview renderer | ✓ | ✗ | ✓ | ✗ |
-| Custom field renderer | ✓ | ✗ | ✓ | ✗ |
-| Filament resources | ✓ | ✗ | ✓ | ✗ |
+| Custom Vue config component | ✓ | ✗ | ✗ (superseded 2026-10-14) | ✗ |
+| Custom preview renderer | ✓ | ✗ | ✗ (superseded 2026-10-14) | ✗ |
+| Custom field renderer | ✓ | ✗ | ✗ (superseded 2026-10-14) | ✗ |
+| ~~Filament resources~~ Console UI through the extension contract (prebuilt) | ✓ | ✗ | ✓ (superseded 2026-10-14) | ✗ |
 | Runtime install without deploy | ✗ | ✓ | ✗ | ✗ |
 | Composer package | internal | optional | mandatory | internal |
 
@@ -77,6 +88,9 @@ Plugin устанавливается без перебилда frontend. Поэ
 Если стандартных типов полей недостаточно — расширять нужно поддерживаемые field types в `SchemaConfigRenderer` (Core), а не делать Plugin Solution-ом.
 
 ### Solution — может поставлять Vue компоненты (с перебилдом)
+
+> **Superseded (2026-10-14)** by adr-20261014-solution-console-ui: Solution UI ships prebuilt and is loaded at run time;
+> this section and its naming convention no longer apply.
 
 Solution устанавливается как composer-пакет. Установка является деплой-событием — перебилд frontend обязателен и ожидаем.
 
@@ -121,15 +135,15 @@ const vendorPreviews = import.meta.glob(
 ## Последствия
 
 - Plugin с нетривиальным config UI ограничен типами полей `SchemaConfigRenderer`. Расширять нужно renderer в Core, не делать Plugin Solution-ом.
-- Каждый новый Solution после установки требует `npm run build` как часть деплой процедуры. Зафиксировать в `platform:update` (Task 25).
-- `vendor:publish` для JS-ресурсов Solution должен быть задокументирован в Module Registration Contract.
+- ~~Каждый новый Solution после установки требует `npm run build` как часть деплой процедуры. Зафиксировать в `platform:update` (Task 25).~~ *(superseded 2026-10-14)*
+- ~~`vendor:publish` для JS-ресурсов Solution должен быть задокументирован в Module Registration Contract.~~ *(superseded 2026-10-14)*
 - Landlord access — исключительно SaaS-оболочка. Ни Plugin, ни Solution не имеют доступа к landlord БД.
 
 ---
 
 ## Альтернативы которые были отклонены
 
-**Runtime dynamic import (Б2)** — Solution поставляет скомпилированный JS, builder загружает через dynamic `import()` в runtime. Отклонено: сложность реализации не оправдана, проблемы с CSP и изоляцией.
+**Runtime dynamic import (Б2)** *(reversed 2026-10-14: chosen by adr-20261014-solution-console-ui)* — Solution поставляет скомпилированный JS, builder загружает через dynamic `import()` в runtime. Отклонено: сложность реализации не оправдана, проблемы с CSP и изоляцией.
 
 **Schema-driven с расширенными типами (В)** — Solution не поставляет Vue код, только описывает сложные типы полей в схеме. Отклонено: не покрывает нестандартный UX (превью, вложенные редакторы, специфичный для домена UI).
 

@@ -8,8 +8,8 @@ paths:
   - "resources/js/builder/**"
 source: docs/site/extending/builder-ui.mdx
 summary: "How an extension gets builder UI: config schema first, overrides only when needed"
-source_hash: 272834d7c1ba7c21c6cc09e4c82df67e0efac948
-reviewed_at: 2026-10-05
+source_hash: 4f3ea8c8cdd6eba3dca9a08e54f7d81c8ae732af
+reviewed_at: 2026-10-14
 ---
 # Builder UI extensions
 

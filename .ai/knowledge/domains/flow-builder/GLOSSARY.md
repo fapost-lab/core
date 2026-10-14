@@ -18,7 +18,7 @@ paths:
   - app/Domains/Flow/Services/ValidateFlowService.php
   - app/Domains/Flow/Services/LoadBuilderFlowService.php
   - "app/Domains/Flow/Validation/**"
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-14
 ---
 # Flow builder glossary
 
@@ -54,7 +54,9 @@ override map in `ConfigPanel.vue`.
 
 ## Vendor component
 
-A Solution's `*Config.vue` or `*Preview.vue`, picked up by the Vite glob.
+A Solution's `*Config.vue` or `*Preview.vue`, picked up by the Vite glob. Superseded by
+`adr-20261014-solution-console-ui` (Solutions add no builder Vue); the term goes when
+`vendorComponents.ts` is removed.
 
 ## Field renderer
 

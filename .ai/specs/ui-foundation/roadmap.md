@@ -98,7 +98,7 @@ suite registers an application in the switcher with its own menu and pages, a co
 on a Core screen, an element in the shell's slot, a dashboard widget, a settings tab and a table
 column, each rendered in the console with pages resolved by name.
 
-- [ ] `solution-ui-adr` — An ADR that supersedes ADR-06's "Filament resources: Solution ✓" and its build-time-only
+- [x] `solution-ui-adr` — An ADR that supersedes ADR-06's "Filament resources: Solution ✓" and its build-time-only
       rule — what a Solution may add to the console, pages referenced by name, UI shipped
       prebuilt with the shared modules from Core's import map
 - [x] `app-switcher` — The app switcher — the rail with the Console, the Admin panel and pinned Solutions, "All
@@ -107,10 +107,14 @@ column, each rendered in the console with pages resolved by name.
       1 — the rail wraps it)
 - [ ] The extension contract — a Foundation contract to register an application with its menu
       and pages, contextual actions, shell-slot elements, dashboard widgets, settings tabs and
-      table columns; the fixture Solution proving each point; docs marking each point
-      experimental (after: the ADR — it fixes the shapes; after: the app switcher — the
-      application point lives in it; after: phases 2 and 3 — the other points extend the
-      dashboard, settings and data table they built)
+      table columns; the run-time half of prebuilt delivery (moved here from first-solution
+      phase 0 by the owner, 2026-10-14): the `<id>::<Page>` resolver, the import map, Core's
+      shared Vite entries for Vue, Inertia and the kit, `dist/` publication in `platform:update`
+      and the Inertia version over the tenant's active Solutions; the fixture Solution proving
+      each point with a committed built `dist/`; docs marking each point experimental (after:
+      the ADR — it fixes the shapes; after: the app switcher — the application point lives in
+      it; after: phases 2 and 3 — the other points extend the dashboard, settings and data table
+      they built)
 - [ ] fog: a mini-app extension point — how a Solution reaches customers in the mini app
 - [ ] fog: the version story of the kit and the extension contract
 
