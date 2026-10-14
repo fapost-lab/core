@@ -8,10 +8,11 @@ That is what separates it from a [Solution](/extending/solutions), which adds
 domain logic such as HR or recruitment.
 
 <Warning>
-  Core does not yet provide an implementation of `CoreRegistrarInterface`, and
-  nothing in Core reads or validates `SolutionManifest` at boot. The contracts
-  below exist in `fapost/foundation`; the Core side that consumes them is not
-  built yet.
+  Core does not yet provide an implementation of `CoreRegistrarInterface`, and it
+  does not discover Plugins yet: the package type `fapost-plugin` is reserved, but
+  only Solutions have a manifest Core reads (see
+  [The Solution manifest](/extending/solutions#the-manifest)). The contracts below
+  exist in `fapost/foundation`; the Core side that consumes them is not built yet.
 </Warning>
 
 ## The service provider
@@ -22,26 +23,6 @@ A Plugin is a Composer package whose service provider extends
 ```php
 final class ViberPluginServiceProvider extends AbstractPluginServiceProvider
 {
-    public function getId(): string
-    {
-        return 'viber';
-    }
-
-    public function getVersion(): string
-    {
-        return '1.0.0';
-    }
-
-    public function getManifest(): SolutionManifest
-    {
-        return SolutionManifest::make(
-            id: $this->getId(),
-            version: $this->getVersion(),
-            requiresPlatform: '>=1.0.0 <2.0.0',
-            requiresCapabilities: ['messaging.channel_adapter'],
-        );
-    }
-
     protected function registerExtensions(CoreRegistrarInterface $registrar): void
     {
         $registrar->registerNodeHandler(ViberNodeHandler::class);
@@ -52,13 +33,12 @@ final class ViberPluginServiceProvider extends AbstractPluginServiceProvider
 `onActivate()` and `onDeactivate()` are available to hook enabling and disabling;
 both are no-ops unless you override them.
 
-## The manifest
+## Identity
 
-`SolutionManifest` is what makes a Plugin checkable at boot rather than at the
-moment it breaks. `requiresPlatform` is a version constraint on Core;
-`requiresCapabilities` names the platform capabilities the Plugin needs to be
-present. Boot-time and update-lifecycle validation of the manifest is the intended
-behaviour; Core does not perform it yet.
+A Plugin does not declare its id or version in code. Like a Solution, it will describe itself in
+its own `composer.json`, so Core can check it without running it; the format is shared and is
+described on the [Solution page](/extending/solutions#the-manifest). Core does not read it for
+Plugins yet.
 
 ## What you may register
 
@@ -70,7 +50,6 @@ entry point defined in `fapost/foundation`. Core does not implement it yet.
 | `registerNodeHandler(string $handlerClass)` | A node handler for the flow engine |
 | `registerDataAccessor(string $namespace, string $accessorClass)` | A read accessor for condition nodes, under `module.<namespace>.*` |
 | `registerRagAdapter(string $provider, string $adapterClass)` | A retrieval provider, for example `pgvector` |
-| `registerManifest(SolutionManifest $manifest)` | The manifest, for boot-time validation |
 | `registerRoutes(Closure $routes)` | Routes, for the platform to mount |
 | `registerSchedule(Closure $schedule)` | Scheduled callbacks |
 | `registerMigrations(string $path)` | A migrations directory |
