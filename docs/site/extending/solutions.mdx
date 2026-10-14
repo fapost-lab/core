@@ -7,9 +7,10 @@ A Solution is a vertical product module — HR, recruitment, anything with its o
 domain behaviour — distributed as a Composer package under your own vendor.
 
 <Note>
-  The external Solution lifecycle is planned, not product-complete in Core. The
-  boundaries below are enforced today; the installation and release tooling around
-  them is still being built. Treat this page as the contract you will be held to,
+  The external Solution lifecycle is partly built in Core. The manifest below is
+  read and validated by `platform:update` today; activation per tenant, the
+  registrar that mounts what a Solution declares, and the release tooling around
+  them are still being built. Treat this page as the contract you will be held to,
   not as a finished walkthrough.
 </Note>
 
@@ -26,6 +27,98 @@ absorb business logic that belongs to Core.
 Front-end components are possible, but only through the agreed build and publish
 contract. A Solution cannot drop Vue files into a running application — the
 builder front end is compiled ahead of time.
+
+## The manifest
+
+A Solution describes itself in its own `composer.json`: `"type": "fapost-solution"` and an
+`extra.fapost` block. It is data, so Core can check it without loading your code, and the check
+fails on the deploy, not on a customer's request.
+
+```json
+{
+  "name": "acme/fapost-feedback",
+  "type": "fapost-solution",
+  "require": { "fapost/foundation": "^0.13" },
+  "extra": {
+    "fapost": {
+      "schema": 1,
+      "id": "feedback",
+      "name": "Feedback",
+      "description": "Collect and route customer feedback from flows.",
+      "provider": "Acme\\Feedback\\FeedbackServiceProvider",
+      "actions": ["feedback.submit", "feedback.score"]
+    }
+  }
+}
+```
+
+The version is the package version Composer already knows, and the Foundation range is the
+package's `require`; neither is repeated in the manifest.
+
+| Field | Required | Rule |
+|---|---|---|
+| `type` | yes | `fapost-solution` (`fapost-plugin` is reserved) |
+| `extra.fapost.schema` | yes | An integer; `1` is the only supported number |
+| `extra.fapost.id` | yes | `^[a-z][a-z0-9_]{1,31}$`, and not `core`, `platform`, `fapost`, `app`, `system`, `flow`, `module` or `rag` |
+| `extra.fapost.name` | yes | One line, 1 to 60 characters, in English |
+| `extra.fapost.description` | no | Up to 280 characters |
+| `extra.fapost.provider` | yes | The class name of your service provider; the class must exist and extend `Fapost\Foundation\Lifecycle\AbstractSolutionServiceProvider` |
+| `extra.fapost.actions` | no | The action ids you register, each starting with `<id>.`, no duplicates |
+| `extra.fapost.x-*` | no | Ignored, for your own tooling |
+| `require.fapost/foundation` | yes | The Foundation range you need; Composer enforces it when the package is installed |
+| `require.fapost/core` | forbidden | A Solution depends on contracts, never on Core |
+
+**The id never changes.** Plans, activations, action ids, permissions and limits all hang on it. A
+different id is a different Solution, and moving a customer's data across is your job.
+
+**List your actions.** The prefix `<id>.` keeps your handlers from colliding with another Solution's,
+or with `core.*` and `platform.*`. Declaring them lets Core show what your Solution offers without
+loading it.
+
+**Do not use `extra.laravel.providers`.** Core boots the provider named in the manifest itself, and
+only for a Solution whose manifest is valid; Laravel's package discovery would boot any provider
+listed there regardless. Any entry is a manifest violation (`extra.laravel.providers: a Solution's
+provider is booted by Core; remove this block`); an empty list is accepted.
+
+### Checking it
+
+```bash
+php artisan platform:update --validate-only
+```
+
+Prints every problem, not just the first, and exits with code 1:
+
+```
+acme/fapost-feedback: extra.fapost.id: required
+acme/fapost-feedback: extra.fapost.actions[1]: "score" must start with "feedback."
+acme/fapost-feedback: extra.fapost.migrations: unknown field (schema 1 allows: schema, id, name, description, provider, actions); a newer fapost/foundation may be required
+acme/one, acme/two: extra.fapost.id: "feedback" is declared by both packages
+```
+
+A package with a wrong manifest, and both packages when two share an id, are left out of the
+catalog. The same check runs at the start of every `platform:update`, before any migration. See
+[Upgrading and rollback](/self-hosting/upgrading#solutions-are-checked-first).
+
+Without Core, for example in your package's own CI, run the same rules from `fapost/foundation`:
+
+```php
+use Fapost\Foundation\Solution\Manifest\ManifestParser;
+
+$result = (new ManifestParser())->parse(json_decode(file_get_contents('composer.json'), true));
+
+$result->isValid();
+$result->lines();
+```
+
+### How the format changes
+
+Unknown fields are an error, except `x-*`, so a Solution written for a newer platform never
+installs quietly without part of its behaviour. A new optional field arrives in a minor release of
+`fapost/foundation`; to use it, require that version, and Composer then refuses to install your
+Solution on a platform that does not have it. A breaking change gets a new `schema` number;
+Foundation reads the current schema and the previous one within one major version, and refuses
+anything else. A field not in schema 1 yet, for example the UI of a Solution or its migrations, is
+added the same way when its contract is settled.
 
 ## What a Solution typically contains
 

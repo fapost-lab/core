@@ -18,10 +18,11 @@ depend on; nothing under `App\…` is. See
 | Contract | Role |
 |---|---|
 | `Contracts\CoreRegistrarInterface` | The single registration entry point for handlers, accessors, adapters, routes, schedules, and migrations |
-| `Contracts\ActivatableInterface` | `onActivate()` / `onDeactivate()` hooks |
+| `Contracts\ActivatableInterface` | `onActivate()` / `onDeactivate()` hooks. Identity (id, name, version) is data in `composer.json`, not a method |
 | `Lifecycle\AbstractPluginServiceProvider` | Base provider for a Plugin |
 | `Lifecycle\AbstractSolutionServiceProvider` | Base provider for a Solution |
-| `Manifest\SolutionManifest` | Declares id, version, platform constraint, and required capabilities |
+| `Solution\Manifest\ManifestParser`, `SolutionManifest`, `ManifestSchema` | Check a package's `composer.json` against the [Solution manifest](/extending/solutions#the-manifest) without Core or the package's code; collect every violation as `<package>: <field>: <message>` |
+| `Solution\Contracts\InstalledSolutionCatalogInterface` | Read-only list of the Solutions installed in this image with a valid manifest (`Solution\DTO\InstalledSolutionInfo`: id, name, description, version); implemented by Core, read by an operator package to offer only Solutions that exist |
 
 ## Flow engine
 
