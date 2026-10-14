@@ -15,7 +15,7 @@ is deployed, and what it is allowed to do to the front end.
 | | Lives in | Front end | Released with |
 |---|---|---|---|
 | **Feature** | The Core repository | May ship Core UI | Core itself |
-| **Solution** | Your own Composer package | Requires the build and publish contract | Its own release cycle |
+| **Solution** | Your own Composer package | Prebuilt console UI through the [console UI contract](/extending/console-ui) | Its own release cycle |
 | **Plugin** | Your own Composer package | No arbitrary runtime Vue | Its own release cycle |
 
 <Note>
@@ -43,9 +43,9 @@ alongside Core.
 
 A Solution must not live under `app/Solutions` inside Core. Its public contracts
 belong in `fapost/foundation`; reusable primitives that carry no domain meaning
-belong in `fapost/support`, which itself depends on no FaPost package except `fapost/foundation`. Front-end components are possible, but only through the agreed
-build and publish contract — not by dropping Vue files into the running
-application.
+belong in `fapost/support`, which itself depends on no FaPost package except `fapost/foundation`. Its screens go to the console through the
+[console UI contract](/extending/console-ui): declared in PHP and shipped
+prebuilt, not by dropping Vue files into the running application.
 
 ## Plugin
 

@@ -14,9 +14,11 @@ import { DataTable, type DataTableColumn, type TableDefaults, type TableMeta, ty
 import { EmptyState } from '@fapost/ui/components/empty-state'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
 import type { LiveChannel } from '@fapost/ui/lib/live-updates'
+import ValueCell from '@fapost/ui/components/data-table/ValueCell.vue'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { useLiveUpdates } from '@fapost/ui/lib/useLiveUpdates'
 import { interpolate } from '@fapost/ui/shell'
+import { rowValue, useSolutionColumns } from '../../../console/solutions'
 import LiveHint from './LiveHint.vue'
 import { STATUS_TONES, type ConversationRow, type ConversationStatus, type ConversationsPageProps } from './types'
 
@@ -38,7 +40,7 @@ const tableLabels = computed(() => page.props.translations.console.table)
 
 const { transport } = useLiveUpdates({ live: () => props.live, only: ['table', 'navigation'], pollMs: POLL_MS })
 
-const columns = computed<DataTableColumn[]>(() => [
+const coreColumns = computed<DataTableColumn[]>(() => [
   { key: 'contact', label: t.value.columns.contact },
   { key: 'platform', label: t.value.columns.platform, class: 'hidden sm:table-cell' },
   { key: 'preview', label: t.value.columns.last_message, class: 'hidden md:table-cell' },
@@ -47,6 +49,9 @@ const columns = computed<DataTableColumn[]>(() => [
   { key: 'status', label: t.value.columns.status },
   { key: 'lastMessageAt', sortKey: 'last_message_at', label: t.value.columns.last_activity, sortable: true, class: 'hidden sm:table-cell' },
 ])
+
+// Columns Solutions add come after Core's.
+const { columns, extra } = useSolutionColumns('conversations', coreColumns)
 
 function capitalise(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1)
@@ -119,6 +124,10 @@ function capitalise(value: string): string {
 
       <template #cell-lastMessageAt="{ row }">
         <span v-if="row.lastMessageAt" class="text-muted-foreground" :title="row.lastMessageAt">{{ relativeTime(row.lastMessageAt, page.props.locale) }}</span>
+      </template>
+
+      <template v-for="column in extra" :key="column.id" #[`cell-${column.id}`]="{ row }">
+        <ValueCell :type="column.cell" :value="rowValue(row, column.id)" :locale="page.props.locale" :tones="column.tones" />
       </template>
 
       <template #actions="{ row }">

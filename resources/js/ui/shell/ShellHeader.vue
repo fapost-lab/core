@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, inject } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { Menu } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
@@ -11,9 +11,12 @@ import ShellSidebar from './ShellSidebar.vue'
 import ThemeToggle from './ThemeToggle.vue'
 import UserMenu from './UserMenu.vue'
 import { breadcrumbs } from './nav'
+import { SHELL_SLOT } from './slots'
 import type { ShellPageProps } from './types'
 
 const page = usePage<ShellPageProps>()
+// What the application adds to the header (`slots.ts`); nothing without a provider.
+const slotted = inject(SHELL_SLOT, null)
 
 const t = computed(() => page.props.translations.console)
 const crumbs = computed(() => {
@@ -54,6 +57,7 @@ const crumbs = computed(() => {
     </nav>
 
     <div class="flex items-center gap-1">
+      <component :is="slotted" v-if="slotted" place="header" />
       <ShellSearch v-if="page.props.navigation?.searchUrl" :url="page.props.navigation.searchUrl" :labels="t.search" />
       <LanguageMenu
         :url="page.props.shell.localeUrl"

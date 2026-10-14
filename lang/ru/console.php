@@ -1408,4 +1408,8 @@ return [
         'description' => 'Приложение, которому она принадлежит, не активно или не загрузилось. Попробуйте позже или обратитесь к администратору.',
         'back'        => 'Назад',
     ],
+    // What Solutions add to Core's screens (extension-contract).
+    'extensions' => [
+        'row_actions' => 'Ещё действия: :name',
+    ],
 ];

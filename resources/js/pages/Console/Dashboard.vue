@@ -12,6 +12,7 @@ import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@fapost/ui/components/card'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { interpolate } from '@fapost/ui/shell'
+import { SolutionWidgets } from '../../console/solutions'
 
 interface DashboardTranslations {
   title: string
@@ -109,5 +110,7 @@ const status = computed(() => (props.assistant.isActive ? t.value.status_active 
         </CardFooter>
       </Card>
     </div>
+
+    <SolutionWidgets target="console" :columns="2" />
   </div>
 </template>

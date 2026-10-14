@@ -6,8 +6,8 @@ domains: []
 paths: []
 source: docs/site/extending/extension-model.mdx
 summary: Feature, Solution and Plugin compared, and which parts are not built yet
-source_hash: d7dd6d36b711b9e0ffb09ea83153c43a3ed803d2
-reviewed_at: 2026-10-05
+source_hash: 60569c9e5e99c2cb733b5fbc7870533f0a6662c7
+reviewed_at: 2026-10-14
 ---
 # Extension model
 

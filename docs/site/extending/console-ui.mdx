@@ -1,0 +1,404 @@
+---
+title: "Console UI"
+description: "How a Solution adds an application, actions, widgets, tabs and columns to the console."
+---
+
+<Warning>
+  **Experimental.** Everything on this page is marked `@experimental` in
+  `fapost/foundation` 0.15: the declarations, their targets, the `fapost-ui.json`
+  schema and the naming rules. Until a real Solution has exercised them they may
+  change in a Foundation minor release, with an entry in its changelog — see
+  [Stability policy](/extending/stability-policy#experimental-extension-points).
+</Warning>
+
+A Solution adds to the console in two halves. Its PHP **declares** what it adds,
+from its service provider. Its front end ships **prebuilt** — hashed ES modules
+and CSS in the package's `dist/` — and the browser loads them by name, running on
+the console's own Vue, Inertia and kit. Nothing is compiled into Core, and
+installing a Solution needs no Node and no rebuild of Core.
+
+The console described here is the new Inertia console, which is switched on with
+`UI_INERTIA` while it replaces the Filament panels. With it off, nothing on this
+page is registered.
+
+## How it fits together
+
+1. Your provider's `boot()` declares an application, actions, widgets and so on
+   through `ConsoleExtensionsInterface`. Core ties every declaration to your
+   Solution's `id` and closes the registry when the application has booted.
+2. `platform:update` checks your `fapost-ui.json` against those declarations and
+   copies your built files to `public/solutions/<id>/<hash>/`.
+3. On every console request Core keeps only the declarations the request may see:
+   your Solution is active for the tenant and its UI is published, the user has the
+   declaration's `ability`, and — for what lives on an assistant — an assistant is
+   open. Labels are translated on the server. The rest never reaches the browser.
+4. The browser renders those points and, when one is shown, loads its component
+   from your bundle. Pages are loaded the same way when one of your routes renders
+   `<id>::<Path>`.
+
+Hiding something in the browser is never the access check: every route of your
+Solution authorizes the request again on the server.
+
+## Registering
+
+Require `fapost/foundation` `^0.15`, override `boot()` in your provider, call
+`parent::boot()` first, then declare:
+
+```php
+use Fapost\Foundation\Console\Contracts\ConsoleExtensionsInterface;
+use Fapost\Foundation\Console\DTO\ConsoleApplication;
+use Fapost\Foundation\Console\DTO\ContextAction;
+use Fapost\Foundation\Console\DTO\DashboardWidget;
+use Fapost\Foundation\Console\DTO\MenuItem;
+use Fapost\Foundation\Console\DTO\TableColumn;
+use Fapost\Foundation\Console\Enums\CellType;
+use Fapost\Foundation\Console\Enums\ConsoleTarget;
+use Fapost\Foundation\Console\Enums\DashboardTarget;
+use Fapost\Foundation\Console\Enums\TableTarget;
+use Fapost\Foundation\Console\Enums\WidgetSize;
+use Illuminate\Routing\Router;
+
+public function boot(): void
+{
+    parent::boot();
+
+    $this->loadTranslationsFrom(__DIR__ . '/../lang', 'showcase');
+
+    $console = $this->app->make(ConsoleExtensionsInterface::class);
+
+    $console->application(new ConsoleApplication(
+        label: 'showcase::console.app',
+        icon: 'kanban',
+        entryRoute: 'solutions.showcase.board',
+        menu: [
+            new MenuItem('showcase::console.menu.board', 'solutions.showcase.board', 'layout-grid'),
+        ],
+        ability: 'showcase.use',
+    ));
+
+    $console->contextAction(ContextAction::dialog(
+        ConsoleTarget::ConversationView, 'note', 'showcase::console.actions.note', 'showcase::Actions/Note', 'sticky-note',
+    ));
+
+    $console->dashboardWidget(new DashboardWidget(
+        DashboardTarget::Console, 'stats', 'showcase::Widgets/Stats', WidgetSize::Double,
+    ));
+
+    $console->tableColumn(new TableColumn(
+        TableTarget::Contacts, 'score', 'showcase::console.columns.score', CellType::Number, ShowcaseColumnValues::class,
+    ));
+
+    $console->routes(static function (Router $router): void {
+        $router->get('board', [BoardController::class, 'index'])->name('board');
+    });
+}
+```
+
+Declare from `boot()` and nowhere else. A call from `register()`, from a
+`booted()` callback or from a request throws `InvalidConsoleDeclarationException`.
+Do not use `bootSolution()` or `registerExtensions()` for this: Core does not
+implement `CoreRegistrarInterface` yet, so `AbstractSolutionServiceProvider::boot()`
+returns before it calls them.
+
+The registry also throws when a name is outside your namespace, when you declare
+a second application, and when a key repeats within the same point and target.
+The DTOs check formats when they are constructed and throw
+`InvalidArgumentException`:
+
+| Name | Format |
+|---|---|
+| Label | A translation key in your namespace, `<id>::…`; Core translates it in the user's language |
+| Icon | Any [lucide](https://lucide.dev/icons) name in kebab case, such as `message-circle`; one outside Core's own set loads lazily, and a name lucide does not have shows a plain circle in the rail and menus, no icon on an action |
+| Key | `^[a-z][a-z0-9_]{0,31}$`, unique per Solution, point and target |
+| Route | One of your own route names, `solutions.<id>.…` |
+| Component | `<id>::<Path>`, see [Names](#names) |
+| Ability | A Gate ability; the declaration is shown only to users who have it |
+| Order | An integer, lower first; Core's own items come before every Solution's, and Solutions with the same order follow by `id` |
+
+## The six points
+
+| Point | Method | Targets | Where it appears |
+|---|---|---|---|
+| Application | `application(ConsoleApplication)` | — | The app rail, with its own menu; its menu entries appear in the ⌘K search |
+| Context action | `contextAction(ContextAction)` | `ConsoleTarget::ContactView` (`contact.view`), `ContactRow` (`contact.row`), `ConversationView` (`conversation.view`) | The contact screen, a row of the contact list, the conversation screen |
+| Shell element | `shellElement(ShellElement)` | `ShellSlot::Floating` (`floating`), `Header` (`header`) | A fixed corner of every console screen, or the shell's header |
+| Dashboard widget | `dashboardWidget(DashboardWidget)` | `DashboardTarget::Console` (`console`), `Admin` (`admin`) | The assistant's dashboard, or the administration dashboard |
+| Settings tab | `settingsTab(SettingsTab)` | `SettingsTarget::Assistant` (`assistant`), `Tenant` (`tenant`) | An extra tab of the assistant's or the tenant's settings |
+| Table column | `tableColumn(TableColumn)` | `TableTarget::Contacts` (`contacts`), `Conversations` (`conversations`) | A column after Core's own in the contact or conversation list |
+
+The targets are enums: a target Core does not list cannot be written. New targets
+arrive as new cases in a Foundation minor.
+
+**Application.** At most one per Solution, keyed by your Solution `id`, so a
+Solution whose `id` is `console` or `admin` cannot have one. `entryRoute` is where
+the rail opens it; `menu` lists `MenuItem`s (label, route, icon, ability, an
+optional group heading) in display order. With `perAssistant: true` it lives on an
+assistant like the Console does, and is offered only where an assistant is open.
+Core's own menus never receive your entries. Your application is not pinned to the
+rail by default; `shortLabel` defaults to `label`.
+
+**Context action.** `ContextAction::link()` navigates to one of your routes, and
+that route takes a `record` parameter: Core fills it with the id of the contact or
+conversation the action was chosen on. A link to a per-assistant route also gets
+the open assistant as `{tenant}`, and is left out where no assistant is open.
+Laravel passes route parameters by position, so the action of
+`assistant/{tenant}/apps/<id>/contacts/{record}` takes `string $tenant, string $record`.
+`ContextAction::dialog()` opens your component in the kit's dialog instead.
+
+**Shell element.** Loaded only after the page has rendered, so it never slows a
+screen down. With `perAssistant: true` it is shown only where an assistant is open.
+
+**Dashboard widget.** `WidgetSize::Single`, `Double` or `Full` — one column, two
+columns or the whole row of the dashboard's grid (two columns on the assistant
+console's dashboard, three on the admin one). A widget fetches its own data from your routes; it gets
+nothing from Core's dashboard request.
+
+**Settings tab.** A form of its own, with its own routes and storage; Core's save
+button does not submit it. The tab is addressed as `?tab=<id>.<key>`. On both
+settings screens a Solution's tabs join Core's tab bar after Core's own tabs; while
+one is open, Core's form and its save button are hidden.
+
+**Table column.** Core renders the cells; you supply only the values, through a
+class implementing `ColumnValuesInterface`:
+
+```php
+use Fapost\Foundation\Console\Contracts\ColumnValuesInterface;
+use Fapost\Foundation\Console\DTO\ColumnContext;
+
+final class ShowcaseColumnValues implements ColumnValuesInterface
+{
+    public function values(array $ids, ColumnContext $context): array
+    {
+        // One query for the whole page, keyed by row id.
+        return Score::query()->whereIn('contact_id', $ids)->pluck('value', 'contact_id')->all();
+    }
+}
+```
+
+It is resolved from the container and called once per table page, inside the
+tenant context, with the row ids of that page. One class may serve several
+columns, told apart by `$context->key`; `$context->assistantId` is the open
+assistant, if any. Return scalars or `null` keyed by row id; a missing id renders
+an empty cell.
+
+<Warning>
+  `values()` runs synchronously inside Core's request, once per page, and there
+  is no timeout: PHP cannot interrupt it, so a slow one slows Core's table. Keep
+  it fast — one batched query for the page's ids, no remote calls.
+</Warning>
+
+The cell type is `CellType::Text`, `Badge`, `Number` (formatted in the user's
+locale), `Date` (shown relative, the exact value on hover) or `Status` with
+`tones` mapping a value to `Tone::Neutral`, `Success`, `Warning`, `Danger` or
+`Info`. A column cannot be sorted or searched, and a cell cannot be your own
+component, in this version.
+
+## Routes and pages
+
+Register routes through the contract, never on your own. Core adds what you may
+not choose yourself: the console's domain, the prefix, the names and the
+middleware.
+
+| Method | URL | Middleware group |
+|---|---|---|
+| `routes()` | `/apps/<id>/…` | `solution` |
+| `assistantRoutes()` | `/assistant/{tenant}/apps/<id>/…` | `solution.assistant` |
+
+Both groups are the console's own stack — session, tenant, signed-in active staff
+user — followed by a check that answers **404** while your Solution is not active
+for the tenant or its UI is not published. `solution.assistant` also resolves the
+assistant from `{tenant}`, as the Console's routes do. When your application
+declares an `ability`, every route also requires it.
+
+The name you give a route is prefixed with `solutions.<id>.`: `->name('board')`
+becomes `solutions.showcase.board`, which is the name your declarations use. Use
+controller actions, not closures, so the routes survive `route:cache`. Authorize
+every action with your own policies: the menu entry a user cannot see is still a
+URL they can type.
+
+A page is an Inertia response with a page of your own:
+
+```php
+return Inertia::render('showcase::Board/Index', ['title' => 'Board']);
+```
+
+Rendering a page outside your namespace — Core's or another Solution's — from one
+of your routes is an error. Core wraps your page in the console's shell unless the
+page sets its own `layout`, and marks your application as the current one in the
+rail.
+
+## Names
+
+Pages and components are named `<id>::<Path>`: your Solution `id`, then
+PascalCase segments joined by `/`, such as `showcase::Board/Index` or
+`showcase::Widgets/Stats`. Core's own pages have no namespace. Pages and
+components share one namespace, so a `Path` names exactly one file. Since names
+appear in URLs, asset paths and pins, the rule that a Solution's `id` never changes
+protects them too.
+
+## Building the bundle
+
+Build your front end into a directory of its own, such as `dist/`, with
+`fapost-ui.json` next to the files. Every page and component is an ES module whose
+default export is a Vue component. Keep these specifiers **external** — do not
+bundle them:
+
+- `vue`
+- `@inertiajs/vue3`
+- `@fapost/ui` and its public subpaths:
+  `@fapost/ui/components/alert-dialog`, `avatar`, `badge`, `button`, `card`,
+  `checkbox`, `command`, `confirm-dialog`, `data-table`, `dialog`,
+  `dropdown-menu`, `empty-state`, `form-field`, `form-section`, `input`, `label`,
+  `select`, `separator`, `sheet`, `skeleton`, `sonner`, `switch`, `table`, `tabs`,
+  `textarea`, `tooltip`, and `@fapost/ui/lib/utils`, `@fapost/ui/lib/relative-time`
+
+The console's import map points each of them at the copy the console itself runs,
+so there is one Vue, one Inertia router and one kit on the page. Every subpath
+resolves to the same module, so a named import works from any of them. The shell
+and the console's live-updates module are not part of the public surface. Your
+own npm dependencies go into your bundle.
+
+### `fapost-ui.json`
+
+```json
+{
+    "schema": 1,
+    "solution": "showcase",
+    "kit": "^0.1",
+    "vue": "^3.5",
+    "inertia": "^3.0",
+    "pages": {
+        "Board/Index": "assets/board-index-4c1d2a.js"
+    },
+    "components": {
+        "Actions/Note": "assets/actions-note-2f6a11.js",
+        "Widgets/Stats": "assets/widgets-stats-5a2f08.js"
+    },
+    "css": ["assets/showcase-8f3d2c.css"]
+}
+```
+
+| Field | Required | Rule |
+|---|---|---|
+| `schema` | yes | An integer; `1` is the only supported number |
+| `solution` | yes | Your Solution `id`, the same as in the manifest |
+| `kit`, `vue`, `inertia` | yes | The version ranges of `@fapost/ui`, Vue and Inertia the bundle was built against; non-empty |
+| `pages` | no | `Path` (without `<id>::`) to a `.js` file |
+| `components` | no | The same, for components mounted on Core's screens; every component your PHP declarations name must be here |
+| `css` | no | A list of `.css` files, attached before any of your modules is mounted |
+| `x-*` | no | Ignored, for your own tooling |
+
+Files are relative to the directory of `fapost-ui.json`, made of letters, digits,
+`.`, `_` and `-`, with no segment starting with `.`. Pages and components together
+list at least one entry. Any other field is an error. To check the file without
+Core, run `Fapost\Foundation\Console\Bundle\UiBundleParser`, which reports every
+violation at once.
+
+Point the manifest at it with `extra.fapost.ui`, a path relative to the package
+root that ends in `.json`:
+
+```json
+"extra": {
+  "fapost": {
+    "schema": 1,
+    "id": "showcase",
+    "name": "Showcase",
+    "provider": "Acme\\Showcase\\ShowcaseServiceProvider",
+    "ui": "dist/fapost-ui.json"
+  }
+}
+```
+
+Commit the built `dist/` in the package, or build it before the package is
+installed: the image that runs Core has no Node.
+
+## Publication
+
+`php artisan platform:update` checks the bundle of every installed Solution with
+`extra.fapost.ui` together with the manifests, before any migration, and
+`--validate-only` runs the same check. Each of these fails the command and changes
+nothing:
+
+- `fapost-ui.json` is missing, is not valid JSON, or breaks the schema;
+- a listed page, component or stylesheet does not exist inside its directory;
+- a component named in your PHP declarations is not listed under `components`;
+- `fapost-ui.json` sits at the package root rather than in a directory of its own;
+- a file in that directory has PHP anywhere in its name (`x.php`, `x.php.js`, `x.phtml`),
+  since a web server may execute it;
+- a link leads outside that directory.
+
+After the migrations the command copies the directory to
+`public/solutions/<id>/<hash>/`, where `<hash>` comes from the content of
+`fapost-ui.json` — your build's hashed file names make every build a new
+directory, served as immutable. Only `fapost-ui.json` and files with these
+extensions are copied:
+
+`js`, `mjs`, `css`, `map`, `woff`, `woff2`, `ttf`, `otf`, `png`, `jpg`, `jpeg`,
+`gif`, `webp`, `avif`, `ico`
+
+No SVG (it can carry script), no HTML. Any other file is left behind with a
+warning, since a module that imports it would fail in the browser; a listed page,
+component or stylesheet that could not be copied is an error. Hidden paths, such
+as `.git/` or `.env`, are skipped without a word. The current build and the one
+before it are kept, so a browser still holding the old page map can finish
+loading; older builds are removed.
+
+A Solution whose build changed since the last `platform:update` is not served
+until the command runs again. The console's asset version includes the published
+bundles of the tenant's active Solutions, so activating, deactivating or updating
+one reloads the page on the next visit.
+
+## Trust and failures
+
+**Same origin means full trust.** Your JavaScript runs with the signed-in user's
+session: it can call any console endpoint as that user and read the screen it is
+mounted on. That adds no new trust — your PHP already runs with the application's
+full rights, and installing a Solution is the decision of whoever builds the image.
+So authorization stays on the server, secrets stay out of props, and a component
+mounted on Core's screens receives nothing but `recordId` and `assistantId` (where
+they apply). This holds only for code an operator installs; a Plugin ships no Vue.
+
+**A failure stays yours.** A component on Core's screens whose name is not in the
+map, whose module does not load within ten seconds, or which throws while
+rendering is hidden, with the error in the browser console; the screen keeps
+working. A page that cannot load becomes a "Solution unavailable" page inside the
+shell rather than a blank screen. A column whose `values()` throws is left empty
+and the error is logged. A link action whose route does not exist is left out.
+
+## The boundary
+
+```
+Solution console UI (ConsoleExtensionsInterface, fapost-ui.json, <id>::<Name>)
+
+MAY:      register one application, context actions, shell elements, dashboard widgets,
+          settings tabs, table columns against targets Core lists in Foundation;
+          ship its own npm dependencies inside dist/; style its own components
+MUST:     register from boot(); name every page/component <own id>::<Name>; put routes
+          behind Core's `solution` group; authorize every route with its own policies;
+          externalize vue, @inertiajs/vue3, @fapost/ui; declare the kit range it was built against
+MUST NOT: bundle its own Vue/Inertia/kit; add global CSS or override kit classes;
+          load code from another origin; rely on hiding in the browser for access;
+          render a component of another Solution or of Core by import path
+```
+
+One Vue instance and one kit are what let a prebuilt bundle work without a
+rebuild, and the server is the only place that knows activation, entitlements and
+permissions. Prefix your own CSS classes so they cannot collide with the kit's.
+
+## Not ready yet
+
+- **The Vite preset** that builds `dist/` and writes `fapost-ui.json`, and the
+  published `@fapost/ui` package to build against, are still to come. Until then a
+  bundle is built by hand or with your own Vite configuration in library mode,
+  with the specifiers above external.
+- **The version check.** `kit`, `vue` and `inertia` are required and recorded but
+  not yet compared with the console's: a bundle built against an incompatible kit
+  is served anyway.
+- **The derived image.** Publication writes to the `public/` of the container that
+  runs `platform:update`. The Docker Compose installation serves static files from
+  its separate `web` image, which does not see that directory, so it does not serve
+  `/solutions/` yet; the recipe for an image with a Solution's assets published is
+  still to be written. A single-tree install — development, bare metal — serves
+  them as soon as the command has run.
+- **The activation screen.** Activation is switched with `solutions:activate` and
+  `solutions:deactivate`; see [Building a Solution](/extending/solutions#activation).

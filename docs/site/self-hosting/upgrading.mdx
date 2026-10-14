@@ -14,8 +14,8 @@ Four things happen, and the order is not interchangeable:
 3. **Landlord** migrations run — platform-wide tables, including any that the SaaS operator package adds — and then **tenant** migrations, once per tenant schema
 4. Queue workers restart, so they stop running the previous release from memory
 
-`php artisan platform:update` repeats the check and does step 3 in one command and then caches the catalog of
-installed Solutions. Step 4 stays yours.
+`php artisan platform:update` repeats the check and does step 3 in one command, then publishes the Solutions'
+[console UI](/extending/console-ui#publication) and caches the catalog of installed Solutions. Step 4 stays yours.
 
 Step 4 is the one most often forgotten. Horizon workers are long-lived PHP
 processes: until they are restarted they keep executing the old code against the

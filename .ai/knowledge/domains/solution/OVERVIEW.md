@@ -2,7 +2,7 @@
 id: domain-solution
 type: domain
 status: active
-summary: "Installed Solution packages: manifest discovery and validation, catalog and cache, platform:update, per-tenant activation storage and registry"
+summary: "Installed Solution packages: manifest discovery and validation, catalog and cache, platform:update, per-tenant activation, the console extension registry and publication of prebuilt console UI"
 domains:
   - solution
 topics: []
@@ -23,6 +23,9 @@ paths:
   - tests/Feature/Tenancy/PostgresSolutionActivationTest.php
   - tests/Support/InstallsFakeSolutions.php
   - tests/Support/InMemorySolutionActivationStore.php
+  - "tests/Fixtures/Solutions/**"
+  - tests/Support/InstallsShowcaseSolution.php
+reviewed_at: 2026-10-14
 ---
 # Solution
 
@@ -31,7 +34,7 @@ paths:
 Finds the Solution packages installed in this image, checks their manifests and answers which of
 them Core may use. A Solution is a Composer package of `type: fapost-solution` whose `composer.json`
 carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`, `provider`,
-`actions`). The format, its rules and how it evolves are defined once, in Foundation
+`actions`, and from Foundation 0.15 the experimental `ui`, the path of its `fapost-ui.json`). The format, its rules and how it evolves are defined once, in Foundation
 (`Fapost\Foundation\Solution\Manifest\ManifestSchema` and `ManifestParser`, a pure function over a decoded
 `composer.json`); this domain adds only what needs the installation. See
 `adr-20261010-solution-manifest-is-data-in-composer-json` for why.
@@ -54,6 +57,25 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   activation). A `fapost-solution` package may carry no `extra.laravel.providers` entry at all (an empty
   list is fine): the manifest rejects any entry, in any spelling, because package discovery would boot it
   whether or not its manifest holds up.
+  It wraps each provider in `booting`/`booted` callbacks that open and close the console registry for that
+  Solution's id, and freezes the registry once the application has booted (`solutions.freeze_console_registry`,
+  off in `phpunit.xml` only, because tests register fixture Solutions after boot).
+- Console UI (`adr-20261014-solution-console-ui`, experimental; rules in `conventions/solution-console-ui.md`):
+  - `Console/ConsoleExtensionRegistry` implements Foundation's `ConsoleExtensionsInterface`: a process
+    singleton (it depends on the image, never on a tenant) that accepts declarations only inside a Solution
+    provider's `boot()`, binds each to that Solution's id, checks names are its own, keys unique per point and
+    target, one application per Solution and none for the ids `console`/`admin`; it keeps the `routes()` and
+    `assistantRoutes()` closures. Reading it per request (activation, ability, assistant), the routes, the
+    shared prop `extensions` and the import map live in `app/Http/Shell` and `app/Http/DataTable`, outside this
+    domain, because they need Staff, Assistant and the Gate.
+  - `SolutionUiBundleReader` reads `fapost-ui.json` (Foundation's `UiBundleParser`, then the files: each listed
+    file exists inside the directory, the directory is not the package root, no file with PHP in its name, no
+    link out, only static extensions are published — others are warnings, hidden paths skipped).
+  - `SolutionUiPublisher` checks every bundle against the components the registry names (before migrations)
+    and copies the allowed files to `public/solutions/<id>/<hash>/` (hash = 12 hex of sha256 of
+    `fapost-ui.json`) through a temporary sibling; it keeps the current and the previous build.
+  - `PublishedSolutionUi` answers which bundles are published, from `SolutionCache` when fresh, otherwise from the
+    files; a changed build is not served before the next `platform:update`.
 - Activation per tenant lives in the tenant's schema (`adr-20261014-solution-activation-in-tenant-schema`):
   `solution_activations` (state, one row per Solution) and `solution_activation_events` (append-only
   journal), behind `Contracts/SolutionActivationStoreInterface` and `Infrastructure/EloquentSolutionActivationStore`.
@@ -66,8 +88,8 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
     deactivating one is allowed; it then drops its tenant's memo. Default: nothing active.
   - `solutions:activate|deactivate|list` need `--tenant=<slug>` and run inside `runForTenant()`.
     The `onActivate`/`onDeactivate` hooks are not called yet.
-- `platform:update` (`app/Console/Commands/Platform`): validate, then (unless `--validate-only`)
-  `App\Console\Platform\PlatformMigratorInterface` (landlord migrate and `ops:tenants-migrate`; console-level and deliberately outside this domain, which only validates and caches), then write the cache.
+- `platform:update` (`app/Console/Commands/Platform`): validate the manifests and the console UI bundles, then
+  (unless `--validate-only`) `App\Console\Platform\PlatformMigratorInterface` (landlord migrate and `ops:tenants-migrate`; console-level and deliberately outside this domain, which only validates, publishes and caches), then publish the bundles, then write the cache with them.
   Any violation exits 1 before the database or the cache is touched. `--validate-only` needs no
   database. `solutions:cache` / `solutions:clear` hang on `optimize` / `optimize:clear`; the container
   entrypoint runs `solutions:cache` with the other caches.
@@ -78,7 +100,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   PHPat (`SolutionBoundariesTest`) forbids a dependency on any other `App\Domains` namespace, and
   forbids facades and `Illuminate\Database` outside `Infrastructure` and `Providers`, so discovery
   and the services run without a database.
-- Not here yet: `CoreRegistrarInterface`, the activation screen, the entitlement check, per-phase migrations of a Solution, the `ui` and `migrations` manifest fields.
+- Not here yet: `CoreRegistrarInterface`, the activation screen, the entitlement check, per-phase migrations of a Solution, the `migrations` manifest field, and the kit/Vue/Inertia range check of a bundle (`SolutionUi::isServable()` is its seam; `first-solution` phase 0).
   Plugins (`type: fapost-plugin`) are reserved and not discovered.
 - The Foundation constraint is not re-checked in Core: Composer refuses to install a package whose
   `require["fapost/foundation"]` does not fit the locked version, and a package Composer did not
@@ -94,5 +116,8 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
 - `app/Console/Commands/Platform/UpdatePlatformCommand.php`
 - `app/Domains/Solution/Services/ActiveSolutions.php`, `SolutionActivator.php`
 - `app/Console/Commands/Platform/ActivateSolutionCommand.php`, `DeactivateSolutionCommand.php`, `ListSolutionsCommand.php`
+- `app/Domains/Solution/Console/ConsoleExtensionRegistry.php`, `Services/SolutionUiPublisher.php`
 - Tests: `tests/Unit/Domains/Solution`, `tests/Feature/Domains/Solution`; a throwaway vendor tree is
-  built by `tests/Support/FakeVendor.php` from the fixture package in `tests/Fixtures/Solution`.
+  built by `tests/Support/FakeVendor.php` from the fixture package in `tests/Fixtures/Solution`. The console
+  fixture `showcase` (every point, both route kinds, a committed hand-written `dist/`) is
+  `tests/Fixtures/Solutions/Showcase`, installed by `tests/Support/InstallsShowcaseSolution.php`.

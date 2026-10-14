@@ -12,6 +12,7 @@ import { Badge } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@fapost/ui/components/card'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
+import { SolutionActions } from '../../../console/solutions'
 import CopyButton from './CopyButton.vue'
 import GroupsDialog from './GroupsDialog.vue'
 import TagsDialog from './TagsDialog.vue'
@@ -54,7 +55,12 @@ function hasValue(field: ContactCardField): boolean {
           {{ t.back }}
         </Link>
       </Button>
-      <h1 class="font-display text-[28px] leading-tight font-semibold break-all">{{ title }}</h1>
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <h1 class="font-display min-w-0 text-[28px] leading-tight font-semibold break-all">{{ title }}</h1>
+        <div class="flex flex-wrap items-center gap-2 empty:hidden">
+          <SolutionActions target="contact.view" :record-id="contact.id" />
+        </div>
+      </div>
     </div>
 
     <Card>

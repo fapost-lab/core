@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3'
 import { cn } from '@fapost/ui/lib/utils'
-import { iconFor } from './icons'
+import ShellIcon from './ShellIcon.vue'
 
 /**
  * One entry of the side menu. A screen that has not left Filament yet (`external`) is a plain link, so the browser
@@ -27,12 +27,12 @@ const linkClass = (): string =>
 
 <template>
   <a v-if="external" :href="href" :class="linkClass()" :aria-current="active ? 'page' : undefined">
-    <component :is="iconFor(icon ?? '')" v-if="icon" class="size-[18px] shrink-0" aria-hidden="true" />
+    <ShellIcon :name="icon" v-if="icon" class="size-[18px] shrink-0" aria-hidden="true" />
     <span class="min-w-0 flex-1 truncate">{{ label }}</span>
     <span v-if="badge" class="bg-primary text-primary-foreground inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold">{{ badge }}</span>
   </a>
   <Link v-else :href="href" :class="linkClass()" :aria-current="active ? 'page' : undefined">
-    <component :is="iconFor(icon ?? '')" v-if="icon" class="size-[18px] shrink-0" aria-hidden="true" />
+    <ShellIcon :name="icon" v-if="icon" class="size-[18px] shrink-0" aria-hidden="true" />
     <span class="min-w-0 flex-1 truncate">{{ label }}</span>
     <span v-if="badge" class="bg-primary text-primary-foreground inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold">{{ badge }}</span>
   </Link>
