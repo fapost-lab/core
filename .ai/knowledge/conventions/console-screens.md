@@ -10,7 +10,7 @@ paths:
   - routes/inertia.php
   - "resources/js/pages/Console/**"
   - "resources/js/ui/**"
-reviewed_at: 2026-10-10
+reviewed_at: 2026-10-14
 ---
 # Console screens
 
