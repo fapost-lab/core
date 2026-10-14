@@ -54,6 +54,10 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  --color-rail: var(--rail);
+  --color-rail-border: var(--rail-border);
+  --color-rail-dashed: var(--rail-dashed);
+
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-info: var(--info);

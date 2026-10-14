@@ -74,6 +74,8 @@ use Spatie\Permission\Traits\HasRoles;
  *                   $phone
  * @property string|null
  *                   $locale
+ * @property list<string>|null
+ *                   $pinned_applications
  * @property bool
  *                   $is_active
  * @property bool
@@ -271,6 +273,8 @@ final class User extends Authenticatable implements FilamentUser, HasLocalePrefe
             'status'              => UserStatus::class,
             'is_active'           => 'boolean',
             'is_platform_support' => 'boolean',
+            // The shell's rail: application keys in the user's order; `null` until the user changes it.
+            'pinned_applications' => 'array',
         ];
     }
 }

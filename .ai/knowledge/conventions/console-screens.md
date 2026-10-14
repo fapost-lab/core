@@ -10,7 +10,7 @@ paths:
   - routes/inertia.php
   - "resources/js/pages/Console/**"
   - "resources/js/ui/**"
-reviewed_at: 2026-10-10
+reviewed_at: 2026-10-14
 ---
 # Console screens
 
@@ -47,8 +47,14 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   Figures and search results that span domains show only what the user may list: each group is
   gated by its policy's `viewAny`, and for staff who are not administrators every assistant-owned
   figure narrows to their assigned assistants. Search is a throttled JSON endpoint behind
-  `navigation.searchUrl`, which is null for anyone with nothing to search. Example: `AdminOverview`,
-  `AdminSearch`, `ShellSearch.vue`.
+  `navigation.searchUrl`, in both panels: the applications and the pages of their menus first
+  (`ApplicationSearch`), then the records. Example: `AdminOverview`, `AdminSearch`, `ShellSearch.vue`.
+- **Applications come from `ApplicationRegistry`** (the app switcher): the rail shows what it returns
+  for the user, with today's panel access (the Console needs an assistant the user may open), and a
+  user's pinning and order live in `users.pinned_applications`. A new application (a Solution's, once
+  the extension contract feeds the registry) gets the rail, "All applications" and ⌘K from there; the
+  assistant switcher shows only for an application that works per assistant. Example: `ApplicationRail`,
+  `AppRail.vue`, `AllApplicationsDialog.vue`, `AppSwitcherConsoleTest`.
 - **After a write**, toast through `Inertia::flash()` (never the session `with()`: a shared prop
   is kept in history and replays on Back). Deletes go `back()` so the list keeps its state; forms
   go to the index.

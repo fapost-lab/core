@@ -4,6 +4,7 @@ import { usePage } from '@inertiajs/vue3'
 import { Menu } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@fapost/ui/components/sheet'
+import AppRail from './AppRail.vue'
 import LanguageMenu from './LanguageMenu.vue'
 import ShellSearch from './ShellSearch.vue'
 import ShellSidebar from './ShellSidebar.vue'
@@ -17,7 +18,9 @@ const page = usePage<ShellPageProps>()
 const t = computed(() => page.props.translations.console)
 const crumbs = computed(() => {
   const navigation = page.props.navigation
-  const root = page.props.assistants?.current.name ?? t.value.breadcrumbs.admin
+  const applications = page.props.applications
+  const application = applications?.items.find((item) => item.key === applications.current)
+  const root = page.props.assistants?.current.name ?? application?.label ?? t.value.breadcrumbs.admin
 
   return breadcrumbs(root, navigation?.groups ?? [], page.url)
 })
@@ -31,10 +34,13 @@ const crumbs = computed(() => {
           <Menu aria-hidden="true" />
         </Button>
       </SheetTrigger>
-      <SheetContent side="left" class="bg-sidebar w-72 p-0">
+      <SheetContent side="left" class="bg-sidebar flex w-[310px] flex-row gap-0 p-0 sm:max-w-[310px]">
         <SheetTitle class="sr-only">{{ t.navigation.menu }}</SheetTitle>
         <SheetDescription class="sr-only">{{ t.navigation.menu }}</SheetDescription>
-        <ShellSidebar />
+        <AppRail />
+        <div class="min-w-0 flex-1">
+          <ShellSidebar />
+        </div>
       </SheetContent>
     </Sheet>
 

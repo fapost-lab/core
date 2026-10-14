@@ -1,4 +1,4 @@
-/** One hit of the admin search, as `AdminSearch` returns it. */
+/** One hit of the palette: an application, a page (`ApplicationSearch`) or a record (`AdminSearch`). */
 export interface SearchHit {
   id: string
   title: string
@@ -9,7 +9,7 @@ export interface SearchHit {
 }
 
 export interface SearchGroup {
-  key: 'assistants' | 'users' | 'roles' | 'media'
+  key: 'applications' | 'pages' | 'assistants' | 'users' | 'roles' | 'media'
   items: SearchHit[]
 }
 

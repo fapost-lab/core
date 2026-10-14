@@ -41,6 +41,11 @@
   --sidebar-border: #e7e5e4;
   --sidebar-ring: #5a6e58;
 
+  /* The application rail left of the side menu: a step darker than the sidebar; dashed border of "All applications". */
+  --rail: #ebe8e3;
+  --rail-border: #e0ddd8;
+  --rail-dashed: #c4c0ba;
+
   --success: #e9eee7;
   --success-foreground: #2f3b30;
   --info: #e8f0f6;
@@ -120,6 +125,10 @@
   --sidebar-accent-foreground: #cfdccb;
   --sidebar-border: #2a2623;
   --sidebar-ring: #8fa68c;
+
+  --rail: #110f0e;
+  --rail-border: #262320;
+  --rail-dashed: #4a4540;
 
   --success: #27302a;
   --success-foreground: #b9cdb5;
