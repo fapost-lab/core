@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Domains\Solution\Providers;
 
+use App\Domains\Solution\Contracts\SolutionActivationStoreInterface;
 use App\Domains\Solution\Infrastructure\CoreInstalledSolutionCatalog;
+use App\Domains\Solution\Infrastructure\EloquentSolutionActivationStore;
+use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\InstalledSolutions;
+use App\Domains\Solution\Services\SolutionActivator;
 use App\Domains\Solution\Services\SolutionCache;
 use Fapost\Foundation\Solution\Contracts\InstalledSolutionCatalogInterface;
 use Illuminate\Support\ServiceProvider;
@@ -27,6 +31,12 @@ final class SolutionServiceProvider extends ServiceProvider
         $this->app->singletonIf(InstalledSolutions::class);
 
         $this->app->bind(InstalledSolutionCatalogInterface::class, CoreInstalledSolutionCatalog::class);
+
+        // Activation belongs to a tenant. `scoped`: a worker drops it before every job, and it keeps its
+        // memo per tenant id, so no process holds one tenant's answer for another or past a deactivation.
+        $this->app->bind(SolutionActivationStoreInterface::class, EloquentSolutionActivationStore::class);
+        $this->app->scoped(ActiveSolutions::class);
+        $this->app->bind(SolutionActivator::class);
 
         foreach ($this->app->make(InstalledSolutions::class)->all() as $solution) {
             $this->app->register($solution->provider);

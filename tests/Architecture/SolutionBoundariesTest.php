@@ -10,7 +10,7 @@ use PHPat\Test\PHPat;
 
 final class SolutionBoundariesTest
 {
-    public function test_solution_domain_depends_on_no_other_domain(): Rule
+    public function test_solution_domain_depends_on_no_other_domain_but_the_tenancy_contracts(): Rule
     {
         return PHPat::rule()
             ->classes(Selector::inNamespace('App\\Domains\\Solution'))
@@ -18,10 +18,13 @@ final class SolutionBoundariesTest
             ->classes(
                 Selector::AllOf(
                     Selector::inNamespace('#^App\\\\Domains\\\\#', true),
-                    Selector::NoneOf(Selector::inNamespace('App\\Domains\\Solution')),
+                    Selector::NoneOf(
+                        Selector::inNamespace('App\\Domains\\Solution'),
+                        Selector::inNamespace('App\\Domains\\Tenancy\\Contracts'),
+                    ),
                 ),
             )
-            ->because('The Solution domain reads package files; it sits below the domains a Solution extends.');
+            ->because('The Solution domain sits below the domains a Solution extends. The one exception is the Tenancy contracts: activation belongs to a tenant, and Tenancy sits below everything.');
     }
 
     public function test_solution_discovery_does_not_touch_the_database_or_facades(): Rule

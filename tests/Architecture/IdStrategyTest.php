@@ -7,6 +7,7 @@ namespace Tests\Architecture;
 use App\Domains\Flow\Models\FlowCallgraphEdge;
 use App\Domains\Presale\Models\PreSaleRequest;
 use Fapost\Support\Concerns\HasUlidPrimaryKey;
+use Illuminate\Database\Eloquent\Model;
 use PHPat\Selector\Selector;
 use PHPat\Test\Builder\Rule;
 use PHPat\Test\PHPat;
@@ -18,7 +19,14 @@ final class IdStrategyTest
         return PHPat::rule()
             ->classes(
                 Selector::AllOf(
-                    Selector::inNamespace('#^App\\\\Domains\\\\.*\\\\Models$#', true),
+                    Selector::AnyOf(
+                        Selector::inNamespace('#^App\\\\Domains\\\\.*\\\\Models$#', true),
+                        // Eloquent models kept next to a store, such as the Solution activation records.
+                        Selector::AllOf(
+                            Selector::inNamespace('#^App\\\\Domains\\\\.*\\\\Infrastructure$#', true),
+                            Selector::extends(Model::class),
+                        ),
+                    ),
                     Selector::NoneOf(
                         Selector::isEnum(),
                         Selector::classname(PreSaleRequest::class),

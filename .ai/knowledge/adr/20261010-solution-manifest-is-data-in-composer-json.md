@@ -41,6 +41,7 @@ of the SaaS operator and the activation store key on its `id`.
   any entry, any provider, any spelling, is a violation `extra.laravel.providers: a Solution's provider is
   booted by Core; remove this block`. An empty list is accepted. Otherwise Laravel's discovery would boot a
   provider regardless of manifest validity or, later, activation, defeating fail-closed.
+- See also `adr-20261014-solution-activation-in-tenant-schema`: it extends the reserved ids with `solution` and `solutions` (Foundation 0.14).
 - `getId()`, `getVersion()`, `getManifest()` leave `ActivatableInterface` and `registerManifest()` leaves
   `CoreRegistrarInterface`.
 
