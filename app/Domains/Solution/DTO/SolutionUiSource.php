@@ -14,6 +14,7 @@ final readonly class SolutionUiSource
      * @param  string|null  $manifestFile  absolute path of `fapost-ui.json`
      * @param  list<string>  $problems  lines an operator reads, each starting with the Solution id; empty exactly when $bundle is set
      * @param  list<string>  $files  what publication copies, relative to $directory: static assets and `fapost-ui.json`
+     * @param  list<string>  $warnings  visible files publication leaves behind, one line each for the operator
      */
     public function __construct(
         public string $solutionId,
@@ -22,6 +23,7 @@ final readonly class SolutionUiSource
         public ?SolutionUiBundle $bundle,
         public array $problems,
         public array $files = [],
+        public array $warnings = [],
     ) {
     }
 

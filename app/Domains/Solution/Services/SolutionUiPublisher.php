@@ -45,12 +45,14 @@ final readonly class SolutionUiPublisher
     /**
      * @param  list<InstalledSolution>  $solutions
      *
-     * @return array{sources: array<string, SolutionUiSource>, problems: list<string>} valid sources by Solution id, and every problem found
+     * @return array{sources: array<string, SolutionUiSource>, problems: list<string>, warnings: list<string>} valid sources by
+     *         Solution id, every problem found, and the files publication will leave behind
      */
     public function check(array $solutions): array
     {
         $sources  = [];
         $problems = [];
+        $warnings = [];
 
         foreach ($solutions as $solution) {
             $components = $this->registry->components($solution->id);
@@ -63,6 +65,8 @@ final readonly class SolutionUiPublisher
 
                 continue;
             }
+
+            array_push($warnings, ...$source->warnings);
 
             if (null === $source->bundle) {
                 array_push($problems, ...$source->problems);
@@ -81,7 +85,7 @@ final readonly class SolutionUiPublisher
             }
         }
 
-        return ['sources' => $sources, 'problems' => $problems];
+        return ['sources' => $sources, 'problems' => $problems, 'warnings' => $warnings];
     }
 
     /**

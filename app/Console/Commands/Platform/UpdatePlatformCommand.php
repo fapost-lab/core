@@ -51,6 +51,10 @@ final class UpdatePlatformCommand extends Command
 
         $ui = $publisher->check($discovery->valid);
 
+        foreach ($ui['warnings'] as $warning) {
+            $this->components->warn($warning);
+        }
+
         if ([] !== $ui['problems']) {
             $this->components->error(sprintf('%d console UI problem(s). Nothing was changed.', count($ui['problems'])));
 

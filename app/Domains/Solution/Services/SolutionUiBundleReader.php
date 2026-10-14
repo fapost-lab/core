@@ -97,7 +97,15 @@ final readonly class SolutionUiBundleReader
             }
         }
 
-        $files = $this->publishable($id, $solution, $directory, $path, $problems);
+        $warnings = [];
+        $files    = $this->publishable($id, $solution, $directory, $path, $problems, $warnings);
+
+        // A listed page, component or stylesheet that publication would leave behind could never load.
+        foreach ($listed as $file => $field) {
+            if ([] === $problems && ! in_array($file, $files, true)) {
+                $problems[] = sprintf('%s: fapost-ui.json: %s: "%s" cannot be published (allowed: %s)', $id, $field, $file, implode(', ', self::STATIC_EXTENSIONS));
+            }
+        }
 
         if ([] !== $problems) {
             return SolutionUiSource::invalid($id, $path, $problems);
@@ -110,6 +118,7 @@ final readonly class SolutionUiBundleReader
             new SolutionUiBundle($id, mb_substr(hash('sha256', $contents), 0, self::HASH_LENGTH), $bundle->pages, $bundle->components, $bundle->css),
             [],
             $files,
+            $warnings,
         );
     }
 
@@ -119,11 +128,14 @@ final readonly class SolutionUiBundleReader
      * expose the package is refused instead: the package root, one holding a file with PHP anywhere in its name (a web
      * server executes it by URL), or a link that leads outside the directory.
      *
+     * Any other visible file is left behind with a warning: a page that imports it would fail in the browser.
+     *
      * @param  list<string>  $problems
+     * @param  list<string>  $warnings
      *
      * @return list<string> paths relative to the bundle directory, sorted
      */
-    private function publishable(string $id, InstalledSolution $solution, string $directory, string $manifestFile, array &$problems): array
+    private function publishable(string $id, InstalledSolution $solution, string $directory, string $manifestFile, array &$problems, array &$warnings): array
     {
         $root    = realpath($directory);
         $package = null === $solution->composerPath ? false : realpath(dirname($solution->composerPath));
@@ -170,12 +182,19 @@ final readonly class SolutionUiBundleReader
 
             $isManifest = $item->getPathname() === $manifestFile;
 
-            if ($item->isFile() && ($isManifest || in_array($extension, self::STATIC_EXTENSIONS, true))) {
+            if (! $item->isFile()) {
+                continue;
+            }
+
+            if ($isManifest || in_array($extension, self::STATIC_EXTENSIONS, true)) {
                 $files[] = $relative;
+            } else {
+                $warnings[] = sprintf('%s: fapost-ui.json: %s is not published (allowed: %s)', $id, $relative, implode(', ', self::STATIC_EXTENSIONS));
             }
         }
 
         sort($files);
+        sort($warnings);
 
         return $files;
     }

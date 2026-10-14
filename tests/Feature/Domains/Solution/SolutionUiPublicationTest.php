@@ -161,7 +161,12 @@ final class SolutionUiPublicationTest extends TestCase
         file_put_contents($package . '/dist/.git/hook.php', '<?php');
         $this->installShowcase(publish: false, package: $package);
 
-        $this->artisan('platform:update')->assertExitCode(0);
+        // Visible files left behind are named, so an import of one is not a mystery 404; hidden ones are not.
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('showcase: fapost-ui.json: assets/icon.svg is not published (allowed: js, mjs, css')
+            ->expectsOutputToContain('showcase: fapost-ui.json: notes.txt is not published')
+            ->doesntExpectOutputToContain('.secret.js')
+            ->assertExitCode(0);
 
         $hash      = mb_substr(hash_file('sha256', $package . '/dist/fapost-ui.json'), 0, 12);
         $published = public_path("solutions/showcase/{$hash}");
@@ -173,6 +178,22 @@ final class SolutionUiPublicationTest extends TestCase
         $this->assertFileDoesNotExist($published . '/assets/icon.svg');
         $this->assertFileDoesNotExist($published . '/assets/.secret.js');
         $this->assertDirectoryDoesNotExist($published . '/.git');
+    }
+
+    public function test_a_listed_file_publication_cannot_reach_stops_the_update(): void
+    {
+        $package = $this->copyPackage(static fn (array $ui): array => $ui);
+        // `assets` becomes a link to a directory inside the bundle: the files resolve, but publication never enters a link.
+        rename($package . '/dist/assets', $package . '/dist/built');
+        symlink($package . '/dist/built', $package . '/dist/assets');
+        $this->installShowcase(publish: false, package: $package);
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('showcase: fapost-ui.json: pages.Board/Index: "assets/board-index-4c1d2a.js" cannot be published')
+            ->assertExitCode(1);
+
+        $this->assertSame(0, $this->migrations);
+        $this->assertDirectoryDoesNotExist(public_path('solutions'));
     }
 
     public function test_php_anywhere_in_a_file_name_stops_the_update(): void
