@@ -60,12 +60,12 @@ final class ConsoleLoginTest extends FeatureTestCase
     {
         $this->actingAs($this->user());
 
-        $this->get($this->panelUrl('/admin/login'))->assertRedirect(route('filament.admin.pages.dashboard'));
+        $this->get($this->panelUrl('/admin/login'))->assertRedirect(route('console.admin.dashboard'));
     }
 
     public function test_the_assistant_panel_login_leads_to_the_one_sign_in(): void
     {
-        $this->get($this->panelUrl('/assistant/login'))->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->panelUrl('/assistant/login'))->assertRedirect(route('console.auth.login'));
     }
 
     public function test_signing_in_goes_to_the_dashboard_with_a_full_page_visit(): void
@@ -74,7 +74,7 @@ final class ConsoleLoginTest extends FeatureTestCase
 
         $this->post($this->panelUrl('/admin/login'), ['email' => $user->email, 'password' => self::PASSWORD], ['X-Inertia' => 'true'])
             ->assertStatus(409)
-            ->assertHeader('X-Inertia-Location', route('filament.admin.pages.dashboard'));
+            ->assertHeader('X-Inertia-Location', route('console.admin.dashboard'));
 
         $this->assertAuthenticatedAs($user);
     }
@@ -97,7 +97,7 @@ final class ConsoleLoginTest extends FeatureTestCase
         $user = $this->user();
 
         $this->post($this->panelUrl('/admin/login'), ['email' => $user->email, 'password' => self::PASSWORD])
-            ->assertRedirect(route('filament.admin.pages.dashboard'));
+            ->assertRedirect(route('console.admin.dashboard'));
     }
 
     public function test_the_session_id_is_regenerated_on_sign_in(): void
@@ -240,7 +240,7 @@ final class ConsoleLoginTest extends FeatureTestCase
 
         $this->post($this->panelUrl('/console/logout'), [], ['X-Inertia' => 'true'])
             ->assertStatus(409)
-            ->assertHeader('X-Inertia-Location', route('filament.admin.auth.login'));
+            ->assertHeader('X-Inertia-Location', route('console.auth.login'));
 
         $this->assertGuest();
     }

@@ -70,7 +70,7 @@ final class AdminMediaConsoleTest extends FeatureTestCase
                     && 1 === collect($tree)->first()['files'])
                 ->where('navigation.groups', fn ($groups): bool => collect($groups)
                     ->flatMap(static fn (array $group): array => $group['items'])
-                    ->contains(static fn (array $item): bool => 'filament.admin.resources.media.index' === $item['key'] && false === $item['external']))
+                    ->contains(static fn (array $item): bool => 'console.admin.media.index' === $item['key'] && false === $item['external']))
                 ->etc());
 
         $this->actingAs($this->admin())
@@ -137,7 +137,7 @@ final class AdminMediaConsoleTest extends FeatureTestCase
 
     public function test_a_visitor_is_sent_to_the_sign_in(): void
     {
-        $this->get($this->url())->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->url())->assertRedirect(route('console.auth.login'));
     }
 
     public function test_an_upload_stores_the_files_in_the_folder(): void

@@ -54,8 +54,8 @@ How Core holds it, and what a change to these files must keep:
   Solution id, so the ids `console` and `admin` (Core's applications, `CORE_APPLICATIONS`) are refused an
   application; reserving them in Foundation's manifest is task `foundation-reserve-console-app-ids`.
 - **Routes only through `routes()`/`assistantRoutes()`.** `SolutionRoutes` adds the panel domain, the prefix
-  `apps/<id>` or `assistant/{tenant}/apps/<id>`, the name prefix `solutions.<id>.`, the middleware group
-  `solution` or `solution.assistant` (the `admin` stack, plus `ResolveCurrentAssistant:tenant` for the
+  `apps/<id>` or `assistant/{assistant}/apps/<id>`, the name prefix `solutions.<id>.`, the middleware group
+  `solution` or `solution.assistant` (the `admin` stack, plus `ResolveCurrentAssistant` for the
   second, then `EnsureSolutionActive` and `EnsureSolutionPage`), and `can:<ability>` of the application.
   The Solution a request belongs to is read **from the route name** (`EnsureSolutionActive::solutionOf()`,
   also the rail's current application): a route in these groups without a `solutions.<id>.` name is a

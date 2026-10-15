@@ -54,7 +54,7 @@ final class SupportAccessEntryTest extends FeatureTestCase
         $token = $this->token();
 
         $this->post($this->enterUrl(), ['token' => $token])
-            ->assertRedirect(route('filament.admin.pages.dashboard'));
+            ->assertRedirect(route('console.admin.dashboard'));
 
         $user = Auth::user();
         $this->assertInstanceOf(User::class, $user);
@@ -191,7 +191,7 @@ final class SupportAccessEntryTest extends FeatureTestCase
     {
         $this->post($this->enterUrl(), ['token' => $this->token()])->assertRedirect();
 
-        $this->post(route('support.leave'))->assertRedirect(route('filament.admin.auth.login'));
+        $this->post(route('support.leave'))->assertRedirect(route('console.auth.login'));
 
         $this->assertGuest();
         $this->assertNotNull(SupportAccessEntry::query()->sole()->left_at);
@@ -220,12 +220,12 @@ final class SupportAccessEntryTest extends FeatureTestCase
         $this->post($this->enterUrl(), ['token' => $this->token()])->assertRedirect();
 
         Carbon::setTestNow(now()->addMinutes(SupportAccessSession::LIFETIME_MINUTES - 1));
-        $this->get(route('filament.admin.pages.dashboard'))->assertOk();
+        $this->get(route('console.admin.dashboard'))->assertOk();
 
         Carbon::setTestNow(now()->addMinutes(2));
 
         try {
-            $this->get(route('filament.admin.pages.dashboard'))->assertRedirect(route('filament.admin.auth.login'));
+            $this->get(route('console.admin.dashboard'))->assertRedirect(route('console.auth.login'));
         } finally {
             Carbon::setTestNow();
         }
@@ -239,7 +239,7 @@ final class SupportAccessEntryTest extends FeatureTestCase
         $this->post($this->enterUrl(), ['token' => $this->token()])->assertRedirect();
         $expires = (new SupportAccessSession($this->app['session.store']))->current()['expires_at'];
 
-        $this->get(route('filament.admin.pages.dashboard'))->assertOk();
+        $this->get(route('console.admin.dashboard'))->assertOk();
 
         $this->assertSame($expires, (new SupportAccessSession($this->app['session.store']))->current()['expires_at']);
     }
@@ -273,7 +273,7 @@ final class SupportAccessEntryTest extends FeatureTestCase
 
         try {
             $fresh = $this->token();
-            $this->post($this->enterUrl(), ['token' => $fresh])->assertRedirect(route('filament.admin.pages.dashboard'));
+            $this->post($this->enterUrl(), ['token' => $fresh])->assertRedirect(route('console.admin.dashboard'));
         } finally {
             Carbon::setTestNow();
         }
@@ -286,11 +286,11 @@ final class SupportAccessEntryTest extends FeatureTestCase
     public function test_switching_the_flag_off_ends_open_support_sessions(): void
     {
         $this->post($this->enterUrl(), ['token' => $this->token()])->assertRedirect();
-        $this->get(route('filament.admin.pages.dashboard'))->assertOk();
+        $this->get(route('console.admin.dashboard'))->assertOk();
 
         config(['tenancy.support_access.enabled' => false]);
 
-        $this->get(route('filament.admin.pages.dashboard'))->assertRedirect(route('filament.admin.auth.login'));
+        $this->get(route('console.admin.dashboard'))->assertRedirect(route('console.auth.login'));
         $this->assertGuest();
         $this->assertNotNull(SupportAccessEntry::query()->sole()->left_at);
     }
@@ -299,16 +299,16 @@ final class SupportAccessEntryTest extends FeatureTestCase
     {
         $support = $this->app->make(PlatformSupportUserService::class)->ensure();
 
-        $this->actingAs($support)->get(route('filament.admin.pages.dashboard'))
-            ->assertRedirect(route('filament.admin.auth.login'));
+        $this->actingAs($support)->get(route('console.admin.dashboard'))
+            ->assertRedirect(route('console.auth.login'));
 
         $this->assertGuest();
     }
 
     public function test_expiry_answers_each_kind_of_request_in_its_own_way(): void
     {
-        $url   = route('filament.admin.pages.dashboard');
-        $login = route('filament.admin.auth.login');
+        $url   = route('console.admin.dashboard');
+        $login = route('console.auth.login');
 
         $cases = [
             'inertia' => [['X-Inertia' => 'true'], fn ($response) => $response->assertStatus(409)->assertHeader('X-Inertia-Location', $login)],

@@ -53,7 +53,7 @@ final class SupportAccessController extends Controller
 
         new SupportAccessSession($request->session())->start($entered['entry']);
 
-        return redirect()->to(route('filament.admin.pages.dashboard'));
+        return redirect()->to(route('console.admin.dashboard'));
     }
 
     public function leave(Request $request): RedirectResponse
@@ -65,6 +65,6 @@ final class SupportAccessController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect()->to(route('filament.admin.auth.login'));
+        return redirect()->to(route('console.auth.login'));
     }
 }

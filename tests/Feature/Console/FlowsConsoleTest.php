@@ -656,7 +656,7 @@ final class FlowsConsoleTest extends FeatureTestCase
 
     public function test_a_guest_is_sent_to_the_login(): void
     {
-        $this->get($this->listUrl())->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->listUrl())->assertRedirect(route('console.auth.login'));
     }
 
     public function test_the_builder_sends_the_user_back_to_the_console_list(): void
@@ -667,7 +667,7 @@ final class FlowsConsoleTest extends FeatureTestCase
             ->get("/builder/flows/{$flow->flow_id}")
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('backUrl', route('filament.assistant.resources.flows.index', ['tenant' => $this->assistant->getKey()]))
+                ->where('backUrl', route('console.flows.index', ['assistant' => $this->assistant->getKey()]))
                 ->etc());
     }
 

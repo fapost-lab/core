@@ -31,9 +31,6 @@ the `tenants` table and the `webhook_registry` table on the `landlord` connectio
 new tenants (schema, migrations, first admin), and keeps the Redis webhook cache consistent
 with the landlord table.
 
-Not to be confused with the *assistant panel's* Filament "tenant", which is an `Assistant`
-(see domain `assistant`).
-
 ## Boundaries
 
 - Every other domain depends on Tenancy. The intended surface is `app/Domains/Tenancy/Contracts`

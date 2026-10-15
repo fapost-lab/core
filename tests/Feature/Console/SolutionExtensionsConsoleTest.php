@@ -53,7 +53,7 @@ final class SolutionExtensionsConsoleTest extends FeatureTestCase
         $this->installShowcase();
 
         Route::middleware('admin')->get('admin/_probe', fn () => Inertia::render('Auth/Login', ['action' => 'probe']));
-        Route::middleware('console')->get('assistant/{tenant}/_probe', fn () => Inertia::render('Auth/Login', ['action' => 'probe']));
+        Route::middleware('console')->get('assistant/{assistant}/_probe', fn () => Inertia::render('Auth/Login', ['action' => 'probe']));
 
         $this->assistant = Assistant::factory()->create(['name' => 'Alpha']);
     }

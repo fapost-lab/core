@@ -134,9 +134,10 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   in-memory SQLite, an array cache and a sync queue, so locks and queue concurrency are exercised
   only against mocks; CI additionally runs the suite on PostgreSQL 15.
 - **The console is Inertia and Vue; Core has no Filament or Livewire.** `routes/inertia.php` is
-  always loaded and serves the admin (`admin/*`) and assistant (`assistant/{tenant}/*`) screens at
-  the URIs the removed Filament panels had; read screens still carry the panels' route names
-  (`filament.*`) and parameter names (`{tenant}`, `{record}`), writes are `console.*`.
+  always loaded and serves the admin (`admin/*`) and assistant (`assistant/{assistant}/*`) screens at
+  the URIs the removed Filament panels had. Every route is named `console.*`: admin screens
+  `console.admin.<resource>.<action>`, an assistant's `console.<resource>.<action>`, reads
+  `index|create|show|edit`; the parameters are `{assistant}` and `{record}`.
   `ConsoleRouteInterceptionTest` pins each name to its action and URI. Console routes use the
   `admin` / `console` middleware groups (`bootstrap/app.php`). The shell's navigation
   (`app/Http/Shell`) keeps an `external` flag for an item that leads off the console (a plain link,

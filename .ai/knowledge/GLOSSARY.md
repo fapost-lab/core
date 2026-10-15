@@ -71,7 +71,7 @@ Use in: documentation, source code (`AbstractPluginServiceProvider`).
 ## Tenant
 
 One organisation's installation, isolated in its own PostgreSQL schema. A self-hosted install
-has exactly one. Not the Filament "tenant" of the assistant panel — see Assistant.
+has exactly one.
 
 Informal synonyms: organisation, account.
 Use in: source code, schema, documentation.
@@ -86,8 +86,8 @@ Use in: source code, schema, documentation.
 
 ## Assistant
 
-One bot inside a tenant, with its own channels, flows and contacts. In the assistant panel
-(`/assistant/{id}`) Filament's "tenant" is an assistant, not a platform tenant.
+One bot inside a tenant, with its own channels, flows and contacts. Its console screens live under
+`/assistant/{assistant}`.
 
 Informal synonyms: bot.
 Use in: source code, schema, documentation.

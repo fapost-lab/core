@@ -47,7 +47,7 @@ final class ConsoleHostModeTest extends FeatureTestCase
     public function test_the_routes_carry_no_domain(): void
     {
         $this->assertNull(TenantHost::panelDomain());
-        $this->assertNull(Route::getRoutes()->getByName('filament.admin.auth.login')?->getDomain());
+        $this->assertNull(Route::getRoutes()->getByName('console.auth.login')?->getDomain());
     }
 
     public function test_in_single_mode_the_routes_are_bound_to_the_default_tenant_host(): void
@@ -61,8 +61,8 @@ final class ConsoleHostModeTest extends FeatureTestCase
     public function test_urls_built_during_a_request_follow_the_request_host(): void
     {
         Route::middleware(['web', 'tenant'])->get('/_probe/urls', fn (): array => [
-            'login'      => route('filament.admin.auth.login'),
-            'assistants' => route('filament.admin.resources.assistants.index'),
+            'login'      => route('console.auth.login'),
+            'assistants' => route('console.admin.assistants.index'),
         ]);
 
         foreach (['main', 'second'] as $slug) {

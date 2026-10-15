@@ -13,7 +13,7 @@ use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
 
 /**
- * `assistant` and `assistant/{tenant}`: no screens, but addresses Filament's assistant panel answered and a bookmark may
+ * `assistant` and `assistant/{assistant}`: no screens, but addresses Filament's assistant panel answered and a bookmark may
  * hold. Both send on to a dashboard.
  */
 final class AssistantHomeConsoleTest extends FeatureTestCase
@@ -35,11 +35,11 @@ final class AssistantHomeConsoleTest extends FeatureTestCase
 
         $this->actingAs($this->admin())
             ->get($this->panelUrl('/assistant'))
-            ->assertRedirect(route('filament.assistant.pages.dashboard', ['tenant' => (string) $alpha->getKey()]));
+            ->assertRedirect(route('console.dashboard', ['assistant' => (string) $alpha->getKey()]));
 
         $this->actingAs($this->manager($beta))
             ->get($this->panelUrl('/assistant'))
-            ->assertRedirect(route('filament.assistant.pages.dashboard', ['tenant' => (string) $beta->getKey()]));
+            ->assertRedirect(route('console.dashboard', ['assistant' => (string) $beta->getKey()]));
     }
 
     public function test_a_user_without_an_assistant_to_open_goes_to_the_admin_console(): void
@@ -48,7 +48,7 @@ final class AssistantHomeConsoleTest extends FeatureTestCase
 
         $this->actingAs($this->manager())
             ->get($this->panelUrl('/assistant'))
-            ->assertRedirect(route('filament.admin.pages.dashboard'));
+            ->assertRedirect(route('console.admin.dashboard'));
     }
 
     public function test_an_assistants_address_opens_its_dashboard(): void
@@ -57,7 +57,7 @@ final class AssistantHomeConsoleTest extends FeatureTestCase
 
         $this->actingAs($this->manager($assistant))
             ->get($this->panelUrl("/assistant/{$assistant->getKey()}"))
-            ->assertRedirect(route('filament.assistant.pages.dashboard', ['tenant' => (string) $assistant->getKey()]));
+            ->assertRedirect(route('console.dashboard', ['assistant' => (string) $assistant->getKey()]));
     }
 
     public function test_an_assistant_the_user_may_not_open_or_a_malformed_or_unknown_id_is_not_found(): void
@@ -71,15 +71,15 @@ final class AssistantHomeConsoleTest extends FeatureTestCase
 
     public function test_the_sign_in_of_the_assistant_panel_is_not_taken_for_an_assistant(): void
     {
-        $this->get($this->panelUrl('/assistant/login'))->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->panelUrl('/assistant/login'))->assertRedirect(route('console.auth.login'));
     }
 
     public function test_a_guest_is_sent_to_the_sign_in(): void
     {
         $assistant = Assistant::factory()->create();
 
-        $this->get($this->panelUrl('/assistant'))->assertRedirect(route('filament.admin.auth.login'));
-        $this->get($this->panelUrl("/assistant/{$assistant->getKey()}"))->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->panelUrl('/assistant'))->assertRedirect(route('console.auth.login'));
+        $this->get($this->panelUrl("/assistant/{$assistant->getKey()}"))->assertRedirect(route('console.auth.login'));
     }
 
     private function admin(): User

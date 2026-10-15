@@ -355,7 +355,7 @@ final class ContactGroupsConsoleTest extends FeatureTestCase
 
     public function test_a_guest_is_sent_to_the_login(): void
     {
-        $this->get($this->listUrl())->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->listUrl())->assertRedirect(route('console.auth.login'));
     }
 
     private function listUrl(string $suffix = ''): string

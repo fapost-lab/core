@@ -13,7 +13,7 @@ use Illuminate\Routing\Router;
 /**
  * Registers the routes Solutions declared through `routes()` and `assistantRoutes()` (ADR solution-console-ui), with
  * everything a Solution may not choose itself: the panel domain, the prefix `apps/<id>/` or
- * `assistant/{tenant}/apps/<id>/`, the names `solutions.<id>.`, the middleware group `solution` or `solution.assistant`
+ * `assistant/{assistant}/apps/<id>/`, the names `solutions.<id>.`, the middleware group `solution` or `solution.assistant`
  * and, when the Solution's application has one, its ability.
  *
  * Called from routes/inertia.php, so only with the console switched on and, under `route:cache`, only when the cache is
@@ -34,7 +34,7 @@ final readonly class SolutionRoutes
         }
 
         foreach ($this->registry->assistantRouteClosures() as $id => $closures) {
-            $this->group($id, 'solution.assistant', 'assistant/{tenant}/apps/' . $id, $closures);
+            $this->group($id, 'solution.assistant', 'assistant/{assistant}/apps/' . $id, $closures);
         }
     }
 

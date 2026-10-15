@@ -11,7 +11,7 @@ paths:
   - "app/Http/Shell/**"
   - vite.config.ts
 summary: "How a Solution adds to the console: server-side declarations on named Core targets, pages by <id>::Path, a prebuilt dist/ on Core's shared Vue, Inertia and kit through an import map; supersedes ADR-06 for Solutions"
-reviewed_at: 2026-10-14
+reviewed_at: 2026-10-15
 ---
 # A Solution adds to the console through server-side declarations and a prebuilt bundle on Core's shared modules
 
@@ -193,3 +193,7 @@ Why:      one Vue instance and one kit are what make prebuilt bundles work witho
   an unknown target cannot be expressed at all, so "a registration error" above is a type error in practice.
 - A `::` name missing from the map, or a bundle that fails to load, renders Core's `Errors/SolutionUnavailable` page
   inside the shell rather than Inertia's generic error page.
+
+**2026-10-15, assistant route parameter (remove-filament PR 3).** The assistant's route parameter is now
+`{assistant}`, not `{tenant}`: a Solution's per-assistant routes live under `/assistant/{assistant}/apps/{id}/…`, and
+`ResolveCurrentAssistant` reads `{assistant}` (its default) in the `solution.assistant` group.

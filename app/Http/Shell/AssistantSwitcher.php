@@ -27,7 +27,7 @@ final readonly class AssistantSwitcher
      */
     public function for(User $user, Assistant $current): array
     {
-        $dashboard = 'filament.assistant.pages.dashboard';
+        $dashboard = 'console.dashboard';
 
         return [
             'current' => ['id' => (string) $current->getKey(), 'name' => (string) $current->name],
@@ -35,7 +35,7 @@ final readonly class AssistantSwitcher
                 ->map(fn (Assistant $assistant): array => [
                     'id'       => (string) $assistant->getKey(),
                     'name'     => (string) $assistant->name,
-                    'href'     => route($dashboard, ['tenant' => $assistant->getKey()], false),
+                    'href'     => route($dashboard, ['assistant' => $assistant->getKey()], false),
                     'external' => false,
                 ])
                 ->values()

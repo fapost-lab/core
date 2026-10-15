@@ -70,7 +70,7 @@ final class AssistantController extends Controller
                     'defaultLanguage' => $assistant->default_language,
                     'languageLabel'   => $languages[$assistant->default_language] ?? $assistant->default_language,
                     'updatedAt'       => $assistant->updated_at?->toIso8601String(),
-                    'showUrl'         => $this->url('view', $assistant),
+                    'showUrl'         => $this->url('show', $assistant),
                     'editUrl'         => $this->url('edit', $assistant),
                     'consoleUrl'      => $this->consoleUrl($assistant),
                     'can'             => [
@@ -149,7 +149,7 @@ final class AssistantController extends Controller
             ],
             'urls' => [
                 'index'   => $this->url('index'),
-                'show'    => $this->url('view', $assistant),
+                'show'    => $this->url('show', $assistant),
                 'edit'    => $this->url('edit', $assistant),
                 'console' => $this->consoleUrl($assistant),
             ],
@@ -176,7 +176,7 @@ final class AssistantController extends Controller
             ],
             'urls' => [
                 'index'   => $this->url('index'),
-                'show'    => $this->url('view', $assistant),
+                'show'    => $this->url('show', $assistant),
                 'submit'  => route('console.admin.assistants.update', ['record' => $assistant->getKey()], false),
                 'destroy' => route('console.admin.assistants.destroy', ['record' => $assistant->getKey()], false),
             ],
@@ -279,7 +279,7 @@ final class AssistantController extends Controller
      */
     private function consoleUrl(Assistant $assistant): string
     {
-        return route('filament.assistant.pages.dashboard', ['tenant' => $assistant->getKey()], false);
+        return route('console.dashboard', ['assistant' => $assistant->getKey()], false);
     }
 
     /**
@@ -294,12 +294,12 @@ final class AssistantController extends Controller
     }
 
     /**
-     * A relative URL of one of the pages Filament served: `index`, `create`, `view` or `edit`.
+     * A relative URL of one of the assistant pages: `index`, `create`, `show` or `edit`.
      */
     private function url(string $page, ?Assistant $assistant = null): string
     {
         return route(
-            'filament.admin.resources.assistants.' . $page,
+            'console.admin.assistants.' . $page,
             null === $assistant ? [] : ['record' => $assistant->getKey()],
             false,
         );

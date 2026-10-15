@@ -166,6 +166,28 @@ address; that proxy must refuse private ranges itself. Names from `/etc/hosts` o
 container aliases still resolve, but their addresses are checked like any other, so allow
 them by range or name (a mock on `localhost` needs `FLOW_EGRESS_ALLOW=127.0.0.1/32`). See [Configuration](/self-hosting/configuration#outbound-calls-from-flows).
 
+## Console route names and the assistant parameter
+
+The console's routes lost the names they inherited from Filament, and the assistant in
+an assistant's URL is now the route parameter `{assistant}` instead of `{tenant}`. The
+addresses themselves did not change, so bookmarks and links keep working.
+
+| Before | After |
+|---|---|
+| `filament.admin.resources.<resource>.<index\|create\|edit\|view>` | `console.admin.<resource>.<index\|create\|edit\|show>` |
+| `filament.admin.pages.dashboard`, `.tenant-settings`, `.translations` | `console.admin.dashboard`, `console.admin.tenant-settings.edit`, `console.admin.translations.index` |
+| `filament.assistant.resources.<resource>.<index\|create\|edit\|view>` | `console.<resource>.<index\|create\|edit\|show>` |
+| `filament.assistant.pages.dashboard`, `.settings`, `.translations` | `console.dashboard`, `console.settings.edit`, `console.translations.index` |
+| `filament.admin.auth.login`, `filament.assistant.auth.login` | `console.auth.login`, `console.auth.assistant-login` |
+| `filament.assistant.tenant` (`/assistant`), `filament.assistant.home` (`/assistant/{id}`) | `console.entry`, `console.home` |
+
+Only Solutions are affected. One that calls `route('filament.…')`, or passes
+`['tenant' => …]` to a Console route or to its own `assistantRoutes()` route, must switch
+to the new name and to `['assistant' => …]` before the upgrade; the old ones no longer
+resolve. An action of an `assistantRoutes()` route receives its parameters by position,
+so its signature does not change. Solutions that link to Core's screens through
+`ConsoleTarget` keys, as [Console UI](/extending/console-ui) describes, need nothing.
+
 ## Downtime
 
 The application tolerates a short window where old and new run side by side —

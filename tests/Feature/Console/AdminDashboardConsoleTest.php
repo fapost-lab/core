@@ -233,7 +233,7 @@ final class AdminDashboardConsoleTest extends FeatureTestCase
 
     public function test_a_guest_is_sent_to_the_login(): void
     {
-        $this->get($this->panelUrl('/admin'))->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->panelUrl('/admin'))->assertRedirect(route('console.auth.login'));
     }
 
     private function channel(Assistant $assistant, bool $active): Channel

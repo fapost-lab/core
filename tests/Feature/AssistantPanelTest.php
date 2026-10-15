@@ -139,11 +139,11 @@ final class AssistantPanelTest extends FeatureTestCase
 
     private function assistantTranslationsUrl(Assistant $assistant): string
     {
-        return route('filament.assistant.pages.translations', ['tenant' => $assistant]);
+        return route('console.translations.index', ['assistant' => $assistant]);
     }
 
     private function assistantPanelUrl(Assistant $assistant): string
     {
-        return route('filament.assistant.pages.dashboard', ['tenant' => $assistant]);
+        return route('console.dashboard', ['assistant' => $assistant]);
     }
 }

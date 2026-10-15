@@ -75,8 +75,8 @@ final class FlowLogController extends Controller
                     'hasError'       => is_array($log->error) && [] !== $log->error,
                     'sessionId'      => (string) $log->session_id,
                     'sessionShortId' => mb_substr((string) $log->session_id, 0, 8),
-                    'viewUrl'        => $this->url('flow-logs.view', $assistant, ['record' => $log->getKey()]),
-                    'sessionUrl'     => $canSessions ? $this->url('flow-sessions.view', $assistant, ['record' => $log->session_id]) : null,
+                    'viewUrl'        => $this->url('flow-logs.show', $assistant, ['record' => $log->getKey()]),
+                    'sessionUrl'     => $canSessions ? $this->url('flow-sessions.show', $assistant, ['record' => $log->session_id]) : null,
                 ],
             ),
             'period'    => $period->value,
@@ -89,10 +89,10 @@ final class FlowLogController extends Controller
     }
 
     /*
-     * Route parameters reach an action by position, so `$tenant` (the assistant in the URL, already resolved by the
+     * Route parameters reach an action by position, so `$assistantKey` (the assistant in the URL, already resolved by the
      * console stack) is declared ahead of `$record`.
      */
-    public function show(string $tenant, string $record): Response
+    public function show(string $assistantKey, string $record): Response
     {
         $assistant = $this->assistant->get();
         $log       = $this->logs->findFor($assistant, $record);
@@ -116,7 +116,7 @@ final class FlowLogController extends Controller
             'urls'         => [
                 'index' => $this->url('flow-logs.index', $assistant),
                 ...(Gate::allows('viewAny', FlowSession::class)
-                    ? ['session' => $this->url('flow-sessions.view', $assistant, ['record' => $log->session_id])]
+                    ? ['session' => $this->url('flow-sessions.show', $assistant, ['record' => $log->session_id])]
                     : []),
             ],
         ]);
@@ -166,12 +166,12 @@ final class FlowLogController extends Controller
     }
 
     /**
-     * A relative URL of one of the assistant's flow screens, which keep the names Filament gave them.
+     * A relative URL of one of the assistant's flow screens (`<resource>.<action>` under `console.`).
      *
      * @param  array<string, mixed>  $parameters
      */
     private function url(string $screen, Assistant $assistant, array $parameters = []): string
     {
-        return route('filament.assistant.resources.' . $screen, ['tenant' => (string) $assistant->getKey(), ...$parameters], false);
+        return route('console.' . $screen, ['assistant' => (string) $assistant->getKey(), ...$parameters], false);
     }
 }

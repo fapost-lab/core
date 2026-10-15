@@ -55,7 +55,7 @@ final class AdminTenantSettingsConsoleTest extends FeatureTestCase
                 ->where('urls.submit', '/admin/tenant-settings')
                 ->where('navigation.groups', fn ($groups): bool => collect($groups)
                     ->flatMap(static fn (array $group): array => $group['items'])
-                    ->contains(static fn (array $item): bool => 'filament.admin.pages.tenant-settings' === $item['key'] && false === $item['external']))
+                    ->contains(static fn (array $item): bool => 'console.admin.tenant-settings.edit' === $item['key'] && false === $item['external']))
                 ->etc());
     }
 
@@ -148,7 +148,7 @@ final class AdminTenantSettingsConsoleTest extends FeatureTestCase
 
     public function test_a_visitor_is_sent_to_the_sign_in(): void
     {
-        $this->get($this->url())->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->url())->assertRedirect(route('console.auth.login'));
     }
 
     /**

@@ -125,7 +125,7 @@ final class AdminAssistantsConsoleTest extends FeatureTestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->where('navigation.groups', fn ($groups): bool => collect($groups)
                     ->flatMap(static fn (array $group): array => $group['items'])
-                    ->contains(static fn (array $item): bool => 'filament.admin.resources.assistants.index' === $item['key'] && false === $item['external']))
+                    ->contains(static fn (array $item): bool => 'console.admin.assistants.index' === $item['key'] && false === $item['external']))
                 ->etc());
     }
 
@@ -528,7 +528,7 @@ final class AdminAssistantsConsoleTest extends FeatureTestCase
 
     public function test_a_visitor_is_sent_to_the_sign_in(): void
     {
-        $this->get($this->url())->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->url())->assertRedirect(route('console.auth.login'));
     }
 
     /**

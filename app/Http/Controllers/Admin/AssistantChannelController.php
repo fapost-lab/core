@@ -167,7 +167,7 @@ final class AssistantChannelController extends Controller
 
     private function showUrl(Assistant $assistant): string
     {
-        return route('filament.admin.resources.assistants.view', ['record' => $assistant->getKey()], false);
+        return route('console.admin.assistants.show', ['record' => $assistant->getKey()], false);
     }
 
     private function url(string $action, Assistant $assistant, Channel $channel): string

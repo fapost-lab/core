@@ -102,10 +102,10 @@ final class ContactSegmentController extends Controller
     }
 
     /*
-     * Route parameters reach an action by position, not by name, so `$tenant` (the assistant in the URL, already
+     * Route parameters reach an action by position, not by name, so `$assistantKey` (the assistant in the URL, already
      * resolved by the console stack) has to be declared ahead of `$record`.
      */
-    public function edit(string $tenant, string $record): Response
+    public function edit(string $assistantKey, string $record): Response
     {
         $segment = $this->segments->findForTenant($record);
 
@@ -121,14 +121,14 @@ final class ContactSegmentController extends Controller
         ]);
     }
 
-    public function update(ContactSegmentRequest $request, string $tenant, string $record): RedirectResponse
+    public function update(ContactSegmentRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $this->segments->update($this->segments->findForTenant($record), $request->segmentName(), $request->segmentRules());
 
         return $this->backToIndex(trans('console.contact_segments.updated'));
     }
 
-    public function destroy(string $tenant, string $record): RedirectResponse
+    public function destroy(string $assistantKey, string $record): RedirectResponse
     {
         $segment = $this->segments->findForTenant($record);
 
@@ -143,7 +143,7 @@ final class ContactSegmentController extends Controller
      * Recounts over all contacts of the tenant and flashes the number. Counting writes the snapshot, so it asks for
      * `update`, as Filament's row action did.
      */
-    public function refreshCount(string $tenant, string $record): RedirectResponse
+    public function refreshCount(string $assistantKey, string $record): RedirectResponse
     {
         $segment = $this->segments->findForTenant($record);
 
@@ -257,11 +257,6 @@ final class ContactSegmentController extends Controller
      */
     private function url(string $action, array $parameters = []): string
     {
-        $name = match ($action) {
-            'index', 'create', 'edit' => 'filament.assistant.resources.contact-segments.' . $action,
-            default                   => 'console.contact-segments.' . $action,
-        };
-
-        return route($name, ['tenant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
+        return route('console.contact-segments.' . $action, ['assistant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
     }
 }

@@ -94,10 +94,10 @@ final class FlowGroupController extends Controller
     }
 
     /*
-     * Route parameters reach an action by position, not by name, so `$tenant` (the assistant in the URL, already
+     * Route parameters reach an action by position, not by name, so `$assistantKey` (the assistant in the URL, already
      * resolved by the console stack) has to be declared ahead of `$record`.
      */
-    public function edit(string $tenant, string $record): Response
+    public function edit(string $assistantKey, string $record): Response
     {
         $group = $this->groups->findForAssistant($record);
 
@@ -109,14 +109,14 @@ final class FlowGroupController extends Controller
         ]);
     }
 
-    public function update(FlowGroupRequest $request, string $tenant, string $record): RedirectResponse
+    public function update(FlowGroupRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $this->groups->update($this->groups->findForAssistant($record), ['name' => (string) $request->validated('name')]);
 
         return $this->backToIndex(trans('console.flow_groups.updated'));
     }
 
-    public function destroy(string $tenant, string $record): RedirectResponse
+    public function destroy(string $assistantKey, string $record): RedirectResponse
     {
         $group = $this->groups->findForAssistant($record);
 
@@ -177,11 +177,6 @@ final class FlowGroupController extends Controller
      */
     private function url(string $action, array $parameters = []): string
     {
-        $name = match ($action) {
-            'index', 'create', 'edit' => 'filament.assistant.resources.flow-groups.' . $action,
-            default                   => 'console.flow-groups.' . $action,
-        };
-
-        return route($name, ['tenant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
+        return route('console.flow-groups.' . $action, ['assistant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
     }
 }

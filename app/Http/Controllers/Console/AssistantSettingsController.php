@@ -94,7 +94,7 @@ final class AssistantSettingsController extends Controller
 
         Inertia::flash('success', trans('console.settings.saved'));
 
-        return redirect()->back(fallback: $this->url('filament.assistant.pages.settings'));
+        return redirect()->back(fallback: $this->url('console.settings.edit'));
     }
 
     /**
@@ -107,7 +107,7 @@ final class AssistantSettingsController extends Controller
         } catch (RecordLimitReachedException $exception) {
             Inertia::flash('error', trans('assistant.flows.limit.reached_title') . '. ' . $exception->getMessage());
 
-            return redirect()->back(fallback: $this->url('filament.assistant.pages.settings'));
+            return redirect()->back(fallback: $this->url('console.settings.edit'));
         }
 
         // The builder is a separate app, so this is a full navigation, not an Inertia visit.
@@ -183,6 +183,6 @@ final class AssistantSettingsController extends Controller
 
     private function url(string $name): string
     {
-        return route($name, ['tenant' => (string) $this->settings->assistant()->getKey()], false);
+        return route($name, ['assistant' => (string) $this->settings->assistant()->getKey()], false);
     }
 }

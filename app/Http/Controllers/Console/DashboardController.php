@@ -43,11 +43,11 @@ final class DashboardController extends Controller
                 'errors24h'    => $activity->errorsLast24Hours($id),
                 // A link is offered only where the user may open the list it leads to.
                 'sessionsUrl' => Gate::allows('viewAny', FlowSession::class)
-                    ? route('filament.assistant.resources.flow-sessions.index', ['tenant' => $id], false)
+                    ? route('console.flow-sessions.index', ['assistant' => $id], false)
                     : null,
                 'logsUrl' => Gate::allows('viewAny', FlowLog::class)
-                    ? route('filament.assistant.resources.flow-logs.index', [
-                        'tenant' => $id,
+                    ? route('console.flow-logs.index', [
+                        'assistant' => $id,
                         // What the count counts: entries with an error over the last 24 hours.
                         'filter' => ['errors' => FlowLogInspector::ERRORS_ONLY, 'period' => FlowActivityPeriod::LastDay->value],
                     ], false)

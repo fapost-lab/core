@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Gate;
 
 /**
  * The two addresses of the assistant console that are not screens but may be bookmarked: `assistant` and
- * `assistant/{tenant}`. Both send on to a dashboard, as Filament's assistant panel did.
+ * `assistant/{assistant}`. Both send on to a dashboard, as Filament's assistant panel did.
  */
 final class AssistantHomeController extends Controller
 {
@@ -31,14 +31,14 @@ final class AssistantHomeController extends Controller
         // The list is already filtered by the same policy; asked again here as defence in depth, and so the action carries
         // its own check (ConsoleAuthorizationTest).
         if (null === $first || Gate::denies('view', $first)) {
-            return redirect()->route('filament.admin.pages.dashboard');
+            return redirect()->route('console.admin.dashboard');
         }
 
-        return redirect()->route('filament.assistant.pages.dashboard', ['tenant' => (string) $first->getKey()]);
+        return redirect()->route('console.dashboard', ['assistant' => (string) $first->getKey()]);
     }
 
     /**
-     * `assistant/{tenant}`: that assistant's dashboard. The `console` stack has already answered 404 for an assistant
+     * `assistant/{assistant}`: that assistant's dashboard. The `console` stack has already answered 404 for an assistant
      * the user may not open.
      */
     public function show(CurrentAssistantInterface $currentAssistant): RedirectResponse
@@ -47,6 +47,6 @@ final class AssistantHomeController extends Controller
 
         Gate::authorize('view', $assistant);
 
-        return redirect()->route('filament.assistant.pages.dashboard', ['tenant' => (string) $assistant->getKey()]);
+        return redirect()->route('console.dashboard', ['assistant' => (string) $assistant->getKey()]);
     }
 }

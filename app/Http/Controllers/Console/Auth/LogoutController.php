@@ -22,6 +22,6 @@ final class LogoutController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return Inertia::location(route('filament.admin.auth.login'));
+        return Inertia::location(route('console.auth.login'));
     }
 }

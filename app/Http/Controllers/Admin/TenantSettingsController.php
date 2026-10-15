@@ -52,6 +52,6 @@ final class TenantSettingsController extends Controller
 
         Inertia::flash('success', trans('console.tenant_settings.saved'));
 
-        return redirect()->back(fallback: route('filament.admin.pages.tenant-settings', [], false));
+        return redirect()->back(fallback: route('console.admin.tenant-settings.edit', [], false));
     }
 }

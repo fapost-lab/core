@@ -29,7 +29,7 @@ final class AppSwitcherConsoleTest extends FeatureTestCase
         $this->seed(TenantAclSeeder::class);
 
         Route::middleware('admin')->get('admin/_probe', fn () => Inertia::render('Auth/Login', ['action' => 'probe']));
-        Route::middleware('console')->get('assistant/{tenant}/_probe', fn () => Inertia::render('Auth/Login', ['action' => 'probe']));
+        Route::middleware('console')->get('assistant/{assistant}/_probe', fn () => Inertia::render('Auth/Login', ['action' => 'probe']));
     }
 
     public function test_the_rail_offers_the_console_and_the_admin_panel_pinned_by_default(): void

@@ -21,7 +21,7 @@ use Tests\Feature\FeatureTestCase;
  * Rules for the routes of the console, checked on the resolved route table (the middleware groups expanded and
  * sorted as the router would run them):
  *
- * - every console route under `assistant/{tenant}/` resolves the current assistant;
+ * - every console route under `assistant/{assistant}/` resolves the current assistant;
  * - every route under `admin/`, `assistant/` or `console/` enters the tenant before the cookies and the session;
  * - the `admin` stack keeps the order its checks need.
  *
@@ -45,9 +45,9 @@ final class ConsoleRoutesArchitectureTest extends FeatureTestCase
 
     public function test_the_assistant_rule_fires_on_a_violator(): void
     {
-        Route::middleware('admin')->get('assistant/{tenant}/_violator', fn (): string => 'ok');
+        Route::middleware('admin')->get('assistant/{assistant}/_violator', fn (): string => 'ok');
 
-        $this->assertSame(['assistant/{tenant}/_violator'], $this->assistantRoutesWithoutAssistant());
+        $this->assertSame(['assistant/{assistant}/_violator'], $this->assistantRoutesWithoutAssistant());
     }
 
     public function test_every_console_route_enters_the_tenant_before_the_session(): void
@@ -84,12 +84,12 @@ final class ConsoleRoutesArchitectureTest extends FeatureTestCase
 
     public function test_the_console_stack_resolves_the_assistant_after_authentication(): void
     {
-        Route::middleware('console')->get('assistant/{tenant}/_order', fn (): string => 'ok');
-        $stack = $this->stack($this->routeByUri('assistant/{tenant}/_order'));
+        Route::middleware('console')->get('assistant/{assistant}/_order', fn (): string => 'ok');
+        $stack = $this->stack($this->routeByUri('assistant/{assistant}/_order'));
 
-        $this->assertContains(ResolveCurrentAssistant::class . ':tenant', $stack);
-        $this->assertBefore($stack, Authenticate::class, ResolveCurrentAssistant::class . ':tenant');
-        $this->assertBefore($stack, EnsureCanAccessPanel::class, ResolveCurrentAssistant::class . ':tenant');
+        $this->assertContains(ResolveCurrentAssistant::class, $stack);
+        $this->assertBefore($stack, Authenticate::class, ResolveCurrentAssistant::class);
+        $this->assertBefore($stack, EnsureCanAccessPanel::class, ResolveCurrentAssistant::class);
     }
 
     /**
@@ -100,11 +100,11 @@ final class ConsoleRoutesArchitectureTest extends FeatureTestCase
         $violations = [];
 
         foreach (Route::getRoutes() as $route) {
-            if (! str_starts_with($route->uri(), 'assistant/{tenant}/')) {
+            if (! str_starts_with($route->uri(), 'assistant/{assistant}/')) {
                 continue;
             }
 
-            if (! in_array(ResolveCurrentAssistant::class . ':tenant', $this->stack($route), true)) {
+            if (! in_array(ResolveCurrentAssistant::class, $this->stack($route), true)) {
                 $violations[] = $route->uri();
             }
         }

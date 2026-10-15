@@ -37,19 +37,19 @@ final class ConsoleStackTest extends FeatureTestCase
 
         Route::middleware('admin')->get('admin/_probe', fn () => Inertia::render('Auth/Login', ['action' => 'probe']));
         Route::middleware('admin')->post('admin/_probe', fn (): string => 'written');
-        Route::middleware('console')->get('assistant/{tenant}/_probe', fn (): string => 'ok');
+        Route::middleware('console')->get('assistant/{assistant}/_probe', fn (): string => 'ok');
     }
 
     public function test_a_guest_is_sent_to_the_login(): void
     {
-        $this->get($this->panelUrl('/admin/_probe'))->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->panelUrl('/admin/_probe'))->assertRedirect(route('console.auth.login'));
     }
 
     public function test_a_legacy_numeric_session_user_id_redirects_to_login_instead_of_crashing(): void
     {
         $this->withSession([Auth::guard()->getName() => 1])
             ->get($this->panelUrl('/admin/_probe'))
-            ->assertRedirect(route('filament.admin.auth.login'));
+            ->assertRedirect(route('console.auth.login'));
 
         $this->assertGuest();
     }
@@ -81,7 +81,7 @@ final class ConsoleStackTest extends FeatureTestCase
         $this->actingAs($user)
             ->withSession(['password_hash_' . Auth::getDefaultDriver() => 'a-hash-from-before'])
             ->get($this->panelUrl('/admin/_probe'))
-            ->assertRedirect(route('filament.admin.auth.login'));
+            ->assertRedirect(route('console.auth.login'));
 
         $this->assertGuest();
     }
@@ -119,7 +119,7 @@ final class ConsoleStackTest extends FeatureTestCase
         $this->actingAs($support)
             ->get($this->panelUrl('/admin/_probe'), ['X-Inertia' => 'true', 'X-Inertia-Version' => (string) $this->app->make(HandleInertiaRequests::class)->version(request())])
             ->assertStatus(409)
-            ->assertHeader('X-Inertia-Location', route('filament.admin.auth.login'));
+            ->assertHeader('X-Inertia-Location', route('console.auth.login'));
 
         $this->assertGuest();
     }

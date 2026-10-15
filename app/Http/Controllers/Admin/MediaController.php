@@ -351,7 +351,7 @@ final class MediaController extends Controller
             'trashed'    => $file->trashed(),
             'createdAt'  => $file->created_at?->toIso8601String(),
             'folderId'   => $file->folder_id,
-            'viewUrl'    => $this->url('view', $parameters),
+            'viewUrl'    => $this->url('show', $parameters),
             'updateUrl'  => $this->url('update', $parameters),
             'destroyUrl' => $this->url('destroy', $parameters),
             'restoreUrl' => $this->url('restore', $parameters),
@@ -374,11 +374,6 @@ final class MediaController extends Controller
      */
     private function url(string $action, array $parameters = []): string
     {
-        $name = match ($action) {
-            'index', 'view' => 'filament.admin.resources.media.' . $action,
-            default         => 'console.admin.media.' . $action,
-        };
-
-        return route($name, $parameters, false);
+        return route('console.admin.media.' . $action, $parameters, false);
     }
 }

@@ -70,7 +70,7 @@ final class FlowSessionController extends Controller
                     'flowName'          => $this->text($session->flowDefinition?->name),
                     'currentNodeId'     => $this->text($session->current_node_id),
                     'updatedAt'         => $session->updated_at?->toIso8601String(),
-                    'viewUrl'           => $this->url('flow-sessions.view', $assistant, ['record' => $session->getKey()]),
+                    'viewUrl'           => $this->url('flow-sessions.show', $assistant, ['record' => $session->getKey()]),
                 ],
             ),
             'statuses' => array_map(static fn (FlowSessionStatus $status): string => $status->value, FlowSessionStatus::cases()),
@@ -82,10 +82,10 @@ final class FlowSessionController extends Controller
     }
 
     /*
-     * Route parameters reach an action by position, so `$tenant` (the assistant in the URL, already resolved by the
+     * Route parameters reach an action by position, so `$assistantKey` (the assistant in the URL, already resolved by the
      * console stack) is declared ahead of `$record`.
      */
-    public function show(string $tenant, string $record): Response
+    public function show(string $assistantKey, string $record): Response
     {
         $assistant = $this->assistant->get();
         $session   = $this->sessions->findFor($assistant, $record);
@@ -117,7 +117,7 @@ final class FlowSessionController extends Controller
             'live'    => $this->live($assistant),
             'urls'    => [
                 'index' => $this->url('flow-sessions.index', $assistant),
-                ...(null !== $parentId ? ['parent' => $this->url('flow-sessions.view', $assistant, ['record' => $parentId])] : []),
+                ...(null !== $parentId ? ['parent' => $this->url('flow-sessions.show', $assistant, ['record' => $parentId])] : []),
                 // The session's own log, over the longest period a log is kept.
                 ...(Gate::allows('viewAny', FlowLog::class) ? ['logs' => $this->url('flow-logs.index', $assistant, [
                     'filter' => ['session' => $key, 'period' => FlowActivityPeriod::LastMonth->value],
@@ -162,12 +162,12 @@ final class FlowSessionController extends Controller
     }
 
     /**
-     * A relative URL of one of the assistant's flow screens, which keep the names Filament gave them.
+     * A relative URL of one of the assistant's flow screens (`<resource>.<action>` under `console.`).
      *
      * @param  array<string, mixed>  $parameters
      */
     private function url(string $screen, Assistant $assistant, array $parameters = []): string
     {
-        return route('filament.assistant.resources.' . $screen, ['tenant' => (string) $assistant->getKey(), ...$parameters], false);
+        return route('console.' . $screen, ['assistant' => (string) $assistant->getKey(), ...$parameters], false);
     }
 }
