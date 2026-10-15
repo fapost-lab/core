@@ -129,7 +129,8 @@
           {
             "group": "Overview",
             "pages": [
-              "contributing/overview"
+              "contributing/overview",
+              "contributing/stack"
             ]
           },
           {
