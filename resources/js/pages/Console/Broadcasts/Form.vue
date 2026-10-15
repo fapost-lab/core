@@ -6,10 +6,9 @@ import { FormField } from '@fapost/ui/components/form-field'
 import { FormSection } from '@fapost/ui/components/form-section'
 import { Input } from '@fapost/ui/components/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
-import LocalizedMessageField from './LocalizedMessageField.vue'
+import { errorsByLocale, LocalizedField, localizedRecord } from '@fapost/ui/components/localized-field'
+import { OptionsPicker } from '@fapost/ui/components/options-picker'
 import ReachLine from './ReachLine.vue'
-import TagsPicker from './TagsPicker.vue'
-import { cleanMessage } from './localized'
 import { useReach } from './useReach'
 import { interpolate } from '@fapost/ui/shell'
 import type { BroadcastFormState, BroadcastLanguage, BroadcastTarget, BroadcastsPageProps, SelectOption } from './types'
@@ -44,9 +43,11 @@ const form = useForm({
 })
 
 // What is sent: only the languages with text.
-form.transform((data) => ({ ...data, message: cleanMessage(data.message) }))
+form.transform((data) => ({ ...data, message: localizedRecord(data.message) }))
 
 const errors = computed(() => form.errors as Record<string, string | undefined>)
+const messageErrors = computed(() => errorsByLocale(errors.value, 'message'))
+const messageLanguages = computed(() => props.languages.map((language) => ({ code: language.code, required: language.isBase })))
 
 const reach = useReach(
   () => props.reachUrl,
@@ -75,7 +76,16 @@ function submit(): void {
       </FormField>
 
       <FormField id="message" :label="t.fields.message" :hint="t.fields.message_help" :error="form.errors.message">
-        <LocalizedMessageField id="message" v-model="form.message" :languages="languages" :errors="errors" :required-label="t.fields.base_required" />
+        <LocalizedField
+          id="message"
+          v-model="form.message"
+          name="message"
+          :label="t.fields.message"
+          :languages="messageLanguages"
+          :errors="messageErrors"
+          :required-label="t.fields.base_required"
+          :rows="6"
+        />
       </FormField>
     </FormSection>
 
@@ -92,13 +102,14 @@ function submit(): void {
       </FormField>
 
       <FormField v-if="form.target_type === 'tags'" id="target_tags" :label="t.fields.tags" :error="errors.target_tags ?? errors['target_tags.0']" v-slot="{ invalid, describedBy }">
-        <TagsPicker
+        <OptionsPicker
           id="target_tags"
           v-model="form.target_tags"
           :options="options.tags"
           :placeholder="t.fields.tags_placeholder"
           :empty-label="t.fields.tags_empty"
           :selected-label="(count) => interpolate(t.fields.tags_selected, { count })"
+          :remove-label="(tag) => interpolate(t.fields.tags_remove, { tag })"
           :invalid="invalid"
           :described-by="describedBy"
         />

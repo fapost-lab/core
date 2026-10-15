@@ -9,8 +9,8 @@ import { Input } from '@fapost/ui/components/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
 import { interpolate } from '@fapost/ui/shell'
 import FlowSelect from './FlowSelect.vue'
-import LocalizedTextField from './LocalizedTextField.vue'
-import { commandErrors, errorsUnder, newCommand } from './settings'
+import { errorsByLocale, LocalizedField } from '@fapost/ui/components/localized-field'
+import { commandErrors, newCommand } from './settings'
 import type { CommandState, CommandType, CommandTypeOption, FlowOption, SettingsPageProps } from './types'
 
 /**
@@ -32,6 +32,23 @@ const emit = defineEmits<{ createFlow: [index: number] }>()
 
 const page = usePage<SettingsPageProps>()
 const t = computed(() => page.props.translations.console.settings)
+// One object per command and field for as long as the form's errors stay the same: a localized field opens the tab
+// of an error when its errors object changes, so it must not change on every render.
+const localizedErrors = computed(() => {
+  const errors = props.errors
+  const built = new Map<string, Record<string, string | undefined>>()
+
+  return (index: number, field: 'response' | 'text'): Record<string, string | undefined> => {
+    const key = `${index}.${field}`
+
+    if (!built.has(key)) {
+      built.set(key, errorsByLocale(commandErrors(errors, index), field))
+    }
+
+    return built.get(key)!
+  }
+})
+const localizedLanguages = computed(() => props.languages.map((code) => ({ code })))
 
 const collapsed = ref<Set<string>>(new Set())
 let added = 0
@@ -133,12 +150,12 @@ function hasErrors(index: number): boolean {
         </div>
 
         <FormField v-if="command.type === 'terminate_session'" :id="`command-${index}-response`" :label="t.commands.fields.response">
-          <LocalizedTextField
+          <LocalizedField
             :id="`command-${index}-response`"
             :model-value="command.response"
             :label="t.commands.fields.response"
-            :languages="languages"
-            :errors="errorsUnder(commandErrors(errors, index), 'response')"
+            :languages="localizedLanguages"
+            :errors="localizedErrors(index, 'response')"
             :rows="2"
             @update:model-value="(value) => update(index, { response: value })"
           />
@@ -168,12 +185,12 @@ function hasErrors(index: number): boolean {
         </FormField>
 
         <FormField v-if="command.type === 'send_message'" :id="`command-${index}-text`" :label="t.commands.fields.text">
-          <LocalizedTextField
+          <LocalizedField
             :id="`command-${index}-text`"
             :model-value="command.text"
             :label="t.commands.fields.text"
-            :languages="languages"
-            :errors="errorsUnder(commandErrors(errors, index), 'text')"
+            :languages="localizedLanguages"
+            :errors="localizedErrors(index, 'text')"
             :rows="2"
             @update:model-value="(value) => update(index, { text: value })"
           />

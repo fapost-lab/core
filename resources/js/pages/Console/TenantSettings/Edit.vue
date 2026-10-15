@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@fapost/ui/components/
 import { Textarea } from '@fapost/ui/components/textarea'
 import { interpolate } from '@fapost/ui/shell'
 import { SolutionMount, tabFromQuery, useExtensions } from '../../../console/solutions'
-import MultiSelectPicker from '../Shared/MultiSelectPicker.vue'
+import { OptionsPicker } from '@fapost/ui/components/options-picker'
 import { fallbackOptions, firstError, isTab, keptFallback, tabsWithErrors } from './form'
 import type { SelectOption, TenantSettingsPageProps, TenantSettingsState, TenantSettingsTab } from './types'
 
@@ -138,7 +138,7 @@ function save(): void {
               :error="firstError(errors, 'available_languages')"
               v-slot="{ invalid, describedBy }"
             >
-              <MultiSelectPicker
+              <OptionsPicker
                 id="available_languages"
                 v-model="form.available_languages"
                 :options="options.languages"

@@ -17,12 +17,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@fapost/ui/components/
 import { interpolate } from '@fapost/ui/shell'
 import CommandsField from './CommandsField.vue'
 import { SolutionMount, tabFromQuery, useExtensions } from '../../../console/solutions'
-import MultiSelectPicker from '../Shared/MultiSelectPicker.vue'
+import { OptionsPicker } from '@fapost/ui/components/options-picker'
+import { errorsByLocale, LocalizedField } from '@fapost/ui/components/localized-field'
 import FlowSelect from './FlowSelect.vue'
 import KeyValueField from './KeyValueField.vue'
-import LocalizedTextField from './LocalizedTextField.vue'
 import NewFlowDialog from './NewFlowDialog.vue'
-import { errorsUnder, firstError, isTab, tabsWithErrors, toPayload, type SettingsFormData } from './settings'
+import { firstError, isTab, tabsWithErrors, toPayload, type SettingsFormData } from './settings'
 import type { SettingsOptions, SettingsPageProps, SettingsState, SettingsTab } from './types'
 
 /**
@@ -56,6 +56,9 @@ const form = useForm<SettingsFormData>({
 
 const errors = computed(() => form.errors as Record<string, string | undefined>)
 const errorTabs = computed(() => tabsWithErrors(errors.value))
+const fallbackErrors = computed(() => errorsByLocale(errors.value, 'fallback_message'))
+const busyErrors = computed(() => errorsByLocale(errors.value, 'busy_message'))
+const localizedLanguages = computed(() => props.languages.map((code) => ({ code })))
 
 // Tabs Solutions add come after Core's; each is its own form with its own routes, outside Core's form.
 const { items: solutionTabs, assistantId } = useExtensions('tabs', 'assistant')
@@ -177,7 +180,7 @@ function createFlow(name: string): void {
               :error="firstError(errors, 'available_countries')"
               v-slot="{ invalid, describedBy }"
             >
-              <MultiSelectPicker
+              <OptionsPicker
                 id="available_countries"
                 v-model="form.available_countries"
                 :options="options.countries"
@@ -218,10 +221,10 @@ function createFlow(name: string): void {
 
           <FormSection :title="t.sections.messages.title" :description="t.sections.messages.description">
             <FormField id="fallback_message" :label="t.fields.fallback_message">
-              <LocalizedTextField id="fallback_message" v-model="form.fallback_message" :label="t.fields.fallback_message" :languages="languages" :errors="errorsUnder(errors, 'fallback_message')" />
+              <LocalizedField id="fallback_message" v-model="form.fallback_message" :label="t.fields.fallback_message" :languages="localizedLanguages" :errors="fallbackErrors" />
             </FormField>
             <FormField id="busy_message" :label="t.fields.busy_message" :hint="t.fields.busy_message_help">
-              <LocalizedTextField id="busy_message" v-model="form.busy_message" :label="t.fields.busy_message" :languages="languages" :errors="errorsUnder(errors, 'busy_message')" />
+              <LocalizedField id="busy_message" v-model="form.busy_message" :label="t.fields.busy_message" :languages="localizedLanguages" :errors="busyErrors" />
             </FormField>
           </FormSection>
         </TabsContent>

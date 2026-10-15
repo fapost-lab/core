@@ -7,8 +7,8 @@ import { FormField } from '@fapost/ui/components/form-field'
 import { Input } from '@fapost/ui/components/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
 import { interpolate } from '@fapost/ui/shell'
-import OptionsPicker from './OptionsPicker.vue'
-import ValueListInput from './ValueListInput.vue'
+import { OptionsPicker } from '@fapost/ui/components/options-picker'
+import { ValueListInput } from '@fapost/ui/components/value-list-input'
 import { arityOf, changeOperator, changeType, isKnown, singleValue, typeOf, withSingleValue } from './rules'
 import type { Condition, ContactSegmentsPageProps, SegmentOptions, SegmentSchema } from './types'
 
@@ -180,7 +180,7 @@ function setKey(value: string | number): void {
             :suggestions="suggestions"
             :placeholder="t.value_placeholder"
             :add-label="t.add_value"
-            :remove-label="t.remove_value"
+            :remove-label="(value) => interpolate(t.remove_value, { value })"
             :invalid="invalid"
             :described-by="describedBy"
           />
@@ -190,10 +190,10 @@ function setKey(value: string | number): void {
             :id="id('value')"
             v-model="list"
             :options="optionList"
-            :pick-label="t.pick_values"
+            :placeholder="t.pick_values"
             :empty-label="t.no_options"
             :missing-label="condition.type === 'group' ? t.deleted_group : undefined"
-            :remove-label="t.remove_value"
+            :remove-label="(value) => interpolate(t.remove_value, { value })"
             :invalid="invalid"
             :described-by="describedBy"
           />

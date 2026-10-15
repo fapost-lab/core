@@ -16,6 +16,8 @@
         "components/form-section",
         "components/input",
         "components/label",
+        "components/localized-field",
+        "components/options-picker",
         "components/select",
         "components/separator",
         "components/sheet",
@@ -26,6 +28,7 @@
         "components/tabs",
         "components/textarea",
         "components/tooltip",
+        "components/value-list-input",
         "lib/utils",
         "lib/relative-time"
     ]

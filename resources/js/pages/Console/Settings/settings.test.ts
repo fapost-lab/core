@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { commandErrors, emptyEntries, errorsUnder, firstError, isTab, newCommand, tabsWithErrors, toPayload, type SettingsFormData } from './settings'
+import { errorsByLocale } from '@fapost/ui/components/localized-field'
+import { commandErrors, emptyEntries, firstError, isTab, newCommand, tabsWithErrors, toPayload, type SettingsFormData } from './settings'
 
 const languages = ['en', 'ru']
 
@@ -108,7 +109,7 @@ describe('error helpers', () => {
 
   it('picks the errors of one command, relative to it', () => {
     expect(commandErrors(errors, 1)).toEqual({ command: 'Too long', 'response.ru': 'Unknown' })
-    expect(errorsUnder(commandErrors(errors, 1), 'response')).toEqual({ ru: 'Unknown' })
+    expect(errorsByLocale(commandErrors(errors, 1), 'response')).toEqual({ ru: 'Unknown' })
   })
 
   it('finds the first error of a field or its items', () => {

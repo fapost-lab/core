@@ -1,7 +1,8 @@
 import type { ShellPageProps } from '@fapost/ui/shell'
-import type { MessageEntry } from '../Broadcasts/localized'
+import type { LocalizedEntry } from '@fapost/ui/components/localized-field'
 
-export type { MessageEntry }
+/** One language of a localized setting. */
+export type MessageEntry = LocalizedEntry
 
 export type CommandType = 'terminate_session' | 'start_flow' | 'send_message'
 
