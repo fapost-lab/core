@@ -86,6 +86,45 @@ final class StaffNotificationTest extends FeatureTestCase
         $this->assertSame(1, DB::table('notifications')->where('notifiable_id', $user->id)->count());
     }
 
+    /**
+     * The row keeps the shape Filament's database notifications wrote, so older and newer rows read the same way. Key
+     * order is not compared: it carries no meaning in the stored JSON.
+     */
+    public function test_an_in_app_notification_is_stored_in_the_shape_filament_wrote(): void
+    {
+        $assistant = Assistant::factory()->create();
+        $user      = User::factory()->create();
+        $user->assistants()->attach($assistant->id);
+
+        $this->runJob($this->createSession($assistant->id), ['target' => 'assistant'], [StaffNotifyChannel::InApp->value]);
+
+        $row  = DB::table('notifications')->where('notifiable_id', $user->id)->sole();
+        $data = json_decode((string) $row->data, true, flags: JSON_THROW_ON_ERROR);
+
+        $expected = [
+            'actions'   => [],
+            'body'      => null,
+            'color'     => null,
+            'duration'  => 'persistent',
+            'icon'      => 'heroicon-o-information-circle',
+            'iconColor' => 'info',
+            'status'    => 'info',
+            'title'     => 'Operator needed',
+            'view'      => null,
+            'viewData'  => [],
+            'format'    => 'filament',
+        ];
+
+        $this->assertEquals($this->canonical($expected), $this->canonical($data));
+        $this->assertNull($row->read_at);
+
+        // The same as Filament's own message while Filament is installed; removed with it.
+        $this->assertEquals(
+            $this->canonical(\Filament\Notifications\Notification::make()->title('Operator needed')->info()->getDatabaseMessage()),
+            $this->canonical($data),
+        );
+    }
+
     public function test_job_delivers_email(): void
     {
         Mail::fake();
@@ -111,6 +150,18 @@ final class StaffNotificationTest extends FeatureTestCase
         $this->runJob($session, ['target' => 'assistant'], [StaffNotifyChannel::InApp->value]);
 
         $this->assertSame(1, DB::table('notifications')->where('notifiable_id', $user->id)->count());
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     *
+     * @return array<string, mixed>
+     */
+    private function canonical(array $data): array
+    {
+        ksort($data);
+
+        return $data;
     }
 
     /**

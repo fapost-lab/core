@@ -70,6 +70,21 @@ final class ConsoleStackTest extends InertiaConsoleTestCase
         $this->actingAs($this->user(['is_active' => false]))->get($this->panelUrl('/admin/_probe'))->assertUnauthorized();
     }
 
+    public function test_a_session_from_before_a_password_change_is_signed_out_to_the_login(): void
+    {
+        $user = $this->user();
+
+        $this->actingAs($user)->get($this->panelUrl('/admin/_probe'))->assertOk();
+
+        // Another device changed the password: the hash this session remembers no longer matches.
+        $this->actingAs($user)
+            ->withSession(['password_hash_' . Auth::getDefaultDriver() => 'a-hash-from-before'])
+            ->get($this->panelUrl('/admin/_probe'))
+            ->assertRedirect(route('filament.admin.auth.login'));
+
+        $this->assertGuest();
+    }
+
     public function test_writes_are_refused_while_the_tenant_is_stopped_and_reads_are_not(): void
     {
         $this->app->instance(TenantAccessModeInterface::class, FakeTenantAccessMode::stopped());

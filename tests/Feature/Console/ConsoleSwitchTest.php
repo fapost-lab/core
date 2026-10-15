@@ -38,6 +38,16 @@ final class ConsoleSwitchTest extends FeatureTestCase
         $this->assertStringContainsString('Filament', $action);
     }
 
+    public function test_filament_answers_the_assistant_landing_addresses(): void
+    {
+        foreach (['filament.assistant.tenant', 'filament.assistant.home'] as $name) {
+            $action = $this->route($name)->getActionName();
+
+            $this->assertStringNotContainsString('App\\Http\\Controllers\\Console', $action, $name);
+            $this->assertStringContainsString('Filament', $action, $name);
+        }
+    }
+
     public function test_filament_answers_the_admin_dashboard(): void
     {
         $action = $this->route('filament.admin.pages.dashboard')->getActionName();

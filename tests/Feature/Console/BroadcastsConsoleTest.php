@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
+use App\Domains\Broadcasting\Exceptions\BroadcastNotEditableException;
 use App\Domains\Broadcasting\Jobs\RunBroadcastJob;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Broadcasting\Services\BroadcastRecipientResolver;
+use App\Domains\Broadcasting\Services\BroadcastService;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
@@ -18,6 +21,8 @@ use App\Domains\Contact\Models\ContactTag;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Facades\Bus;
@@ -458,6 +463,29 @@ final class BroadcastsConsoleTest extends InertiaConsoleTestCase
             $this->assertEquals(['en' => 'Original'], $broadcast->message);
             $this->assertSame($status, $broadcast->status);
         }
+    }
+
+    public function test_the_write_itself_refuses_a_broadcast_that_started_after_the_screen_read_it(): void
+    {
+        // The screen reads the record as a draft; a run can start between that read and the write, so the write looks
+        // again under a lock. This is that second look, with the record the request still holds as a draft.
+        $held = $this->broadcast('Original', ['message' => ['en' => 'Original text']]);
+        Broadcast::query()->whereKey($held->getKey())->update(['status' => BroadcastStatus::Running->value]);
+
+        $this->app->make(TenantContextInterface::class)->set(Tenant::query()->findOrFail(self::TENANT_ID));
+        $this->app->make(CurrentAssistantInterface::class)->set($this->assistant);
+
+        try {
+            $this->app->make(BroadcastService::class)->update($held, $this->payload(['name' => 'Hijacked', 'message' => ['en' => 'Changed after the start']]));
+            $this->fail('The write went ahead on a broadcast that was no longer a draft.');
+        } catch (BroadcastNotEditableException) {
+            // Refused, as it should be.
+        }
+
+        $held->refresh();
+        $this->assertSame('Original', $held->name);
+        $this->assertEquals(['en' => 'Original text'], $held->message);
+        $this->assertSame(BroadcastStatus::Running, $held->status);
     }
 
     // ---- send ----------------------------------------------------------------------------------------------------

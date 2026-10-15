@@ -84,11 +84,11 @@ final readonly class TenantFlowActivity
      * `executed` counts `executed` and `terminal` entries (a terminal step is a normal completion), `failed` counts
      * `failed`; `conflict`, which the engine never writes today, counts in neither.
      *
-     * The day cut is UTC on both drivers: SQLite stores `created_at` in the app timezone (UTC), and PostgreSQL converts
-     * explicitly (`AT TIME ZONE 'UTC'`), since `TO_CHAR` on a `timestamptz` renders in the session's TimeZone. The
-     * window's bounds are not converted: they are bound as timestamps without a zone, which PostgreSQL reads in the
-     * session's TimeZone, so the first and last day line up with UTC days only while that session TimeZone is UTC.
-     * Under another TimeZone the window shifts by the offset; the days themselves stay UTC days.
+     * The day cut is UTC on both drivers, whatever TimeZone a PostgreSQL session is set to: SQLite stores `created_at` in
+     * the app timezone (UTC), and PostgreSQL converts explicitly (`AT TIME ZONE 'UTC'`), since `TO_CHAR` on a
+     * `timestamptz` renders in the session's TimeZone. The window's bounds carry their offset on PostgreSQL for the same
+     * reason: a timestamp bound without a zone is read in the session's TimeZone, which would shift the window and drop
+     * the rows of today written after the offset.
      *
      * @param  EloquentBuilder<Assistant>|null  $assistants  the assistants to count for; `null` is the whole tenant
      *
@@ -105,10 +105,14 @@ final readonly class TenantFlowActivity
             default  => throw new RuntimeException("TenantFlowActivity: unsupported database driver [{$driver}]."),
         };
 
+        $bounds = 'pgsql' === $driver
+            ? [$start->format('Y-m-d H:i:sP'), $now->format('Y-m-d H:i:sP')]
+            : [$start, $now];
+
         $ids  = null === $assistants ? null : $this->assistantIds($assistants);
         $rows = $this->connection->table('flow_logs')
             ->selectRaw("{$day} AS day, status, COUNT(*) AS total")
-            ->whereBetween('created_at', [$start, $now])
+            ->whereBetween('created_at', $bounds)
             ->whereIn('session_id', fn (Builder $sessions): Builder => $sessions
                 ->select('id')
                 ->from('flow_sessions')

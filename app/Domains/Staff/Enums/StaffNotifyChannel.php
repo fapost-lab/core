@@ -16,7 +16,7 @@ namespace App\Domains\Staff\Enums;
  */
 enum StaffNotifyChannel: string
 {
-    /** In-app Filament database notification (always available). */
+    /** In-app database notification (always available). */
     case InApp = 'in_app';
 
     /** Email to the staff member's address. */

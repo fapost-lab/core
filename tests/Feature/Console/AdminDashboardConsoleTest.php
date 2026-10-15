@@ -20,6 +20,7 @@ use App\Domains\Staff\Services\PlatformSupportUserService;
 use App\Http\Controllers\Admin\DashboardController;
 use Carbon\CarbonImmutable;
 use Database\Seeders\TenantAclSeeder;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 
@@ -193,6 +194,40 @@ final class AdminDashboardConsoleTest extends InertiaConsoleTestCase
                 ->where('activity.12', ['date' => '2026-10-09', 'executed' => 0, 'failed' => 0])
                 ->where('activity.13', ['date' => '2026-10-10', 'executed' => 2, 'failed' => 1])
                 ->etc());
+    }
+
+    /**
+     * `created_at` is a `timestamptz`, so a session TimeZone other than UTC (an installation may set one) shifts both the
+     * rendering of a day and a window bound passed without a zone. Late in the UTC day a UTC+14 session would render the
+     * row as tomorrow, or leave it after the window's end. Filament's chart kept the row on its own UTC day; so does this.
+     */
+    public function test_the_activity_days_do_not_shift_with_a_non_utc_session_timezone(): void
+    {
+        if ('pgsql' !== DB::connection()->getDriverName()) {
+            $this->markTestSkipped('The session TimeZone this guards against exists on PostgreSQL only.');
+        }
+
+        $now = CarbonImmutable::parse('2026-10-10 20:00:00', 'UTC');
+        CarbonImmutable::setTestNow($now);
+
+        $session = $this->flowSession(Assistant::factory()->create(), FlowSessionStatus::Active);
+        // Written before the TimeZone changes: the insert binds its timestamp without a zone too.
+        $this->log($session, 'executed', $now->subMinute());
+        $this->log($session, 'failed', $now->subDays(13)->startOfDay()->addMinute());
+
+        $timeZone = (string) DB::selectOne('SHOW TimeZone')->TimeZone;
+        DB::statement("SET TIME ZONE 'Pacific/Kiritimati'");
+
+        try {
+            $response = $this->actingAs($this->admin())->get($this->panelUrl('/admin'));
+        } finally {
+            DB::statement("SET TIME ZONE '{$timeZone}'");
+        }
+
+        $response->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('activity.0', ['date' => '2026-09-27', 'executed' => 0, 'failed' => 1])
+            ->where('activity.13', ['date' => '2026-10-10', 'executed' => 1, 'failed' => 0])
+            ->etc());
     }
 
     public function test_a_guest_is_sent_to_the_login(): void
