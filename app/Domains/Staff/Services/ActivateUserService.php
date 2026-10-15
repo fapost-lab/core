@@ -6,7 +6,6 @@ namespace App\Domains\Staff\Services;
 
 use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\User;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -18,6 +17,9 @@ final class ActivateUserService
     }
 
     /**
+     * Sets the invitee's password and makes the account active. Signing the invitee in is the caller's: it belongs to
+     * the request's session, which the activation controller replaces.
+     *
      * @param  array{password: string, password_confirmation: string}  $credentials
      */
     public function activate(string $plainToken, array $credentials): User
@@ -26,7 +28,7 @@ final class ActivateUserService
 
         if (null === $user || UserStatus::Pending !== $user->status) {
             throw ValidationException::withMessages([
-                'token' => __('The activation link is invalid or has expired.'),
+                'token' => __('auth.activation.invalid'),
             ]);
         }
 
@@ -38,8 +40,6 @@ final class ActivateUserService
             $user->save();
 
             $this->activationTokenService->deleteForUser($user);
-
-            Auth::login($user);
 
             return $user;
         });
