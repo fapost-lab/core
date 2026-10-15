@@ -76,6 +76,10 @@
             "Composer\\Config::disableProcessTimeout",
             "@php tools/composer-overlay.php"
         ],
+        "overlay:post-install": [
+            "Composer\\Config::disableProcessTimeout",
+            "@php tools/composer-overlay.php --post-install-only"
+        ],
         "ngrok": "tools/ngrok-http",
         "tunnel": "tools/cf-tunnel",
         "setup": [

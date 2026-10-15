@@ -275,12 +275,64 @@ locks, the install fails instead of upgrading Core underneath it.
 `post-update-cmd` runs `dev:link`, so a checkout under `packages/` is symlinked into
 `vendor/` exactly as in the Core-required lane.
 
+### Post-install steps
+
+Some packages need an artisan command after they are installed — publishing their
+assets, for example. Core does not know your package, so the package declares the
+commands itself, in its own `composer.json`:
+
+```json
+{
+  "extra": {
+    "fapost": {
+      "post-install": ["filament:assets"]
+    }
+  }
+}
+```
+
+After a successful install, `composer overlay` reads this list from each overlay
+package's installed manifest (`vendor/<name>/composer.json`, which follows the
+`dev:link` symlink to your checkout) and runs `php artisan <command>` for every
+entry, printing `[overlay] <package>: php artisan <command>` before each. Only
+overlay packages are read; Core's own dependencies never run anything.
+
+Each entry is a bare artisan command name — lowercase letters, digits, `:` and `-`,
+with no arguments and no shell. A list that is not a list of such names fails the
+run with the package's name before any command runs, and a command that fails stops
+the run with its exit code.
+
+When Composer's scripts are disabled the steps are skipped as well, since packages
+are not discovered yet; run them once discovery has happened. An image build or CI
+does this by calling the script directly:
+
+```bash
+php tools/composer-overlay.php --require-overlay -- --no-dev --no-scripts
+```
+
+<Warning>
+  Do not pass `--no-scripts` through `composer overlay`: Composer applies it to itself,
+  so the `overlay` script never runs and nothing is installed, without an error.
+</Warning>
+
+To run only these steps again — after `composer dev:link`, after changing the
+package or after a `--no-scripts` install — without reinstalling anything:
+
+```bash
+composer overlay:post-install
+```
+
+Assets published under `public/css/filament/`, `public/js/filament/` and
+`public/fonts/filament/` are git-ignored in Core, since only overlay packages put them
+there.
+
 Options reach the script after `--`, because Composer strips the first `--` and
 drops options it does not know before it:
 
 | Command | Effect |
 |---|---|
-| `composer overlay -- --dry-run` | Writes the two files, installs nothing. |
+| `composer overlay -- --dry-run` | Writes the two files, installs nothing, and lists the post-install steps without running them. |
+| `composer overlay:post-install` | Runs only the post-install steps of the installed overlay packages; add `-- --dry-run` to list them. |
 | `composer overlay -- --require-overlay` | A missing `composer.overlay.json` is an error instead of a no-op — use it in CI and images. |
 | `composer overlay -- --no-dev` | Anything else after `--` is passed to `composer update`. |
 

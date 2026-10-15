@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Tooling;
 
+use FilesystemIterator;
 use PHPUnit\Framework\TestCase;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use Symfony\Component\Process\Process;
 
 final class ComposerOverlayScriptTest extends TestCase
@@ -29,8 +32,13 @@ final class ComposerOverlayScriptTest extends TestCase
 
     protected function tearDown(): void
     {
-        foreach (glob($this->root . '/*') ?: [] as $file) {
-            unlink($file);
+        $entries = new RecursiveIteratorIterator(
+            new RecursiveDirectoryIterator($this->root, FilesystemIterator::SKIP_DOTS),
+            RecursiveIteratorIterator::CHILD_FIRST,
+        );
+
+        foreach ($entries as $entry) {
+            $entry->isDir() ? rmdir($entry->getPathname()) : unlink($entry->getPathname());
         }
 
         rmdir($this->root);
@@ -143,6 +151,19 @@ final class ComposerOverlayScriptTest extends TestCase
         self::assertSame(1, $this->runScript()->getExitCode());
     }
 
+    public function test_invalid_package_name_is_rejected(): void
+    {
+        foreach (['../../evil', 'acme/../../evil', 'no-vendor'] as $package) {
+            $this->writeOverlay(['require' => [$package => '@dev']]);
+
+            $process = $this->runScript();
+
+            self::assertSame(1, $process->getExitCode(), $package);
+            self::assertStringContainsString("\"{$package}\" in composer.overlay.json is not a valid package name", $process->getErrorOutput());
+            self::assertFileDoesNotExist($this->root . '/composer.local.json');
+        }
+    }
+
     public function test_list_shaped_require_is_rejected(): void
     {
         $this->writeOverlay(['require' => ['acme/extra']]);
@@ -188,6 +209,148 @@ final class ComposerOverlayScriptTest extends TestCase
 
         self::assertSame(7, $process->getExitCode());
         self::assertStringNotContainsString('[overlay] done', $process->getOutput());
+    }
+
+    public function test_post_install_steps_of_overlay_packages_run_after_composer_update(): void
+    {
+        $this->writeOverlay(['require' => ['Acme/Extra' => '@dev', 'acme/plain' => '@dev']]);
+        $this->installPackage('acme/extra', ['extra' => ['fapost' => ['post-install' => ['filament:assets', 'about']]]]);
+        $this->installPackage('acme/plain', ['extra' => ['other' => true]]);
+        $this->installPackage('acme/core-package', ['extra' => ['fapost' => ['post-install' => ['core:never']]]]);
+        $this->writeFakeArtisan();
+
+        $process = $this->runScript(withFakeComposer: 0);
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertSame(
+            ['artisan filament:assets COMPOSER=composer.local.json', 'artisan about COMPOSER=composer.local.json'],
+            $this->artisanCalls($process),
+        );
+        self::assertStringContainsString('[overlay] Acme/Extra: php artisan filament:assets', $process->getOutput());
+        self::assertStringNotContainsString('core:never', $process->getOutput());
+        self::assertStringContainsString('[overlay] done', $process->getOutput());
+    }
+
+    public function test_dry_run_lists_post_install_steps_without_running_them(): void
+    {
+        $this->writeOverlay(['require' => ['acme/extra' => '@dev', 'acme/absent' => '@dev']]);
+        $this->installPackage('acme/extra', ['extra' => ['fapost' => ['post-install' => ['filament:assets']]]]);
+        $this->writeFakeArtisan();
+
+        $process = $this->runScript();
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertStringContainsString('[overlay] would run acme/extra: php artisan filament:assets', $process->getOutput());
+        self::assertStringContainsString('acme/absent: not installed', $process->getErrorOutput());
+        self::assertSame([], $this->artisanCalls($process));
+    }
+
+    public function test_post_install_only_runs_the_steps_without_composer(): void
+    {
+        $this->writeOverlay(['require' => ['acme/extra' => '@dev']]);
+        $this->installPackage('acme/extra', ['extra' => ['fapost' => ['post-install' => ['filament:assets']]]]);
+        $this->writeFakeArtisan();
+
+        $process = $this->runScript(['--', '--post-install-only'], withFakeComposer: 0);
+
+        self::assertSame(0, $process->getExitCode(), $process->getErrorOutput());
+        self::assertSame(['artisan filament:assets COMPOSER=composer.local.json'], $this->artisanCalls($process));
+        self::assertStringNotContainsString('update', $process->getOutput());
+        self::assertFileDoesNotExist($this->root . '/composer.local.json');
+    }
+
+    public function test_no_scripts_skips_post_install_steps_but_post_install_only_still_runs_them(): void
+    {
+        $this->writeOverlay(['require' => ['acme/extra' => '@dev']]);
+        $this->installPackage('acme/extra', ['extra' => ['fapost' => ['post-install' => ['filament:assets']]]]);
+        $this->writeFakeArtisan();
+
+        $skipped = $this->runScript(['--require-overlay', '--', '--no-dev', '--no-scripts'], withFakeComposer: 0);
+
+        self::assertSame(0, $skipped->getExitCode(), $skipped->getErrorOutput());
+        self::assertStringContainsString('[overlay] --no-scripts: skipping post-install steps', $skipped->getOutput());
+        self::assertSame([], $this->artisanCalls($skipped));
+        self::assertStringContainsString('[overlay] done', $skipped->getOutput());
+
+        $later = $this->runScript(['--post-install-only', '--', '--no-scripts'], withFakeComposer: 0);
+
+        self::assertSame(0, $later->getExitCode(), $later->getErrorOutput());
+        self::assertSame(['artisan filament:assets COMPOSER=composer.local.json'], $this->artisanCalls($later));
+    }
+
+    public function test_malformed_post_install_declaration_fails_with_the_package_name_before_anything_runs(): void
+    {
+        $malformed = [
+            'not a list'        => 'filament:assets',
+            'not a string'      => [['filament:assets']],
+            'arguments'         => ['migrate --force'],
+            'shell'             => ['about; rm -rf /'],
+            'upper case'        => ['Filament:Assets'],
+            'leading separator' => ['-about'],
+        ];
+
+        foreach ($malformed as $case => $postInstall) {
+            $this->writeOverlay(['require' => ['acme/extra' => '@dev', 'acme/bad' => '@dev']]);
+            $this->installPackage('acme/extra', ['extra' => ['fapost' => ['post-install' => ['about']]]]);
+            $this->installPackage('acme/bad', ['extra' => ['fapost' => ['post-install' => $postInstall]]]);
+            $this->writeFakeArtisan();
+
+            $process = $this->runScript(['--post-install-only']);
+
+            self::assertSame(1, $process->getExitCode(), $case);
+            self::assertStringContainsString('acme/bad: extra.fapost.post-install', $process->getErrorOutput(), $case);
+            self::assertSame([], $this->artisanCalls($process), $case);
+        }
+    }
+
+    public function test_failing_post_install_step_stops_with_its_exit_code(): void
+    {
+        $this->writeOverlay(['require' => ['acme/extra' => '@dev']]);
+        $this->installPackage('acme/extra', ['extra' => ['fapost' => ['post-install' => ['fail:now', 'about']]]]);
+        $this->writeFakeArtisan();
+
+        $process = $this->runScript(withFakeComposer: 0);
+
+        self::assertSame(3, $process->getExitCode());
+        self::assertStringContainsString('acme/extra: post-install step "php artisan fail:now" failed with exit code 3', $process->getErrorOutput());
+        self::assertSame(['artisan fail:now COMPOSER=composer.local.json'], $this->artisanCalls($process));
+        self::assertStringNotContainsString('[overlay] done', $process->getOutput());
+    }
+
+    /**
+     * @param  array<string, mixed>  $manifest
+     */
+    private function installPackage(string $name, array $manifest): void
+    {
+        $directory = $this->root . '/vendor/' . $name;
+
+        if (! is_dir($directory)) {
+            mkdir($directory, 0777, true);
+        }
+
+        file_put_contents($directory . '/composer.json', json_encode(['name' => $name, ...$manifest]));
+    }
+
+    /**
+     * A stand-in for `artisan` that echoes its call and fails for `fail:now`.
+     */
+    private function writeFakeArtisan(): void
+    {
+        file_put_contents(
+            $this->root . '/artisan',
+            '<?php echo "artisan " . implode(" ", array_slice($argv, 1)) . " COMPOSER=" . getenv("COMPOSER") . "\n"; exit("fail:now" === $argv[1] ? 3 : 0);',
+        );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function artisanCalls(Process $process): array
+    {
+        return array_values(array_filter(
+            explode("\n", $process->getOutput()),
+            static fn (string $line): bool => str_starts_with($line, 'artisan '),
+        ));
     }
 
     /**

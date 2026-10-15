@@ -74,7 +74,10 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   `composer.overlay.json` is merged into `composer.local.json` and installed against Core's lock by
   `tools/composer-overlay.php`, which refuses any package Core requires or locks, so an overlay can
   never move a Core version. The same script serves local development, images derived from Core and
-  an extension's CI.
+  an extension's CI. A package that needs work after installation (publishing its assets) declares
+  bare artisan command names in its own `extra.fapost.post-install`; the overlay runs them for
+  overlay packages only, so Core never names a package's post-install step — Filament's
+  `filament:assets` included.
 - **The extension surface is partly built.** Present: the action handler registry
   (`Flow/Action/ActionHandlerRegistry`). The builder's former vendor-component glob
   (`vendorComponents.ts`) is removed: Solution UI goes to the console prebuilt
