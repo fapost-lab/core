@@ -392,10 +392,11 @@ permissions. Prefix your own CSS classes so they cannot collide with the kit's.
 
 ## Not ready yet
 
-- **The Vite preset** that builds `dist/` and writes `fapost-ui.json`, and the
-  published `@fapost/ui` package to build against, are still to come. Until then a
-  bundle is built by hand or with your own Vite configuration in library mode,
-  with the specifiers above external.
+- **The Vite preset** that builds `dist/` and writes `fapost-ui.json` is still to
+  come. The kit itself is published: install
+  [`@fapost/ui`](https://www.npmjs.com/package/@fapost/ui) to build and type-check
+  against it. Until the preset exists a bundle is built with your own Vite
+  configuration in library mode, with the specifiers above external.
 - **The version check.** `kit`, `vue` and `inertia` are required and recorded but
   not yet compared with the console's: a bundle built against an incompatible kit
   is served anyway.

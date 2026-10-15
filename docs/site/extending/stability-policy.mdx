@@ -24,10 +24,11 @@ is fixed, along with who may write each.
 **The console's run-time interface for Solutions.** What a prebuilt Solution bundle
 runs against in the browser — see [Console UI](/extending/console-ui):
 
-- `@fapost/ui`, the console kit, at the public subpaths that page lists. It follows
-  strict semver from its first published version, `0.1.0`, which is not released
-  yet (see [Not ready yet](/extending/console-ui#not-ready-yet)); an installation
-  serves exactly one version of it.
+- `@fapost/ui`, the console kit, at the public subpaths that page lists. It is
+  published to npm from its first version, `0.1.0`, and follows semver with a rule
+  for `0.x`: a breaking change to the surface raises the minor version (`0.2.0`),
+  additions and fixes raise the patch version, so a `^0.1.0` range takes new
+  components and never a break. An installation serves exactly one version of it.
 - The `fapost-ui.json` schema.
 - Page and component names, `<id>::<Path>`, and the string values of the console
   targets (`contact.view`, `floating`, `admin`, …).

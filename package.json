@@ -6,7 +6,9 @@
         "build": "vite build",
         "dev": "vite",
         "type-check": "vue-tsc --noEmit",
-        "test": "vitest run"
+        "test": "vitest run",
+        "dev:link": "node tools/dev-link-npm.mjs",
+        "postinstall": "node tools/dev-link-npm.mjs"
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.0.0",
@@ -23,21 +25,16 @@
         "vue-tsc": "^3.2.7"
     },
     "dependencies": {
-        "@fontsource-variable/onest": "^5.3.1",
-        "@fontsource-variable/roboto-condensed": "^5.3.0",
-        "@fontsource-variable/victor-mono": "^5.3.0",
+        "@fapost/ui": "^0.1.0",
         "@inertiajs/vue3": "^3.7.1",
         "@lucide/vue": "^1.53.0",
         "@vitejs/plugin-vue": "^6.0.6",
         "@vueuse/core": "^15.0.0",
-        "class-variance-authority": "^0.7.1",
-        "clsx": "^2.1.1",
         "laravel-echo": "^2.5.0",
         "nanoid": "^6.0.1",
         "pinia": "^4.0.3",
         "pusher-js": "^8.6.0",
         "reka-ui": "^2.11.0",
-        "tailwind-merge": "^3.7.0",
         "vue": "^3.5.32",
         "vue-router": "^5.0.6",
         "vue-sonner": "^2.0.9"

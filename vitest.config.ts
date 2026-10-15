@@ -18,11 +18,18 @@ export default defineConfig({
             '@console': path.resolve(root, 'resources/js/console'),
             '@shared': path.resolve(root, 'resources/js/shared'),
             '@tma': path.resolve(root, 'resources/js/tma'),
-            '@fapost/ui': path.resolve(root, 'resources/js/ui'),
         },
+        // The same modules as `onePerPage` in vite.config.ts: one copy each, also when packages/fapost-ui is linked.
+        dedupe: ['vue', '@inertiajs/vue3', 'reka-ui', 'vue-sonner', '@lucide/vue', '@vueuse/core'],
     },
     test: {
         include: ['resources/js/**/*.test.ts'],
         environment: 'node',
+        server: {
+            deps: {
+                // @fapost/ui ships .vue and .ts sources: Vitest must transform it instead of handing it to Node.
+                inline: ['@fapost/ui'],
+            },
+        },
     },
 })

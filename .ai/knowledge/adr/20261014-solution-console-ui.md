@@ -201,3 +201,10 @@ Why:      one Vue instance and one kit are what make prebuilt bundles work witho
 **2026-10-15, Filament left Core (remove-filament).** The migration the Context describes as under way is
 complete: Core has no Filament or Livewire, and the Inertia + Vue console is its only operator UI. The decision is
 unchanged; "is leaving" above now reads "has left".
+
+**2026-10-15, the kit is a package (kit-extract-package).** `@fapost/ui` is published to npm from `fapost-lab/ui`
+(`adr-20261015-ui-kit-package-shape`). The public surface a Solution imports is the package's `surface.json`; Core keeps
+a copy in `resources/js/console/shared/ui-surface.json`, which PHP reads at run time and `ui-surface.test.ts` holds
+equal to the installed package. "Strict semver from `0.1.0`" above reads as that ADR's `0.x` rule: a breaking change
+raises the minor, so a kit range `^0.1.0` takes additions and never a break. The extracted `@fapost/ui` listed under
+Consequences for `first-solution` is done; the npm preset and the kit-range check remain.

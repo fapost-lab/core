@@ -4,7 +4,7 @@ description: "Working on packages locally against a Core checkout."
 ---
 
 `fapost/foundation` and `fapost/support` — and any Solution or Plugin you build —
-live in their own git repositories. This page explains how a package is developed
+live in their own git repositories, and so does the console kit `@fapost/ui`. This page explains how a package is developed
 against a Core checkout, and the two ways it reaches an install: as a dependency
 Core itself declares, or as an overlay Core never names.
 
@@ -64,6 +64,47 @@ its own.
 From here, edits inside `packages/fapost-foundation` are picked up instantly — no
 `composer update` needed. The checkout is a normal git repository: branch, commit,
 and push it independently of Core.
+
+## The console kit, an npm package
+
+`@fapost/ui`, the console kit, is an npm package
+([fapost-lab/ui](https://github.com/fapost-lab/ui)) that Core installs from the
+registry like any other dependency; `package.json` and `package-lock.json` always
+describe that lane. It is developed the same way as the Composer packages: clone it
+into `packages/` and link it over `node_modules/`.
+
+```bash
+git clone git@github.com:fapost-lab/ui.git packages/fapost-ui
+```
+
+```bash
+npm run dev:link
+```
+
+That replaces `node_modules/@fapost/ui` with a relative symlink to
+`packages/fapost-ui`. `tools/dev-link-npm.mjs` links every `packages/*/package.json`
+whose `name` Core depends on, runs as `postinstall` so a plain `npm install` or
+`npm ci` restores the link, and is a no-op without `packages/`. `make dev-link` runs
+both linkers; the npm one runs on the host, where `node_modules` is installed, so it
+needs Node there.
+
+<Warning>
+  With the kit linked, install Core's dependencies with `npm ci`, not `npm install`.
+  `npm install` treats the link target as part of Core's tree and prunes
+  `packages/fapost-ui/node_modules`, so the kit loses its own Vue and type-checking
+  and tests break. If it happened, run `npm ci` in `packages/fapost-ui`. The linker
+  warns when a linked checkout has no `node_modules/vue`. The `vite` service of
+  `docker/compose.dev.yaml` and `composer setup` already use `npm ci`, which fails
+  while `package.json` and `package-lock.json` disagree: after editing `package.json`,
+  run `npm install` once to update the lock, then `npm ci` in `packages/fapost-ui`
+  if the kit is linked.
+</Warning>
+
+The kit ships its sources, so Vite serves an edit in `packages/fapost-ui` at once,
+with no build and no release. The checkout has its own `node_modules`; Core's
+`resolve.dedupe` in `vite.config.ts` and `vitest.config.ts`, and the `paths` for the
+kit's peers in `tsconfig.json`, keep one Vue, one Inertia, one `reka-ui` and one
+`vue-sonner` on the page and in type-checking either way.
 
 ## Which lane a package takes
 
@@ -376,5 +417,6 @@ php artisan migrate --database=landlord --force
 | `require` in the root `composer.json` | Version constraint per package, for example `^0.1`. |
 | `composer.lock` | Pins the exact commit of each tagged version. Always the VCS lane, so it is safe to commit. |
 | `tools/dev-link-packages.php` / `composer dev:link` | Symlinks `vendor/<name>` to the local checkout. Runs on install and update; a no-op without `packages/`. |
+| `tools/dev-link-npm.mjs` / `npm run dev:link` | Symlinks `node_modules/<name>` to the local checkout of an npm package (`@fapost/ui`). Runs as `postinstall`; a no-op without `packages/`. |
 | `composer.overlay.json` | Packages Core does not require: `repositories` and `require` only. Git-ignored. |
 | `tools/composer-overlay.php` / `composer overlay` | Writes `composer.local.json` and `composer.local.lock` and installs the overlay against Core's lock. |

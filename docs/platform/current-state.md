@@ -13,7 +13,7 @@ The application is an active Laravel 12 Core implementation, not a starter scaff
 - a versioned Flow Engine with handlers, validation, publish flow, sessions, logs, concurrency primitives, and routing;
 - a Vue/Inertia builder under `resources/js/builder`;
 - the Inertia + Vue console (the admin panel and each assistant's screens, `routes/inertia.php`,
-  `resources/js/pages`, the `@fapost/ui` kit in `resources/js/ui`); Core has no Filament or Livewire;
+  `resources/js/pages`, the `@fapost/ui` kit, an npm package from `fapost-lab/ui`); Core has no Filament or Livewire;
 - a Conversation Logging domain (transcript capture pipeline, Postgres store driver, operator inbox with reply);
 - a managed Broadcasting domain and Contact Segments, with their console screens;
 - local `fapost-foundation` and `fapost-support` packages;

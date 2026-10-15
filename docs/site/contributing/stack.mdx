@@ -60,9 +60,9 @@ is installed — a local Core checkout with the SaaS overlay.
 | TypeScript | 6 | Type-checked with `vue-tsc`. |
 | Vite | 8 | Builds every front-end entry; on Vite 8 the bundler underneath is Rolldown. Configuration is `vite.config.ts`. |
 | Tailwind CSS | 4 | Styling, through the `@tailwindcss/vite` plugin rather than a PostCSS config. |
-| `@fapost/ui` | — | Core's component kit in `resources/js/ui`: shadcn-vue components (new-york style) on `reka-ui` 2, the design tokens and the Tailwind theme. An alias, not an npm package. The console shell is Core's own code in `resources/js/console/shell` (alias `@console`). |
+| `@fapost/ui` | 0.1 | The console kit, an npm package from [fapost-lab/ui](https://github.com/fapost-lab/ui) shipped as source: shadcn-vue components (new-york style) on `reka-ui` 2, the design tokens, the Tailwind theme and the fonts. The console shell is Core's own code in `resources/js/console/shell` (alias `@console`). |
 | `@lucide/vue` | 1 | Icons. |
-| Fontsource | — | Onest, Roboto Condensed and Victor Mono, bundled rather than loaded from a font CDN. |
+| Fontsource | — | Onest, Roboto Condensed and Victor Mono, bundled rather than loaded from a font CDN; they come with `@fapost/ui` (`@fapost/ui/fonts.css`). |
 
 **Translations** come from Laravel's `lang/` files (`en`, `ru`, `uk`) and reach a
 page as shared Inertia props, one namespace per page — there is no separate

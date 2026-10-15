@@ -91,6 +91,8 @@ FROM node:26-alpine AS assets
 WORKDIR /build
 
 COPY package.json package-lock.json* ./
+# postinstall runs the npm package linker; it is a no-op here (no packages/), but it must exist.
+COPY tools/dev-link-npm.mjs ./tools/
 RUN npm ci
 
 COPY vite.config.ts tsconfig*.json ./
