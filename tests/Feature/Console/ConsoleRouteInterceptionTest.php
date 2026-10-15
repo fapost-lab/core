@@ -32,6 +32,7 @@ use App\Http\Controllers\Console\FlowGroupController;
 use App\Http\Controllers\Console\FlowLogController;
 use App\Http\Controllers\Console\FlowSessionController;
 use App\Http\Controllers\Console\LocaleController;
+use App\Http\Controllers\Console\NotificationController;
 use App\Http\Controllers\Console\TranslationController;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
@@ -196,6 +197,11 @@ final class ConsoleRouteInterceptionTest extends FeatureTestCase
             'admin search' => ['console.admin.search', AdminSearchController::class, '', 'GET', 'admin/search'],
             // App switcher: the user's own rail, in both panels.
             'application rail' => ['console.applications.rail.update', ApplicationRailController::class, '', 'PUT', 'console/applications/rail'],
+            // Notification bell: the user's own notifications, in both panels.
+            'notifications index'    => ['console.notifications.index', NotificationController::class, 'index', 'GET', 'console/notifications'],
+            'notifications count'    => ['console.notifications.count', NotificationController::class, 'count', 'GET', 'console/notifications/count'],
+            'notification read'      => ['console.notifications.read', NotificationController::class, 'read', 'POST', 'console/notifications/{notification}/read'],
+            'notifications read all' => ['console.notifications.read-all', NotificationController::class, 'readAll', 'POST', 'console/notifications/read'],
         ];
     }
 

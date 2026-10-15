@@ -6,6 +6,7 @@ namespace App\Http\Middleware;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Services\StaffNotificationInbox;
 use App\Domains\Staff\Support\SupportAccessSession;
 use App\Domains\Tenancy\Services\CurrentAccessState;
 use App\Http\Shell\ApplicationRail;
@@ -96,7 +97,8 @@ final class HandleInertiaRequests extends Middleware
         $shared['assistants']              = fn (): ?array => $this->assistants($request);
         $shared['applications']            = fn (): ?array => $this->applications($request);
         // What the Solutions served to the tenant add to Core's screens (extension-contract).
-        $shared['extensions'] = fn (): ?array => $request->user() instanceof User ? app(SolutionExtensions::class)->props($request->user(), $request) : null;
+        $shared['extensions']    = fn (): ?array => $request->user() instanceof User ? app(SolutionExtensions::class)->props($request->user(), $request) : null;
+        $shared['notifications'] = fn (): ?array => $this->notifications($request);
 
         return $shared;
     }
@@ -127,6 +129,28 @@ final class HandleInertiaRequests extends Middleware
             'logoutUrl'       => route('console.auth.logout', [], false),
             'supportLeaveUrl' => route('support.leave', [], false),
             'locales'         => SetLocale::SUPPORTED_LOCALES,
+        ];
+    }
+
+    /**
+     * The notification bell: one count of the user's unread notifications (an indexed query on the notifiable), and
+     * where the bell reads the list, polls the count and marks everything read. The list itself loads when it opens.
+     *
+     * @return array{unread: int, indexUrl: string, countUrl: string, readAllUrl: string}|null
+     */
+    private function notifications(Request $request): ?array
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        return [
+            'unread'     => app(StaffNotificationInbox::class)->unreadCount($user),
+            'indexUrl'   => route('console.notifications.index', [], false),
+            'countUrl'   => route('console.notifications.count', [], false),
+            'readAllUrl' => route('console.notifications.read-all', [], false),
         ];
     }
 

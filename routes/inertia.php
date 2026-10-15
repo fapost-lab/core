@@ -31,6 +31,7 @@ use App\Http\Controllers\Console\FlowGroupController;
 use App\Http\Controllers\Console\FlowLogController;
 use App\Http\Controllers\Console\FlowSessionController;
 use App\Http\Controllers\Console\LocaleController;
+use App\Http\Controllers\Console\NotificationController;
 use App\Http\Controllers\Console\TranslationController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\SetConsoleRootView;
@@ -72,6 +73,12 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
 
         // App switcher: the user's own rail (which applications are pinned, in what order), in both panels.
         Route::put('console/applications/rail', ApplicationRailController::class)->name('console.applications.rail.update');
+
+        // The notification bell: the user's own in-app notifications, in both panels. The count is polled; every route is throttled.
+        Route::get('console/notifications', [NotificationController::class, 'index'])->middleware('throttle:60,1')->name('console.notifications.index');
+        Route::get('console/notifications/count', [NotificationController::class, 'count'])->middleware('throttle:60,1')->name('console.notifications.count');
+        Route::post('console/notifications/read', [NotificationController::class, 'readAll'])->middleware('throttle:60,1')->name('console.notifications.read-all');
+        Route::post('console/notifications/{notification}/read', [NotificationController::class, 'read'])->middleware('throttle:60,1')->name('console.notifications.read');
 
         // Translations: the tenant's overrides of the system catalog, one layer. `{key}` is a catalog key (dots included).
         Route::get('admin/translations', [AdminTranslationController::class, 'index'])->name('console.admin.translations.index');

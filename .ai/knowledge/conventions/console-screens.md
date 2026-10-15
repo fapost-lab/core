@@ -55,6 +55,11 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   the extension contract feeds the registry) gets the rail, "All applications" and ⌘K from there; the
   assistant switcher shows only for an application that works per assistant. Example: `ApplicationRail`,
   `AppRail.vue`, `AllApplicationsDialog.vue`, `AppSwitcherConsoleTest`.
+- **The notification bell** lives in the shell's header in both panels. The shared `notifications` prop carries
+  only the unread count (one indexed count, no cache) and the bell's URLs; the list loads as JSON when the menu
+  opens, the count is polled every 60 s while the tab is visible, and every bell route is throttled. A link the
+  bell opens is a full page load, after the "read" write settles or a second passes. Example:
+  `NotificationController`, `StaffNotificationInbox`, `resources/js/ui/shell/NotificationBell.vue`.
 - **After a write**, toast through `Inertia::flash()` (never the session `with()`: a shared prop
   is kept in history and replays on Back). Deletes go `back()` so the list keeps its state; forms
   go to the index.

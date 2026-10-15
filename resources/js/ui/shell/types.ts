@@ -89,6 +89,27 @@ export interface ShellConfig {
     locales: string[]
 }
 
+/** The notification bell (see `HandleInertiaRequests::notifications()`); the list loads when it opens. */
+export interface ShellNotifications {
+    unread: number
+    indexUrl: string
+    countUrl: string
+    readAllUrl: string
+}
+
+export interface NotificationsTranslations {
+    label: string
+    unread: string
+    title: string
+    mark_all: string
+    unread_item: string
+    open: string
+    empty: string
+    loading: string
+    error: string
+    untitled: string
+}
+
 export interface ShellUser {
     id: string
     name: string
@@ -143,6 +164,7 @@ export interface ConsoleTranslations {
     theme: { label: string; light: string; dark: string; system: string }
     language: { label: string } & Record<string, string>
     user_menu: { label: string; sign_out: string }
+    notifications: NotificationsTranslations
     search: {
         open: string
         placeholder: string
@@ -174,5 +196,7 @@ export interface ShellPageProps {
     navigation: ShellNavigation | null
     assistants: AssistantSwitcherData | null
     applications: ShellApplications | null
+    /** `null` for a guest. */
+    notifications: ShellNotifications | null
     [key: string]: unknown
 }
