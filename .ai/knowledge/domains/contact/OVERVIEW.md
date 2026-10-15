@@ -15,7 +15,7 @@ paths:
   - "app/Http/Requests/Console/*Contact*"
   - "resources/js/pages/Console/Contacts/**"
   - "resources/js/pages/Console/ContactSegments/**"
-reviewed_at: 2026-10-09
+reviewed_at: 2026-10-15
 ---
 # Contact
 
@@ -52,8 +52,9 @@ and external id — and the link between a contact and a channel (`ChannelContac
   (the assistant's contacts and the two writes, tags and groups) and `Services/ContactCard.php` (the card's
   sections); pages in `resources/js/pages/Console/Contacts/`.
 - Inertia console, segments: `ContactSegmentController`, `Services/ContactSegmentService.php` (tenant-bounded
-  reads and writes, stores rules in the shape Filament writes), `ContactSegmentRequest`; pages in
+  reads and writes, stores rules in the shape the removed Filament form wrote), `ContactSegmentRequest`; pages in
   `resources/js/pages/Console/ContactSegments/`. `SegmentConditionType` (with `SegmentOperator`,
-  `SegmentValueArity`) is where the rule builder's choices come from, on both UIs.
-- Admin UI: `app/Filament/Assistant/Resources/{Contacts,ContactGroups,ContactSegments}`; tag
-  options for the builder: `app/Http/Controllers/Builder/ContactTagsController.php`.
+  `SegmentValueArity`) is where the rule builder's choices come from.
+- Inertia console, contact groups: `ContactGroupController`; pages in
+  `resources/js/pages/Console/ContactGroups/`. Tag options for the builder:
+  `app/Http/Controllers/Builder/ContactTagsController.php`.

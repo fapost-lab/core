@@ -18,8 +18,8 @@ use Illuminate\Support\Str;
 /**
  * Reads and writes the {@see Channel}s of one assistant, which the caller names.
  *
- * Every read is bounded by the tenant and the assistant, explicitly, because the console does not register Filament's
- * tenancy scope: a channel of another assistant or tenant is "not found", never "forbidden". The assistant is an
+ * Every read is bounded by the tenant and the assistant, explicitly, because no global scope does it
+ * implicitly: a channel of another assistant or tenant is "not found", never "forbidden". The assistant is an
  * argument, not a dependency, so a screen that gets it from its own URL (the tenant-wide admin) can use the service
  * as the assistant console does. The writes are {@see ChannelServiceInterface}'s: it checks the channel limit, keeps
  * the webhook routing in step and is the only path that rotates the webhook hash.

@@ -10,7 +10,7 @@ namespace App\Domains\Contact\Enums;
  * (dot-path key), or {@see \App\Domains\Contact\Models\ContactGroup} membership.
  *
  * The type is also the single source of which operators a condition may use and how many values it takes: the
- * Filament form and the console form offer exactly these, the console validates against them, and the
+ * console form offers exactly these, the console validates against them, and the
  * {@see \App\Domains\Contact\Services\ContactSegmentResolver} reads a condition the same way.
  */
 enum SegmentConditionType: string

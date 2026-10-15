@@ -29,8 +29,7 @@ tags, or a segment. `RunBroadcastJob` writes one recipient row per contact, then
 ## Boundaries
 
 - There is no service provider. The services are concrete classes resolved by the container;
-  the Filament table calls `app(BroadcastDispatcher::class)`, the console goes through
-  `BroadcastService`.
+  the console goes through `BroadcastService`.
 - Depends on Contact (the tag repository contract, and the concrete `ContactSegmentResolver`,
   `ContactSegment`, `ChannelContact`, `Contact`), Flow's `ContentTranslatorInterface`, the
   `Channel` and `Assistant` models, Conversation's `MessageOrigin`, Tenancy, and the foundation
@@ -45,5 +44,5 @@ tags, or a segment. `RunBroadcastJob` writes one recipient row per contact, then
 - Console UI: `app/Http/Controllers/Console/BroadcastController.php` over
   `Services/BroadcastService.php` (the console's writes and the send guard), with the requests in
   `app/Http/Requests/Console/*Broadcast*` and the pages in `resources/js/pages/Console/Broadcasts`.
-- Filament UI: `app/Filament/Assistant/Resources/Broadcasts`. Both UIs share
-  `Support/BroadcastMessage.php` for cleaning the message and the base-language check.
+- `Support/BroadcastMessage.php` cleans the message and checks the base language, for the console's
+  request and service.

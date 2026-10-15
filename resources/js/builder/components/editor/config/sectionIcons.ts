@@ -1,7 +1,7 @@
 /**
  * Inline Heroicon (outline, 24px) path lookup for AccordionSection icons.
- * Keep paths in sync with the Heroicons set Filament uses so admin and
- * builder share a single icon vocabulary. Unknown names fall back to a
+ * Icon names are Heroicons names, the vocabulary the PHP builder schema
+ * uses (the console itself draws Lucide icons). Unknown names fall back to a
  * neutral square so a typo in PHP schema does not crash rendering.
  */
 const PATHS: Record<string, string> = {

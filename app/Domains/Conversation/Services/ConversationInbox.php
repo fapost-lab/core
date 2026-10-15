@@ -39,7 +39,7 @@ use Throwable;
  * The staff inbox of one assistant: which threads it lists, how many are unread, one thread's transcript, and what an
  * operator does with a thread (take it over, hand it back, close or reopen it, reply).
  *
- * Every query filters the tenant and the assistant itself (the console has no Filament tenancy scope), and the shell's
+ * Every query filters the tenant and the assistant itself (no global scope does it implicitly), and the shell's
  * unread badge counts through {@see self::unreadCount()} over the same {@see self::query()} the list uses, so the two
  * never disagree.
  *
@@ -50,7 +50,7 @@ use Throwable;
  * ambiguous one (the provider may have the message) does not, and the operator is asked to check the transcript
  * ({@see self::reply()} has the exact rules).
  *
- * Reads the transcript through the Eloquent model, like the Filament view it replaces (the documented exception to the
+ * Reads the transcript through the Eloquent model, like the Filament view it replaced (the documented exception to the
  * storage port, see the conversation domain rules).
  */
 final readonly class ConversationInbox

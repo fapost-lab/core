@@ -6,7 +6,8 @@ belong to one domain live in `domains/<domain>/GLOSSARY.md`.
 
 ## Core
 
-This repository (`fapost/core`): the platform runtime, the admin panels and the flow builder.
+This repository (`fapost/core`): the platform runtime, the console (the admin panel and each assistant's
+screens, Inertia + Vue) and the flow builder.
 Not the extension packages, which are separate repositories.
 
 Informal synonyms: platform, the app.
@@ -30,7 +31,7 @@ Use in: source code (`Fapost\Support`), documentation.
 ## Feature
 
 A capability built inside Core and released with it. The only extension type that may ship UI
-into the builder and admin panels directly.
+into the builder and the console directly.
 
 Use in: documentation.
 
@@ -110,7 +111,8 @@ Use in: source code, schema, documentation.
 
 ## Staff user
 
-A person who works in the admin or assistant panels, with exactly one role. An *operator* is a
+A person who works in the console (the admin panel or an assistant's screens), with one or more
+roles. An *operator* is a
 staff user taking over a conversation.
 
 Informal synonyms: user, admin, operator.
@@ -127,7 +129,8 @@ Use in: source code, schema, documentation.
 ## Content language
 
 The language of messages sent to contacts, resolved at runtime per contact and assistant. Kept
-apart from the *admin UI language* of the panels, which comes from Laravel lang files.
+apart from the *admin UI language* of the console and the builder, which comes from Laravel lang
+files.
 
 Informal synonyms: bot language.
 Use in: source code, documentation.

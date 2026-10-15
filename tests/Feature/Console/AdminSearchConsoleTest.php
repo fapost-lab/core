@@ -70,7 +70,7 @@ final class AdminSearchConsoleTest extends FeatureTestCase
                     'url'      => "/admin/roles/{$role->getKey()}/edit",
                     'external' => false,
                 ]]],
-                // No storage path. `external` follows whoever answers the media screen's name (Filament until it moves).
+                // No storage path, and a console link: every Core screen is an Inertia page.
                 ['key' => 'media', 'items' => [[
                     'id'       => (string) $file->getKey(),
                     'title'    => 'acme-logo.png',

@@ -16,8 +16,9 @@ use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
 /**
  * Sign-in for the Inertia console. A signed-in visitor is sent on to the console instead of seeing the form.
  *
- * Success answers with {@see Inertia::location()}: the intended URL often belongs to Filament, and an
- * ordinary redirect from an Inertia request would load that HTML page inside the Inertia app.
+ * Success answers with {@see Inertia::location()}: the intended URL may be a page outside the console (the builder,
+ * a package's own panel), and an ordinary redirect from an Inertia request would load that HTML page inside the
+ * Inertia app.
  */
 final class LoginController extends Controller
 {

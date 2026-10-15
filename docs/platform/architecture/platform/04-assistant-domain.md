@@ -130,22 +130,24 @@ Isolation is per assistant, not per channel (`LockScope`).
 
 ## UI architecture
 
-Two Filament panels, both served on the tenant host.
+One Inertia + Vue console, served on the tenant host (`routes/inertia.php`, every route named `console.*`). Until
+October 2026 these were two Filament panels at the same URIs; Filament and Livewire have since left Core.
 
-- **Admin panel** (`/admin`): top-level tenant management. Resources: Assistants (with a Channels relation manager),
-  Users, Roles, Media. Pages: tenant settings, translations, dashboard.
-- **Assistant panel** (`/assistant/{assistant}`): Filament tenancy, where the Filament tenant is the `Assistant`
-  (`CurrentAssistantInterface` resolves it). Resources: Flows, Flow groups, Flow sessions, Flow logs, Contacts, Contact
-  groups, Contact segments, Conversations, Broadcasts, Channels. Pages: dashboard, assistant settings (general, commands,
+- **Admin panel** (`/admin`): top-level tenant management. Screens: Assistants (with the assistant's channels),
+  Users, Roles, Support access, Media, translations, tenant settings, dashboard.
+- **Assistant console** (`/assistant/{assistant}`): `ResolveCurrentAssistant` sets the `Assistant` from the URL
+  (`CurrentAssistantInterface` reads it). Screens: Flows, Flow groups, Flow sessions, Flow logs, Contacts, Contact
+  groups, Contact segments, Conversations, Broadcasts, Channels, dashboard, assistant settings (general, commands,
   advanced), translations.
 
-The tenant switcher in the assistant panel lists only the assistants the user may view.
+The assistant switcher in the console lists only the assistants the user may view; the application rail moves between
+the admin panel and the console.
 
 ---
 
 ## Triggers and broadcasts
 
-Broadcasts belong to an assistant (`broadcasts.assistant_id`, managed in the assistant panel). Flow triggers carry a
+Broadcasts belong to an assistant (`broadcasts.assistant_id`, managed in the assistant console). Flow triggers carry a
 nullable `assistant_id`: a null value is a tenant-wide trigger, and the FK is `nullOnDelete` so such triggers survive
 assistant removal.
 
@@ -154,8 +156,8 @@ assistant removal.
 ## Access control
 
 User ↔ Assistants is many-to-many (`user_assistants`). `AssistantPolicy`: managing assistants requires `manage_assistants`,
-and a non-admin additionally needs the assistant assigned to them. This affects the assistant list, the assistant panel
-tenant list, and the assistant pickers.
+and a non-admin additionally needs the assistant assigned to them. This affects the assistant list, the console's assistant
+switcher, and the assistant pickers.
 
 ---
 

@@ -24,7 +24,7 @@ use Illuminate\Support\Str;
  * Reads one assistant's flow sessions for the operator console: the list with its filters, a session's details, its
  * flattened state and its audit history. Sessions are the engine's; nothing here writes.
  *
- * The console has no Filament tenancy scope, so every query is bounded by the current tenant and the assistant itself.
+ * No global scope bounds a query implicitly, so every query is bounded by the current tenant and the assistant itself.
  */
 final readonly class FlowSessionInspector
 {

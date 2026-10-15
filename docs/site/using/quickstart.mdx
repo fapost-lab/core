@@ -23,7 +23,7 @@ them.
   </Step>
 
   <Step title="Create an assistant">
-    Admin panel → **Assistants** → **New Assistant**.
+    Admin panel → **Assistants** → **New assistant**.
 
     A name, a default language, active. Then **Manage** to open its console —
     everything after this happens there.
@@ -32,19 +32,21 @@ them.
   </Step>
 
   <Step title="Connect a channel">
-    Console → **Channels** → **New Channel**.
+    Console → **Channels** → **New channel**.
 
     Have the bot token ready: saving contacts the provider and registers the
-    webhook, so a token that does not belong to a real bot will not save.
+    webhook. A token that does not belong to a real bot is still saved, but the
+    channel is marked **Webhook not registered** and receives nothing until the
+    token is corrected.
 
-    Once it saves, messages sent to that bot reach the assistant — and, with
+    Once the webhook is registered, messages sent to that bot reach the assistant — and, with
     nothing to answer them yet, produce nothing.
 
     See [Channels](/using/channels).
   </Step>
 
   <Step title="Build and publish a flow">
-    Console → **Flows** → **New Flow**, then **Builder**.
+    Console → **Flows** → **New flow**, then **Builder**.
 
     Start small: one node that sends a message. Give the flow a trigger so
     something starts it, or set it as the assistant's default flow in
@@ -72,7 +74,7 @@ almost always one of these:
 | It answered once and then stopped | The flow is waiting at a node — check [Sessions](/using/sessions) |
 | Messages arrive nowhere | The channel's webhook is registered against an address that no longer exists |
 
-The console's **Assistant Dashboard** shows live sessions and errors in the last
+The console's **Dashboard** shows live sessions and errors in the last
 24 hours, which is the fastest place to see whether anything arrived at all.
 
 ## What next

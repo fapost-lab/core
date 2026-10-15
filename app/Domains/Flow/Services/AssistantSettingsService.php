@@ -23,7 +23,7 @@ use InvalidArgumentException;
  *
  * It lives in Flow, not in Assistant, because the commands, their validator and the flows they point at are Flow's,
  * and Flow already depends on Assistant (never the other way round). Every flow it reads is bounded by the tenant and
- * the assistant explicitly: the console registers no Filament tenancy scope.
+ * the assistant explicitly: no global scope does it implicitly.
  *
  * What it stores is canonical, as the Filament page stored it: a command has only the fields its type uses, blank
  * locale texts are dropped, and the default language stays as it is once the assistant has flows (their content was

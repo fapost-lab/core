@@ -17,7 +17,7 @@ paths:
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
   - "database/migrations/tenant/*channels*"
-reviewed_at: 2026-10-09
+reviewed_at: 2026-10-15
 ---
 # Channels
 
@@ -59,7 +59,8 @@ Messaging, and its tests still use the `Tests\Unit\Domains\Messaging\Telegram` n
   the row (no model events); `Services/ChannelWebhookSyncOutcome.php` is a scoped note of the refusals of the
   current request or job, read by the screens after a delete or deactivation.
 - `Services/AssistantChannelService.php` — reads and writes the channels of an assistant the caller names (tenant
-  and assistant bounded explicitly, no Filament scope); the Inertia console and, later, the admin use it. The
+  and assistant bounded explicitly, no implicit tenancy scope); the assistant's console (`ChannelController`) and the
+  admin panel (`AssistantController`, `AssistantChannelController`) use it. The
   type of a channel is chosen at creation and does not change in the console: changing it would leave the old
   provider's webhook registered against a hash the router now reads as another type.
   `Telegram/TelegramWebhookOptions.php` holds the update types and the `max_connections` bounds.

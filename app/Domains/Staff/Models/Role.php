@@ -86,7 +86,7 @@ final class Role extends SpatieRole
 
     /**
      * Human-readable title: display_name when set, falls back to name.
-     * Used as $recordTitleAttribute in Filament resources.
+     * Used as the role's title in the console's search results.
      */
     protected function title(): Attribute
     {

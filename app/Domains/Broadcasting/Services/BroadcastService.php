@@ -26,8 +26,8 @@ use Illuminate\Support\Str;
 /**
  * Writes and reads the {@see Broadcast}s of the current assistant on the console.
  *
- * Every read and write is bounded by the tenant and the assistant, explicitly, because the console does not register
- * Filament's tenancy scope: a broadcast of another assistant or tenant is "not found", never "forbidden".
+ * Every read and write is bounded by the tenant and the assistant, explicitly, because no global scope
+ * does it implicitly: a broadcast of another assistant or tenant is "not found", never "forbidden".
  *
  * A broadcast reaches real people, so the three things that can go wrong are closed here and not left to the screen:
  *

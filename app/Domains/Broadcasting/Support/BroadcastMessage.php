@@ -6,7 +6,7 @@ namespace App\Domains\Broadcasting\Support;
 
 /**
  * The locale map a broadcast carries as its message (`{lang: text}`): how it is cleaned before it is stored and when it
- * is usable. One place for both screens, so Filament and the console agree on what a stored message is.
+ * is usable. One place for the console's request and service, so both agree on what a stored message is.
  */
 final class BroadcastMessage
 {

@@ -66,7 +66,7 @@ reading it does not look into the JSONB and get `null`.
 2. **Checking the flag:** no dedicated node; use `branch` with a `user_variable` operand (storage `contact`,
    name `is_authenticated`).
 3. **Flow availability (the gate):** `flow_definitions.is_public` (a mirror of `flow_drafts.is_public`, default
-   true; `PublishFlowService` copies it from the draft; the UI toggle is in the Filament flow form).
+   true; `PublishFlowService` copies it from the draft; the UI toggle is "Public" in the console's flow form).
    `FlowAccessPolicy::canStart(definition, contact)` is `is_public || contact.is_authenticated`, and fails open
    for a `null` value. `FlowOrchestrator` applies it when it would start a **new** session: a private flow for an
    unauthenticated contact does not start and falls through to the normal fallback, as with "no flow available".

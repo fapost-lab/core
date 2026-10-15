@@ -20,7 +20,7 @@ use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeTenantAccessMode;
 
 /**
- * A stopped tenant on the request side: writes outside Filament answer 423, reads and the
+ * A stopped tenant on the request side: writes answer 423, reads and the
  * validate endpoint carry on, platform support may write, the notice reaches the banner and the
  * Inertia props, and the operator is asked once per request.
  */

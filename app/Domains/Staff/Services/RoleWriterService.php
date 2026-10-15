@@ -12,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
- * Persists staff roles and syncs Spatie permissions from grouped Filament form state.
+ * Persists staff roles and syncs Spatie permissions from the role form's grouped state.
  * Only permission names defined in {@see Permission} may be synced.
  *
  * Spatie flushes the permission cache inside the transaction, before the commit: a request of the

@@ -17,7 +17,7 @@ use Psr\Http\Message\StreamInterface;
 interface MediaUploaderInterface
 {
     /**
-     * Store an HTTP-uploaded file (Filament/REST entrypoint).
+     * Store an HTTP-uploaded file (admin screen/REST entrypoint).
      *
      * @throws StorageLimitReachedException when the content is new and does not fit the tenant's storage limit
      */

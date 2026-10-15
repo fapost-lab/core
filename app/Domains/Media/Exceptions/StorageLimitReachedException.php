@@ -9,7 +9,7 @@ use RuntimeException;
 /**
  * Thrown when new content does not fit into the tenant's stored-media limit: nothing was written.
  *
- * Carries the numbers, not a sentence; each surface (REST, Filament, transcript, flow) words the
+ * Carries the numbers, not a sentence; each surface (REST, the admin screen, transcript, flow) words the
  * refusal itself, see {@see \App\Domains\Media\Services\StorageLimitMessage}.
  */
 final class StorageLimitReachedException extends RuntimeException

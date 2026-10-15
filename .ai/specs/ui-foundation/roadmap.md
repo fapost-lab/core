@@ -128,7 +128,7 @@ new UI, and `@fapost/ui` is published.
       assets, Filament interfaces on `User` and `Assistant`, the vendor-before-node build order
       in the Dockerfile and CI; tests ported to the new routes; the SaaS CI green (after: phases
       2 and 3 — no screen may still need Filament)
-- [ ] The docs and knowledge describe the new UI — `docs/site` usage, self-hosting and
+- [x] `ui-docs-and-knowledge` — The docs and knowledge describe the new UI — `docs/site` usage, self-hosting and
       contributing pages, the positioning line; `ARCHITECTURE.md`, the multilingual convention,
       every domain document's admin-UI paths (after: Filament removed — they describe the
       result)

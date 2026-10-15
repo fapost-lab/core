@@ -132,7 +132,7 @@ enum Permission: string
     }
 
     /**
-     * Logical UI group for this permission (used in Filament form sections).
+     * Logical UI group for this permission (a section of the console's role form).
      */
     public function group(): string
     {

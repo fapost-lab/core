@@ -144,7 +144,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   never an Inertia `<Link>`); every Core item has it false. No `Filament\` or `Livewire\` dependency in
   `App\`: an operator package (the SaaS shell) may install Filament for a panel of its own, and Core
   must not lean on it. In Core's CI phpstan's unknown-class errors (level 0) enforce this, since the
-  classes are absent; PHPat `NoFilamentTest` bites only where Filament is installed (the SaaS overlay).
+  classes are absent; PHPat `NoFilamentTest` bites only where Filament is installed — a local Core
+  checkout with the SaaS package added through the composer overlay. No CI runs it there: the SaaS
+  package's CI does not run Core's `test:arch` (phpstan).
 - **The operator surfaces share one token source.**
   `resources/css/tokens.css` holds the Warm Minimal tokens (light and `.dark`, fonts Onest,
   Roboto Condensed, Victor Mono, self-hosted through Fontsource); the kit (`resources/js/ui`,

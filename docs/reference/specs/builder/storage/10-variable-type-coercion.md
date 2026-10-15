@@ -1,6 +1,6 @@
 # 10 · Variable type coercion + schema registry
 
-**Layer:** backend (PHP) + Filament admin
+**Layer:** backend (PHP) + console (Inertia + Vue)
 **Depends on:** 02, 04, 05 (Variable VO, VariableResolver, node config format)
 
 ## Context

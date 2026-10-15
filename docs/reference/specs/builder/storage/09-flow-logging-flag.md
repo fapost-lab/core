@@ -1,6 +1,6 @@
 # 09 · Flow `logging_enabled` flag + per-session history
 
-**Layer:** backend (PHP) + Filament admin
+**Layer:** backend (PHP) + console (Inertia + Vue)
 
 ## Purpose
 
@@ -24,14 +24,16 @@ execution logs (`flow_logs`) are written.
 - **Subflows.** Each definition has its own flag. The parent's flag decides whether `subflow_started` /
   `subflow_returned` are written to the parent session; the child's internals are written only if the
   child definition has logging enabled too.
-- **Admin toggle.** `FlowFormSchema` (Filament Assistant, Flows form) has the `logging_enabled` toggle with a
-  helper text. The Vue builder has no settings panel; the flag is edited only in Filament.
-- **Session detail.** `FlowSessionInfolistSchema` shows a "History" section (timestamp, node, event, path,
-  payload) when the flow has logging enabled or the session already has history entries.
+- **Admin toggle.** The console's flow form (`resources/js/pages/Console/Flows/Form.vue`, "Log change history")
+  has the `logging_enabled` toggle with a helper text. The Vue builder has no settings panel; the flag is edited
+  only in that form.
+- **Session detail.** The console's session page (`FlowSessionInspector`, `Console/FlowSessions/Show.vue`) shows a
+  "History" section (the newest 200 entries: timestamp, node, event, path, payload) when the flow has logging
+  enabled or the session already has history entries.
 
 ## Not built
 
-- A "Logged" column in the FlowSession list (`FlowSessionsTable`).
+- A "Logged" column in the console's flow session list.
 - Drill-down from history rows to child sessions.
 - Dedicated event types for user input, button choice, API result mapping and RAG results; these changes
   are visible only as `state_change` entries.
@@ -43,6 +45,6 @@ execution logs (`flow_logs`) are written.
 - `app/Domains/Flow/History/{HistoryWriterFactory,DefaultHistoryWriter,NoOpHistoryWriter,HistoryWriterInterface}.php`
 - `app/Domains/Flow/Models/{FlowDefinition,FlowDraft,FlowSessionHistoryEntry}.php`
 - `app/Domains/Flow/Services/PublishFlowService.php`
-- `app/Filament/Assistant/Resources/Flows/Schemas/FlowFormSchema.php`
-- `app/Filament/Assistant/Resources/FlowSessions/Schemas/FlowSessionInfolistSchema.php`
+- `app/Domains/Flow/Services/FlowSessionInspector.php`
+- `resources/js/pages/Console/Flows/Form.vue`, `resources/js/pages/Console/FlowSessions/Show.vue`
 - `lang/{en,ru,uk}/assistant.php`

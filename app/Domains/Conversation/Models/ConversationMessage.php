@@ -17,7 +17,7 @@ use Illuminate\Support\Carbon;
  * Read-only Eloquent surface over conversation_messages (Postgres driver). Writes
  * go through {@see \App\Domains\Conversation\Store\Postgres\PostgresConversationStore}
  * via raw inserts (partitioned table, composite PK); this model exists for the
- * Postgres reader / Filament transcript only. The table is partitioned by month
+ * Postgres reader / the console transcript only. The table is partitioned by month
  * with PK (id, created_at), so there is no updated_at.
  *
  * @property string                  $id

@@ -20,7 +20,7 @@ use Throwable;
  * so the order is the same on every engine. Values are formatted by the type the tenant's variable schema declares, in
  * the locale of the request; a variable with no declared type is shown as it is stored.
  *
- * The same layout as the Filament infolist, which stays as it was while the old console is still served.
+ * The same layout as the Filament infolist it replaced.
  */
 final readonly class ContactCard
 {

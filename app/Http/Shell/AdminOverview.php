@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
  * The tenant's record counts on the admin dashboard, the ones Filament's `StatsOverview` showed (the flow figures are
  * {@see \App\Domains\Flow\Services\TenantFlowActivity}'s). Which of them a user sees is the controller's decision.
  *
- * Every count is bounded by the current tenant explicitly: the console has no Filament tenancy scope.
+ * Every count is bounded by the current tenant explicitly: no global scope does it implicitly.
  */
 final readonly class AdminOverview
 {

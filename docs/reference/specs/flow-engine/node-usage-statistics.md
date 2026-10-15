@@ -143,7 +143,7 @@ shrunk to retention: if a deployment changes the prune cutoff, a hard cap would 
 - **Redis counters.** Motivated by the `logging_enabled` gap that does not exist.
 - **`duration_ms`.** A profiling need, not a usage-statistics one; it would be a raw-level
   column on `flow_logs`.
-- **UI.** SQL and the console command for now; a Filament page can follow if asked for.
+- **UI.** SQL and the console command for now; a console page can follow if asked for.
 
 ## 8. Related documents
 
