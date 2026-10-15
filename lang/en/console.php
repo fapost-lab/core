@@ -35,6 +35,20 @@ return [
         'sign_out' => 'Sign out',
     ],
 
+    // The notification bell in the shell's header.
+    'notifications' => [
+        'label'       => 'Notifications',
+        'unread'      => ':count unread',
+        'title'       => 'Notifications',
+        'mark_all'    => 'Mark all as read',
+        'unread_item' => 'Unread',
+        'open'        => 'Open',
+        'empty'       => 'No notifications yet.',
+        'loading'     => 'Loading…',
+        'error'       => 'The notifications could not be loaded. Try again.',
+        'untitled'    => 'Notification',
+    ],
+
     'support' => [
         'banner' => 'You are signed in as platform support (:name, :email).',
         'leave'  => 'Sign out',

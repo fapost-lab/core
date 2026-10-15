@@ -63,6 +63,12 @@ broken.
   Filament left read the same way when an inbox shows them. They are sent with `notifyNow` inside the
   notify job's `runForTenant`, never queued, for the reason limit notices are: a queued notification
   restores the `User` outside the tenant. Enforced: `StaffNotificationTest`.
+- **A user reads and marks only their own notifications, admins included.** Ownership is the query, not a
+  policy: `StaffNotificationInbox` goes through `$user->notifications()` every time, because `Gate::before` would
+  let an admin through any policy. Another user's id, or one that is not a uuid, is a 404; the tenant boundary is the
+  schema. The inbox returns plain text (markup stripped, never rendered) and keeps a link only when it is a path on
+  this host or an `http(s)` address with no whitespace, control character or backslash anywhere.
+  Enforced: `NotificationBellConsoleTest`.
 - **Admins hear about a limit once per limit and episode, and a broken path never changes the
   gate.** `NotifyAdminsOfLimit` (synchronous, on the hot path) does one atomic `Cache::add` on the
   `LimitEpisode` key and queues `SendLimitNoticeJob` only for the first refusal of an episode:

@@ -6,6 +6,7 @@ import { Button } from '@fapost/ui/components/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@fapost/ui/components/sheet'
 import AppRail from './AppRail.vue'
 import LanguageMenu from './LanguageMenu.vue'
+import NotificationBell from './NotificationBell.vue'
 import ShellSearch from './ShellSearch.vue'
 import ShellSidebar from './ShellSidebar.vue'
 import ThemeToggle from './ThemeToggle.vue'
@@ -66,6 +67,12 @@ const crumbs = computed(() => {
         :labels="t.language"
       />
       <ThemeToggle :labels="t.theme" />
+      <NotificationBell
+        v-if="page.props.notifications"
+        :notifications="page.props.notifications"
+        :locale="page.props.locale"
+        :labels="t.notifications"
+      />
       <UserMenu
         v-if="page.props.auth.user"
         :user="page.props.auth.user"
