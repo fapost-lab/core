@@ -7,15 +7,10 @@ namespace Tests\Feature\Tenancy;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
 use App\Domains\Tenancy\Exceptions\TenantSlugMovedException;
-use Closure;
 use Fapost\Foundation\Tenancy\Contracts\TenantRenamerInterface;
-use Illuminate\Http\Request;
-use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Route;
-use Livewire\Mechanisms\HandleRequests\EndpointResolver;
-use Symfony\Component\HttpFoundation\Response;
 use Tests\Feature\FeatureTestCase;
 
 /**
@@ -251,27 +246,6 @@ final class HostResolutionTest extends FeatureTestCase
             ->assertJsonPath('slug', 'second');
     }
 
-    public function test_livewire_update_endpoint_runs_in_the_tenant_of_its_host(): void
-    {
-        $route = $this->livewireUpdateRoute();
-        $route->middleware(LivewireUpdateProbe::class);
-        LivewireUpdateProbe::using(fn (): array => $this->probe());
-
-        $path    = EndpointResolver::updatePath();
-        $headers = ['X-Livewire' => 'true'];
-
-        $this->postJson("http://second.{$this->base}{$path}", [], $headers)
-            ->assertOk()
-            ->assertJsonPath('slug', 'second');
-
-        $this->postJson("http://main.{$this->base}{$path}", [], $headers)
-            ->assertOk()
-            ->assertJsonPath('slug', 'main');
-
-        $this->postJson("http://ghost.{$this->base}{$path}", [], $headers)->assertNotFound();
-        $this->postJson("http://example.com{$path}", [], $headers)->assertNotFound();
-    }
-
     private function renameSecond(string $slug): void
     {
         $this->app->make(TenantRenamerInterface::class)->rename('00000000-0000-0000-0000-000000000002', $slug);
@@ -320,35 +294,5 @@ final class HostResolutionTest extends FeatureTestCase
             'slug'   => $context->isResolved() ? $context->get()->getSlug() : null,
             'schema' => $this->onPostgres() ? DB::selectOne('SELECT current_schema() AS schema')?->schema : null,
         ];
-    }
-
-    private function livewireUpdateRoute(): RoutingRoute
-    {
-        foreach (Route::getRoutes() as $route) {
-            if (str_ends_with((string) $route->getName(), 'livewire.update')) {
-                return $route;
-            }
-        }
-
-        $this->fail('Livewire update route is not registered.');
-    }
-}
-
-/**
- * Stands in for the Livewire request handler at the end of the update route's middleware
- * stack: it reports what the stack in front of it set up, instead of processing a payload.
- */
-final class LivewireUpdateProbe
-{
-    private static ?Closure $report = null;
-
-    public static function using(Closure $report): void
-    {
-        self::$report = $report;
-    }
-
-    public function handle(Request $request, Closure $next): Response
-    {
-        return response()->json((self::$report)());
     }
 }

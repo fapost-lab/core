@@ -34,7 +34,6 @@ const application = computed(() => {
       v-if="page.props.assistants && (application === null || application.perAssistant)"
       :data="page.props.assistants"
       :label="t.switcher.label"
-      :back-label="t.switcher.back_to_admin"
     />
 
     <nav class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto" aria-label="Main">

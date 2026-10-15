@@ -23,13 +23,14 @@ use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * Channels on the Inertia console: the assistant's list and the channel limit, creating and changing a channel by its
  * type, keeping the secrets out of every response, rotating the webhook hash, deleting, and what happens when the
  * provider refuses after the channel is stored.
  */
-final class ChannelsConsoleTest extends InertiaConsoleTestCase
+final class ChannelsConsoleTest extends FeatureTestCase
 {
     use SetsRecordLimits;
 

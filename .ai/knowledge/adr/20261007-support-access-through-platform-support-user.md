@@ -12,6 +12,7 @@ paths:
   - app/Domains/Staff/Services/PlatformSupportUserService.php
   - app/Domains/Staff/Policies/PlatformSupportProtection.php
   - app/Providers/StaffServiceProvider.php
+reviewed_at: 2026-10-15
 ---
 # A platform operator enters a tenant through one platform support user, with a single-use token posted to the tenant's host
 
@@ -105,3 +106,10 @@ a secret leaks through browser history, web-server logs and referrers; Core has 
 
 Source: spec `tenant-quotas` (Core), task `support-access-contract`, decided with the owner on
 2026-10-06.
+
+## Amendment 2026-10-15: Filament left Core
+
+Filament and Livewire were removed from Core (task `remove-filament`). The text above is kept as accepted;
+its points about Livewire (the 419 answer to an expired support session) and about frozen Filament screens
+are historical. An expired support session now answers an Inertia visit with a location (409), JSON with 401
+and a page with a redirect to the sign-in; the support access log is a console screen.

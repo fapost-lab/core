@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeTenantAccessMode;
 use Tests\Support\RecordingCurrentAssistant;
 
@@ -26,7 +27,7 @@ use Tests\Support\RecordingCurrentAssistant;
  * The `admin` and `console` middleware stacks, exercised through probe routes: the account checks Filament makes
  * on every request, the stopped-tenant refusal, the support session and the props shared with every page.
  */
-final class ConsoleStackTest extends InertiaConsoleTestCase
+final class ConsoleStackTest extends FeatureTestCase
 {
     protected function setUp(): void
     {

@@ -10,7 +10,6 @@ load: domain
 paths:
   - "app/Domains/Conversation/**"
   - config/conversation.php
-  - "app/Filament/Assistant/Resources/Conversations/**"
   - "database/migrations/tenant/*conversation*"
   - "tests/*/Domains/Conversation/**"
 reviewed_at: 2026-10-10

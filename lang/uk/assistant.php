@@ -3,9 +3,6 @@
 declare(strict_types=1);
 
 return [
-    'switcher' => [
-        'back_to_admin' => 'До адмін-панелі',
-    ],
     'navigation' => [
         'groups' => [
             'overview'   => 'Огляд',

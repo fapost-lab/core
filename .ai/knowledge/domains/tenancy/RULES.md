@@ -21,7 +21,6 @@ paths:
   - app/Http/Middleware/ResolveTenantContext.php
   - app/Http/Middleware/RefuseWritesWhenTenantStopped.php
   - tests/Unit/Architecture/RuntimeJobAccessModeTest.php
-  - app/Filament/Support/AccessNoticeBanner.php
   - app/Http/Middleware/OnlyOnPlatformHosts.php
   - config/trustedproxy.php
   - config/horizon.php
@@ -29,7 +28,7 @@ paths:
   - app/Providers/HorizonServiceProvider.php
   - docker/compose.yaml
   - "tests/Feature/Http/**"
-reviewed_at: 2026-10-09
+reviewed_at: 2026-10-15
 ---
 # Tenancy rules
 
@@ -49,7 +48,7 @@ broken.
   `TenantMiddlewareOrderTest`.
 - **In `host` mode only `<slug>.<base_domain>` reaches a tenant.** The base domain runs with no
   tenant, and neither does a declared platform subdomain (`tenancy.platform_subdomains`, filled by
-  an operator package): it runs with no tenant like the base domain, its tenant panels answer 404,
+  an operator package): it runs with no tenant like the base domain, the console answers 404 there,
   and its label is reserved as a slug. Any other host, an unknown, inactive or reserved slug is a
   404, and the default-slug exemption from the reserved list applies only in `single` mode. One
   exception: a tenant's former slug (`tenant_slug_aliases`) answers GET/HEAD with a 302 to the new
@@ -57,16 +56,17 @@ broken.
   rendered before the generic not-found; it is deliberately not a `TenantNotFoundException`
   subclass because Pint's `final_class`); other methods and expired aliases are 404.
   Enforced: `RequestHostClassifierTest`, `HostTenantResolverTest`, `HostResolutionTest`,
-  `HostModePanelsTest::test_platform_subdomain_runs_without_a_tenant_and_serves_no_panels`,
+  `ConsoleHostModeTest::test_the_base_domain_foreign_hosts_and_platform_subdomains_answer_404`,
   `TenantSlugPolicyTest::test_platform_subdomains_are_reserved`.
-- **In `host` mode a panel's only host boundary is `TenancyMiddleware`.** Panels are registered
-  without a domain (`TenantHost::panelDomain()` is `null`), so `/admin` and `/assistant` match on
-  every host; `TenancyMiddleware` first in each panel's middleware — and persistent, so Livewire
-  updates replay it — is what turns the base domain and foreign hosts into 404. Never remove it or
-  move it after the session stack. URLs built inside a request follow the current host; URLs built
+- **In `host` mode the console's only host boundary is `TenancyMiddleware`.** The console's routes
+  are registered without a domain (`TenantHost::panelDomain()` is `null`), so `/admin` and `/assistant`
+  match on every host; `tenant` in the console's middleware stacks (`admin`, `console`, the sign-in
+  group) is what turns the base domain and foreign hosts into 404. Never remove it or move it after
+  the session stack. URLs built inside a request follow the current host; URLs built
   outside one (mail, queued jobs) must name the tenant host explicitly — through
-  `TenantHost::urlFor()`, as the staff activation mail does. Enforced: `HostModePanelsTest`,
-  `TenantMiddlewareOrderTest` (every `filament.*` route), `ActivationHostModeTest`.
+  `TenantHost::urlFor()`, as the staff activation mail does. Enforced: `ConsoleHostModeTest`,
+  `ConsoleRoutesArchitectureTest` (every route under `admin/`, `assistant/`, `console/`),
+  `TenantMiddlewareOrderTest`, `ActivationHostModeTest`.
 - **`host` mode needs a session that works with no tenant, and host-only cookies.** Platform pages run
   `StartSession` with no tenant, so `SESSION_DRIVER=database` (a tenant-schema table) is refused, and a
   `SESSION_DOMAIN` that spans subdomains would hand one tenant's cookie to the others. A web process refuses to
@@ -189,8 +189,8 @@ broken.
   (`channels`, inactive included), `CreatePendingUserService` and `UserService::activate()` (`staff`: users with
   `is_active`, i.e. every account not deactivated, pending and suspended included, through `User::scopeCountedForLimit()`, the one seam for accounts that must not count, such as
   the platform's support user). `AclBootstrapService::createFirstAdmin()` creates a tenant's first admin without the
-  check, deliberately. The assistant panel's `assistant_tenancy` global scope narrows `FlowDraft` and `Channel` to the
-  current assistant, so their `countForLimit()` strips it. A key unknown to
+  check, deliberately. `FlowDraft::countForLimit()` and `Channel::countForLimit()` count the whole tenant, not the
+  current assistant. A key unknown to
   `LimitRegistry` throws `LogicException` rather than meaning "no limit". Existing records stay when a
   limit drops below the count; only creating more is refused. Concurrent creates may exceed a limit
   by the number of parallel requests (accepted: tenant schema and landlord are different
@@ -224,7 +224,7 @@ broken.
 - **A stopped tenant is a mode, never a status, and Core asks the operator on every request and runtime job.**
   `TenantRequestRunner` asks `TenantAccessModeInterface` once per request into the `scoped` `CurrentAccessState`;
   the default is `AlwaysActiveAccessMode`, bound with `bindIf`. While stopped: unsafe methods on the builder,
-  media and mini-app routes answer 423 (`RefuseWritesWhenTenantStopped`; the platform support user passes; a
+  media, mini-app and console routes answer 423 (`RefuseWritesWhenTenantStopped`; the platform support user passes; a
   route with no side effects opts out with `withoutMiddleware`), runtime jobs are dropped or postponed by
   `RespectsTenantAccessMode`, and `flow:sweep-subflow-timeouts` skips the tenant. The tenant stays `Active` so
   console commands see it. A postponed job is re-queued as a delayed copy, never `release()`d (a release spends

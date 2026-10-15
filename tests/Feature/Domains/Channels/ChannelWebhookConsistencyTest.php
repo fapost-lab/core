@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Channels;
 
 use App\Domains\Assistant\Contracts\AssistantServiceInterface;
-use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
@@ -17,19 +16,12 @@ use App\Domains\Channels\Services\ChannelWebhookSyncOutcome;
 use App\Domains\Channels\Telegram\Exceptions\TelegramApiException;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
-use App\Filament\Assistant\Resources\Channels\Pages\CreateChannel;
-use App\Filament\Assistant\Resources\Channels\Pages\EditChannel;
-use App\Filament\Assistant\Resources\Channels\Pages\ListChannels;
-use App\Filament\Resources\Assistants\Pages\EditAssistant;
-use App\Filament\Resources\Assistants\RelationManagers\ChannelsRelationManager;
 use Database\Seeders\TenantAclSeeder;
-use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
-use Livewire\Livewire;
 use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
 
@@ -264,76 +256,6 @@ final class ChannelWebhookConsistencyTest extends FeatureTestCase
         $this->assertModelMissing($assistant);
     }
 
-    public function test_the_assistant_panel_warns_instead_of_failing_when_the_provider_refuses_a_new_channel(): void
-    {
-        $this->providerRefuses();
-        $assistant = Assistant::factory()->create();
-        $this->actingAsAdmin('assistant');
-        Filament::setTenant($assistant);
-        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
-
-        Livewire::test(CreateChannel::class)
-            ->fillForm(['type' => ChannelTypeEnum::Telegram->value, 'token' => self::TOKEN, 'secret_token' => 'secret-1'])
-            ->call('create')
-            ->assertHasNoFormErrors()
-            ->assertNotified(__('staff.channels.notifications.webhook_failed_title'));
-
-        $this->assertSame(ChannelWebhookStatus::Failed, Channel::query()->sole()->webhook_status);
-    }
-
-    public function test_the_assistant_panel_warns_instead_of_failing_when_the_provider_refuses_a_change(): void
-    {
-        $this->providerRefuses();
-        $assistant = Assistant::factory()->create();
-        $channel   = $this->channel($assistant);
-        $this->actingAsAdmin('assistant');
-        Filament::setTenant($assistant);
-        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
-
-        Livewire::test(EditChannel::class, ['record' => $channel->getKey()])
-            ->fillForm(['token' => 'bot-token-NEW-222'])
-            ->call('save')
-            ->assertNotified(__('staff.channels.notifications.webhook_failed_title'));
-
-        $this->assertSame(ChannelWebhookStatus::Failed, $channel->refresh()->webhook_status);
-    }
-
-    public function test_the_assistant_table_flags_a_refused_channel_and_offers_registering_again_only_for_it(): void
-    {
-        $assistant = Assistant::factory()->create();
-        $failed    = $this->channel($assistant, ['webhook_status' => ChannelWebhookStatus::Failed->value]);
-        $fine      = $this->channel($assistant, ['webhook_status' => ChannelWebhookStatus::Registered->value]);
-        $this->actingAsAdmin('assistant');
-        Filament::setTenant($assistant);
-
-        Livewire::test(ListChannels::class)
-            ->assertTableActionVisible('reregisterWebhook', $failed)
-            ->assertTableActionHidden('reregisterWebhook', $fine);
-
-        $this->providerAccepts();
-
-        Livewire::test(ListChannels::class)
-            ->callTableAction('reregisterWebhook', $failed)
-            ->assertNotified(__('staff.channels.notifications.webhook_registered_title'));
-
-        $this->assertSame(ChannelWebhookStatus::Registered, $failed->refresh()->webhook_status);
-    }
-
-    public function test_a_table_delete_that_the_provider_does_not_confirm_warns(): void
-    {
-        $this->providerRefuses();
-        $assistant = Assistant::factory()->create();
-        $channel   = $this->channel($assistant);
-        $this->actingAsAdmin('assistant');
-        Filament::setTenant($assistant);
-
-        Livewire::test(ListChannels::class)
-            ->callTableAction('delete', $channel)
-            ->assertNotified(__('staff.channels.notifications.webhook_deregister_failed_title'));
-
-        $this->assertModelMissing($channel);
-    }
-
     public function test_a_stale_failed_flag_of_an_inactive_channel_is_not_a_failure(): void
     {
         $assistant = Assistant::factory()->create();
@@ -354,66 +276,6 @@ final class ChannelWebhookConsistencyTest extends FeatureTestCase
 
         $this->assertFalse($result->webhookRegistrationFailed());
         $this->assertFalse($result->is_active);
-    }
-
-    public function test_the_assistant_panel_warns_instead_of_failing_when_the_provider_refuses_a_rotation(): void
-    {
-        $this->providerRefuses();
-        $assistant = Assistant::factory()->create();
-        $channel   = $this->channel($assistant);
-        $old       = $channel->webhook_public_hash;
-        $this->actingAsAdmin('assistant');
-        Filament::setTenant($assistant);
-
-        Livewire::test(ListChannels::class)
-            ->callTableAction('rotateWebhookHash', $channel)
-            ->assertNotified(__('staff.channels.notifications.webhook_failed_title'));
-
-        $channel->refresh();
-        $this->assertNotSame($old, $channel->webhook_public_hash);
-        $this->assertSame(ChannelWebhookStatus::Failed, $channel->webhook_status);
-    }
-
-    public function test_the_admin_relation_manager_warns_on_a_refused_change_rotation_and_delete_and_can_register_again(): void
-    {
-        $assistant = Assistant::factory()->create();
-        $channel   = $this->channel($assistant);
-        $this->actingAsAdmin('admin');
-
-        $component = fn () => Livewire::test(ChannelsRelationManager::class, [
-            'ownerRecord' => $assistant,
-            'pageClass'   => EditAssistant::class,
-        ]);
-
-        $this->providerRefuses();
-
-        $component()
-            ->callTableAction('edit', $channel, ['token' => 'bot-token-NEW-222'])
-            ->assertNotified(__('staff.channels.notifications.webhook_failed_title'));
-        $this->assertSame(ChannelWebhookStatus::Failed, $channel->refresh()->webhook_status);
-
-        $component()
-            ->callTableAction('rotateWebhookHash', $channel)
-            ->assertNotified(__('staff.channels.notifications.webhook_failed_title'));
-
-        $component()
-            ->assertTableActionVisible('reregisterWebhook', $channel);
-
-        $this->providerAccepts();
-
-        $component()
-            ->callTableAction('reregisterWebhook', $channel)
-            ->assertNotified(__('staff.channels.notifications.webhook_registered_title'));
-        $this->assertSame(ChannelWebhookStatus::Registered, $channel->refresh()->webhook_status);
-
-        $component()->assertTableActionHidden('reregisterWebhook', $channel);
-
-        $this->providerRefuses();
-
-        $component()
-            ->callTableAction('delete', $channel)
-            ->assertNotified(__('staff.channels.notifications.webhook_deregister_failed_title'));
-        $this->assertModelMissing($channel);
     }
 
     /**

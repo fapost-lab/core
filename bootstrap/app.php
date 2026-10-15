@@ -50,11 +50,8 @@ return Application::configure(basePath: dirname(__DIR__))
             Route::middleware('web')->group(base_path('routes/media.php'));
             Route::middleware('web')->group(base_path('routes/tma.php'));
 
-            // Registered after the Filament panels on purpose: a route with the same method, domain, URI and name
-            // replaces Filament's (see routes/inertia.php). Off by default; takes effect after a restart.
-            if (config('ui.inertia')) {
-                Route::group([], base_path('routes/inertia.php'));
-            }
+            // The console: the admin and assistant screens, sign-in and the routes of Solutions.
+            Route::group([], base_path('routes/inertia.php'));
         }
     )
     // Live updates: `/broadcasting/auth` answers in the tenant of the host, for a signed-in user who passes the console's
@@ -79,10 +76,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // Unlisted middleware sorts after the listed ones, which put `auth` ahead of it in the console stacks.
         $middleware->prependToPriorityList(before: AuthenticatesRequests::class, prepend: ForgetInvalidAuthenticatedSession::class);
 
-        // Stacks of the Inertia console (routes/inertia.php), the Filament panels' checks in the same order:
-        // the tenant first (sessions live in the tenant schema), then the session, authentication and
-        // the account checks that Filament repeats on every request. `console` adds the assistant of the
-        // URL, whose parameter keeps Filament's name `{tenant}` until Filament goes.
+        // Stacks of the console (routes/inertia.php): the tenant first (sessions live in the tenant schema), then the
+        // session, authentication and the account checks repeated on every request. `console` adds the assistant of
+        // the URL, whose parameter is still named `{tenant}` (a historical name kept by the route names).
         $admin = [
             'web',
             'tenant',

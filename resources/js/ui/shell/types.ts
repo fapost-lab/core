@@ -6,7 +6,7 @@ export interface NavItem {
     href: string
     /** Lucide icon name in kebab case; see icons.ts. */
     icon: string
-    /** The screen is still Filament's: a plain link with a full page load, never an Inertia visit. */
+    /** The screen is not an Inertia page: a plain link with a full page load, never an Inertia visit. */
     external: boolean
     badge: string | null
 }
@@ -34,7 +34,7 @@ export interface ShellApplication {
     /** Lucide icon name in kebab case; see icons.ts. */
     icon: string
     href: string
-    /** Its home is still Filament's: a full page load, never an Inertia visit. */
+    /** Its home is not an Inertia page: a full page load, never an Inertia visit. */
     external: boolean
     /** It works per assistant: only then does the menu show the assistant switcher. */
     perAssistant: boolean
@@ -80,7 +80,6 @@ export interface SwitcherAssistant {
 export interface AssistantSwitcherData {
     current: { id: string; name: string }
     items: SwitcherAssistant[]
-    back: { href: string; external: boolean }
 }
 
 export interface ShellConfig {
@@ -140,7 +139,7 @@ export interface FormTranslations {
 export interface ConsoleTranslations {
     navigation: { dashboard: string; menu: string }
     breadcrumbs: { admin: string }
-    switcher: { label: string; back_to_admin: string }
+    switcher: { label: string }
     theme: { label: string; light: string; dark: string; system: string }
     language: { label: string } & Record<string, string>
     user_menu: { label: string; sign_out: string }

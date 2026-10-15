@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
  * Standard Laravel notifications table, tenant-scoped.
  *
  * Staff users live in the tenant schema, so their database notifications
- * (Filament in-app inbox, `notify_staff` node) belong here too. Uses uuid
+ * (in-app staff notifications, `notify_staff` node) belong here too. Uses uuid
  * morphs because staff user PKs are ULIDs stored as uuid (ADR-03).
  */
 return new class () extends Migration {

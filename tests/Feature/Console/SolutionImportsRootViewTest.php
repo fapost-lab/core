@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use Illuminate\Filesystem\Filesystem;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * The console's root view renders the import map before the first module script: a browser ignores an import map
  * that arrives after module loading started (ADR solution-console-ui).
  */
-final class SolutionImportsRootViewTest extends InertiaConsoleTestCase
+final class SolutionImportsRootViewTest extends FeatureTestCase
 {
     private string $publicPath;
 

@@ -22,6 +22,7 @@ use App\Domains\Staff\Models\SupportAccessEntry;
 use App\Domains\Staff\Models\User;
 use Closure;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Route;
 
 /**
  * The shell's side menu for the Inertia console, with the groups, order, labels and visibility of the Filament
@@ -29,8 +30,8 @@ use Illuminate\Support\Facades\Gate;
  * item exactly when Filament showed it. Administrators pass every check through `Gate::before`.
  *
  * Items keep Filament's route names. A screen Filament never had is given by its full `console.*` route name, taken
- * as is. An item whose screen has not moved off Filament yet is marked `external` and
- * rendered as a plain link (see {@see RouteOwnership}); an item whose route does not exist is left out.
+ * as is. An item whose route does not exist is left out. `external` (a plain link, a full page load) is false for
+ * every Core item; it stays for an item that leads off the console.
  *
  * @phpstan-type Item array{key: string, label: string, href: string, icon: string, external: bool, badge: string|null}
  * @phpstan-type Group array{label: string|null, items: list<Item>}
@@ -38,7 +39,6 @@ use Illuminate\Support\Facades\Gate;
 final readonly class NavigationBuilder
 {
     public function __construct(
-        private RouteOwnership $ownership,
         private ConversationInbox $inbox,
     ) {
     }
@@ -138,7 +138,7 @@ final readonly class NavigationBuilder
     {
         $visible = array_values(array_filter(
             $entries,
-            fn (array $entry): bool => $entry['visible'] && $this->ownership->exists($this->routeName($prefix, $entry['route'])),
+            fn (array $entry): bool => $entry['visible'] && Route::has($this->routeName($prefix, $entry['route'])),
         ));
 
         /** @var array<string, list<array{sort: int, item: Item}>> $sorted */
@@ -157,7 +157,7 @@ final readonly class NavigationBuilder
                     'label'    => $entry['label'],
                     'href'     => route($name, $parameters, false),
                     'icon'     => $entry['icon'],
-                    'external' => ! $this->ownership->isMigrated($name),
+                    'external' => false,
                     'badge'    => null === $entry['badge'] ? null : ($entry['badge'])(),
                 ],
             ];

@@ -12,7 +12,6 @@ use App\Domains\Conversation\Policies\ConversationPolicy;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
-use App\Filament\Assistant\Resources\Conversations\ConversationResource;
 use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Facades\Gate;
 use Tests\Feature\FeatureTestCase;
@@ -55,18 +54,6 @@ final class ConversationResourceAuthorizationTest extends FeatureTestCase
         $this->get($this->indexUrl($assistant))->assertForbidden();
     }
 
-    public function test_navigation_visibility_follows_permission(): void
-    {
-        $allowed = User::factory()->create();
-        $allowed->givePermissionTo(Permission::ViewConversations->value);
-        $this->actingAs($allowed);
-        $this->assertTrue(ConversationResource::shouldRegisterNavigation());
-
-        $denied = User::factory()->create();
-        $this->actingAs($denied);
-        $this->assertFalse(ConversationResource::shouldRegisterNavigation());
-    }
-
     public function test_view_conversation_page_denied_without_permission(): void
     {
         $assistant    = Assistant::factory()->create();
@@ -96,7 +83,7 @@ final class ConversationResourceAuthorizationTest extends FeatureTestCase
         $foreignThread  = $this->createConversation($otherAssistant);
 
         // User only has tenant access to $ownAssistant; the thread belongs to a
-        // different assistant. getEloquentQuery() scoping must 404 it, not 403.
+        // different assistant. assistant scoping must 404 it, not 403.
         $user = $this->userWithAssistantAccess($ownAssistant, [Permission::ViewConversations]);
 
         $this->actingAs($user);

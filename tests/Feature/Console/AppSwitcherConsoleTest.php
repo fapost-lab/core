@@ -14,12 +14,13 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\TestResponse;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * The app switcher: which applications the rail offers (today's panel access), the user's own pinning and order, and
  * the search palette finding applications and their pages.
  */
-final class AppSwitcherConsoleTest extends InertiaConsoleTestCase
+final class AppSwitcherConsoleTest extends FeatureTestCase
 {
     protected function setUp(): void
     {

@@ -11,8 +11,8 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Route middleware for the Inertia console: answers 403 when the signed-in user may not use the
- * console (status not Active, or deactivated), on every request, as Filament's own
- * authentication middleware does for its panels. Run it after `auth`.
+ * console (status not Active, or deactivated), on every request, as Filament's
+ * authentication middleware did for the panels the console replaced. Run it after `auth`.
  */
 final class EnsureCanAccessPanel
 {

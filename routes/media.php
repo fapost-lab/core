@@ -14,7 +14,7 @@ use Illuminate\Support\Facades\Route;
 | Media REST endpoints
 |--------------------------------------------------------------------------
 | Mounted under web middleware so they share the staff session and tenant
-| context with the Filament admin and the Vue builder. Authorization is
+| context with the console and the Vue builder. Authorization is
 | enforced per-route by media_view / media_manage permissions and per-row
 | by MediaFilePolicy / MediaFolderPolicy.
 */

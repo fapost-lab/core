@@ -10,17 +10,17 @@ paths:
   - routes/inertia.php
   - "resources/js/pages/Console/**"
   - "resources/js/ui/**"
-reviewed_at: 2026-10-14
+reviewed_at: 2026-10-15
 ---
 # Console screens
 
 ## Practice
 
-A screen moved off Filament copies the contact-groups pilot; deviate only with a reason.
+A console screen copies the contact-groups pilot; deviate only with a reason.
 
-- **Routes.** The screens Filament served keep their method, URI, name and parameters
-  (`{tenant}`, `{record}`) in `routes/inertia.php`; writes Filament never had as routes get
-  `console.*` names. Laravel passes route parameters to the action by position, so an action
+- **Routes.** The read screens the removed Filament panels served keep their URI, name
+  (`filament.*`) and parameters (`{tenant}`, `{record}`) in `routes/inertia.php` until the planned
+  rename; writes and screens Filament never had get `console.*` names. Laravel passes route parameters to the action by position, so an action
   under `assistant/{tenant}/…/{record}` takes `string $tenant, string $record` even when it
   ignores `$tenant`.
 - **Controller orchestrates, a domain service writes.** The service finds records inside the
@@ -41,9 +41,8 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   under an admin screen (an assistant's channels at `admin/assistants/{record}/channels/{channel}`)
   is found through its parent, so a mismatched pair is a 404, and reuses the console's page and
   presenter (`PresentsChannels`) with admin URLs. Example: `Admin\AssistantChannelController`.
-  A screen Filament never had (new screens in Filament are frozen) gets only a `console.*` route,
-  and its menu item names that route in full; it exists only with the switch on. Example:
-  `Admin\SupportAccessController`.
+  A screen Filament never had gets only a `console.*` route, and its menu item names that route in
+  full. Example: `Admin\SupportAccessController`.
   Figures and search results that span domains show only what the user may list: each group is
   gated by its policy's `viewAny`, and for staff who are not administrators every assistant-owned
   figure narrows to their assigned assistants. Search is a throttled JSON endpoint behind
@@ -82,7 +81,7 @@ A screen moved off Filament copies the contact-groups pilot; deviate only with a
   sessions) is always per record: the service throws a domain exception, the controller turns it
   into `Inertia::flash('error')`, and a bulk delete skips the blocked records and reports both
   counts.
-- **The console has no Filament tenancy scope.** Every service query filters `tenant_id` and, for
+- **The console has no implicit tenancy scope.** Every service query filters `tenant_id` and, for
   assistant-owned records, `assistant_id` itself. A policy that checks the record's assistant
   (`FlowDraftPolicy`) gets its `can` flags from an unsaved model with the current assistant set
   as its relation (`FlowDraftService::abilityProbe()`); a bare `new Model()` has no assistant and
@@ -138,6 +137,6 @@ With a confirmed irreversible step, a live reach count and a localized field: `B
 
 ## Rationale
 
-About thirty screens move the same way. One worked pattern, reviewed once, keeps tenant isolation,
+About thirty screens are built the same way. One worked pattern, reviewed once, keeps tenant isolation,
 authorization and list behaviour identical across them, and makes a screen that differs stand out
 in review.

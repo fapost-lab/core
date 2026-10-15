@@ -111,8 +111,8 @@ configuration and starts you on `APP_ENV=local` with an empty database password.
 The trailing Compose section of the production template is inert here: ports,
 images and TLS are your web server's and supervisor's business on bare metal.
 
-`npm run build` compiles the Vue flow builder. It needs `vendor/` to already
-exist — the Filament theme imports CSS from there — so keep this order.
+`npm run build` compiles the console, the flow builder and the mini app. It needs
+nothing from `vendor/`, so it can run before or after Composer.
 
 Ownership: the web server user needs write access to `storage/` and
 `bootstrap/cache/`, and nothing else.
@@ -214,6 +214,7 @@ npm ci && npm run build
 
 php artisan platform:update --validate-only   # stop here if a Solution manifest is wrong
 php artisan platform:update        # checks Solutions, migrates landlord and tenants, caches the catalog
+php artisan view:clear             # compiled views of the previous release may call code this one dropped
 
 php artisan horizon:terminate      # workers pick up the new code on restart
 sudo systemctl reload php8.4-fpm

@@ -13,7 +13,6 @@ paths:
   - "app/Http/Controllers/Media/**"
   - "app/Http/Requests/Media/**"
   - "app/Http/Resources/Media/**"
-  - "app/Filament/Resources/Media/**"
   - routes/media.php
   - config/media.php
   - "database/migrations/tenant/*media*"

@@ -13,8 +13,6 @@ use App\Domains\Webhook\Providers\WebhookServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\AssistantServiceProvider;
 use App\Providers\DomainServiceProvider;
-use App\Providers\Filament\AdminPanelProvider;
-use App\Providers\Filament\AssistantPanelProvider;
 use App\Providers\HorizonServiceProvider;
 use App\Providers\StaffServiceProvider;
 
@@ -30,8 +28,6 @@ return [
     MessageSenderServiceProvider::class,
     WebhookServiceProvider::class,
     StaffServiceProvider::class,
-    AdminPanelProvider::class,
-    AssistantPanelProvider::class,
     HorizonServiceProvider::class,
     SolutionServiceProvider::class,
 ];

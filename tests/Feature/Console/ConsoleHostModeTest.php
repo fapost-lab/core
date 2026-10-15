@@ -14,14 +14,15 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia;
 use Symfony\Component\HttpFoundation\Cookie;
 use Tests\Feature\Concerns\RunsInHostMode;
+use Tests\Feature\FeatureTestCase;
 
 /**
- * The Inertia sign-in in `host` mode: {@see \Tests\Feature\Tenancy\HostModePanelsTest} with `UI_INERTIA` on.
+ * The console's sign-in and sessions in `host` mode: every tenant host is its own console.
  *
  * The routes carry no domain in this mode, so `TenancyMiddleware` is the only host boundary: a tenant host reaches
  * the sign-in, the base domain, a foreign host and a platform subdomain get 404.
  */
-final class ConsoleHostModeTest extends InertiaConsoleTestCase
+final class ConsoleHostModeTest extends FeatureTestCase
 {
     use RunsInHostMode;
 
@@ -47,6 +48,29 @@ final class ConsoleHostModeTest extends InertiaConsoleTestCase
     {
         $this->assertNull(TenantHost::panelDomain());
         $this->assertNull(Route::getRoutes()->getByName('filament.admin.auth.login')?->getDomain());
+    }
+
+    public function test_in_single_mode_the_routes_are_bound_to_the_default_tenant_host(): void
+    {
+        config(['tenancy.resolution' => 'single']);
+
+        $this->assertNotNull(TenantHost::panelDomain());
+        $this->assertSame(TenantHost::forDefaultTenant(), TenantHost::panelDomain());
+    }
+
+    public function test_urls_built_during_a_request_follow_the_request_host(): void
+    {
+        Route::middleware(['web', 'tenant'])->get('/_probe/urls', fn (): array => [
+            'login'      => route('filament.admin.auth.login'),
+            'assistants' => route('filament.admin.resources.assistants.index'),
+        ]);
+
+        foreach (['main', 'second'] as $slug) {
+            $this->getJson("http://{$slug}.{$this->base}/_probe/urls")
+                ->assertOk()
+                ->assertJsonPath('login', "http://{$slug}.{$this->base}/admin/login")
+                ->assertJsonPath('assistants', "http://{$slug}.{$this->base}/admin/assistants");
+        }
     }
 
     public function test_the_login_is_an_inertia_page_on_every_tenant_host(): void

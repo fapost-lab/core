@@ -7,6 +7,7 @@ namespace Tests\Feature\Tenancy;
 use App\Http\Middleware\ResolveTenantContext;
 use App\Http\Middleware\TenancyMiddleware;
 use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
@@ -18,6 +19,15 @@ use Tests\Feature\FeatureTestCase;
  */
 final class TenantMiddlewareOrderTest extends FeatureTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // The HTTP kernel hands the middleware groups and priority to the router when it is built; nothing here sends a
+        // request before the middleware is resolved, so build it.
+        $this->app->make(HttpKernel::class);
+    }
+
     public function test_panel_logins_enter_the_tenant_before_the_session_starts(): void
     {
         foreach (['filament.admin.auth.login', 'filament.assistant.auth.login'] as $name) {
@@ -57,9 +67,8 @@ final class TenantMiddlewareOrderTest extends FeatureTestCase
     }
 
     /**
-     * By address rather than by route name: whatever answers under `admin/` or `assistant/` (Filament's route or, with
-     * `UI_INERTIA` on, the console's, which keeps the name but not the stack) enters the tenant first.
-     * The same rule with the switch on, and proved on a violator, is in
+     * By address rather than by route name: whatever answers under `admin/` or `assistant/` enters the tenant first.
+     * The same rule, proved on a violator, is in
      * {@see \Tests\Feature\Console\ConsoleRoutesArchitectureTest}.
      */
     public function test_every_route_under_the_panel_prefixes_enters_the_tenant_before_the_session_starts(): void

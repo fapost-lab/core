@@ -13,8 +13,7 @@ use Illuminate\Support\Facades\Gate;
 /**
  * The assistants of the current platform tenant that a user may open, ordered by name.
  *
- * One list for every surface that switches between assistants: the Filament panel's tenant menu
- * ({@see User::getTenants()}) and the Inertia console's switcher.
+ * One list for every surface that switches between assistants, such as the console's switcher.
  */
 final readonly class AccessibleAssistants
 {

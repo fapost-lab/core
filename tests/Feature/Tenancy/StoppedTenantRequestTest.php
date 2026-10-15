@@ -12,7 +12,6 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\PlatformSupportUserService;
 use App\Domains\Staff\Support\SupportAccessSession;
 use App\Domains\Tenancy\Services\CurrentAccessState;
-use App\Filament\Support\AccessNoticeBanner;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Fapost\Foundation\Tenancy\DTO\AccessNotice;
@@ -156,21 +155,6 @@ final class StoppedTenantRequestTest extends FeatureTestCase
                 ->where('accessState.notice.title', 'Your trial has ended')
                 ->where('accessState.notice.actionLabel', 'Renew')
                 ->etc());
-    }
-
-    public function test_the_panel_banner_shows_the_notice(): void
-    {
-        $this->actingAs($this->admin())
-            ->get(route('filament.admin.pages.dashboard'))
-            ->assertOk()
-            ->assertSee('Your trial has ended')
-            ->assertSee('Renew to bring the assistant back.')
-            ->assertSee('https://billing.example.com/renew');
-    }
-
-    public function test_the_banner_is_empty_without_a_notice(): void
-    {
-        $this->assertSame('', AccessNoticeBanner::render());
     }
 
     private function admin(): User

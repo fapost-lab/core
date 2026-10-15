@@ -18,8 +18,6 @@ paths:
   - app/Domains/Flow/Services/ValidateFlowService.php
   - app/Domains/Flow/Services/LoadBuilderFlowService.php
   - "app/Domains/Flow/Validation/**"
-  - "app/Filament/Assistant/Resources/Flows/**"
-  - "app/Filament/Assistant/Resources/FlowGroups/**"
   - app/Http/Requests/SaveDraftRequest.php
   - app/Http/Requests/ValidateFlowRequest.php
   - app/Http/Requests/CallTestRequest.php

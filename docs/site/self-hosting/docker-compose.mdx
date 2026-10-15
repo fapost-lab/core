@@ -417,10 +417,8 @@ service that declares a `build:` as one it should build: with both `image:` and
 `pull_policy: always`. Keeping them apart is what makes pulling the default.
 
 Both images come from [`docker/Dockerfile`](https://github.com/fapost-lab/core/blob/main/docker/Dockerfile) via targets
-`core` and `web`. They share one Dockerfile because the Filament theme imports
-CSS out of `vendor/`, so the front-end cannot be compiled without the Composer
-install — splitting them would mean installing dependencies twice, with two
-results that could differ.
+`core` and `web`, built from the same sources in one pass. The `web` image is
+nginx with the compiled front end; its build needs no Composer install.
 
 Note that `packages/` is excluded from the build context. Those are separate git
 checkouts that `composer dev:link` symlinks over `vendor/` during development;

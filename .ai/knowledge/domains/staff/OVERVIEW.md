@@ -10,8 +10,6 @@ load: domain
 paths:
   - "app/Domains/Staff/**"
   - app/Providers/StaffServiceProvider.php
-  - "app/Filament/Resources/Users/**"
-  - "app/Filament/Resources/Roles/**"
   - database/seeders/RoleSeeder.php
   - "tests/*/Domains/Staff/**"
   - "database/migrations/tenant/*staff_users*"
@@ -24,7 +22,7 @@ paths:
   - app/Http/Controllers/Admin/UserController.php
   - app/Http/Controllers/Admin/RoleController.php
   - "app/Http/Requests/Admin/**"
-reviewed_at: 2026-10-10
+reviewed_at: 2026-10-15
 ---
 # Staff
 
@@ -52,8 +50,7 @@ email) raised by Flow's staff-notify node.
   `Jobs/SendActivationEmailJob.php`.
 - Notifications: `Jobs/SendStaffNotificationJob.php` (queue `messaging.system`), the staff
   notifier registry.
-- `Http/Middleware/EnsureUserIsActive.php` (both panels), `database/seeders/RoleSeeder.php`.
-- Admin UI: with `UI_INERTIA=true`, `app/Http/Controllers/Admin/{UserController,RoleController}.php`
+- `Http/Middleware/EnsureUserIsActive.php` (the console stacks), `database/seeders/RoleSeeder.php`.
+- Admin UI: `app/Http/Controllers/Admin/{UserController,RoleController}.php`
   over `Services/StaffUserService.php` and `Services/StaffRoleService.php` (roles are written by
-  `RoleWriterService`), pages in `resources/js/pages/Console/{Users,Roles}`; with it off,
-  `app/Filament/Resources/{Users,Roles}`.
+  `RoleWriterService`), pages in `resources/js/pages/Console/{Users,Roles}`.

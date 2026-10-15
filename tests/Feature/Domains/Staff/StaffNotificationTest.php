@@ -11,7 +11,9 @@ use App\Domains\Staff\Jobs\SendStaffNotificationJob;
 use App\Domains\Staff\Mail\StaffNotificationMail;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Notifications\StaffMessageNotification;
 use App\Domains\Staff\Notifications\StaffRecipientResolver;
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Spatie\Permission\PermissionRegistrar;
@@ -117,12 +119,14 @@ final class StaffNotificationTest extends FeatureTestCase
 
         $this->assertEquals($this->canonical($expected), $this->canonical($data));
         $this->assertNull($row->read_at);
+    }
 
-        // The same as Filament's own message while Filament is installed; removed with it.
-        $this->assertEquals(
-            $this->canonical(\Filament\Notifications\Notification::make()->title('Operator needed')->info()->getDatabaseMessage()),
-            $this->canonical($data),
-        );
+    /**
+     * Written in the notify job's tenant switch: a queued notification would restore the user outside the tenant.
+     */
+    public function test_the_in_app_notification_is_never_queued(): void
+    {
+        $this->assertNotInstanceOf(ShouldQueue::class, new StaffMessageNotification('Operator needed'));
     }
 
     public function test_job_delivers_email(): void

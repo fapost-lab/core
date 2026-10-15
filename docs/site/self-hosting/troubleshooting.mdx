@@ -94,7 +94,7 @@ A missing monthly partition, which means the scheduler is not running.
 `logs:create-partition` runs on the first of the month, so the failure surfaces
 weeks after the scheduler actually stopped.
 
-## The admin panel looks broken after an upgrade
+## The console looks broken after an upgrade
 
 Rebuild the front end:
 
@@ -102,10 +102,10 @@ Rebuild the front end:
 npm run build
 ```
 
-Filament ships compiled assets and the custom theme is compiled alongside them.
-After a Filament upgrade the built theme is stale, and the symptom is visual
-rather than functional — controls that render with the wrong colours, or text
-that disappears against its own background.
+The console's pages and styles are compiled into `public/build`. A build left
+over from the previous version is stale, and the symptom is usually visual
+rather than functional — controls that render with the wrong colours, or a page
+that does not load at all because its chunk is missing.
 
 Check the build manifest's date before assuming anything subtler.
 

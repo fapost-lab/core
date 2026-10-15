@@ -17,7 +17,6 @@ paths:
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
   - "database/migrations/tenant/*channels*"
-  - "app/Filament/Assistant/Resources/Channels/**"
 reviewed_at: 2026-10-09
 ---
 # Channels

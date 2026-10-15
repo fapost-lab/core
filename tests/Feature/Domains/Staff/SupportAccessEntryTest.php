@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Staff;
 
-use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\SupportAccessEntry;
@@ -188,38 +187,6 @@ final class SupportAccessEntryTest extends FeatureTestCase
         $this->assertContains('throttle:20,1', $route->gatherMiddleware());
     }
 
-    public function test_the_banner_names_the_operator_while_the_session_lasts(): void
-    {
-        $this->post($this->enterUrl(), ['token' => $this->token()])->assertRedirect();
-
-        $this->get(route('filament.admin.pages.dashboard'))
-            ->assertOk()
-            ->assertSee(__('staff.support_access.banner', ['name' => 'Olga', 'email' => 'olga@example.com']))
-            ->assertSee(route('support.leave'), false);
-    }
-
-    public function test_there_is_no_banner_for_an_ordinary_session(): void
-    {
-        $admin = User::factory()->create();
-        $admin->assignRole(RoleEnum::Admin->value);
-
-        $this->actingAs($admin)
-            ->get(route('filament.admin.pages.dashboard'))
-            ->assertOk()
-            ->assertDontSee(route('support.leave'), false);
-    }
-
-    public function test_the_banner_is_also_on_the_assistant_panel(): void
-    {
-        $this->post($this->enterUrl(), ['token' => $this->token()])->assertRedirect();
-
-        $assistant = Assistant::factory()->create();
-
-        $this->get(route('filament.assistant.pages.dashboard', ['tenant' => $assistant]))
-            ->assertOk()
-            ->assertSee('olga@example.com');
-    }
-
     public function test_leaving_closes_the_entry_and_ends_the_session(): void
     {
         $this->post($this->enterUrl(), ['token' => $this->token()])->assertRedirect();
@@ -338,30 +305,15 @@ final class SupportAccessEntryTest extends FeatureTestCase
         $this->assertGuest();
     }
 
-    public function test_the_banner_is_not_shown_to_an_ordinary_user_with_a_forged_support_record(): void
-    {
-        $admin = User::factory()->create();
-        $admin->assignRole(RoleEnum::Admin->value);
-
-        $this->actingAs($admin)
-            ->withSession(['support_access' => [
-                'entry_id'   => 'x', 'operator_name' => 'Mallory', 'operator_email' => 'm@example.com',
-                'expires_at' => now()->addHour()->toIso8601String(),
-            ]])
-            ->get(route('filament.admin.pages.dashboard'))
-            ->assertDontSee('Mallory');
-    }
-
     public function test_expiry_answers_each_kind_of_request_in_its_own_way(): void
     {
         $url   = route('filament.admin.pages.dashboard');
         $login = route('filament.admin.auth.login');
 
         $cases = [
-            'inertia'  => [['X-Inertia' => 'true'], fn ($response) => $response->assertStatus(409)->assertHeader('X-Inertia-Location', $login)],
-            'json'     => [['Accept' => 'application/json'], fn ($response) => $response->assertUnauthorized()],
-            'livewire' => [['X-Livewire' => 'true'], fn ($response) => $response->assertStatus(419)],
-            'browser'  => [[], fn ($response) => $response->assertRedirect($login)],
+            'inertia' => [['X-Inertia' => 'true'], fn ($response) => $response->assertStatus(409)->assertHeader('X-Inertia-Location', $login)],
+            'json'    => [['Accept' => 'application/json'], fn ($response) => $response->assertUnauthorized()],
+            'browser' => [[], fn ($response) => $response->assertRedirect($login)],
         ];
 
         foreach ($cases as [$headers, $assert]) {

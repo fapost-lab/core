@@ -8,9 +8,7 @@ use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Notifications\StaffRecipientResolver;
 use App\Domains\Staff\Services\PlatformSupportUserService;
-use App\Filament\Widgets\StatsOverview;
 use Database\Seeders\TenantAclSeeder;
-use Livewire\Livewire;
 use Tests\Feature\FeatureTestCase;
 
 /**
@@ -49,18 +47,5 @@ final class PlatformSupportExclusionTest extends FeatureTestCase
 
         $response->assertOk();
         $this->assertSame([(string) $this->admin->getKey()], array_column($response->json('data'), 'value'));
-    }
-
-    public function test_the_dashboard_staff_count_omits_it(): void
-    {
-        $this->actingAs($this->admin);
-
-        $component = Livewire::test(StatsOverview::class);
-        $stats     = (fn (): array => $this->getStats())->call($component->instance());
-
-        $staff = collect($stats)->first(fn ($stat): bool => __('staff.dashboard.stats.staff_users.label') === (string) $stat->getLabel());
-
-        $this->assertNotNull($staff);
-        $this->assertSame(1, (int) $staff->getValue());
     }
 }

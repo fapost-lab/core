@@ -14,6 +14,7 @@ use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Fapost\Foundation\Tenancy\DTO\AccessNotice;
 use Fapost\Foundation\Tenancy\DTO\SupportAccessRequest;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeTenantAccessMode;
 
 /**
@@ -21,7 +22,7 @@ use Tests\Support\FakeTenantAccessMode;
  * on the real home screens of both modes: a stopped tenant's notice (`accessState`) and the operator behind a platform
  * support session (`supportAccess`, with the leave address in `shell`).
  */
-final class ConsoleNoticesTest extends InertiaConsoleTestCase
+final class ConsoleNoticesTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

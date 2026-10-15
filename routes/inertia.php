@@ -42,19 +42,12 @@ use Illuminate\Support\Facades\Route;
 | The Inertia console
 |--------------------------------------------------------------------------
 |
-| Loaded by bootstrap/app.php only when `config('ui.inertia')` is on, and always after the Filament
-| panels have registered their routes.
+| Always loaded by bootstrap/app.php. The admin screens live under `admin/*`, an
+| assistant's under `assistant/{tenant}/*`, on the panel domain of the tenant.
 |
-| A screen that moves off Filament is declared here with the SAME domain, method, URI and name as the
-| Filament route it replaces. The route collection keys routes by method + domain + URI, so the later
-| declaration wins, also under `route:cache`, and every `route()`, `getUrl()` and redirect by name now
-| reaches the new screen. Two traps:
-|
-|  - a different parameter name in the URI (`{assistant}` for `{tenant}`) is a different key and
-|    replaces nothing: Filament keeps answering, silently. Keep `{tenant}` and `{record}`;
-|  - the name must be the same, or the name of the replaced route disappears.
-|
-| `ConsoleRouteInterceptionTest` pins which action answers each intercepted name.
+| The read screens keep the names (`filament.*`) and parameters (`{tenant}`, `{record}`) of the Filament
+| panels this console replaced (renaming them is a separate change), and the URIs are the panels' too;
+| writes use `console.*` names. `ConsoleRouteInterceptionTest` pins which action answers each name.
 |
 | Stacks (defined in bootstrap/app.php):
 |  - `admin`   : web + tenant + session checks + account checks, for tenant-wide screens (`admin/*`);
@@ -146,7 +139,7 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::get('assistant', [AssistantHomeController::class, 'index'])->name('filament.assistant.tenant');
     });
 
-    // An assistant's screens: `{tenant}` is the assistant, under the name Filament gave the parameter.
+    // An assistant's screens: `{tenant}` is the assistant (the parameter's historical name).
     Route::middleware('console')->group(function (): void {
         // The assistant's own address sends on to its dashboard, as Filament's panel home did.
         Route::get('assistant/{tenant}', [AssistantHomeController::class, 'show'])->name('filament.assistant.home');

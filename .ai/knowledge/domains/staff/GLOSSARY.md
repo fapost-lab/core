@@ -10,8 +10,6 @@ load: domain
 paths:
   - "app/Domains/Staff/**"
   - app/Providers/StaffServiceProvider.php
-  - "app/Filament/Resources/Users/**"
-  - "app/Filament/Resources/Roles/**"
   - database/seeders/RoleSeeder.php
   - "tests/*/Domains/Staff/**"
 reviewed_at: 2026-10-05

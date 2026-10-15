@@ -23,13 +23,14 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * Assistants in the admin panel, served by the console shell in its admin mode: who sees which assistant, the
  * assistant limit, assigning a non-administrator creator, changing and deleting an assistant, and the assistant's
  * channels on the console's channel form without their secrets.
  */
-final class AdminAssistantsConsoleTest extends InertiaConsoleTestCase
+final class AdminAssistantsConsoleTest extends FeatureTestCase
 {
     use SetsRecordLimits;
 

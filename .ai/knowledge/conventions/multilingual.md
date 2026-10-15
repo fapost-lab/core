@@ -6,7 +6,6 @@ domains: []
 paths:
   - "app/Domains/Flow/**"
   - "app/Domains/Messaging/**"
-  - "app/Filament/**"
   - "lang/**"
   - "app/Domains/Assistant/**"
 summary: Admin UI language and content language stay separate; content resolves via LanguageResolverInterface, and a button/select value is never translated

@@ -48,6 +48,7 @@ use Inertia\Testing\AssertableInertia;
 use Mockery;
 use Mockery\MockInterface;
 use RuntimeException;
+use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeUsageMeter;
 
 /**
@@ -55,7 +56,7 @@ use Tests\Support\FakeUsageMeter;
  * transcript and when it is marked read, the operator's controls, and a reply that reaches a real person exactly once,
  * through the outbound path and its volume gate, and only on the thread's own channel.
  */
-final class ConversationsConsoleTest extends InertiaConsoleTestCase
+final class ConversationsConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

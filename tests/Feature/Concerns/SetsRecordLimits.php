@@ -11,7 +11,6 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
-use Filament\Facades\Filament;
 use Tests\Support\FakeTenantLimits;
 
 /**
@@ -29,15 +28,15 @@ trait SetsRecordLimits
         return $limits;
     }
 
-    private function actingAsAdmin(string $panel): User
+    private function actingAsAdmin(): User
     {
-        return $this->actingAsStaff($panel);
+        return $this->actingAsStaff();
     }
 
     /**
      * Signs in as an admin when no permission is given, otherwise as a staff member with exactly those.
      */
-    private function actingAsStaff(string $panel, Permission ...$permissions): User
+    private function actingAsStaff(Permission ...$permissions): User
     {
         $this->app->make(TenantContextInterface::class)->set($this->tenant());
 
@@ -47,7 +46,6 @@ trait SetsRecordLimits
             : $user->givePermissionTo(array_map(static fn (Permission $permission): string => $permission->value, $permissions));
 
         $this->actingAs($user);
-        Filament::setCurrentPanel(Filament::getPanel($panel));
 
         return $user;
     }

@@ -25,12 +25,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * Contacts on the Inertia console: which contacts an assistant sees (tenant and channel link), the list with its search,
  * sort and filters, the card, and the two writes the card has, tags and groups.
  */
-final class ContactsConsoleTest extends InertiaConsoleTestCase
+final class ContactsConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

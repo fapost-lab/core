@@ -13,17 +13,17 @@ use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
 use App\Http\Shell\AdminSearch;
-use App\Http\Shell\RouteOwnership;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Media\Enums\MediaKind;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * The records of the shell's search palette, in place of Filament's global search: what each user may find, inside the
  * tenant, a few hits per group, links to the screens that open them, and no storage path. Applications and pages:
  * AppSwitcherConsoleTest.
  */
-final class AdminSearchConsoleTest extends InertiaConsoleTestCase
+final class AdminSearchConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -76,7 +76,7 @@ final class AdminSearchConsoleTest extends InertiaConsoleTestCase
                     'title'    => 'acme-logo.png',
                     'subtitle' => 'Image',
                     'url'      => "/admin/media/{$file->getKey()}",
-                    'external' => ! $this->app->make(RouteOwnership::class)->isMigrated('filament.admin.resources.media.view'),
+                    'external' => false,
                 ]]],
             ]]);
     }

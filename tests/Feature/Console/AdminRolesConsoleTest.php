@@ -13,13 +13,14 @@ use App\Domains\Tenancy\Services\TenantSwitcher;
 use Database\Seeders\TenantAclSeeder;
 use Inertia\Testing\AssertableInertia;
 use Spatie\Permission\PermissionRegistrar;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * Staff roles in the admin panel, served by the console shell in its admin mode: only an administrator with
  * `ManageUsers` reaches them, permissions come from the catalogue only, a system role keeps its name and is never
  * deleted, and the tenant's permission cache is flushed after every write.
  */
-final class AdminRolesConsoleTest extends InertiaConsoleTestCase
+final class AdminRolesConsoleTest extends FeatureTestCase
 {
     protected function setUp(): void
     {

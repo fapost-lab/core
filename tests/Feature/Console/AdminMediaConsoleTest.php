@@ -24,6 +24,7 @@ use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeTenantLimits;
 
 /**
@@ -32,7 +33,7 @@ use Tests\Support\FakeTenantLimits;
  * move, the trash, a file in use kept from permanent deletion, folders and their tree rules — all inside the tenant,
  * and with no storage path reaching the browser.
  */
-final class AdminMediaConsoleTest extends InertiaConsoleTestCase
+final class AdminMediaConsoleTest extends FeatureTestCase
 {
     private string $tenantId;
 

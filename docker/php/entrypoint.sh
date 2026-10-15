@@ -77,6 +77,12 @@ case "${ROLE}" in
         ;;
     php-fpm)
         warm_caches
+        # Compiled Blade views live in the storage volume and outlive the image. One compiled by a previous release
+        # can call code that release had and this one has not (Livewire's Blade hooks, before Filament left Core),
+        # and a view is recompiled only when its source is newer. Start from none; they compile again on first use.
+        # Here only, in every environment: the web role is the one that renders them, and a Horizon or Reverb
+        # restart must not wipe them under live traffic.
+        php artisan view:clear --no-interaction || true
         exec php-fpm
         ;;
     *)

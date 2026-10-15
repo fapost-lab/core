@@ -11,12 +11,13 @@ use App\Domains\Staff\Models\User;
 use Carbon\CarbonImmutable;
 use Database\Seeders\TenantAclSeeder;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * The tenant's support access log in the admin panel: read only, newest entry first, behind the right that manages the
  * staff users, and linked from the admin menu inside the shell.
  */
-final class AdminSupportAccessConsoleTest extends InertiaConsoleTestCase
+final class AdminSupportAccessConsoleTest extends FeatureTestCase
 {
     protected function setUp(): void
     {

@@ -203,8 +203,6 @@ install_dependencies() {
     fi
 
     printf '  building front-end assets\n'
-    # Order matters: the Filament theme imports CSS out of vendor/, so Composer
-    # has to have run first.
     (cd "$ROOT" && npm ci && npm run build)
     ok "public/build compiled"
 }

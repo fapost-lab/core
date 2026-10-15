@@ -11,7 +11,7 @@ import type { ShellPageProps } from './types'
 /**
  * The application rail left of the side menu (the app switcher): the brand, the applications the user pinned in their
  * order (and the current one, pinned or not), and "All applications", where the user finds, pins and orders them.
- * An application whose home is still Filament's is a plain link, a full page load.
+ * An application whose home is not an Inertia page (`external`) is a plain link, a full page load.
  */
 const page = usePage<ShellPageProps>()
 

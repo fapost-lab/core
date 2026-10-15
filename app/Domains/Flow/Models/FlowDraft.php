@@ -82,13 +82,10 @@ final class FlowDraft extends BaseModel
 
     /**
      * How many flows the tenant has, across all its assistants.
-     *
-     * The assistant panel scopes this model to the current assistant through Filament's
-     * tenancy global scope ({@see Assistant::PANEL_TENANCY_SCOPE}); the limit counts the whole tenant.
      */
     public static function countForLimit(): int
     {
-        return self::query()->withoutGlobalScope(Assistant::PANEL_TENANCY_SCOPE)->count();
+        return self::query()->count();
     }
 
     public function assistant(): BelongsTo

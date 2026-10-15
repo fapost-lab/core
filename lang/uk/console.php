@@ -13,8 +13,7 @@ return [
     ],
 
     'switcher' => [
-        'label'         => 'Асистент',
-        'back_to_admin' => 'Назад в адмінку',
+        'label' => 'Асистент',
     ],
 
     'theme' => [

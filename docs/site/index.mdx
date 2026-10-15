@@ -41,7 +41,7 @@ yourself — a general-purpose automation tool models an execution, not a person
 mid-conversation.
 
 **You extend it in Laravel, not in a plugin language.** A node type is a PHP class
-registered by a service provider; the admin panel is Filament, the builder is
+registered by a service provider; the console and the builder are
 Inertia and Vue, the queues are Horizon. An extension is a Composer package that
 depends on `fapost/foundation` and never on `App\…`. There is no bespoke runtime,
 DSL or plugin SDK between you and the code — see

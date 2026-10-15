@@ -36,15 +36,13 @@ use App\Http\Controllers\Console\TranslationController;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Route;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Feature\FeatureTestCase;
 
 /**
- * `UI_INERTIA` on: a route declared in routes/inertia.php with the key and name of a Filament route replaces it.
- *
- * A key mistake (a different parameter name, a different domain) replaces nothing and fails silently, with
- * Filament still answering, so each intercepted name is listed here with the action that must answer it.
- * {@see ConsoleSwitchTest} holds the same names with the switch off.
+ * The console's route table: each name the Filament panels used (and the console kept) with the action and URI
+ * that answer it, and the console's own write routes. Renaming a route or changing its URI fails here first.
  */
-final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
+final class ConsoleRouteInterceptionTest extends FeatureTestCase
 {
     /**
      * @return array<string, array{0: string, 1: class-string, 2: string, 3: string}>

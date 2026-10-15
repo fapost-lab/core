@@ -10,12 +10,13 @@ use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
 use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Str;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * `assistant` and `assistant/{tenant}`: no screens, but addresses Filament's assistant panel answered and a bookmark may
  * hold. Both send on to a dashboard.
  */
-final class AssistantHomeConsoleTest extends InertiaConsoleTestCase
+final class AssistantHomeConsoleTest extends FeatureTestCase
 {
     private const string OTHER_TENANT_ID = '00000000-0000-0000-0000-0000000000ff';
 

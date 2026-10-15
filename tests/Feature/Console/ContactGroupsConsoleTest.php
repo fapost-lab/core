@@ -13,12 +13,13 @@ use App\Domains\Staff\Models\User;
 use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * Contact groups on the Inertia console: the list (search, sort, pages, tenant scope), create, change and delete,
  * and who may do which.
  */
-final class ContactGroupsConsoleTest extends InertiaConsoleTestCase
+final class ContactGroupsConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

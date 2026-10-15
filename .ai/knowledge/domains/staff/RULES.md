@@ -11,8 +11,6 @@ requires: []
 paths:
   - "app/Domains/Staff/**"
   - app/Providers/StaffServiceProvider.php
-  - "app/Filament/Resources/Users/**"
-  - "app/Filament/Resources/Roles/**"
   - database/seeders/RoleSeeder.php
   - "tests/*/Domains/Staff/**"
   - app/Http/Controllers/Admin/UserController.php
@@ -55,7 +53,7 @@ broken.
   password, is not counted as the last active admin, and is left out of the staff limit count (`User::scopeCountedForLimit()`); it is created by `PlatformSupportUserService`, allowed in the record-creation architecture rules, and never refused by the limit.
   Enforced: `PlatformSupportProtectionTest`.
 - **A support session ends 60 minutes after it began** (`EndExpiredSupportSession`, in the `web`
-  group and both panels) and every entry is recorded in `support_access_entries`, closed by a
+  group) and every entry is recorded in `support_access_entries`, closed by a
   `Logout` listener. Enforced: `SupportAccessEntryTest`.
 - **Staff notifications are delivered at most once:** the idempotency guard is set before
   delivery (`SendStaffNotificationJob`).
@@ -83,10 +81,10 @@ broken.
   back to "contact the platform administrator" (`NoLimitNotice` is the `bindIf` default). Review only.
 
 - **Who may use the console is decided in one place, `User::canAccessConsole()`** (status Active
-  and `is_active`); Filament's `canAccessPanel()` delegates to it, the Inertia sign-in and
-  `EnsureCanAccessPanel` call it, so the two stacks cannot disagree. Enforced: `ConsoleLoginTest`,
+  and `is_active`); the console's sign-in and `EnsureCanAccessPanel` call it, so the two cannot
+  disagree. Enforced: `ConsoleLoginTest`,
   `ConsoleStackTest`.
-- **The Inertia sign-in behaves like Filament's** (`ConsoleLoginService`): 5 attempts a minute per
+- **The console's sign-in keeps the behaviour of the removed Filament login** (`ConsoleLoginService`): 5 attempts a minute per
   IP, every attempt counted; one failure message for an unknown email, a wrong password and an
   account that may not sign in, padded by a `Timebox`; the `Attempting`, `Failed` and `Login` events
   (the SaaS shell listens to `Login`). Enforced: `ConsoleLoginTest`.

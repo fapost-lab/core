@@ -32,7 +32,7 @@ Contacts, segments, conversation history and broadcasts are part of the platform
 wire up yourself — a general-purpose automation tool models an execution, not a person mid-conversation.
 
 **You extend it in Laravel, not in a plugin language.** A node type is a PHP class registered by a service
-provider; the admin panel is Filament, the builder is Inertia and Vue, the queues are Horizon. An
+provider; the console and the builder are Inertia and Vue, the queues are Horizon. An
 extension is a Composer package that depends on `fapost/foundation` and never on `App\…`. There is no
 bespoke runtime, DSL or plugin SDK between you and the code.
 
@@ -79,7 +79,6 @@ published separately under [fapost-lab](https://github.com/fapost-lab).
 - PostgreSQL with landlord/tenant connections
 - Redis for cache, queues, locks and the webhook registry
 - Horizon
-- Filament
 - Inertia + Vue 3
 - Vite + Tailwind CSS 4
 - PHPUnit 12
