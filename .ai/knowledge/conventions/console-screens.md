@@ -65,8 +65,11 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   go to the index.
 - **Pages** live in `resources/js/pages/Console/<Screen>/`, use `AppShell` as layout, read their
   strings from `page.props.translations.console.<screen>` (en, ru, uk together), and build from
-  `@fapost/ui` components: `data-table`, `form-field`, `confirm-dialog`. Permission flags for
-  buttons come from the controller as `can`.
+  `@fapost/ui` components: `data-table`, `form-field`, `confirm-dialog`; several of a fixed list is
+  `options-picker`, free-text values as chips `value-list-input`, a text per language `localized-field`
+  (its errors keyed by locale through `errorsByLocale`). A control a second screen needs moves into the
+  kit and takes every label through props — the kit imports nothing from pages, Inertia or `shell` (it
+  becomes the npm package `@fapost/ui`). Permission flags for buttons come from the controller as `can`.
 - **The kit follows the approved mockups, not stock shadcn-vue** (the design canvas linked from the
   `ui-foundation` spec): a page adds no colours or type of its own. A state (active, inactive)
   is a `StatusDot`; a category or count is a soft `Badge` chosen by meaning (`info`, `neutral`,

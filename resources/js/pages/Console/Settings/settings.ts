@@ -1,5 +1,5 @@
-import { cleanMessage, type MessageEntry } from '../Broadcasts/localized'
-import type { CommandState, SettingRow, SettingsTab } from './types'
+import { localizedRecord } from '@fapost/ui/components/localized-field'
+import type { CommandState, MessageEntry, SettingRow, SettingsTab } from './types'
 
 /** The settings form as the page holds it; `commands` carry a list key that is never sent. */
 export interface SettingsFormData {
@@ -55,17 +55,17 @@ export function toPayload(data: SettingsFormData): SettingsPayload {
     default_language: data.default_language,
     available_countries: data.available_countries,
     default_flow_id: data.default_flow_id,
-    fallback_message: cleanMessage(data.fallback_message),
-    busy_message: cleanMessage(data.busy_message),
+    fallback_message: localizedRecord(data.fallback_message),
+    busy_message: localizedRecord(data.busy_message),
     commands: data.commands.map((command) => {
       const row: CommandPayload = { command: command.command.trim(), type: command.type }
 
       if (command.type === 'terminate_session') {
-        row.response = cleanMessage(command.response)
+        row.response = localizedRecord(command.response)
       } else if (command.type === 'start_flow') {
         row.flow_id = command.flowId
       } else {
-        row.text = cleanMessage(command.text)
+        row.text = localizedRecord(command.text)
       }
 
       return row
@@ -103,19 +103,6 @@ export function commandErrors(errors: Record<string, string | undefined>, index:
   for (const [key, message] of Object.entries(errors)) {
     if (key.startsWith(prefix)) {
       own[key.slice(prefix.length)] = message
-    }
-  }
-
-  return own
-}
-
-/** The errors under one prefix (`fallback_message.ru` → `ru`), for a localized field. */
-export function errorsUnder(errors: Record<string, string | undefined>, prefix: string): Record<string, string | undefined> {
-  const own: Record<string, string | undefined> = {}
-
-  for (const [key, message] of Object.entries(errors)) {
-    if (key.startsWith(`${prefix}.`)) {
-      own[key.slice(prefix.length + 1)] = message
     }
   }
 

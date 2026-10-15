@@ -568,6 +568,7 @@ return [
             'tags_placeholder'    => 'Оберіть теги',
             'tags_selected'       => 'Обрано: :count',
             'tags_empty'          => 'Жоден контакт поки не має тегів.',
+            'tags_remove'         => 'Прибрати :tag',
             'segment'             => 'Сегмент',
             'segment_placeholder' => 'Оберіть сегмент',
             'segment_missing'     => 'Сегмент, який використовувала розсилка, видалено. Оберіть інший.',

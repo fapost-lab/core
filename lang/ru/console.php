@@ -568,6 +568,7 @@ return [
             'tags_placeholder'    => 'Выберите теги',
             'tags_selected'       => 'Выбрано: :count',
             'tags_empty'          => 'Ни у одного контакта пока нет тегов.',
+            'tags_remove'         => 'Убрать :tag',
             'segment'             => 'Сегмент',
             'segment_placeholder' => 'Выберите сегмент',
             'segment_missing'     => 'Сегмент, который использовала рассылка, удалён. Выберите другой.',

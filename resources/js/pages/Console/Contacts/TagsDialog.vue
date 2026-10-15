@@ -1,14 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useForm, usePage } from '@inertiajs/vue3'
-import { X } from '@lucide/vue'
-import { Badge } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@fapost/ui/components/dialog'
 import { FormField } from '@fapost/ui/components/form-field'
-import { Input } from '@fapost/ui/components/input'
+import { ValueListInput } from '@fapost/ui/components/value-list-input'
 import { interpolate } from '@fapost/ui/shell'
-import { addTags, removeTag } from './tags'
 import type { ContactsPageProps } from './types'
 
 /**
@@ -28,7 +25,7 @@ const t = computed(() => page.props.translations.console.contacts)
 const common = computed(() => page.props.translations.console.form)
 
 const form = useForm({ tags: [...props.tags] })
-const draft = ref('')
+const tagInput = ref<InstanceType<typeof ValueListInput> | null>(null)
 
 // Each opening starts from the tags the contact has now.
 watch(open, (isOpen) => {
@@ -36,27 +33,14 @@ watch(open, (isOpen) => {
     form.reset()
     form.clearErrors()
     form.tags = [...props.tags]
-    draft.value = ''
   }
 })
 
-// A tag written in the field and not yet added still counts when the form is saved.
-function commitDraft(): void {
-  form.tags = addTags(form.tags, draft.value)
-  draft.value = ''
-}
-
-function onKeydown(event: KeyboardEvent): void {
-  if (event.key === 'Enter' || event.key === ',') {
-    event.preventDefault()
-    commitDraft()
-  }
-}
-
 const errors = computed(() => Object.entries(form.errors).filter(([key]) => key === 'tags' || key.startsWith('tags.')).map(([, message]) => message))
 
+// A tag typed and not yet added still counts: the field adds it on blur, and once more here in case it kept focus.
 function submit(): void {
-  commitDraft()
+  tagInput.value?.commit()
   form.put(props.submitUrl, {
     preserveScroll: true,
     onSuccess: () => {
@@ -76,35 +60,16 @@ function submit(): void {
 
       <form class="flex flex-col gap-5" novalidate @submit.prevent="submit">
         <FormField id="contact-tag" :label="t.view.tags" :error="errors[0]" v-slot="{ invalid, describedBy }">
-          <div v-if="form.tags.length" class="flex flex-wrap gap-1.5">
-            <Badge v-for="tag in form.tags" :key="tag" variant="neutral" class="gap-1 pr-1">
-              <span class="max-w-48 truncate">{{ tag }}</span>
-              <button
-                type="button"
-                class="hover:bg-foreground/10 rounded-full p-0.5"
-                :aria-label="interpolate(t.tags_dialog.remove_named, { tag })"
-                @click="form.tags = removeTag(form.tags, tag)"
-              >
-                <X class="size-3" aria-hidden="true" />
-              </button>
-            </Badge>
-          </div>
-
-          <Input
+          <ValueListInput
             id="contact-tag"
-            v-model="draft"
-            maxlength="255"
-            autocomplete="off"
-            list="contact-tag-suggestions"
+            ref="tagInput"
+            v-model="form.tags"
+            :suggestions="suggestions"
             :placeholder="t.tags_dialog.placeholder"
-            :aria-invalid="invalid"
-            :aria-describedby="describedBy"
-            @keydown="onKeydown"
-            @blur="commitDraft"
+            :remove-label="(tag) => interpolate(t.tags_dialog.remove_named, { tag })"
+            :invalid="invalid"
+            :described-by="describedBy"
           />
-          <datalist id="contact-tag-suggestions">
-            <option v-for="suggestion in suggestions" :key="suggestion" :value="suggestion" />
-          </datalist>
         </FormField>
 
         <DialogFooter>

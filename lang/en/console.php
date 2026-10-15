@@ -568,6 +568,7 @@ return [
             'tags_placeholder'    => 'Choose tags',
             'tags_selected'       => 'Selected: :count',
             'tags_empty'          => 'No contact has a tag yet.',
+            'tags_remove'         => 'Remove :tag',
             'segment'             => 'Segment',
             'segment_placeholder' => 'Choose a segment',
             'segment_missing'     => 'The segment this broadcast used was deleted. Choose another one.',

@@ -1,5 +1,5 @@
 import type { ShellPageProps } from '@fapost/ui/shell'
-import type { MessageEntry } from './localized'
+import type { LocalizedEntry } from '@fapost/ui/components/localized-field'
 
 export interface BroadcastsTranslations {
   title: string
@@ -28,6 +28,7 @@ export interface BroadcastsTranslations {
     tags_placeholder: string
     tags_selected: string
     tags_empty: string
+    tags_remove: string
     segment: string
     segment_placeholder: string
     segment_missing: string
@@ -78,7 +79,7 @@ export interface SelectOption {
 
 export interface BroadcastFormState {
   name: string
-  message: MessageEntry[]
+  message: LocalizedEntry[]
   targetType: BroadcastTarget
   targetTags: string[]
   targetSegmentId: string | null
