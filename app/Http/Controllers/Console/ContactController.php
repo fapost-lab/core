@@ -68,7 +68,7 @@ final class ContactController extends Controller
                     'name'       => $this->displayName($contact),
                     'language'   => '' === (string) $contact->language ? null : $contact->language,
                     'createdAt'  => $contact->created_at?->toIso8601String(),
-                    'viewUrl'    => $this->url('view', ['record' => $contact->getKey()]),
+                    'viewUrl'    => $this->url('show', ['record' => $contact->getKey()]),
                 ],
             ),
             'platforms' => array_map(
@@ -84,10 +84,10 @@ final class ContactController extends Controller
     }
 
     /*
-     * Route parameters reach an action by position, so `$tenant` (the assistant in the URL, already resolved by the
+     * Route parameters reach an action by position, so `$assistantKey` (the assistant in the URL, already resolved by the
      * console stack) is declared ahead of `$record`.
      */
-    public function show(string $tenant, string $record): Response
+    public function show(string $assistantKey, string $record): Response
     {
         $assistant = $this->assistant->get();
         $contact   = $this->contacts->findFor($assistant, $record);
@@ -125,22 +125,22 @@ final class ContactController extends Controller
         ]);
     }
 
-    public function updateTags(UpdateContactTagsRequest $request, string $tenant, string $record): RedirectResponse
+    public function updateTags(UpdateContactTagsRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $assistant = $this->assistant->get();
         $contact   = $this->contacts->findFor($assistant, $record);
-        $back      = $this->url('view', ['record' => $contact->getKey()]);
+        $back      = $this->url('show', ['record' => $contact->getKey()]);
 
         $this->contacts->syncTags($contact, $request->tags(), (string) $request->user()?->getAuthIdentifier());
 
         return $this->backToCard($back, trans('console.contacts.tags_updated'));
     }
 
-    public function updateGroups(UpdateContactGroupsRequest $request, string $tenant, string $record): RedirectResponse
+    public function updateGroups(UpdateContactGroupsRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $assistant = $this->assistant->get();
         $contact   = $this->contacts->findFor($assistant, $record);
-        $back      = $this->url('view', ['record' => $contact->getKey()]);
+        $back      = $this->url('show', ['record' => $contact->getKey()]);
 
         $this->contacts->syncGroups($contact, $request->groupIds());
 
@@ -207,11 +207,6 @@ final class ContactController extends Controller
      */
     private function url(string $action, array $parameters = []): string
     {
-        $name = match ($action) {
-            'index', 'view' => 'filament.assistant.resources.contacts.' . $action,
-            default         => 'console.contacts.' . $action,
-        };
-
-        return route($name, ['tenant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
+        return route('console.contacts.' . $action, ['assistant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
     }
 }

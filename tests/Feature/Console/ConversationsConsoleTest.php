@@ -110,7 +110,7 @@ final class ConversationsConsoleTest extends FeatureTestCase
                     'channel' => 'tenant.' . self::TENANT_ID . ".assistant.{$this->assistant->getKey()}.conversations",
                     'event'   => 'conversation.activity',
                 ])
-                ->where('navigation.groups', fn ($groups): bool => '1' === $this->badgeOf($groups, 'filament.assistant.resources.conversations.index'))
+                ->where('navigation.groups', fn ($groups): bool => '1' === $this->badgeOf($groups, 'console.conversations.index'))
                 ->etc());
     }
 

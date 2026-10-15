@@ -184,14 +184,14 @@ final class ConversationResourceAuthorizationTest extends FeatureTestCase
 
     private function indexUrl(Assistant $assistant): string
     {
-        return route('filament.assistant.resources.conversations.index', ['tenant' => $assistant]);
+        return route('console.conversations.index', ['assistant' => $assistant]);
     }
 
     private function viewUrl(Assistant $assistant, Conversation $conversation): string
     {
-        return route('filament.assistant.resources.conversations.view', [
-            'tenant' => $assistant,
-            'record' => $conversation,
+        return route('console.conversations.show', [
+            'assistant' => $assistant,
+            'record'    => $conversation,
         ]);
     }
 }

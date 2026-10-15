@@ -96,7 +96,7 @@ final readonly class AdminSearch
                 $assistant,
                 (string) $assistant->name,
                 null,
-                'filament.admin.resources.assistants.view',
+                'console.admin.assistants.show',
                 ['record' => $assistant->getKey()],
             ))
             ->values()
@@ -118,8 +118,8 @@ final readonly class AdminSearch
                 $editable = $gate->allows('update', $user) && $gate->allows('updateProfile', $user);
 
                 return $editable
-                    ? $this->hit($user, (string) $user->name, (string) $user->email, 'filament.admin.resources.users.edit', ['record' => $user->getKey()])
-                    : $this->hit($user, (string) $user->name, (string) $user->email, 'filament.admin.resources.users.index', ['search' => (string) $user->email]);
+                    ? $this->hit($user, (string) $user->name, (string) $user->email, 'console.admin.users.edit', ['record' => $user->getKey()])
+                    : $this->hit($user, (string) $user->name, (string) $user->email, 'console.admin.users.index', ['search' => (string) $user->email]);
             })
             ->values()
             ->all();
@@ -137,7 +137,7 @@ final readonly class AdminSearch
                 $role,
                 $role->title,
                 $role->title === $role->name ? null : $role->name,
-                'filament.admin.resources.roles.edit',
+                'console.admin.roles.edit',
                 ['record' => $role->getKey()],
             ))
             ->values()
@@ -160,7 +160,7 @@ final readonly class AdminSearch
                 $file,
                 $file->name,
                 trans('media.kinds.' . $file->kind->value),
-                'filament.admin.resources.media.view',
+                'console.admin.media.show',
                 ['record' => $file->getKey()],
             ))
             ->values()

@@ -34,7 +34,7 @@ runtime and jobs read.
 - Current assistant: `CurrentAssistant` is `scoped` and holds only what was set explicitly: the
   console's `ResolveCurrentAssistant` middleware sets it from the URL, jobs from their payload
   (`IncomingMessageJob`, `StartFlowFromEventJob`), and a `TenantSwitcher` restore hook clears it.
-- The assistant's console screens (`/assistant/{tenant}/*`) resolve the assistant from the URL;
+- The assistant's console screens (`/assistant/{assistant}/*`) resolve the assistant from the URL;
   access goes through `AssistantPolicy` (`ResolveCurrentAssistant` answers 404 when it is not viewable).
 - ADR-02 describes a `?assistant=` query parameter and a `ResolveAssistantMiddleware`. The code
   uses a path segment instead; that middleware was never registered and has been removed.

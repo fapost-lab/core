@@ -18,11 +18,12 @@ reviewed_at: 2026-10-15
 
 A console screen copies the contact-groups pilot; deviate only with a reason.
 
-- **Routes.** The read screens the removed Filament panels served keep their URI, name
-  (`filament.*`) and parameters (`{tenant}`, `{record}`) in `routes/inertia.php` until the planned
-  rename; writes and screens Filament never had get `console.*` names. Laravel passes route parameters to the action by position, so an action
-  under `assistant/{tenant}/…/{record}` takes `string $tenant, string $record` even when it
-  ignores `$tenant`.
+- **Routes.** The read screens the removed Filament panels served keep their URI; every name is
+  `console.*` — `console.admin.<resource>.<action>` for `admin/*`, `console.<resource>.<action>` for
+  `assistant/{assistant}/*`, reads `index|create|show|edit`, writes their own verbs. Laravel passes route
+  parameters to the action by position, so an action under `assistant/{assistant}/…/{record}` takes
+  `string $assistantKey, string $record` even when it ignores the key (the current assistant is already
+  resolved; `$assistant` is left free for the model).
 - **Controller orchestrates, a domain service writes.** The service finds records inside the
   current tenant (another tenant's id is a 404, a malformed one too — check `Str::isUuid` before
   Postgres sees it), creates, updates and deletes. Every action authorizes; writes go through a

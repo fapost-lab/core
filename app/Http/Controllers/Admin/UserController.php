@@ -345,11 +345,6 @@ final class UserController extends Controller
      */
     private function url(string $action, array $parameters = []): string
     {
-        $name = match ($action) {
-            'index', 'create', 'edit' => 'filament.admin.resources.users.' . $action,
-            default                   => 'console.admin.users.' . $action,
-        };
-
-        return route($name, $parameters, false);
+        return route('console.admin.users.' . $action, $parameters, false);
     }
 }

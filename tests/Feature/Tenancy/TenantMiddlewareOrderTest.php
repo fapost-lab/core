@@ -30,7 +30,7 @@ final class TenantMiddlewareOrderTest extends FeatureTestCase
 
     public function test_panel_logins_enter_the_tenant_before_the_session_starts(): void
     {
-        foreach (['filament.admin.auth.login', 'filament.assistant.auth.login'] as $name) {
+        foreach (['console.auth.login', 'console.auth.assistant-login'] as $name) {
             $stack = $this->stackFor($name);
 
             $tenant = array_search(TenancyMiddleware::class, $stack, true);
@@ -47,7 +47,7 @@ final class TenantMiddlewareOrderTest extends FeatureTestCase
         foreach (Route::getRoutes() as $route) {
             $name = (string) $route->getName();
 
-            if (! str_starts_with($name, 'filament.admin.') && ! str_starts_with($name, 'filament.assistant.')) {
+            if (! str_starts_with($name, 'console.')) {
                 continue;
             }
 

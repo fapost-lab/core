@@ -58,6 +58,6 @@ final class ActivationController extends Controller
                 ->withErrors($exception->errors());
         }
 
-        return redirect()->route('filament.admin.pages.dashboard');
+        return redirect()->route('console.admin.dashboard');
     }
 }

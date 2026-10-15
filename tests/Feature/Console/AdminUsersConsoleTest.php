@@ -66,7 +66,7 @@ final class AdminUsersConsoleTest extends FeatureTestCase
                     && [] !== $this->rowOf($rows, $other)['roles'])
                 ->where('navigation.groups', fn ($groups): bool => collect($groups)
                     ->flatMap(static fn (array $group): array => $group['items'])
-                    ->contains(static fn (array $item): bool => 'filament.admin.resources.users.index' === $item['key'] && false === $item['external']))
+                    ->contains(static fn (array $item): bool => 'console.admin.users.index' === $item['key'] && false === $item['external']))
                 ->etc());
     }
 
@@ -91,7 +91,7 @@ final class AdminUsersConsoleTest extends FeatureTestCase
 
     public function test_a_visitor_is_sent_to_the_sign_in(): void
     {
-        $this->get($this->url())->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->url())->assertRedirect(route('console.auth.login'));
     }
 
     public function test_an_invitation_creates_a_pending_user_with_the_role(): void

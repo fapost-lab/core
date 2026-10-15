@@ -106,6 +106,6 @@ final class MediaFolderController extends Controller
      */
     private function index(array $parameters = []): string
     {
-        return route('filament.admin.resources.media.index', $parameters, false);
+        return route('console.admin.media.index', $parameters, false);
     }
 }

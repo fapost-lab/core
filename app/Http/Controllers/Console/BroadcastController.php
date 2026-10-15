@@ -114,10 +114,10 @@ final class BroadcastController extends Controller
     }
 
     /*
-     * Route parameters reach an action by position, not by name, so `$tenant` (the assistant in the URL, already
+     * Route parameters reach an action by position, not by name, so `$assistantKey` (the assistant in the URL, already
      * resolved by the console stack) has to be declared ahead of `$record`.
      */
-    public function edit(string $tenant, string $record): Response|RedirectResponse
+    public function edit(string $assistantKey, string $record): Response|RedirectResponse
     {
         $broadcast = $this->broadcasts->findForAssistant($record);
 
@@ -131,7 +131,7 @@ final class BroadcastController extends Controller
         return Inertia::render('Console/Broadcasts/Edit', $this->formProps($broadcast));
     }
 
-    public function update(BroadcastRequest $request, string $tenant, string $record): RedirectResponse
+    public function update(BroadcastRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         try {
             $this->broadcasts->update($this->broadcasts->findForAssistant($record), $request->fields());
@@ -165,7 +165,7 @@ final class BroadcastController extends Controller
      * Starts a draft. The destination is fixed before the service runs: a synchronous queue runs the job inside the
      * request, and the tenant switch it makes resets the current assistant.
      */
-    public function send(SendBroadcastRequest $request, string $tenant, string $record): RedirectResponse
+    public function send(SendBroadcastRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $broadcast = $this->broadcasts->findForAssistant($record);
         $fallback  = $this->url('index');
@@ -189,7 +189,7 @@ final class BroadcastController extends Controller
         return $this->backToList(trans('console.broadcasts.started'), $fallback);
     }
 
-    public function cancel(string $tenant, string $record): RedirectResponse
+    public function cancel(string $assistantKey, string $record): RedirectResponse
     {
         $broadcast = $this->broadcasts->findForAssistant($record);
 
@@ -202,7 +202,7 @@ final class BroadcastController extends Controller
         return $this->backToList(trans('console.broadcasts.cancelled'), $this->url('index'));
     }
 
-    public function destroy(string $tenant, string $record): RedirectResponse
+    public function destroy(string $assistantKey, string $record): RedirectResponse
     {
         $broadcast = $this->broadcasts->findForAssistant($record);
 
@@ -338,11 +338,6 @@ final class BroadcastController extends Controller
      */
     private function url(string $action, array $parameters = []): string
     {
-        $name = match ($action) {
-            'index', 'create', 'edit' => 'filament.assistant.resources.broadcasts.' . $action,
-            default                   => 'console.broadcasts.' . $action,
-        };
-
-        return route($name, ['tenant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
+        return route('console.broadcasts.' . $action, ['assistant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
     }
 }

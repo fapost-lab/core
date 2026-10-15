@@ -108,7 +108,7 @@ final class AdminSupportAccessConsoleTest extends FeatureTestCase
 
     public function test_a_visitor_is_sent_to_the_sign_in(): void
     {
-        $this->get($this->url())->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->url())->assertRedirect(route('console.auth.login'));
     }
 
     private function entry(string $name, string $email, ?string $ip, string $enteredAt, ?string $leftAt): void

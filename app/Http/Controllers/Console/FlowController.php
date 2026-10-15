@@ -135,10 +135,10 @@ final class FlowController extends Controller
     }
 
     /*
-     * Route parameters reach an action by position, not by name, so `$tenant` (the assistant in the URL, already
+     * Route parameters reach an action by position, not by name, so `$assistantKey` (the assistant in the URL, already
      * resolved by the console stack) has to be declared ahead of `$record`.
      */
-    public function edit(string $tenant, string $record): Response
+    public function edit(string $assistantKey, string $record): Response
     {
         $flow = $this->flows->findForAssistant($record);
 
@@ -167,21 +167,21 @@ final class FlowController extends Controller
         ]);
     }
 
-    public function update(FlowRequest $request, string $tenant, string $record): RedirectResponse
+    public function update(FlowRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $this->flows->update($this->flows->findForAssistant($record), $request->fields());
 
         return $this->backToIndex(trans('console.flows.updated'));
     }
 
-    public function updateActivity(UpdateFlowActivityRequest $request, string $tenant, string $record): RedirectResponse
+    public function updateActivity(UpdateFlowActivityRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $this->flows->setActive($this->flows->findForAssistant($record), $request->active());
 
         return $this->backToList(trans($request->active() ? 'console.flows.activated' : 'console.flows.deactivated'));
     }
 
-    public function destroy(string $tenant, string $record): RedirectResponse
+    public function destroy(string $assistantKey, string $record): RedirectResponse
     {
         $flow = $this->flows->findForAssistant($record);
 
@@ -250,17 +250,11 @@ final class FlowController extends Controller
      */
     private function url(string $action, array $parameters = []): string
     {
-        $name = match ($action) {
-            'index', 'create', 'edit' => 'filament.assistant.resources.flows.' . $action,
-            'activity'                => 'console.flows.activity',
-            default                   => 'console.flows.' . $action,
-        };
-
-        return route($name, ['tenant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
+        return route('console.flows.' . $action, ['assistant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
     }
 
     private function groupUrl(string $action): string
     {
-        return route('console.flow-groups.' . $action, ['tenant' => (string) $this->assistant->get()->getKey()], false);
+        return route('console.flow-groups.' . $action, ['assistant' => (string) $this->assistant->get()->getKey()], false);
     }
 }

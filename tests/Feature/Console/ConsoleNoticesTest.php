@@ -79,7 +79,7 @@ final class ConsoleNoticesTest extends FeatureTestCase
         config(['tenancy.support_access.enabled' => true]);
 
         $this->post(route('support.enter'), ['token' => $this->supportToken()])
-            ->assertRedirect(route('filament.admin.pages.dashboard'));
+            ->assertRedirect(route('console.admin.dashboard'));
 
         foreach ($this->homeScreens() as $url) {
             $this->get($this->panelUrl($url))
@@ -92,7 +92,7 @@ final class ConsoleNoticesTest extends FeatureTestCase
                     ->etc());
         }
 
-        $this->post(route('support.leave'))->assertRedirect(route('filament.admin.auth.login'));
+        $this->post(route('support.leave'))->assertRedirect(route('console.auth.login'));
         $this->assertGuest();
     }
 

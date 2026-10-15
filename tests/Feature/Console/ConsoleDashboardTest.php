@@ -172,7 +172,7 @@ final class ConsoleDashboardTest extends FeatureTestCase
     {
         $assistant = Assistant::factory()->create();
 
-        $this->get($this->panelUrl("/assistant/{$assistant->getKey()}/dashboard"))->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->panelUrl("/assistant/{$assistant->getKey()}/dashboard"))->assertRedirect(route('console.auth.login'));
     }
 
     private function channel(Assistant $assistant): Channel

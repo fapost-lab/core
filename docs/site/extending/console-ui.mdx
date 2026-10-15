@@ -137,9 +137,9 @@ rail by default; `shortLabel` defaults to `label`.
 **Context action.** `ContextAction::link()` navigates to one of your routes, and
 that route takes a `record` parameter: Core fills it with the id of the contact or
 conversation the action was chosen on. A link to a per-assistant route also gets
-the open assistant as `{tenant}`, and is left out where no assistant is open.
+the open assistant as `{assistant}`, and is left out where no assistant is open.
 Laravel passes route parameters by position, so the action of
-`assistant/{tenant}/apps/<id>/contacts/{record}` takes `string $tenant, string $record`.
+`assistant/{assistant}/apps/<id>/contacts/{record}` takes `string $assistantKey, string $record`.
 `ContextAction::dialog()` opens your component in the kit's dialog instead.
 
 **Shell element.** Loaded only after the page has rendered, so it never slows a
@@ -199,12 +199,12 @@ middleware.
 | Method | URL | Middleware group |
 |---|---|---|
 | `routes()` | `/apps/<id>/…` | `solution` |
-| `assistantRoutes()` | `/assistant/{tenant}/apps/<id>/…` | `solution.assistant` |
+| `assistantRoutes()` | `/assistant/{assistant}/apps/<id>/…` | `solution.assistant` |
 
 Both groups are the console's own stack — session, tenant, signed-in active staff
 user — followed by a check that answers **404** while your Solution is not active
 for the tenant or its UI is not published. `solution.assistant` also resolves the
-assistant from `{tenant}`, as the Console's routes do. When your application
+assistant from `{assistant}`, as the Console's routes do. When your application
 declares an `ability`, every route also requires it.
 
 The name you give a route is prefixed with `solutions.<id>.`: `->name('board')`

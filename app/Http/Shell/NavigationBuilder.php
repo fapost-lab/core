@@ -29,8 +29,7 @@ use Illuminate\Support\Facades\Route;
  * navigation it replaces: a model's `viewAny` policy or the permission the Filament page asks for, so a user sees an
  * item exactly when Filament showed it. Administrators pass every check through `Gate::before`.
  *
- * Items keep Filament's route names. A screen Filament never had is given by its full `console.*` route name, taken
- * as is. An item whose route does not exist is left out. `external` (a plain link, a full page load) is false for
+ * Each item names its full `console.*` route; an item whose route does not exist is left out. `external` (a plain link, a full page load) is false for
  * every Core item; it stays for an item that leads off the console.
  *
  * @phpstan-type Item array{key: string, label: string, href: string, icon: string, external: bool, badge: string|null}
@@ -44,7 +43,7 @@ final readonly class NavigationBuilder
     }
 
     /**
-     * The menu of an assistant's screens (`assistant/{tenant}/*`). Without badges it asks no counts: the search
+     * The menu of an assistant's screens (`assistant/{assistant}/*`). Without badges it asks no counts: the search
      * palette lists the pages of an application it is not in, and a count there would be a query nobody sees.
      *
      * @return list<Group>
@@ -58,30 +57,30 @@ final readonly class NavigationBuilder
         $settings   = __('assistant.navigation.groups.settings');
 
         $entries = [
-            $this->entry($overview, 'pages.dashboard', __('console.navigation.dashboard'), 'layout-grid', -100, true),
-            $this->entry($channels, 'resources.channels.index', __('staff.channels.plural_label'), 'signal', 10, $this->canViewAny($user, Channel::class)),
-            $this->entry($flow, 'resources.flows.index', __('assistant.flows.plural_label'), 'arrow-left-right', 40, $this->canViewAny($user, FlowDraft::class)),
-            $this->entry($flow, 'resources.flow-groups.index', __('assistant.flow_groups.plural_label'), 'folder-open', 50, $this->canViewAny($user, FlowGroup::class)),
-            $this->entry($operations, 'resources.flow-sessions.index', __('assistant.flow_sessions.plural_label'), 'list', 60, $this->canViewAny($user, FlowSession::class)),
-            $this->entry($operations, 'resources.flow-logs.index', __('assistant.flow_logs.plural_label'), 'file-text', 70, $this->canViewAny($user, FlowLog::class)),
-            $this->entry($operations, 'resources.contacts.index', __('contact.plural_label'), 'circle-user', 70, $this->canViewAny($user, Contact::class)),
-            $this->entry($operations, 'resources.contact-groups.index', __('contact_group.plural_label'), 'users-round', 72, $this->canViewAny($user, ContactGroup::class)),
+            $this->entry($overview, 'console.dashboard', __('console.navigation.dashboard'), 'layout-grid', -100, true),
+            $this->entry($channels, 'console.channels.index', __('staff.channels.plural_label'), 'signal', 10, $this->canViewAny($user, Channel::class)),
+            $this->entry($flow, 'console.flows.index', __('assistant.flows.plural_label'), 'arrow-left-right', 40, $this->canViewAny($user, FlowDraft::class)),
+            $this->entry($flow, 'console.flow-groups.index', __('assistant.flow_groups.plural_label'), 'folder-open', 50, $this->canViewAny($user, FlowGroup::class)),
+            $this->entry($operations, 'console.flow-sessions.index', __('assistant.flow_sessions.plural_label'), 'list', 60, $this->canViewAny($user, FlowSession::class)),
+            $this->entry($operations, 'console.flow-logs.index', __('assistant.flow_logs.plural_label'), 'file-text', 70, $this->canViewAny($user, FlowLog::class)),
+            $this->entry($operations, 'console.contacts.index', __('contact.plural_label'), 'circle-user', 70, $this->canViewAny($user, Contact::class)),
+            $this->entry($operations, 'console.contact-groups.index', __('contact_group.plural_label'), 'users-round', 72, $this->canViewAny($user, ContactGroup::class)),
             $this->entry(
                 $operations,
-                'resources.conversations.index',
+                'console.conversations.index',
                 __('conversation.plural_label'),
                 'messages-square',
                 75,
                 $this->canViewAny($user, Conversation::class),
                 $badges ? fn (): ?string => $this->unreadConversations($assistant) : null,
             ),
-            $this->entry($operations, 'resources.contact-segments.index', __('segment.plural_label'), 'funnel', 78, $this->canViewAny($user, ContactSegment::class)),
-            $this->entry($operations, 'resources.broadcasts.index', __('broadcast.plural_label'), 'megaphone', 80, $this->canViewAny($user, Broadcast::class)),
-            $this->entry($settings, 'pages.settings', __('assistant.pages.settings.title'), 'settings', 50, $user->can(Permission::ManageAssistantSettings->value)),
-            $this->entry($settings, 'pages.translations', __('staff.tenant_translations.navigation'), 'languages', 70, $user->can(Permission::ManageTranslations->value)),
+            $this->entry($operations, 'console.contact-segments.index', __('segment.plural_label'), 'funnel', 78, $this->canViewAny($user, ContactSegment::class)),
+            $this->entry($operations, 'console.broadcasts.index', __('broadcast.plural_label'), 'megaphone', 80, $this->canViewAny($user, Broadcast::class)),
+            $this->entry($settings, 'console.settings.edit', __('assistant.pages.settings.title'), 'settings', 50, $user->can(Permission::ManageAssistantSettings->value)),
+            $this->entry($settings, 'console.translations.index', __('staff.tenant_translations.navigation'), 'languages', 70, $user->can(Permission::ManageTranslations->value)),
         ];
 
-        return $this->groups($entries, 'filament.assistant.', ['tenant' => $assistant->getKey()]);
+        return $this->groups($entries, ['assistant' => $assistant->getKey()]);
     }
 
     /**
@@ -95,24 +94,24 @@ final readonly class NavigationBuilder
         $media = __('media.navigation_group');
 
         $entries = [
-            $this->entry(null, 'pages.dashboard', __('console.navigation.dashboard'), 'home', -100, true),
-            $this->entry(__('staff.assistants.label'), 'resources.assistants.index', __('staff.assistants.plural_label'), 'rocket', 0, $this->canViewAny($user, Assistant::class)),
-            $this->entry($staff, 'resources.users.index', __('staff.users.plural_label'), 'users', 0, $this->canViewAny($user, User::class)),
-            $this->entry($staff, 'resources.roles.index', __('staff.roles.plural_label'), 'shield-check', 0, $this->canViewAny($user, Role::class)),
+            $this->entry(null, 'console.admin.dashboard', __('console.navigation.dashboard'), 'home', -100, true),
+            $this->entry(__('staff.assistants.label'), 'console.admin.assistants.index', __('staff.assistants.plural_label'), 'rocket', 0, $this->canViewAny($user, Assistant::class)),
+            $this->entry($staff, 'console.admin.users.index', __('staff.users.plural_label'), 'users', 0, $this->canViewAny($user, User::class)),
+            $this->entry($staff, 'console.admin.roles.index', __('staff.roles.plural_label'), 'shield-check', 0, $this->canViewAny($user, Role::class)),
             $this->entry($staff, 'console.admin.support-access.index', __('console.support_access.title'), 'life-buoy', 10, $this->canViewAny($user, SupportAccessEntry::class)),
             $this->entry(
                 $media,
-                'resources.media.index',
+                'console.admin.media.index',
                 __('media.plural_model_label'),
                 'image',
                 0,
                 $user->can(Permission::ViewMedia->value) || $user->can(Permission::ManageMedia->value),
             ),
-            $this->entry($media, 'pages.translations', __('staff.tenant_translations.navigation'), 'languages', 60, $user->can(Permission::ManageTranslations->value)),
-            $this->entry(null, 'pages.tenant-settings', __('staff.tenant_settings.navigation'), 'sliders-horizontal', 100, $user->can(Permission::ManageSettings->value)),
+            $this->entry($media, 'console.admin.translations.index', __('staff.tenant_translations.navigation'), 'languages', 60, $user->can(Permission::ManageTranslations->value)),
+            $this->entry(null, 'console.admin.tenant-settings.edit', __('staff.tenant_settings.navigation'), 'sliders-horizontal', 100, $user->can(Permission::ManageSettings->value)),
         ];
 
-        return $this->groups($entries, 'filament.admin.', []);
+        return $this->groups($entries, []);
     }
 
     /**
@@ -134,11 +133,11 @@ final readonly class NavigationBuilder
      *
      * @return list<Group>
      */
-    private function groups(array $entries, string $prefix, array $parameters): array
+    private function groups(array $entries, array $parameters): array
     {
         $visible = array_values(array_filter(
             $entries,
-            fn (array $entry): bool => $entry['visible'] && Route::has($this->routeName($prefix, $entry['route'])),
+            fn (array $entry): bool => $entry['visible'] && Route::has($entry['route']),
         ));
 
         /** @var array<string, list<array{sort: int, item: Item}>> $sorted */
@@ -146,7 +145,7 @@ final readonly class NavigationBuilder
         $labels = [];
 
         foreach ($visible as $entry) {
-            $name = $this->routeName($prefix, $entry['route']);
+            $name = $entry['route'];
             $key  = $entry['group'] ?? '';
 
             $labels[$key]   = $entry['group'];
@@ -174,14 +173,6 @@ final readonly class NavigationBuilder
         usort($result, static fn (array $a, array $b): int => (null === $a['label'] ? 0 : 1) <=> (null === $b['label'] ? 0 : 1));
 
         return $result;
-    }
-
-    /**
-     * The full route name of an item: a Filament route under the panel's prefix, or a console route as given.
-     */
-    private function routeName(string $prefix, string $route): string
-    {
-        return str_starts_with($route, 'console.') ? $route : $prefix . $route;
     }
 
     /**

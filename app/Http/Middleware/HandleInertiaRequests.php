@@ -131,7 +131,7 @@ final class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * The side menu: an assistant's screens under `assistant/{tenant}`, otherwise the tenant-wide ones.
+     * The side menu: an assistant's screens under `assistant/{assistant}`, otherwise the tenant-wide ones.
      *
      * @return array{mode: string, groups: list<array{label: string|null, items: list<array<string, mixed>>}>, searchUrl: string}|null
      */

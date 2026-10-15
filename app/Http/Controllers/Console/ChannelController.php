@@ -119,10 +119,10 @@ final class ChannelController extends Controller
     }
 
     /*
-     * Route parameters reach an action by position, not by name, so `$tenant` (the assistant in the URL, already
+     * Route parameters reach an action by position, not by name, so `$assistantKey` (the assistant in the URL, already
      * resolved by the console stack) has to be declared ahead of `$record`.
      */
-    public function edit(string $tenant, string $record): Response
+    public function edit(string $assistantKey, string $record): Response
     {
         $channel = $this->channels->findFor($this->assistant->get(), $record);
 
@@ -138,7 +138,7 @@ final class ChannelController extends Controller
         ]);
     }
 
-    public function update(ChannelRequest $request, string $tenant, string $record): RedirectResponse
+    public function update(ChannelRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $channel = $this->channels->findFor($this->assistant->get(), $record);
         $updated = $this->channels->update($channel, $request->fields());
@@ -153,7 +153,7 @@ final class ChannelController extends Controller
             : $this->backToIndex(trans('console.channels.updated'));
     }
 
-    public function rotateWebhook(string $tenant, string $record): RedirectResponse
+    public function rotateWebhook(string $assistantKey, string $record): RedirectResponse
     {
         // Rotating shows the new hash, so seeing channels is required too, not only the rotation permission.
         Gate::authorize('viewAny', Channel::class);
@@ -172,7 +172,7 @@ final class ChannelController extends Controller
         return $this->backToList(trans('console.channels.rotated', ['hash' => $rotated->webhook_public_hash]));
     }
 
-    public function registerWebhook(string $tenant, string $record): RedirectResponse
+    public function registerWebhook(string $assistantKey, string $record): RedirectResponse
     {
         $channel = $this->channels->findFor($this->assistant->get(), $record);
 
@@ -187,7 +187,7 @@ final class ChannelController extends Controller
             : $this->backToList(trans('console.channels.register_webhook.done'));
     }
 
-    public function destroy(string $tenant, string $record): RedirectResponse
+    public function destroy(string $assistantKey, string $record): RedirectResponse
     {
         $channel = $this->channels->findFor($this->assistant->get(), $record);
 
@@ -233,11 +233,6 @@ final class ChannelController extends Controller
      */
     private function url(string $action, array $parameters = []): string
     {
-        $name = match ($action) {
-            'index', 'create', 'edit' => 'filament.assistant.resources.channels.' . $action,
-            default                   => 'console.channels.' . $action,
-        };
-
-        return route($name, ['tenant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
+        return route('console.channels.' . $action, ['assistant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
     }
 }

@@ -54,7 +54,7 @@ final class EndExpiredSupportSession
 
     private function ended(Request $request): Response
     {
-        $login = route('filament.admin.auth.login');
+        $login = route('console.auth.login');
 
         // An Inertia visit follows a full-page redirect to the login form.
         if ($request->headers->has('X-Inertia')) {

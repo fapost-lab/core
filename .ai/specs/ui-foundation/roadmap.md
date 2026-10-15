@@ -124,7 +124,7 @@ Goal: Filament leaves Core. Done when: `filament/filament`, its plugins and `liv
 are absent from `composer.json`, the switch is gone, the public docs and knowledge describe the
 new UI, and `@fapost/ui` is published.
 
-- [ ] `remove-filament` — Filament removed — the switch, panel providers, `app/Filament`, the theme and published
+- [x] `remove-filament` — Filament removed — the switch, panel providers, `app/Filament`, the theme and published
       assets, Filament interfaces on `User` and `Assistant`, the vendor-before-node build order
       in the Dockerfile and CI; tests ported to the new routes; the SaaS CI green (after: phases
       2 and 3 — no screen may still need Filament)

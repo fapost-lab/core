@@ -53,6 +53,6 @@ final class LocaleController extends Controller
             return $previous;
         }
 
-        return route('filament.admin.pages.dashboard');
+        return route('console.admin.dashboard');
     }
 }

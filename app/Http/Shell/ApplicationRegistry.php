@@ -33,9 +33,9 @@ final class ApplicationRegistry
      */
     public const string LAST_ASSISTANT = 'shell.console_assistant';
 
-    private const string CONSOLE_ROUTE = 'filament.assistant.pages.dashboard';
+    private const string CONSOLE_ROUTE = 'console.dashboard';
 
-    private const string ADMIN_ROUTE = 'filament.admin.pages.dashboard';
+    private const string ADMIN_ROUTE = 'console.admin.dashboard';
 
     /**
      * Assistants this instance already found, by user and wished-for ids.
@@ -70,7 +70,7 @@ final class ApplicationRegistry
         $assistant    = $current ?? $this->consoleAssistant($user, $wishedAssistantIds);
 
         if (null !== $assistant) {
-            $applications[] = $this->application(self::CONSOLE, 'message-square', self::CONSOLE_ROUTE, ['tenant' => $assistant->getKey()], $assistant);
+            $applications[] = $this->application(self::CONSOLE, 'message-square', self::CONSOLE_ROUTE, ['assistant' => $assistant->getKey()], $assistant);
         }
 
         $applications[] = $this->application(self::ADMIN, 'shield', self::ADMIN_ROUTE, []);

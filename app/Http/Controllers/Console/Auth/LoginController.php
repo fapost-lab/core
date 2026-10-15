@@ -55,11 +55,11 @@ final class LoginController extends Controller
      */
     public function assistant(): RedirectResponse
     {
-        return redirect()->route('filament.admin.auth.login');
+        return redirect()->route('console.auth.login');
     }
 
     private function home(): string
     {
-        return route('filament.admin.pages.dashboard');
+        return route('console.admin.dashboard');
     }
 }

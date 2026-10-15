@@ -58,7 +58,7 @@ return Application::configure(basePath: dirname(__DIR__))
     // account checks; each channel then checks its own subject (routes/channels.php).
     ->withBroadcasting(__DIR__ . '/../routes/channels.php', ['middleware' => ['broadcasting']])
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->redirectGuestsTo(fn () => route('filament.admin.auth.login'));
+        $middleware->redirectGuestsTo(fn () => route('console.auth.login'));
 
         $middleware->alias([
             'tenant'               => TenancyMiddleware::class,
@@ -78,7 +78,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Stacks of the console (routes/inertia.php): the tenant first (sessions live in the tenant schema), then the
         // session, authentication and the account checks repeated on every request. `console` adds the assistant of
-        // the URL, whose parameter is still named `{tenant}` (a historical name kept by the route names).
+        // the URL, the route parameter `{assistant}`.
         $admin = [
             'web',
             'tenant',
@@ -103,12 +103,12 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureUserIsActive::class,
             EnsureCanAccessPanel::class,
         ]);
-        $middleware->group('console', [...$admin, ResolveCurrentAssistant::class . ':tenant']);
+        $middleware->group('console', [...$admin, ResolveCurrentAssistant::class]);
 
         // Routes of Solutions (App\Http\Shell\SolutionRoutes): the console's stacks, then 404 unless the Solution is
         // served to the tenant, and a check that the route renders only the Solution's own pages.
         $middleware->group('solution', [...$admin, EnsureSolutionActive::class, EnsureSolutionPage::class]);
-        $middleware->group('solution.assistant', [...$admin, ResolveCurrentAssistant::class . ':tenant', EnsureSolutionActive::class, EnsureSolutionPage::class]);
+        $middleware->group('solution.assistant', [...$admin, ResolveCurrentAssistant::class, EnsureSolutionActive::class, EnsureSolutionPage::class]);
 
         $middleware->web(
             append: [

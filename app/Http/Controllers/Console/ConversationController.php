@@ -106,7 +106,7 @@ final class ConversationController extends Controller
                     'status'        => $conversation->status->value,
                     'owner'         => $this->owner($conversation)->value,
                     'lastMessageAt' => $conversation->last_message_at?->toIso8601String(),
-                    'viewUrl'       => $this->url('view', $assistant, ['record' => $conversation->getKey()]),
+                    'viewUrl'       => $this->url('show', $assistant, ['record' => $conversation->getKey()]),
                 ],
             ),
             'statuses' => array_map(static fn (ConversationStatus $status): string => $status->value, ConversationStatus::cases()),
@@ -116,10 +116,10 @@ final class ConversationController extends Controller
     }
 
     /*
-     * Route parameters reach an action by position, so `$tenant` (the assistant in the URL, already resolved by the
+     * Route parameters reach an action by position, so `$assistantKey` (the assistant in the URL, already resolved by the
      * console stack) is declared ahead of `$record`.
      */
-    public function show(Request $request, string $tenant, string $record): Response
+    public function show(Request $request, string $assistantKey, string $record): Response
     {
         $assistant    = $this->assistant->get();
         $conversation = $this->inbox->find($assistant, $record);
@@ -170,7 +170,7 @@ final class ConversationController extends Controller
             'live'    => $this->live($assistant),
             'urls'    => [
                 'index'       => $this->url('index', $assistant),
-                'self'        => $this->url('view', $assistant, ['record' => $key]),
+                'self'        => $this->url('show', $assistant, ['record' => $key]),
                 'reply'       => $this->url('reply', $assistant, ['record' => $key]),
                 'takeOver'    => $this->url('takeover', $assistant, ['record' => $key]),
                 'returnToBot' => $this->url('return-to-bot', $assistant, ['record' => $key]),
@@ -179,7 +179,7 @@ final class ConversationController extends Controller
         ]);
     }
 
-    public function reply(ReplyConversationRequest $request, string $tenant, string $record): RedirectResponse
+    public function reply(ReplyConversationRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $assistant    = $this->assistant->get();
         $conversation = $this->inbox->find($assistant, $record);
@@ -216,7 +216,7 @@ final class ConversationController extends Controller
         };
     }
 
-    public function takeOver(Request $request, string $tenant, string $record): RedirectResponse
+    public function takeOver(Request $request, string $assistantKey, string $record): RedirectResponse
     {
         $conversation = $this->inbox->find($this->assistant->get(), $record);
 
@@ -229,7 +229,7 @@ final class ConversationController extends Controller
         return $this->back(trans('conversation.notifications.taken_over'));
     }
 
-    public function returnToBot(string $tenant, string $record): RedirectResponse
+    public function returnToBot(string $assistantKey, string $record): RedirectResponse
     {
         $conversation = $this->inbox->find($this->assistant->get(), $record);
 
@@ -240,7 +240,7 @@ final class ConversationController extends Controller
         return $this->back(trans('conversation.notifications.returned_to_bot'));
     }
 
-    public function updateStatus(UpdateConversationStatusRequest $request, string $tenant, string $record): RedirectResponse
+    public function updateStatus(UpdateConversationStatusRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $conversation = $this->inbox->find($this->assistant->get(), $record);
         $status       = $request->status();
@@ -395,11 +395,6 @@ final class ConversationController extends Controller
      */
     private function url(string $action, Assistant $assistant, array $parameters = []): string
     {
-        $name = match ($action) {
-            'index', 'view' => 'filament.assistant.resources.conversations.' . $action,
-            default         => 'console.conversations.' . $action,
-        };
-
-        return route($name, ['tenant' => (string) $assistant->getKey(), ...$parameters], false);
+        return route('console.conversations.' . $action, ['assistant' => (string) $assistant->getKey(), ...$parameters], false);
     }
 }

@@ -43,7 +43,7 @@ final class AdminRolesConsoleTest extends FeatureTestCase
                     && count(Permission::cases()) === $row['permissionsCount']))
                 ->where('navigation.groups', fn ($groups): bool => collect($groups)
                     ->flatMap(static fn (array $group): array => $group['items'])
-                    ->contains(static fn (array $item): bool => 'filament.admin.resources.roles.index' === $item['key'] && false === $item['external']))
+                    ->contains(static fn (array $item): bool => 'console.admin.roles.index' === $item['key'] && false === $item['external']))
                 ->etc());
     }
 

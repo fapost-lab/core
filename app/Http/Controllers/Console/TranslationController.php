@@ -48,9 +48,9 @@ final class TranslationController extends Controller
     }
 
     /*
-     * Route parameters reach an action by position, so `$tenant` (the assistant in the URL) comes before `$key`.
+     * Route parameters reach an action by position, so `$assistantKey` (the assistant in the URL) comes before `$key`.
      */
-    public function update(TranslationOverridesRequest $request, string $tenant, string $key): RedirectResponse
+    public function update(TranslationOverridesRequest $request, string $assistantKey, string $key): RedirectResponse
     {
         $this->editor->save($this->scope(), $this->knownKey($key), $request->values());
 
@@ -59,7 +59,7 @@ final class TranslationController extends Controller
         return redirect()->back(fallback: $this->url('index'));
     }
 
-    public function reset(string $tenant, string $key): RedirectResponse
+    public function reset(string $assistantKey, string $key): RedirectResponse
     {
         Gate::authorize(Permission::ManageTranslations->value);
 
@@ -90,8 +90,6 @@ final class TranslationController extends Controller
      */
     private function url(string $action, array $parameters = []): string
     {
-        $name = 'index' === $action ? 'filament.assistant.pages.translations' : 'console.translations.' . $action;
-
-        return route($name, ['tenant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
+        return route('console.translations.' . $action, ['assistant' => (string) $this->assistant->get()->getKey(), ...$parameters], false);
     }
 }

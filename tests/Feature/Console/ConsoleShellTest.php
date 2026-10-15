@@ -28,7 +28,7 @@ final class ConsoleShellTest extends FeatureTestCase
         $this->seed(TenantAclSeeder::class);
 
         Route::middleware('admin')->get('admin/_probe', fn () => Inertia::render('Auth/Login', ['action' => 'probe']));
-        Route::middleware('console')->get('assistant/{tenant}/_probe', fn () => Inertia::render('Auth/Login', ['action' => 'probe']));
+        Route::middleware('console')->get('assistant/{assistant}/_probe', fn () => Inertia::render('Auth/Login', ['action' => 'probe']));
         Route::middleware('web')->get('_web_probe', fn () => Inertia::render('Auth/Login', ['action' => 'probe']));
     }
 
@@ -40,24 +40,24 @@ final class ConsoleShellTest extends FeatureTestCase
 
         $this->assertSame('console', $props['navigation']['mode']);
         $this->assertSame(['Overview', 'Channels', 'Flow', 'Operations', 'Settings'], array_column($props['navigation']['groups'], 'label'));
-        $this->assertSame(['filament.assistant.pages.dashboard'], $this->keys($props['navigation']['groups'][0]));
-        $this->assertSame(['filament.assistant.resources.channels.index'], $this->keys($props['navigation']['groups'][1]));
+        $this->assertSame(['console.dashboard'], $this->keys($props['navigation']['groups'][0]));
+        $this->assertSame(['console.channels.index'], $this->keys($props['navigation']['groups'][1]));
         $this->assertSame([
-            'filament.assistant.resources.flows.index',
-            'filament.assistant.resources.flow-groups.index',
+            'console.flows.index',
+            'console.flow-groups.index',
         ], $this->keys($props['navigation']['groups'][2]));
         $this->assertSame([
-            'filament.assistant.resources.flow-sessions.index',
-            'filament.assistant.resources.flow-logs.index',
-            'filament.assistant.resources.contacts.index',
-            'filament.assistant.resources.contact-groups.index',
-            'filament.assistant.resources.conversations.index',
-            'filament.assistant.resources.contact-segments.index',
-            'filament.assistant.resources.broadcasts.index',
+            'console.flow-sessions.index',
+            'console.flow-logs.index',
+            'console.contacts.index',
+            'console.contact-groups.index',
+            'console.conversations.index',
+            'console.contact-segments.index',
+            'console.broadcasts.index',
         ], $this->keys($props['navigation']['groups'][3]));
         $this->assertSame([
-            'filament.assistant.pages.settings',
-            'filament.assistant.pages.translations',
+            'console.settings.edit',
+            'console.translations.index',
         ], $this->keys($props['navigation']['groups'][4]));
         $this->assertSame("/assistant/{$assistant->getKey()}/dashboard", $props['navigation']['groups'][0]['items'][0]['href']);
     }
@@ -89,7 +89,7 @@ final class ConsoleShellTest extends FeatureTestCase
         $groups = $this->props($this->actingAs($user)->get($this->panelUrl("/assistant/{$assistant->getKey()}/_probe")))['navigation']['groups'];
 
         $this->assertSame(
-            ['filament.assistant.pages.dashboard', 'filament.assistant.pages.translations'],
+            ['console.dashboard', 'console.translations.index'],
             array_merge(...array_map($this->keys(...), $groups)),
         );
     }
@@ -102,17 +102,17 @@ final class ConsoleShellTest extends FeatureTestCase
         $this->assertSame('admin', $props['navigation']['mode']);
         $this->assertNull($props['assistants']);
         $this->assertNull($groups[0]['label']);
-        $this->assertSame(['filament.admin.pages.dashboard', 'filament.admin.pages.tenant-settings'], $this->keys($groups[0]));
-        $this->assertSame(['filament.admin.resources.assistants.index'], $this->keys($groups[1]));
-        $this->assertSame(['filament.admin.resources.users.index', 'filament.admin.resources.roles.index', 'console.admin.support-access.index'], $this->keys($groups[2]));
-        $this->assertSame(['filament.admin.resources.media.index', 'filament.admin.pages.translations'], $this->keys($groups[3]));
+        $this->assertSame(['console.admin.dashboard', 'console.admin.tenant-settings.edit'], $this->keys($groups[0]));
+        $this->assertSame(['console.admin.assistants.index'], $this->keys($groups[1]));
+        $this->assertSame(['console.admin.users.index', 'console.admin.roles.index', 'console.admin.support-access.index'], $this->keys($groups[2]));
+        $this->assertSame(['console.admin.media.index', 'console.admin.translations.index'], $this->keys($groups[3]));
     }
 
     public function test_a_user_without_rights_sees_only_the_dashboard_in_the_tenant_wide_menu(): void
     {
         $groups = $this->props($this->actingAs(User::factory()->create())->get($this->panelUrl('/admin/_probe')))['navigation']['groups'];
 
-        $this->assertSame(['filament.admin.pages.dashboard'], array_merge(...array_map($this->keys(...), $groups)));
+        $this->assertSame(['console.admin.dashboard'], array_merge(...array_map($this->keys(...), $groups)));
     }
 
     public function test_the_switcher_lists_only_the_assistants_the_user_may_open(): void
@@ -195,12 +195,12 @@ final class ConsoleShellTest extends FeatureTestCase
             ->from('https://evil.example/page')
             ->post($this->panelUrl('/console/locale'), ['locale' => 'ru'], ['X-Inertia' => 'true'])
             ->assertStatus(409)
-            ->assertHeader('X-Inertia-Location', route('filament.admin.pages.dashboard'));
+            ->assertHeader('X-Inertia-Location', route('console.admin.dashboard'));
     }
 
     public function test_a_guest_cannot_set_the_language(): void
     {
-        $this->post($this->panelUrl('/console/locale'), ['locale' => 'ru'])->assertRedirect(route('filament.admin.auth.login'));
+        $this->post($this->panelUrl('/console/locale'), ['locale' => 'ru'])->assertRedirect(route('console.auth.login'));
     }
 
     /**

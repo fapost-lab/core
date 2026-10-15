@@ -85,8 +85,6 @@ final class TranslationController extends Controller
      */
     private function url(string $action, array $parameters = []): string
     {
-        $name = 'index' === $action ? 'filament.admin.pages.translations' : 'console.admin.translations.' . $action;
-
-        return route($name, $parameters, false);
+        return route('console.admin.translations.' . $action, $parameters, false);
     }
 }

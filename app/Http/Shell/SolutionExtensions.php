@@ -48,8 +48,8 @@ final readonly class SolutionExtensions
      * The Core screens that show one record, by the target of their context actions: there the server knows the record.
      */
     private const array RECORD_SCREENS = [
-        'contact.view'      => 'filament.assistant.resources.contacts.view',
-        'conversation.view' => 'filament.assistant.resources.conversations.view',
+        'contact.view'      => 'console.contacts.show',
+        'conversation.view' => 'console.conversations.show',
     ];
 
     public function __construct(
@@ -102,7 +102,7 @@ final readonly class SolutionExtensions
                 continue;
             }
 
-            $href = $this->url($application->entryRoute, null === $assistant ? [] : ['tenant' => (string) $assistant->getKey()]);
+            $href = $this->url($application->entryRoute, null === $assistant ? [] : ['assistant' => (string) $assistant->getKey()]);
 
             if (null === $href) {
                 continue;
@@ -141,7 +141,7 @@ final readonly class SolutionExtensions
             return [];
         }
 
-        $parameters = null === $application->assistant ? [] : ['tenant' => (string) $application->assistant->getKey()];
+        $parameters = null === $application->assistant ? [] : ['assistant' => (string) $application->assistant->getKey()];
         $groups     = [];
 
         foreach ($declared->menu as $item) {
@@ -306,12 +306,12 @@ final readonly class SolutionExtensions
 
         $parameters = ['record' => self::RECORD_PLACEHOLDER];
 
-        if (in_array('tenant', $route->parameterNames(), true)) {
+        if (in_array('assistant', $route->parameterNames(), true)) {
             if (null === $assistant) {
                 return null;
             }
 
-            $parameters['tenant'] = (string) $assistant->getKey();
+            $parameters['assistant'] = (string) $assistant->getKey();
         }
 
         $template = route((string) $declared->route, $parameters, false);
@@ -361,7 +361,7 @@ final readonly class SolutionExtensions
 
         $taken = $route->parameterNames();
 
-        if (in_array('tenant', $taken, true) && ! isset($parameters['tenant'])) {
+        if (in_array('assistant', $taken, true) && ! isset($parameters['assistant'])) {
             return null;
         }
 

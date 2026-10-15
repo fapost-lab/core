@@ -170,11 +170,6 @@ final class RoleController extends Controller
      */
     private function url(string $action, array $parameters = []): string
     {
-        $name = match ($action) {
-            'index', 'create', 'edit' => 'filament.admin.resources.roles.' . $action,
-            default                   => 'console.admin.roles.' . $action,
-        };
-
-        return route($name, $parameters, false);
+        return route('console.admin.roles.' . $action, $parameters, false);
     }
 }

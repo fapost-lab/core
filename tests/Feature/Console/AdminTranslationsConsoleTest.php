@@ -71,7 +71,7 @@ final class AdminTranslationsConsoleTest extends FeatureTestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->where('navigation.groups', fn ($groups): bool => collect($groups)
                     ->flatMap(static fn (array $group): array => $group['items'])
-                    ->contains(static fn (array $item): bool => 'filament.admin.pages.translations' === $item['key'] && false === $item['external']))
+                    ->contains(static fn (array $item): bool => 'console.admin.translations.index' === $item['key'] && false === $item['external']))
                 ->etc());
     }
 
@@ -113,7 +113,7 @@ final class AdminTranslationsConsoleTest extends FeatureTestCase
 
     public function test_a_visitor_is_sent_to_the_sign_in(): void
     {
-        $this->get($this->url())->assertRedirect(route('filament.admin.auth.login'));
+        $this->get($this->url())->assertRedirect(route('console.auth.login'));
     }
 
     private function url(string $suffix = ''): string
