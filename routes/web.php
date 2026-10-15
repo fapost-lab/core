@@ -7,6 +7,8 @@ use App\Domains\Staff\Http\Controllers\SupportAccessController;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\PreSaleController;
+use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
+use App\Http\Middleware\SetConsoleRootView;
 use Illuminate\Support\Facades\Route;
 
 Route::domain((string) config('tenancy.base_domain'))->group(function (): void {
@@ -27,10 +29,13 @@ Route::domain((string) config('tenancy.base_domain'))->group(function (): void {
 
 // Activation needs a tenant: its tokens live in the tenant schema. In `host` mode only a tenant host
 // reaches it and the base domain answers 404; in `single` mode the default tenant serves any host,
-// so links issued before the move to the tenant host keep working.
+// so links issued before the move to the tenant host keep working. Its pages are guest pages of the console, on the
+// console's root view and with the sign-in's session check (routes/inertia.php), in the same order.
 Route::middleware('tenant')->group(function (): void {
-    Route::get('/activate', [ActivationController::class, 'show'])->name('activate.show');
-    Route::post('/activate', [ActivationController::class, 'store'])->name('activate.store');
+    Route::middleware([ForgetInvalidAuthenticatedSession::class, SetConsoleRootView::class])->group(function (): void {
+        Route::get('/activate', [ActivationController::class, 'show'])->name('activate.show');
+        Route::post('/activate', [ActivationController::class, 'store'])->name('activate.store');
+    });
 
     // Support access: a platform operator enters this tenant as its platform support user. The token
     // travels in the POST body, never in a URL; CSRF is exempt for `enter` (see bootstrap/app.php) and

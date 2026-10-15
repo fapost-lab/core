@@ -44,6 +44,12 @@ broken.
 - **Deactivating a user deletes their sessions** (`UserService`).
 - **Activation tokens are stored hashed, expire after 72 hours, and can be resent at most once
   every 5 minutes** (`ActivationTokenService`, `ResendActivationService`).
+- **Activating by the link signs the invitee in on a session of their own.** Whoever was signed in in
+  that browser is logged out and the session invalidated before the invitee is logged in
+  (`ActivationController::store()`, as the support entry does): the session would otherwise keep the
+  previous user's `password_hash_*`, which `AuthenticateSession` compares with the invitee's and signs
+  them out on the next request, and their state (intended URL, support session). `ActivateUserService`
+  only sets the password and status; signing in is the controller's. Enforced: `ActivationSingleModeTest`.
 - **Admins bypass every policy** through `Gate::before` in `StaffServiceProvider`. A policy that
   returns `false` does not stop an admin — write policies with that in mind.
 - **Nobody changes or removes the platform support user, admins included.** The Gate refuses

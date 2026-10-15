@@ -14,6 +14,7 @@ use App\Domains\Tenancy\Services\TenantSwitcher;
 use Fapost\Foundation\Tenancy\Contracts\TenantRenamerInterface;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
+use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\RunsInHostMode;
 use Tests\Feature\FeatureTestCase;
 
@@ -69,7 +70,7 @@ final class ActivationHostModeTest extends FeatureTestCase
 
         $this->get($host . $path)
             ->assertOk()
-            ->assertViewIs('staff.activate');
+            ->assertInertia(fn (AssertableInertia $page) => $page->component('Auth/Activate')->etc());
 
         $this->post("{$host}/activate", [
             'token'                 => $query['token'],
@@ -95,7 +96,7 @@ final class ActivationHostModeTest extends FeatureTestCase
 
         $host = "http://main-new.{$this->base}";
 
-        $this->get($host . $path)->assertOk()->assertViewIs('staff.activate');
+        $this->get($host . $path)->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('Auth/Activate')->etc());
         $this->post("{$host}/activate", [
             'token'                 => $query['token'],
             'password'              => 'a-long-password',
@@ -124,7 +125,7 @@ final class ActivationHostModeTest extends FeatureTestCase
     {
         $this->get("http://main.{$this->base}/activate")
             ->assertOk()
-            ->assertViewIs('staff.activation-expired');
+            ->assertInertia(fn (AssertableInertia $page) => $page->component('Auth/ActivationExpired')->etc());
     }
 
     public function test_a_token_of_one_tenant_is_not_valid_on_another(): void
@@ -140,7 +141,7 @@ final class ActivationHostModeTest extends FeatureTestCase
 
         $this->get("http://second.{$this->base}/activate?token={$query['token']}")
             ->assertOk()
-            ->assertViewIs('staff.activation-expired');
+            ->assertInertia(fn (AssertableInertia $page) => $page->component('Auth/ActivationExpired')->etc());
 
         Auth::forgetGuards();
 
