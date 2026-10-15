@@ -1,4 +1,4 @@
-import type { ShellPageProps } from '@fapost/ui/shell'
+import type { ShellPageProps } from '@console/shell'
 import type { LocalizedEntry } from '@fapost/ui/components/localized-field'
 
 export interface BroadcastsTranslations {

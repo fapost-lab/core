@@ -78,6 +78,9 @@ return [
         ],
     ],
 
+    // The close button of the kit's dialogs and sheets.
+    'close' => 'Close',
+
     // Shared by every list screen built on the kit's DataTable.
     'table' => [
         'search'          => 'Search',

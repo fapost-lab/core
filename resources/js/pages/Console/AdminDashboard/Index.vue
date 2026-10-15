@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -12,7 +12,7 @@ import type { Component } from 'vue'
 import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@fapost/ui/components/card'
 import { EmptyState } from '@fapost/ui/components/empty-state'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import { SolutionWidgets } from '../../../console/solutions'
 import ActivityChart from './ActivityChart.vue'
 import type { ActivityDay, AdminDashboardPageProps, AdminStats } from './types'

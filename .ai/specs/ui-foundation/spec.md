@@ -47,6 +47,12 @@ with the builder.
   application code built from it), the builder's own components, and the PHP side of the
   extension contract.
 
+  *Amended 2026-10-15 (owner, `kit-extract-package` gate):* the `AppShell` and `useLiveUpdates`
+  stay in Core (`resources/js/console/shell`, `resources/js/console/lib`) and are not part of the
+  published package. Both read Core's shared props, which change together with Core's PHP; in a
+  separate package every such change would be a kit release. Solutions do not import them. The
+  kit's own strings (table labels, "Close") reach it from the host through `lib/messages`.
+
 ## What exists today
 
 Facts gathered 2026-10-06; evidence paths are in the task notes of this session's research.

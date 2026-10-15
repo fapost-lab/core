@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@fapost/ui/components/confirm-dialog'
 import { DataTable, type DataTableColumn, type TableDefaults, type TableMeta, type TableState } from '@fapost/ui/components/data-table'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@fapost/ui/components/dropdown-menu'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import type { ChannelRow, ChannelsPageProps } from './types'
 import WebhookStatus from './WebhookStatus.vue'
 

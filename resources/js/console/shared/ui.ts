@@ -7,8 +7,8 @@
  * `@fapost/ui` and every subpath in `ui-surface.json` at this one entry (`App\Http\Shell\SolutionImportMap`).
  *
  * One line per subpath in `ui-surface.json`, in the same order; `ui-surface.test.ts` holds both to each other and
- * keeps export names unique across subpaths, since `export *` silently drops a name two subpaths share. `shell` and
- * the live-updates helpers are internal to the console and stay out (ADR solution-console-ui).
+ * keeps export names unique across subpaths, since `export *` silently drops a name two subpaths share. The shell and
+ * live updates are not in the kit at all: they are Core's own code in resources/js/console (ADR solution-console-ui).
  */
 export * from '@fapost/ui/components/alert-dialog'
 export * from '@fapost/ui/components/avatar'

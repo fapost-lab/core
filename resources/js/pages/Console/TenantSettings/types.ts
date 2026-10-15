@@ -1,4 +1,4 @@
-import type { ShellPageProps } from '@fapost/ui/shell'
+import type { ShellPageProps } from '@console/shell'
 import type { SelectOption } from '../Settings/types'
 
 export type { SelectOption }

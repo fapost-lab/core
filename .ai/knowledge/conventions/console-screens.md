@@ -10,6 +10,8 @@ paths:
   - routes/inertia.php
   - "resources/js/pages/Console/**"
   - "resources/js/ui/**"
+  - "resources/js/console/shell/**"
+  - "resources/js/console/lib/**"
 reviewed_at: 2026-10-15
 ---
 # Console screens
@@ -59,7 +61,7 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   only the unread count (one indexed count, no cache) and the bell's URLs; the list loads as JSON when the menu
   opens, the count is polled every 60 s while the tab is visible, and every bell route is throttled. A link the
   bell opens is a full page load, after the "read" write settles or a second passes. Example:
-  `NotificationController`, `StaffNotificationInbox`, `resources/js/ui/shell/NotificationBell.vue`.
+  `NotificationController`, `StaffNotificationInbox`, `resources/js/console/shell/NotificationBell.vue`.
 - **After a write**, toast through `Inertia::flash()` (never the session `with()`: a shared prop
   is kept in history and replays on Back). Deletes go `back()` so the list keeps its state; forms
   go to the index.
@@ -68,8 +70,16 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   `@fapost/ui` components: `data-table`, `form-field`, `confirm-dialog`; several of a fixed list is
   `options-picker`, free-text values as chips `value-list-input`, a text per language `localized-field`
   (its errors keyed by locale through `errorsByLocale`). A control a second screen needs moves into the
-  kit and takes every label through props — the kit imports nothing from pages, Inertia or `shell` (it
+  kit and takes every label through props — the kit imports nothing from pages, the shell or the
+  console, and from Inertia only the router; `resources/js/ui/boundary.test.ts` enforces it (the kit
   becomes the npm package `@fapost/ui`). Permission flags for buttons come from the controller as `can`.
+- **The kit's own strings come from the host.** A string the kit itself shows (the DataTable's labels,
+  the close button of dialogs and sheets) is a key of `KitMessages` in `@fapost/ui/lib/messages`, with
+  an English default there; components read it through `useKitMessages()`. Core's `AppShell` provides
+  `KIT_MESSAGES` as a getter over `translations.console` (`close`, `table`), so a language switch reaches
+  the kit without a reload. A new kit string gets its key there, its default, and the key in
+  `lang/{en,ru,uk}/console.php`; the kit never reads page props. Why: the kit is released apart from
+  Core and rendered by Solutions too, so it cannot know Core's props or lang files.
 - **The kit follows the approved mockups, not stock shadcn-vue** (the design canvas linked from the
   `ui-foundation` spec): a page adds no colours or type of its own. A state (active, inactive)
   is a `StatusDot`; a category or count is a soft `Badge` chosen by meaning (`info`, `neutral`,
@@ -120,7 +130,7 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   otherwise. The server announces only after the commit, only while a screen marks itself watched
   (`FlowActivityWatchers`), throttled per assistant, and a failed announcement is reported, never
   thrown into the flow step. The event carries no data: the page reloads its own props. Example:
-  `FlowSessionController`, `FlowActivityNotifier`, `resources/js/ui/lib/useLiveUpdates.ts`.
+  `FlowSessionController`, `FlowActivityNotifier`, `resources/js/console/lib/useLiveUpdates.ts`.
   The browser learns how to reach the socket at runtime from the shared `broadcaster.client` prop
   (never a secret, `null` for guests), not from `VITE_*` build variables: self-hosters run prebuilt
   images. The Echo client is a lazy chunk and counts as registered only while its connection is

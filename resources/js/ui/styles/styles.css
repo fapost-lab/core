@@ -1,0 +1,24 @@
+/*
+ * Everything the kit needs on a page, for a host application that already imports Tailwind:
+ *
+ *   @import 'tailwindcss';
+ *   @import '@fapost/ui/styles.css';
+ *
+ * Tailwind itself is the host's (one per page). @source is resolved against this file, so the kit's classes are found
+ * wherever the kit is installed.
+ */
+@import './fonts.css';
+@import './tokens.css';
+@import './theme.css';
+
+@source '../components';
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+}

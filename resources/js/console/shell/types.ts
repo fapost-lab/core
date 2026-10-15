@@ -1,3 +1,5 @@
+import type { DataTableLabels } from '@fapost/ui/lib/messages'
+
 /** What the server shares with every console page (see HandleInertiaRequests). */
 
 export interface NavItem {
@@ -124,27 +126,8 @@ export interface AccessNotice {
     actionUrl: string | null
 }
 
-/** Strings every list screen built on the kit's DataTable shares (`table` in the console lang files). */
-export interface TableTranslations {
-    search: string
-    search_hint: string
-    empty: string
-    empty_search: string
-    clear_search: string
-    selected: string
-    clear_selection: string
-    select_all: string
-    select_row: string
-    actions: string
-    sort_by: string
-    rows_per_page: string
-    range: string
-    page: string
-    previous: string
-    next: string
-    expand_group: string
-    collapse_group: string
-}
+/** Strings every list screen built on the kit's DataTable shares (`table` in the console lang files); the shell hands them to the kit. */
+export type TableTranslations = DataTableLabels
 
 /** Strings every form screen shares (`form` in the console lang files). */
 export interface FormTranslations {
@@ -179,6 +162,8 @@ export interface ConsoleTranslations {
     applications: ApplicationsTranslations
     support: { banner: string; leave: string }
     dashboard: Record<string, string | Record<string, string>>
+    /** The close button of the kit's dialogs and sheets. */
+    close: string
     table: TableTranslations
     form: FormTranslations
 }

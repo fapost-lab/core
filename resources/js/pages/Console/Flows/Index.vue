@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -17,7 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Label } from '@fapost/ui/components/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
 import { Switch } from '@fapost/ui/components/switch'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import TriggerHint from './TriggerHint.vue'
 import type { FlowGroupOption, FlowRow, FlowsPageProps } from './types'
 

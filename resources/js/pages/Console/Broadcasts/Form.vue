@@ -10,7 +10,7 @@ import { errorsByLocale, LocalizedField, localizedRecord } from '@fapost/ui/comp
 import { OptionsPicker } from '@fapost/ui/components/options-picker'
 import ReachLine from './ReachLine.vue'
 import { useReach } from './useReach'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import type { BroadcastFormState, BroadcastLanguage, BroadcastTarget, BroadcastsPageProps, SelectOption } from './types'
 
 /**

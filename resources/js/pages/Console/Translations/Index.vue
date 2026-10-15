@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -14,7 +14,7 @@ import { ConfirmDialog } from '@fapost/ui/components/confirm-dialog'
 import { DataTable, type DataTableColumn, type TableDefaults, type TableMeta, type TableState } from '@fapost/ui/components/data-table'
 import { EmptyState } from '@fapost/ui/components/empty-state'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import EditDialog from './EditDialog.vue'
 import { cellOf, statusVariant, truncate } from './translations'
 import type { TranslationRow, TranslationsPageProps } from './types'

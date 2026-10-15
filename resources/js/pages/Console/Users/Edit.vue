@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -15,7 +15,7 @@ import { FormField } from '@fapost/ui/components/form-field'
 import { FormSection } from '@fapost/ui/components/form-section'
 import { Input } from '@fapost/ui/components/input'
 import { Label } from '@fapost/ui/components/label'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import { toggleValue } from './roles'
 import type { EditableUser, RoleOption, UsersPageProps } from './types'
 

@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest'
-import {breadcrumbs, findActive, initials, interpolate, pathOf} from './nav'
+import {breadcrumbs, findActive, initials, pathOf} from './nav'
 import type {NavGroup} from './types'
 
 const item = (key: string, href: string, label = key) => ({key, label, href, icon: 'home', external: false, badge: null})
@@ -56,22 +56,6 @@ describe('breadcrumbs', () => {
         const same: NavGroup[] = [{label: 'Media', items: [item('media', '/admin/media', 'Media')]}]
 
         expect(breadcrumbs('Administration', same, '/admin/media')).toEqual(['Administration', 'Media'])
-    })
-})
-
-describe('interpolate', () => {
-    it('fills the placeholders', () => {
-        expect(interpolate('Live sessions (:count)', {count: 3})).toBe('Live sessions (3)')
-        expect(interpolate('(:name, :email)', {name: 'Olga', email: 'o@x.io'})).toBe('(Olga, o@x.io)')
-    })
-
-    it('fills a long name before a short one that starts it', () => {
-        expect(interpolate('Showing :from–:to of :total', {from: 1, to: 4, total: 4})).toBe('Showing 1–4 of 4')
-        expect(interpolate('Showing :from–:to of :total', {to: 4, from: 1, total: 12})).toBe('Showing 1–4 of 12')
-    })
-
-    it('inserts a value verbatim', () => {
-        expect(interpolate('Delete :name?', {name: "a$&b$'c"})).toBe("Delete a$&b$'c?")
     })
 })
 

@@ -9,8 +9,8 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@fapost/ui/components/dropdown-menu'
-import { isThemePreference } from './theme'
-import { useTheme } from './useTheme'
+import { isThemePreference } from '@shared/theme/theme'
+import { useTheme } from '@shared/theme/useTheme'
 
 const props = defineProps<{ labels: { label: string; light: string; dark: string; system: string } }>()
 

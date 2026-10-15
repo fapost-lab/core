@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@fapost/ui/components/dropdown-menu'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
-import { interpolate } from './nav'
+import { interpolate } from '@fapost/ui/lib/utils'
 import { NOTIFICATION_POLL_MS, READ_BEFORE_LEAVING_MS, allMarkedRead, badgeText, markedRead, settleWithin, type ShellNotification } from './notifications'
 import type { NotificationsTranslations, ShellNotifications } from './types'
 

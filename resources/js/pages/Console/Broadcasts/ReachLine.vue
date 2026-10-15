@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { Badge } from '@fapost/ui/components/badge'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import type { ReachState } from './useReach'
 import type { BroadcastsPageProps } from './types'
 

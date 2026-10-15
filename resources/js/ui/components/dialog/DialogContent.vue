@@ -9,6 +9,7 @@ import {
   DialogPortal,
   useForwardPropsEmits,
 } from "reka-ui"
+import { useKitMessages } from '@fapost/ui/lib/messages'
 import { cn } from '@fapost/ui/lib/utils'
 import DialogOverlay from "./DialogOverlay.vue"
 
@@ -24,6 +25,8 @@ const emits = defineEmits<DialogContentEmits>()
 const delegatedProps = reactiveOmit(props, "class")
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
+
+const messages = useKitMessages()
 </script>
 
 <template>
@@ -46,7 +49,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
         class="ring-offset-background focus:ring-ring data-[state=open]:bg-accent data-[state=open]:text-muted-foreground absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4"
       >
         <X />
-        <span class="sr-only">Close</span>
+        <span class="sr-only">{{ messages.close }}</span>
       </DialogClose>
     </DialogContent>
   </DialogPortal>

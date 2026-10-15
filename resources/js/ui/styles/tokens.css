@@ -1,5 +1,6 @@
 /*
- * Design tokens shared by the console kit (ui.css) and the flow builder (builder.css).
+ * Design tokens of the kit (Warm Minimal). The kit's styles.css brings them to the console; the flow builder
+ * (resources/css/builder.css) imports this file on its own.
  * Custom properties only: no Tailwind, no selectors beyond :root and .dark.
  */
 :root {

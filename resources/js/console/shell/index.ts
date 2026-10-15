@@ -1,0 +1,7 @@
+export { default as AppShell } from './AppShell.vue'
+export { applyTheme, isDark, readPreference, writePreference, type ThemePreference } from '@shared/theme/theme'
+export { useTheme } from '@shared/theme/useTheme'
+export { SHELL_SLOT, type ShellSlotPlace } from './slots'
+export { breadcrumbs, findActive } from './nav'
+export { interpolate } from '@fapost/ui/lib/utils'
+export type * from './types'

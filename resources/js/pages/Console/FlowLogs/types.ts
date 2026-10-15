@@ -1,4 +1,4 @@
-import type { ShellPageProps } from '@fapost/ui/shell'
+import type { ShellPageProps } from '@console/shell'
 import type { ActivityPeriod, KeyValue, LiveTranslations, Tone } from '../FlowSessions/types'
 
 export type FlowLogStatus = 'executed' | 'failed' | 'conflict' | 'terminal'

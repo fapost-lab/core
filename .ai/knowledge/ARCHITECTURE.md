@@ -148,10 +148,13 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   checkout with the SaaS package added through the composer overlay. No CI runs it there: the SaaS
   package's CI does not run Core's `test:arch` (phpstan).
 - **The operator surfaces share one token source.**
-  `resources/css/tokens.css` holds the Warm Minimal tokens (light and `.dark`, fonts Onest,
-  Roboto Condensed, Victor Mono, self-hosted through Fontsource); the kit (`resources/js/ui`,
-  shadcn-vue, alias `@fapost/ui`, styles `resources/css/ui.css`) builds on it, and the builder's
-  own variables point at it in both themes. The public site (`resources/css/app.css`) keeps its own
+  The kit's `tokens.css` (`resources/js/ui/styles/`, imported as `@fapost/ui/tokens.css`) holds the
+  Warm Minimal tokens (light and `.dark`, fonts Onest, Roboto Condensed, Victor Mono, self-hosted
+  through Fontsource); the kit (`resources/js/ui`, shadcn-vue, alias `@fapost/ui`, its CSS in
+  `styles/`, brought to the console by `resources/css/ui.css`) builds on it, and the builder's
+  own variables point at it in both themes. The console shell and live updates are Core's own code
+  (`resources/js/console/shell`, `resources/js/console/lib`, alias `@console`), not the kit; the
+  theme helpers the console and the builder share are in `resources/js/shared/theme`. The public site (`resources/css/app.css`) keeps its own
   palette by decision (D5, spec `ui-foundation`). The front-end build needs nothing from Composer's
   `vendor/`, so the image's `assets` stage and CI's front-end job build from `package.json` alone.
 - **Only one messenger integration is real.** Telegram is implemented; the WhatsApp adapter throws

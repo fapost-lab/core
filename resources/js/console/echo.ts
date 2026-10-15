@@ -1,6 +1,6 @@
 import Echo from 'laravel-echo'
 import Pusher from 'pusher-js'
-import type { BroadcasterClientOptions, EchoClientLike, EchoConnection } from '@fapost/ui/lib/live-updates'
+import type { BroadcasterClientOptions, EchoClientLike, EchoConnection } from '@console/lib/live-updates'
 
 /**
  * The console's Echo client. Loaded only through a dynamic import (see app.ts), so laravel-echo and pusher-js become a

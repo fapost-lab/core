@@ -1,6 +1,6 @@
 import { onBeforeUnmount, toRaw } from 'vue'
 import { router, usePage } from '@inertiajs/vue3'
-import { toast } from 'vue-sonner'
+import { toast } from '@fapost/ui/components/sonner'
 import { toastsFor, type FlashMessages } from './flash'
 
 /**

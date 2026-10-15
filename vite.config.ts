@@ -60,12 +60,15 @@ export default defineConfig({
         sharedEntriesKeepTheirExports(),
     ],
     resolve: {
-        alias: {
-            '@builder': path.resolve(__dirname, 'resources/js/builder'),
-            '@shared': path.resolve(__dirname, 'resources/js/shared'),
-            '@tma': path.resolve(__dirname, 'resources/js/tma'),
-            '@fapost/ui': path.resolve(__dirname, 'resources/js/ui'),
-        },
+        alias: [
+            {find: '@builder', replacement: path.resolve(__dirname, 'resources/js/builder')},
+            {find: '@console', replacement: path.resolve(__dirname, 'resources/js/console')},
+            {find: '@shared', replacement: path.resolve(__dirname, 'resources/js/shared')},
+            {find: '@tma', replacement: path.resolve(__dirname, 'resources/js/tma')},
+            // The kit's stylesheets, at the paths its package exports them under (`@fapost/ui/styles.css`, ...).
+            {find: /^@fapost\/ui\/(styles|theme|tokens|fonts)\.css$/, replacement: path.resolve(__dirname, 'resources/js/ui/styles/$1.css')},
+            {find: '@fapost/ui', replacement: path.resolve(__dirname, 'resources/js/ui')},
+        ],
     },
     build: {
         rolldownOptions: {

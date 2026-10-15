@@ -132,7 +132,7 @@ new UI, and `@fapost/ui` is published.
       contributing pages, the positioning line; `ARCHITECTURE.md`, the multilingual convention,
       every domain document's admin-UI paths (after: Filament removed — they describe the
       result)
-- [ ] The kit extracted — `fapost-lab/ui`, `@fapost/ui` `0.1.0` on npm, Core consuming it with
+- [ ] `kit-extract-package` — The kit extracted — `fapost-lab/ui`, `@fapost/ui` `0.1.0` on npm, Core consuming it with
       no import changed, local linking like `composer dev:link` (after: phases 2 and 3 — the set
       has settled)
 

@@ -4,7 +4,7 @@ import { usePage } from '@inertiajs/vue3'
 import { Plus, Trash2 } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { Input } from '@fapost/ui/components/input'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import type { SettingRow, SettingsPageProps } from './types'
 
 /**

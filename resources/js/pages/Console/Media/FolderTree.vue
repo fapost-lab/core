@@ -5,7 +5,7 @@ import { EllipsisVertical, Folder, FolderOpen, Library, Pencil, Trash2 } from '@
 import { Button } from '@fapost/ui/components/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@fapost/ui/components/dropdown-menu'
 import { cn } from '@fapost/ui/lib/utils'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import type { FolderNode, MediaPageProps } from './types'
 
 /**

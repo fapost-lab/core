@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -10,14 +10,13 @@ import { Head, Link, usePage } from '@inertiajs/vue3'
 import { Eye, SearchX, UserRound } from '@lucide/vue'
 import { Badge, StatusDot } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
-import { DataTable, type DataTableColumn, type TableDefaults, type TableMeta, type TableState } from '@fapost/ui/components/data-table'
+import { DataTable, ValueCell, type DataTableColumn, type TableDefaults, type TableMeta, type TableState } from '@fapost/ui/components/data-table'
 import { EmptyState } from '@fapost/ui/components/empty-state'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
-import type { LiveChannel } from '@fapost/ui/lib/live-updates'
-import ValueCell from '@fapost/ui/components/data-table/ValueCell.vue'
+import type { LiveChannel } from '@console/lib/live-updates'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
-import { useLiveUpdates } from '@fapost/ui/lib/useLiveUpdates'
-import { interpolate } from '@fapost/ui/shell'
+import { useLiveUpdates } from '@console/lib/useLiveUpdates'
+import { interpolate } from '@console/shell'
 import { rowValue, useSolutionColumns } from '../../../console/solutions'
 import LiveHint from './LiveHint.vue'
 import { STATUS_TONES, type ConversationRow, type ConversationStatus, type ConversationsPageProps } from './types'

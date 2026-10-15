@@ -2,8 +2,8 @@ import type { DefineComponent } from 'vue'
 import { createApp, h } from 'vue'
 import { createInertiaApp, router } from '@inertiajs/vue3'
 import { createPinia } from 'pinia'
-import { connectBroadcaster, type BroadcasterProp } from '@fapost/ui/lib/live-updates'
-import { AppShell, SHELL_SLOT } from '@fapost/ui/shell'
+import { connectBroadcaster, type BroadcasterProp } from '@console/lib/live-updates'
+import { AppShell, SHELL_SLOT } from '@console/shell'
 import { isSolutionName, resolveSolutionPage, SolutionShellSlot } from './solutions'
 
 createInertiaApp({

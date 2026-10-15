@@ -246,14 +246,22 @@ bundle them:
   `@fapost/ui/components/alert-dialog`, `avatar`, `badge`, `button`, `card`,
   `checkbox`, `command`, `confirm-dialog`, `data-table`, `dialog`,
   `dropdown-menu`, `empty-state`, `form-field`, `form-section`, `input`, `label`,
-  `select`, `separator`, `sheet`, `skeleton`, `sonner`, `switch`, `table`, `tabs`,
-  `textarea`, `tooltip`, and `@fapost/ui/lib/utils`, `@fapost/ui/lib/relative-time`
+  `localized-field`, `options-picker`, `select`, `separator`, `sheet`, `skeleton`,
+  `sonner`, `switch`, `table`, `tabs`, `textarea`, `tooltip`, `value-list-input`,
+  and `@fapost/ui/lib/utils`, `@fapost/ui/lib/relative-time`
 
 The console's import map points each of them at the copy the console itself runs,
 so there is one Vue, one Inertia router and one kit on the page. Every subpath
 resolves to the same module, so a named import works from any of them. The shell
 and the console's live-updates module are not part of the public surface. Your
 own npm dependencies go into your bundle.
+
+Besides the components, the surface carries a few helpers: `toast` from
+`@fapost/ui/components/sonner`, `ValueCell` and the `CellType` and `CellTone`
+types from `@fapost/ui/components/data-table`, and `interpolate` (fills `:name`
+placeholders) from `@fapost/ui/lib/utils`. Show a toast with that `toast`, not
+with one from `vue-sonner`: the toasts live in one module, and only the
+console's copy is connected to the toaster on the page.
 
 ### `fapost-ui.json`
 

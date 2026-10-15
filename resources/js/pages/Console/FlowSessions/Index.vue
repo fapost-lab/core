@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -13,10 +13,10 @@ import { Button } from '@fapost/ui/components/button'
 import { DataTable, type DataTableColumn, type TableDefaults, type TableMeta, type TableState } from '@fapost/ui/components/data-table'
 import { EmptyState } from '@fapost/ui/components/empty-state'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
-import type { LiveChannel } from '@fapost/ui/lib/live-updates'
+import type { LiveChannel } from '@console/lib/live-updates'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
-import { useLiveUpdates } from '@fapost/ui/lib/useLiveUpdates'
-import { interpolate } from '@fapost/ui/shell'
+import { useLiveUpdates } from '@console/lib/useLiveUpdates'
+import { interpolate } from '@console/shell'
 import CopyButton from '../Contacts/CopyButton.vue'
 import LiveHint from './LiveHint.vue'
 import { END_STATUS_TONES, STATUS_TONES, type ActivityPeriod, type FlowSessionRow, type FlowSessionStatus, type FlowSessionsPageProps } from './types'

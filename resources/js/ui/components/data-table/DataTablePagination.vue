@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { ChevronLeft, ChevronRight } from '@lucide/vue'
-import { cn } from '@fapost/ui/lib/utils'
+import { cn, interpolate } from '@fapost/ui/lib/utils'
 import { Button } from '@fapost/ui/components/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
-import { interpolate } from '@fapost/ui/shell'
-import type { TableTranslations } from '@fapost/ui/shell'
+import type { DataTableLabels } from '@fapost/ui/lib/messages'
 import { pageWindow } from './query'
 import type { TableMeta } from './query'
 
@@ -13,7 +12,7 @@ import type { TableMeta } from './query'
 const props = defineProps<{
   meta: TableMeta
   perPageOptions: readonly number[]
-  labels: TableTranslations
+  labels: DataTableLabels
   busy?: boolean
 }>()
 

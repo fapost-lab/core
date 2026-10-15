@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
-import { toast } from 'vue-sonner'
+import { toast } from '@fapost/ui/components/sonner'
 import { ChevronDown, ChevronUp, Pin, PinOff, Search } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@fapost/ui/components/dialog'
 import ShellIcon from './ShellIcon.vue'
-import { interpolate } from './nav'
+import { interpolate } from '@fapost/ui/lib/utils'
 import { filterApplications, move, togglePin } from './rail'
 import type { ApplicationsTranslations, ShellApplication, ShellApplications } from './types'
 

@@ -1,13 +1,16 @@
 <script setup lang="ts">
-import { inject } from 'vue'
+import { inject, provide } from 'vue'
+import { usePage } from '@inertiajs/vue3'
 import { Toaster } from '@fapost/ui/components/sonner'
+import { KIT_MESSAGES } from '@fapost/ui/lib/messages'
 import AppRail from './AppRail.vue'
 import ShellBanners from './ShellBanners.vue'
 import ShellHeader from './ShellHeader.vue'
 import ShellSidebar from './ShellSidebar.vue'
 import { SHELL_SLOT } from './slots'
 import { useFlashToasts } from './useFlashToasts'
-import { useIsDark } from './useIsDark'
+import { useIsDark } from '@shared/theme/useIsDark'
+import type { ShellPageProps } from './types'
 
 /**
  * The frame of every console page: the application rail (the app switcher), the side menu of the current application,
@@ -15,7 +18,16 @@ import { useIsDark } from './useIsDark'
  * so the menu keeps its state while the page changes.
  *
  * Inertia's flash data (`success`, `error`) is shown here as toasts, after every visit; they follow the console's theme.
+ *
+ * The kit's own strings (DataTable, the close button of dialogs and sheets) come from here too: the shell provides
+ * them under KIT_MESSAGES from the console lang files, read on every render, so a language switch reaches them.
  */
+const page = usePage<ShellPageProps>()
+provide(KIT_MESSAGES, () => ({
+  close: page.props.translations.console.close,
+  table: page.props.translations.console.table,
+}))
+
 useFlashToasts()
 const dark = useIsDark()
 // What the application adds to the shell's slots (`slots.ts`); nothing without a provider.

@@ -1,5 +1,5 @@
-import type { LiveChannel } from '@fapost/ui/lib/live-updates'
-import type { ShellPageProps } from '@fapost/ui/shell'
+import type { LiveChannel } from '@console/lib/live-updates'
+import type { ShellPageProps } from '@console/shell'
 
 export type ConversationStatus = 'open' | 'closed' | 'snoozed'
 export type ConversationOwner = 'bot' | 'staff'
