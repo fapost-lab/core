@@ -1,0 +1,139 @@
+---
+title: "Technology stack"
+description: "What Core is built with, layer by layer, and why each piece is there."
+---
+
+A map, not a manual: each entry names what Core uses, the major version it is on,
+and why. The deeper pages are linked rather than repeated. Versions are those in
+`composer.json`, `package.json` and their lock files; when this page and a lock
+file disagree, the lock file is right.
+
+## Backend
+
+| Piece | Version | Why it is there |
+|---|---|---|
+| PHP | 8.4 | The language floor for Core and both shared packages. |
+| Laravel | 12 | The application framework; Core uses the streamlined structure, with routing and middleware in `bootstrap/app.php`. |
+| Inertia (`inertiajs/inertia-laravel`) | 3 | Serves the console and the builder as Vue pages from ordinary controllers, without a separate API layer. |
+| `spatie/laravel-permission` | 8 | Staff roles and permissions. |
+| `spatie/laravel-settings` | 3 | Typed platform and tenant settings, stored rather than kept in `.env`. |
+| `spatie/laravel-data` | 4 | DTOs that cross boundaries; `fapost/foundation` builds on it too. |
+| `giggsey/libphonenumber-for-php` | 9 | Phone number parsing and validation in flow input and the country catalog. |
+
+Development-only: Telescope, Pail, ide-helper, Ray and Laravel Boost.
+
+## Data
+
+| Piece | Why it is there |
+|---|---|
+| PostgreSQL 15+ (the bundled compose ships 16) | The only production database. A **landlord** schema holds platform records; each tenant gets a **schema of its own**, migrated from `database/migrations/tenant`. Conversation history and flow logs are partitioned tables. |
+| Redis 7 | Cache, sessions and queues, plus the webhook routing registry, idempotency keys and session locks on the message hot path. |
+| Media storage | Per tenant: a private local disk under `storage/app` by default, or S3, chosen in the tenant's configuration and built per call so nothing leaks between tenants. |
+
+How tenant context is held and switched: [Tenant-aware execution](/contributing/tenant-aware-execution).
+Why migrations are pure DDL: [Migration isolation](/contributing/migration-isolation).
+Why keys are ULIDs in `uuid` columns: [ID strategy](/contributing/id-strategy).
+
+## Queues and realtime
+
+| Piece | Version | Why it is there |
+|---|---|---|
+| Laravel Horizon | 5 | Supervises the Redis queue workers. Queues are named by purpose, not by convenience — see [Queues](/reference/queues). |
+| Laravel Reverb | 1 | The optional websocket server for live console screens; without it those screens poll. |
+| `laravel-echo` + `pusher-js` | 2 / 8 | The console's websocket client, loaded only when broadcasting is on. |
+
+Workers are long-lived, which is what [Long-lived worker safety](/contributing/worker-safety)
+is about. Turning websockets on: [Realtime](/self-hosting/realtime).
+
+## Console front end
+
+The staff console — platform administration and the per-assistant screens — is an
+Inertia application in Vue. Core has no Filament or Livewire: neither is in
+`composer.json`, so in Core's CI a reference to either fails phpstan's
+unknown-class checks. The PHPat rule `NoFilamentTest` bites only where Filament
+is installed — a local Core checkout with the SaaS overlay.
+
+| Piece | Version | Why it is there |
+|---|---|---|
+| Vue | 3 | Every Core screen, with TypeScript throughout. |
+| `@inertiajs/vue3` | 3 | The client half of Inertia: pages in `resources/js/pages`, props from the controller. |
+| TypeScript | 6 | Type-checked with `vue-tsc`. |
+| Vite | 8 | Builds every front-end entry; on Vite 8 the bundler underneath is Rolldown. Configuration is `vite.config.ts`. |
+| Tailwind CSS | 4 | Styling, through the `@tailwindcss/vite` plugin rather than a PostCSS config. |
+| `@fapost/ui` | — | Core's component kit in `resources/js/ui`: shadcn-vue components (new-york style) on `reka-ui` 2, plus the console shell. An alias, not an npm package. |
+| `@lucide/vue` | 1 | Icons. |
+| Fontsource | — | Onest, Roboto Condensed and Victor Mono, bundled rather than loaded from a font CDN. |
+
+**Translations** come from Laravel's `lang/` files (`en`, `ru`, `uk`) and reach a
+page as shared Inertia props, one namespace per page — there is no separate
+front-end i18n library. Admin UI language and content language are different
+things; see [Multilingual](/extending/multilingual).
+
+**Solution screens** are prebuilt bundles that import Vue, Inertia and `@fapost/ui`
+from the console through an import map, so a Solution never ships its own copy.
+See [Console UI](/extending/console-ui).
+
+### The flow builder
+
+The builder in `resources/js/builder` is a separate Vite entry with its own root
+view and stylesheet. It is still Inertia and Vue, but the canvas holds a lot of
+client state, so it keeps it in Pinia stores rather than in page props. Node
+configuration forms are rendered from the schema a handler declares, not written
+per node — see [Builder UI](/extending/builder-ui).
+
+`resources/js/tma` is a third entry: a small Vue Router app served as a Telegram
+Mini App for forms.
+
+## Extensions
+
+Core is extended from outside, never by forking it. Briefly:
+
+- **`fapost/foundation`** — the public contracts a Solution or Plugin builds against; Core implements them.
+- **`fapost/support`** — primitives with no domain meaning, including the builder schema field classes.
+- **Solutions and Plugins** — separate Composer packages, added to a checkout with a composer overlay that leaves Core's own `composer.json` untouched.
+- **The SaaS operator package** — the control plane of the hosted service (billing, onboarding), a separate repository on top of Core and never part of it. Its operator panel is built on Filament and lives in that package, not in Core.
+
+Where each thing belongs: [Extension model](/extending/extension-model). Working on
+the packages locally: [Development setup](/extending/development-setup). Which way
+dependencies may point: [Dependency direction](/contributing/dependency-direction).
+
+## Gateway and images
+
+The **gateway** in `gateway/` is an optional Go service (Go 1.27, `go-redis` 9) in
+front of webhook ingress: it verifies, deduplicates and queues provider webhooks
+without a PHP process. See [Webhook gateway](/self-hosting/gateway).
+
+A release publishes three images from `.github/workflows/publish-images.yml`:
+
+| Image | What it is |
+|---|---|
+| `core` | PHP 8.4 FPM on Alpine with every extension Core needs. One image serves three roles — PHP-FPM, Horizon and the scheduler — that differ only in the command, so their dependencies cannot drift. |
+| `web` | nginx with the compiled front end baked in. Its assets stage builds from `package.json` and `resources/` alone, with nothing from Composer. |
+| `gateway` | The Go binary on a `scratch` image. |
+
+`core` and `web` come from one `docker/Dockerfile`; its `dev` target is the local
+development image, built from the same base. Running them: [Docker Compose](/self-hosting/docker-compose).
+
+## Quality
+
+| Check | What it guards |
+|---|---|
+| PHPUnit 13, in parallel through ParaTest | Behaviour. Unit and feature suites. |
+| PHPat on PHPStan 2 | Architecture rules in `tests/Architecture`, run with `composer run test:arch`. |
+| Pint | PHP code style; CI fails on a style difference instead of fixing it. |
+| Vitest + Vue Test Utils | Front-end units; a test that needs a DOM opts into `happy-dom`. |
+| `vue-tsc` | Types across the Vue and TypeScript code. |
+| `go vet` and `go test` | The gateway. |
+
+CI runs the PHP job twice — on SQLite, what a developer runs locally, and on
+PostgreSQL, where schema-per-tenant switching and partitioned tables actually
+behave as in production — with a real Redis beside both. The front-end job
+type-checks, tests and runs the same production build the `web` image does. How
+to run all of it: [Testing and architecture checks](/contributing/testing).
+
+Agents working on Core use [Jig](/contributing/coding-agents) for task routing and
+project knowledge.
+
+## Running it locally
+
+Docker or a local install, and the commands for both: [Local setup](/contributing/local-setup).
