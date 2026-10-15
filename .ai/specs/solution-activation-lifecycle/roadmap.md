@@ -21,7 +21,7 @@ field, and passes on a valid one.
 Goal: activation changes what a flow can do. Done when: a `call` node reaches a handler that only
 an activated Solution provides, and stops reaching it after deactivation.
 
-- [ ] `solution-core-registrar` — Core implementation of `CoreRegistrarInterface`: an activated Solution's action handlers
+- [x] `solution-core-registrar` — Core implementation of `CoreRegistrarInterface`: an activated Solution's action handlers
       resolve in the flow runtime, and a name collision with Core fails at registration instead of
       overwriting (after: activation storage — registration has to ask what is active)
 - [ ] Lifecycle test suite over the whole chain: install → activate → handler available →

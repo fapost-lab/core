@@ -17,7 +17,7 @@ depend on; nothing under `App\…` is. See
 
 | Contract | Role |
 |---|---|
-| `Contracts\CoreRegistrarInterface` | The single registration entry point for handlers, accessors, adapters, routes, schedules, and migrations |
+| `Contracts\CoreRegistrarInterface` | The single registration entry point for action handlers (`registerActionHandler`, by class), node handlers, accessors, adapters, routes, schedules, and migrations. Core gives each Solution a registrar of its own, through `AbstractSolutionServiceProvider::registerExtensionsWith()`; for a Solution only action handlers are supported so far |
 | `Contracts\ActivatableInterface` | `onActivate()` / `onDeactivate()` hooks. Identity (id, name, version) is data in `composer.json`, not a method |
 | `Lifecycle\AbstractPluginServiceProvider` | Base provider for a Plugin |
 | `Lifecycle\AbstractSolutionServiceProvider` | Base provider for a Solution |

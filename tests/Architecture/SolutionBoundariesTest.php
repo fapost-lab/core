@@ -46,4 +46,16 @@ final class SolutionBoundariesTest
             )
             ->because('Discovery must run without a database (platform:update --validate-only) and read its collaborators from the constructor.');
     }
+
+    public function test_flow_does_not_depend_on_the_solution_domain(): Rule
+    {
+        return PHPat::rule()
+            ->classes(
+                Selector::inNamespace('App\\Domains\\Flow'),
+                Selector::inNamespace('App\\Infrastructure\\Flow'),
+            )
+            ->shouldNotDependOn()
+            ->classes(Selector::inNamespace('App\\Domains\\Solution'))
+            ->because('Flow asks whether an action may run through ActionAvailabilityInterface; App\\Infrastructure\\Solution answers it from the Solution domain. The registry and the handler transport are singletons and must not hold the scoped ActiveSolutions.');
+    }
 }

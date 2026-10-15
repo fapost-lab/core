@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands\Platform;
 
 use App\Console\Platform\PlatformMigratorInterface;
+use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\DTO\SolutionDiscovery;
 use App\Domains\Solution\Services\PublishedSolutionUi;
@@ -34,6 +35,7 @@ final class UpdatePlatformCommand extends Command
         SolutionDiscoverer $discoverer,
         SolutionCache $cache,
         PlatformMigratorInterface $migrator,
+        ActionHandlerRegistry $actions,
         SolutionUiPublisher $publisher,
         PublishedSolutionUi $published,
     ): int {
@@ -68,6 +70,18 @@ final class UpdatePlatformCommand extends Command
         $this->components->info(sprintf('Solution manifests are valid (%d installed).', count($discovery->valid)));
         $this->reportSolutions($discovery);
 
+        $unregistered = $this->unregisteredActions($discovery, $actions);
+
+        if ([] !== $unregistered) {
+            $this->components->error(sprintf('%d declared action(s) are not registered. Nothing was changed.', count($unregistered)));
+
+            foreach ($unregistered as $line) {
+                $this->line('  ' . $line);
+            }
+
+            return self::FAILURE;
+        }
+
         if ((bool) $this->option('validate-only')) {
             return self::SUCCESS;
         }
@@ -90,6 +104,27 @@ final class UpdatePlatformCommand extends Command
         $this->line('Restart the queue workers so they run the new code: php artisan horizon:terminate');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The manifest is the static truth for the catalog and the activation screen; a Solution that declares an
+     * action its provider never registered would offer a flow author something that always fails.
+     *
+     * @return list<string>
+     */
+    private function unregisteredActions(SolutionDiscovery $discovery, ActionHandlerRegistry $actions): array
+    {
+        $lines = [];
+
+        foreach ($discovery->valid as $solution) {
+            foreach ($solution->actions as $index => $actionId) {
+                if (!$actions->has($actionId)) {
+                    $lines[] = sprintf('%s: extra.fapost.actions[%d]: "%s" is declared but not registered', $solution->package, $index, $actionId);
+                }
+            }
+        }
+
+        return $lines;
     }
 
     private function reportViolations(SolutionDiscovery $discovery): void

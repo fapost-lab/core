@@ -35,8 +35,8 @@ of the SaaS operator and the activation store key on its `id`.
   and N-1 within one major version. The Composer gate on Foundation replaces a runtime semver check in Core.
 - Core boots the provider named in the manifest, only for a valid manifest. This is the owner's explicit
   decision (2026-10-10) for this task, instead of waiting for activation: only `register()` bindings run
-  today, since `AbstractSolutionServiceProvider::boot()` exits without a registrar; action registration
-  comes with activation.
+  at that time, since `AbstractSolutionServiceProvider::boot()` exited without a registrar; action
+  registration came later (`adr-20261014-solution-actions-registered-per-process`).
 - A `fapost-solution` package may carry no `extra.laravel.providers` entry (owner decision, 2026-10-10):
   any entry, any provider, any spelling, is a violation `extra.laravel.providers: a Solution's provider is
   booted by Core; remove this block`. An empty list is accepted. Otherwise Laravel's discovery would boot a

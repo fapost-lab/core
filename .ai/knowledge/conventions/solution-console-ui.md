@@ -43,9 +43,10 @@ How Core holds it, and what a change to these files must keep:
 
 - **Declarations only from `boot()`.** `SolutionServiceProvider` opens the registry for one Solution id in
   the provider's `booting` callback and closes it in `booted`; a call outside that window, or after
-  `freeze()`, throws `InvalidConsoleDeclarationException`. Solutions register in an overridden `boot()`
-  after `parent::boot()`, never in `bootSolution()`/`registerExtensions()` — Core binds no
-  `CoreRegistrarInterface`, so the base `boot()` returns before calling them. The registry is frozen after
+  `freeze()`, throws `InvalidConsoleDeclarationException`. `AbstractSolutionServiceProvider::boot()` always runs `bootSolution()` inside that window, so
+  Solutions declare in an overridden `boot()` after `parent::boot()` or in `bootSolution()`, never in
+  `registerExtensions()`: Core calls it earlier (`adr-20261014-solution-actions-registered-per-process`),
+  before any `enter`, so a console declaration there throws. The registry is frozen after
   the application boots unless `solutions.freeze_console_registry` is false; only `phpunit.xml` turns it
   off (tests register fixtures into a booted app). Never turn it off in a deployed config.
 - **Names belong to the Solution.** Labels `<id>::…`, components `<id>::<Path>`, routes

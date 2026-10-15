@@ -83,7 +83,10 @@ The actual HTTP status is always in the result metadata (`status_code`). For a r
 does not accept, the error code is `http_4xx`, `http_5xx` or `http_other`, usable by a downstream branch.
 
 For the `handler` transport: an action that returns is `success`; an action that throws becomes
-`error_code = action_exception` and takes `error`.
+`error_code = action_exception` and takes `error`. An action registered by a Solution that the tenant has
+not activated is not called: `error_code = solution_inactive` (metadata `action_id`, `solution_id`), the flow
+log shows `solution_inactive: <solution id>`, and the node takes `error`. A refusal still spends one call
+execution.
 
 ### Egress guard (HTTP transport)
 

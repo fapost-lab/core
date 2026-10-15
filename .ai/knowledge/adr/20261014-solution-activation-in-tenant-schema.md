@@ -47,12 +47,12 @@ outlive its package.
 - `solutions:activate`, `solutions:deactivate` and `solutions:list` take a required `--tenant=<slug>` and
   work inside `TenantSwitcher::runForTenant()`; the actor is `console`. The `onActivate` and
   `onDeactivate` hooks are not called by this storage.
-- The Solution ids `solution` and `solutions` are reserved in Foundation (from 0.14; until Core requires it the parser still accepts them, and no Solution may use them), so no Solution's own
+- The Solution ids `solution` and `solutions` are reserved in Foundation (from 0.14; Core now requires Foundation 0.17, so the parser rejects them), so no Solution's own
   table prefix can collide with these table names. This extends the reserved list in
   `adr-20261010-solution-manifest-is-data-in-composer-json`.
-- Phase 2 (the registrar) is expected to register the handlers of every installed valid Solution once per
-  process and to check `ActiveSolutions::isActive` for the action's `<id>.` prefix at call time, so the
-  handler registry stays tenant-free. This storage does not depend on that choice.
+- Phase 2 (the registrar) registers the handlers of every installed valid Solution once per process and
+  checks `ActiveSolutions::isActive` for the action's owner at call time, so the handler registry stays
+  tenant-free (`adr-20261014-solution-actions-registered-per-process`). This storage does not depend on that choice.
 
 ## Alternatives
 
