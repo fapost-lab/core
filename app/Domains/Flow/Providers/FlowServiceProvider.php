@@ -21,6 +21,8 @@ use App\Domains\Flow\Concurrency\LockAcquisitionPolicy;
 use App\Domains\Flow\Concurrency\LockHeartbeat;
 use App\Domains\Flow\Concurrency\SessionLockManager;
 use App\Domains\Flow\Concurrency\SessionLockRegistry;
+use App\Domains\Flow\Contracts\ActionAvailabilityInterface;
+use App\Domains\Flow\Contracts\ActionHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationRepositoryInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationServiceInterface;
@@ -139,11 +141,13 @@ use App\Domains\Messaging\Typing\TypingIndicatorService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\ConnectionAfterCommitDispatcher;
+use App\Infrastructure\Flow\ContainerActionHandlerFactory;
 use App\Infrastructure\Flow\ContainerNodeHandlerFactory;
 use App\Infrastructure\Flow\DnsHostResolver;
 use App\Infrastructure\Flow\FlowExecutionGuard;
 use App\Infrastructure\Flow\QueuedDelayResumeScheduler;
 use App\Infrastructure\Flow\QueuedSendMessageTimeoutScheduler;
+use App\Infrastructure\Solution\ContainerActionAvailability;
 use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
@@ -352,6 +356,11 @@ final class FlowServiceProvider extends ServiceProvider
 
             return $registry;
         });
+        // Action handlers are kept as classes and built per call in the current scope. Whether the action of a
+        // Solution may run for the current tenant is asked through ActionAvailabilityInterface; the answer comes from
+        // App\Infrastructure\Solution, the seam that composes Flow with the Solution domain.
+        $this->app->singleton(ActionHandlerFactoryInterface::class, ContainerActionHandlerFactory::class);
+        $this->app->singleton(ActionAvailabilityInterface::class, ContainerActionAvailability::class);
         $this->app->singleton(ActionHandlerRegistry::class);
         $this->app->singleton(RagAdapterRegistry::class);
         // Egress guard of the call node. The policy is read once into a value object, so the

@@ -7,6 +7,7 @@ namespace App\Domains\Flow\Services;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Support\CountryCatalog;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
+use App\Domains\Flow\Contracts\ActionAvailabilityInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
@@ -24,6 +25,7 @@ final readonly class LoadBuilderFlowService
         private TenantEventRepositoryInterface $tenantEvents,
         private TenantSettings $tenantSettings,
         private ActionHandlerRegistry $actionHandlers,
+        private ActionAvailabilityInterface $actionAvailability,
         private CountryCatalog $countries,
     ) {
     }
@@ -53,8 +55,22 @@ final readonly class LoadBuilderFlowService
             contentBaseLanguage: $this->tenantSettings->content_base_language,
             availableLanguages: $this->tenantSettings->available_languages,
             availableFlows: $availableFlows,
-            availableActions: $this->actionHandlers->ids(),
+            availableActions: $this->availableActions(),
             availableCountries: $this->countries->toOptions($assistantCountries),
         );
+    }
+
+    /**
+     * Core's actions and the actions of the Solutions the builder's tenant has activated. A flow that
+     * already uses an action of a Solution that is switched off still opens: the node keeps its saved value.
+     *
+     * @return list<string>
+     */
+    public function availableActions(): array
+    {
+        return array_values(array_filter(
+            $this->actionHandlers->ids(),
+            fn (string $id): bool => $this->actionAvailability->isAvailable($this->actionHandlers->ownerOf($id)),
+        ));
     }
 }

@@ -197,8 +197,14 @@ failure outcome is taken; how many times is a tenant setting.
 
 Each run of the block counts against the tenant's call executions for the
 period, and so does every **Test call** in the builder. When they are used up the
-call is not made and the flow takes the failure outcome, with the error type
-`limit_reached` (the flow log shows `limit_reached: ...` on the block).
+call is not made and the flow takes the failure outcome, with
+`error_code = limit_reached` (the flow log shows `limit_reached: ...` on the block).
+
+An internal action that comes from a Solution works only while your workspace has that
+Solution switched on. When it is off, the call is not made and the flow takes the failure
+outcome, with `error_code = solution_inactive` (the flow log shows
+`solution_inactive: ...` on the block); the Test call in the builder answers the same way. The
+action list in the builder shows only the actions you can use now.
 
 <Warning>
   A call reaches outside the platform, so it is the block most likely to be slow

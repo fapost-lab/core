@@ -81,10 +81,16 @@ Registered in `FlowServiceProvider` through `CallTransportRegistry`.
 
 **HandlerTransport** (`id() = 'handler'`, `app/Domains/Flow/Call/Transports/HandlerTransport.php`):
 
-- Dispatches to `ActionHandlerRegistry`; the target is the action id.
+- Dispatches to `ActionHandlerRegistry`; the target is the action id. The registry keeps handler
+  classes and an owner (a Solution id, or null for Core) and builds the handler on every call in the
+  current scope.
+- An action owned by a Solution the current tenant has not activated returns
+  `CallResult::error('solution_inactive')` (metadata `{action_id, solution_id}`) before the handler is
+  built; the check is `ActionAvailabilityInterface`, asked on every call.
 - `ActionHandlerInterface::handle($parameters, $context)` returns the payload, which becomes
   `CallResult::$payload`. Any exception from the action becomes `CallResult::error('action_exception')`;
-  an unknown id becomes `action_not_found`. The call node therefore never sees an exception from a
+  an unknown id becomes `action_not_found`; a Solution's action for a tenant without that Solution is
+  `solution_inactive`. The call node therefore never sees an exception from a
   handler action.
 
 ## 4.4 ActionHandlerInterface
@@ -102,7 +108,9 @@ interface ActionHandlerInterface
 ```
 
 `ActionHandlerRegistry` (`app/Domains/Flow/Action/`) is separate from `NodeHandlerRegistry`. Plugin and
-solution actions register through `CoreRegistrar` before the registry is frozen.
+solution actions register through `CoreRegistrar` (`registerActionHandler`, by class; a Solution may
+register only ids its manifest declares, Core's own ids start with `core.` or `platform.`) before the
+registry is frozen.
 
 ## 4.5 Fail-on-conflict policy for the registries
 

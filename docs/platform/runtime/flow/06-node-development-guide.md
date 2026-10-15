@@ -81,8 +81,8 @@ private function registerCoreNodeHandlers(NodeHandlerRegistry $registry): void
   constructor are forbidden by the architecture test
   `FlowRuntimeIsolationTest::test_node_handlers_do_not_take_resolver_closures`.
 - `FlowServiceProvider::boot()` freezes the registry (`freeze()`) once the app has booted, except
-  in the `testing` environment. Late registration is rejected. Solutions and plugins add their
-  handlers before the freeze.
+  in the `testing` environment. Late registration is rejected. Plugins add their node handlers before
+  the freeze; a Solution registers action handlers, not node handlers.
 
 `NodeHandlerRegistry::register()` also checks that:
 

@@ -6,6 +6,8 @@ namespace App\Domains\Solution\Providers;
 
 use App\Domains\Solution\Console\ConsoleExtensionRegistry;
 use App\Domains\Solution\Contracts\SolutionActivationStoreInterface;
+use App\Domains\Solution\Contracts\SolutionRegistrarFactoryInterface;
+use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\Infrastructure\CoreInstalledSolutionCatalog;
 use App\Domains\Solution\Infrastructure\EloquentSolutionActivationStore;
 use App\Domains\Solution\Services\ActiveSolutions;
@@ -16,11 +18,14 @@ use App\Domains\Solution\Services\SolutionActivator;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionUiBundleReader;
 use App\Domains\Solution\Services\SolutionUiPublisher;
+use App\Infrastructure\Solution\SolutionCoreRegistrarFactory;
 use Fapost\Foundation\Console\Contracts\ConsoleExtensionsInterface;
+use Fapost\Foundation\Lifecycle\AbstractSolutionServiceProvider;
 use Fapost\Foundation\Solution\Contracts\InstalledSolutionCatalogInterface;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\ServiceProvider;
+use LogicException;
 
 /**
  * Wires the Solution domain and boots the service provider of every installed Solution with a valid
@@ -58,7 +63,13 @@ final class SolutionServiceProvider extends ServiceProvider
         $this->app->scoped(ActiveSolutions::class);
         $this->app->bind(SolutionActivator::class);
 
-        foreach ($this->app->make(InstalledSolutions::class)->all() as $solution) {
+        // Implemented outside the domain, in App\Infrastructure\Solution: it writes into the registries of the
+        // domains a Solution extends.
+        $this->app->singleton(SolutionRegistrarFactoryInterface::class, SolutionCoreRegistrarFactory::class);
+
+        $solutions = $this->app->make(InstalledSolutions::class)->all();
+
+        foreach ($solutions as $solution) {
             $provider = $this->app->resolveProvider($solution->provider);
             $id       = $solution->id;
 
@@ -67,6 +78,11 @@ final class SolutionServiceProvider extends ServiceProvider
 
             $this->app->register($provider);
         }
+
+        // Runs after every provider's register() and before the first boot(): the registries are bound
+        // and not yet frozen, and a Solution's registerExtensions() comes before its bootSolution().
+        // boot() of this provider would be too late, Laravel boots the Solution providers first.
+        $this->app->booting(fn () => $this->registerExtensions($solutions));
     }
 
     public function boot(): void
@@ -79,5 +95,30 @@ final class SolutionServiceProvider extends ServiceProvider
                 $this->app->make(ConsoleExtensionRegistry::class)->freeze();
             }
         });
+    }
+
+    /**
+     * Gives every Solution its own registrar and lets it register its extensions. A violation is an
+     * exception: the process does not start, so it surfaces on `platform:update` and at deploy, not at a client.
+     *
+     * @param  list<InstalledSolution>  $solutions
+     */
+    public function registerExtensions(array $solutions): void
+    {
+        $factory = $this->app->make(SolutionRegistrarFactoryInterface::class);
+
+        foreach ($solutions as $solution) {
+            $provider = $this->app->getProvider($solution->provider);
+
+            if (!$provider instanceof AbstractSolutionServiceProvider) {
+                throw new LogicException(sprintf('Solution "%s" (%s): provider %s is not registered.', $solution->id, $solution->package, $solution->provider));
+            }
+
+            $provider->registerExtensionsWith($factory->forSolution($solution));
+        }
+
+        // Registration builds a throwaway handler per action, outside any tenant, and its scoped dependencies
+        // would otherwise stay in the container for the rest of a PHP-FPM request.
+        $this->app->forgetScopedInstances();
     }
 }

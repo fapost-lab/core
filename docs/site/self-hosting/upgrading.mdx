@@ -64,10 +64,23 @@ for example in a pipeline or when building a derived image:
 php artisan platform:update --validate-only
 ```
 
+The same step checks that every action a manifest declares in `extra.fapost.actions` is registered by
+the Solution's provider. A declared action nobody registered is reported as
+`acme/fapost-feedback: extra.fapost.actions[1]: "feedback.score" is declared but not registered`, and
+`platform:update` (also with `--validate-only`) exits with code 1 before anything is migrated.
+
 This needs no database. After a successful update the catalog of Solutions is cached in
 `bootstrap/cache/fapost-solutions.php`; if that file is missing or older than the installed
 packages, Core builds the catalog from the package files instead, so a stale cache cannot hide a
 Solution.
+
+<Warning>
+  A Solution that breaks the registration rules (an action its manifest does not declare, a duplicate
+  action id, an unsupported registrar call) stops the application from booting: the web process,
+  Horizon and every `php artisan` command fail, including `package:discover` during `composer install`
+  and `platform:update` itself. Fix the package or remove it from the image; the message names the
+  Solution, the package, the action and the class.
+</Warning>
 
 ## Two schemas, two migration commands
 
