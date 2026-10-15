@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Solution;
 
 use App\Console\Platform\PlatformMigratorInterface;
+use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionManifestValidator;
 use Fapost\Foundation\Solution\Manifest\ManifestParser;
 use Symfony\Component\Console\Output\OutputInterface;
+use Tests\Fixtures\Solution\Actions\FeedbackScoreAction;
+use Tests\Fixtures\Solution\Actions\FeedbackSubmitAction;
 use Tests\Support\FakeVendor;
 use Tests\TestCase;
 
@@ -69,6 +72,7 @@ final class UpdatePlatformCommandTest extends TestCase
 
     public function test_validate_only_passes_on_a_valid_manifest_and_touches_nothing(): void
     {
+        $this->registerFeedbackActions();
         $this->vendor->package(FakeVendor::solutionComposer(), '1.2.0')->write();
 
         $this->artisan('platform:update', ['--validate-only' => true])
@@ -89,6 +93,29 @@ final class UpdatePlatformCommandTest extends TestCase
             ->assertExitCode(1);
     }
 
+    public function test_a_declared_action_that_is_not_registered_fails_the_update_before_migrations_and_cache(): void
+    {
+        $this->registerFeedbackActions(score: false);
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('acme/fapost-feedback: extra.fapost.actions[1]: "feedback.score" is declared but not registered')
+            ->expectsOutputToContain('Nothing was changed')
+            ->assertExitCode(1);
+
+        $this->assertSame(0, $this->migrations);
+        $this->assertFileDoesNotExist($this->cache->path());
+    }
+
+    public function test_validate_only_also_fails_on_a_declared_action_that_is_not_registered(): void
+    {
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+
+        $this->artisan('platform:update', ['--validate-only' => true])
+            ->expectsOutputToContain('"feedback.submit" is declared but not registered')
+            ->assertExitCode(1);
+    }
+
     public function test_an_invalid_manifest_stops_the_update_before_migrations_and_cache(): void
     {
         $this->vendor->package(FakeVendor::solutionComposer(['provider' => 'Acme\\Missing']))->write();
@@ -104,6 +131,7 @@ final class UpdatePlatformCommandTest extends TestCase
 
     public function test_a_valid_update_migrates_and_then_caches_the_catalog(): void
     {
+        $this->registerFeedbackActions();
         $this->vendor->package(FakeVendor::solutionComposer())->write();
 
         $this->artisan('platform:update')
@@ -117,6 +145,7 @@ final class UpdatePlatformCommandTest extends TestCase
 
     public function test_a_failed_migration_fails_the_update_and_leaves_no_cache(): void
     {
+        $this->registerFeedbackActions();
         $this->vendor->package(FakeVendor::solutionComposer())->write();
         $this->migrationsSucceed = false;
 
@@ -156,5 +185,18 @@ final class UpdatePlatformCommandTest extends TestCase
             ->assertExitCode(1);
 
         $this->assertFileDoesNotExist($this->cache->path());
+    }
+
+    /**
+     * What the booted application holds once the fixture Solution has registered its handlers.
+     */
+    private function registerFeedbackActions(bool $score = true): void
+    {
+        $registry = $this->app->make(ActionHandlerRegistry::class);
+        $registry->register(FeedbackSubmitAction::class, 'feedback');
+
+        if ($score) {
+            $registry->register(FeedbackScoreAction::class, 'feedback');
+        }
     }
 }

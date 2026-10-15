@@ -23,6 +23,9 @@ paths:
   - tests/Feature/Tenancy/PostgresSolutionActivationTest.php
   - tests/Support/InstallsFakeSolutions.php
   - tests/Support/InMemorySolutionActivationStore.php
+  - "app/Infrastructure/Solution/**"
+  - "tests/Unit/Infrastructure/Solution/**"
+  - tests/Architecture/SolutionBoundariesTest.php
   - "tests/Fixtures/Solutions/**"
   - tests/Support/InstallsShowcaseSolution.php
 reviewed_at: 2026-10-14
@@ -51,10 +54,14 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
 - `SolutionCache` compiles the valid Solutions to `bootstrap/cache/fapost-solutions.php`. It is an
   accelerator only: it records size and mtime of installed.json and of each Solution's composer.json,
   a missing or stale file is ignored and the catalog is built in memory, and a request never writes it.
-- `SolutionServiceProvider` boots the provider of every valid Solution itself (owner decision, 2026-10-10,
-  recorded in the ADR: this task boots providers, but only `register()` bindings run, because
-  `AbstractSolutionServiceProvider::boot()` exits without a registrar; action registration comes with
-  activation). A `fapost-solution` package may carry no `extra.laravel.providers` entry at all (an empty
+- `SolutionServiceProvider` boots the provider of every valid Solution itself (owner decision, 2026-10-10)
+  and, in an `$app->booting()` callback (after every `register()`, before any `boot()`), hands each provider
+  a registrar of its own through `registerExtensionsWith()` (`adr-20261014-solution-actions-registered-per-process`).
+  The port is `Contracts/SolutionRegistrarFactoryInterface`; the implementation, `SolutionCoreRegistrar`, is in
+  `app/Infrastructure/Solution` because it writes into the Flow action registry. It accepts only
+  `registerActionHandler`, and only for ids in the Solution's `extra.fapost.actions`; every other call, an
+  undeclared id and a duplicate throw at boot. Whether an action may run for a tenant is asked per call through the Flow port
+  `ActionAvailabilityInterface` (`solution_inactive`). A `fapost-solution` package may carry no `extra.laravel.providers` entry at all (an empty
   list is fine): the manifest rejects any entry, in any spelling, because package discovery would boot it
   whether or not its manifest holds up.
   It wraps each provider in `booting`/`booted` callbacks that open and close the console registry for that
@@ -88,6 +95,8 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
     deactivating one is allowed; it then drops its tenant's memo. Default: nothing active.
   - `solutions:activate|deactivate|list` need `--tenant=<slug>` and run inside `runForTenant()`.
     The `onActivate`/`onDeactivate` hooks are not called yet.
+- `platform:update` also checks that every action a valid manifest declares is registered in the booted
+  `ActionHandlerRegistry` (`<package>: extra.fapost.actions[i]: "<id>" is declared but not registered`, exit 1), after the manifest and console UI checks and before any migration.
 - `platform:update` (`app/Console/Commands/Platform`): validate the manifests and the console UI bundles, then
   (unless `--validate-only`) `App\Console\Platform\PlatformMigratorInterface` (landlord migrate and `ops:tenants-migrate`; console-level and deliberately outside this domain, which only validates, publishes and caches), then publish the bundles, then write the cache with them.
   Any violation exits 1 before the database or the cache is touched. `--validate-only` needs no
@@ -100,7 +109,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   PHPat (`SolutionBoundariesTest`) forbids a dependency on any other `App\Domains` namespace, and
   forbids facades and `Illuminate\Database` outside `Infrastructure` and `Providers`, so discovery
   and the services run without a database.
-- Not here yet: `CoreRegistrarInterface`, the activation screen, the entitlement check, per-phase migrations of a Solution, the `migrations` manifest field, and the kit/Vue/Inertia range check of a bundle (`SolutionUi::isServable()` is its seam; `first-solution` phase 0).
+- Not here yet: registrar methods other than `registerActionHandler`, the activation screen, the entitlement check, per-phase migrations of a Solution, the `migrations` manifest field, and the kit/Vue/Inertia range check of a bundle (`SolutionUi::isServable()` is its seam; `first-solution` phase 0).
   Plugins (`type: fapost-plugin`) are reserved and not discovered.
 - The Foundation constraint is not re-checked in Core: Composer refuses to install a package whose
   `require["fapost/foundation"]` does not fit the locked version, and a package Composer did not

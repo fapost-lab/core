@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "1442a50fadd10507201ad2db243ad729",
+  "content-hash": "593ee91494fd3f112a3b93f692a7c2c8",
   "packages": [
     {
       "name": "brick/math",
@@ -897,16 +897,16 @@
     },
     {
       "name": "fapost/foundation",
-      "version": "v0.15.0",
+      "version": "v0.17.0",
       "source": {
         "type": "git",
         "url": "https://github.com/fapost-lab/foundation.git",
-        "reference": "d507e9dba31a3eb2f93fe02581aa721ba7c6c3aa"
+        "reference": "b9d721610e00911ec73ea665037c20d988a17b62"
       },
       "dist": {
         "type": "zip",
-        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/d507e9dba31a3eb2f93fe02581aa721ba7c6c3aa",
-        "reference": "d507e9dba31a3eb2f93fe02581aa721ba7c6c3aa",
+        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/b9d721610e00911ec73ea665037c20d988a17b62",
+        "reference": "b9d721610e00911ec73ea665037c20d988a17b62",
         "shasum": ""
       },
       "require": {
@@ -945,10 +945,10 @@
       ],
       "description": "FaPost public contract layer for Solutions, Plugins and external integrations",
       "support": {
-        "source": "https://github.com/fapost-lab/foundation/tree/v0.15.0",
+        "source": "https://github.com/fapost-lab/foundation/tree/v0.17.0",
         "issues": "https://github.com/fapost-lab/foundation/issues"
       },
-      "time": "2026-10-14T12:00:39+00:00"
+      "time": "2026-10-15T07:58:59+00:00"
     },
     {
       "name": "fapost/support",

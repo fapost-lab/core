@@ -38,7 +38,8 @@ through `NodeHandlerFactoryInterface` (`ContainerNodeHandlerFactory`), which alw
 through the container's current scope. This is what lets handler constructors take ordinary
 scoped dependencies (tenant context, translators, senders) without leaking them across Horizon
 jobs for different tenants. `FlowServiceProvider::boot()` freezes the registry outside the
-`testing` environment so Solutions/Plugins can no longer add handlers after boot.
+`testing` environment so Plugins can no longer add handlers after boot. A Solution adds action handlers
+(`call` node, `handler` transport), never node handlers.
 
 ## Keeping this catalog current
 

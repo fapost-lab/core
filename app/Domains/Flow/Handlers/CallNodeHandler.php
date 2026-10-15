@@ -62,6 +62,8 @@ final class CallNodeHandler extends AbstractVersionedHandler
     private const string IDEMPOTENCY_KEY_META = 'idempotency_key';
     private const string STATUS_CODE_META     = 'status_code';
 
+    private const string ERROR_SOLUTION_INACTIVE = 'solution_inactive';
+
     private const string HANDLE_SUCCESS = 'success';
     private const string HANDLE_ERROR   = 'error';
 
@@ -193,6 +195,10 @@ final class CallNodeHandler extends AbstractVersionedHandler
                 self::ERROR_CODE_META      => $result->errorCode,
                 self::IDEMPOTENCY_KEY_META => $callContext->idempotencyKey,
             ], static fn (mixed $v): bool => null !== $v),
+            // The flow log keeps only this field; without it the author would not see why the call was refused.
+            errorMessage: self::ERROR_SOLUTION_INACTIVE === $result->errorCode
+                ? self::ERROR_SOLUTION_INACTIVE . ': ' . (is_string($result->metadata['solution_id'] ?? null) ? $result->metadata['solution_id'] : 'unknown')
+                : null,
         );
     }
 

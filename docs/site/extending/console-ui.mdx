@@ -37,7 +37,7 @@ Solution authorizes the request again on the server.
 
 ## Registering
 
-Require `fapost/foundation` `^0.15`, override `boot()` in your provider, call
+Require `fapost/foundation` `>=0.15 <1.0` (`>=0.17 <1.0` if the Solution also registers action handlers), override `boot()` in your provider, call
 `parent::boot()` first, then declare:
 
 ```php
@@ -90,11 +90,12 @@ public function boot(): void
 }
 ```
 
-Declare from `boot()` and nowhere else. A call from `register()`, from a
-`booted()` callback or from a request throws `InvalidConsoleDeclarationException`.
-Do not use `bootSolution()` or `registerExtensions()` for this: Core does not
-implement `CoreRegistrarInterface` yet, so `AbstractSolutionServiceProvider::boot()`
-returns before it calls them.
+Declare from `boot()` (or from `bootSolution()`, which `parent::boot()` runs)
+and nowhere else: Core opens the console window for your Solution around `boot()`.
+A call from `register()`, from a `booted()` callback or from a request throws
+`InvalidConsoleDeclarationException`. So does a call from `registerExtensions()`:
+Core runs it earlier, before any Solution's console window opens, so keep it for
+action handlers.
 
 The registry also throws when a name is outside your namespace, when you declare
 a second application, and when a key repeats within the same point and target.

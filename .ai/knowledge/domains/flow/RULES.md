@@ -57,6 +57,17 @@ broken.
   handler never needs to know which of its dependencies are scoped; a `Closure` in a handler
   signature is forbidden. Enforced: `FlowRuntimeIsolationTest::test_node_handlers_do_not_take_resolver_closures`,
   `NodeHandlerScopedDependenciesTest`.
+- **Action handlers are kept as classes and built per call; a Solution's action is checked for activation per call.**
+  `ActionHandlerRegistry` stores `id => {class, owner}` (owner = Solution id, null = Core) and builds
+  the handler through `ActionHandlerFactoryInterface` in the caller's scope, so a handler may take scoped
+  services and nothing is kept between jobs. Core's own action ids start with `core.` or `platform.`
+  (a Solution's start with its id, by the manifest), so a collision is impossible by construction; a
+  duplicate or a post-freeze registration throws. `HandlerTransport` asks `ActionAvailabilityInterface` on
+  every call and returns `solution_inactive` (handler not built) for a Solution the tenant has not
+  activated; the singleton transport and registry never hold the scoped `ActiveSolutions`. The Flow
+  domain does not depend on the Solution domain. Enforced: `SolutionBoundariesTest::test_flow_does_not_depend_on_the_solution_domain`,
+  `HandlerTransportTest`, `ActionHandlerRegistryTest`, `SolutionActionsRuntimeTest`
+  (`adr-20261014-solution-actions-registered-per-process`).
 - **The handler registry is closed and unambiguous.** No registration after freeze; a handler's
   `version()` must be in its `supportedVersions()`; a duplicate `type@version` is rejected; an
   unknown key throws. Publishing rejects unknown versions. Enforced: `NodeHandlerRegistry`,

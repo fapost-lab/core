@@ -67,6 +67,16 @@ An operator can allow trusted internal targets with `FLOW_EGRESS_ALLOW`; see
 [Configuration](/self-hosting/configuration#outbound-calls-from-flows). Cloud
 metadata addresses can never be allowed.
 
+### The handler transport
+
+The `handler` transport calls an in-process action by id (`target` is the id, for example
+`feedback.submit`). Core builds the handler for each call in the job that makes it. An action
+registered by a [Solution](/extending/solutions#registering-actions) runs only for a tenant that has
+activated that Solution; otherwise the node takes the `error` handle with
+`error_code = solution_inactive`, the flow log shows `solution_inactive: <solution id>`, and the
+handler is not called. An id nobody registered is `action_not_found`; an exception in the handler is
+`action_exception`. Every refusal counts as one call execution.
+
 <Note>
   An extension that makes its own HTTP request from a flow parameter is not covered
   by this check. Such a request must refuse private, loopback, link-local and

@@ -9,8 +9,9 @@ domain behaviour — distributed as a Composer package under your own vendor.
 <Note>
   The external Solution lifecycle is partly built in Core. The manifest below is
   read and validated by `platform:update` today, and a tenant's activation of a
-  Solution is stored and switched with `solutions:activate` and `solutions:deactivate`;
-  the registrar that mounts what a Solution declares, the activation screen and the
+  Solution is stored and switched with `solutions:activate` and `solutions:deactivate`.
+  Core also registers the action handlers a Solution declares and refuses them for a tenant
+  that has not activated it. The activation screen, the other registrar methods and the
   release tooling around them are still being built. Treat this page as the contract you will be held to,
   not as a finished walkthrough.
 </Note>
@@ -40,7 +41,7 @@ fails on the deploy, not on a customer's request.
 {
   "name": "acme/fapost-feedback",
   "type": "fapost-solution",
-  "require": { "fapost/foundation": "^0.13" },
+  "require": { "fapost/foundation": "^0.17" },
   "extra": {
     "fapost": {
       "schema": 1,
@@ -143,12 +144,78 @@ Foundation reads the current schema and the previous one within one major versio
 anything else. A field not in schema 1 yet, for example a Solution's migrations, is added the same
 way when its contract is settled, as `ui` was in 0.15.
 
+## Registering actions
+
+A Solution gives flows something to do by registering **action handlers**, which the `call` node
+reaches with the `handler` transport. It does not add node types: a node's contract is a Core
+handler version, so a package cannot extend it. Implement
+`Fapost\Foundation\Action\ActionHandlerInterface`, declare the id in the manifest and register
+the class from your provider:
+
+```php
+final class FeedbackServiceProvider extends AbstractSolutionServiceProvider
+{
+    protected function registerExtensions(CoreRegistrarInterface $registrar): void
+    {
+        $registrar->registerActionHandler(SubmitFeedbackAction::class);
+    }
+}
+```
+
+Core calls `registerExtensions()` once per process, with a registrar of your own, after every
+provider's `register()` and before any `boot()`. So it runs before your `bootSolution()` and before
+the registries close. The provider never fetches a registrar itself.
+
+**Registration is strict and fails the boot.** The process does not start (so `platform:update`
+fails on the deploy, not at a customer), and the message names the Solution, the package, the action
+and the class, when:
+
+- the action id is not listed in `extra.fapost.actions`;
+- the id is already registered (two handlers, or a Solution and Core);
+- the class does not implement `ActionHandlerInterface`;
+- you call `registerNodeHandler()`, or `registerDataAccessor()`, `registerRagAdapter()`,
+  `registerRoutes()`, `registerSchedule()` or `registerMigrations()`, which Core does not support for a
+  Solution yet.
+
+The opposite case, an action listed in the manifest that no handler registers, is reported by
+`platform:update` (also with `--validate-only`) as
+`acme/fapost-feedback: extra.fapost.actions[1]: "feedback.score" is declared but not registered`, and
+exits with code 1 before anything is migrated.
+
+**A handler is built on every call**, in the job that makes it, so its constructor may take scoped
+services (the current tenant, a connection) and gets the ones of that job. Nothing is kept between
+calls. Core also builds one throwaway instance at boot to read `id()`, outside any tenant, so keep the
+constructor cheap and do the work, and every read of tenant data, in `handle()`.
+
+**What the handler is called with.** `handle(array $parameters, CallContext $context)` runs inside the
+job of a tenant that has the Solution activated; `$context->tenantId` is that tenant. The builder's
+**Test call** reaches the same handler for the same tenant, with a synthetic context
+(`contactId` `test-contact`, `sessionId` `test-session`), and it really runs: a handler must cope
+with a contact that does not exist.
+
+**Activation is checked on every call.** The action of a Solution the tenant has not activated, or has
+just deactivated, is refused: the `call` node takes its `error` handle with
+`error_code = solution_inactive`, the flow log shows `solution_inactive: <solution id>` on the block,
+and your handler is not built or called. A session that is running when a Solution is deactivated is
+not failed: its next `call` to that Solution takes the `error` handle. The builder lists the actions
+of Core and of the tenant's active Solutions only; a flow that already uses an action of a Solution
+that is off still opens and shows the saved value.
+
+A refused call still counts as one call execution, as any refusal does.
+
+**Outbound HTTP.** Core's egress check covers only its own `http` transport. A handler that makes a
+request from a flow parameter must itself refuse private, loopback, link-local and cloud-metadata
+addresses after resolving the name and on every redirect hop. A shared contract for this will arrive
+with the first Solution that needs outbound HTTP.
+
+`onActivate()` and `onDeactivate()` are not called yet.
+
 ## What a Solution typically contains
 
 Most Solutions are a combination of pieces documented elsewhere in this section:
 
 <CardGroup cols={2}>
-  <Card title="Node handlers" href="/extending/flow-nodes/handler-contract">
+  <Card title="Action handlers" href="#registering-actions">
     So flows can act on your domain.
   </Card>
   <Card title="A data accessor" href="/extending/data-accessors">
