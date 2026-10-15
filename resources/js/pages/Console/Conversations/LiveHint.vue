@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Radio, RefreshCw } from '@lucide/vue'
-import { interpolate } from '@fapost/ui/shell'
-import type { LiveTransport } from '@fapost/ui/lib/live-updates'
+import { interpolate } from '@console/shell'
+import type { LiveTransport } from '@console/lib/live-updates'
 import type { LiveTranslations } from './types'
 
 /** Says how the screen stays current: live through the websocket, or refreshed every few seconds. */

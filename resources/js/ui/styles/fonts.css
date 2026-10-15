@@ -1,0 +1,7 @@
+/*
+ * The kit's typefaces: Onest (text), Roboto Condensed (display), Victor Mono (code). The font tokens in tokens.css
+ * and theme.css name these families.
+ */
+@import '@fontsource-variable/onest';
+@import '@fontsource-variable/roboto-condensed';
+@import '@fontsource-variable/victor-mono';

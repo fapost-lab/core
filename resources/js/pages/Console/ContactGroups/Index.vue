@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -14,7 +14,7 @@ import { Button } from '@fapost/ui/components/button'
 import { ConfirmDialog } from '@fapost/ui/components/confirm-dialog'
 import { DataTable, type DataTableColumn, type TableDefaults, type TableMeta, type TableState } from '@fapost/ui/components/data-table'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import type { ContactGroupRow, ContactGroupsPageProps } from './types'
 
 const props = defineProps<{

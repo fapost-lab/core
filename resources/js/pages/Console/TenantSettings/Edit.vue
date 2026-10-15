@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@fapost/ui/components/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@fapost/ui/components/tabs'
 import { Textarea } from '@fapost/ui/components/textarea'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import { SolutionMount, tabFromQuery, useExtensions } from '../../../console/solutions'
 import { OptionsPicker } from '@fapost/ui/components/options-picker'
 import { fallbackOptions, firstError, isTab, keptFallback, tabsWithErrors } from './form'

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -10,7 +10,7 @@ import { Head, router, usePage } from '@inertiajs/vue3'
 import { Trash2 } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { ConfirmDialog } from '@fapost/ui/components/confirm-dialog'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import RoleForm from './Form.vue'
 import type { EditableRole, PermissionGroup, RolesPageProps } from './types'
 

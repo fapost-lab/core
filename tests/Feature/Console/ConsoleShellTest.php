@@ -156,6 +156,8 @@ final class ConsoleShellTest extends FeatureTestCase
                 ->where('shell.supportLeaveUrl', '/support/leave')
                 ->where('shell.locales', ['en', 'ru', 'uk'])
                 ->where('translations.console.user_menu.sign_out', 'Выйти')
+                ->where('translations.console.close', 'Закрыть')
+                ->where('translations.console.table.search', 'Поиск')
                 ->etc());
     }
 

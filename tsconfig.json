@@ -11,6 +11,7 @@
     "noEmit": true,
     "paths": {
       "@builder/*": ["./resources/js/builder/*"],
+      "@console/*": ["./resources/js/console/*"],
       "@shared/*": ["./resources/js/shared/*"],
       "@tma/*": ["./resources/js/tma/*"],
       "@fapost/ui/*": ["./resources/js/ui/*"]

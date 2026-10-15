@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -14,7 +14,7 @@ import { FormField } from '@fapost/ui/components/form-field'
 import { FormSection } from '@fapost/ui/components/form-section'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@fapost/ui/components/tabs'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import CommandsField from './CommandsField.vue'
 import { SolutionMount, tabFromQuery, useExtensions } from '../../../console/solutions'
 import { OptionsPicker } from '@fapost/ui/components/options-picker'

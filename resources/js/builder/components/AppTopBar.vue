@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import {computed} from 'vue'
 import {usePage} from '@inertiajs/vue3'
-import {isThemePreference} from '@fapost/ui/shell/theme'
-import {useTheme} from '@fapost/ui/shell/useTheme'
+import {isThemePreference} from '@shared/theme/theme'
+import {useTheme} from '@shared/theme/useTheme'
 import {useTranslations} from '../composables/useTranslations.js'
 
 const { t } = useTranslations()

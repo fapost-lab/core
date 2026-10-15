@@ -1,12 +1,10 @@
-@import '@fontsource-variable/onest';
-@import '@fontsource-variable/roboto-condensed';
-@import '@fontsource-variable/victor-mono';
-@import './tokens.css';
+@import '@fapost/ui/fonts.css';
+@import '@fapost/ui/tokens.css';
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /*
- * The builder's own variables point at the shared tokens (tokens.css) where a
+ * The builder's own variables point at the kit's tokens (@fapost/ui/tokens.css) where a
  * counterpart exists. --border and --primary carry the same name in both
  * places, so they come straight from the tokens and are not redeclared here
  * (a self-reference would be invalid). --radius stays 8px on purpose: it

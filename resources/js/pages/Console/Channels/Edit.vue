@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -9,7 +9,7 @@ import { computed } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
 import { Button } from '@fapost/ui/components/button'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import ChannelForm from './ChannelForm.vue'
 import type { ChannelsPageProps, EditableChannel, MaxConnections, SelectOption } from './types'
 import WebhookStatus from './WebhookStatus.vue'

@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -8,7 +8,7 @@ export default { layout: AppShell }
 import { computed } from 'vue'
 import { Head, usePage } from '@inertiajs/vue3'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import ContactSegmentForm from './Form.vue'
 import type { ContactSegmentsPageProps, SegmentFields, SegmentOptions, SegmentSchema } from './types'
 

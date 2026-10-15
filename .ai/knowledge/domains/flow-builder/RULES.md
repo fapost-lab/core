@@ -19,7 +19,8 @@ paths:
   - app/Domains/Flow/Services/ValidateFlowService.php
   - app/Domains/Flow/Services/LoadBuilderFlowService.php
   - "app/Domains/Flow/Validation/**"
-reviewed_at: 2026-10-14
+  - resources/js/ui/styles/tokens.css
+reviewed_at: 2026-10-15
 ---
 # Flow builder rules
 
@@ -38,7 +39,7 @@ broken.
 
 ## Rules
 
-- **The builder's colours and fonts come from `resources/css/tokens.css`,** through its own
+- **The builder's colours and fonts come from the kit's `tokens.css` (`@fapost/ui/tokens.css`),** through its own
   variables, defined only in the `:root` and `.dark` blocks of `builder.css`; every variable with
   a literal value there has a `.dark` override, and no builder component or script carries a
   literal colour. The builder's own brown is `--builder-accent`, so the token `--accent` stays

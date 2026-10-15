@@ -66,11 +66,10 @@ describe('the public surface of @fapost/ui', () => {
     expect(reExports).toEqual(subpaths)
   })
 
-  it('lists only modules that exist, and neither the shell nor the live-updates helpers', () => {
+  // Only modules of the kit: the shell and live updates are Core's own code (resources/js/console), never a subpath.
+  it('lists only modules of the kit that exist', () => {
     for (const subpath of subpaths) {
       expect(existsSync(sourceOf(subpath)), subpath).toBe(true)
-      expect(subpath.startsWith('shell'), subpath).toBe(false)
-      expect(subpath, subpath).not.toMatch(/live-?updates/i)
     }
   })
 

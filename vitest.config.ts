@@ -15,6 +15,7 @@ export default defineConfig({
     resolve: {
         alias: {
             '@builder': path.resolve(root, 'resources/js/builder'),
+            '@console': path.resolve(root, 'resources/js/console'),
             '@shared': path.resolve(root, 'resources/js/shared'),
             '@tma': path.resolve(root, 'resources/js/tma'),
             '@fapost/ui': path.resolve(root, 'resources/js/ui'),

@@ -5,7 +5,7 @@ import { Button } from '@fapost/ui/components/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@fapost/ui/components/dialog'
 import { FormField } from '@fapost/ui/components/form-field'
 import { ValueListInput } from '@fapost/ui/components/value-list-input'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import type { ContactsPageProps } from './types'
 
 /**

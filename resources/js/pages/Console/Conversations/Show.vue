@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -12,9 +12,9 @@ import { Badge, StatusDot } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { EmptyState } from '@fapost/ui/components/empty-state'
 import { Textarea } from '@fapost/ui/components/textarea'
-import type { LiveChannel } from '@fapost/ui/lib/live-updates'
-import { useLiveUpdates } from '@fapost/ui/lib/useLiveUpdates'
-import { interpolate } from '@fapost/ui/shell'
+import type { LiveChannel } from '@console/lib/live-updates'
+import { useLiveUpdates } from '@console/lib/useLiveUpdates'
+import { interpolate } from '@console/shell'
 import { exceedsSize, formatSize, newRequestId } from './draft'
 import { SolutionActions } from '../../../console/solutions'
 import LiveHint from './LiveHint.vue'

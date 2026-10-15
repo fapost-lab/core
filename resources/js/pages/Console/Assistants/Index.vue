@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -14,7 +14,7 @@ import { DataTable, type DataTableColumn, type TableDefaults, type TableMeta, ty
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@fapost/ui/components/dropdown-menu'
 import { EmptyState } from '@fapost/ui/components/empty-state'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import type { AssistantRow, AssistantsPageProps } from './types'
 
 defineProps<{

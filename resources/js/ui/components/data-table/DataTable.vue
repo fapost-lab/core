@@ -1,6 +1,6 @@
 <script setup lang="ts" generic="T extends Record<string, unknown>">
 import { computed, ref, watch } from 'vue'
-import { router, usePage } from '@inertiajs/vue3'
+import { router } from '@inertiajs/vue3'
 import { useDebounceFn } from '@vueuse/core'
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, ChevronRight, Inbox, Search, SearchX, X } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
@@ -8,9 +8,8 @@ import { Checkbox } from '@fapost/ui/components/checkbox'
 import { EmptyState } from '@fapost/ui/components/empty-state'
 import { Input } from '@fapost/ui/components/input'
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@fapost/ui/components/table'
-import { cn } from '@fapost/ui/lib/utils'
-import { interpolate } from '@fapost/ui/shell'
-import type { ShellPageProps } from '@fapost/ui/shell'
+import { useKitMessages } from '@fapost/ui/lib/messages'
+import { cn, interpolate } from '@fapost/ui/lib/utils'
 import DataTablePagination from './DataTablePagination.vue'
 import {
   buildQuery,
@@ -80,8 +79,9 @@ const emit = defineEmits<{
   'selection-change': [selected: string[]]
 }>()
 
-const page = usePage<ShellPageProps>()
-const t = computed(() => page.props.translations.console.table)
+// The host's strings (KIT_MESSAGES), English where it gives none.
+const messages = useKitMessages()
+const t = computed(() => messages.value.table)
 
 const busy = ref(false)
 const search = ref(props.state.search)

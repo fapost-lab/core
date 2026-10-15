@@ -2,7 +2,7 @@
 import {readFileSync} from 'node:fs'
 import {describe, expect, it} from 'vitest'
 
-const css = readFileSync(new URL('../../../css/tokens.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const css = readFileSync(new URL('./tokens.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
 
 /** Custom properties declared inside the first block opened by `selector`. */
 function declared(selector: string): string[] {

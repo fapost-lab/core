@@ -1,0 +1,95 @@
+/*
+ * The kit's Tailwind theme: the `dark` variant and the utilities over the tokens of tokens.css (bg-primary,
+ * text-muted-foreground, rounded-lg, shadow-md, font-display, ...). No preflight and no base styles: the host's
+ * Tailwind brings preflight, styles.css the base styles.
+ */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 2px);
+  --radius-2xl: calc(var(--radius) + 4px);
+
+  --shadow-md: 0 8px 24px color-mix(in srgb, var(--shadow-ink) 18%, transparent);
+  --shadow-lg: 0 20px 48px color-mix(in srgb, var(--shadow-ink) 22%, transparent);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-rail: var(--rail);
+  --color-rail-border: var(--rail-border);
+  --color-rail-dashed: var(--rail-dashed);
+
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-neutral: var(--neutral);
+  --color-neutral-foreground: var(--neutral-foreground);
+  --color-success-dot: var(--success-dot);
+  --color-warning-dot: var(--warning-dot);
+  --color-danger-dot: var(--danger-dot);
+  --color-neutral-dot: var(--neutral-dot);
+  --color-info-dot: var(--info-dot);
+  --color-danger-border: var(--danger-border);
+  --color-invalid: var(--invalid);
+  --color-faint-foreground: var(--faint-foreground);
+  --color-border-soft: var(--border-soft);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-soft-border: var(--primary-soft-border);
+  --color-row-selected: var(--row-selected);
+  --color-scrim: var(--scrim);
+  --color-toast: var(--toast);
+  --color-toast-foreground: var(--toast-foreground);
+  --color-toast-muted-foreground: var(--toast-muted-foreground);
+  --color-toast-border: var(--toast-border);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-surface-muted: var(--surface-muted);
+
+  /*
+   * Same names as the tokens, so they cannot be var() references (that would
+   * be a cycle). Keep these values equal to the font tokens in tokens.css.
+   */
+  --font-sans: 'Onest Variable', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Roboto Condensed Variable', 'Onest Variable', sans-serif;
+  --font-mono: 'Victor Mono Variable', ui-monospace, monospace;
+}

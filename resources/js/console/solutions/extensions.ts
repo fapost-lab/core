@@ -1,4 +1,4 @@
-import type { CellTone, CellType } from '@fapost/ui/components/data-table/cells'
+import type { CellTone, CellType } from '@fapost/ui/components/data-table'
 
 /**
  * The shared prop `extensions` (App\Http\Shell\SolutionExtensions::props()): what the Solutions served to the tenant

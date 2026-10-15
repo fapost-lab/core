@@ -1,4 +1,4 @@
-{{-- Applies the saved colour theme before the first paint. Same rule as resources/js/ui/shell/theme.ts; keep the storage key equal. Shared by the console and the builder. --}}
+{{-- Applies the saved colour theme before the first paint. Same rule as resources/js/shared/theme/theme.ts; keep the storage key equal. Shared by the console and the builder. --}}
 <script>
     (function () {
         try {

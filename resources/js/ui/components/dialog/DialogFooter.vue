@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from "vue"
 import { DialogClose } from "reka-ui"
+import { useKitMessages } from '@fapost/ui/lib/messages'
 import { cn } from '@fapost/ui/lib/utils'
 import { Button } from '@fapost/ui/components/button'
 
@@ -10,6 +11,8 @@ const props = withDefaults(defineProps<{
 }>(), {
   showCloseButton: false,
 })
+
+const messages = useKitMessages()
 </script>
 
 <template>
@@ -20,7 +23,7 @@ const props = withDefaults(defineProps<{
     <slot />
     <DialogClose v-if="showCloseButton" as-child>
       <Button variant="outline">
-        Close
+        {{ messages.close }}
       </Button>
     </DialogClose>
   </div>

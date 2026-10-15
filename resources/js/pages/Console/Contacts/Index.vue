@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -11,11 +11,10 @@ import { Eye, SearchX } from '@lucide/vue'
 import { Badge } from '@fapost/ui/components/badge'
 import { EmptyState } from '@fapost/ui/components/empty-state'
 import { Button } from '@fapost/ui/components/button'
-import { DataTable, type DataTableColumn, type TableDefaults, type TableMeta, type TableState } from '@fapost/ui/components/data-table'
+import { DataTable, ValueCell, type DataTableColumn, type TableDefaults, type TableMeta, type TableState } from '@fapost/ui/components/data-table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
-import ValueCell from '@fapost/ui/components/data-table/ValueCell.vue'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import { rowValue, SolutionActions, useSolutionColumns } from '../../../console/solutions'
 import CopyButton from './CopyButton.vue'
 import type { ContactRow, ContactsPageProps } from './types'

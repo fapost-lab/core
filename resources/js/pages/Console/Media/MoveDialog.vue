@@ -4,7 +4,7 @@ import { useForm, usePage } from '@inertiajs/vue3'
 import { Button } from '@fapost/ui/components/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@fapost/ui/components/dialog'
 import { FormField } from '@fapost/ui/components/form-field'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import FolderSelect from './FolderSelect.vue'
 import type { FolderNode, MediaPageProps } from './types'
 

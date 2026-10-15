@@ -10,6 +10,7 @@ import {
   DialogPortal,
   useForwardPropsEmits,
 } from "reka-ui"
+import { useKitMessages } from '@fapost/ui/lib/messages'
 import { cn } from '@fapost/ui/lib/utils'
 
 defineOptions({
@@ -22,6 +23,8 @@ const emits = defineEmits<DialogContentEmits>()
 const delegatedProps = reactiveOmit(props, "class")
 
 const forwarded = useForwardPropsEmits(delegatedProps, emits)
+
+const messages = useKitMessages()
 </script>
 
 <template>
@@ -51,7 +54,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
           class="absolute top-4 right-4 p-0.5 transition-colors rounded-md hover:bg-secondary"
         >
           <X class="w-4 h-4" />
-          <span class="sr-only">Close</span>
+          <span class="sr-only">{{ messages.close }}</span>
         </DialogClose>
       </DialogContent>
     </DialogOverlay>

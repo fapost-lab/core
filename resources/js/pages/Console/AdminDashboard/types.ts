@@ -1,4 +1,4 @@
-import type { ShellPageProps } from '@fapost/ui/shell'
+import type { ShellPageProps } from '@console/shell'
 
 /** One UTC day of the flow activity chart, as `TenantFlowActivity::daily()` builds it. */
 export interface ActivityDay {

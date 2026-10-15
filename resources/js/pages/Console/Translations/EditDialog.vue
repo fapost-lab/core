@@ -5,7 +5,7 @@ import { Button } from '@fapost/ui/components/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@fapost/ui/components/dialog'
 import { FormField } from '@fapost/ui/components/form-field'
 import { Textarea } from '@fapost/ui/components/textarea'
-import { interpolate } from '@fapost/ui/shell'
+import { interpolate } from '@console/shell'
 import { fallbackOf, formValues } from './translations'
 import type { TranslationCell, TranslationRow, TranslationsPageProps } from './types'
 

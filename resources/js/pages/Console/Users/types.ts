@@ -1,4 +1,4 @@
-import type { ShellPageProps } from '@fapost/ui/shell'
+import type { ShellPageProps } from '@console/shell'
 
 interface Section {
   title: string

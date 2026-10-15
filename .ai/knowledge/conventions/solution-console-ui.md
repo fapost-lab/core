@@ -17,6 +17,7 @@ paths:
   - config/solutions.php
   - docs/site/extending/console-ui.mdx
 summary: "How a Solution adds console UI: the ADR's MAY/MUST/MUST NOT boundary, boot()-only registration and the freeze flag, route groups and route-name ids, the publication allow-list, values() without a timeout"
+reviewed_at: 2026-10-15
 ---
 # Solution console UI
 
@@ -76,7 +77,7 @@ How Core holds it, and what a change to these files must keep:
 - **One Vue, one Inertia, one kit.** The import map points `vue`, `@inertiajs/vue3`, `@fapost/ui` and every
   subpath in `resources/js/console/shared/ui-surface.json` at Core's three shared entries, built with
   `preserveEntrySignatures: 'strict'`. A subpath added there is public surface (strict semver from kit
-  `0.1.0`); `shell` and `lib/live-updates` stay out. Kit components carry no `<style>`: the import-mapped
+  `0.1.0`); the shell and live updates are not in the kit at all (`resources/js/console`). Kit components carry no `<style>`: the import-mapped
   `ui` entry ships no CSS.
 
 ## Example

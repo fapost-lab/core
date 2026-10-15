@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { usePage } from '@inertiajs/vue3'
-import { interpolate } from './nav'
+import { interpolate } from '@fapost/ui/lib/utils'
 import type { ShellPageProps } from './types'
 
 /** The strips above the page: a platform-support session, and the notice the tenant's access mode carries. */

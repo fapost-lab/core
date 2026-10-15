@@ -1,5 +1,5 @@
 <script lang="ts">
-import { AppShell } from '@fapost/ui/shell'
+import { AppShell } from '@console/shell'
 
 export default { layout: AppShell }
 </script>
@@ -11,10 +11,10 @@ import { ArrowLeft, FileText } from '@lucide/vue'
 import { Badge, StatusDot } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@fapost/ui/components/card'
-import type { LiveChannel } from '@fapost/ui/lib/live-updates'
+import type { LiveChannel } from '@console/lib/live-updates'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
-import { useLiveUpdates } from '@fapost/ui/lib/useLiveUpdates'
-import { interpolate } from '@fapost/ui/shell'
+import { useLiveUpdates } from '@console/lib/useLiveUpdates'
+import { interpolate } from '@console/shell'
 import CopyButton from '../Contacts/CopyButton.vue'
 import LiveHint from './LiveHint.vue'
 import { END_STATUS_TONES, STATUS_TONES, type FlowSessionDetails, type FlowSessionsPageProps, type HistoryEntry, type KeyValue } from './types'
