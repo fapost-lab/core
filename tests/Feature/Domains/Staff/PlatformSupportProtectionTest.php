@@ -10,14 +10,9 @@ use App\Domains\Staff\Services\PlatformSupportUserService;
 use App\Domains\Staff\Services\UserService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Models\Tenant;
-use App\Filament\Resources\Users\Pages\EditUser;
-use App\Filament\Resources\Users\Pages\ListUsers;
 use Database\Seeders\TenantAclSeeder;
-use Filament\Actions\DeleteAction;
-use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
-use Livewire\Livewire;
 use Tests\Feature\FeatureTestCase;
 
 /**
@@ -103,50 +98,6 @@ final class PlatformSupportProtectionTest extends FeatureTestCase
         $this->expectExceptionMessage('last active administrator');
 
         $service->deactivate($second->fresh(), $this->admin);
-    }
-
-    public function test_the_edit_page_is_closed(): void
-    {
-        $this->actingAs($this->admin);
-
-        $this->get(route('filament.admin.resources.users.edit', ['record' => $this->support]))->assertForbidden();
-    }
-
-    public function test_the_edit_page_of_an_ordinary_user_still_offers_delete(): void
-    {
-        $this->actingAs($this->admin);
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
-        $other = User::factory()->create();
-
-        Livewire::test(EditUser::class, ['record' => $other->getKey()])
-            ->assertActionVisible(DeleteAction::class);
-    }
-
-    public function test_the_table_marks_it_and_offers_no_actions_on_it(): void
-    {
-        $this->actingAs($this->admin);
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
-        $other = User::factory()->create();
-
-        Livewire::test(ListUsers::class)
-            ->assertCanSeeTableRecords([$this->admin, $this->support])
-            ->assertSee(__('staff.users.platform_support'))
-            ->assertTableActionHidden('edit', $this->support)
-            ->assertTableActionHidden('deactivate', $this->support)
-            ->assertTableActionVisible('deactivate', $other);
-    }
-
-    public function test_bulk_delete_skips_the_support_user(): void
-    {
-        $this->actingAs($this->admin);
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
-        $other = User::factory()->create();
-
-        Livewire::test(ListUsers::class)
-            ->callTableBulkAction('delete', [$this->support, $other]);
-
-        $this->assertNotNull(User::query()->find($this->support->getKey()));
-        $this->assertNull(User::query()->find($other->getKey()));
     }
 
     public function test_the_role_of_the_support_user_cannot_be_changed(): void

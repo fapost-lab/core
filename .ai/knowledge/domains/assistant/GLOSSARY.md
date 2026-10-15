@@ -10,9 +10,6 @@ load: domain
 paths:
   - "app/Domains/Assistant/**"
   - app/Providers/AssistantServiceProvider.php
-  - app/Providers/Filament/AssistantPanelProvider.php
-  - "app/Filament/Assistant/Pages/**"
-  - "app/Filament/Resources/Assistants/**"
   - "database/migrations/tenant/*assistant*"
   - "tests/Unit/Domains/Assistant/**"
   - "tests/Feature/Assistants/**"

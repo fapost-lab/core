@@ -10,7 +10,7 @@ use App\Domains\Assistant\Models\Assistant;
 
 /**
  * Holds the assistant the current request or job works on. It knows nothing about any UI: the assistant is set
- * explicitly by the console middleware, by the panel middleware, or by a job from its payload.
+ * explicitly by the console middleware or by a job from its payload.
  *
  * Contract: {@see CurrentAssistantInterface} lives under {@code Domains/Assistant/Contracts/}; this class is the
  * scoped implementation in {@code Services/}.

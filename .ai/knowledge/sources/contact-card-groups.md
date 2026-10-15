@@ -4,8 +4,7 @@ type: feature
 status: active
 domains:
   - contact
-paths:
-  - "app/Filament/Assistant/Resources/Contacts/Schemas/**"
+paths: []
 source: docs/reference/specs/builder/storage/08-contact-card-groups.md
 summary: The contact card shows attributes as a profile plus collapsible groups
 source_hash: c148fdc4ee6358ab3bced8288b3c1d91da0c8a01

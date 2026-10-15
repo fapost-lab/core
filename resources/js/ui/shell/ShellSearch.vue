@@ -9,7 +9,7 @@ import { SEARCH_DEBOUNCE_MS, hitValue, isPaletteShortcut, searchable, type Searc
 
 /**
  * The shell's search palette (⌘K / Ctrl+K) in both panels: the applications the user may open, the pages of each, then
- * the records Filament's global search found. The server searches what the user may see and answers a few hits per
+ * the records (assistants, users, roles, media files). The server searches what the user may see and answers a few hits per
  * group; nothing is filtered here. A question still on its way is cancelled
  * by the next one, and only the latest answer is shown.
  */

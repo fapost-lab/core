@@ -47,7 +47,6 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/css/builder.css',
                 'resources/css/ui.css',
-                'resources/css/filament/theme.css',
                 'resources/js/app.js',
                 'resources/js/builder/app.ts',
                 'resources/js/console/app.ts',

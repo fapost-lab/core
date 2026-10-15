@@ -11,14 +11,13 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * Route middleware for the tenant's own endpoints outside Filament (the builder, media, the
+ * Route middleware for the tenant's own endpoints (the console, the builder, media, the
  * mini app): while the tenant is stopped, a request that changes something is answered
  * 423 Locked with the notice the operator wrote. Reading carries on.
  *
  * The platform support user passes: an operator in a stopped tenant is there to look and, when
  * need be, to fix. A route with no side effects despite its method opts out with
- * `withoutMiddleware()`. Filament is not covered (no read-only mode there; the banner is
- * its only sign), and neither are logout, `/support/*` and activation, which sit outside
+ * `withoutMiddleware()`. Logout, `/support/*` and activation are not covered: they sit outside
  * the routes this is applied to.
  */
 final readonly class RefuseWritesWhenTenantStopped

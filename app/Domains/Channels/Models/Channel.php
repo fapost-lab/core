@@ -87,13 +87,10 @@ final class Channel extends Model implements ChannelInterface
 
     /**
      * How many channels the tenant has, across all its assistants.
-     *
-     * The assistant panel scopes this model to the current assistant through Filament's
-     * tenancy global scope ({@see Assistant::PANEL_TENANCY_SCOPE}); the limit counts the whole tenant.
      */
     public static function countForLimit(): int
     {
-        return self::query()->withoutGlobalScope(Assistant::PANEL_TENANCY_SCOPE)->count();
+        return self::query()->count();
     }
 
     public function getId(): string

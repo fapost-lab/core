@@ -19,7 +19,7 @@ paths:
   - "tests/Feature/Domains/Tenancy/**"
   - tests/Unit/Architecture/WebhookArchitectureTest.php
   - app/Http/Middleware/ResolveTenantContext.php
-reviewed_at: 2026-10-06
+reviewed_at: 2026-10-15
 ---
 # Tenancy
 
@@ -63,9 +63,9 @@ Not to be confused with the *assistant panel's* Filament "tenant", which is an `
   declared `tenancy.platform_subdomains` label, no tenant), tenant (`<slug>.<base_domain>`,
   resolved by `Services/HostTenantResolver`) or foreign (404).
   `app/Http/Middleware/ResolveTenantContext.php` is prepended to `web`;
-  `app/Http/Middleware/TenancyMiddleware.php` (alias `tenant`, in the Filament panel stacks and on
+  `app/Http/Middleware/TenancyMiddleware.php` (alias `tenant`, in the console stacks and on
   builder/media/tma) requires a tenant and is placed before the session stack by the middleware
-  priority list. Both enter the tenant through `Services/TenantRequestRunner`. Filament panels are
+  priority list. Both enter the tenant through `Services/TenantRequestRunner`. The console's routes are
   bound to the default tenant's host in `single` mode and to no domain in `host` mode
   (`Support/TenantHost::panelDomain()`).
 - Workers: `TenantSwitcher::runForTenant()`.

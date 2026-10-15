@@ -6,28 +6,19 @@ namespace Tests\Feature\Assistants;
 
 use App\Domains\Assistant\Contracts\AssistantServiceInterface;
 use App\Domains\Assistant\Models\Assistant;
-use App\Domains\Staff\Enums\Permission;
-use App\Domains\Staff\Enums\RoleEnum;
-use App\Domains\Staff\Models\User;
-use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Services\UnlimitedTenantLimits;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
-use App\Filament\Resources\Assistants\AssistantResource;
-use App\Filament\Resources\Assistants\Pages\CreateAssistant;
-use App\Filament\Resources\Assistants\Pages\ListAssistants;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
-use Filament\Facades\Filament;
-use Livewire\Livewire;
 use LogicException;
 use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeTenantLimits;
 
 /**
- * The assistant limit is checked in AssistantService::create() and surfaced in the admin panel.
+ * The assistant limit is checked in AssistantService::create().
  */
 final class AssistantLimitTest extends FeatureTestCase
 {
@@ -117,59 +108,6 @@ final class AssistantLimitTest extends FeatureTestCase
         });
     }
 
-    public function test_create_button_and_page_are_closed_for_admin_at_the_limit(): void
-    {
-        $this->actingAsPanelUser(admin: true);
-        $this->limitAssistants(1);
-        Assistant::factory()->create();
-
-        $this->assertFalse(AssistantResource::canCreate());
-        $this->get($this->panelUrl('/admin/assistants/create'))->assertForbidden();
-
-        Livewire::test(ListAssistants::class)
-            ->assertActionHidden('create')
-            ->assertSee('Limit reached (1 of 1)');
-    }
-
-    public function test_create_button_is_closed_for_staff_with_permission_at_the_limit(): void
-    {
-        $this->actingAsPanelUser(admin: false);
-        $this->limitAssistants(0);
-
-        $this->assertFalse(AssistantResource::canCreate());
-        $this->get($this->panelUrl('/admin/assistants/create'))->assertForbidden();
-    }
-
-    public function test_create_button_is_visible_below_the_limit(): void
-    {
-        $this->actingAsPanelUser(admin: true);
-        $this->limitAssistants(2);
-        Assistant::factory()->create();
-
-        $this->assertTrue(AssistantResource::canCreate());
-
-        Livewire::test(ListAssistants::class)
-            ->assertActionVisible('create')
-            ->assertDontSee('Limit reached');
-    }
-
-    public function test_race_shows_a_notification_instead_of_an_error(): void
-    {
-        $this->actingAsPanelUser(admin: true);
-        $this->limitAssistants(1);
-
-        $component = Livewire::test(CreateAssistant::class)
-            ->fillForm(['name' => 'Raced', 'default_language' => 'en']);
-
-        // Another request takes the last slot after the page was opened below the limit: the stale
-        // page must reach the service and get a notification, not a 403.
-        Assistant::factory()->create();
-
-        $component->call('create')->assertNotified(__('staff.assistants.limit.reached_title'));
-
-        $this->assertSame(1, Assistant::query()->count());
-    }
-
     private function limitAssistants(?int $limit): FakeTenantLimits
     {
         $limits = new FakeTenantLimits(['assistants' => $limit]);
@@ -177,17 +115,6 @@ final class AssistantLimitTest extends FeatureTestCase
         $this->app->instance(TenantLimitsInterface::class, $limits);
 
         return $limits;
-    }
-
-    private function actingAsPanelUser(bool $admin): void
-    {
-        $this->app->make(TenantContextInterface::class)->set($this->tenant());
-
-        $user = User::factory()->create();
-        $admin ? $user->assignRole(RoleEnum::Admin->value) : $user->givePermissionTo(Permission::ManageAssistants->value);
-
-        $this->actingAs($user);
-        Filament::setCurrentPanel(Filament::getPanel('admin'));
     }
 
     private function tenant(): Tenant

@@ -15,13 +15,13 @@ sessions. The platform is extended from outside through public contracts, not by
 
 | Container | Technology | Role |
 |---|---|---|
-| Laravel application | PHP 8.4, Laravel 12, PHP-FPM | Webhook ingress, Filament admin and assistant panels, builder and mini-app endpoints |
+| Laravel application | PHP 8.4, Laravel 12, PHP-FPM | Webhook ingress, the console (admin and assistant screens), builder and mini-app endpoints |
 | Queue workers | Laravel Horizon | Flow execution, message delivery, transcript logging, trigger fan-out |
 | Ingress gateway | Go, optional | Verifies, rate-limits, deduplicates and enqueues webhook deliveries in front of the application |
 | Landlord schema | PostgreSQL | Tenants and the webhook registry |
 | Tenant schemas | PostgreSQL | Every domain's data, one schema per tenant, selected by switching the connection's search path |
 | Redis | Redis | Queues, locks, cache, sessions and the webhook spec registry |
-| Front ends | Inertia + Vue 3 (builder), Vue 3 + vue-router (mini app), Tailwind (public site), Filament theme | Separately built surfaces |
+| Front ends | Inertia + Vue 3 (console, builder), Vue 3 + vue-router (mini app), Tailwind (public site) | Separately built surfaces |
 
 ## Domains
 
@@ -125,24 +125,23 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   database driver as fallbacks; `.env.example` selects PostgreSQL and Redis. Locally PHPUnit uses
   in-memory SQLite, an array cache and a sync queue, so locks and queue concurrency are exercised
   only against mocks; CI additionally runs the suite on PostgreSQL 15.
-- **The Inertia console takes over Filament's addresses one route at a time, behind `ui.inertia`.**
-  With `UI_INERTIA` on, `routes/inertia.php` loads after the Filament panels and declares a
-  migrated screen with Filament's exact domain, method, URI (`{tenant}`, `{record}`) and name; the
-  route collection keys routes by method + domain + URI, so the later one replaces Filament's, also
-  under `route:cache`, and every `route()` by name follows. A different parameter name replaces
-  nothing and Filament keeps answering silently, which `ConsoleRouteInterceptionTest` guards. The
-  switch is read at boot, so it changes only with a restart. Console routes use the `admin` /
-  `console` middleware groups (`bootstrap/app.php`), which repeat the panels' checks.
-  The shell's navigation (`app/Http/Shell`) repeats Filament's menus and marks an item migrated
-  when its named route's action lives in `App\Http\Controllers\Console` or `Admin`; an unmigrated
-  item is a plain link into Filament, never an Inertia `<Link>`. Tests pin `UI_INERTIA=false` in
-  `phpunit.xml`; console tests switch it on themselves.
+- **The console is Inertia and Vue; Core has no Filament or Livewire.** `routes/inertia.php` is
+  always loaded and serves the admin (`admin/*`) and assistant (`assistant/{tenant}/*`) screens at
+  the URIs the removed Filament panels had; read screens still carry the panels' route names
+  (`filament.*`) and parameter names (`{tenant}`, `{record}`), writes are `console.*`.
+  `ConsoleRouteInterceptionTest` pins each name to its action and URI. Console routes use the
+  `admin` / `console` middleware groups (`bootstrap/app.php`). The shell's navigation
+  (`app/Http/Shell`) keeps an `external` flag for an item that leads off the console (a plain link,
+  never an Inertia `<Link>`); every Core item has it false. No `Filament\` or `Livewire\` dependency in
+  `App\`: an operator package (the SaaS shell) may install Filament for a panel of its own, and Core
+  must not lean on it. In Core's CI phpstan's unknown-class errors (level 0) enforce this, since the
+  classes are absent; PHPat `NoFilamentTest` bites only where Filament is installed (the SaaS overlay).
 - **The operator surfaces share one token source.**
   `resources/css/tokens.css` holds the Warm Minimal tokens (light and `.dark`, fonts Onest,
   Roboto Condensed, Victor Mono, self-hosted through Fontsource); the kit (`resources/js/ui`,
   shadcn-vue, alias `@fapost/ui`, styles `resources/css/ui.css`) builds on it, and the builder's
-  own variables point at it in both themes. The Filament theme (`resources/css/filament/theme.css`) still duplicates the
-  palette until Filament leaves Core, and the public site (`resources/css/app.css`) keeps its own
-  palette by decision (D5, spec `ui-foundation`).
+  own variables point at it in both themes. The public site (`resources/css/app.css`) keeps its own
+  palette by decision (D5, spec `ui-foundation`). The front-end build needs nothing from Composer's
+  `vendor/`, so the image's `assets` stage and CI's front-end job build from `package.json` alone.
 - **Only one messenger integration is real.** Telegram is implemented; the WhatsApp adapter throws
   on every method. Channel swappability is a property of the contracts, not yet a demonstrated one.

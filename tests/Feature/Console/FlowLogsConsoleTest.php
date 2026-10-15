@@ -21,12 +21,13 @@ use Carbon\CarbonImmutable;
 use Database\Seeders\TenantAclSeeder;
 use Inertia\Testing\AssertableInertia;
 use Symfony\Component\Uid\Ulid;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * The flow log on the Inertia console: every read bounded in time (the list by its period, an entry by the time its id
  * carries), scoped to the assistant's sessions, its filters, an entry's page, and who may open them.
  */
-final class FlowLogsConsoleTest extends InertiaConsoleTestCase
+final class FlowLogsConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

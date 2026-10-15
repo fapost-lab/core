@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * The records of the shell's search palette, in place of Filament's global search over the same four resources:
+ * The records of the shell's search palette, over the four resources Filament's global search covered:
  * assistants, staff users, roles and media files. They follow the applications and pages of {@see ApplicationSearch}.
  *
  * Each group is searched only for a user who may list that kind of record, through the same bounded query its list
@@ -43,7 +43,6 @@ final readonly class AdminSearch
         private StaffAssistantService $assistants,
         private StaffUserService $users,
         private StaffRoleService $roles,
-        private RouteOwnership $ownership,
     ) {
     }
 
@@ -204,7 +203,7 @@ final readonly class AdminSearch
             'title'    => $title,
             'subtitle' => $subtitle,
             'url'      => route($route, $parameters, false),
-            'external' => ! $this->ownership->isMigrated($route),
+            'external' => false,
         ];
     }
 }

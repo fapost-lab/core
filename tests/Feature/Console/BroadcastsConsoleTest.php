@@ -28,13 +28,14 @@ use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * Broadcasts on the Inertia console. A broadcast reaches real people, so most of this file is about what must not
  * happen: a second run, a send of something other than what was confirmed, a change to a run that has started, an
  * audience that is gone or is somebody else's, a send nobody authorized.
  */
-final class BroadcastsConsoleTest extends InertiaConsoleTestCase
+final class BroadcastsConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

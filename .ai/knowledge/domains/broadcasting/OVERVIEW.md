@@ -9,14 +9,13 @@ topics: []
 load: domain
 paths:
   - "app/Domains/Broadcasting/**"
-  - "app/Filament/Assistant/Resources/Broadcasts/**"
   - "database/migrations/tenant/*broadcast*"
   - "tests/Feature/Domains/Broadcasting/**"
   - app/Http/Controllers/Console/BroadcastController.php
   - "app/Http/Requests/Console/*Broadcast*"
   - "resources/js/pages/Console/Broadcasts/**"
   - tests/Feature/Console/BroadcastsConsoleTest.php
-reviewed_at: 2026-10-10
+reviewed_at: 2026-10-15
 ---
 # Broadcasting
 
@@ -36,8 +35,7 @@ tags, or a segment. `RunBroadcastJob` writes one recipient row per contact, then
   `ContactSegment`, `ChannelContact`, `Contact`), Flow's `ContentTranslatorInterface`, the
   `Channel` and `Assistant` models, Conversation's `MessageOrigin`, Tenancy, and the foundation
   `MessageSenderInterface`.
-- The only consumers are the two admin UIs: the console (Inertia, `UI_INERTIA` on) and Filament
-  (the default).
+- The only consumer is the console (`BroadcastController`, Inertia).
 - Tenant settings `broadcast_*` in `TenantSettings` control backpressure and batching.
 
 ## Entry points

@@ -10,6 +10,7 @@ paths:
   - app/Domains/Tenancy/Services/TenantRequestRunner.php
   - app/Domains/Tenancy/Services/CurrentAccessState.php
   - app/Http/Middleware/RefuseWritesWhenTenantStopped.php
+reviewed_at: 2026-10-15
 ---
 # A tenant's access mode is a computed answer asked per request and per job, not a tenants.status value
 
@@ -95,3 +96,11 @@ side says the mode is computed, never switched by a job.
 - The operator's `stateFor` runs on every tenant request and every runtime job, so it must be fast and
   cached by the implementation, and should not throw.
 - Messages that arrive while stopped are lost, not replayed: the conversation is not kept.
+
+## Amendment 2026-10-15: Filament left Core
+
+Filament and Livewire were removed from Core (task `remove-filament`). The text above is kept as accepted;
+its points about the Filament panel (the banner-only `AccessNoticeBanner`, the unguarded panel, read-only
+Filament as an alternative) are historical. The console that replaced the panels runs behind the `admin`
+stack, which includes `RefuseWritesWhenTenantStopped`, so a stopped tenant's writes there answer 423 like
+the builder's, and the notice reaches the console as a prop.

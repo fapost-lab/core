@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
  * The one-line summary of a flow's trigger shown under its name in a list: what starts the flow, as plain text and
  * the trigger type (the screen picks the icon).
  *
- * The same logic as the Filament flows table has, without its HTML; that copy goes away with Filament.
+ * The same logic the Filament flows table had, without its HTML.
  */
 final class FlowTriggerHint
 {

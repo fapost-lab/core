@@ -16,8 +16,7 @@ use Illuminate\Support\Str;
  *
  * Core's two first: the Console, which works per assistant, and the Admin panel, tenant-wide. Their visibility is the
  * panel access of today: both need an account that may use the console ({@see User::canAccessConsole()}), and the
- * Console needs an assistant the user may open ({@see AccessibleAssistants}, the list of the assistant switcher and of
- * Filament's tenant menu). Then the applications of the Solutions served to the tenant, by Solution id
+ * Console needs an assistant the user may open ({@see AccessibleAssistants}, the list of the assistant switcher). Then the applications of the Solutions served to the tenant, by Solution id
  * ({@see SolutionExtensions}); a per-assistant one opens on the Console's assistant. The menu of each is chosen by its
  * key, not by whether it carries an assistant.
  *
@@ -47,7 +46,6 @@ final class ApplicationRegistry
 
     public function __construct(
         private readonly StaffAssistantService $assistants,
-        private readonly RouteOwnership $ownership,
         private readonly NavigationBuilder $navigation,
         private readonly SolutionExtensions $solutions,
     ) {
@@ -135,7 +133,7 @@ final class ApplicationRegistry
             scope: __("console.applications.apps.{$key}.scope"),
             icon: $icon,
             href: route($route, $parameters, false),
-            external: ! $this->ownership->isMigrated($route),
+            external: false,
             pinnedByDefault: true,
             assistant: $assistant,
         );

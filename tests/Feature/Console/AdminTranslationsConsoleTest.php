@@ -17,12 +17,13 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Database\Seeders\TenantAclSeeder;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * The tenant's translations in the admin panel, served by the console shell in its admin mode: one override layer
  * (`tenant_translations`), the same page as the assistant's, and the permission Filament asked for.
  */
-final class AdminTranslationsConsoleTest extends InertiaConsoleTestCase
+final class AdminTranslationsConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

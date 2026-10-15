@@ -10,7 +10,6 @@ load: domain
 requires: []
 paths:
   - "app/Domains/Contact/**"
-  - "app/Filament/Assistant/Resources/Contact*/**"
   - "database/migrations/tenant/*contact*"
   - "tests/*/Domains/Contact/**"
   - "app/Http/Controllers/Console/Contact*"

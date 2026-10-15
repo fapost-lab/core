@@ -12,9 +12,7 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Policies\UserPolicy;
 use App\Domains\Staff\Services\UserService;
 use Database\Seeders\RoleSeeder;
-use Filament\Panel;
 use Illuminate\Validation\ValidationException;
-use Mockery;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Feature\FeatureTestCase;
 
@@ -109,10 +107,9 @@ final class UserPolicyTest extends FeatureTestCase
 
     public function test_deactivated_user_cannot_login(): void
     {
-        $panel = Mockery::mock(Panel::class);
-        $user  = new User(['status' => UserStatus::Active->value, 'is_active' => false]);
+        $user = new User(['status' => UserStatus::Active->value, 'is_active' => false]);
 
-        $this->assertFalse($user->canAccessPanel($panel));
+        $this->assertFalse($user->canAccessConsole());
     }
 
     // -----------------------------------------------------------------------

@@ -8,20 +8,18 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
-use App\Domains\Tenancy\Contracts\TenantContextInterface;
-use App\Domains\Tenancy\Models\Tenant;
 use Database\Seeders\TenantAclSeeder;
-use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\TestResponse;
 use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Feature\FeatureTestCase;
 
 /**
- * The shell's props (side menu, assistant switcher, endpoints) and the language endpoint, with the switch on.
+ * The shell's props (side menu, assistant switcher, endpoints) and the language endpoint.
  */
-final class ConsoleShellTest extends InertiaConsoleTestCase
+final class ConsoleShellTest extends FeatureTestCase
 {
     protected function setUp(): void
     {
@@ -34,7 +32,7 @@ final class ConsoleShellTest extends InertiaConsoleTestCase
         Route::middleware('web')->get('_web_probe', fn () => Inertia::render('Auth/Login', ['action' => 'probe']));
     }
 
-    public function test_an_administrator_sees_every_assistant_item_in_filaments_groups_and_order(): void
+    public function test_an_administrator_sees_every_assistant_item_in_its_group_and_order(): void
     {
         $assistant = Assistant::factory()->create();
 
@@ -64,19 +62,19 @@ final class ConsoleShellTest extends InertiaConsoleTestCase
         $this->assertSame("/assistant/{$assistant->getKey()}/dashboard", $props['navigation']['groups'][0]['items'][0]['href']);
     }
 
-    public function test_only_the_screens_that_moved_are_inertia_links(): void
+    public function test_every_core_item_is_an_inertia_link(): void
     {
         $assistant = Assistant::factory()->create();
 
         $groups = $this->props($this->actingAs($this->admin())->get($this->panelUrl("/assistant/{$assistant->getKey()}/_probe")))['navigation']['groups'];
 
-        $this->assertFalse($groups[0]['items'][0]['external'], 'The dashboard moved.');
-        $this->assertFalse($groups[1]['items'][0]['external'], 'Channels moved.');
-        $this->assertFalse($groups[2]['items'][0]['external'], 'Flows moved.');
-        $this->assertFalse($groups[2]['items'][1]['external'], 'Flow groups moved.');
-        $this->assertFalse($groups[3]['items'][0]['external'], 'Flow sessions moved.');
-        $this->assertFalse($groups[3]['items'][1]['external'], 'The flow log moved.');
-        $this->assertFalse($groups[3]['items'][4]['external'], 'Conversations moved.');
+        $this->assertFalse($groups[0]['items'][0]['external'], 'The dashboard.');
+        $this->assertFalse($groups[1]['items'][0]['external'], 'Channels.');
+        $this->assertFalse($groups[2]['items'][0]['external'], 'Flows.');
+        $this->assertFalse($groups[2]['items'][1]['external'], 'Flow groups.');
+        $this->assertFalse($groups[3]['items'][0]['external'], 'Flow sessions.');
+        $this->assertFalse($groups[3]['items'][1]['external'], 'The flow log.');
+        $this->assertFalse($groups[3]['items'][4]['external'], 'Conversations.');
         $this->assertNull($groups[3]['items'][4]['badge'], 'No unread conversations, no badge.');
     }
 
@@ -133,26 +131,7 @@ final class ConsoleShellTest extends InertiaConsoleTestCase
         $this->assertNotContains((string) $other->getKey(), array_column($switcher['items'], 'id'));
         $this->assertSame("/assistant/{$mine->getKey()}/dashboard", $switcher['items'][0]['href']);
         $this->assertFalse($switcher['items'][0]['external']);
-        $this->assertSame('/admin/assistants', $switcher['back']['href']);
-        // The admin assistant list moved into the shell too.
-        $this->assertFalse($switcher['back']['external']);
-    }
-
-    public function test_the_filament_tenant_list_is_the_same_list(): void
-    {
-        $mine = Assistant::factory()->create(['name' => 'Alpha']);
-        Assistant::factory()->create(['name' => 'Beta']);
-        $user = User::factory()->create();
-        $user->givePermissionTo(Permission::ManageAssistants->value);
-        $user->assistants()->attach($mine);
-
-        $this->app->make(TenantContextInterface::class)->set(Tenant::query()->firstOrFail());
-
-        $this->assertSame(
-            [(string) $mine->getKey()],
-            $user->getTenants(Filament::getPanel('assistant'))->map(fn (Assistant $assistant): string => (string) $assistant->getKey())->all(),
-        );
-        $this->assertTrue($user->getTenants(Filament::getPanel('admin'))->isEmpty());
+        $this->assertArrayNotHasKey('back', $switcher, 'The way to the admin screens is the application rail.');
     }
 
     public function test_the_shell_props_exist_only_on_console_routes(): void

@@ -16,7 +16,7 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * The `tenant` alias: a tenant is required here.
  *
  * Inside the `web` group the tenant is already active ({@see ResolveTenantContext}) and
- * this passes straight through. Routes outside that group (Filament panels, tenant
+ * this passes straight through. Routes outside that group (tenant
  * routes) enter the tenant here instead. A request on a host that names no tenant,
  * such as the base domain, is answered with 404.
  */

@@ -11,16 +11,12 @@ requires: []
 paths:
   - "app/Domains/Assistant/**"
   - app/Providers/AssistantServiceProvider.php
-  - app/Providers/Filament/AssistantPanelProvider.php
-  - "app/Filament/Assistant/Pages/**"
-  - "app/Filament/Resources/Assistants/**"
   - "database/migrations/tenant/*assistant*"
   - "tests/Unit/Domains/Assistant/**"
   - "tests/Feature/Assistants/**"
   - tests/Feature/AssistantPanelTest.php
   - app/Http/Middleware/ResolveCurrentAssistant.php
-  - app/Filament/Support/SetCurrentAssistantFromPanelTenant.php
-reviewed_at: 2026-10-10
+reviewed_at: 2026-10-15
 ---
 # Assistant rules
 
@@ -41,15 +37,13 @@ broken.
 
 ## Rules
 
-- **Read the current assistant through `CurrentAssistantInterface`,** not
-  `Filament::getTenant()`. Why: the interface also works in jobs, where Filament has no tenant,
-  and it survives the move off Filament. Enforced for `App\Domains\Assistant`, `Flow`, `Webhook`,
-  `App\Jobs` and `App\Infrastructure` by `tests/Architecture/CurrentAssistantSourceTest.php`;
-  panel code under `app/Filament` still reads Filament's tenant until it is migrated.
+- **Read the current assistant through `CurrentAssistantInterface`.** Why: the interface also works
+  in jobs, where no request names an assistant. Core no longer has Filament's tenant to read:
+  a `Filament\` or `Livewire\` reference in `App\` fails phpstan's unknown-class checks in Core's CI,
+  and PHPat `NoFilamentTest` where Filament is installed (the SaaS overlay).
 - **The current assistant is only ever set explicitly:** by the console route middleware
-  (`ResolveCurrentAssistant`, 404 when the assistant is missing or not viewable), by the assistant
-  panel's tenant middleware (`SetCurrentAssistantFromPanelTenant`, persistent so Livewire updates
-  replay it), or by a job from its payload. `CurrentAssistant` itself reads nothing ambient.
+  (`ResolveCurrentAssistant`, 404 when the assistant is missing or not viewable) or by a job from
+  its payload. `CurrentAssistant` itself reads nothing ambient.
   Enforced: `CurrentAssistantTest`, `ResolveCurrentAssistantTest`, `AssistantPanelTest`.
 - **Change `is_active` through `AssistantService`,** never by updating the model. Why: only the
   service cascades to channels. Only the admin edit form bypasses it today, in both panels

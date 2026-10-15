@@ -17,12 +17,13 @@ use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * Contact segments on the Inertia console: the list, the rule builder's server side (what is stored, what is refused),
  * the size recount, and who may do which.
  */
-final class ContactSegmentsConsoleTest extends InertiaConsoleTestCase
+final class ContactSegmentsConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

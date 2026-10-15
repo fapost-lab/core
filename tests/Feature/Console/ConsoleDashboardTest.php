@@ -21,12 +21,13 @@ use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use RuntimeException;
+use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeTenantLimits;
 
 /**
  * The assistant dashboard on Inertia: Filament's figures and links, and the same 404 for an assistant the user may not open.
  */
-final class ConsoleDashboardTest extends InertiaConsoleTestCase
+final class ConsoleDashboardTest extends FeatureTestCase
 {
     protected function setUp(): void
     {

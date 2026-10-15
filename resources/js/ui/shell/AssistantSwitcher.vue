@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowLeft, Check, ChevronsUpDown } from '@lucide/vue'
+import { Check, ChevronsUpDown } from '@lucide/vue'
 import { Link } from '@inertiajs/vue3'
 import { Avatar, AvatarFallback } from '@fapost/ui/components/avatar'
 import {
@@ -7,7 +7,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@fapost/ui/components/dropdown-menu'
 import { initials } from './nav'
@@ -16,7 +15,6 @@ import type { AssistantSwitcherData } from './types'
 defineProps<{
   data: AssistantSwitcherData
   label: string
-  backLabel: string
 }>()
 </script>
 
@@ -55,17 +53,6 @@ defineProps<{
           </Link>
         </DropdownMenuItem>
       </template>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem as-child>
-        <a v-if="data.back.external" :href="data.back.href">
-          <ArrowLeft aria-hidden="true" />
-          {{ backLabel }}
-        </a>
-        <Link v-else :href="data.back.href">
-          <ArrowLeft aria-hidden="true" />
-          {{ backLabel }}
-        </Link>
-      </DropdownMenuItem>
     </DropdownMenuContent>
   </DropdownMenu>
 </template>

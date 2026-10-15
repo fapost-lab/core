@@ -27,6 +27,7 @@ use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia;
 use LogicException;
 use Symfony\Component\HttpFoundation\Response;
+use Tests\Feature\FeatureTestCase;
 use Tests\Fixtures\Solutions\Showcase\ShowcaseColumnValues;
 use Tests\Support\InstallsShowcaseSolution;
 
@@ -36,7 +37,7 @@ use Tests\Support\InstallsShowcaseSolution;
  * `extensions`), what the user's abilities and the open assistant hide, and that an inactive or unpublished Solution
  * adds nothing and answers 404.
  */
-final class SolutionExtensionsConsoleTest extends InertiaConsoleTestCase
+final class SolutionExtensionsConsoleTest extends FeatureTestCase
 {
     use InstallsShowcaseSolution;
 

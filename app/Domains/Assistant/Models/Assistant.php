@@ -10,7 +10,6 @@ use App\Domains\Staff\Models\User;
 use Database\Factories\AssistantFactory;
 use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Fapost\Support\Models\BaseModel;
-use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -57,7 +56,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @method static AssistantBuilder<static>|Assistant whereUpdatedAt($value)
  * @mixin \Eloquent
  */
-final class Assistant extends BaseModel implements HasName
+final class Assistant extends BaseModel
 {
     /** @use HasFactory<AssistantFactory> */
     use HasFactory;
@@ -66,12 +65,6 @@ final class Assistant extends BaseModel implements HasName
      * Limit key under which a tenant's assistant count is capped.
      */
     public const string LIMIT_KEY = 'assistants';
-
-    /**
-     * Name of the global scope Filament's `assistant` panel adds to models owned by an assistant
-     * (its panel id plus `_tenancy`). Counting a tenant-wide limit strips it.
-     */
-    public const string PANEL_TENANCY_SCOPE = 'assistant_tenancy';
 
     /** @var class-string<AssistantBuilder> */
     protected string $customBuilder = AssistantBuilder::class;
@@ -106,14 +99,6 @@ final class Assistant extends BaseModel implements HasName
     public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_assistants');
-    }
-
-    /**
-     * Filament display name for the assistant.
-     */
-    public function getFilamentName(): string
-    {
-        return $this->name;
     }
 
     protected static function newFactory(): AssistantFactory

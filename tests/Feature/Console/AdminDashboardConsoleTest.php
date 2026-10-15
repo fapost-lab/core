@@ -23,12 +23,13 @@ use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * The admin dashboard on Inertia: the figures of Filament's `StatsOverview` and the days of `FlowActivityChart`,
  * bounded by the tenant, and each figure only for a user who may list that kind of record.
  */
-final class AdminDashboardConsoleTest extends InertiaConsoleTestCase
+final class AdminDashboardConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

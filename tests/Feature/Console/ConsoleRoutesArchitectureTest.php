@@ -10,26 +10,34 @@ use App\Http\Middleware\RefuseWritesWhenTenantStopped;
 use App\Http\Middleware\ResolveCurrentAssistant;
 use App\Http\Middleware\TenancyMiddleware;
 use Illuminate\Auth\Middleware\Authenticate;
+use Illuminate\Contracts\Http\Kernel as HttpKernel;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Route;
+use Tests\Feature\FeatureTestCase;
 
 /**
- * Rules for the routes of the Inertia console, checked on the resolved route table (the middleware groups
- * expanded and sorted as the router would run them), with the switch on:
+ * Rules for the routes of the console, checked on the resolved route table (the middleware groups expanded and
+ * sorted as the router would run them):
  *
  * - every console route under `assistant/{tenant}/` resolves the current assistant;
- * - every route under `admin/`, `assistant/` or `console/` that is not Filament's enters the tenant before the
- *   cookies and the session;
+ * - every route under `admin/`, `assistant/` or `console/` enters the tenant before the cookies and the session;
  * - the `admin` stack keeps the order its checks need.
  *
- * Filament's own routes are left out where they differ (they carry their own stack, covered by
- * {@see \Tests\Feature\Tenancy\TenantMiddlewareOrderTest}). Each rule is proved on a violator, so a refactor of the
- * route table cannot turn them into passes that check nothing.
+ * Each rule is proved on a violator, so a refactor of the route table cannot turn them into passes that check nothing.
  */
-final class ConsoleRoutesArchitectureTest extends InertiaConsoleTestCase
+final class ConsoleRoutesArchitectureTest extends FeatureTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // The HTTP kernel hands the middleware groups and priority to the router when it is built; nothing here sends a
+        // request before the middleware is resolved, so build it.
+        $this->app->make(HttpKernel::class);
+    }
+
     public function test_every_console_assistant_route_resolves_the_current_assistant(): void
     {
         $this->assertSame([], $this->assistantRoutesWithoutAssistant());
@@ -54,16 +62,11 @@ final class ConsoleRoutesArchitectureTest extends InertiaConsoleTestCase
         $this->assertSame(['admin/_violator'], $this->routesWithoutEarlyTenant());
     }
 
-    public function test_the_rules_see_filament_and_console_routes_apart(): void
+    public function test_the_rules_find_the_console_routes(): void
     {
-        $filament = $console = 0;
+        $console = array_filter(Route::getRoutes()->getRoutes(), $this->isConsolePath(...));
 
-        foreach (Route::getRoutes() as $route) {
-            $this->isFilament($route) ? $filament++ : (($this->isConsolePath($route)) ? $console++ : null);
-        }
-
-        $this->assertGreaterThan(0, $filament, 'Filament routes were not recognised.');
-        $this->assertGreaterThan(2, $console, 'Console routes were not found.');
+        $this->assertGreaterThan(2, count($console), 'Console routes were not found.');
     }
 
     public function test_the_admin_stack_checks_in_the_order_they_need(): void
@@ -97,7 +100,7 @@ final class ConsoleRoutesArchitectureTest extends InertiaConsoleTestCase
         $violations = [];
 
         foreach (Route::getRoutes() as $route) {
-            if ($this->isFilament($route) || ! str_starts_with($route->uri(), 'assistant/{tenant}/')) {
+            if (! str_starts_with($route->uri(), 'assistant/{tenant}/')) {
                 continue;
             }
 
@@ -117,7 +120,7 @@ final class ConsoleRoutesArchitectureTest extends InertiaConsoleTestCase
         $violations = [];
 
         foreach (Route::getRoutes() as $route) {
-            if ($this->isFilament($route) || ! $this->isConsolePath($route)) {
+            if (! $this->isConsolePath($route)) {
                 continue;
             }
 
@@ -142,20 +145,6 @@ final class ConsoleRoutesArchitectureTest extends InertiaConsoleTestCase
             || str_starts_with($uri, 'admin/')
             || str_starts_with($uri, 'assistant/')
             || str_starts_with($uri, 'console/');
-    }
-
-    /**
-     * A Filament route carries the `panel:<id>` middleware that sets its panel up.
-     */
-    private function isFilament(RoutingRoute $route): bool
-    {
-        foreach ($route->gatherMiddleware() as $middleware) {
-            if (is_string($middleware) && (str_starts_with($middleware, 'panel:') || str_contains($middleware, 'SetUpPanel'))) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     /**

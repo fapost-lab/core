@@ -17,12 +17,12 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\ViewErrorBag;
 use Inertia\Testing\AssertableInertia;
 use Symfony\Component\HttpFoundation\Cookie;
+use Tests\Feature\FeatureTestCase;
 
 /**
- * The Inertia sign-in against what Filament's login page does: the same refusals, throttle, events
- * and session handling, behind `UI_INERTIA=true`.
+ * The console's sign-in: the refusals, throttle, events and session handling the replaced Filament login page had.
  */
-final class ConsoleLoginTest extends InertiaConsoleTestCase
+final class ConsoleLoginTest extends FeatureTestCase
 {
     private const string PASSWORD = 'secret-password';
 
@@ -225,20 +225,11 @@ final class ConsoleLoginTest extends InertiaConsoleTestCase
         $this->assertStringContainsString('Забагато спроб входу', $this->errorMessages()['email'][0]);
     }
 
-    /**
-     * The texts are the project's own, copied from Filament's login page so nothing changes for the user when Filament
-     * goes. Compared while Filament is still installed; removed with it.
-     */
-    public function test_the_messages_are_worded_as_filaments_login_page_words_them(): void
+    public function test_the_messages_are_translated_in_every_interface_language(): void
     {
         foreach (['en', 'ru', 'uk'] as $locale) {
-            foreach ([
-                'auth.login.failed'          => 'filament-panels::auth/pages/login.messages.failed',
-                'auth.login.throttled.title' => 'filament-panels::auth/pages/login.notifications.throttled.title',
-                'auth.login.throttled.body'  => 'filament-panels::auth/pages/login.notifications.throttled.body',
-            ] as $own => $filament) {
-                $this->assertSame(__($filament, [], $locale), __($own, [], $locale), "{$own} ({$locale})");
-                $this->assertNotSame($own, __($own, [], $locale), "{$own} ({$locale}) is missing");
+            foreach (['auth.login.failed', 'auth.login.throttled.title', 'auth.login.throttled.body'] as $key) {
+                $this->assertNotSame($key, __($key, [], $locale), "{$key} ({$locale}) is missing");
             }
         }
     }

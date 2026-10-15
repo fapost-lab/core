@@ -4,7 +4,7 @@ export interface SearchHit {
   title: string
   subtitle: string | null
   url: string
-  /** The screen is still Filament's: a full page load, never an Inertia visit. */
+  /** The screen is not an Inertia page: a full page load, never an Inertia visit. */
   external: boolean
 }
 

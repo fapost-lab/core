@@ -14,13 +14,14 @@ use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * The assistant's settings on the Inertia console: the form and what it offers, saving it in the canonical shape the
  * Filament page stored, its validation (including the domain's command rules), the locked default language, and a
  * flow created from inside the form for the default flow or for a command.
  */
-final class AssistantSettingsConsoleTest extends InertiaConsoleTestCase
+final class AssistantSettingsConsoleTest extends FeatureTestCase
 {
     use SetsRecordLimits;
 

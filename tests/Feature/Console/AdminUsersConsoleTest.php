@@ -23,13 +23,14 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * Staff users in the admin panel, served by the console shell in its admin mode, with every guard of the Filament
  * resource it replaces and the ones that must stop an administrator too: their own account and roles, the last
  * administrator, the platform support user, roles at or above the actor's priority, the staff limit.
  */
-final class AdminUsersConsoleTest extends InertiaConsoleTestCase
+final class AdminUsersConsoleTest extends FeatureTestCase
 {
     use SetsRecordLimits;
 

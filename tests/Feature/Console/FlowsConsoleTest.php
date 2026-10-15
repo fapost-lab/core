@@ -21,12 +21,13 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Concerns\SetsRecordLimits;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * Flows on the Inertia console: the list with its filters and grouping, the flow limit, creating a flow (which ends
  * in the builder), changing its metadata, switching it on and off, and deleting it with the guard for live sessions.
  */
-final class FlowsConsoleTest extends InertiaConsoleTestCase
+final class FlowsConsoleTest extends FeatureTestCase
 {
     use SetsRecordLimits;
 

@@ -10,14 +10,12 @@ load: domain
 requires: []
 paths:
   - "app/Domains/Broadcasting/**"
-  - "app/Filament/Assistant/Resources/Broadcasts/**"
   - "database/migrations/tenant/*broadcast*"
   - "tests/Feature/Domains/Broadcasting/**"
   - app/Http/Controllers/Console/BroadcastController.php
   - "app/Http/Requests/Console/*Broadcast*"
   - "resources/js/pages/Console/Broadcasts/**"
   - tests/Feature/Console/BroadcastsConsoleTest.php
-  - tests/Feature/Filament/EditBroadcastTest.php
 reviewed_at: 2026-10-10
 ---
 # Broadcasting rules

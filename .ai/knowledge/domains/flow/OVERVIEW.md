@@ -21,8 +21,6 @@ paths:
   - "database/migrations/tenant/*persistent_inline_buttons*"
   - "database/migrations/tenant/*tenant_events*"
   - "database/migrations/tenant/*tenant_translations*"
-  - "app/Filament/Assistant/Resources/FlowSessions/**"
-  - "app/Filament/Assistant/Resources/FlowLogs/**"
   - app/Console/Commands/CreateNextFlowLogPartitionCommand.php
   - app/Console/Commands/PruneFlowLogsCommand.php
 reviewed_at: 2026-10-05

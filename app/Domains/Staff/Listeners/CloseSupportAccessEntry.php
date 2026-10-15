@@ -10,7 +10,7 @@ use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\Session\Session;
 
 /**
- * Records that the operator left, however the support session ended: the banner's link, the Filament
+ * Records that the operator left, however the support session ended: the banner's link, the console's
  * sign-out, or the hour running out.
  */
 final readonly class CloseSupportAccessEntry

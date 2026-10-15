@@ -22,12 +22,13 @@ use Fapost\Foundation\Flow\History\HistoryEventType;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * Flow sessions on the Inertia console: which sessions an assistant sees, the live default and the other filters, a
  * session's page, and who may open them.
  */
-final class FlowSessionsConsoleTest extends InertiaConsoleTestCase
+final class FlowSessionsConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

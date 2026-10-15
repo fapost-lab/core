@@ -159,8 +159,8 @@ final class HandleInertiaRequests extends Middleware
             ];
         }
 
-        // The search palette (applications, their pages, then records) replaces Filament's global search, which only the
-        // admin panel had; every user has applications to find.
+        // The search palette (applications, their pages, then records) took over from Filament's global search, which only
+        // the admin panel had; every user has applications to find.
         $searchUrl = route('console.admin.search', [], false);
 
         if ($assistants->isResolved()) {

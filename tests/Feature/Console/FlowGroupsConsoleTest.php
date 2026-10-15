@@ -12,12 +12,13 @@ use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
 use Database\Seeders\TenantAclSeeder;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * Flow groups on the Inertia console: the list scoped to the assistant, create, change, inline create from a flow's
  * form, and delete with the guard for a group that still has flows.
  */
-final class FlowGroupsConsoleTest extends InertiaConsoleTestCase
+final class FlowGroupsConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

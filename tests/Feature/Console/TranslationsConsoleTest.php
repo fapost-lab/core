@@ -17,13 +17,14 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Database\Seeders\TenantAclSeeder;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * The assistant's translations on the Inertia console: the catalog as a list with three cell states (own override,
  * the tenant's override as inherited, the default), its search, filter, sort and pages, the writes that touch only the
  * assistant's layer, and who may open it.
  */
-final class TranslationsConsoleTest extends InertiaConsoleTestCase
+final class TranslationsConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

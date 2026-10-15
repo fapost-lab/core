@@ -12,8 +12,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * Read-only Eloquent surface over the partitioned `flow_logs` table.
  *
  * Writes still go through {@see \App\Domains\Flow\Logging\FlowLogWriter} which
- * inserts via the partitioned root; this model is bound only by Filament for
- * the operational log viewer.
+ * inserts via the partitioned root; this model serves the console's
+ * operational log viewer.
  *
  * @property string                                      $id
  * @property string                                      $session_id

@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Resolves and persists the admin/UI interface locale for the whole web surface
- * (Filament panels + Vue builder).
+ * (the console and the Vue builder).
  *
  * Storage is the source of truth: the locale is auto-detected from the browser
  * only on the very first visit, then written to both the session and a long-lived
@@ -19,8 +19,9 @@ use Symfony\Component\HttpFoundation\Response;
  * from silently "jumping" to the browser default when the session is empty
  * (fresh/expired session, post-login redirect, session regeneration).
  *
- * The cookie name matches the Filament language switcher plugin, so the in-panel
- * switcher and the builder switcher (?lang=) share a single persisted value.
+ * The cookie name is historical: it comes from the Filament language switcher plugin the
+ * removed panels used. It is kept so the language people already chose survives; renaming
+ * it would reset everyone to the browser default.
  */
 final class SetLocale
 {

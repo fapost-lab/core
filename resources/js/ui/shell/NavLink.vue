@@ -4,8 +4,8 @@ import { cn } from '@fapost/ui/lib/utils'
 import ShellIcon from './ShellIcon.vue'
 
 /**
- * One entry of the side menu. A screen that has not left Filament yet (`external`) is a plain link, so the browser
- * loads it as a page; handing it to Inertia would try to render Filament's HTML as a component.
+ * One entry of the side menu. An entry that leads off the console (`external`) is a plain link, so the browser
+ * loads it as a page; handing it to Inertia would try to render that page's HTML as a component.
  */
 const props = defineProps<{
   href: string

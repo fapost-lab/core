@@ -212,9 +212,9 @@ Core asks it, and a package implements it; Core's default answers "active" for e
 - While a tenant is `Stopped`: inbound messages, event triggers and notifications sent from a flow are
   dropped with a log line; delayed wake-ups, send-message timeouts and the broadcast run wait (re-checked every
   hour, so work resumes up to an hour after the tenant is active again) and a broadcast's recipients stay
-  pending and are sent once it is; the builder, media library and mini app refuse changes with
-  `423 Locked` and the notice, while reading stays open; the platform support user may still change things. The Filament panel shows the banner but is not
-  guarded until the new UI.
+  pending and are sent once it is; the console, builder, media library and mini app refuse changes with
+  `423 Locked` and the notice, while reading stays open; the platform support user may still change things. The console
+  shows the notice as a banner.
   The conversation record, delivery statuses, webhook sync and the console commands run as usual. The
   tenant stays `Active` as a status, so its host keeps answering.
 

@@ -13,12 +13,13 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Database\Seeders\TenantAclSeeder;
 use Inertia\Testing\AssertableInertia;
+use Tests\Feature\FeatureTestCase;
 
 /**
  * The tenant's settings in the admin panel, served by the console shell in its admin mode: the fields, rules and
  * permission of the Filament page, and the content base language locked once the tenant has a flow definition.
  */
-final class AdminTenantSettingsConsoleTest extends InertiaConsoleTestCase
+final class AdminTenantSettingsConsoleTest extends FeatureTestCase
 {
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 

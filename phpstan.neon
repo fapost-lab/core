@@ -10,10 +10,6 @@ services:
 		tags:
 			- phpat.test
 	-
-		class: Tests\Architecture\CurrentAssistantSourceTest
-		tags:
-			- phpat.test
-	-
 		class: Tests\Architecture\EgressGuardTest
 		tags:
 			- phpat.test
@@ -31,6 +27,10 @@ services:
 			- phpat.test
 	-
 		class: Tests\Architecture\MessagingBoundariesTest
+		tags:
+			- phpat.test
+	-
+		class: Tests\Architecture\NoFilamentTest
 		tags:
 			- phpat.test
 	-

@@ -1,10 +1,8 @@
 # FaPost Core images.
 #
-# One file with two published targets, `core` and `web`, because they share the
-# same Composer install. The front-end cannot be built without it: the Filament
-# theme imports CSS from vendor/, so the Node stage has to run after Composer.
-# Split across two Dockerfiles that dependency would have to be installed twice,
-# and the two copies could resolve differently.
+# One file with two published targets, `core` and `web`, built from the same
+# sources in one pass. The front-end needs nothing from Composer: the `assets`
+# stage builds from package.json and resources/ alone.
 #
 #   docker build --target core -t fapost/core .
 #   docker build --target web  -t fapost/web  .
@@ -94,10 +92,6 @@ WORKDIR /build
 
 COPY package.json package-lock.json* ./
 RUN npm ci
-
-# The Filament theme imports its stylesheet straight out of vendor/, so the
-# Composer result has to be here before Vite runs.
-COPY --from=deps /var/www/html/vendor ./vendor
 
 COPY vite.config.ts tsconfig*.json ./
 COPY resources ./resources

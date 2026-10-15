@@ -7,21 +7,14 @@ namespace App\Domains\Staff\Models;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\UserStatus;
-use App\Domains\Staff\Services\AccessibleAssistants;
 use Database\Factories\UserFactory;
 use Fapost\Support\Concerns\HasUlidPrimaryKey;
-use Filament\Models\Contracts\FilamentUser;
-use Filament\Models\Contracts\HasTenants;
-use Filament\Panel;
 use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Gate;
 use Spatie\Permission\Traits\HasRoles;
 
 /**
@@ -101,7 +94,7 @@ use Spatie\Permission\Traits\HasRoles;
  * @method static \Illuminate\Database\Eloquent\Builder<static>|User whereUpdatedAt($value)
  * @mixin \Eloquent
  */
-final class User extends Authenticatable implements FilamentUser, HasLocalePreference, HasTenants
+final class User extends Authenticatable implements HasLocalePreference
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory;
@@ -144,16 +137,7 @@ final class User extends Authenticatable implements FilamentUser, HasLocalePrefe
     }
 
     /**
-     * Active status AND not deactivated by admin.
-     */
-    public function canAccessPanel(Panel $panel): bool
-    {
-        return $this->canAccessConsole();
-    }
-
-    /**
-     * The same rule without a Filament panel: the new console (Inertia) checks it directly, and
-     * `canAccessPanel()` delegates here so the two stacks can never disagree.
+     * Whether the person may use the console at all: active status AND not deactivated by an admin.
      */
     public function canAccessConsole(): bool
     {
@@ -228,27 +212,6 @@ final class User extends Authenticatable implements FilamentUser, HasLocalePrefe
     public function hasAssistantAccess(Assistant $assistant): bool
     {
         return $this->isAdmin() || $this->assistants()->whereKey($assistant->getKey())->exists();
-    }
-
-    public function canAccessTenant(Model $tenant): bool
-    {
-        return $tenant instanceof Assistant && Gate::forUser($this)->allows('view', $tenant);
-    }
-
-    /**
-     * @param  Panel  $panel
-     *
-     * @return Collection<int, Assistant>
-     * @throws \Psr\Container\ContainerExceptionInterface
-     * @throws \Psr\Container\NotFoundExceptionInterface
-     */
-    public function getTenants(Panel $panel): Collection
-    {
-        if ('assistant' !== $panel->getId()) {
-            return collect();
-        }
-
-        return app(AccessibleAssistants::class)->for($this);
     }
 
     protected static function booted(): void

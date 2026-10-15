@@ -18,17 +18,16 @@ use Illuminate\Validation\ValidationException;
 use SensitiveParameter;
 
 /**
- * Signs a staff user in for the Inertia console with the behaviour of Filament's login page, so the
- * two stacks are interchangeable behind the `ui.inertia` switch:
+ * Signs a staff user in for the console, with the behaviour the replaced Filament login page had:
  *
  * - at most {@see self::MAX_ATTEMPTS} attempts a minute per client (every attempt counts, successful
- *   or not), answered with Filament's throttled text;
+ *   or not), answered with the throttled text;
  * - one failure for an unknown email, a wrong password and an account that may not use the console
  *   (pending, suspended, deactivated), padded to the same duration by a {@see Timebox} so response time
  *   does not tell them apart;
  * - the `Attempting`, `Failed` and `Login` events (the SaaS shell listens to `Login`).
  *
- * The messages are the project's own `auth.login.*` keys, worded as Filament's login page words them. Multi-factor
+ * The messages are the project's own `auth.login.*` keys (worded as Filament's login page worded them). Multi-factor
  * authentication is not supported (none is configured).
  */
 final readonly class ConsoleLoginService
