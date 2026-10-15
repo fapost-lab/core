@@ -15,6 +15,7 @@ use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsCo
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Console\ApplicationRailController;
+use App\Http\Controllers\Console\AssistantHomeController;
 use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
@@ -140,10 +141,15 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::put('admin/tenant-settings', [AdminTenantSettingsController::class, 'update'])->name('console.admin.tenant-settings.update');
         // Support access log: read only, and never a Filament screen, so the name is the console's own.
         Route::get('admin/support-access', [AdminSupportAccessController::class, 'index'])->name('console.admin.support-access.index');
+
+        // `assistant` is no screen but may be bookmarked: it sends on to an assistant the user may open.
+        Route::get('assistant', [AssistantHomeController::class, 'index'])->name('filament.assistant.tenant');
     });
 
     // An assistant's screens: `{tenant}` is the assistant, under the name Filament gave the parameter.
     Route::middleware('console')->group(function (): void {
+        // The assistant's own address sends on to its dashboard, as Filament's panel home did.
+        Route::get('assistant/{tenant}', [AssistantHomeController::class, 'show'])->name('filament.assistant.home');
         Route::get('assistant/{tenant}/dashboard', DashboardController::class)->name('filament.assistant.pages.dashboard');
 
         // Channels: the assistant's transport endpoints; rotation is its own write.

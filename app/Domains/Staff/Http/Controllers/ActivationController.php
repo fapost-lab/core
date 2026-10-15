@@ -7,7 +7,6 @@ namespace App\Domains\Staff\Http\Controllers;
 use App\Domains\Staff\Services\ActivateUserService;
 use App\Domains\Staff\Services\ActivationTokenService;
 use App\Http\Controllers\Controller;
-use Filament\Facades\Filament;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -59,6 +58,6 @@ final class ActivationController extends Controller
                 ->withErrors($exception->errors());
         }
 
-        return redirect()->to(Filament::getPanel('admin')->getUrl());
+        return redirect()->route('filament.admin.pages.dashboard');
     }
 }

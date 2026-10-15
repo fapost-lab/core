@@ -54,6 +54,10 @@ final class ActivationSingleModeTest extends FeatureTestCase
         }
     }
 
+    /**
+     * The base domain serves no console in single mode: the user is sent to the admin dashboard on the default tenant's
+     * host, where the panel is (Filament's panel URL pointed at the base domain, which answered 404).
+     */
     public function test_activation_on_the_base_domain_signs_the_user_in_and_goes_to_the_panel(): void
     {
         $user  = User::factory()->create(['status' => UserStatus::Pending]);
@@ -63,7 +67,7 @@ final class ActivationSingleModeTest extends FeatureTestCase
             'token'                 => $plain,
             'password'              => 'a-long-password',
             'password_confirmation' => 'a-long-password',
-        ])->assertRedirectContains('/admin');
+        ])->assertRedirect("http://main.{$this->base}/admin");
 
         $this->assertSame(UserStatus::Active, $user->fresh()->status);
     }

@@ -157,7 +157,7 @@ final class ConsoleLoginTest extends InertiaConsoleTestCase
 
     public function test_every_refusal_gives_the_same_message_and_fires_failed(): void
     {
-        $message = __('filament-panels::auth/pages/login.messages.failed');
+        $message = 'These credentials do not match our records.';
         $failed  = 0;
         Event::listen(Failed::class, function () use (&$failed): void {
             $failed++;
@@ -210,10 +210,7 @@ final class ConsoleLoginTest extends InertiaConsoleTestCase
         $this->post($this->panelUrl('/admin/login'), ['email' => $user->email, 'password' => self::PASSWORD])
             ->assertSessionHasErrors('email');
 
-        $this->assertStringContainsString(
-            __('filament-panels::auth/pages/login.notifications.throttled.title'),
-            $this->errorMessages()['email'][0],
-        );
+        $this->assertMatchesRegularExpression('/^Too many login attempts\. Please try again in \d+ seconds\.$/', $this->errorMessages()['email'][0]);
         $this->assertGuest();
     }
 
@@ -226,6 +223,24 @@ final class ConsoleLoginTest extends InertiaConsoleTestCase
         }
 
         $this->assertStringContainsString('Забагато спроб входу', $this->errorMessages()['email'][0]);
+    }
+
+    /**
+     * The texts are the project's own, copied from Filament's login page so nothing changes for the user when Filament
+     * goes. Compared while Filament is still installed; removed with it.
+     */
+    public function test_the_messages_are_worded_as_filaments_login_page_words_them(): void
+    {
+        foreach (['en', 'ru', 'uk'] as $locale) {
+            foreach ([
+                'auth.login.failed'          => 'filament-panels::auth/pages/login.messages.failed',
+                'auth.login.throttled.title' => 'filament-panels::auth/pages/login.notifications.throttled.title',
+                'auth.login.throttled.body'  => 'filament-panels::auth/pages/login.notifications.throttled.body',
+            ] as $own => $filament) {
+                $this->assertSame(__($filament, [], $locale), __($own, [], $locale), "{$own} ({$locale})");
+                $this->assertNotSame($own, __($own, [], $locale), "{$own} ({$locale}) is missing");
+            }
+        }
     }
 
     public function test_signing_out_ends_the_session_with_a_full_page_visit(): void

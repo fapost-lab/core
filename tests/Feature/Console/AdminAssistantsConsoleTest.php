@@ -7,6 +7,7 @@ namespace Tests\Feature\Console;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Enums\ChannelWebhookStatus;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
@@ -17,6 +18,7 @@ use App\Jobs\Messaging\SyncChannelWebhookJob;
 use Database\Seeders\TenantAclSeeder;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Client\Factory as HttpFactory;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia;
@@ -438,6 +440,62 @@ final class AdminAssistantsConsoleTest extends InertiaConsoleTestCase
         $this->assertContains(['remove', $new], $this->registry->calls);
     }
 
+    public function test_a_refused_change_flags_the_channel_and_registering_again_from_the_assistants_page_stores_the_outcome(): void
+    {
+        $assistant = Assistant::factory()->create();
+        $channel   = $this->channel($assistant, ['token' => self::TOKEN]);
+        $base      = "/admin/assistants/{$assistant->getKey()}/channels/{$channel->getKey()}";
+        $page      = $this->url("/{$assistant->getKey()}");
+
+        Bus::swap($this->realBus);
+        $this->actingAs($this->admin());
+
+        $this->provider(accepts: false);
+
+        $this->put($this->panelUrl($base), [
+            'type'         => 'telegram',
+            'token'        => 'bot-token-NEW-333',
+            'secret_token' => '',
+            'is_active'    => true,
+            'config'       => ['allowed_updates' => ['message'], 'max_connections' => 10],
+        ])
+            ->assertRedirect($page)
+            ->assertInertiaFlash('error', 'The channel is saved, but the webhook is not registered. Check the token and register it again from the list.');
+        $this->assertSame(ChannelWebhookStatus::Failed, $channel->refresh()->webhook_status);
+
+        $this->from($page)->post($this->panelUrl("{$base}/register-webhook"))
+            ->assertRedirect($page)
+            ->assertInertiaFlash('error', 'The webhook was not registered. Check the token and try again.');
+        $this->assertSame(ChannelWebhookStatus::Failed, $channel->refresh()->webhook_status);
+
+        $this->provider(accepts: true);
+
+        $this->from($page)->post($this->panelUrl("{$base}/register-webhook"))
+            ->assertRedirect($page)
+            ->assertInertiaFlash('success', 'Webhook registered.');
+        $this->assertSame(ChannelWebhookStatus::Registered, $channel->refresh()->webhook_status);
+    }
+
+    public function test_registering_again_from_the_assistants_page_needs_an_active_channel_and_the_update_permission(): void
+    {
+        $assistant = Assistant::factory()->create();
+        $inactive  = $this->channel($assistant, ['is_active' => false, 'webhook_status' => ChannelWebhookStatus::Failed->value]);
+        $failed    = $this->channel($assistant, ['webhook_status' => ChannelWebhookStatus::Failed->value]);
+        $base      = "/admin/assistants/{$assistant->getKey()}/channels";
+        Bus::fake([SyncChannelWebhookJob::class]);
+
+        $this->actingAs($this->admin())
+            ->post($this->panelUrl("{$base}/{$inactive->getKey()}/register-webhook"))
+            ->assertRedirect()
+            ->assertInertiaFlash('error', 'Only an active channel has a webhook to register.');
+        Bus::assertNotDispatchedSync(SyncChannelWebhookJob::class);
+
+        $this->actingAs($this->manager($assistant, Permission::RotateChannelToken))
+            ->post($this->panelUrl("{$base}/{$failed->getKey()}/register-webhook"))
+            ->assertForbidden();
+        $this->assertSame(ChannelWebhookStatus::Failed, $failed->refresh()->webhook_status);
+    }
+
     public function test_the_channel_actions_answer_to_the_channel_policy_and_the_assistant_in_the_url(): void
     {
         $assistant = Assistant::factory()->create();
@@ -470,6 +528,18 @@ final class AdminAssistantsConsoleTest extends InertiaConsoleTestCase
     public function test_a_visitor_is_sent_to_the_sign_in(): void
     {
         $this->get($this->url())->assertRedirect(route('filament.admin.auth.login'));
+    }
+
+    /**
+     * Telegram answers every call the same way. Stubs accumulate and the first match wins, so each change of mind starts
+     * from a clean client.
+     */
+    private function provider(bool $accepts): void
+    {
+        Http::swap(new HttpFactory());
+        Http::fake(['api.telegram.org/*' => $accepts
+            ? Http::response(['ok' => true, 'result' => ['username' => 'help_bot']])
+            : Http::response(['ok' => false, 'description' => 'Unauthorized'], 401)]);
     }
 
     /**

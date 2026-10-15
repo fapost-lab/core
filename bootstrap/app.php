@@ -24,7 +24,6 @@ use App\Http\Middleware\SetConsoleRootView;
 use App\Http\Middleware\SetLocale;
 use App\Http\Middleware\TenancyMiddleware;
 use App\Http\Middleware\TmaAuthMiddleware;
-use Filament\Http\Middleware\AuthenticateSession;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -32,6 +31,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 

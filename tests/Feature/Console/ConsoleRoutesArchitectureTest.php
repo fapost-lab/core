@@ -62,7 +62,7 @@ final class ConsoleRoutesArchitectureTest extends InertiaConsoleTestCase
             $this->isFilament($route) ? $filament++ : (($this->isConsolePath($route)) ? $console++ : null);
         }
 
-        $this->assertGreaterThan(2, $filament, 'Filament routes were not recognised.');
+        $this->assertGreaterThan(0, $filament, 'Filament routes were not recognised.');
         $this->assertGreaterThan(2, $console, 'Console routes were not found.');
     }
 

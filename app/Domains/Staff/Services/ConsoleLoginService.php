@@ -28,8 +28,8 @@ use SensitiveParameter;
  *   does not tell them apart;
  * - the `Attempting`, `Failed` and `Login` events (the SaaS shell listens to `Login`).
  *
- * The messages reuse Filament's `filament-panels::auth/pages/login` keys; they move to the project's own
- * language files when Filament leaves. Multi-factor authentication is not supported (none is configured).
+ * The messages are the project's own `auth.login.*` keys, worded as Filament's login page words them. Multi-factor
+ * authentication is not supported (none is configured).
  */
 final readonly class ConsoleLoginService
 {
@@ -102,7 +102,7 @@ final readonly class ConsoleLoginService
     private function fail(): never
     {
         throw ValidationException::withMessages([
-            'email' => $this->translator->get('filament-panels::auth/pages/login.messages.failed'),
+            'email' => $this->translator->get('auth.login.failed'),
         ]);
     }
 
@@ -110,11 +110,6 @@ final readonly class ConsoleLoginService
     {
         $replace = ['seconds' => $seconds, 'minutes' => (int) ceil($seconds / 60)];
 
-        $title = $this->translator->get('filament-panels::auth/pages/login.notifications.throttled.title', $replace);
-        $body  = is_array($throttled = $this->translator->get('filament-panels::auth/pages/login.notifications.throttled')) && array_key_exists('body', $throttled)
-            ? $this->translator->get('filament-panels::auth/pages/login.notifications.throttled.body', $replace)
-            : null;
-
-        return null === $body ? $title : $title . '. ' . $body;
+        return $this->translator->get('auth.login.throttled.title', $replace) . '. ' . $this->translator->get('auth.login.throttled.body', $replace);
     }
 }

@@ -8,9 +8,11 @@ use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Support\TenantHost;
 use Database\Seeders\TenantAclSeeder;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
 use Inertia\Testing\AssertableInertia;
+use Symfony\Component\HttpFoundation\Cookie;
 use Tests\Feature\Concerns\RunsInHostMode;
 
 /**
@@ -96,5 +98,40 @@ final class ConsoleHostModeTest extends InertiaConsoleTestCase
         $this->post("http://main.{$this->base}/admin/login", ['email' => $user->email, 'password' => 'secret-password'], ['X-Inertia' => 'true'])
             ->assertStatus(409)
             ->assertHeader('X-Inertia-Location', "http://main.{$this->base}/admin");
+    }
+
+    public function test_the_session_of_one_tenant_host_does_not_open_the_console_of_another(): void
+    {
+        if (! $this->onPostgres()) {
+            $this->markTestSkipped('Two tenants with separate users need PostgreSQL schemas.');
+        }
+
+        $this->seed(TenantAclSeeder::class);
+
+        $user = User::factory()->create(['password' => Hash::make('secret-password')]);
+        $user->assignRole(RoleEnum::Admin->value);
+
+        $signIn = $this->post("http://main.{$this->base}/admin/login", ['email' => $user->email, 'password' => 'secret-password']);
+
+        $cookie = collect($signIn->headers->getCookies())
+            ->first(fn (Cookie $cookie): bool => $cookie->getName() === config('session.cookie'));
+
+        $this->assertNotNull($cookie, 'Signing in must issue a session cookie.');
+        $this->assertNull($cookie->getDomain(), 'The session cookie must stay host-only.');
+
+        // The application is shared by the requests of one test; a real browser starts each request with nobody signed
+        // in, and only the session cookie says otherwise.
+        Auth::forgetGuards();
+
+        $this->withUnencryptedCookie($cookie->getName(), $cookie->getValue())
+            ->get("http://main.{$this->base}/admin")
+            ->assertOk();
+
+        Auth::forgetGuards();
+
+        // Presented on another tenant host, the same session finds no such user there.
+        $this->withUnencryptedCookie($cookie->getName(), $cookie->getValue())
+            ->get("http://second.{$this->base}/admin")
+            ->assertRedirect("http://second.{$this->base}/admin/login");
     }
 }

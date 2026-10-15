@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsCo
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Console\ApplicationRailController;
+use App\Http\Controllers\Console\AssistantHomeController;
 use App\Http\Controllers\Console\AssistantSettingsController;
 use App\Http\Controllers\Console\Auth\LoginController;
 use App\Http\Controllers\Console\Auth\LogoutController;
@@ -51,9 +52,12 @@ final class ConsoleRouteInterceptionTest extends InertiaConsoleTestCase
     public static function interceptedRoutes(): array
     {
         return [
-            'admin login'           => ['filament.admin.auth.login', LoginController::class, 'show', 'admin/login'],
-            'assistant login'       => ['filament.assistant.auth.login', LoginController::class, 'assistant', 'assistant/login'],
-            'assistant dashboard'   => ['filament.assistant.pages.dashboard', DashboardController::class, '', 'assistant/{tenant}/dashboard'],
+            'admin login'         => ['filament.admin.auth.login', LoginController::class, 'show', 'admin/login'],
+            'assistant login'     => ['filament.assistant.auth.login', LoginController::class, 'assistant', 'assistant/login'],
+            'assistant dashboard' => ['filament.assistant.pages.dashboard', DashboardController::class, '', 'assistant/{tenant}/dashboard'],
+            // Addresses that only send on, kept for bookmarks.
+            'assistant landing'     => ['filament.assistant.tenant', AssistantHomeController::class, 'index', 'assistant'],
+            'assistant home'        => ['filament.assistant.home', AssistantHomeController::class, 'show', 'assistant/{tenant}'],
             'channels list'         => ['filament.assistant.resources.channels.index', ChannelController::class, 'index', 'assistant/{tenant}/channels'],
             'channels create'       => ['filament.assistant.resources.channels.create', ChannelController::class, 'create', 'assistant/{tenant}/channels/create'],
             'channels edit'         => ['filament.assistant.resources.channels.edit', ChannelController::class, 'edit', 'assistant/{tenant}/channels/{record}/edit'],

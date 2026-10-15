@@ -18,7 +18,7 @@ paths:
   - app/Http/Controllers/Admin/UserController.php
   - app/Http/Controllers/Admin/RoleController.php
   - "app/Http/Requests/Admin/**"
-reviewed_at: 2026-10-10
+reviewed_at: 2026-10-15
 ---
 # Staff rules
 
@@ -59,6 +59,12 @@ broken.
   `Logout` listener. Enforced: `SupportAccessEntryTest`.
 - **Staff notifications are delivered at most once:** the idempotency guard is set before
   delivery (`SendStaffNotificationJob`).
+- **In-app staff notifications are stored in the shape Filament's database notifications wrote**
+  (`notifications.data`: `title`, `body`, `status`, `icon`, `iconColor`, `duration`, `format: filament`
+  and the rest, key for key), by Core's own `StaffMessageNotification`, so rows written before and after
+  Filament left read the same way when an inbox shows them. They are sent with `notifyNow` inside the
+  notify job's `runForTenant`, never queued, for the reason limit notices are: a queued notification
+  restores the `User` outside the tenant. Enforced: `StaffNotificationTest`.
 - **Admins hear about a limit once per limit and episode, and a broken path never changes the
   gate.** `NotifyAdminsOfLimit` (synchronous, on the hot path) does one atomic `Cache::add` on the
   `LimitEpisode` key and queues `SendLimitNoticeJob` only for the first refusal of an episode:
