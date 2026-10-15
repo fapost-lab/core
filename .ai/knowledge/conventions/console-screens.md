@@ -9,7 +9,6 @@ paths:
   - "app/Http/DataTable/**"
   - routes/inertia.php
   - "resources/js/pages/Console/**"
-  - "resources/js/ui/**"
   - "resources/js/console/shell/**"
   - "resources/js/console/lib/**"
 reviewed_at: 2026-10-15
@@ -70,9 +69,13 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   `@fapost/ui` components: `data-table`, `form-field`, `confirm-dialog`; several of a fixed list is
   `options-picker`, free-text values as chips `value-list-input`, a text per language `localized-field`
   (its errors keyed by locale through `errorsByLocale`). A control a second screen needs moves into the
-  kit and takes every label through props — the kit imports nothing from pages, the shell or the
-  console, and from Inertia only the router; `resources/js/ui/boundary.test.ts` enforces it (the kit
-  becomes the npm package `@fapost/ui`). Permission flags for buttons come from the controller as `can`.
+  kit and takes every label through props. Permission flags for buttons come from the controller as `can`.
+- **The kit is the npm package `@fapost/ui`** (`fapost-lab/ui`, checked out in `packages/fapost-ui` and linked with `npm run dev:link`): a kit change is made and
+  released there, then bumped in Core. Its boundary, enforced by the package's `boundary.test.ts`: MAY
+  import vue, the Inertia router, reka-ui, vue-sonner, @vueuse/core, @lucide/vue, cva/clsx/tailwind-merge;
+  MUST take every label through props or `lib/messages`; MUST NOT import from Core, read page props or
+  export a deep path. Why: Core and every Solution render the same kit through one import map, and a kit
+  that knows Core's props cannot be released without Core.
 - **The kit's own strings come from the host.** A string the kit itself shows (the DataTable's labels,
   the close button of dialogs and sheets) is a key of `KitMessages` in `@fapost/ui/lib/messages`, with
   an English default there; components read it through `useKitMessages()`. Core's `AppShell` provides
@@ -85,7 +88,7 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   is a `StatusDot`; a category or count is a soft `Badge` chosen by meaning (`info`, `neutral`,
   `success`, `warning`, `danger`); a form is a stack of `FormSection`s (title and description
   left, fields right); an empty list is `EmptyState`; a bulk delete is the `outline-danger`
-  button. A new colour need becomes a token in `tokens.css` with its dark value.
+  button. A new colour need becomes a token in the kit's `tokens.css` with its dark value.
 - **Choices that depend on another field** (a condition's operators by its type, how many values each
   takes) reach the client as a prop built from one domain source (an enum's methods); the client holds
   no literal of them, and the FormRequest validates the same pair from the same source. Example:

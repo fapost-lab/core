@@ -14,7 +14,10 @@
       "@console/*": ["./resources/js/console/*"],
       "@shared/*": ["./resources/js/shared/*"],
       "@tma/*": ["./resources/js/tma/*"],
-      "@fapost/ui/*": ["./resources/js/ui/*"]
+      "vue": ["./node_modules/vue"],
+      "@inertiajs/vue3": ["./node_modules/@inertiajs/vue3"],
+      "reka-ui": ["./node_modules/reka-ui"],
+      "vue-sonner": ["./node_modules/vue-sonner"]
     }
   },
   "include": ["resources/js/**/*"],

@@ -76,8 +76,9 @@ How Core holds it, and what a change to these files must keep:
   cannot execute in the browser or on the server.
 - **One Vue, one Inertia, one kit.** The import map points `vue`, `@inertiajs/vue3`, `@fapost/ui` and every
   subpath in `resources/js/console/shared/ui-surface.json` at Core's three shared entries, built with
-  `preserveEntrySignatures: 'strict'`. A subpath added there is public surface (strict semver from kit
-  `0.1.0`); the shell and live updates are not in the kit at all (`resources/js/console`). Kit components carry no `<style>`: the import-mapped
+  `preserveEntrySignatures: 'strict'`. That file is Core's copy of the installed package's `surface.json`
+  (`ui-surface.test.ts` holds them equal); a subpath added in the package is public surface under the `0.x`
+  rule of `adr-20261015-ui-kit-package-shape`, and reaches Core as a kit bump plus this copy; the shell and live updates are not in the kit at all (`resources/js/console`). Kit components carry no `<style>`: the import-mapped
   `ui` entry ships no CSS.
 
 ## Example

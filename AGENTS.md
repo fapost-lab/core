@@ -21,7 +21,9 @@ This repository contains the platform itself, without niche Solution packages.
 Two things about the layout are not visible from the tree itself:
 `packages/fapost-foundation` and `packages/fapost-support` are **separate
 repositories**, git-ignored here and consumed from Packagist — local checkouts
-are symlinked over `vendor/` by `composer dev:link`. And migrations are split by
+are symlinked over `vendor/` by `composer dev:link`. `packages/fapost-ui` is one too:
+the npm package `@fapost/ui` (the console kit, which never depends on Core), linked over
+`node_modules/` by `npm run dev:link`. And migrations are split by
 scope: `database/migrations/landlord/` is platform-wide, `tenant/` runs once per
 tenant schema.
 

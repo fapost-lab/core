@@ -78,8 +78,10 @@ setup: ## Install dependencies, create .env, migrate, build assets
 hooks-install: ## Install the git hooks
 	$(EXEC) php tools/git-hooks/install.php
 
-dev-link: ## Symlink packages/* over vendor/ for local package development
+dev-link: ## Symlink packages/* over vendor/ and node_modules/ for local package development
 	$(EXEC) php tools/dev-link-packages.php
+	# On the host, like npm itself (node_modules is installed there); needs Node on the host.
+	node tools/dev-link-npm.mjs
 
 # ─── Running ─────────────────────────────────────────────────────────────────
 

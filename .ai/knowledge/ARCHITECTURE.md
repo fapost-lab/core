@@ -61,7 +61,11 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   stays in Core (ADR-05).
 - **The extension packages are separate repositories.** Core consumes them through VCS
   repositories (`fapost/foundation ^0.17`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
-  symlinked over `vendor/` by `composer dev:link` (`tools/dev-link-packages.php`).
+  symlinked over `vendor/` by `composer dev:link` (`tools/dev-link-packages.php`). The console kit is
+  one too: the npm package `@fapost/ui` (`fapost-lab/ui`), checked out in `packages/fapost-ui` and
+  linked over `node_modules/` by `npm run dev:link` (`tools/dev-link-npm.mjs`); it depends on nothing
+  in Core. With it linked, Core installs with `npm ci`: `npm install` prunes the checkout's
+  `node_modules`.
   Until 1.0 a package that depends on another FaPost package accepts its whole 0.x line
   (`fapost/support` requires `fapost/foundation >=0.2 <1.0`), so a Foundation minor needs no release
   of Support; from 1.0 constraints go by major.
@@ -148,14 +152,16 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   checkout with the SaaS package added through the composer overlay. No CI runs it there: the SaaS
   package's CI does not run Core's `test:arch` (phpstan).
 - **The operator surfaces share one token source.**
-  The kit's `tokens.css` (`resources/js/ui/styles/`, imported as `@fapost/ui/tokens.css`) holds the
+  The kit's `tokens.css` (`@fapost/ui/tokens.css`) holds the
   Warm Minimal tokens (light and `.dark`, fonts Onest, Roboto Condensed, Victor Mono, self-hosted
-  through Fontsource); the kit (`resources/js/ui`, shadcn-vue, alias `@fapost/ui`, its CSS in
-  `styles/`, brought to the console by `resources/css/ui.css`) builds on it, and the builder's
+  through Fontsource); the kit (the npm package `@fapost/ui` from `fapost-lab/ui`, shadcn-vue, shipped
+  as source, linked from `packages/fapost-ui` for local work, brought to the console by
+  `resources/css/ui.css`; `adr-20261015-ui-kit-package-shape`) builds on it, and the builder's
   own variables point at it in both themes. The console shell and live updates are Core's own code
   (`resources/js/console/shell`, `resources/js/console/lib`, alias `@console`), not the kit; the
   theme helpers the console and the builder share are in `resources/js/shared/theme`. The public site (`resources/css/app.css`) keeps its own
   palette by decision (D5, spec `ui-foundation`). The front-end build needs nothing from Composer's
-  `vendor/`, so the image's `assets` stage and CI's front-end job build from `package.json` alone.
+  `vendor/`, so the image's `assets` stage and CI's front-end job build from `package.json` alone, with the kit
+  from the public npm registry.
 - **Only one messenger integration is real.** Telegram is implemented; the WhatsApp adapter throws
   on every method. Channel swappability is a property of the contracts, not yet a demonstrated one.

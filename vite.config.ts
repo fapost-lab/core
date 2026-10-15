@@ -8,6 +8,13 @@ import {fileURLToPath} from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
+ * Modules that must exist once on a page, resolved from Core's node_modules: the peers of @fapost/ui, and the kit's own
+ * dependencies that hook into Vue (icon context, lifecycle helpers). It matters when packages/fapost-ui is linked over
+ * the installed copy (tools/dev-link-npm.mjs) and brings node_modules of its own; vitest.config.ts keeps the same list.
+ */
+const onePerPage = ['vue', '@inertiajs/vue3', 'reka-ui', 'vue-sonner', '@lucide/vue', '@vueuse/core'];
+
+/**
  * Entries a prebuilt Solution bundle imports through the console's import map (ADR solution-console-ui). They are
  * built with their full export signature; without `preserveEntrySignatures: 'strict'` Vite tree-shakes an entry's
  * exports away and leaves an empty module.
@@ -65,10 +72,13 @@ export default defineConfig({
             {find: '@console', replacement: path.resolve(__dirname, 'resources/js/console')},
             {find: '@shared', replacement: path.resolve(__dirname, 'resources/js/shared')},
             {find: '@tma', replacement: path.resolve(__dirname, 'resources/js/tma')},
-            // The kit's stylesheets, at the paths its package exports them under (`@fapost/ui/styles.css`, ...).
-            {find: /^@fapost\/ui\/(styles|theme|tokens|fonts)\.css$/, replacement: path.resolve(__dirname, 'resources/js/ui/styles/$1.css')},
-            {find: '@fapost/ui', replacement: path.resolve(__dirname, 'resources/js/ui')},
         ],
+        // One Vue, one reka-ui context, one toast store, also with the kit linked from packages/fapost-ui.
+        dedupe: onePerPage,
+    },
+    // @fapost/ui ships .vue sources; the dependency pre-bundler would try to bundle them without the Vue plugin.
+    optimizeDeps: {
+        exclude: ['@fapost/ui'],
     },
     build: {
         rolldownOptions: {

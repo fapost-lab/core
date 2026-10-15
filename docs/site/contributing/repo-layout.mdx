@@ -17,10 +17,10 @@ database/migrations/
 packages/
   fapost-foundation Public contracts and DTOs for Core, Solutions, and Plugins
   fapost-support    Shared primitives
+  fapost-ui         @fapost/ui, the console kit (npm package, linked over node_modules)
 
 resources/js/
   pages/            The console's Inertia pages (admin and assistant screens)
-  ui/               @fapost/ui: the component kit (components, tokens, Tailwind theme)
   console/          The console's own code: the shell, live updates, the Solution runtime and the shared entries
   shared/           Code the console and the builder share (the colour theme)
   builder/          The Vue flow builder
@@ -77,6 +77,8 @@ autoload outside Core, and landlord access is caught in review only.
 |---|---|
 | A contract external packages build against | `packages/fapost-foundation` |
 | A reusable primitive with no Core dependency | `packages/fapost-support` |
+| A console component, token or style a Solution may use too | `@fapost/ui` ([fapost-lab/ui](https://github.com/fapost-lab/ui), checked out in `packages/fapost-ui`) |
+| Console code that reads Core's shared props: shell, live updates | `resources/js/console` |
 | Used by one domain and carrying its meaning | That domain in Core |
 | Orchestration across several domains | `app/Jobs` |
 
