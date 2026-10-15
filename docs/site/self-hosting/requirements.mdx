@@ -34,7 +34,6 @@ Required — the application will not boot without these:
   `predis` instead is possible but untested here; if you switch, set
   `REDIS_CLIENT=predis` and add the Composer package.
 - `mbstring`, `intl`, `bcmath` — Laravel 12 and the application
-- `gd` — image handling in the admin panel
 - `zip` — Composer, to unpack package archives
 - `json`, `openssl`, `tokenizer`, `xml`, `ctype`, `fileinfo`, `curl` — Laravel baseline
 
@@ -43,6 +42,8 @@ Required for queue workers, which is where all flow execution happens:
 - `pcntl`, `posix` — Horizon needs both to supervise workers. Missing them is a
   quiet failure mode: the application serves pages normally while no queued job
   ever runs, so incoming messages simply never get a reply.
+
+Optional: `gd` is not required by Core itself (application code does not use it). The bundled Docker image installs it, and the test suite uses it for fake image uploads.
 
 ## Database privileges
 
