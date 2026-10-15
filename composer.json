@@ -31,11 +31,8 @@
         "romanzipp/laravel-queue-monitor": "^5.4",
         "spatie/laravel-activitylog": "^5.0",
         "spatie/laravel-data": "^4.20",
-        "spatie/laravel-model-states": "^2.13",
         "spatie/laravel-permission": "^8.3",
-        "spatie/laravel-query-builder": "^7.0",
-        "spatie/laravel-settings": "^3.7",
-        "tpetry/laravel-postgresql-enhanced": "^3.6"
+        "spatie/laravel-settings": "^3.7"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.7",
