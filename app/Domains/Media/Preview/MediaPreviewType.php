@@ -10,17 +10,15 @@ namespace App\Domains\Media\Preview;
  * Produced once per file extension and stored in {@see MediaPreviewRegistry}. The console's
  * media library and the Vue picker read the same descriptor; the picker reads the metadata
  * over the API and renders an appropriate native element (or falls back to a server-rendered
- * iframe for views that need external assets — see `requiresExternalRender`). The Blade `view`
- * was rendered by the removed Filament admin; nothing in Core renders it now.
+ * iframe for previews that need external assets — see `requiresExternalRender`).
  */
 final readonly class MediaPreviewType
 {
     /**
      * @param  list<string>  $extensions    Lowercase extensions this type matches.
      * @param  string        $kind          Coarse preview kind ("image", "video", "audio", "document", "other").
-     * @param  string        $view          Blade view path (rendered server-side by the removed Filament admin).
      * @param  string        $iconHeroicon  Heroicon name (without the "heroicon-o-" prefix) used in lists / pickers.
-     * @param  list<string>  $assets        External JS/CSS URLs the view needs (e.g. pdf.js).
+     * @param  list<string>  $assets        External JS/CSS URLs the preview needs (e.g. pdf.js).
      * @param  bool          $requiresExternalRender
      *                                      True when the preview cannot be inlined client-side and must be
      *                                      rendered server-side (e.g. PDF viewer behind pdf.js). The Vue picker
@@ -29,7 +27,6 @@ final readonly class MediaPreviewType
     public function __construct(
         public array $extensions,
         public string $kind,
-        public string $view,
         public string $iconHeroicon,
         public array $assets = [],
         public bool $requiresExternalRender = false,

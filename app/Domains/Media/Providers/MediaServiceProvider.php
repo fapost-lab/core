@@ -145,7 +145,6 @@ final class MediaServiceProvider extends ServiceProvider
             new MediaPreviewType(
                 extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'],
                 kind: 'image',
-                view: 'media.preview.image',
                 iconHeroicon: 'photo',
             )
         );
@@ -154,7 +153,6 @@ final class MediaServiceProvider extends ServiceProvider
             new MediaPreviewType(
                 extensions: ['mp4', 'webm', 'mov'],
                 kind: 'video',
-                view: 'media.preview.video',
                 iconHeroicon: 'video-camera',
             )
         );
@@ -163,7 +161,6 @@ final class MediaServiceProvider extends ServiceProvider
             new MediaPreviewType(
                 extensions: ['mp3', 'ogg', 'wav', 'm4a'],
                 kind: 'audio',
-                view: 'media.preview.audio',
                 iconHeroicon: 'speaker-wave',
             )
         );
@@ -172,7 +169,6 @@ final class MediaServiceProvider extends ServiceProvider
             new MediaPreviewType(
                 extensions: ['pdf'],
                 kind: 'document',
-                view: 'media.preview.pdf',
                 iconHeroicon: 'document-text',
                 requiresExternalRender: true,
             )
