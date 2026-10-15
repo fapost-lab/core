@@ -156,7 +156,7 @@ final class ContactSegmentController extends Controller
 
     /**
      * The choices of the rule builder, from the domain: the combinators and, per condition type, its operators and
-     * how many values each takes. Labels are the ones Filament shows.
+     * how many values each takes. Labels are the ones Filament showed.
      *
      * @return array{
      *     match: list<array{value: string, label: string}>,

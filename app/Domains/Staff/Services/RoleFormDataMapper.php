@@ -8,7 +8,7 @@ use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\Role;
 
 /**
- * Maps Spatie role permissions to/from grouped Filament form state.
+ * Maps Spatie role permissions to/from the role form's grouped state.
  */
 final class RoleFormDataMapper
 {

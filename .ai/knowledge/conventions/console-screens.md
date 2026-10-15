@@ -42,8 +42,8 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   under an admin screen (an assistant's channels at `admin/assistants/{record}/channels/{channel}`)
   is found through its parent, so a mismatched pair is a 404, and reuses the console's page and
   presenter (`PresentsChannels`) with admin URLs. Example: `Admin\AssistantChannelController`.
-  A screen Filament never had gets only a `console.*` route, and its menu item names that route in
-  full. Example: `Admin\SupportAccessController`.
+  A screen with no Filament predecessor has no old URI to keep: it gets its own URI and `console.*`
+  name, and its menu item names that route in full. Example: `Admin\SupportAccessController`.
   Figures and search results that span domains show only what the user may list: each group is
   gated by its policy's `viewAny`, and for staff who are not administrators every assistant-owned
   figure narrows to their assigned assistants. Search is a throttled JSON endpoint behind

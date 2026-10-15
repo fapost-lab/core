@@ -12,9 +12,10 @@ The application is an active Laravel 12 Core implementation, not a starter scaff
 - assistant, contact, staff, media, messaging, and shared model infrastructure;
 - a versioned Flow Engine with handlers, validation, publish flow, sessions, logs, concurrency primitives, and routing;
 - a Vue/Inertia builder under `resources/js/builder`;
-- Filament administration surfaces;
+- the Inertia + Vue console (the admin panel and each assistant's screens, `routes/inertia.php`,
+  `resources/js/pages`, the `@fapost/ui` kit in `resources/js/ui`); Core has no Filament or Livewire;
 - a Conversation Logging domain (transcript capture pipeline, Postgres store driver, operator inbox with reply);
-- a managed Broadcasting domain and Contact Segments, with their Filament resources;
+- a managed Broadcasting domain and Contact Segments, with their console screens;
 - local `fapost-foundation` and `fapost-support` packages;
 - PHPUnit tests and PHPat architecture rules executed through PHPStan.
 
@@ -25,7 +26,7 @@ The application is an active Laravel 12 Core implementation, not a starter scaff
 - PHP version: 8.4
 - Tenant model: landlord connection plus tenant connection/schema
 - Redis is part of the runtime design for queues, locks, cache, and webhook registry
-- Horizon, Filament, Inertia, Vue, Vite, and Tailwind are present in the application stack
+- Horizon, Inertia, Vue, Vite, and Tailwind are present in the application stack
 - Webhook ingress runs on PHP-FPM; an optional Go gateway in `gateway/` can take it over
 
 ## What Does Not Exist Yet
@@ -36,7 +37,7 @@ These areas are planned or partial and should not be documented as finished prod
 - external Solution/Plugin lifecycle beyond current contracts and conventions;
 - broadcast analytics beyond the aggregate counters on the broadcast list: no per-broadcast view page,
   no `broadcast_recipients` drill-down, no dashboard widget;
-- Knowledge Base/RAG product layer (`knowledge_bases`, `knowledge_documents`, provider adapters, Filament resource);
+- Knowledge Base/RAG product layer (`knowledge_bases`, `knowledge_documents`, provider adapters, console screen);
 - production WhatsApp adapter behavior;
 - product-complete enforcement for every target architecture rule described in `docs/platform/architecture`.
 
@@ -52,11 +53,11 @@ These areas are planned or partial and should not be documented as finished prod
 - `BroadcastSendJob` exists as low-level fan-out plumbing; it is not the same as a complete managed Broadcast feature.
 - Conversation Logging is implemented end to end, but only the write side is a port: `ConversationStoreInterface`
   (bound to `PostgresConversationStore` by driver config) covers `ensureConversation` / `appendMessage` /
-  `updateMessageMedia` / `updateStatus`. There is no reader port; the Filament inbox reads the `Conversation`
+  `updateMessageMedia` / `updateStatus`. There is no reader port; the console inbox (`ConversationInbox`) reads the `Conversation`
   and `ConversationMessage` Eloquent models directly, so a second storage backend would need a read path first.
 - Managed Broadcasting is implemented (`broadcasts`, `broadcast_recipients`, `BroadcastDispatcher`,
-  `BroadcastRecipientResolver`, `RunBroadcastJob`, `SendBroadcastRecipientJob`, `BroadcastResource`). Its
-  reporting surface is limited to `sent_count`/`total_recipients` and `failed_count` columns on the list table.
+  `BroadcastRecipientResolver`, `RunBroadcastJob`, `SendBroadcastRecipientJob`, the console's
+  `BroadcastController`). Its reporting surface is limited to the sent, failed and skipped counts on the list.
 - PHPat architecture rules live under `tests/Architecture` and are executed by PHPStan. The default PHPUnit suite reaches
   them through `tests/Unit/Architecture/MigrationTest.php`; running `php artisan test tests/Architecture` directly is
   not the correct command.

@@ -7,24 +7,24 @@ namespace App\Domains\Media\Preview;
 /**
  * Declarative description of how a media file is previewed in admin / picker UI.
  *
- * Produced once per file extension and stored in {@see MediaPreviewRegistry}. Both the
- * Filament admin and the Vue picker consume the same descriptor: Filament renders the
- * Blade `view` directly; the picker reads the metadata over the API and renders an
- * appropriate native element (or falls back to a server-rendered iframe for views that
- * need external assets — see `requiresExternalRender`).
+ * Produced once per file extension and stored in {@see MediaPreviewRegistry}. The console's
+ * media library and the Vue picker read the same descriptor; the picker reads the metadata
+ * over the API and renders an appropriate native element (or falls back to a server-rendered
+ * iframe for views that need external assets — see `requiresExternalRender`). The Blade `view`
+ * was rendered by the removed Filament admin; nothing in Core renders it now.
  */
 final readonly class MediaPreviewType
 {
     /**
      * @param  list<string>  $extensions    Lowercase extensions this type matches.
      * @param  string        $kind          Coarse preview kind ("image", "video", "audio", "document", "other").
-     * @param  string        $view          Blade view path (rendered server-side in Filament).
+     * @param  string        $view          Blade view path (rendered server-side by the removed Filament admin).
      * @param  string        $iconHeroicon  Heroicon name (without the "heroicon-o-" prefix) used in lists / pickers.
      * @param  list<string>  $assets        External JS/CSS URLs the view needs (e.g. pdf.js).
      * @param  bool          $requiresExternalRender
      *                                      True when the preview cannot be inlined client-side and must be
      *                                      rendered server-side (e.g. PDF viewer behind pdf.js). The Vue picker
-     *                                      routes these through an iframe to the Filament view.
+     *                                      routes these through a server-side iframe.
      */
     public function __construct(
         public array $extensions,

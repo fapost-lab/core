@@ -17,7 +17,7 @@ use Illuminate\Support\Str;
  * Writes and reads the {@see FlowGroup}s of the current assistant.
  *
  * A group belongs to one assistant of one tenant, and every read and write is bounded by both: a group of another
- * assistant or tenant is "not found", never "forbidden". The console has no Filament tenancy scope, so the bounds are
+ * assistant or tenant is "not found", never "forbidden". No global scope bounds a query implicitly, so the bounds are
  * explicit here. A group that still holds flows cannot be deleted: `flow_drafts.flow_group_id` has no foreign key to
  * catch it, so this is the only guard.
  */

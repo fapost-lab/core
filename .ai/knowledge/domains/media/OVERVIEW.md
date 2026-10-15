@@ -20,7 +20,7 @@ paths:
   - "app/Http/Controllers/Admin/Media*Controller.php"
   - "app/Http/Requests/Admin/*Media*"
   - "resources/js/pages/Console/Media/**"
-reviewed_at: 2026-10-10
+reviewed_at: 2026-10-15
 ---
 # Media
 
@@ -44,7 +44,7 @@ definitions reference which file, so a file in use is not deleted silently.
 - Depends on the `Channel` model; Telegram's media adapters throw Media's exceptions, so Media
   and Channels import each other.
 - Consumers: Flow (dispatcher, ingestor, media service — `InputNodeHandler`, `FlowMessageSender`,
-  `ValidateFlowService`), Conversation (operator replies, media fetch), the assistant panel.
+  `ValidateFlowService`), Conversation (operator replies, media fetch), the console's media library.
 
 ## Entry points
 
@@ -55,4 +55,4 @@ definitions reference which file, so a file in use is not deleted silently.
 - `app/Jobs/Media/CleanupSoftDeletedMediaJob.php` (queue `messaging.system`, daily).
 - Admin UI: `app/Http/Controllers/Admin/MediaController.php` and `MediaFolderController.php` on the
   `admin` stack (pages `resources/js/pages/Console/Media`), over `MediaLibraryService` and
-  `MediaFolderService`; `app/Filament/Resources/Media` still serves it when `UI_INERTIA=false`.
+  `MediaFolderService`.

@@ -10,11 +10,11 @@ show *what happened* to get it there.
 
 | Column | |
 |---|---|
-| **When** | Time of the step |
+| **Time** | Time of the step |
 | **Status** | Whether it succeeded |
-| **Type** | Which kind of node ran |
+| **Node type** | Which kind of node ran |
 | **Node** | Which node in the flow |
-| **Handle** | Which outcome it reported |
+| **Output** | Which outcome (handle) it reported |
 | **Error** | What went wrong, when something did |
 | **Session** | Which session this belongs to |
 
@@ -27,13 +27,13 @@ filtered view can be shared as a link.
 The list keeps itself current: it updates as steps run when your installation
 has live updates switched on, and refreshes every minute otherwise.
 
-## Handle is the column to learn
+## Output is the column to learn
 
 Every node reports an outcome — a **handle** — and the flow follows whichever
 edge that handle is wired to. A branch reports `yes` or `no`; a call reports
 whether it succeeded.
 
-Reading the handle column tells you which way a conversation actually went, as
+Reading the *Output* column tells you which way a conversation actually went, as
 opposed to which way it was supposed to. A branch that reports the same handle
 for every contact is a branch that is not branching: the condition is wrong, or
 the value it tests is never what the author expected.

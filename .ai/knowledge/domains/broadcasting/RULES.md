@@ -16,7 +16,7 @@ paths:
   - "app/Http/Requests/Console/*Broadcast*"
   - "resources/js/pages/Console/Broadcasts/**"
   - tests/Feature/Console/BroadcastsConsoleTest.php
-reviewed_at: 2026-10-10
+reviewed_at: 2026-10-15
 ---
 # Broadcasting rules
 
@@ -29,9 +29,8 @@ broken.
   `BroadcastDispatcher`, `BroadcastDispatcherTest`.
 - **A broadcast is changed only while it is a draft, and the check is part of the write.** A
   started run reads `message` for each recipient as it delivers, so a later edit would change what
-  the rest of the audience receives. The console's `BroadcastService::update()` and Filament's
-  `EditBroadcast::handleRecordUpdate()` lock the row and look at the status again. Enforced:
-  `BroadcastsConsoleTest`, `EditBroadcastTest`.
+  the rest of the audience receives. The console's `BroadcastService::update()` locks the row and
+  looks at the status again. Enforced: `BroadcastsConsoleTest`.
 - **The console sends only the revision a person confirmed.** `BroadcastService::send()` locks the
   draft and refuses a stale revision (a hash of name, message, target; not `updated_at`), a base
   language without text and an audience that no longer exists, then lets

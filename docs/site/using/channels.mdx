@@ -16,7 +16,7 @@ flagged channel, **Register webhook again**.
 
 ## Connecting one
 
-**New Channel** asks for the platform and its credentials:
+**New channel** asks for the platform and its credentials:
 
 **Token** — the bot token issued by the platform. This is what authorises the
 assistant to send.
@@ -30,13 +30,13 @@ value checked against the `X-Telegram-Bot-Api-Secret-Token` header.
 **Channel settings** — free-form key/value pairs for options a particular
 platform needs beyond the two above.
 
-In the new console the platform is chosen when the channel is created and cannot be changed afterwards.
+The platform is chosen when the channel is created and cannot be changed afterwards.
 
 <Warning>
   Saving a channel contacts the provider and registers the webhook. Saving always
   succeeds: if the provider refuses (a token that does not belong to a real bot,
   for instance), the channel is stored and marked **Webhook not registered** in
-  the list (and, in the new console, on its page), and you are told so. Correct the token and save again,
+  the list and on its page, and you are told so. Correct the token and save again,
   or use **Register webhook again**.
 
   Until the provider accepts the registration, the channel does not receive

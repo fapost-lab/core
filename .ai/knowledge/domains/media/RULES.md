@@ -21,7 +21,7 @@ paths:
   - "app/Http/Controllers/Admin/Media*Controller.php"
   - "app/Http/Requests/Admin/*Media*"
   - "resources/js/pages/Console/Media/**"
-reviewed_at: 2026-10-10
+reviewed_at: 2026-10-15
 ---
 # Media rules
 
@@ -45,7 +45,7 @@ broken.
   uploader asks `MediaStorageGate` before it writes a byte for new content.** Order: stream into a local
   buffer, hash and measure, look the hash up (a known blob writes nothing), gate, then write. A refusal
   (`StorageLimitReachedException`) leaves no blob, no file and nothing on the tenant's disk. Callers word the
-  refusal for their surface: REST 422, Filament danger notification, admin screen error toast (one file per request, the last answer
+  refusal for their surface: REST 422, admin screen error toast (one file per request, the last answer
   speaks for the batch: "saved N of M"), transcript descriptor `failed` with
   `reason: storage_limit_reached`, input node `invalid` exit with `error_key: storage_limit_reached`.
   Enforced: `MediaStorageGateTest`, PHPat and unit `CountableModelCreationTest`.
@@ -54,7 +54,7 @@ broken.
   `MediaUploaderTest`. Blobs written before the fix are corrected by `media:recount-blob-sizes`.
 - **Force delete reaps an unreferenced blob.** `MediaService::forceDelete()` deletes the file, then the blob row
   and the stored object when no file, trashed ones included, still uses it; the cleanup job, the REST
-  `files/{id}/force` and the Filament `ForceDeleteAction` all go through it. The row goes first so the
+  `files/{id}/force` and the admin screen's permanent delete (`MediaLibraryService::forceDelete`) all go through it. The row goes first so the
   restrict foreign key protects a blob a parallel upload just reused. Only that violation is swallowed (SQLSTATE 23503, or SQLite's
   generic text); other database errors propagate. If deleting the object then fails, the delete still succeeds:
   a `media.blob.object_delete_failed` warning logs the path and the orphaned object stays for an operator,

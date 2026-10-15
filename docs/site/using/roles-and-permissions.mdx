@@ -3,8 +3,9 @@ title: "Roles and permissions"
 description: "What each permission grants, and which ones deserve a second thought."
 ---
 
-A user gets exactly one role, and the role carries a set of permissions. There is
-no per-user override: to give someone a different set, make a role for it.
+A role carries a set of permissions, and a user may do what their roles allow
+together. There is no per-user override: to give someone a different set, make a
+role for it.
 
 ## The roles that ship
 
@@ -17,12 +18,13 @@ no per-user override: to give someone a different set, make a role for it.
 All three are marked **System**. They exist on every tenant and are the sensible
 starting point: assign one of them before inventing your own.
 
-**New Role** creates a custom role, and **Edit** opens any role's permission set.
+**New role** creates a custom role, and **Edit** opens any role's permission set.
 
 ## How permissions are grouped
 
-The role editor arranges permissions into seven groups, each with **Select all**
-and **Deselect all** so a whole area can be granted or withheld at once.
+The role editor arranges permissions into seven groups, each with a **Select all**
+button (**Clear all** once the whole group is ticked) so a whole area can be
+granted or withheld at once.
 
 | Group | Covers |
 |---|---|
@@ -47,8 +49,8 @@ Content group — see [Manage flows (legacy)](#manage-flows-legacy) below.
 
 ## The five that warrant a pause
 
-The editor marks certain permissions **Sensitive — review carefully before
-assigning** and explains each one in place. They are worth repeating, because
+The editor marks certain permissions **Sensitive: give with care** and explains
+each one in place. They are worth repeating, because
 what they do is not obvious from the name.
 
 <Warning>

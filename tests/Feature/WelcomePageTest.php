@@ -16,9 +16,9 @@ final class WelcomePageTest extends FeatureTestCase
 
     public function test_welcome_page_links_to_the_admin_panel(): void
     {
-        // One link, deliberately: the assistant console is a Filament tenant
-        // panel keyed by assistant id, so a bare /assistant link depends on how
-        // many assistants the signed-in user owns.
+        // One link, deliberately: the assistant console is keyed by assistant
+        // id, so a bare /assistant link depends on how many assistants the
+        // signed-in user may open.
         //
         // It points at the tenant host rather than a relative path, because this
         // page is served from the base domain where the panel does not exist.

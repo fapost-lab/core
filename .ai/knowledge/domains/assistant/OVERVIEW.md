@@ -23,8 +23,8 @@ reviewed_at: 2026-10-15
 An assistant is the business unit a tenant configures: a name, an active flag, a default flow,
 localised fallback and busy messages, commands, and available countries. This domain owns the
 assistant's lifecycle — deactivation cascades to its channels — the assignment of staff users to
-assistants, and the scoped **current assistant** context that the assistant panel, the flow
-runtime and jobs read.
+assistants, and the scoped **current assistant** context that the assistant's console screens, the
+flow runtime and jobs read.
 
 ## Boundaries
 
@@ -44,5 +44,7 @@ runtime and jobs read.
 ## Entry points
 
 - `Services/AssistantService.php`, `Services/CurrentAssistant.php`, `Policies/AssistantPolicy.php`.
-- `app/Providers/Filament/AssistantPanelProvider.php`, `app/Filament/Assistant/`.
-- Admin UI: `app/Filament/Resources/Assistants`.
+- An assistant's console: `routes/inertia.php` (`assistant/{assistant}/*`, `console.*` names),
+  `app/Http/Controllers/Console/`, the shell's menu and switcher in `app/Http/Shell/`.
+- Admin UI: `app/Http/Controllers/Admin/AssistantController.php` (with `AssistantChannelController`),
+  `resources/js/pages/Console/Assistants/`.

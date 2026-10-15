@@ -13,7 +13,7 @@ paths:
   - config/conversation.php
   - "database/migrations/tenant/*conversation*"
   - "tests/*/Domains/Conversation/**"
-reviewed_at: 2026-10-10
+reviewed_at: 2026-10-15
 ---
 # Conversation rules
 
@@ -37,8 +37,8 @@ broken.
 - **Write to the transcript only through `ConversationLoggerInterface` with a capture.** Never
   insert into `conversation_messages` directly. Review only. *(proposed)*
 - **Keep storage-specific code behind `ConversationStoreInterface`.** New read features should
-  not add direct `ConversationMessage` queries; the Filament conversation view and `ConversationInbox::transcript` (the console inbox) are the existing
-  exceptions. Review only. *(proposed)*
+  not add direct `ConversationMessage` queries; `ConversationInbox::transcript` (the console inbox) is the existing
+  exception. Review only. *(proposed)*
 - **`conversation_messages` has no foreign key** (the table is partitioned), so deleting a
   contact or thread leaves its messages behind. Deletion and retention work must remove them
   explicitly.

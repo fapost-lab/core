@@ -48,8 +48,8 @@ Contacts mode:
 | `tags` | contacts, `contact_target = tag` | Tag names; the audience is the union of contacts with any of them |
 
 The builder UI is `NotifyConfig.vue`, with search dropdowns (`SearchSelect.vue`) backed by
-`/builder/staff`, `/builder/assistants` and `/builder/tags`. Tags are assigned to a contact by hand in the
-Filament `ContactResource` ("Manage tags" action).
+`/builder/staff`, `/builder/assistants` and `/builder/tags`. Tags are assigned to a contact by hand on the
+console's contact card ("Edit tags").
 
 ## Output handles
 
@@ -66,7 +66,7 @@ Filament `ContactResource` ("Manage tags" action).
 
 The job re-establishes the tenant context, resolves recipients through `StaffRecipientResolver` (active staff only:
 `is_active` and `status = active`), and sends through each selected transport of `StaffNotifierRegistry`
-(`StaffNotifierInterface`: `in_app` Filament database notifications, `email` through `StaffNotificationMail`). A
+(`StaffNotifierInterface`: `in_app` Laravel database notifications (`StaffMessageNotification`, in the data shape Filament's database notifications had), `email` through `StaffNotificationMail`). A
 failing channel is logged and does not fail the others. A new transport (for example a messenger bot) is
 registered in `StaffServiceProvider`; the node does not change. A cache guard on `(tenant, session, node)`
 (`Cache::add`, 24 h) stops a retried job from double-delivering.

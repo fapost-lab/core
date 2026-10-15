@@ -2,7 +2,7 @@
 id: glossary-assistant
 type: glossary
 status: active
-summary: Assistant, assistant panel (whose Filament tenant is an assistant), current assistant, assignment
+summary: Assistant, assistant console (an assistant's screens, the assistant taken from the URL), current assistant, assignment
 domains:
   - assistant
 topics: []
@@ -14,7 +14,7 @@ paths:
   - "tests/Unit/Domains/Assistant/**"
   - "tests/Feature/Assistants/**"
   - tests/Feature/AssistantPanelTest.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-15
 ---
 # Assistant glossary
 
@@ -23,10 +23,11 @@ reviewed_at: 2026-10-05
 The configurable conversational unit of a tenant, stored in the tenant schema. Informal
 synonyms: bot (avoid — a bot is a channel on a messenger).
 
-## Assistant panel
+## Assistant console
 
-The operational Filament console at `/assistant/{id}`. **Filament's "tenant" in this panel is an
-assistant, not a platform tenant.**
+An assistant's screens in the Inertia console at `/assistant/{assistant}/*` (the "Console"
+application of the shell). The assistant comes from the URL through `ResolveCurrentAssistant`; it is
+an assistant, not a platform tenant.
 
 ## Current assistant
 

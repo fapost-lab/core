@@ -187,7 +187,7 @@ final class ContactSegmentResolver
      */
     private function applyTag(Builder $query, string $operator, mixed $value, bool $or): void
     {
-        // Accept both a bare tag and a single-element list (Filament TagsInput).
+        // Accept both a bare tag and a single-element list (as the Filament TagsInput stored it).
         $tag = is_array($value) ? ($value[0] ?? null) : $value;
 
         if (! is_string($tag) || '' === $tag) {
@@ -213,7 +213,7 @@ final class ContactSegmentResolver
 
     /**
      * Filter on membership in one or more {@see ContactGroup}.
-     * Value is a list of group ids (Filament Select, multiple).
+     * Value is a list of group ids.
      *
      * A group that no longer exists (deleted since the segment was saved) makes the whole condition match nobody,
      * under `in` and `not_in` alike: `not_in` of a vanished group would otherwise match every contact, widening a

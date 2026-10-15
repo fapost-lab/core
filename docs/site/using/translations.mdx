@@ -24,8 +24,12 @@ Every cell arrives with a sensible default in every enabled language. The screen
 is not a translation task waiting to be done — the assistant works without anyone
 opening it.
 
-**Filling a cell overrides that default for that language.** Leave a cell alone
-and the catalogue default stands; edit it and your text is used from then on.
+**Editing a key overrides that default for the languages you fill in.** Each
+row's **Edit** opens the key with a field per language; a language left empty
+keeps the text of the next level (the workspace's, then the catalogue default),
+and your text is used from then on. **Reset** removes a key's
+overrides in every language. A badge in a language's cell says whether that
+language is overridden.
 
 <Note>
   Override selectively. Changing `buttons.yes` from "Yes" to "Sure" affects every
@@ -46,8 +50,14 @@ Three different things carry language, and they are edited in three places:
 
 A language must be enabled in Settings before a column for it appears here.
 
-## Per assistant
+## Workspace and assistant
 
-This screen belongs to one assistant. Two assistants can answer the same command
-differently — useful when one is formal and another is not, and worth knowing
-before wondering why an override did not take effect somewhere else.
+The screen exists twice. **Translations** in the admin panel holds the workspace's
+overrides, used by every assistant. **Translations** in an assistant's console
+holds that assistant's own, over the workspace's: the assistant's text wins over
+the workspace's, which wins over the catalogue default, and a value the workspace
+set shows there as inherited.
+
+So two assistants can answer the same command differently — useful when one is
+formal and another is not, and worth knowing before wondering why an override did
+not take effect somewhere else.

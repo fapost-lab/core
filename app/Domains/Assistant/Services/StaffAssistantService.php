@@ -20,8 +20,8 @@ use Illuminate\Support\Str;
  * The assistants a staff member manages from the admin panel: the ones of the current tenant they may see (an
  * administrator all of them, anyone else the ones assigned to them), and creating, changing and deleting them.
  *
- * Every read is bounded by the tenant and, for a non-administrator, the assignment, explicitly, because the console
- * has no Filament scope: an assistant the user may not see is "not found", never "forbidden". The writes are
+ * Every read is bounded by the tenant and, for a non-administrator, the assignment, explicitly, because no global
+ * scope does it implicitly: an assistant the user may not see is "not found", never "forbidden". The writes are
  * {@see AssistantServiceInterface}'s, which checks the assistant limit.
  */
 final readonly class StaffAssistantService

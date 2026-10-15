@@ -109,12 +109,12 @@ A column-store driver may buffer and batch inside the driver; the port does not 
 - Retention: the daily `conversations:prune` command (`app/Console/Commands/PruneConversationMessagesCommand.php`)
   drops whole monthly partitions older than `conversation.retention_days` (env `CONVERSATION_RETENTION_DAYS`,
   per install, unset = keep forever). Threads and media are not pruned.
-- Filament `ConversationResource` (list and view) with operator reply and ownership handover; the router
-  skips the flow engine for staff-owned threads.
+- The console's conversation inbox (`ConversationController`, `ConversationInbox`; list and view) with operator
+  reply and ownership handover; the router skips the flow engine for staff-owned threads.
 
 **Differs from the original design:**
 
-- The Filament inbox reads the Eloquent models `Conversation` / `ConversationMessage` directly, so the
+- The console inbox (`ConversationInbox`) reads the Eloquent models `Conversation` / `ConversationMessage` directly, so the
   port invariant in decision 4 is not yet enforced on the read side.
 - Deleting a contact cascades only to `conversations` (FK `cascadeOnDelete`); messages have no FK and
   remain as orphans, so a GDPR erasure does not remove them today.

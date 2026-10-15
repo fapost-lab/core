@@ -33,7 +33,7 @@ use Illuminate\Validation\ValidationException;
 final readonly class StaffUserService
 {
     /**
-     * The guard staff roles belong to, as the Filament form filters them.
+     * The guard staff roles belong to, as the Filament form filtered them.
      */
     private const string STAFF_GUARD = 'web';
 

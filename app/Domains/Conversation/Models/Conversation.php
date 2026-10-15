@@ -67,7 +67,7 @@ final class Conversation extends BaseModel
 
     /**
      * Thread → Contact. Aggregate-level relation used only by the read surface
-     * (Filament). The driver-boundary rule (spec §10) forbids Eloquent relations
+     * (the console inbox). The driver-boundary rule (spec §10) forbids Eloquent relations
      * on the *messages*, which are the ClickHouse-swappable part — the aggregate
      * itself is always Postgres, so this relation is safe.
      *

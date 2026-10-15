@@ -11,9 +11,10 @@ use PHPat\Test\PHPat;
 /**
  * Core's code must not depend on Filament or Livewire.
  *
- * PHPat checks only targets it can reflect, so this rule bites where Filament is installed (Core with the SaaS
- * overlay, in the SaaS package's CI). In Core's own CI those classes are absent and the rule passes vacuously; there
- * a reference to them fails phpstan's unknown-class checks (level 0) instead.
+ * PHPat checks only targets it can reflect, so this rule bites where Filament is installed: a local Core checkout with
+ * the SaaS package added through the composer overlay. No CI runs it there (the SaaS package's CI does not run Core's
+ * phpstan). In Core's own CI those classes are absent and the rule passes vacuously; there a reference to them fails
+ * phpstan's unknown-class checks (level 0) instead.
  */
 final class NoFilamentTest
 {

@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\Route;
 
 /**
  * The shell's side menu for the Inertia console, with the groups, order, labels and visibility of the Filament
- * navigation it replaces: a model's `viewAny` policy or the permission the Filament page asks for, so a user sees an
+ * navigation it replaced: a model's `viewAny` policy or the permission the Filament page asked for, so a user sees an
  * item exactly when Filament showed it. Administrators pass every check through `Gate::before`.
  *
  * Each item names its full `console.*` route; an item whose route does not exist is left out. `external` (a plain link, a full page load) is false for
@@ -126,7 +126,7 @@ final readonly class NavigationBuilder
 
     /**
      * Keeps what the user may see, orders items by their sort within a group (declaration order breaks ties) and
-     * keeps groups in the order they are first declared, the group-less one first as Filament shows it.
+     * keeps groups in the order they are first declared, the group-less one first as Filament showed it.
      *
      * @param  list<array{group: string|null, route: string, label: string, icon: string, sort: int, visible: bool, badge: (Closure(): (string|null))|null}>  $entries
      * @param  array<string, mixed>  $parameters

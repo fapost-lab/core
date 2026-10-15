@@ -8,8 +8,11 @@ paths:
   - "app/Domains/Messaging/**"
   - "lang/**"
   - "app/Domains/Assistant/**"
-summary: Admin UI language and content language stay separate; content resolves via LanguageResolverInterface, and a button/select value is never translated
-reviewed_at: 2026-10-05
+  - app/Http/Middleware/SetLocale.php
+  - app/Http/Controllers/Console/LocaleController.php
+  - app/Http/Middleware/HandleInertiaRequests.php
+summary: "Admin UI language (per person: SetLocale, the locale cookie, users.locale, shared Inertia translations) and content language stay separate; content resolves via LanguageResolverInterface, and a button/select value is never translated"
+reviewed_at: 2026-10-15
 ---
 # Multilingual layers
 
@@ -17,7 +20,8 @@ reviewed_at: 2026-10-05
 
 Two language layers are kept apart:
 
-- **Admin UI language** — Laravel lang files, Filament/backend validation, staff UI.
+- **Admin UI language** — what staff read: the console, the builder, validation messages, and
+  mail and notifications to staff. Laravel lang files (`lang/{en,ru,uk}`).
 - **Content language** — runtime assistant messages to the end user.
 
 Runtime language resolution goes through `LanguageResolverInterface` and the content
@@ -28,6 +32,19 @@ translation keys or flow content.
 A button/select `value` is language-agnostic and never translated; only the
 label/content is.
 
+The admin UI language is one per person, resolved by `SetLocale` on every web request: a
+`?lang=` override, then the session, then a long-lived cookie, then the browser's
+`Accept-Language` on the first visit only, then `app.locale`; only
+`SetLocale::SUPPORTED_LOCALES` are accepted. The cookie keeps its historical name
+(`filament_language_switcher_locale`, `SetLocale::LOCALE_COOKIE`): renaming it would reset
+everyone's choice. The shell's language switcher posts to `console.locale.update`
+(`LocaleController`), which writes the session, the cookie and `users.locale`; mail and
+notifications read `User::preferredLocale()`, because a queued job has no session. Pages get
+their strings as shared Inertia props from `HandleInertiaRequests` — `translations.<namespace>`
+(`builder`, `auth`, and on console routes `console`), never whole files another page needs —
+and there is no front-end i18n library. A key added for the console exists in every supported
+locale.
+
 Enforcement is review only: no PHPat rule or test backs this, so a mixed layer or a
 literal in a handler is caught by a human reviewer, not CI.
 
@@ -36,9 +53,9 @@ literal in a handler is caught by a human reviewer, not CI.
 A flow button node stores its option as `{"label": {"en": "Confirm", "es":
 "Confirmar"}, "value": "confirm"}`. The handler compares against `value`, which
 stays `"confirm"` in every locale; only `label` goes through the content translator
-chain. A validation message shown to a Filament staff user, by contrast, comes from
-`lang/{locale}` (only `lang/en` exists) and never touches `LanguageResolverInterface` — it belongs
-to the admin UI layer, not the content one.
+chain. A validation message shown to a staff user in the console, by contrast, comes from
+`lang/{locale}` in the locale `SetLocale` resolved for that person, and never touches
+`LanguageResolverInterface` — it belongs to the admin UI layer, not the content one.
 
 ## Rationale
 

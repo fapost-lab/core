@@ -20,7 +20,7 @@ use Illuminate\Support\Str;
  *
  * A contact belongs to the tenant, not to an assistant: the assistant sees the contacts that wrote to at least one of
  * its channels (`channel_contacts` to `channels.assistant_id`). Every read is bounded by the tenant and that link,
- * explicitly, because the console does not register Filament's tenancy scope: a contact of another tenant or of another
+ * explicitly, because no global scope does it implicitly: a contact of another tenant or of another
  * assistant is "not found", never "forbidden". The assistant is an argument so the controller takes it once, before a
  * write that could reset the current assistant.
  *

@@ -16,7 +16,7 @@ not against what a typical Laravel application usually needs.
 | PHP        | 8.4+    | `composer.json` requires `^8.4`; the code uses typed class constants and property hooks |
 | PostgreSQL | 15+     | Tenant isolation is schema-per-tenant, and the installer creates schemas at runtime |
 | Redis      | 6+      | Queues, cache, locks and the webhook routing registry                 |
-| Node.js    | 20+     | Build-time only — compiles the Vue flow builder through Vite          |
+| Node.js    | 20+     | Build-time only — compiles the console, the flow builder and the mini app through Vite |
 | Composer   | 2.x     | Build-time only                                                       |
 | Go         | 1.27+   | Optional, and build-time only — needed solely for the webhook gateway |
 
@@ -35,7 +35,7 @@ Required — the application will not boot without these:
   `REDIS_CLIENT=predis` and add the Composer package.
 - `mbstring`, `intl`, `bcmath` — Laravel 12 and the application
 - `gd` — image handling in the admin panel
-- `zip` — Composer and export features
+- `zip` — Composer, to unpack package archives
 - `json`, `openssl`, `tokenizer`, `xml`, `ctype`, `fileinfo`, `curl` — Laravel baseline
 
 Required for queue workers, which is where all flow execution happens:

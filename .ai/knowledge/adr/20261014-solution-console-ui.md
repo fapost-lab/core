@@ -197,3 +197,7 @@ Why:      one Vue instance and one kit are what make prebuilt bundles work witho
 **2026-10-15, assistant route parameter (remove-filament PR 3).** The assistant's route parameter is now
 `{assistant}`, not `{tenant}`: a Solution's per-assistant routes live under `/assistant/{assistant}/apps/{id}/…`, and
 `ResolveCurrentAssistant` reads `{assistant}` (its default) in the `solution.assistant` group.
+
+**2026-10-15, Filament left Core (remove-filament).** The migration the Context describes as under way is
+complete: Core has no Filament or Livewire, and the Inertia + Vue console is its only operator UI. The decision is
+unchanged; "is leaving" above now reads "has left".

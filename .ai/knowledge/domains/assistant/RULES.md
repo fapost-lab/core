@@ -40,15 +40,16 @@ broken.
 - **Read the current assistant through `CurrentAssistantInterface`.** Why: the interface also works
   in jobs, where no request names an assistant. Core no longer has Filament's tenant to read:
   a `Filament\` or `Livewire\` reference in `App\` fails phpstan's unknown-class checks in Core's CI,
-  and PHPat `NoFilamentTest` where Filament is installed (the SaaS overlay).
+  and PHPat `NoFilamentTest` where Filament is installed (a local Core checkout with the SaaS
+  package overlaid; no CI runs it there).
 - **The current assistant is only ever set explicitly:** by the console route middleware
   (`ResolveCurrentAssistant`, 404 when the assistant is missing or not viewable) or by a job from
   its payload. `CurrentAssistant` itself reads nothing ambient.
   Enforced: `CurrentAssistantTest`, `ResolveCurrentAssistantTest`, `AssistantPanelTest`.
 - **Change `is_active` through `AssistantService`,** never by updating the model. Why: only the
-  service cascades to channels. Only the admin edit form bypasses it today, in both panels
-  (`EditAssistant.php` and the Inertia admin's `StaffAssistantService::update` →
-  `AssistantService::update`, which writes `is_active` without the channel cascade);
+  service cascades to channels. Only the admin edit form bypasses it today (the console's
+  `StaffAssistantService::update` → `AssistantService::update`, which writes `is_active` without the
+  channel cascade, as the removed Filament form did);
   `AssistantSettings` has no assistant `is_active` field.
   *(proposed)*
 - **A nested `runForTenant` hides the current assistant inside and returns it after.** A synchronous job in an

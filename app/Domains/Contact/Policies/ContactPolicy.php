@@ -14,9 +14,8 @@ use Illuminate\Foundation\Auth\User as AuthUser;
  * Authorization policy for {@see Contact}.
  *
  * Viewing contacts requires {@see Permission::ViewContacts}.
- * Mutations (future operators UI) require {@see Permission::ManageContacts}.
- * The current Filament resource is read-only — create/update are denied at the
- * resource level regardless of this policy.
+ * Mutations require {@see Permission::ManageContacts}; the console uses them only for a
+ * contact's tags and groups, and offers no create or edit of a contact itself.
  */
 final class ContactPolicy
 {

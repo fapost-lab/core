@@ -60,7 +60,7 @@ final class ContactSegmentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // The table has no unique index on the name and Filament allows repeats, so the console does too.
+            // The table has no unique index on the name and Filament allowed repeats, so the console does too.
             'name'                  => ['required', 'string', 'max:255'],
             'match'                 => ['required', Rule::enum(SegmentMatch::class)],
             'conditions'            => ['present', 'array', 'max:' . self::MAX_CONDITIONS],

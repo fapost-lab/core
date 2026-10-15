@@ -65,7 +65,7 @@ app/Domains/       Bounded contexts: Tenancy, Flow, Messaging, Contact, Assistan
 packages/          fapost/foundation — public contracts for Solutions and Plugins
                    fapost/support    — reusable primitives and builder schema fields
 gateway/           Optional Go service that verifies and queues provider webhooks
-resources/js/      Vue flow builder (Inertia)
+resources/js/      The console and the flow builder (Inertia + Vue), the `@fapost/ui` kit
 ```
 
 `fapost/foundation` is the extension boundary. A Solution or Plugin depends on it and never on `App\…`,
@@ -116,7 +116,7 @@ migration isolation, tenant-aware execution. A change that violates one fails he
 
 ## Status
 
-Active development, pre-1.0. The flow engine, tenancy, channels, messaging, and the builder are in use;
+Active development, pre-1.0. The flow engine, tenancy, channels, messaging, the console and the builder are in use;
 several product areas are still partial. The documentation says so explicitly wherever something is not
 finished, rather than describing an intention as a fact — so
 [docs.fapost.in](https://docs.fapost.in) is the place to check what a given feature actually does today.

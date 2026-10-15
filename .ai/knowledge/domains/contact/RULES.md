@@ -16,7 +16,7 @@ paths:
   - "resources/js/pages/Console/Contacts/**"
   - "app/Http/Requests/Console/*Contact*"
   - "resources/js/pages/Console/ContactSegments/**"
-reviewed_at: 2026-10-09
+reviewed_at: 2026-10-15
 ---
 # Contact rules
 
@@ -38,10 +38,9 @@ broken.
   keeps such a condition visible instead of dropping it on re-save. Why *(inferred)*: an unknown condition must never widen a broadcast's
   audience. Enforced: `ContactSegmentResolverTest`.
 - **`SegmentConditionType` decides which operators a condition type takes and how many values
-  (`operators()`, `arity()`, `needsKey()`).** The Filament form offers them, the console sends them
-  to the client as its schema and validates a save against them, and the resolver reads a
-  condition the same way (a `One` condition uses the first value only). Why: two forms and the
-  resolver used to disagree, and a value the resolver ignores is a silent mistake in an audience.
+  (`operators()`, `arity()`, `needsKey()`).** The console sends them to the client as its schema and
+  validates a save against them, and the resolver reads a condition the same way (a `One` condition
+  uses the first value only). Why: the forms and the resolver used to disagree, and a value the resolver ignores is a silent mistake in an audience.
   Enforced: `SegmentConditionTypeTest`, `ContactSegmentsConsoleTest`.
 - **Attribute keys are validated against a pattern before they reach SQL**
   (`ContactSegmentResolver`).
@@ -50,7 +49,7 @@ broken.
 
 - **A contact is visible in an assistant's console only through `channel_contacts` to
   `channels.assistant_id`, and every query filters `tenant_id` explicitly.** A contact belongs to the
-  tenant and has no assistant of its own; the console has no Filament tenancy scope, so a filter on
+  tenant and has no assistant of its own; nothing scopes a query to the tenant implicitly, so a filter on
   the tenant alone would show a sibling assistant's contacts. Enforced: `AssistantContactService`,
   `ContactsConsoleTest`.
 

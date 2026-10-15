@@ -23,8 +23,8 @@ use Illuminate\Support\Str;
 /**
  * Writes and reads the {@see FlowDraft}s (the flows) of the current assistant.
  *
- * Every read and write is bounded by the tenant and the assistant, explicitly, because the console does not register
- * Filament's tenancy scope: a flow of another assistant or tenant is "not found", never "forbidden". Creating goes
+ * Every read and write is bounded by the tenant and the assistant, explicitly, because no global scope
+ * does it implicitly: a flow of another assistant or tenant is "not found", never "forbidden". Creating goes
  * through {@see CreateFlowAction}, the one place that checks the tenant's flow limit. Changing a flow here touches its
  * metadata only, never the graph or the draft version, which belong to the builder.
  */

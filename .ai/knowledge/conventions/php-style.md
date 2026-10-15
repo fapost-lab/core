@@ -6,7 +6,7 @@ domains: []
 paths:
   - "**/*.php"
 summary: Strict types, final classes, PHPDoc and Pint as the mechanical half of PHP style
-reviewed_at: 2026-10-08
+reviewed_at: 2026-10-15
 ---
 # PHP style and Laravel conventions
 
@@ -19,7 +19,7 @@ reviewed_at: 2026-10-08
 - Every own property and every own class constant has a type (`private string $x`,
   `public const string NAME = '...'`; typed constants need PHP 8.3, the project runs 8.4).
   The one exception is a property that overrides an untyped property of a parent class
-  (Laravel, Filament, Livewire, vendor): it stays untyped and carries a `/** @var ... */`
+  (Laravel, Inertia, another vendor package): it stays untyped and carries a `/** @var ... */`
   docblock instead. Adding a type there is a fatal error ("Type of B::$t must not be defined").
   A constant may always be typed, even when the parent's is not.
 - Enum cases are written in TitleCase (`Monthly`, not `MONTHLY` or `monthly`).

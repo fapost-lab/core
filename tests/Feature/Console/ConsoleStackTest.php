@@ -24,7 +24,7 @@ use Tests\Support\FakeTenantAccessMode;
 use Tests\Support\RecordingCurrentAssistant;
 
 /**
- * The `admin` and `console` middleware stacks, exercised through probe routes: the account checks Filament makes
+ * The `admin` and `console` middleware stacks, exercised through probe routes: the account checks Filament made
  * on every request, the stopped-tenant refusal, the support session and the props shared with every page.
  */
 final class ConsoleStackTest extends FeatureTestCase

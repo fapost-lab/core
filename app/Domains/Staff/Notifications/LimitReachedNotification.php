@@ -19,8 +19,8 @@ use Illuminate\Notifications\Notification;
  * numbers and what was refused; "what to do next" is the operator's {@see LimitNotice} when it gave one,
  * else Core's "contact the platform administrator".
  *
- * The stored `title` and `body` use the keys Filament's database notifications use, so one list can
- * show both kinds.
+ * The stored `title` and `body` use the keys Filament's database notifications used (as
+ * {@see StaffMessageNotification} does), so one list can show both kinds.
  */
 final class LimitReachedNotification extends Notification
 {

@@ -11,7 +11,7 @@ use Illuminate\Auth\Access\HandlesAuthorization;
 use Illuminate\Foundation\Auth\User as AuthUser;
 
 /**
- * Staff users CRUD and role-hierarchy gates in Filament.
+ * Staff users CRUD and role-hierarchy gates for the console.
  */
 final class UserPolicy
 {
