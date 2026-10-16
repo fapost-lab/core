@@ -17,9 +17,13 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Database\Seeders\TenantAclSeeder;
+use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
+use Fapost\Foundation\Solution\DTO\SolutionEntitlement;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Exceptions;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\FakeSolutionEntitlement;
 use Tests\Support\FakeVendor;
 use Tests\Support\InstallsShowcaseSolution;
 
@@ -71,6 +75,7 @@ final class AdminSolutionsConsoleTest extends FeatureTestCase
                 ->where('solutions.0.ui', null)
                 ->where('solutions.0.lastChange', null)
                 ->where('solutions.0.canActivate', true)
+                ->where('solutions.0.entitlement', ['state' => 'entitled', 'paused' => false, 'action' => null])
                 ->where('solutions.0.urls.activate', '/admin/solutions/feedback/activate')
                 ->where('solutions.1.id', 'showcase')
                 ->where('solutions.1.active', true)
@@ -293,6 +298,81 @@ final class AdminSolutionsConsoleTest extends FeatureTestCase
                 ->etc());
     }
 
+    public function test_a_solution_the_plan_does_not_include_cannot_be_turned_on_and_shows_the_operator_button(): void
+    {
+        $this->installShowcase();
+        $this->operator()->default = SolutionEntitlement::only([], 'See plans', 'https://ops.example.test/plans');
+        $admin                     = $this->admin();
+
+        $this->actingAs($admin)
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('solutions.0.canActivate', false)
+                ->where('solutions.0.entitlement', ['state' => 'not_entitled', 'paused' => false, 'action' => ['label' => 'See plans', 'url' => 'https://ops.example.test/plans']])
+                ->etc());
+
+        $this->actingAs($admin)
+            ->from($this->url())
+            ->post($this->url('/showcase/activate'))
+            ->assertRedirect($this->url())
+            ->assertInertiaFlash('error', 'Solution showcase was not turned on. This Solution is not included in your plan.');
+
+        $this->assertSame(0, SolutionActivationRecord::query()->count());
+        $this->assertSame(0, SolutionActivationEventRecord::query()->count());
+    }
+
+    public function test_a_solution_that_left_the_plan_is_paused_with_its_row_kept_and_can_be_turned_off(): void
+    {
+        $this->installShowcase();
+        $this->activateShowcase();
+        $this->operator()->default = SolutionEntitlement::only([]);
+        $admin                     = $this->admin();
+
+        $this->actingAs($admin)
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('solutions.0.active', false)
+                ->where('solutions.0.entitlement.state', 'not_entitled')
+                ->where('solutions.0.entitlement.paused', true)
+                ->etc());
+
+        $this->assertSame(SolutionActivationStatus::Active, SolutionActivationRecord::query()->where('solution_id', 'showcase')->firstOrFail()->status);
+        $this->assertSame(1, SolutionActivationEventRecord::query()->count(), 'Losing the entitlement journals nothing.');
+
+        $this->actingAs($admin)->post($this->url('/showcase/deactivate'))->assertRedirect();
+        $this->assertSame(SolutionActivationStatus::Inactive, SolutionActivationRecord::query()->where('solution_id', 'showcase')->firstOrFail()->status);
+
+        // Back in the plan, a Solution the tenant turned off stays off.
+        $this->operator()->default = null;
+        $this->app->forgetScopedInstances();
+        $this->assertFalse($this->isActive('showcase'));
+    }
+
+    public function test_while_the_plan_cannot_be_checked_nothing_can_be_turned_on_and_what_is_on_stays_on(): void
+    {
+        Exceptions::fake();
+        $this->installShowcase(alsoInstalled: [$this->feedback()]);
+        $this->activateShowcase();
+        $this->operator()->failing = true;
+        $admin                     = $this->admin();
+
+        $this->actingAs($admin)
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('solutions.0.id', 'feedback')
+                ->where('solutions.0.canActivate', false)
+                ->where('solutions.0.entitlement.state', 'unavailable')
+                ->where('solutions.1.active', true)
+                ->etc());
+
+        $this->actingAs($admin)
+            ->from($this->url())
+            ->post($this->url('/feedback/activate'))
+            ->assertInertiaFlash('error', 'Solution feedback was not turned on. Your plan could not be checked right now. Try again later.');
+
+        $this->assertNull(SolutionActivationRecord::query()->where('solution_id', 'feedback')->first());
+    }
+
     public function test_the_page_has_its_menu_entry_for_those_who_may_open_it(): void
     {
         $this->installShowcase();
@@ -321,6 +401,15 @@ final class AdminSolutionsConsoleTest extends FeatureTestCase
     private function url(string $suffix = ''): string
     {
         return $this->panelUrl('/admin/solutions' . $suffix);
+    }
+
+    private function operator(): FakeSolutionEntitlement
+    {
+        $operator = new FakeSolutionEntitlement();
+        $this->app->instance(SolutionEntitlementInterface::class, $operator);
+        $this->app->forgetScopedInstances();
+
+        return $operator;
     }
 
     private function admin(): User

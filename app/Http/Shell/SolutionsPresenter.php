@@ -27,7 +27,8 @@ use Fapost\Foundation\Console\DTO\TableColumn;
 /**
  * The props of the Solutions screen of the admin panel: every Solution installed in this image with a valid manifest,
  * whether the tenant has it on, what it registers (the actions of its manifest and its console declarations, as the
- * registry holds them) and, when it ships a console UI, whether the bundle is published and fits the kit Core ships.
+ * registry holds them), whether the operator entitles the tenant to it and, when it ships a console UI, whether the
+ * bundle is published and fits the kit Core ships.
  * A Solution whose package is gone but whose activation is still stored is listed apart, so it can be put out.
  *
  * Only valid Solutions are shown: the catalog is closed to a package whose manifest fails, and `platform:update`
@@ -93,22 +94,28 @@ final readonly class SolutionsPresenter
     }
 
     /**
-     * Whether this tenant may turn the Solution on: it is installed and its console UI fits the kit, Vue and Inertia
-     * this platform ships ({@see self::refusal()} says why not). The one place the entitlement step
-     * (`solution-entitlement-seam`) will also be asked what the tenant is allowed to have; there is no such check yet.
-     * The controller asks again before it activates.
+     * Whether this tenant may turn the Solution on: it is installed, the operator entitles the tenant to it, and its
+     * console UI fits the kit, Vue and Inertia this platform ships ({@see self::refusal()} says why not). An entitlement
+     * that cannot be checked refuses (fail closed). The controller asks again before it activates.
      */
     public function isActivatable(string $solutionId): bool
     {
-        return $this->installed->has($solutionId) && [] === $this->mismatches($solutionId);
+        return $this->installed->has($solutionId) && true === $this->active->isEntitled($solutionId) && [] === $this->mismatches($solutionId);
     }
 
     /**
-     * Why the Solution cannot be turned on, in the reader's language, or null when nothing stands in the way: a console
-     * UI built for a kit, Vue or Inertia this platform does not ship (`adr-20261014-solution-console-ui`, Stability).
+     * Why the Solution cannot be turned on, in the reader's language, or null when nothing stands in the way: the
+     * operator does not entitle the tenant to it, or its answer could not be had; or a console UI built for a kit, Vue
+     * or Inertia this platform does not ship (`adr-20261014-solution-console-ui`, Stability).
      */
     public function refusal(string $solutionId): ?string
     {
+        $entitled = $this->active->isEntitled($solutionId);
+
+        if (true !== $entitled) {
+            return (string) __(null === $entitled ? 'console.solutions.entitlement.unavailable' : 'console.solutions.entitlement.not_entitled');
+        }
+
         $mismatches = $this->mismatches($solutionId);
 
         if ([] === $mismatches) {
@@ -169,10 +176,37 @@ final readonly class SolutionsPresenter
             'ui'          => $this->ui($solution),
             'lastChange'  => null === $stored ? null : $this->lastChange($latest),
             'canActivate' => $this->isActivatable($solution->id),
+            'entitlement' => $this->entitlement($solution, $stored),
             'urls'        => [
                 'activate'   => $this->url('console.admin.solutions.activate', $solution->id),
                 'deactivate' => $this->url('console.admin.solutions.deactivate', $solution->id),
             ],
+        ];
+    }
+
+    /**
+     * Whether the operator entitles the tenant to the Solution: `entitled`, `not_entitled` (with the operator's button,
+     * if it gives one) or `unavailable` when its answer could not be had. `paused` is a Solution the tenant turned on
+     * that does not run because it is not entitled: its activation and data are kept, and it runs again once included.
+     *
+     * @return array{state: string, paused: bool, action: array{label: string, url: string}|null}
+     */
+    private function entitlement(InstalledSolution $solution, ?SolutionActivation $stored): array
+    {
+        $entitlement = $this->active->entitlement();
+        $state       = match (true) {
+            null === $entitlement               => 'unavailable',
+            $entitlement->allows($solution->id) => 'entitled',
+            default                             => 'not_entitled',
+        };
+        $action = 'not_entitled' === $state && null !== $entitlement->actionLabel && null !== $entitlement->actionUrl
+            ? ['label' => $entitlement->actionLabel, 'url' => $entitlement->actionUrl]
+            : null;
+
+        return [
+            'state'  => $state,
+            'paused' => 'not_entitled' === $state && SolutionActivationStatus::Active === $stored?->status,
+            'action' => $action,
         ];
     }
 

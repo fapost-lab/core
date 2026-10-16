@@ -6,6 +6,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Domains\Solution\DTO\ActivationActor;
 use App\Domains\Solution\Enums\ActivationChange;
+use App\Domains\Solution\Exceptions\SolutionEntitlementUnavailableException;
+use App\Domains\Solution\Exceptions\SolutionNotEntitledException;
 use App\Domains\Solution\Exceptions\SolutionNotInstalledException;
 use App\Domains\Solution\Services\SolutionActivator;
 use App\Domains\Staff\Enums\Permission;
@@ -23,7 +25,8 @@ use Inertia\Response;
  * for the tenant the staff user works in. A new screen (it has no Filament predecessor), so it has its own URI.
  *
  * Every change goes through {@see SolutionActivator} with the staff user as the actor, so it lands in the journal.
- * A Solution whose console UI does not fit the kit this platform ships is refused with the reason; turning one off is
+ * A Solution the operator does not entitle the tenant to, or whose console UI does not fit the kit this platform ships,
+ * is refused with the reason (an entitlement that cannot be checked refuses too); turning one off is
  * always allowed. Turning a Solution off keeps its data. The tenant is the one the request resolved; the request never names it.
  */
 final class SolutionController extends Controller
@@ -44,7 +47,7 @@ final class SolutionController extends Controller
         $refusal = $presenter->refusal($solution);
 
         if (null !== $refusal) {
-            Inertia::flash('error', trans('console.solutions.flash.kit_mismatch', ['solution' => $solution, 'reasons' => $refusal]));
+            Inertia::flash('error', trans('console.solutions.flash.refused', ['solution' => $solution, 'reasons' => $refusal]));
 
             return $this->back();
         }
@@ -59,6 +62,11 @@ final class SolutionController extends Controller
             $change = $activator->activate($solution, $this->actor($request));
         } catch (SolutionNotInstalledException) {
             abort(404);
+        } catch (SolutionNotEntitledException|SolutionEntitlementUnavailableException $exception) {
+            // The entitlement changed between the check above and the write: refuse with the same reason.
+            Inertia::flash('error', trans('console.solutions.flash.refused', ['solution' => $solution, 'reasons' => trans($exception instanceof SolutionNotEntitledException ? 'console.solutions.entitlement.not_entitled' : 'console.solutions.entitlement.unavailable')]));
+
+            return $this->back();
         }
 
         Inertia::flash('success', trans(ActivationChange::Unchanged === $change ? 'console.solutions.flash.already_active' : 'console.solutions.flash.activated', ['solution' => $solution]));

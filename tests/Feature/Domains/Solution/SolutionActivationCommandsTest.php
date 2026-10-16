@@ -7,7 +7,10 @@ namespace Tests\Feature\Domains\Solution;
 use App\Domains\Solution\Enums\ActivationActorKind;
 use App\Domains\Solution\Infrastructure\SolutionActivationEventRecord;
 use App\Domains\Solution\Infrastructure\SolutionActivationRecord;
+use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
+use Fapost\Foundation\Solution\DTO\SolutionEntitlement;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\FakeSolutionEntitlement;
 use Tests\Support\InstallsFakeSolutions;
 
 /**
@@ -59,6 +62,34 @@ final class SolutionActivationCommandsTest extends FeatureTestCase
             ->assertExitCode(1);
 
         $this->assertSame(0, SolutionActivationRecord::query()->count());
+    }
+
+    public function test_activate_refuses_a_solution_the_operator_does_not_entitle_and_list_says_why_it_does_not_run(): void
+    {
+        $this->artisan('solutions:activate', ['solution' => 'feedback', '--tenant' => 'main'])->assertExitCode(0);
+        $operator          = new FakeSolutionEntitlement();
+        $operator->default = SolutionEntitlement::only(['feedback']);
+        $this->app->instance(SolutionEntitlementInterface::class, $operator);
+        $this->app->forgetScopedInstances();
+
+        $this->artisan('solutions:activate', ['solution' => 'survey', '--tenant' => 'main'])
+            ->expectsOutputToContain('not included in what this tenant is entitled to')
+            ->assertExitCode(1);
+
+        $operator->default = SolutionEntitlement::only([]);
+        $this->app->forgetScopedInstances();
+
+        $this->artisan('solutions:list', ['--tenant' => 'main'])
+            ->expectsTable(
+                ['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective'],
+                [
+                    ['feedback', 'Feedback', '1.0.0', 'yes', 'active', 'no', 'inactive'],
+                    ['survey', 'Survey', '1.0.0', 'yes', 'none', 'no', 'inactive'],
+                ],
+            )
+            ->assertExitCode(0);
+
+        $this->assertSame(1, SolutionActivationEventRecord::query()->count(), 'Refusing and losing the entitlement journal nothing.');
     }
 
     public function test_deactivate_turns_it_off_and_keeps_the_reason(): void
@@ -118,10 +149,10 @@ final class SolutionActivationCommandsTest extends FeatureTestCase
 
         $this->artisan('solutions:list', ['--tenant' => 'main'])
             ->expectsTable(
-                ['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Effective'],
+                ['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective'],
                 [
-                    ['feedback', 'Feedback', '1.0.0', 'yes', 'active', 'active'],
-                    ['survey', '-', '-', 'no', 'active', 'inactive'],
+                    ['feedback', 'Feedback', '1.0.0', 'yes', 'active', 'yes', 'active'],
+                    ['survey', '-', '-', 'no', 'active', '-', 'inactive'],
                 ],
             )
             ->assertExitCode(0);
@@ -131,10 +162,10 @@ final class SolutionActivationCommandsTest extends FeatureTestCase
     {
         $this->artisan('solutions:list', ['--tenant' => 'main'])
             ->expectsTable(
-                ['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Effective'],
+                ['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective'],
                 [
-                    ['feedback', 'Feedback', '1.0.0', 'yes', 'none', 'inactive'],
-                    ['survey', 'Survey', '1.0.0', 'yes', 'none', 'inactive'],
+                    ['feedback', 'Feedback', '1.0.0', 'yes', 'none', 'yes', 'inactive'],
+                    ['survey', 'Survey', '1.0.0', 'yes', 'none', 'yes', 'inactive'],
                 ],
             )
             ->assertExitCode(0);
