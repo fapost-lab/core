@@ -1,0 +1,73 @@
+---
+title: "Solutions"
+description: "See which Solutions are installed, turn them on or off for your workspace, and read what each one adds."
+---
+
+A **Solution** is an extension package installed on the platform by whoever runs it. Installing one does
+not turn it on: each workspace chooses. **Solutions** in the admin panel menu lists every installed
+Solution and lets you turn it on or off for this workspace. It is open to anyone who can manage
+[tenant settings](/using/tenant-settings), which by default means administrators.
+
+Everything starts off. A Solution you never turned on does nothing in your flows or in the console.
+
+## What the page shows
+
+Solutions are shown as compact cards. Each card has the name, whether it is **On**, **Off** or **Paused** (on, but
+not in your plan), a one-line description, the version and package, and the **Turn on** or **Turn off** button.
+
+**Details** opens the rest:
+
+- the full description, and who last changed the state and when (times are in UTC);
+- **What it adds** — the flow actions it provides (the ones you pick in a `call` node) and, when it has a
+  console interface, its application, its pages and the places it adds to existing screens: actions,
+  dashboard widgets, settings tabs, table columns and shell elements.
+
+Only Solutions the platform accepts are listed. A package whose manifest is wrong is refused when the
+platform is updated, so it never appears here.
+
+## Turning one on
+
+Click **Turn on**. The change is immediate, and the next flow run can use the Solution's actions. The page
+records you as the person who did it, in the same journal the command line writes to.
+
+## Turning one off
+
+Click **Turn off** and confirm. From then on:
+
+- a flow that reaches one of its actions leaves that node by the **error** output with the reason
+  `solution_inactive`, so the flow can decide what to do; a session already running is not cut off, it takes
+  that route on its next call;
+- whatever it added to the console disappears;
+- **its data is kept.** Turning it off never deletes anything the Solution stored, and turning it on again
+  brings it back as it was.
+
+## Not included in your plan
+
+On a platform that sells Solutions by plan, whoever runs it decides which Solutions your workspace may use.
+A Solution your plan does not include says **Not in your plan**: **Turn on** stays disabled, and a request that
+skips the button is refused with the same reason. When the platform offers one, **Details** has a button to its
+plans or contact page.
+
+If a Solution you had on leaves your plan, its card says **Paused**. It does nothing in flows or in the console,
+exactly as if it were off, but nothing is changed: **its data is kept, and it runs again by itself** as soon as
+your plan includes it. You can still turn it off; then it stays off when it comes back to your plan.
+
+If your plan cannot be checked for a moment, the page says so and nothing can be turned on until it can; the
+Solutions you already have on keep running.
+
+## A console interface that does not fit
+
+A Solution's console interface is built against a version of the interface kit, Vue and Inertia. When the
+console ships a version outside what the Solution declares, its card says **Interface does not fit**, and **Details** lists
+each one: what it was built for and what this platform ships. **Turn on** stays disabled, and a request that
+skips the button is refused with the same reason. The Solution's data and its flow actions are untouched; ask
+whoever maintains the Solution for a build that matches. A Solution that is already on can still be turned
+off.
+
+If the interface has not been published yet, the card says so. It is published when the platform is next
+updated.
+
+## No longer installed
+
+If a package was removed while a workspace still had it on, it is listed under **No longer installed**. It
+does nothing, and **Turn off** clears it. If the package comes back, you can turn it on again.

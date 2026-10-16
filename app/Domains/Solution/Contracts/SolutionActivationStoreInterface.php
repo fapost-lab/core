@@ -40,6 +40,13 @@ interface SolutionActivationStoreInterface
     public function events(string $solutionId): array;
 
     /**
+     * The newest journal entry of every Solution that has one, in one read.
+     *
+     * @return array<string, SolutionActivationEvent> by Solution id
+     */
+    public function latestEvents(): array;
+
+    /**
      * Brings the Solution to `$target` and journals the change, as one transaction holding a lock on the row.
      * Idempotent: a repeat in the same state, or a deactivation of a Solution that has no row, writes nothing.
      */

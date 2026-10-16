@@ -17,7 +17,8 @@ use Fapost\Foundation\Media\DTO\UploadContext;
  * never trigger a second upload while the cache is fresh.
  *
  * The returned {@see DispatchResult} carries `alreadyDelivered` so handlers can detect
- * upload-as-send providers (Telegram) and avoid double-sending.
+ * upload-as-send providers (Telegram) and avoid double-sending. For a channel that sends media by URL it carries
+ * `publicLink` instead of a provider file id.
  */
 interface MediaDispatcherInterface
 {

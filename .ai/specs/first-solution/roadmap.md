@@ -20,6 +20,10 @@ Core's Vue and kit.
       (owner, 2026-10-14) (after: ui-foundation's kit extracted — authors build against the
       published `@fapost/ui`; after: ui-foundation's extension contract — the run time the preset
       builds for)
+- [x] `hello-world-solution` — Hello World, the smallest real Solution in its own public repository
+      (`fapost-lab/solution-hello-world`): one action, one console page from a prebuilt `dist/`,
+      installed by the composer overlay and tested inside Core; the demo the Extending docs point
+      to, and the candidate fixture for this phase's done-when (owner, 2026-10-16)
 - [ ] The derived-image recipe — `FROM` Core's image, the overlay, `composer install`, assets
       published; documented for self-hosters and used by the SaaS (after: prebuilt Solution UI —
       the recipe has no Node step only because of it)
@@ -48,7 +52,8 @@ team — with no `App\…` import and no change made to Core for its benefit.
       and the flow messages whoever the tenant configured (after: the package — the event is
       raised by its writes)
 - [ ] fog: customers reaching the widget — a mini-app extension point, a bot command, or both; the
-      UI extension contract has no mini-app point yet
+      UI extension contract has no mini-app point yet (carried over from `ui-foundation`, closed
+      2026-10-16, where it stood as "a mini-app extension point")
 
 ## Phase 2 — The FaPost board
 

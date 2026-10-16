@@ -43,6 +43,7 @@
               "using/assistants",
               "using/tenant-settings",
               "using/usage-and-limits",
+              "using/solutions",
               "using/users",
               "using/roles-and-permissions",
               "using/media"
@@ -156,6 +157,7 @@
             "pages": [
               "extending/development-setup",
               "extending/solutions",
+              "extending/connectors",
               "extending/plugins"
             ]
           },

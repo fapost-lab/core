@@ -22,12 +22,13 @@ final class CacheSolutionsCommand extends Command
 
     public function handle(SolutionDiscoverer $discoverer, SolutionCache $cache, PublishedSolutionUi $published): int
     {
-        $discovery = $discoverer->discover();
+        $all       = $discoverer->discoverAll();
+        $discovery = $all->solutions;
 
-        if (!$discovery->isValid()) {
+        if (!$all->isValid()) {
             $this->components->error('The Solution catalog was not cached: run php artisan platform:update --validate-only.');
 
-            foreach ($discovery->violations as $violation) {
+            foreach ($all->violations() as $violation) {
                 $this->line('  ' . $violation->line());
             }
 
@@ -36,7 +37,7 @@ final class CacheSolutionsCommand extends Command
 
         // Records what is published; publishing itself is platform:update's.
         $computed = $published->compute($discovery->valid);
-        $cache->write($discovery, array_values($computed['bundles']), $computed['watched']);
+        $cache->write($discovery, array_values($computed['bundles']), $computed['watched'], $all->connectors);
         $this->components->info(sprintf('Solution catalog cached (%d installed).', count($discovery->valid)));
 
         return self::SUCCESS;

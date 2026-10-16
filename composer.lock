@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "ca211ba81d8e119175a0ce892e4ec350",
+  "content-hash": "57281177c950ca38738a7d12aefb2902",
   "packages": [
     {
       "name": "brick/math",
@@ -269,6 +269,83 @@
         }
       ],
       "time": "2025-01-03T16:18:33+00:00"
+    },
+    {
+      "name": "composer/semver",
+      "version": "3.4.4",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/composer/semver.git",
+        "reference": "198166618906cb2de69b95d7d47e5fa8aa1b2b95"
+      },
+      "dist": {
+        "type": "zip",
+        "url": "https://api.github.com/repos/composer/semver/zipball/198166618906cb2de69b95d7d47e5fa8aa1b2b95",
+        "reference": "198166618906cb2de69b95d7d47e5fa8aa1b2b95",
+        "shasum": ""
+      },
+      "require": {
+        "php": "^5.3.2 || ^7.0 || ^8.0"
+      },
+      "require-dev": {
+        "phpstan/phpstan": "^1.11",
+        "symfony/phpunit-bridge": "^3 || ^7"
+      },
+      "type": "library",
+      "extra": {
+        "branch-alias": {
+          "dev-main": "3.x-dev"
+        }
+      },
+      "autoload": {
+        "psr-4": {
+          "Composer\\Semver\\": "src"
+        }
+      },
+      "notification-url": "https://packagist.org/downloads/",
+      "license": [
+        "MIT"
+      ],
+      "authors": [
+        {
+          "name": "Nils Adermann",
+          "email": "naderman@naderman.de",
+          "homepage": "http://www.naderman.de"
+        },
+        {
+          "name": "Jordi Boggiano",
+          "email": "j.boggiano@seld.be",
+          "homepage": "http://seld.be"
+        },
+        {
+          "name": "Rob Bast",
+          "email": "rob.bast@gmail.com",
+          "homepage": "http://robbast.nl"
+        }
+      ],
+      "description": "Semver library that offers utilities, version constraint parsing and validation.",
+      "keywords": [
+        "semantic",
+        "semver",
+        "validation",
+        "versioning"
+      ],
+      "support": {
+        "irc": "ircs://irc.libera.chat:6697/composer",
+        "issues": "https://github.com/composer/semver/issues",
+        "source": "https://github.com/composer/semver/tree/3.4.4"
+      },
+      "funding": [
+        {
+          "url": "https://packagist.com",
+          "type": "custom"
+        },
+        {
+          "url": "https://github.com/composer",
+          "type": "github"
+        }
+      ],
+      "time": "2025-08-20T19:15:30+00:00"
     },
     {
       "name": "dflydev/dot-access-data",
@@ -738,16 +815,16 @@
     },
     {
       "name": "fapost/foundation",
-      "version": "v0.19.0",
+      "version": "v0.22.0",
       "source": {
         "type": "git",
         "url": "https://github.com/fapost-lab/foundation.git",
-        "reference": "f8042b0f42c4a963d208034cc7ce8645b2d036bf"
+        "reference": "4cf38b3d7708b66bdbb9a06c15eda9a175d2d392"
       },
       "dist": {
         "type": "zip",
-        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/f8042b0f42c4a963d208034cc7ce8645b2d036bf",
-        "reference": "f8042b0f42c4a963d208034cc7ce8645b2d036bf",
+        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/4cf38b3d7708b66bdbb9a06c15eda9a175d2d392",
+        "reference": "4cf38b3d7708b66bdbb9a06c15eda9a175d2d392",
         "shasum": ""
       },
       "require": {
@@ -786,10 +863,10 @@
       ],
       "description": "FaPost public contract layer for Solutions, Plugins and external integrations",
       "support": {
-        "source": "https://github.com/fapost-lab/foundation/tree/v0.19.0",
+        "source": "https://github.com/fapost-lab/foundation/tree/v0.22.0",
         "issues": "https://github.com/fapost-lab/foundation/issues"
       },
-      "time": "2026-10-16T09:55:00+00:00"
+      "time": "2026-10-16T13:57:10+00:00"
     },
     {
       "name": "fapost/support",
@@ -8114,12 +8191,12 @@
       "version": "v5.7.0",
       "source": {
         "type": "git",
-        "url": "https://github.com/vlucas/phpdotenv.git",
+        "url": "https://github.com/phpdotenv/phpdotenv.git",
         "reference": "301c07936b16d88628b126b01d082ba153cf4c40"
       },
       "dist": {
         "type": "zip",
-        "url": "https://api.github.com/repos/vlucas/phpdotenv/zipball/301c07936b16d88628b126b01d082ba153cf4c40",
+        "url": "https://api.github.com/repos/phpdotenv/phpdotenv/zipball/301c07936b16d88628b126b01d082ba153cf4c40",
         "reference": "301c07936b16d88628b126b01d082ba153cf4c40",
         "shasum": ""
       },
@@ -8719,83 +8796,6 @@
         }
       ],
       "time": "2026-06-07T11:47:49+00:00"
-    },
-    {
-      "name": "composer/semver",
-      "version": "3.4.4",
-      "source": {
-        "type": "git",
-        "url": "https://github.com/composer/semver.git",
-        "reference": "198166618906cb2de69b95d7d47e5fa8aa1b2b95"
-      },
-      "dist": {
-        "type": "zip",
-        "url": "https://api.github.com/repos/composer/semver/zipball/198166618906cb2de69b95d7d47e5fa8aa1b2b95",
-        "reference": "198166618906cb2de69b95d7d47e5fa8aa1b2b95",
-        "shasum": ""
-      },
-      "require": {
-        "php": "^5.3.2 || ^7.0 || ^8.0"
-      },
-      "require-dev": {
-        "phpstan/phpstan": "^1.11",
-        "symfony/phpunit-bridge": "^3 || ^7"
-      },
-      "type": "library",
-      "extra": {
-        "branch-alias": {
-          "dev-main": "3.x-dev"
-        }
-      },
-      "autoload": {
-        "psr-4": {
-          "Composer\\Semver\\": "src"
-        }
-      },
-      "notification-url": "https://packagist.org/downloads/",
-      "license": [
-        "MIT"
-      ],
-      "authors": [
-        {
-          "name": "Nils Adermann",
-          "email": "naderman@naderman.de",
-          "homepage": "http://www.naderman.de"
-        },
-        {
-          "name": "Jordi Boggiano",
-          "email": "j.boggiano@seld.be",
-          "homepage": "http://seld.be"
-        },
-        {
-          "name": "Rob Bast",
-          "email": "rob.bast@gmail.com",
-          "homepage": "http://robbast.nl"
-        }
-      ],
-      "description": "Semver library that offers utilities, version constraint parsing and validation.",
-      "keywords": [
-        "semantic",
-        "semver",
-        "validation",
-        "versioning"
-      ],
-      "support": {
-        "irc": "ircs://irc.libera.chat:6697/composer",
-        "issues": "https://github.com/composer/semver/issues",
-        "source": "https://github.com/composer/semver/tree/3.4.4"
-      },
-      "funding": [
-        {
-          "url": "https://packagist.com",
-          "type": "custom"
-        },
-        {
-          "url": "https://github.com/composer",
-          "type": "github"
-        }
-      ],
-      "time": "2025-08-20T19:15:30+00:00"
     },
     {
       "name": "fakerphp/faker",

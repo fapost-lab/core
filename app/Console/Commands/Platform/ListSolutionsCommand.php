@@ -49,6 +49,11 @@ final class ListSolutionsCommand extends SolutionTenantCommand
                     $solution->version ?? '-',
                     null === $solution ? 'no' : 'yes',
                     $row instanceof SolutionActivation ? $row->status->value : 'none',
+                    null === $solution ? '-' : match ($active->isEntitled($id)) {
+                        true    => 'yes',
+                        false   => 'no',
+                        default => 'unknown',
+                    },
                     $active->isActive($id) ? 'active' : 'inactive',
                 ];
             }
@@ -59,7 +64,7 @@ final class ListSolutionsCommand extends SolutionTenantCommand
                 return self::SUCCESS;
             }
 
-            $this->table(['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Effective'], $rows);
+            $this->table(['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective'], $rows);
 
             return self::SUCCESS;
         });

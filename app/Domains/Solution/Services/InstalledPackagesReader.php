@@ -9,7 +9,7 @@ use Fapost\Foundation\Solution\Manifest\ManifestSchema;
 use JsonException;
 
 /**
- * Reads `vendor/composer/installed.json` and picks out the packages that are, or claim to be, Solutions.
+ * Reads `vendor/composer/installed.json` and picks out the packages that are, or claim to be, Solutions or connectors.
  *
  * Read-only and free of the framework and the database. The package type comes from installed.json;
  * the manifest is read from the package's own composer.json, so a package linked from a local checkout
@@ -27,7 +27,7 @@ final class InstalledPackagesReader
     }
 
     /**
-     * Packages of type `fapost-solution`, and any other package carrying an `extra.fapost` block.
+     * Packages of type `fapost-solution` or `fapost-connector`, and any other package carrying an `extra.fapost` block.
      *
      * @return list<InstalledPackage> ordered by name
      */
@@ -44,7 +44,7 @@ final class InstalledPackagesReader
 
             $type = is_string($entry['type'] ?? null) ? $entry['type'] : null;
 
-            if (ManifestSchema::PACKAGE_TYPE !== $type && !$this->declaresManifest($entry)) {
+            if (ManifestSchema::PACKAGE_TYPE !== $type && ManifestSchema::CONNECTOR_PACKAGE_TYPE !== $type && !$this->declaresManifest($entry)) {
                 continue;
             }
 

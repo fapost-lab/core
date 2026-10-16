@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Solution;
 
 use App\Domains\Solution\Providers\SolutionServiceProvider;
+use App\Domains\Solution\Services\InstalledConnectors;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\InstalledSolutions;
 use App\Domains\Solution\Services\SolutionCache;
@@ -12,6 +13,7 @@ use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionManifestValidator;
 use Fapost\Foundation\Solution\Contracts\InstalledSolutionCatalogInterface;
 use Fapost\Foundation\Solution\Manifest\ManifestParser;
+use Tests\Fixtures\Connectors\Echo\EchoConnectorServiceProvider;
 use Tests\Fixtures\Solution\FeedbackServiceProvider;
 use Tests\Support\FakeVendor;
 use Tests\TestCase;
@@ -56,6 +58,32 @@ final class SolutionServiceProviderTest extends TestCase
         $this->assertNull($this->app->getProvider(FeedbackServiceProvider::class));
     }
 
+    public function test_core_boots_the_provider_of_a_valid_connector_before_the_solution_providers(): void
+    {
+        $this->vendor->package(FakeVendor::solutionComposer())->package(FakeVendor::connectorComposer());
+        $this->bindInstalled();
+
+        (new SolutionServiceProvider($this->app))->register();
+
+        $this->assertInstanceOf(EchoConnectorServiceProvider::class, $this->app->getProvider(EchoConnectorServiceProvider::class));
+
+        $loaded = array_keys($this->app->getLoadedProviders());
+        $this->assertLessThan(
+            array_search(FeedbackServiceProvider::class, $loaded, true),
+            array_search(EchoConnectorServiceProvider::class, $loaded, true),
+        );
+    }
+
+    public function test_core_does_not_boot_the_provider_of_an_invalid_connector(): void
+    {
+        $this->vendor->package(FakeVendor::connectorComposer(['channels' => null]));
+        $this->bindInstalled();
+
+        (new SolutionServiceProvider($this->app))->register();
+
+        $this->assertNull($this->app->getProvider(EchoConnectorServiceProvider::class));
+    }
+
     public function test_the_foundation_catalog_is_answered_from_the_installed_solutions(): void
     {
         $this->vendor->package(FakeVendor::solutionComposer(), '1.2.0');
@@ -81,12 +109,27 @@ final class SolutionServiceProviderTest extends TestCase
     {
         $this->vendor->write();
 
-        return new InstalledSolutions(
-            new SolutionCache(dirname($this->vendor->path) . '/fapost-solutions.php'),
-            new SolutionDiscoverer(
-                new InstalledPackagesReader($this->vendor->path),
-                new SolutionManifestValidator(new ManifestParser()),
-            ),
+        return new InstalledSolutions($this->cache(), $this->discoverer());
+    }
+
+    private function bindInstalled(): void
+    {
+        $this->vendor->write();
+
+        $this->app->instance(InstalledSolutions::class, new InstalledSolutions($this->cache(), $this->discoverer()));
+        $this->app->instance(InstalledConnectors::class, new InstalledConnectors($this->cache(), $this->discoverer()));
+    }
+
+    private function cache(): SolutionCache
+    {
+        return new SolutionCache(dirname($this->vendor->path) . '/fapost-solutions.php');
+    }
+
+    private function discoverer(): SolutionDiscoverer
+    {
+        return new SolutionDiscoverer(
+            new InstalledPackagesReader($this->vendor->path),
+            new SolutionManifestValidator(new ManifestParser()),
         );
     }
 }

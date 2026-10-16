@@ -69,6 +69,31 @@ final class EloquentSolutionActivationStore implements SolutionActivationStoreIn
             ->all();
     }
 
+    public function latestEvents(): array
+    {
+        $table  = (new SolutionActivationEventRecord())->getTable();
+        $latest = [];
+
+        // The newest entry of a Solution is the one no other entry of it follows, by time and then by id.
+        $rows = SolutionActivationEventRecord::query()
+            ->from($table . ' as e')
+            ->select('e.*')
+            ->whereNotExists(static fn ($newer) => $newer
+                ->from($table . ' as n')
+                ->whereColumn('n.solution_id', 'e.solution_id')
+                ->where(static fn ($later) => $later
+                    ->whereColumn('n.occurred_at', '>', 'e.occurred_at')
+                    ->orWhere(static fn ($tie) => $tie->whereColumn('n.occurred_at', 'e.occurred_at')->whereColumn('n.id', '>', 'e.id'))))
+            ->orderBy('e.solution_id')
+            ->get();
+
+        foreach ($rows as $row) {
+            $latest[$row->solution_id] = new SolutionActivationEvent($row->solution_id, $row->action, $row->actor_kind, $row->actor_id, $row->actor_label, $row->reason, $row->occurred_at);
+        }
+
+        return $latest;
+    }
+
     public function change(string $solutionId, SolutionActivationStatus $target, ActivationActor $actor, ?string $reason): ActivationChange
     {
         return DB::transaction(function () use ($solutionId, $target, $actor, $reason): ActivationChange {

@@ -3,7 +3,8 @@ title: "Building a Plugin"
 description: "Extensions installed and enabled at runtime."
 ---
 
-A Plugin adds **platform capability** — a new channel adapter, a new RAG provider.
+A Plugin adds **platform capability** — a new node, a new RAG provider. A new
+messaging channel is not a Plugin but a [Connector](/extending/connectors).
 That is what separates it from a [Solution](/extending/solutions), which adds
 domain logic such as HR or recruitment.
 
@@ -21,11 +22,11 @@ A Plugin is a Composer package whose service provider extends
 `Fapost\Foundation\Lifecycle\AbstractPluginServiceProvider`:
 
 ```php
-final class ViberPluginServiceProvider extends AbstractPluginServiceProvider
+final class AcmePluginServiceProvider extends AbstractPluginServiceProvider
 {
     protected function registerExtensions(CoreRegistrarInterface $registrar): void
     {
-        $registrar->registerNodeHandler(ViberNodeHandler::class);
+        $registrar->registerNodeHandler(AcmeNodeHandler::class);
     }
 }
 ```

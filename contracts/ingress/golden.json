@@ -888,6 +888,213 @@
                 "verified": true,
                 "idempotencyKey": "i:"
             }
+        },
+        {
+            "name": "hmac_sha256: viber signature over the raw body",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-viber-content-signature",
+                "prefix": "",
+                "idempotency": "viber:{channel}:{body.message_token}"
+            },
+            "secret": "445da6az1s345z78-dazcczb2542zv51a-e0vc5fva17480im9",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"event\":\"message\",\"timestamp\":1457764197627,\"chat_hostname\":\"SN-376_\",\"message_token\":4912661846655238145,\"sender\":{\"id\":\"01234567890A=\",\"name\":\"John McClane\",\"language\":\"en\",\"country\":\"UK\",\"api_version\":1},\"message\":{\"type\":\"text\",\"text\":\"a message to the service\",\"tracking_data\":\"tracking data\"},\"silent\":false}",
+                "headers": {
+                    "X-Viber-Content-Signature": "d7f70ca07bb60db59759733e41268b79a6e2ecbf74087596922509f6faf7b58c"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "viber:channel-42:4912661846655238145"
+            },
+            "note": "Viber signs the raw body with the bot token as the key and sends a bare lowercase hex digest. The 19-digit message_token must survive without rounding."
+        },
+        {
+            "name": "hmac_sha256: viber webhook callback is verified",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-viber-content-signature",
+                "prefix": "",
+                "idempotency": "viber:{channel}:{body.message_token}"
+            },
+            "secret": "445da6az1s345z78-dazcczb2542zv51a-e0vc5fva17480im9",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"event\":\"webhook\",\"timestamp\":1457764197627,\"chat_hostname\":\"SN-376_\",\"message_token\":241256543215}",
+                "headers": {
+                    "x-viber-content-signature": "a0c9cd3c1a53760af46a7fa9eaba7e22ff52e771262279202d55c9baacd871fb"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "viber:channel-42:241256543215"
+            },
+            "note": "The set_webhook callback is a callback like any other and carries the same signature."
+        },
+        {
+            "name": "hmac_sha256: viber signature under a different token",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-viber-content-signature",
+                "prefix": "",
+                "idempotency": "viber:{channel}:{body.message_token}"
+            },
+            "secret": "445da6az1s345z78-dazcczb2542zv51a-e0vc5fva17480im9",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"event\":\"message\",\"timestamp\":1457764197627,\"chat_hostname\":\"SN-376_\",\"message_token\":4912661846655238145,\"sender\":{\"id\":\"01234567890A=\",\"name\":\"John McClane\",\"language\":\"en\",\"country\":\"UK\",\"api_version\":1},\"message\":{\"type\":\"text\",\"text\":\"a message to the service\",\"tracking_data\":\"tracking data\"},\"silent\":false}",
+                "headers": {
+                    "x-viber-content-signature": "a5ef95f6396cc3d8a384a5ca84d96442b904f216c1bc0bf24925b9e0c6ec2696"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "viber:channel-42:4912661846655238145"
+            }
+        },
+        {
+            "name": "hmac_sha256: uppercase hex digest is rejected",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-viber-content-signature",
+                "prefix": "",
+                "idempotency": "viber:{channel}:{body.message_token}"
+            },
+            "secret": "445da6az1s345z78-dazcczb2542zv51a-e0vc5fva17480im9",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"event\":\"message\",\"timestamp\":1457764197627,\"chat_hostname\":\"SN-376_\",\"message_token\":4912661846655238145,\"sender\":{\"id\":\"01234567890A=\",\"name\":\"John McClane\",\"language\":\"en\",\"country\":\"UK\",\"api_version\":1},\"message\":{\"type\":\"text\",\"text\":\"a message to the service\",\"tracking_data\":\"tracking data\"},\"silent\":false}",
+                "headers": {
+                    "x-viber-content-signature": "D7F70CA07BB60DB59759733E41268B79A6E2ECBF74087596922509F6FAF7B58C"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "viber:channel-42:4912661846655238145"
+            },
+            "note": "Digests are compared as exact lowercase hex; no provider sends uppercase."
+        },
+        {
+            "name": "header_equals: empty secret refuses a request without the header",
+            "spec": {
+                "v": 1,
+                "scheme": "header_equals",
+                "parameter": "x-telegram-bot-api-secret-token",
+                "prefix": "",
+                "idempotency": "tg:{channel}:{body.update_id}"
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"update_id\":987654}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "tg:channel-42:987654"
+            },
+            "note": "An empty secret would otherwise equal the empty value of an absent header."
+        },
+        {
+            "name": "query_param: empty secret refuses a request without the parameter",
+            "spec": {
+                "v": 1,
+                "scheme": "query_param",
+                "parameter": "token",
+                "prefix": "",
+                "idempotency": "q:{channel}"
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "q:channel-42"
+            }
+        },
+        {
+            "name": "hmac_sha256: empty secret refuses a body signed with an empty key",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha256",
+                "parameter": "x-viber-content-signature",
+                "prefix": "",
+                "idempotency": "viber:{channel}:{body.message_token}"
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"event\":\"message\",\"timestamp\":1457764197627,\"chat_hostname\":\"SN-376_\",\"message_token\":4912661846655238145,\"sender\":{\"id\":\"01234567890A=\",\"name\":\"John McClane\",\"language\":\"en\",\"country\":\"UK\",\"api_version\":1},\"message\":{\"type\":\"text\",\"text\":\"a message to the service\",\"tracking_data\":\"tracking data\"},\"silent\":false}",
+                "headers": {
+                    "x-viber-content-signature": "f8c3e9711386974248c21f83fa2836cd07d81368a5598f506a83beee2eff2fce"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "viber:channel-42:4912661846655238145"
+            },
+            "note": "An empty HMAC key is known to everyone, so anyone could sign."
+        },
+        {
+            "name": "hmac_sha1: empty secret refuses a body signed with an empty key",
+            "spec": {
+                "v": 1,
+                "scheme": "hmac_sha1",
+                "parameter": "x-sig",
+                "prefix": "sha1=",
+                "idempotency": "s:{channel}"
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"a\":1}",
+                "headers": {
+                    "x-sig": "sha1=be7f53283232a37a0e165a01be1d108f01fd706a"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": false,
+                "idempotencyKey": "s:channel-42"
+            }
+        },
+        {
+            "name": "none: empty secret still accepts",
+            "spec": {
+                "v": 1,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "n:{channel}"
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "n:channel-42"
+            },
+            "note": "The none scheme reads no secret."
         }
     ]
 }

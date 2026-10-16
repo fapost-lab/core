@@ -76,12 +76,18 @@ GNU Make still executes the recipe lines that call `$(MAKE)`.
 ## Continuous integration
 
 The same checks run in GitHub Actions (`.github/workflows/ci.yml`) on every
-pull request and on every push to `main`. Three jobs run in parallel:
+pull request and on every push to `main`. Four jobs run in parallel:
 
 - **PHP** — Pint in `--test` mode, the PHPUnit suites, the architecture rules.
   The suites run twice, as a matrix: once on SQLite in memory, exactly as
   `phpunit.xml` and the pre-commit hook run them locally, and once on
   PostgreSQL 15, which is what production uses.
+- **Solution** — the public
+  [Hello World Solution](https://github.com/fapost-lab/solution-hello-world),
+  installed into the pull request's Core with the composer overlay, runs its own
+  test suite. It is pinned to a commit in `ci.yml`; a Core change that breaks
+  installing or testing an external Solution fails here. When the Solution's
+  tests change, move the pin in a Core pull request.
 - **Gateway** — `go vet` and `go test` in `gateway/`.
 - **Frontend** — `vue-tsc` type check, Vitest, and the production Vite build.
 

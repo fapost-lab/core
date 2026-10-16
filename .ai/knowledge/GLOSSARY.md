@@ -62,10 +62,21 @@ lists them, a Solution only chooses among them.
 Informal synonyms: hook point.
 Use in: source code, documentation.
 
+## Connector
+
+A Composer package of `type: fapost-connector` that brings a messaging channel (Telegram, Viber):
+it owns the channel types its manifest lists in `extra.fapost.channels`. Installed at build time like a
+Solution, but booted for the whole installation with no per-tenant activation
+(`adr-20261016-connector-package-type`).
+
+Informal synonyms: channel driver, channel integration.
+Use in: documentation, source code (`AbstractConnectorServiceProvider`).
+
 ## Plugin
 
-A package that registers runtime behaviour with Core — node handlers, transports, commands,
-routes, schedules, migrations — through `CoreRegistrarInterface`. It cannot ship Vue components.
+A package that registers runtime behaviour with Core — node handlers, commands, routes, schedules,
+migrations — through `CoreRegistrarInterface`. It cannot ship Vue components. A messaging channel is
+a Connector, not a Plugin.
 
 Use in: documentation, source code (`AbstractPluginServiceProvider`).
 

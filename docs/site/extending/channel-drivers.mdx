@@ -7,9 +7,10 @@ A channel has two halves: **ingress**, which accepts and verifies what the provi
 sends you, and **egress**, which delivers what the assistant says back.
 
 <Warning>
-  `CoreRegistrarInterface` has no channel-adapter surface today. The contracts
-  below exist and are stable, but there is no registration entry point for a
-  Plugin to add a channel with — a new provider is currently a Core change.
+  A channel ships as a [Connector](/extending/connectors) package. Core already
+  finds and boots connectors, but there is no registration entry point for a
+  connector to add its channel with yet: the contracts below exist and are stable,
+  and a new provider is still a Core change until that entry point ships.
 </Warning>
 
 ## Identity
@@ -41,7 +42,7 @@ is authenticated and deduplicated through an `IngressSpec`, exposed by
 | Piece | Role |
 |---|---|
 | `IngressSpec` | The declarative description of a provider's webhook contract |
-| `SignatureScheme` | How the request is verified — for example `header_equals` |
+| `SignatureScheme` | How the request is verified — for example `header_equals` (a header equals the channel secret) or `hmac_sha256` (a header carries an HMAC-SHA256 of the raw body, keyed by the channel secret) |
 | `SignedRequest` | The request as presented for verification |
 | `IngressSpecExecutor` | Applies a spec to an incoming request |
 | `WebhookRegistrarInterface` / `WebhookRegistrationPayload` | Registering the webhook with the provider |
@@ -69,6 +70,16 @@ Two optional capabilities sit alongside it. `TypingCapableProviderInterface`
 exposes a typing or processing indicator through a `ProcessingIndicatorHandle`;
 `ChannelMediaUploaderInterface` and `ChannelMediaDownloaderInterface` handle media
 in each direction.
+
+A provider that accepts pictures, video and files only as a URL it fetches itself
+registers `ChannelMediaLinkPolicyInterface` instead of an uploader, tagged
+`media.channel.link`. Core then puts a signed public link to the file in the outgoing
+payload, issued just before delivery and valid for a limited time: `media.url`, with
+`mime_type`, `size` (bytes), `file_name` (with its extension) and `kind` (`image`,
+`video`, `audio` or `document`). The payload's `type` is shaped for channels that
+upload, so choose the provider's message type from `mime_type`. The link is the only
+way to the file without signing in, so the sender never logs it, never stores it and
+never builds links of its own. A channel type with an uploader keeps uploading.
 
 ## Rate limits are preventive
 

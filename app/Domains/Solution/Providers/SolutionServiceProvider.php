@@ -11,25 +11,30 @@ use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\Infrastructure\CoreInstalledSolutionCatalog;
 use App\Domains\Solution\Infrastructure\EloquentSolutionActivationStore;
 use App\Domains\Solution\Services\ActiveSolutions;
+use App\Domains\Solution\Services\AllSolutionsEntitled;
+use App\Domains\Solution\Services\InstalledConnectors;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\InstalledSolutions;
 use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionActivator;
 use App\Domains\Solution\Services\SolutionCache;
+use App\Domains\Solution\Services\SolutionEntitlements;
 use App\Domains\Solution\Services\SolutionUiBundleReader;
+use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Solution\Services\SolutionUiPublisher;
 use App\Infrastructure\Solution\SolutionCoreRegistrarFactory;
 use Fapost\Foundation\Console\Contracts\ConsoleExtensionsInterface;
 use Fapost\Foundation\Lifecycle\AbstractSolutionServiceProvider;
 use Fapost\Foundation\Solution\Contracts\InstalledSolutionCatalogInterface;
+use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\ServiceProvider;
 use LogicException;
 
 /**
- * Wires the Solution domain and boots the service provider of every installed Solution with a valid
- * manifest. A Solution's provider is never listed in `extra.laravel.providers`: Laravel's package
+ * Wires the Solution domain and boots the service provider of every installed connector and Solution with a valid
+ * manifest, connectors first. A Solution's provider is never listed in `extra.laravel.providers`: Laravel's package
  * discovery would boot it whether or not its manifest holds up.
  *
  * Around each Solution provider's `boot()` the console registry is opened for that Solution's id and closed again, so
@@ -44,6 +49,7 @@ final class SolutionServiceProvider extends ServiceProvider
         $this->app->singletonIf(InstalledPackagesReader::class, fn ($app): InstalledPackagesReader => new InstalledPackagesReader($app->basePath('vendor')));
         $this->app->singletonIf(SolutionCache::class, fn ($app): SolutionCache => new SolutionCache($app->bootstrapPath('cache/fapost-solutions.php')));
         $this->app->singletonIf(InstalledSolutions::class);
+        $this->app->singletonIf(InstalledConnectors::class);
         $this->app->singletonIf(ConsoleExtensionRegistry::class);
         $this->app->singletonIf(ConsoleExtensionsInterface::class, static fn (Application $app): ConsoleExtensionRegistry => $app->make(ConsoleExtensionRegistry::class));
         // The web root is read when the publisher is made, so a test can point it elsewhere first.
@@ -54,6 +60,7 @@ final class SolutionServiceProvider extends ServiceProvider
             $app->publicPath(),
         ));
         $this->app->singletonIf(PublishedSolutionUi::class);
+        $this->app->singletonIf(SolutionUiCompatibility::class, static fn (Application $app): SolutionUiCompatibility => new SolutionUiCompatibility((array) config('solutions.console_runtime', [])));
 
         $this->app->bind(InstalledSolutionCatalogInterface::class, CoreInstalledSolutionCatalog::class);
 
@@ -61,11 +68,22 @@ final class SolutionServiceProvider extends ServiceProvider
         // memo per tenant id, so no process holds one tenant's answer for another or past a deactivation.
         $this->app->bind(SolutionActivationStoreInterface::class, EloquentSolutionActivationStore::class);
         $this->app->scoped(ActiveSolutions::class);
+        // What a tenant may run is the operator's answer. bindIf: an operator package registers before this provider
+        // and its binding wins; without one every installed Solution is entitled. Asked through the scoped,
+        // tenant-keyed SolutionEntitlements only.
+        $this->app->bindIf(SolutionEntitlementInterface::class, AllSolutionsEntitled::class);
+        $this->app->scoped(SolutionEntitlements::class);
         $this->app->bind(SolutionActivator::class);
 
         // Implemented outside the domain, in App\Infrastructure\Solution: it writes into the registries of the
         // domains a Solution extends.
         $this->app->singleton(SolutionRegistrarFactoryInterface::class, SolutionCoreRegistrarFactory::class);
+
+        // Connectors come first: they bring channels for the whole installation, which a Solution's flows may rely on.
+        // There is no activation and no registrar for them yet, only the provider.
+        foreach ($this->app->make(InstalledConnectors::class)->all() as $connector) {
+            $this->app->register($this->app->resolveProvider($connector->provider));
+        }
 
         $solutions = $this->app->make(InstalledSolutions::class)->all();
 

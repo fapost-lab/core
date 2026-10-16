@@ -38,7 +38,7 @@ sessions. The platform is extended from outside through public contracts, not by
 | `media` | `app/Domains/Media` | Media storage, deduplication, channel asset cache | — |
 | `assistant` | `app/Domains/Assistant` | The assistant aggregate and the current-assistant context | — |
 | `staff` | `app/Domains/Staff` | Staff users, roles, staff notifications | — |
-| `solution` | `app/Domains/Solution` | Installed Solution packages: manifest discovery and validation, the catalog and its cache, `platform:update`, per-tenant activation (`ActiveSolutions`, `SolutionActivator`), the console extension registry (`Console/ConsoleExtensionRegistry`) and the check and publication of a Solution's prebuilt console UI (`SolutionUiBundleReader`, `SolutionUiPublisher`, `PublishedSolutionUi`) | Depend on a domain other than the Tenancy contracts, or on the database outside `Infrastructure` |
+| `solution` | `app/Domains/Solution` | Installed extension packages — Solutions and, experimental, connectors (`adr-20261016-connector-package-type`): manifest discovery and validation, the catalog and its cache, `platform:update`, per-tenant activation (`ActiveSolutions`, `SolutionActivator`), the console extension registry (`Console/ConsoleExtensionRegistry`) and the check and publication of a Solution's prebuilt console UI (`SolutionUiBundleReader`, `SolutionUiPublisher`, `PublishedSolutionUi`) | Depend on a domain other than the Tenancy contracts, or on the database outside `Infrastructure` |
 
 `app/Infrastructure/<X>` also holds the seams that compose two domains so neither knows the other:
 `app/Infrastructure/Solution` writes a Solution's actions into the Flow registry and answers Flow's
@@ -60,7 +60,7 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   Foundation, a primitive with no domain meaning into Support, anything with one domain's meaning
   stays in Core (ADR-05).
 - **The extension packages are separate repositories.** Core consumes them through VCS
-  repositories (`fapost/foundation ^0.19`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
+  repositories (`fapost/foundation ^0.22`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
   symlinked over `vendor/` by `composer dev:link` (`tools/dev-link-packages.php`). The console kit is
   one too: the npm package `@fapost/ui` (`fapost-lab/ui`), checked out in `packages/fapost-ui` and
   linked over `node_modules/` by `npm run dev:link` (`tools/dev-link-npm.mjs`); it depends on nothing
@@ -81,7 +81,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
 - **The extension surface is partly built.** Present: the action handler registry
   (`Flow/Action/ActionHandlerRegistry`). The builder's former vendor-component glob
   (`vendorComponents.ts`) is removed: Solution UI goes to the console prebuilt
-  (`adr-20261014-solution-console-ui`). The Solution manifest, a data
+  (`adr-20261014-solution-console-ui`). Connector packages (`type: fapost-connector`) are found,
+  validated and booted for the whole installation beside Solutions, but cannot register a channel yet
+  (`adr-20261016-connector-package-type`, experimental). The Solution manifest, a data
   block in the package's `composer.json`, is read and validated by `platform:update` (`solution`
   domain). A tenant's Solution activation is stored in its schema and read only through `ActiveSolutions`
   (`adr-20261014-solution-activation-in-tenant-schema`). Core implements `CoreRegistrarInterface` for

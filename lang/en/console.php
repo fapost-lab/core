@@ -6,6 +6,7 @@ return [
     'navigation' => [
         'dashboard' => 'Dashboard',
         'menu'      => 'Menu',
+        'system'    => 'System',
     ],
 
     'breadcrumbs' => [
@@ -1378,6 +1379,86 @@ return [
         ],
         'empty'      => 'There are no limits to show.',
         'empty_hint' => 'Limits appear here when the platform or your plan defines them.',
+    ],
+
+    // The Solutions screen of the admin panel: what is installed, what the tenant has on, what each one adds.
+    'solutions' => [
+        'navigation'  => 'Solutions',
+        'title'       => 'Solutions',
+        'description' => 'Extension packages installed for this platform. Turn a Solution on to let this workspace use what it adds; turn it off to stop, with its data kept.',
+        'empty'       => 'No Solutions are installed',
+        'empty_hint'  => 'A Solution is installed by whoever runs the platform. Once it is, it appears here.',
+        'version'     => 'Version :version',
+        'package'     => 'Package :package',
+        'state'       => [
+            'active'   => 'On',
+            'inactive' => 'Off',
+        ],
+        'activate'    => 'Turn on',
+        'deactivate'  => 'Turn off',
+        'details'     => 'Details',
+        'last_change' => [
+            'activated'   => 'Turned on by :actor, :date',
+            'deactivated' => 'Turned off by :actor, :date',
+            'unknown'     => 'someone',
+        ],
+        'registers' => [
+            'title'   => 'What it adds',
+            'actions' => 'Flow actions',
+            'none'    => 'This Solution adds nothing to flows or the console.',
+        ],
+        'ui' => [
+            'title'         => 'Console',
+            'application'   => 'Application: :label',
+            'pages'         => 'Pages',
+            'not_published' => 'Its console interface is not published yet, so it does not appear in the console. It is published when the platform is next updated.',
+            'inactive_note' => 'Nothing below shows in the console while the Solution is off.',
+        ],
+        'points' => [
+            'context_action'   => 'Action',
+            'shell_element'    => 'Shell element',
+            'dashboard_widget' => 'Dashboard widget',
+            'settings_tab'     => 'Settings tab',
+            'table_column'     => 'Table column',
+        ],
+        'kit' => [
+            'badge'       => 'Interface does not fit',
+            'title'       => 'Cannot be turned on: its console interface does not fit',
+            'description' => 'Its console interface was built for versions this platform does not ship, so it cannot be turned on until the Solution is rebuilt. If it is already on, it can still be turned off.',
+            'mismatch'    => ':runtime: built for :required, this platform ships :provided.',
+            'unreadable'  => ':runtime: built for ":required", a range this platform cannot evaluate; it ships :provided.',
+            'runtime'     => [
+                'kit'     => 'Interface kit',
+                'vue'     => 'Vue',
+                'inertia' => 'Inertia',
+            ],
+        ],
+        'entitlement' => [
+            'badge'            => 'Not in your plan',
+            'paused'           => 'Paused',
+            'not_entitled'     => 'This Solution is not included in your plan.',
+            'unavailable'      => 'Your plan could not be checked right now. Try again later.',
+            'paused_note'      => 'It is on for this workspace but does not run, because it is not included in your plan. Its data is kept, and it runs again by itself once it is included.',
+            'off_note'         => 'It is not included in your plan, so it cannot be turned on.',
+            'unavailable_note' => 'Your plan could not be checked right now, so Solutions cannot be turned on. Those already on keep running.',
+        ],
+        'deactivate_dialog' => [
+            'title'       => 'Turn off :name?',
+            'description' => 'Flows that call its actions will stop at the error output of that node with the reason solution_inactive, and what it added to the console disappears. Its data is kept and comes back if you turn it on again.',
+            'confirm'     => 'Turn off',
+        ],
+        'missing' => [
+            'title'       => 'No longer installed',
+            'description' => 'These Solutions are still on for this workspace, but their package is no longer installed, so they do nothing. Turn them off to clear them; if the package returns, you can turn it on again.',
+        ],
+        'flash' => [
+            'activated'        => 'Solution :solution is on.',
+            'already_active'   => 'Solution :solution was already on.',
+            'deactivated'      => 'Solution :solution is off. Its data is kept.',
+            'already_inactive' => 'Solution :solution was already off.',
+            'not_allowed'      => 'This workspace may not turn that Solution on.',
+            'refused'          => 'Solution :solution was not turned on. :reasons',
+        ],
     ],
 
     'admin_dashboard' => [

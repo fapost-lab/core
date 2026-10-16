@@ -6,11 +6,15 @@ namespace App\Console\Commands\Platform;
 
 use App\Console\Platform\PlatformMigratorInterface;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
+use App\Domains\Solution\DTO\ConnectorDiscovery;
+use App\Domains\Solution\DTO\ExtensionDiscovery;
+use App\Domains\Solution\DTO\InstalledConnector;
 use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\DTO\SolutionDiscovery;
 use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
+use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Solution\Services\SolutionUiPublisher;
 use Illuminate\Console\Command;
 
@@ -26,10 +30,10 @@ final class UpdatePlatformCommand extends Command
 {
     /** @var string */
     protected $signature = 'platform:update
-        {--validate-only : Only check the installed Solutions; touch neither the database nor the cache}';
+        {--validate-only : Only check the installed Solutions and connectors; touch neither the database nor the cache}';
 
     /** @var string */
-    protected $description = 'Validate installed Solutions, migrate the landlord and tenant schemas, and cache the Solution catalog';
+    protected $description = 'Validate installed Solutions and connectors, migrate the landlord and tenant schemas, and cache the Solution catalog';
 
     public function handle(
         SolutionDiscoverer $discoverer,
@@ -38,15 +42,17 @@ final class UpdatePlatformCommand extends Command
         ActionHandlerRegistry $actions,
         SolutionUiPublisher $publisher,
         PublishedSolutionUi $published,
+        SolutionUiCompatibility $compatibility,
     ): int {
-        $discovery = $discoverer->discover();
+        $all       = $discoverer->discoverAll();
+        $discovery = $all->solutions;
 
         foreach ($discovery->warnings as $warning) {
             $this->components->warn($warning);
         }
 
-        if (!$discovery->isValid()) {
-            $this->reportViolations($discovery);
+        if (!$all->isValid()) {
+            $this->reportViolations($all);
 
             return self::FAILURE;
         }
@@ -55,6 +61,21 @@ final class UpdatePlatformCommand extends Command
 
         foreach ($ui['warnings'] as $warning) {
             $this->components->warn($warning);
+        }
+
+        // A bundle built for another kit, Vue or Inertia than this platform ships is a warning here and a refusal on the
+        // activation screen (adr-20261014-solution-console-ui, Stability).
+        foreach ($ui['sources'] as $source) {
+            foreach (null === $source->bundle ? [] : $compatibility->mismatches($source->bundle) as $mismatch) {
+                $this->components->warn(sprintf(
+                    '%s: console UI is built for %s %s%s, this platform ships %s; the Solution cannot be activated until it is rebuilt.',
+                    $source->solutionId,
+                    $mismatch->component,
+                    $mismatch->required,
+                    $mismatch->unreadable ? ' (a range that cannot be read)' : '',
+                    $mismatch->provided,
+                ));
+            }
         }
 
         if ([] !== $ui['problems']) {
@@ -69,6 +90,9 @@ final class UpdatePlatformCommand extends Command
 
         $this->components->info(sprintf('Solution manifests are valid (%d installed).', count($discovery->valid)));
         $this->reportSolutions($discovery);
+
+        $this->components->info(sprintf('Connector manifests are valid (%d installed).', count($all->connectors->valid)));
+        $this->reportConnectors($all->connectors);
 
         $unregistered = $this->unregisteredActions($discovery, $actions);
 
@@ -99,7 +123,7 @@ final class UpdatePlatformCommand extends Command
         }
 
         $computed = $published->compute($discovery->valid);
-        $cache->write($discovery, array_values($computed['bundles']), $computed['watched']);
+        $cache->write($discovery, array_values($computed['bundles']), $computed['watched'], $all->connectors);
         $this->components->info('Solution catalog cached.');
         $this->line('Restart the queue workers so they run the new code: php artisan horizon:terminate');
 
@@ -127,11 +151,13 @@ final class UpdatePlatformCommand extends Command
         return $lines;
     }
 
-    private function reportViolations(SolutionDiscovery $discovery): void
+    private function reportViolations(ExtensionDiscovery $discovery): void
     {
-        $this->components->error(sprintf('%d manifest problem(s). Nothing was changed.', count($discovery->violations)));
+        $violations = $discovery->violations();
 
-        foreach ($discovery->violations as $violation) {
+        $this->components->error(sprintf('%d manifest problem(s). Nothing was changed.', count($violations)));
+
+        foreach ($violations as $violation) {
             $this->line('  ' . $violation->line());
         }
     }
@@ -150,6 +176,26 @@ final class UpdatePlatformCommand extends Command
                     $solution->package,
                     $solution->version ?? '-',
                     $solution->foundationConstraint,
+                ],
+                $discovery->valid,
+            ),
+        );
+    }
+
+    private function reportConnectors(ConnectorDiscovery $discovery): void
+    {
+        if ([] === $discovery->valid) {
+            return;
+        }
+
+        $this->table(
+            ['Id', 'Package', 'Version', 'Channels'],
+            array_map(
+                static fn (InstalledConnector $connector): array => [
+                    $connector->id,
+                    $connector->package,
+                    $connector->version ?? '-',
+                    implode(', ', $connector->channels),
                 ],
                 $discovery->valid,
             ),

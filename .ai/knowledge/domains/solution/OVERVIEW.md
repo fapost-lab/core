@@ -28,6 +28,15 @@ paths:
   - tests/Architecture/SolutionBoundariesTest.php
   - "tests/Fixtures/Solutions/**"
   - tests/Support/InstallsShowcaseSolution.php
+  - app/Http/Controllers/Admin/SolutionController.php
+  - app/Http/Shell/SolutionsPresenter.php
+  - "resources/js/pages/Console/AdminSolutions/**"
+  - tests/Feature/Console/AdminSolutionsConsoleTest.php
+  - config/solutions.php
+  - tests/Support/FakeSolutionEntitlement.php
+  - "tests/Fixtures/Connectors/**"
+  - "testing/**"
+  - "tests/Feature/Testing/**"
 reviewed_at: 2026-10-16
 ---
 # Solution
@@ -67,6 +76,15 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   It wraps each provider in `booting`/`booted` callbacks that open and close the console registry for that
   Solution's id, and freezes the registry once the application has booted (`solutions.freeze_console_registry`,
   off in `phpunit.xml` only, because tests register fixture Solutions after boot).
+- Connectors (`adr-20261016-connector-package-type`, experimental): packages of `type: fapost-connector`
+  are found by the same `InstalledPackagesReader` scan; `SolutionManifestValidator` skips them silently,
+  `ConnectorManifestValidator` applies Foundation's `ConnectorManifestParser`, then checks the provider
+  extends `AbstractConnectorServiceProvider` and that no two connectors share an id or a channel type.
+  `SolutionDiscoverer::discoverAll()` returns both discoveries (`ExtensionDiscovery`) after removing ids
+  claimed by a Solution and a connector at once; `discover()` keeps returning the Solution half.
+  `InstalledConnectors` is the catalog; `SolutionCache` keeps it under a `connectors` key of the same file
+  (a file without that key is stale for connectors only). `SolutionServiceProvider` registers connector
+  providers before the Solution ones, with no activation and, for now, no registrar.
 - Console UI (`adr-20261014-solution-console-ui`, experimental; rules in `conventions/solution-console-ui.md`):
   - `Console/ConsoleExtensionRegistry` implements Foundation's `ConsoleExtensionsInterface`: a process
     singleton (it depends on the image, never on a tenant) that accepts declarations only inside a Solution
@@ -87,14 +105,39 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   `solution_activations` (state, one row per Solution) and `solution_activation_events` (append-only
   journal), behind `Contracts/SolutionActivationStoreInterface` and `Infrastructure/EloquentSolutionActivationStore`.
   - `ActiveSolutions` (`isActive`, `ids`) is the only source of the effective state (raw rows and the journal are read through the store port: `all()`, `events()`). Bound `scoped`, memoised per tenant id,
-    one lazy indexed query. Active = stored `active` AND installed with a valid manifest, so a removed
-    package or a broken manifest makes a Solution inactive with no write; reading never writes.
+    one lazy indexed query. Active = stored `active` AND installed with a valid manifest AND entitled by the
+    operator, so a removed package, a broken manifest or a lost entitlement makes a Solution inactive with no
+    write; reading never writes. `isEntitled()`/`entitlement()` tell screens and commands why one does not run.
+  - Entitlement (amendment of the activation ADR, 2026-10-16): Foundation's `SolutionEntitlementInterface` is asked
+    only by the `scoped` `Services/SolutionEntitlements` (memo per tenant id, one question per tenant and scope, an
+    exception reported once and remembered as unavailable). Default `AllSolutionsEntitled` (`bindIf`). Fail open in
+    `ActiveSolutions` (the factor is left out), fail closed in `SolutionActivator::activate`
+    (`SolutionEntitlementUnavailableException`); a Solution not entitled is refused for every actor
+    (`SolutionNotEntitledException`). The operator is not asked when the tenant has nothing stored active and installed.
   - `SolutionActivator` (`activate`, `deactivate`) is the only writer, with an `ActivationActor` (`user`,
     `console`, `operator`, `system`). Idempotent; row and journal entry in one transaction under a row
-    lock; activating a Solution that is not installed throws `SolutionNotInstalledException`,
+    lock; activating a Solution that is not installed throws `SolutionNotInstalledException` (not entitled:
+    `SolutionNotEntitledException`; entitlement unreadable: `SolutionEntitlementUnavailableException`),
     deactivating one is allowed; it then drops its tenant's memo. Default: nothing active.
   - `solutions:activate|deactivate|list` need `--tenant=<slug>` and run inside `runForTenant()`.
     The `onActivate`/`onDeactivate` hooks are not called yet.
+  - The activation screen is `admin/solutions` (`Admin\SolutionController`, props from `Http/Shell/SolutionsPresenter`,
+    page `Console/AdminSolutions`), behind `manage_settings` like tenant settings and usage. It lists only valid Solutions
+    (a failing manifest never reaches the catalog, and `platform:update` refuses it first) plus stored-active rows whose
+    package is gone ("no longer installed", which can only be turned off). Activate and deactivate are POSTs through
+    `SolutionActivator` with `ActivationActor::user(id, name)`, so the journal names the staff user; deactivation asks for
+    confirmation and says the data is kept. What a Solution "registers" is its manifest actions plus its declarations in
+    `ConsoleExtensionRegistry`, shown whether or not it is on. `SolutionsPresenter::isActivatable()` is the one place the
+    entitlement step (`solution-entitlement-seam`) will be asked what a tenant may have; the controller checks it again.
+  - `SolutionUiCompatibility` follows `adr-20261014-solution-console-ui` (Stability): the `kit` range a bundle declares
+    (kept on `SolutionUiBundle`, with `vue` and `inertia`; null in a cache older than that) is checked with `composer/semver`
+    (a direct dependency since 2026-10-16, owner-approved by the ADR) against `config/solutions.php: console_runtime`;
+    Vue and Inertia are checked by major, i.e. whether the range admits any version of the shipped major. A range the
+    library cannot read counts as a mismatch. `ConsoleRuntimeConfigTest` holds the config equal to `package-lock.json`.
+    A mismatch makes `SolutionsPresenter::isActivatable()` false: the card shows the reason beside a disabled button, the
+    controller refuses a direct POST with a flashed reason, and `platform:update` warns (exit 0). Turning off is always
+    allowed. Not done: an already-active Solution whose range fails after a Core upgrade is still served its UI, because
+    `SolutionUi::isServable()` still passes every bundle (the ADR says it should not; `first-solution` phase 0).
 - `platform:update` also checks that every action a valid manifest declares is registered in the booted
   `ActionHandlerRegistry` (`<package>: extra.fapost.actions[i]: "<id>" is declared but not registered`, exit 1), after the manifest and console UI checks and before any migration.
 - `platform:update` (`app/Console/Commands/Platform`): validate the manifests and the console UI bundles, then
@@ -109,7 +152,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   PHPat (`SolutionBoundariesTest`) forbids a dependency on any other `App\Domains` namespace, and
   forbids facades and `Illuminate\Database` outside `Infrastructure` and `Providers`, so discovery
   and the services run without a database.
-- Not here yet: registrar methods other than `registerActionHandler`, the activation screen, the entitlement check, per-phase migrations of a Solution, the `migrations` manifest field, and the kit/Vue/Inertia range check of a bundle (`SolutionUi::isServable()` is its seam; `first-solution` phase 0).
+- Not here yet: registrar methods other than `registerActionHandler`, per-phase migrations of a Solution, the `migrations` manifest field, and hiding the UI of an active Solution whose kit range fails (`SolutionUi::isServable()` is the seam; `first-solution` phase 0).
   Plugins (`type: fapost-plugin`) are reserved and not discovered.
 - The Foundation constraint is not re-checked in Core: Composer refuses to install a package whose
   `require["fapost/foundation"]` does not fit the locked version, and a package Composer did not
@@ -125,11 +168,30 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
 - `app/Console/Commands/Platform/UpdatePlatformCommand.php`
 - `app/Domains/Solution/Services/ActiveSolutions.php`, `SolutionActivator.php`
 - `app/Console/Commands/Platform/ActivateSolutionCommand.php`, `DeactivateSolutionCommand.php`, `ListSolutionsCommand.php`
+- `app/Http/Controllers/Admin/SolutionController.php`, `app/Http/Shell/SolutionsPresenter.php`, `resources/js/pages/Console/AdminSolutions/`
 - `app/Domains/Solution/Console/ConsoleExtensionRegistry.php`, `Services/SolutionUiPublisher.php`
 - Tests: `tests/Unit/Domains/Solution`, `tests/Feature/Domains/Solution`; a throwaway vendor tree is
   built by `tests/Support/FakeVendor.php` from the fixture package in `tests/Fixtures/Solution`. The console
   fixture `showcase` (every point, both route kinds, a committed hand-written `dist/`) is
   `tests/Fixtures/Solutions/Showcase`, installed by `tests/Support/InstallsShowcaseSolution.php`.
+- A real Composer-installed Solution lives outside Core: `fapost-lab/solution-hello-world` (id `hello`, one action,
+  one console page from a committed `dist/`), installed by the composer overlay and tested inside Core by its own CI on
+  Core's main and latest release, and by Core's CI (job `solution` in `.github/workflows/ci.yml`) on every Core
+  pull request, at a pinned commit: a change in the Solution's repository never turns a Core PR red, and the pin is
+  moved on purpose in a Core PR. It is the interim form of the first-solution roadmap item that tests a generated
+  package in Core's CI. It is the check that the overlay → installed.json → manifest → provider → bundle path
+  works for a package Core never names; the fixtures above cannot prove that, because FakeVendor builds the vendor tree.
+  Its tests use only Foundation and the Solution testing kit below.
+- The Solution testing kit is `testing/` (`Fapost\Testing\`, Core's autoload-dev, `@experimental`), documented in
+  `docs/site/extending/testing.mdx`. It lives in Core, not Foundation or its own package, because a Solution's tests
+  always run inside a Core checkout: the kit is always the version of the Core under test, and a Core change that breaks
+  it fails Core's CI in the same pull request (gate of `solution-testing-kit`, 2026-10-16). `Fapost\Testing\Support`
+  and `Concerns` are `@internal`. Keep three things honest when changing Solution internals: Core's `FeatureTestCase`
+  uses the kit's `PreparesCoreDatabase`, so the database set-up is one; the singletons a new request would not carry
+  are listed once, in `SolutionRequestState`, which `InstallsShowcaseSolution` uses too — a new per-request Solution
+  singleton goes there; and `tests/Feature/Testing/SolutionTestCaseTest.php` exercises every kit method on the
+  showcase fixture (with the `showcase.ping` action). State shared across test classes in one process lives in
+  `CoreDatabaseState`, never in a trait's static property: a trait static is copied per using class.
 - The lifecycle proof is one suite, `tests/Feature/Domains/Solution/SolutionLifecycleTest.php`: the fixtures `feedback` (actions)
   and `showcase` (console UI) installed together, `platform:update --validate-only` and the full update, activation for
   tenant A, a real flow whose `call` node reaches the action through the FlowEngine, the builder's test call, the
