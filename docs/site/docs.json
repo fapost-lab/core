@@ -157,6 +157,7 @@
             "pages": [
               "extending/development-setup",
               "extending/solutions",
+              "extending/connectors",
               "extending/plugins"
             ]
           },

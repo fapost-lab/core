@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Solution;
 
+use App\Domains\Solution\Services\InstalledConnectors;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\InstalledSolutions;
 use App\Domains\Solution\Services\SolutionCache;
@@ -53,6 +54,55 @@ final class SolutionCacheTest extends TestCase
         $this->assertSame('feedback', $solutions[0]->id);
         $this->assertSame(['feedback.submit', 'feedback.score'], $solutions[0]->actions);
         $this->assertSame('1.0.0', $solutions[0]->version);
+    }
+
+    public function test_connectors_are_written_and_read_back_beside_the_solutions(): void
+    {
+        $this->vendor->package(FakeVendor::connectorComposer(), '2.0.0')->write();
+
+        $all = $this->discoverer->discoverAll();
+        $this->cache->write($all->solutions, connectors: $all->connectors);
+
+        $connectors = $this->cache->connectors();
+        $this->assertNotNull($connectors);
+        $this->assertSame('echo', $connectors[0]->id);
+        $this->assertSame('acme/fapost-connector-echo', $connectors[0]->package);
+        $this->assertSame(['echo'], $connectors[0]->channels);
+        $this->assertSame('2.0.0', $connectors[0]->version);
+        $this->assertSame('feedback', $this->cache->read()[0]->id ?? null);
+
+        $installed = new InstalledConnectors($this->cache, new SolutionDiscoverer(
+            new InstalledPackagesReader('/nonexistent'),
+            new SolutionManifestValidator(new ManifestParser()),
+        ));
+        $this->assertTrue($installed->has('echo'));
+        $this->assertSame('Echo', $installed->find('echo')?->name);
+    }
+
+    public function test_a_cache_without_connectors_still_serves_solutions_and_the_connectors_are_built_in_memory(): void
+    {
+        $this->vendor->package(FakeVendor::connectorComposer())->write();
+        $this->cache->write($this->discoverer->discover());
+
+        $this->assertNotNull($this->cache->read());
+        $this->assertNull($this->cache->connectors());
+        $this->assertSame(['echo'], array_map(
+            static fn ($connector): string => $connector->id,
+            (new InstalledConnectors($this->cache, $this->discoverer))->all(),
+        ));
+    }
+
+    public function test_the_cache_is_stale_once_the_composer_json_of_a_connector_is_edited(): void
+    {
+        $this->vendor->package(FakeVendor::connectorComposer())->write();
+        $all = $this->discoverer->discoverAll();
+        $this->cache->write($all->solutions, connectors: $all->connectors);
+        $this->assertNotNull($this->cache->connectors());
+
+        $this->vendor->writePackageFile('acme/fapost-connector-echo', json_encode(FakeVendor::connectorComposer(['name' => 'Echo v2'])));
+
+        $this->assertNull($this->cache->connectors());
+        $this->assertNull($this->cache->read());
     }
 
     public function test_the_cache_is_stale_once_installed_json_changes(): void

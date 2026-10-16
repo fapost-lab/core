@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Solution\Services;
 
+use App\Domains\Solution\DTO\ConnectorDiscovery;
+use App\Domains\Solution\DTO\InstalledConnector;
 use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\DTO\SolutionDiscovery;
 use App\Domains\Solution\DTO\SolutionUiBundle;
@@ -17,6 +19,9 @@ use Throwable;
  * missing, unreadable or stale it is ignored and the catalog is built in memory. It records the size
  * and modification time of installed.json and of the composer.json of every candidate package, valid or not; any difference makes
  * it stale. A request never writes it.
+ *
+ * The valid connectors live in the same file under `connectors`. A cache written before connectors existed has no such
+ * key and says nothing about them, so {@see connectors()} returns null for it and the list is built in memory.
  *
  * Beside the catalog it keeps the published console UI bundles ({@see PublishedSolutionUi}), so a request reads
  * neither `fapost-ui.json` nor `public/solutions/`.
@@ -54,6 +59,27 @@ final class SolutionCache
     }
 
     /**
+     * @return list<InstalledConnector>|null null when there is no usable, fresh cache, or it was written without connectors
+     */
+    public function connectors(): ?array
+    {
+        $data = $this->load();
+
+        if (null === $data || !is_array($data['connectors'] ?? null)) {
+            return null;
+        }
+
+        try {
+            return array_values(array_map(
+                static fn (mixed $connector): InstalledConnector => InstalledConnector::fromArray((array) $connector),
+                $data['connectors'],
+            ));
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    /**
      * The published console UI bundles the cache recorded, by Solution id.
      *
      * @return array<string, SolutionUiBundle>|null null when there is no usable, fresh cache
@@ -82,23 +108,30 @@ final class SolutionCache
     }
 
     /**
+     * @param  ConnectorDiscovery|null  $connectors  the connectors to record; null writes a cache that says nothing about them
      * @param  list<SolutionUiBundle>  $bundles  the published console UI bundles
      * @param  list<string>  $watchedFiles  more files whose change makes the cache stale: the `fapost-ui.json` of each
      *                                      Solution, so a new build is not taken for the published one
      */
-    public function write(SolutionDiscovery $discovery, array $bundles = [], array $watchedFiles = []): void
+    public function write(SolutionDiscovery $discovery, array $bundles = [], array $watchedFiles = [], ?ConnectorDiscovery $connectors = null): void
     {
         $files = [$discovery->installedJsonPath => $this->stamp($discovery->installedJsonPath)];
 
-        foreach ([...$discovery->watchedFiles, ...$watchedFiles] as $file) {
+        foreach ([...$discovery->watchedFiles, ...($connectors->watchedFiles ?? []), ...$watchedFiles] as $file) {
             $files[$file] = $this->stamp($file);
         }
 
-        $contents = '<?php return ' . var_export([
+        $data = [
             'files'     => $files,
             'solutions' => array_map(static fn (InstalledSolution $solution): array => $solution->toArray(), $discovery->valid),
             'bundles'   => array_map(static fn (SolutionUiBundle $bundle): array => $bundle->toArray(), $bundles),
-        ], true) . ";\n";
+        ];
+
+        if (null !== $connectors) {
+            $data['connectors'] = array_map(static fn (InstalledConnector $connector): array => $connector->toArray(), $connectors->valid);
+        }
+
+        $contents = '<?php return ' . var_export($data, true) . ";\n";
 
         $temporary = $this->path . '.' . bin2hex(random_bytes(4)) . '.tmp';
 
@@ -121,7 +154,7 @@ final class SolutionCache
     /**
      * The cached data when the file is there, readable and fresh.
      *
-     * @return array{files: array<string, mixed>, solutions: array<mixed>, bundles?: array<mixed>}|null
+     * @return array{files: array<string, mixed>, solutions: array<mixed>, bundles?: array<mixed>, connectors?: array<mixed>}|null
      */
     private function load(): ?array
     {
@@ -142,7 +175,7 @@ final class SolutionCache
                 }
             }
 
-            /** @var array{files: array<string, mixed>, solutions: array<mixed>, bundles?: array<mixed>} $data */
+            /** @var array{files: array<string, mixed>, solutions: array<mixed>, bundles?: array<mixed>, connectors?: array<mixed>} $data */
             return $data;
         } catch (Throwable) {
             return null;

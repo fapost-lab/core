@@ -14,7 +14,7 @@ paths:
   - "contracts/ingress/**"
   - config/webhook.php
   - "tests/Unit/Domains/Webhook/**"
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-16
 ---
 # Channel ingress rules
 
@@ -29,6 +29,10 @@ broken.
   hash, in both runtimes. Why *(inferred)*: a provider must neither retry-storm on errors nor
   learn which hashes exist.
 - **Signatures are compared in constant time** (`hash_equals`, `hmac.Equal`).
+- **An empty channel secret refuses every scheme but `none`,** in both runtimes. Compared
+  directly it would match an absent header or parameter, and as an HMAC key it lets anyone sign.
+  An adapter without a spec is never asked to verify against one (`WebhookController`). Enforced:
+  the `empty secret` cases in `contracts/ingress/golden.json`, `WebhookControllerTest`.
 - **Deduplication uses the same `processed:<key>` shape and 24-hour TTL in both runtimes;** the
   gateway releases the key if the queue push fails.
 - **PHP and Go verification behave identically.** Enforced: `IngressSpecGoldenTest`,

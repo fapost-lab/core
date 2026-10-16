@@ -1,6 +1,6 @@
 ---
 title: "Extension model"
-description: "How Features, Solutions, and Plugins differ."
+description: "How Features, Solutions, Connectors, and Plugins differ."
 ---
 
 <Note>
@@ -9,13 +9,14 @@ description: "How Features, Solutions, and Plugins differ."
   registrable, the page says so instead of implying it works.
 </Note>
 
-FaPost Core can be extended in three ways. They differ in who owns the code, how it
+FaPost Core can be extended in four ways. They differ in who owns the code, how it
 is deployed, and what it is allowed to do to the front end.
 
 | | Lives in | Front end | Released with |
 |---|---|---|---|
 | **Feature** | The Core repository | May ship Core UI | Core itself |
 | **Solution** | Your own Composer package | Prebuilt console UI through the [console UI contract](/extending/console-ui) | Its own release cycle |
+| **Connector** | Your own Composer package | None yet | Its own release cycle |
 | **Plugin** | Your own Composer package | No arbitrary runtime Vue | Its own release cycle |
 
 <Note>
@@ -47,10 +48,17 @@ belong in `fapost/support`, which itself depends on no FaPost package except `fa
 [console UI contract](/extending/console-ui): declared in PHP and shipped
 prebuilt, not by dropping Vue files into the running application.
 
+## Connector
+
+A connector brings a messaging channel — Telegram, Viber — to an installation. It is
+a Composer package installed with the image, like a Solution, but it is not activated
+per tenant: its channel types exist for the whole installation. See
+[Connectors](/extending/connectors); the format is experimental.
+
 ## Plugin
 
-A Plugin registers runtime behaviour with Core: node handlers, transports,
-commands, routes, schedules, migrations. It is the smallest of the three and the
+A Plugin registers runtime behaviour with Core: node handlers,
+commands, routes, schedules, migrations. It is the smallest of them and the
 most constrained, because it is installed into a running system rather than built
 into it.
 
@@ -58,7 +66,7 @@ A Plugin depends on public contracts, never on concrete Core internals, and it
 cannot inject arbitrary Vue components into the builder — the front end is already
 compiled by the time a Plugin is enabled.
 
-## The rule underneath all three
+## The rule underneath all of them
 
 Everything outside the Core repository depends on `fapost/foundation`, never on
 `App\…`. That single constraint is what makes Core able to refactor its own

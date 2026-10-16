@@ -7,9 +7,10 @@ A channel has two halves: **ingress**, which accepts and verifies what the provi
 sends you, and **egress**, which delivers what the assistant says back.
 
 <Warning>
-  `CoreRegistrarInterface` has no channel-adapter surface today. The contracts
-  below exist and are stable, but there is no registration entry point for a
-  Plugin to add a channel with — a new provider is currently a Core change.
+  A channel ships as a [Connector](/extending/connectors) package. Core already
+  finds and boots connectors, but there is no registration entry point for a
+  connector to add its channel with yet: the contracts below exist and are stable,
+  and a new provider is still a Core change until that entry point ships.
 </Warning>
 
 ## Identity
@@ -41,7 +42,7 @@ is authenticated and deduplicated through an `IngressSpec`, exposed by
 | Piece | Role |
 |---|---|
 | `IngressSpec` | The declarative description of a provider's webhook contract |
-| `SignatureScheme` | How the request is verified — for example `header_equals` |
+| `SignatureScheme` | How the request is verified — for example `header_equals` (a header equals the channel secret) or `hmac_sha256` (a header carries an HMAC-SHA256 of the raw body, keyed by the channel secret) |
 | `SignedRequest` | The request as presented for verification |
 | `IngressSpecExecutor` | Applies a spec to an incoming request |
 | `WebhookRegistrarInterface` / `WebhookRegistrationPayload` | Registering the webhook with the provider |
