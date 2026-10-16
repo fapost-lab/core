@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands\Platform;
 
 use App\Console\Platform\PlatformMigratorInterface;
+use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Solution\DTO\ConnectorDiscovery;
 use App\Domains\Solution\DTO\ExtensionDiscovery;
@@ -43,6 +44,7 @@ final class UpdatePlatformCommand extends Command
         SolutionUiPublisher $publisher,
         PublishedSolutionUi $published,
         SolutionUiCompatibility $compatibility,
+        ConnectorChannels $connectorChannels,
     ): int {
         $all       = $discoverer->discoverAll();
         $discovery = $all->solutions;
@@ -106,6 +108,18 @@ final class UpdatePlatformCommand extends Command
             return self::FAILURE;
         }
 
+        $unregisteredChannels = $this->unregisteredChannels($all->connectors, $connectorChannels);
+
+        if ([] !== $unregisteredChannels) {
+            $this->components->error(sprintf('%d declared channel type(s) are not registered. Nothing was changed.', count($unregisteredChannels)));
+
+            foreach ($unregisteredChannels as $line) {
+                $this->line('  ' . $line);
+            }
+
+            return self::FAILURE;
+        }
+
         if ((bool) $this->option('validate-only')) {
             return self::SUCCESS;
         }
@@ -144,6 +158,26 @@ final class UpdatePlatformCommand extends Command
             foreach ($solution->actions as $index => $actionId) {
                 if (!$actions->has($actionId)) {
                     $lines[] = sprintf('%s: extra.fapost.actions[%d]: "%s" is declared but not registered', $solution->package, $index, $actionId);
+                }
+            }
+        }
+
+        return $lines;
+    }
+
+    /**
+     * A connector that declares a channel type its provider never registered would offer a type nothing serves.
+     *
+     * @return list<string>
+     */
+    private function unregisteredChannels(ConnectorDiscovery $connectors, ConnectorChannels $registered): array
+    {
+        $lines = [];
+
+        foreach ($connectors->valid as $connector) {
+            foreach ($connector->channels as $type) {
+                if ($connector->id !== $registered->ownerOf($type)) {
+                    $lines[] = sprintf('"%s" declares channel type "%s" but does not register it', $connector->id, $type);
                 }
             }
         }

@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Solution;
 
 use App\Console\Platform\PlatformMigratorInterface;
+use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionManifestValidator;
+use Fapost\Foundation\Connector\ConnectorChannel;
 use Fapost\Foundation\Solution\Manifest\ManifestParser;
 use Symfony\Component\Console\Output\OutputInterface;
+use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
+use Tests\Fixtures\Connectors\Echo\EchoSender;
 use Tests\Fixtures\Solution\Actions\FeedbackScoreAction;
 use Tests\Fixtures\Solution\Actions\FeedbackSubmitAction;
 use Tests\Support\FakeVendor;
@@ -95,6 +99,7 @@ final class UpdatePlatformCommandTest extends TestCase
 
     public function test_validate_only_lists_the_installed_connectors(): void
     {
+        $this->registerEchoChannel();
         $this->vendor->package(FakeVendor::connectorComposer(), '1.4.0')->write();
 
         $this->artisan('platform:update', ['--validate-only' => true])
@@ -131,12 +136,39 @@ final class UpdatePlatformCommandTest extends TestCase
     public function test_a_valid_update_caches_the_connectors_with_the_solutions(): void
     {
         $this->registerFeedbackActions();
+        $this->registerEchoChannel();
         $this->vendor->package(FakeVendor::solutionComposer())->package(FakeVendor::connectorComposer())->write();
 
         $this->artisan('platform:update')->assertExitCode(0);
 
         $this->assertSame('echo', $this->cache->connectors()[0]->id ?? null);
         $this->assertSame('feedback', $this->cache->read()[0]->id ?? null);
+    }
+
+    public function test_a_declared_channel_type_that_is_not_registered_fails_the_update_before_migrations_and_cache(): void
+    {
+        $this->vendor->package(FakeVendor::connectorComposer())->write();
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('"echo" declares channel type "echo" but does not register it')
+            ->expectsOutputToContain('Nothing was changed')
+            ->assertExitCode(1);
+
+        $this->assertSame(0, $this->migrations);
+        $this->assertFileDoesNotExist($this->cache->path());
+    }
+
+    public function test_a_channel_type_registered_by_another_connector_does_not_count(): void
+    {
+        $this->app->make(ConnectorChannels::class)->add(
+            new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class),
+            'someone-else',
+        );
+        $this->vendor->package(FakeVendor::connectorComposer())->write();
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('"echo" declares channel type "echo" but does not register it')
+            ->assertExitCode(1);
     }
 
     public function test_solutions_cache_records_the_connectors_too(): void
@@ -245,6 +277,14 @@ final class UpdatePlatformCommandTest extends TestCase
     /**
      * What the booted application holds once the fixture Solution has registered its handlers.
      */
+    private function registerEchoChannel(): void
+    {
+        $this->app->make(ConnectorChannels::class)->add(
+            new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class),
+            'echo',
+        );
+    }
+
     private function registerFeedbackActions(bool $score = true): void
     {
         $registry = $this->app->make(ActionHandlerRegistry::class);

@@ -12,6 +12,8 @@ use App\Domains\Conversation\Enums\DeliveryStatus;
 use App\Domains\Messaging\Exceptions\RateLimitExceededException;
 use App\Domains\Messaging\Exceptions\UnsupportedChannelException;
 use App\Domains\Messaging\MessageSender;
+use App\Domains\Messaging\TenantMessagingRateLimit;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Carbon\CarbonImmutable;
 use Closure;
 use Fapost\Foundation\Messaging\DeliveryResult;
@@ -39,7 +41,7 @@ final class MessageSenderTest extends TestCase
         $redis = $this->redisFactory($connection);
 
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
+        $sender   = new MessageSender($this->registry($provider), $redis, $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
 
         $result = $sender->send($this->message(idempotencyKey: 'idem-1'));
 
@@ -58,7 +60,7 @@ final class MessageSenderTest extends TestCase
         $redis = $this->redisFactory($connection);
 
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
+        $sender   = new MessageSender($this->registry($provider), $redis, $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
 
         $this->expectException(RateLimitExceededException::class);
 
@@ -74,7 +76,7 @@ final class MessageSenderTest extends TestCase
         });
         $redis = $this->redisFactory($connection);
 
-        $sender = new MessageSender($this->registry(null), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
+        $sender = new MessageSender($this->registry(null), $redis, $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
 
         $this->expectException(UnsupportedChannelException::class);
 
@@ -91,7 +93,7 @@ final class MessageSenderTest extends TestCase
         $redis = $this->redisFactory($connection);
 
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
+        $sender   = new MessageSender($this->registry($provider), $redis, $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
 
         $result = $sender->send($this->message(idempotencyKey: 'idem-4'));
 
@@ -119,7 +121,7 @@ final class MessageSenderTest extends TestCase
         $redis = $this->redisFactory($connection);
 
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $redis, 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
+        $sender   = new MessageSender($this->registry($provider), $redis, $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
 
         $sender->send($this->message(idempotencyKey: 'idem-5'));
     }
@@ -135,7 +137,7 @@ final class MessageSenderTest extends TestCase
 
         $logger   = new RecordingConversationLogger();
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $redis, 30, $logger, new ConversationCaptureFactory(), UsageGates::gate());
+        $sender   = new MessageSender($this->registry($provider), $redis, $this->rateLimit(), $logger, new ConversationCaptureFactory(), UsageGates::gate());
 
         $message = new OutboundMessage(
             idempotencyKey: 'idem-6',
@@ -174,7 +176,7 @@ final class MessageSenderTest extends TestCase
 
         $logger   = new RecordingConversationLogger();
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $redis, 30, $logger, new ConversationCaptureFactory(), UsageGates::gate());
+        $sender   = new MessageSender($this->registry($provider), $redis, $this->rateLimit(), $logger, new ConversationCaptureFactory(), UsageGates::gate());
 
         // Bare message (no contact/assistant metadata) — e.g. an internal system
         // message that is not part of a contact transcript.
@@ -192,7 +194,7 @@ final class MessageSenderTest extends TestCase
         });
         $provider = new InMemoryProviderSender();
         $meter    = FakeUsageMeter::denying(1000, 1000);
-        $sender   = new MessageSender($this->registry($provider), $this->redisFactory($connection), 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
+        $sender   = new MessageSender($this->registry($provider), $this->redisFactory($connection), $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
 
         try {
             $sender->send($this->message(idempotencyKey: 'idem-8'));
@@ -228,7 +230,7 @@ final class MessageSenderTest extends TestCase
             $mock->shouldReceive('set')->once()->with('msg:sent:idem-9', 'processing', 'EX', 86400, 'NX')->andReturn(false);
         });
         $meter  = FakeUsageMeter::denying();
-        $sender = new MessageSender($this->registry(new InMemoryProviderSender()), $this->redisFactory($connection), 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
+        $sender = new MessageSender($this->registry(new InMemoryProviderSender()), $this->redisFactory($connection), $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
 
         $result = $sender->send($this->message(idempotencyKey: 'idem-9'));
 
@@ -245,7 +247,7 @@ final class MessageSenderTest extends TestCase
             $mock->shouldReceive('del')->twice();
         });
 
-        $limited = new MessageSender($this->registry(new InMemoryProviderSender()), $this->redisFactory($connection), 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
+        $limited = new MessageSender($this->registry(new InMemoryProviderSender()), $this->redisFactory($connection), $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
 
         try {
             $limited->send($this->message(idempotencyKey: 'a'));
@@ -253,7 +255,7 @@ final class MessageSenderTest extends TestCase
         } catch (RateLimitExceededException) {
         }
 
-        $unsupported = new MessageSender($this->registry(null), $this->redisFactory($connection), 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
+        $unsupported = new MessageSender($this->registry(null), $this->redisFactory($connection), $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
 
         try {
             $unsupported->send($this->message(idempotencyKey: 'b'));
@@ -334,10 +336,19 @@ final class MessageSenderTest extends TestCase
             $mock->shouldReceive('set')->once()->with('msg:sent:idem-10', '1', 'EX', 86400);
         });
         $provider = new InMemoryProviderSender();
-        $sender   = new MessageSender($this->registry($provider), $this->redisFactory($connection), 30, $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
+        $sender   = new MessageSender($this->registry($provider), $this->redisFactory($connection), $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
 
         $this->assertTrue($sender->send($this->message(idempotencyKey: 'idem-10'))->sent);
         $this->assertSame(1, $provider->calls);
+    }
+
+    private function rateLimit(int $perMinute = 30): TenantMessagingRateLimit
+    {
+        $context = $this->mock(TenantContextInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('isResolved')->andReturn(false);
+        });
+
+        return new TenantMessagingRateLimit($context, $perMinute);
     }
 
     private function nullConversationLogger(): ConversationLoggerInterface

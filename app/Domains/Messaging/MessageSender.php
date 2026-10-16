@@ -25,12 +25,12 @@ use Throwable;
 final readonly class MessageSender implements MessageSenderInterface
 {
     /**
-     * @param  int  $rateLimitPerMinute  Per-channel-chat rate limit enforced in Redis.
+     * @param  TenantMessagingRateLimit  $rateLimit  Per-channel-chat rate limit of the current tenant, enforced in Redis.
      */
     public function __construct(
         private ChannelRegistryInterface $channelRegistry,
         private RedisFactory $redis,
-        private int $rateLimitPerMinute,
+        private TenantMessagingRateLimit $rateLimit,
         private ConversationLoggerInterface $conversationLogger,
         private ConversationCaptureFactory $captureFactory,
         private OutboundVolumeGate $volumeGate,
@@ -136,7 +136,7 @@ final readonly class MessageSender implements MessageSenderInterface
             $pipe->expire($key, 60);
         });
 
-        return ((int)$results[0]) > $this->rateLimitPerMinute;
+        return ((int)$results[0]) > $this->rateLimit->perMinute();
     }
 
     /**

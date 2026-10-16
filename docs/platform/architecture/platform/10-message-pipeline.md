@@ -46,8 +46,11 @@ and `messaging.broadcast` + `messaging.system` + `messaging.logging` (low priori
 ## Rate limiting and backpressure
 
 - Provider rate limit: `MessageSender` keeps a Redis counter per `(channel_id, chat_id)` (`rate:{channel}:{chat}`, 60s
-  window, limit from `messaging.rate_limit_per_minute`, default 30). Exceeding it throws `RateLimitExceededException`
-  and releases the idempotency reservation so the job can retry.
+  window). The limit is the current tenant's `TenantSettings::messaging_rate_limit` (Console → Tenant settings), read at
+  send time by the scoped `TenantMessagingRateLimit` and memoized per tenant id for the request or job;
+  provisioning stores 30 in every tenant schema. `messaging.rate_limit_per_minute` (`MESSAGING_RATE_LIMIT_PER_MINUTE`,
+  default 30) is only a fallback used outside a tenant and when the tenant's row is absent. Exceeding it throws `RateLimitExceededException` and releases
+  the idempotency reservation so the job can retry.
 - Broadcast backpressure lives in `RunBroadcastJob`, not in `BroadcastSendJob`. When the tenant setting
   `broadcast_backpressure` is on and the `messaging.broadcast` queue holds more than 1000 jobs, the run is re-dispatched
   with a 30s delay before any recipient rows are created. Otherwise recipients are fanned out in per-second chunks

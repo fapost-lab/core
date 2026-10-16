@@ -58,4 +58,19 @@ final class SolutionBoundariesTest
             ->classes(Selector::inNamespace('App\\Domains\\Solution'))
             ->because('Flow asks whether an action may run through ActionAvailabilityInterface; App\\Infrastructure\\Solution answers it from the Solution domain. The registry and the handler transport are singletons and must not hold the scoped ActiveSolutions.');
     }
+
+    public function test_channels_and_media_depend_on_neither_the_solution_domain_nor_infrastructure(): Rule
+    {
+        return PHPat::rule()
+            ->classes(
+                Selector::inNamespace('App\\Domains\\Channels'),
+                Selector::inNamespace('App\\Domains\\Media'),
+            )
+            ->shouldNotDependOn()
+            ->classes(
+                Selector::inNamespace('App\\Domains\\Solution'),
+                Selector::inNamespace('App\\Infrastructure'),
+            )
+            ->because('Channels and Media are filled by connectors through registrars that live in App\\Infrastructure\\Solution; the dependency points from Infrastructure to the domains, never back.');
+    }
 }

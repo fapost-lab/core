@@ -4,10 +4,9 @@ description: "Packages that bring a messaging channel to an installation."
 ---
 
 <Warning>
-  Experimental. Core finds, validates and boots connector packages, but a connector
-  cannot register a channel yet: the registration surface (sender, ingress, webhook
-  registration) comes in a later Foundation release. Today a new provider is still a
-  Core change — see [Channel drivers](/extending/channel-drivers).
+  Experimental. Core finds and boots connector packages and accepts their channel
+  registrations, but a channel of a connector's type cannot be created in the console
+  yet: channel types are still a closed list in Core. Opening it is the next step.
 </Warning>
 
 A connector brings one or more messaging channels — Telegram, Viber — to an
@@ -63,15 +62,66 @@ a pure function you can run in your package's CI.
 ```php
 final class ViberConnectorServiceProvider extends AbstractConnectorServiceProvider
 {
-    protected function registerBindings(): void
+    protected function registerChannels(ConnectorRegistrarInterface $registrar): void
     {
-        // container bindings
+        $registrar->registerChannel(new ConnectorChannel(
+            type: 'viber',
+            sender: ViberSender::class,
+            inbound: ViberInboundAdapter::class,
+            webhookRegistrar: ViberWebhookRegistrar::class,
+            mediaLinkPolicy: ViberMediaLinkPolicy::class,
+        ));
     }
 }
 ```
 
-`registerBindings()` runs in `register()`, `bootConnector()` in `boot()`. Core boots
-connectors before Solutions.
+Core calls `registerChannels()` once per process, after every provider's `register()`
+and before any `boot()`. `registerBindings()` runs in `register()`, `bootConnector()`
+in `boot()`. Core boots connectors before Solutions.
+
+A `ConnectorChannel` names classes, not instances: Core builds each service inside the
+request or job that uses it and never shares one across requests or jobs, so a service
+may depend on tenant-scoped bindings. Core also builds one instance at boot to check
+it, so constructors must be cheap and must not touch tenant data.
+
+| Field | Required | Implements |
+|---|---|---|
+| `type` | yes | A channel type listed in `extra.fapost.channels` |
+| `sender` | yes | `Fapost\Foundation\Messaging\ProviderSenderInterface` |
+| `inbound` | yes | `Fapost\Foundation\Channel\ChannelInboundAdapterInterface` |
+| `webhookRegistrar` | no | `Fapost\Foundation\Channel\WebhookRegistrarInterface` |
+| `mediaUploader` | no | `Fapost\Foundation\Media\ChannelMediaUploaderInterface` |
+| `mediaDownloader` | no | `Fapost\Foundation\Media\ChannelMediaDownloaderInterface` |
+| `mediaLinkPolicy` | no | `Fapost\Foundation\Media\ChannelMediaLinkPolicyInterface` |
+
+Boot fails, naming your connector, when you register a type your manifest does not
+declare, a type Core serves itself (such as `telegram`), a type twice, a class that does
+not implement its interface, or a media class whose `channelType()` is another type.
+`platform:update` also refuses a declared type you never register.
+
+## Inbound webhooks
+
+The inbound adapter does not verify signatures in code. It declares how in an
+`IngressSpec`, which Core and the ingress gateway both execute, and turns a verified
+body into an `IncomingMessage` in the worker:
+
+```php
+final class ViberInboundAdapter implements ChannelInboundAdapterInterface
+{
+    public function ingressSpec(): IngressSpec
+    {
+        return IngressSpec::hmacSha256('x-viber-content-signature', 'viber:{channel}:{body.message_token}');
+    }
+
+    public function normalize(array $payload): IncomingMessage
+    {
+        // map the provider's payload to an IncomingMessage
+    }
+}
+```
+
+If your provider signs requests in a way no `SignatureScheme` covers, the scheme is
+extended in Foundation and the gateway; a connector cannot ship its own check.
 
 ## Installing
 

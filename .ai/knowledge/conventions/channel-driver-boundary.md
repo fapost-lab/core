@@ -24,6 +24,8 @@ MUST:     throw on a method it does not support; never degrade silently
 MUST NOT: be called directly by Flow, Broadcasting or any other domain for sending
 MUST NOT: log, store or put into an exception message a payload's `media.url` (a signed public link)
 MUST NOT: mint a media link itself; take the one Core put in the payload
+MUST:     (a connector) declare inbound verification and the idempotency key through `IngressSpec` only
+MUST NOT: (a connector) register a channel type Core serves itself
 ```
 
 ## Example
