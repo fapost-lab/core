@@ -9,13 +9,15 @@ use App\Domains\Solution\Enums\ActivationChange;
 use App\Domains\Solution\Exceptions\SolutionEntitlementUnavailableException;
 use App\Domains\Solution\Exceptions\SolutionNotEntitledException;
 use App\Domains\Solution\Exceptions\SolutionNotInstalledException;
+use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Solution\Services\SolutionActivator;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 
 /**
  * Turns an installed Solution on for one tenant. Idempotent. Refused, like on the screen, for a Solution the operator
- * does not entitle the tenant to, or while the operator's answer cannot be had; there is no way around it.
+ * does not entitle the tenant to, or while the operator's answer cannot be had; there is no way around it. A Solution
+ * the operator grants (its plan's bundle, a running add-on) is already on, and nothing is written.
  */
 final class ActivateSolutionCommand extends SolutionTenantCommand
 {
@@ -38,7 +40,11 @@ final class ActivateSolutionCommand extends SolutionTenantCommand
                 return self::FAILURE;
             }
 
-            if (ActivationChange::Unchanged === $change) {
+            $grant = $this->laravel->make(ActiveSolutions::class)->grantFor($solution);
+
+            if (null !== $grant) {
+                $this->components->info(sprintf('Solution "%s" is already on for tenant "%s": included by its %s; nothing was written.', $solution, $this->option('tenant'), $grant->source->value));
+            } elseif (ActivationChange::Unchanged === $change) {
                 $this->components->info(sprintf('Solution "%s" was already active for tenant "%s".', $solution, $this->option('tenant')));
             } else {
                 $this->components->info(sprintf('Solution "%s" is now active for tenant "%s".', $solution, $this->option('tenant')));

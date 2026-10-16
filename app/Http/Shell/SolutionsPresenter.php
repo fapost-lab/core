@@ -16,6 +16,7 @@ use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Solution\Services\InstalledSolutions;
 use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionUiCompatibility;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Fapost\Foundation\Console\DTO\ContextAction;
@@ -23,12 +24,19 @@ use Fapost\Foundation\Console\DTO\DashboardWidget;
 use Fapost\Foundation\Console\DTO\SettingsTab;
 use Fapost\Foundation\Console\DTO\ShellElement;
 use Fapost\Foundation\Console\DTO\TableColumn;
+use Fapost\Foundation\Solution\Contracts\SolutionStorefrontInterface;
+use Fapost\Foundation\Solution\DTO\SolutionGrant;
+use Fapost\Foundation\Solution\DTO\SolutionOffer;
+use Fapost\Foundation\Solution\DTO\SolutionPrice;
+use NumberFormatter;
+use Throwable;
 
 /**
  * The props of the Solutions screen of the admin panel: every Solution installed in this image with a valid manifest,
  * whether the tenant has it on, what it registers (the actions of its manifest and its console declarations, as the
- * registry holds them), whether the operator entitles the tenant to it and, when it ships a console UI, whether the
- * bundle is published and fits the kit Core ships.
+ * registry holds them), whether the operator grants it (plan or add-on: on, with no Turn off), allows it (the tenant's
+ * own toggle) or offers it to connect (the operator's storefront) and, when it ships a console UI, whether the bundle is
+ * published and fits the kit Core ships.
  * A Solution whose package is gone but whose activation is still stored is listed apart, so it can be put out.
  *
  * Only valid Solutions are shown: the catalog is closed to a package whose manifest fails, and `platform:update`
@@ -58,6 +66,8 @@ final readonly class SolutionsPresenter
         private ConsoleExtensionRegistry $registry,
         private PublishedSolutionUi $published,
         private SolutionUiCompatibility $compatibility,
+        private SolutionStorefrontInterface $storefront,
+        private TenantContextInterface $tenantContext,
     ) {
     }
 
@@ -73,8 +83,9 @@ final readonly class SolutionsPresenter
             $stored[$row->solutionId] = $row;
         }
 
+        $offers    = $this->offers();
         $solutions = array_map(
-            fn (InstalledSolution $solution): array => $this->solution($solution, $stored[$solution->id] ?? null, $latest[$solution->id] ?? null),
+            fn (InstalledSolution $solution): array => $this->solution($solution, $stored[$solution->id] ?? null, $latest[$solution->id] ?? null, $offers[$solution->id] ?? null),
             $this->installed->all(),
         );
 
@@ -101,6 +112,15 @@ final readonly class SolutionsPresenter
     public function isActivatable(string $solutionId): bool
     {
         return $this->installed->has($solutionId) && true === $this->active->isEntitled($solutionId) && [] === $this->mismatches($solutionId);
+    }
+
+    /**
+     * What the operator offers this tenant for the Solution, or null when it offers nothing, already includes it, or its
+     * storefront or its entitlement answer cannot be had. Asks the storefront once.
+     */
+    public function offer(string $solutionId): ?SolutionOffer
+    {
+        return $this->installed->has($solutionId) ? ($this->offers()[$solutionId] ?? null) : null;
     }
 
     /**
@@ -163,8 +183,10 @@ final readonly class SolutionsPresenter
     /**
      * @return array<string, mixed>
      */
-    private function solution(InstalledSolution $solution, ?SolutionActivation $stored, ?SolutionActivationEvent $latest): array
+    private function solution(InstalledSolution $solution, ?SolutionActivation $stored, ?SolutionActivationEvent $latest, ?SolutionOffer $offer): array
     {
+        $grant = $this->active->grantFor($solution->id);
+
         return [
             'id'          => $solution->id,
             'name'        => $solution->name,
@@ -175,11 +197,14 @@ final readonly class SolutionsPresenter
             'actions'     => $solution->actions,
             'ui'          => $this->ui($solution),
             'lastChange'  => null === $stored ? null : $this->lastChange($latest),
-            'canActivate' => $this->isActivatable($solution->id),
+            'canActivate' => null === $grant && $this->isActivatable($solution->id),
             'entitlement' => $this->entitlement($solution, $stored),
+            'grant'       => null === $grant ? null : $this->grant($grant),
+            'offer'       => null === $offer ? null : $this->offerRow($offer),
             'urls'        => [
                 'activate'   => $this->url('console.admin.solutions.activate', $solution->id),
                 'deactivate' => $this->url('console.admin.solutions.deactivate', $solution->id),
+                'connect'    => $this->url('console.admin.solutions.connect', $solution->id),
             ],
         ];
     }
@@ -208,6 +233,80 @@ final readonly class SolutionsPresenter
             'paused' => 'not_entitled' === $state && SolutionActivationStatus::Active === $stored?->status,
             'action' => $action,
         ];
+    }
+
+    /**
+     * The operator's offers for this tenant by Solution id: only for installed Solutions it neither grants nor allows,
+     * and none while its entitlement answer cannot be had (connecting is refused then). A storefront that fails is
+     * reported and offers nothing.
+     *
+     * @return array<string, SolutionOffer>
+     */
+    private function offers(): array
+    {
+        $entitlement = $this->active->entitlement();
+
+        if (null === $entitlement || $entitlement->isUnrestricted()) {
+            return [];
+        }
+
+        try {
+            $offers = $this->storefront->offersFor($this->tenantContext->get()->getId());
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return [];
+        }
+
+        $found = [];
+
+        foreach ($offers as $offer) {
+            if ($this->installed->has($offer->solutionId) && ! $entitlement->allows($offer->solutionId)) {
+                $found[$offer->solutionId] ??= $offer;
+            }
+        }
+
+        return $found;
+    }
+
+    /**
+     * @return array{source: string, note: string|null, endsAt: string|null, endsAtLabel: string|null}
+     */
+    private function grant(SolutionGrant $grant): array
+    {
+        return [
+            'source'      => $grant->source->value,
+            'note'        => $grant->note,
+            'endsAt'      => null === $grant->endsAt ? null : $this->utc($grant->endsAt)->toIso8601String(),
+            'endsAtLabel' => null === $grant->endsAt ? null : $this->utc($grant->endsAt)->locale(app()->getLocale())->isoFormat('LL'),
+        ];
+    }
+
+    /**
+     * @return array{name: string, description: string|null, trialDays: int, price: string|null, requestPending: bool}
+     */
+    private function offerRow(SolutionOffer $offer): array
+    {
+        return [
+            'name'           => $offer->name,
+            'description'    => $offer->description,
+            'trialDays'      => $offer->trialDays,
+            'price'          => null === $offer->price ? null : $this->price($offer->price),
+            'requestPending' => $offer->requestPending,
+        ];
+    }
+
+    /**
+     * The price in the reader's language, such as "€9.00 / month" or "€90.00 / 3 months"; the amount is in the currency's
+     * minor units, so its fraction digits come from the currency (two for EUR, none for JPY).
+     */
+    private function price(SolutionPrice $price): string
+    {
+        $formatter = new NumberFormatter(app()->getLocale() . '@currency=' . $price->currency, NumberFormatter::CURRENCY);
+        $digits    = (int) $formatter->getAttribute(NumberFormatter::FRACTION_DIGITS);
+        $amount    = $formatter->formatCurrency($price->amountMinor / 10 ** $digits, $price->currency);
+
+        return trans_choice('console.solutions.offer.period.' . $price->period->value, $price->periodCount, ['amount' => $amount, 'count' => $price->periodCount]);
     }
 
     /**

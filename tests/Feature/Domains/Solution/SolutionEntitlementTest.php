@@ -131,9 +131,17 @@ final class SolutionEntitlementTest extends TestCase
         $this->assertSame(0, $this->store->writes);
     }
 
-    public function test_the_operator_is_not_asked_when_the_tenant_runs_nothing(): void
+    public function test_the_operator_is_asked_even_when_the_tenant_turned_nothing_on_because_a_grant_needs_no_row(): void
+    {
+        $this->inTenant($this->alpha, fn () => $this->assertSame([], $this->app->make(ActiveSolutions::class)->ids()));
+
+        $this->assertSame(['tenant-alpha'], $this->operator->asked);
+    }
+
+    public function test_the_operator_is_not_asked_when_no_solution_is_installed(): void
     {
         $this->store->active['tenant-alpha'] = ['gone'];
+        $this->installSolutions();
 
         $this->inTenant($this->alpha, fn () => $this->assertSame([], $this->app->make(ActiveSolutions::class)->ids()));
 
@@ -220,14 +228,13 @@ final class SolutionEntitlementTest extends TestCase
 
     public function test_turning_one_off_needs_no_entitlement(): void
     {
+        Exceptions::fake();
         $this->store->active['tenant-alpha'] = ['feedback'];
         $this->operator->failing             = true;
 
         $this->inTenant($this->alpha, function (): void {
             $this->assertSame(ActivationChange::Deactivated, $this->app->make(SolutionActivator::class)->deactivate('feedback', ActivationActor::console()));
         });
-
-        $this->assertSame([], $this->operator->asked);
     }
 
     private function inTenant(RuntimeTenant $tenant, callable $callback): mixed

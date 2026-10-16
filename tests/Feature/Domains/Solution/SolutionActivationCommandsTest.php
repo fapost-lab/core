@@ -9,6 +9,8 @@ use App\Domains\Solution\Infrastructure\SolutionActivationEventRecord;
 use App\Domains\Solution\Infrastructure\SolutionActivationRecord;
 use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
 use Fapost\Foundation\Solution\DTO\SolutionEntitlement;
+use Fapost\Foundation\Solution\DTO\SolutionGrant;
+use Fapost\Foundation\Solution\Enums\SolutionGrantSource;
 use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeSolutionEntitlement;
 use Tests\Support\InstallsFakeSolutions;
@@ -81,10 +83,10 @@ final class SolutionActivationCommandsTest extends FeatureTestCase
 
         $this->artisan('solutions:list', ['--tenant' => 'main'])
             ->expectsTable(
-                ['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective'],
+                ['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective', 'Source'],
                 [
-                    ['feedback', 'Feedback', '1.0.0', 'yes', 'active', 'no', 'inactive'],
-                    ['survey', 'Survey', '1.0.0', 'yes', 'none', 'no', 'inactive'],
+                    ['feedback', 'Feedback', '1.0.0', 'yes', 'active', 'no', 'inactive', '-'],
+                    ['survey', 'Survey', '1.0.0', 'yes', 'none', 'no', 'inactive', '-'],
                 ],
             )
             ->assertExitCode(0);
@@ -149,10 +151,10 @@ final class SolutionActivationCommandsTest extends FeatureTestCase
 
         $this->artisan('solutions:list', ['--tenant' => 'main'])
             ->expectsTable(
-                ['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective'],
+                ['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective', 'Source'],
                 [
-                    ['feedback', 'Feedback', '1.0.0', 'yes', 'active', 'yes', 'active'],
-                    ['survey', '-', '-', 'no', 'active', '-', 'inactive'],
+                    ['feedback', 'Feedback', '1.0.0', 'yes', 'active', 'yes', 'active', 'manual'],
+                    ['survey', '-', '-', 'no', 'active', '-', 'inactive', '-'],
                 ],
             )
             ->assertExitCode(0);
@@ -162,14 +164,44 @@ final class SolutionActivationCommandsTest extends FeatureTestCase
     {
         $this->artisan('solutions:list', ['--tenant' => 'main'])
             ->expectsTable(
-                ['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective'],
+                ['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective', 'Source'],
                 [
-                    ['feedback', 'Feedback', '1.0.0', 'yes', 'none', 'yes', 'inactive'],
-                    ['survey', 'Survey', '1.0.0', 'yes', 'none', 'yes', 'inactive'],
+                    ['feedback', 'Feedback', '1.0.0', 'yes', 'none', 'yes', 'inactive', '-'],
+                    ['survey', 'Survey', '1.0.0', 'yes', 'none', 'yes', 'inactive', '-'],
                 ],
             )
             ->assertExitCode(0);
 
         $this->assertSame(0, SolutionActivationRecord::query()->count(), 'Listing writes nothing.');
+    }
+
+    public function test_a_granted_solution_is_on_with_nothing_written_and_cannot_be_turned_off_from_the_command_line(): void
+    {
+        $operator          = new FakeSolutionEntitlement();
+        $operator->default = SolutionEntitlement::grants([new SolutionGrant('feedback', SolutionGrantSource::Plan)], ['survey']);
+        $this->app->instance(SolutionEntitlementInterface::class, $operator);
+        $this->app->forgetScopedInstances();
+
+        $this->artisan('solutions:activate', ['solution' => 'feedback', '--tenant' => 'main'])
+            ->expectsOutputToContain('included by its plan; nothing was written')
+            ->assertExitCode(0);
+
+        $this->artisan('solutions:deactivate', ['solution' => 'feedback', '--tenant' => 'main'])
+            ->expectsOutputToContain('cannot be turned off here')
+            ->assertExitCode(1);
+
+        $this->artisan('solutions:activate', ['solution' => 'survey', '--tenant' => 'main'])->assertExitCode(0);
+
+        $this->artisan('solutions:list', ['--tenant' => 'main'])
+            ->expectsTable(
+                ['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective', 'Source'],
+                [
+                    ['feedback', 'Feedback', '1.0.0', 'yes', 'none', 'yes', 'active', 'plan'],
+                    ['survey', 'Survey', '1.0.0', 'yes', 'active', 'yes', 'active', 'manual'],
+                ],
+            )
+            ->assertExitCode(0);
+
+        $this->assertSame(1, SolutionActivationEventRecord::query()->count(), 'Only the manual activation is journaled.');
     }
 }
