@@ -119,6 +119,10 @@ production.
 Provider rate limits are handled preventively rather than as a reaction to being
 rejected. The relevant settings are per-tenant: message rate per chat, broadcast
 chunk size, and how hard the platform pushes when a provider strains.
+A tenant admin sets them under Tenant settings. The message rate per chat is
+picked up by the next job without a restart; every tenant starts at 30 per minute.
+`MESSAGING_RATE_LIMIT_PER_MINUTE` no longer sets a tenant's rate — it is only a
+fallback for sends outside a tenant.
 
 A provider complaining about rate is a signal to lower those, not to add
 retries — a retry storm against a limit is the same request made worse.

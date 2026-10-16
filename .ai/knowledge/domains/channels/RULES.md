@@ -17,7 +17,7 @@ paths:
   - "tests/Unit/Domains/Messaging/**"
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
-reviewed_at: 2026-10-09
+reviewed_at: 2026-10-16
 ---
 # Channels rules
 
@@ -29,6 +29,13 @@ broken.
 - **`MessageSender` reserves the idempotency key and applies the per-chat rate limit before
   calling the provider.** Why: provider limits are handled preventively, not after a provider
   error (`conventions/queues.md`).
+- **The per-chat limit is the sending tenant's `TenantSettings::messaging_rate_limit`, read at send
+  time** through the scoped `TenantMessagingRateLimit`, memoized per tenant id for the request or job;
+  provisioning stores 30 in every tenant schema, and `MESSAGING_RATE_LIMIT_PER_MINUTE` is only a
+  fallback outside a tenant or when the tenant's row is absent (a settings migration may not read
+  config, so env cannot seed new tenants). Never capture the limit when a binding is built. Why: a worker serves many tenants, and a
+  captured value leaks one tenant's limit into the others and ignores the admin's change until a
+  restart. Enforced: `TenantMessagingRateLimitTest`.
 - **On channel save, the Redis routing write happens before the provider webhook sync, and both
   run after commit** (`ChannelObserver`). Why: the provider must never deliver to a hash the
   registry does not know. A rotation follows the same order: `ChannelService::rotateWebhookHash` queues
