@@ -1396,6 +1396,7 @@ return [
         ],
         'activate'    => 'Turn on',
         'deactivate'  => 'Turn off',
+        'details'     => 'Details',
         'last_change' => [
             'activated'   => 'Turned on by :actor, :date',
             'deactivated' => 'Turned off by :actor, :date',
@@ -1421,6 +1422,7 @@ return [
             'table_column'     => 'Table column',
         ],
         'kit' => [
+            'badge'       => 'Interface does not fit',
             'title'       => 'Cannot be turned on: its console interface does not fit',
             'description' => 'Its console interface was built for versions this platform does not ship, so it cannot be turned on until the Solution is rebuilt. If it is already on, it can still be turned off.',
             'mismatch'    => ':runtime: built for :required, this platform ships :provided.',
