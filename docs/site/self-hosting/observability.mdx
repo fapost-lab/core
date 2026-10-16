@@ -48,7 +48,7 @@ running:
 | `flow:sweep-subflow-timeouts` | Every minute | Parent flows waiting on expired subflows never resume |
 | `logs:create-partition` | Monthly, on the 1st | Next month's flow-log partition is missing |
 | `logs:prune-flow` | Daily, 03:00 | Old log partitions accumulate |
-| `conversations:prune` | Daily, 03:15 | Nothing is pruned; the transcript keeps growing (a no-op unless retention is set) |
+| `conversations:prune` | Daily, 03:15 | Nothing is pruned; the transcript keeps growing (a no-op while retention is `0`) |
 
 The monthly one is the trap: it fails at a month boundary, weeks after the
 scheduler stopped, and presents as flow logging breaking for no apparent reason.
@@ -56,10 +56,13 @@ scheduler stopped, and presents as flow logging breaking for no apparent reason.
 ## Conversation retention
 
 The conversation transcript is kept forever by default. To cap it, set
-`CONVERSATION_RETENTION_DAYS` in `.env`. The daily `conversations:prune` task then
+the platform setting `conversation.retention_days` (a number of days, `0` keeps
+forever) in [Platform settings](/self-hosting/platform-settings), or in host mode with
+`php artisan platform:settings:set conversation.retention_days 90`.
+`CONVERSATION_RETENTION_DAYS` in `.env` is only its default. The daily `conversations:prune` task then
 drops, in every tenant schema, the monthly `conversation_messages` partitions that
 lie wholly older than that many days. Whole months only, so a message lives between
-`CONVERSATION_RETENTION_DAYS` and about 31 days longer.
+that many days and about 31 days longer.
 
 <Warning>
   Pruning is irreversible. A dropped partition is gone for good; only a database

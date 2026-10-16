@@ -12,7 +12,7 @@ paths:
   - config/conversation.php
   - "database/migrations/tenant/*conversation*"
   - "tests/*/Domains/Conversation/**"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-10-17
 ---
 # Conversation
 
@@ -23,6 +23,10 @@ threads, and owns who answers a thread: the bot or a staff operator (operator ta
 provides operator replies and the staff inbox.
 
 ## Write path
+
+Whether anything is written, and whether inbound media is fetched, is the tenant's setting
+(`TenantSettings::conversation_logging` / `conversation_media_fetch`, null = the env default), read at
+run time through the scoped `Settings/ConversationSettings`; the persist job is the authoritative check.
 
 Capture sites build a `MessageLogEntry` through `ConversationCaptureFactory` and hand it to
 `ConversationLoggerInterface`. The logger queues `PersistConversationMessageJob`
@@ -48,9 +52,9 @@ second backend would need a read port first.
 `conversation_messages` is a range-partitioned table with no foreign keys, so messages survive the
 deletion of the contact, assistant or channel (the `conversations` row cascades). Monthly partitions
 are created only on write (`ensureMonthlyPartition` in the store). Retention is the daily command
-`conversations:prune` (`app/Console/Commands/PruneConversationMessagesCommand.php`): when
-`conversation.retention_days` (env `CONVERSATION_RETENTION_DAYS`, per install, null = keep forever)
-is set, it drops, per active tenant schema, the monthly partitions that lie wholly older than the
+`conversations:prune` (`app/Console/Commands/PruneConversationMessagesCommand.php`): when the
+platform setting `conversation.retention_days` (default from env `CONVERSATION_RETENTION_DAYS`, one
+value per install, 0 = keep forever) is positive, it drops, per active tenant schema, the monthly partitions that lie wholly older than the
 cutoff (`Retention/PartitionRetention`), so a message lives retention to retention + ~31 days. Threads
 and media are not touched. The dedup index
 `conversation_messages_idem_unique` includes `created_at`, the partition key.

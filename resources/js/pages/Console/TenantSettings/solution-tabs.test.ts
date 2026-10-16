@@ -64,7 +64,7 @@ describe('Solution tabs in the tenant settings', () => {
   it('leaves the screen as Core draws it without a Solution tab', () => {
     const wrapper = mountScreen()
 
-    expect(wrapper.findAll('[role="tab"]')).toHaveLength(3)
+    expect(wrapper.findAll('[role="tab"]')).toHaveLength(4)
     expect(wrapper.find('[data-solution-tab]').exists()).toBe(false)
     expect(wrapper.find('form').attributes('style') ?? '').not.toContain('display: none')
   })
@@ -74,9 +74,9 @@ describe('Solution tabs in the tenant settings', () => {
     const wrapper = mountScreen()
 
     const tabs = wrapper.findAll('[role="tab"]')
-    expect(tabs).toHaveLength(4)
-    expect(tabs[3].attributes('data-solution-tab')).toBe('showcase.billing')
-    expect(tabs[3].text()).toBe('Billing')
+    expect(tabs).toHaveLength(5)
+    expect(tabs[4].attributes('data-solution-tab')).toBe('showcase.billing')
+    expect(tabs[4].text()).toBe('Billing')
     expect(wrapper.find('form').attributes('style') ?? '').not.toContain('display: none')
     expect(vi.mocked(loadSolutionComponent)).not.toHaveBeenCalled()
   })

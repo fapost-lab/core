@@ -95,9 +95,14 @@ path — see [Runtime architecture](/contributing/runtime).
 
 ## Conversation transcript
 
+These three are defaults only: a value stored in the admin replaces them, and resetting it brings
+them back.
+
 | Variable | Default | Notes |
 |---|---|---|
-| `CONVERSATION_RETENTION_DAYS` | *unset* | Unset keeps the transcript forever. A plain whole number of days (anything else, including `0`, disables pruning) lets `conversations:prune` drop whole monthly `conversation_messages` partitions older than that, so a message lives between that many days and about 31 days longer. **Irreversible**: dropped messages come back only from a database backup. Conversation threads and downloaded media are kept. One value for the whole installation |
+| `CONVERSATION_LOGGING` | `true` | Default for each tenant's **Keep the conversation log** switch on Tenant settings > Conversations. A tenant that saves a value uses its own |
+| `CONVERSATION_MEDIA_FETCH` | `true` | Default for each tenant's **Download inbound media** switch on the same tab |
+| `CONVERSATION_RETENTION_DAYS` | *unset* | Default for the platform setting `conversation.retention_days`. Unset or `0` keeps the transcript forever. A whole number of days from 1 to 3650 lets `conversations:prune` drop whole monthly `conversation_messages` partitions older than that, so a message lives between that many days and about 31 days longer. A larger value keeps working as the default but cannot be stored in the admin. **Irreversible**: dropped messages come back only from a database backup. Conversation threads and downloaded media are kept. One value for the whole installation |
 
 See [Conversation retention](/self-hosting/observability#conversation-retention).
 

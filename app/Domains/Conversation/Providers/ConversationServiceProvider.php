@@ -10,11 +10,16 @@ use App\Domains\Conversation\Contracts\ConversationReplyServiceInterface;
 use App\Domains\Conversation\Contracts\ConversationStoreInterface;
 use App\Domains\Conversation\Models\Conversation;
 use App\Domains\Conversation\Policies\ConversationPolicy;
+use App\Domains\Conversation\Retention\PartitionRetention;
 use App\Domains\Conversation\Services\ConversationLogger;
 use App\Domains\Conversation\Services\ConversationOwnership;
 use App\Domains\Conversation\Services\ConversationReplyService;
+use App\Domains\Conversation\Settings\ConversationSettings;
 use App\Domains\Conversation\Store\Postgres\PostgresConversationStore;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Services\PlatformSettingRegistry;
+use App\Domains\Tenancy\ValueObjects\PlatformSettingField;
+use Fapost\Foundation\Settings\Enums\PlatformSettingType;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -33,9 +38,18 @@ final class ConversationServiceProvider extends ServiceProvider
         $this->app->scoped(
             ConversationLoggerInterface::class,
             static fn (Application $app): ConversationLogger => new ConversationLogger(
-                enabled: (bool) config('conversation.enabled', true),
+                settings: $app->make(ConversationSettings::class),
                 logger: $app->make(LoggerInterface::class),
                 tenantContext: $app->make(TenantContextInterface::class),
+            ),
+        );
+
+        $this->app->scoped(
+            ConversationSettings::class,
+            static fn (Application $app): ConversationSettings => new ConversationSettings(
+                tenantContext: $app->make(TenantContextInterface::class),
+                defaultLogging: (bool) config('conversation.enabled', true),
+                defaultMediaFetch: (bool) config('conversation.media.fetch', true),
             ),
         );
 
@@ -55,5 +69,18 @@ final class ConversationServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Conversation::class, ConversationPolicy::class);
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: PartitionRetention::SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'conversation.retention_days',
+            fallback: 0,
+            label: 'Conversation retention',
+            description: 'How many days a message transcript is kept, for every tenant. 0 keeps it forever. Older monthly partitions are dropped by the daily prune, so a message lives between this many days and about 31 days more; dropping is irreversible. Threads and media are never touched.',
+            group: 'Conversations',
+            unit: 'days',
+            min: 0,
+            max: 3650,
+        ));
     }
 }

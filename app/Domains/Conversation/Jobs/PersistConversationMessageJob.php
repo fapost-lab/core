@@ -8,6 +8,7 @@ use App\Domains\Conversation\Contracts\ConversationStoreInterface;
 use App\Domains\Conversation\DTO\MessageLogEntry;
 use App\Domains\Conversation\Enums\MessageDirection;
 use App\Domains\Conversation\Live\ConversationActivityNotifier;
+use App\Domains\Conversation\Settings\ConversationSettings;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -38,11 +39,19 @@ final class PersistConversationMessageJob implements ShouldQueue
         $tenant = $tenants->getById($this->entry->tenantId);
 
         $switcher->runForTenant($tenant, function () use ($store, $activity): void {
+            // Resolved inside the switch, in the entry's own tenant: a tenant that has turned its log off after the
+            // entry was queued writes nothing. The memo is per tenant id, so a scoped instance is safe either way.
+            $settings = app(ConversationSettings::class);
+
+            if (! $settings->loggingEnabled()) {
+                return;
+            }
+
             $conversationId = $store->ensureConversation($this->entry->ref());
             $messageId      = $store->appendMessage($conversationId, $this->entry);
 
             if (null !== $messageId) {
-                $this->fetchMediaIfNeeded($messageId);
+                $this->fetchMediaIfNeeded($messageId, $settings);
 
                 // An open inbox shows the new message (and the unread count) without waiting for its next poll.
                 $activity->touched($this->entry->tenantId, $this->entry->assistantId);
@@ -55,9 +64,9 @@ final class PersistConversationMessageJob implements ShouldQueue
      * download (spec §6.1). Only inbound media is fetched — outbound already
      * references a stored media_file.
      */
-    private function fetchMediaIfNeeded(string $messageId): void
+    private function fetchMediaIfNeeded(string $messageId, ConversationSettings $settings): void
     {
-        if (! (bool) config('conversation.media.fetch', true)) {
+        if (! $settings->mediaFetchEnabled()) {
             return;
         }
 

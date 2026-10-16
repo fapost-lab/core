@@ -10,6 +10,7 @@ const options = [
 describe('tenant settings form', () => {
   it('knows its tabs', () => {
     expect(isTab('runtime')).toBe(true)
+    expect(isTab('conversations')).toBe(true)
     expect(isTab('general')).toBe(false)
     expect(isTab(null)).toBe(false)
   })
@@ -18,7 +19,10 @@ describe('tenant settings form', () => {
     expect(tabOfError('available_languages.1')).toBe('languages')
     expect(tabOfError('flow_session_ttl')).toBe('runtime')
     expect(tabOfError('broadcast_chunk_size')).toBe('broadcasts')
+    expect(tabOfError('conversation_logging')).toBe('conversations')
+    expect(tabOfError('conversation_media_fetch')).toBe('conversations')
     expect(tabsWithErrors({ broadcast_chunk_size: 'x', fallback_language: 'y', flow_session_ttl: undefined })).toEqual(['languages', 'broadcasts'])
+    expect(tabsWithErrors({ conversation_media_fetch: 'x', broadcast_chunk_size: 'y' })).toEqual(['broadcasts', 'conversations'])
   })
 
   it('offers only available languages as the fallback', () => {
