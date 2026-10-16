@@ -113,7 +113,7 @@ final class SendLimitNoticeJob implements ShouldQueue
         $tenant = $tenantRepository->getById($this->tenantId);
         $reason = $this->noticeReason();
         $label  = $registry->find($this->key)->label ?? $this->key;
-        $panel  = TenantHost::urlFor($tenant, '/admin');
+        $panel  = TenantHost::urlFor($tenant, '/admin/usage');
 
         $tenantSwitcher->runForTenant($tenant, function () use ($resolver, $operatorNotice, $logger, $reason, $label, $panel): void {
             $recipients = $resolver->admins();

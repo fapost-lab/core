@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Tenancy;
 
+use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\Models\Channel;
+use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Media\Models\MediaBlob;
+use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Services\PlatformSupportUserService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Infrastructure\CoreTenantUsage;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\Contracts\TenantUsageInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
@@ -29,6 +35,7 @@ final class CoreTenantUsageTest extends FeatureTestCase
     {
         parent::setUp();
 
+        $this->seed(TenantAclSeeder::class);
         $this->usage = $this->app->make(TenantUsageInterface::class);
     }
 
@@ -77,9 +84,26 @@ final class CoreTenantUsageTest extends FeatureTestCase
         $this->assertNull($this->usage->current($id, 'media_storage'));
     }
 
+    public function test_it_reports_the_four_records_keys_the_way_enforcement_counts_them(): void
+    {
+        $this->assertSame(Assistant::countForLimit(), $this->usage->current(self::MAIN_ID, 'assistants'));
+        $this->assertSame(FlowDraft::countForLimit(), $this->usage->current(self::MAIN_ID, 'flows'));
+        $this->assertSame(Channel::countForLimit(), $this->usage->current(self::MAIN_ID, 'channels'));
+        $this->assertSame(User::countForLimit(), $this->usage->current(self::MAIN_ID, 'staff'));
+
+        Assistant::factory()->count(2)->create();
+        User::factory()->create();
+        User::factory()->create(['is_active' => false]);
+        $this->app->make(PlatformSupportUserService::class)->ensure();
+
+        $this->assertSame(2, $this->usage->current(self::MAIN_ID, 'assistants'));
+        $this->assertSame(1, $this->usage->current(self::MAIN_ID, 'staff'), 'A deactivated account and the platform support user do not count.');
+        $this->assertSame(0, $this->usage->current(self::MAIN_ID, 'channels'));
+    }
+
     public function test_a_key_the_platform_does_not_count_is_not_reported(): void
     {
-        $this->assertNull($this->usage->current(self::MAIN_ID, 'assistants'));
+        $this->assertNull($this->usage->current(self::MAIN_ID, 'outbound_messages'));
         $this->assertNull($this->usage->current(self::MAIN_ID, 'unknown'));
     }
 

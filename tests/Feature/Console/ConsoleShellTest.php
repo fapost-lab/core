@@ -102,7 +102,7 @@ final class ConsoleShellTest extends FeatureTestCase
         $this->assertSame('admin', $props['navigation']['mode']);
         $this->assertNull($props['assistants']);
         $this->assertNull($groups[0]['label']);
-        $this->assertSame(['console.admin.dashboard', 'console.admin.tenant-settings.edit'], $this->keys($groups[0]));
+        $this->assertSame(['console.admin.dashboard', 'console.admin.usage.index', 'console.admin.tenant-settings.edit'], $this->keys($groups[0]));
         $this->assertSame(['console.admin.assistants.index'], $this->keys($groups[1]));
         $this->assertSame(['console.admin.users.index', 'console.admin.roles.index', 'console.admin.support-access.index'], $this->keys($groups[2]));
         $this->assertSame(['console.admin.media.index', 'console.admin.translations.index'], $this->keys($groups[3]));

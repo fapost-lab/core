@@ -28,7 +28,7 @@ paths:
   - app/Providers/HorizonServiceProvider.php
   - docker/compose.yaml
   - "tests/Feature/Http/**"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-10-16
 ---
 # Tenancy rules
 
@@ -212,8 +212,21 @@ broken.
   with the error reported, because nobody is there to retry. Concurrent uploads of new content may overshoot by
   the files in flight (accepted, as for records). The usage report is Foundation's `TenantUsageInterface`,
   implemented by `CoreTenantUsage`: a per-key counter registered in `TenantUsageCounters` by the owning domain
-  (only `media_storage` today) and run inside `TenantSwitcher::runForTenant()`; unknown and Pending tenants and
+  (the four Records keys through their `countForLimit()` and `media_storage`; the same definition serves the
+  refusal and the report) and run inside `TenantSwitcher::runForTenant()`; unknown and Pending tenants and
   uncounted keys answer `null`. Enforced: `MediaStorageGateTest`, `ByteQuotaTest`, `CoreTenantUsageTest`.
+
+- **The usage page asks the operator once per view, through `TenantUsageOverview`, and never breaks on it.**
+  `PeriodUsageInterface::reportFor()` (default `NoPeriodUsage`, `bindIf`) is called only by `TenantUsageOverview`,
+  at most once per page view (the admin usage page and the dashboard card, which is a lazy Inertia prop so the
+  polling refresh does not ask again), never per key and never on a gate or in a job. An exception from the
+  report, from `limitFor()` or from a counter is reported and turns the row into `unavailable`: an unreadable
+  limit is never shown as "no limit", and `limited` stays true so the page does not claim that no limits are set.
+  The state of each row (`unlimited`, `not_reported`, `unavailable`, `ok`, `near` from `NEAR_PERCENT` = 80,
+  `reached` including a limit of 0 and use over the limit) is decided in `TenantUsageOverview`, which returns
+  English labels and raw numbers; `UsagePresenter` (Http layer) translates and formats, because Tenancy takes no
+  outward dependency. The numbers are display only and never enforce. Core does not cache them. Enforced:
+  `TenantUsageOverviewTest`, `AdminUsageConsoleTest`.
 
 - **Support access is off unless the flag is on, and a token is single use.** `issue()` throws
   when `tenancy.support_access.enabled` is false or the resolution mode is not `host`, and `POST /support/enter` answers 404 before it

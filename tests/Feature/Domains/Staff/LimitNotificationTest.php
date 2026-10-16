@@ -85,7 +85,8 @@ final class LimitNotificationTest extends FeatureTestCase
         $this->assertStringContainsString('Used 1 of 1.', $data['body']);
         $this->assertStringContainsString('A new record could not be created.', $data['body']);
         $this->assertStringContainsString('To raise the limit, contact the platform administrator.', $data['body']);
-        $this->assertSame('Open the panel', $data['action']['label']);
+        $this->assertSame('View usage', $data['action']['label']);
+        $this->assertStringEndsWith('/admin/usage', $data['action']['url']);
 
         $recipients = array_map(static fn ($message): string => $message->getOriginalMessage()->getTo()[0]->getAddress(), $this->sentMail());
         $this->assertEqualsCanonicalizing([$first->email, $second->email], $recipients);
@@ -324,7 +325,7 @@ final class LimitNotificationTest extends FeatureTestCase
         $this->assertStringContainsString('The period ends on November 5, 2030.', $data['body']);
         $this->assertStringContainsString('this work will be turned away until the limit is raised or a new period starts', $data['body']);
         $this->assertStringContainsString('To raise the limit, contact the platform administrator.', $data['body']);
-        $this->assertSame('Open the panel', $data['action']['label']);
+        $this->assertSame('View usage', $data['action']['label']);
 
         $recipients = array_map(static fn ($message): string => $message->getOriginalMessage()->getTo()[0]->getAddress(), $this->sentMail());
         $this->assertEqualsCanonicalizing([$first->email, $second->email], $recipients);

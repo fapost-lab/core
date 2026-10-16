@@ -19,7 +19,7 @@
         "php": "^8.4",
         "ext-pdo": "*",
         "ext-pdo_pgsql": "*",
-        "fapost/foundation": "^0.18",
+        "fapost/foundation": "^0.19",
         "fapost/support": "^0.2",
         "giggsey/libphonenumber-for-php": "^9.0",
         "inertiajs/inertia-laravel": "^3.0",

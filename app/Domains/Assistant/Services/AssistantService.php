@@ -51,7 +51,7 @@ final readonly class AssistantService implements AssistantServiceInterface
             throw new LogicException('Assistants can be created only for the current tenant context.');
         }
 
-        $countBefore = Assistant::query()->count();
+        $countBefore = Assistant::countForLimit();
 
         $this->recordQuota->assertCanCreate(Assistant::LIMIT_KEY, $countBefore);
 

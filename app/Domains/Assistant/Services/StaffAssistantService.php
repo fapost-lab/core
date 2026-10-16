@@ -68,7 +68,7 @@ final readonly class StaffAssistantService
      */
     public function limit(): AssistantLimitStatus
     {
-        $current = Assistant::query()->count();
+        $current = Assistant::countForLimit();
 
         return new AssistantLimitStatus(
             current: $current,

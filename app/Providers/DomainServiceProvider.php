@@ -33,6 +33,7 @@ use App\Domains\Tenancy\Services\HostTenantResolver;
 use App\Domains\Tenancy\Services\LimitAnnouncer;
 use App\Domains\Tenancy\Services\LimitRegistry;
 use App\Domains\Tenancy\Services\NoLimitNotice;
+use App\Domains\Tenancy\Services\NoPeriodUsage;
 use App\Domains\Tenancy\Services\PeriodQuota;
 use App\Domains\Tenancy\Services\RecordLimitWatch;
 use App\Domains\Tenancy\Services\RecordQuota;
@@ -50,6 +51,7 @@ use App\Domains\Tenancy\Services\WebhookRegistryWriter;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use Fapost\Foundation\Quota\Contracts\LimitNoticeInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
+use Fapost\Foundation\Quota\Contracts\PeriodUsageInterface;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
 use Fapost\Foundation\Quota\Contracts\TenantUsageInterface;
@@ -219,6 +221,8 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->bindIf(UsageMeterInterface::class, UnlimitedUsageMeter::class);
         // And the operator's wording of the limit notification: by default it has nothing to add.
         $this->app->bindIf(LimitNoticeInterface::class, NoLimitNotice::class);
+        // And the operator's report of per-period use for the usage page: by default it reports nothing.
+        $this->app->bindIf(PeriodUsageInterface::class, NoPeriodUsage::class);
         // Not a singleton: it reads the scoped tenant context.
         $this->app->bind(LimitAnnouncer::class);
         $this->app->bind(RecordLimitWatch::class);

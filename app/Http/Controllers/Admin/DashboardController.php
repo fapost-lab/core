@@ -11,9 +11,12 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowLog;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\TenantFlowActivity;
+use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
+use App\Domains\Tenancy\Services\TenantUsageOverview;
 use App\Http\Controllers\Controller;
 use App\Http\Shell\AdminOverview;
+use App\Http\Shell\UsagePresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -28,7 +31,8 @@ use LogicException;
  * Every signed-in staff user opens it, as they opened Filament's dashboard. Filament showed every figure to all of
  * them; here a figure is given only to a user who may list that kind of record (`viewAny` of its policy), and is
  * `null` otherwise. For anyone but an administrator, assistants, channels, flows, waiting sessions and the activity
- * count only the assistants the user may list; contacts and staff are the tenant's.
+ * count only the assistants the user may list; contacts and staff are the tenant's. The limits widget is for whoever
+ * may open the usage page (`manage_settings`), and is computed once per page view, not on the polling refresh.
  */
 final class DashboardController extends Controller
 {
@@ -37,7 +41,7 @@ final class DashboardController extends Controller
      */
     public const int POLL_SECONDS = 60;
 
-    public function __invoke(Request $request, AdminOverview $overview, TenantFlowActivity $flows): Response
+    public function __invoke(Request $request, AdminOverview $overview, TenantFlowActivity $flows, TenantUsageOverview $usage, UsagePresenter $usagePresenter): Response
     {
         $user = $request->user();
 
@@ -60,6 +64,13 @@ final class DashboardController extends Controller
             ],
             'activity'    => Gate::allows('viewAny', FlowLog::class) ? $flows->daily(CarbonImmutable::now(), $scope) : null,
             'pollSeconds' => self::POLL_SECONDS,
+            // A closure, so the polling refresh (`only: stats, activity`) does not ask the operator again: one call per view.
+            'usage' => $user->can(Permission::ManageSettings->value)
+                ? static fn (): array => [
+                    ...$usagePresenter->widget($usage->overview(app()->getLocale())),
+                    'url' => route('console.admin.usage.index', [], false),
+                ]
+                : null,
         ]);
     }
 }

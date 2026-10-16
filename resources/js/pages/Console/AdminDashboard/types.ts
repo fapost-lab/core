@@ -1,4 +1,5 @@
 import type { ShellPageProps } from '@console/shell'
+import type { UsageAction, UsageRowData, UsageTranslations } from '../AdminUsage/types'
 
 /** One UTC day of the flow activity chart, as `TenantFlowActivity::daily()` builds it. */
 export interface ActivityDay {
@@ -15,6 +16,17 @@ export interface AdminStats {
   flows: { published: number } | null
   sessions: { waiting: number } | null
   staff: { total: number } | null
+}
+
+/** The dashboard's "Limits and usage" card, as `UsagePresenter::widget()` builds it. */
+export interface UsageWidgetData {
+  rows: UsageRowData[]
+  total: number
+  /** How many limits could not be read right now. */
+  unavailable: number
+  action: UsageAction | null
+  limited: boolean
+  url: string
 }
 
 export interface AdminDashboardTranslations {
@@ -39,9 +51,10 @@ export interface AdminDashboardTranslations {
     | 'staff_hint',
     string
   >
+  usage: { title: string; description: string; all: string; none: string; more: string; unavailable: string }
   activity: { title: string; description: string; executed: string; failed: string; day: string; empty: string }
 }
 
 export type AdminDashboardPageProps = ShellPageProps & {
-  translations: { console: ShellPageProps['translations']['console'] & { admin_dashboard: AdminDashboardTranslations } }
+  translations: { console: ShellPageProps['translations']['console'] & { admin_dashboard: AdminDashboardTranslations; usage: UsageTranslations } }
 }

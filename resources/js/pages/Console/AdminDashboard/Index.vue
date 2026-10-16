@@ -15,7 +15,8 @@ import { EmptyState } from '@fapost/ui/components/empty-state'
 import { interpolate } from '@console/shell'
 import { SolutionWidgets } from '../../../console/solutions'
 import ActivityChart from './ActivityChart.vue'
-import type { ActivityDay, AdminDashboardPageProps, AdminStats } from './types'
+import UsageWidget from './UsageWidget.vue'
+import type { ActivityDay, AdminDashboardPageProps, AdminStats, UsageWidgetData } from './types'
 
 /** How long the page keeps refreshing its figures before it stops asking. */
 const POLL_FOR_MS = 60 * 60 * 1000
@@ -24,6 +25,8 @@ const props = defineProps<{
   stats: AdminStats
   activity: ActivityDay[] | null
   pollSeconds: number
+  /** The limits card; null for a user who may not open the usage page. Not part of the polling refresh. */
+  usage?: UsageWidgetData | null
 }>()
 
 const page = usePage<AdminDashboardPageProps>()
@@ -124,6 +127,8 @@ onBeforeUnmount(() => {
         <CardContent class="text-muted-foreground text-[13px]">{{ tile.hint }}</CardContent>
       </Card>
     </div>
+
+    <UsageWidget v-if="usage" :usage="usage" />
 
     <SolutionWidgets target="admin" :columns="3" />
 

@@ -10,6 +10,7 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Policies\ChannelPolicy;
 use App\Domains\Channels\Telegram\TelegramChannelServiceProvider;
 use App\Domains\Channels\WhatsApp\WhatsAppChannelServiceProvider;
+use App\Domains\Tenancy\Services\TenantUsageCounters;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
@@ -50,5 +51,7 @@ final class ChannelsServiceProvider extends ServiceProvider
             kind: LimitKind::Records,
             description: 'How many channels a tenant can have at a time, inactive ones included.',
         ));
+
+        $this->app->make(TenantUsageCounters::class)->register(Channel::LIMIT_KEY, Channel::countForLimit(...));
     }
 }

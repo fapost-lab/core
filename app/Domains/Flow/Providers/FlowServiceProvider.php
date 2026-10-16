@@ -139,6 +139,7 @@ use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Services\TenantUsageCounters;
 use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\ConnectionAfterCommitDispatcher;
 use App\Infrastructure\Flow\ContainerActionHandlerFactory;
@@ -185,6 +186,8 @@ final class FlowServiceProvider extends ServiceProvider
             kind: LimitKind::Records,
             description: 'How many flows a tenant can have at a time; published versions of a flow do not count.',
         ));
+
+        $this->app->make(TenantUsageCounters::class)->register(FlowDraft::LIMIT_KEY, FlowDraft::countForLimit(...));
 
         $this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(
             key: CallNodeHandler::LIMIT_KEY,

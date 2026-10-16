@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\SearchController as AdminSearchController;
 use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessController;
 use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
+use App\Http\Controllers\Admin\UsageController as AdminUsageController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Console\ApplicationRailController;
 use App\Http\Controllers\Console\AssistantHomeController;
@@ -142,6 +143,9 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::put('admin/tenant-settings', [AdminTenantSettingsController::class, 'update'])->name('console.admin.tenant-settings.update');
         // Support access log: read only, and never a Filament screen, so the name is the console's own.
         Route::get('admin/support-access', [AdminSupportAccessController::class, 'index'])->name('console.admin.support-access.index');
+
+        // Usage and limits: what the tenant uses against each limit, read only; a new screen, so its own URI.
+        Route::get('admin/usage', [AdminUsageController::class, 'index'])->name('console.admin.usage.index');
 
         // `assistant` is no screen but may be bookmarked: it sends on to an assistant the user may open.
         Route::get('assistant', [AssistantHomeController::class, 'index'])->name('console.entry');
