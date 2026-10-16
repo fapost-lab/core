@@ -11,7 +11,7 @@ paths:
   - "resources/js/pages/Console/**"
   - "resources/js/console/shell/**"
   - "resources/js/console/lib/**"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-10-16
 ---
 # Console screens
 
@@ -145,6 +145,12 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   to the named route `builder.flows.show`, never a `<Link>` or a redirect. A related record
   created from inside a form (a flow's new group) uses its own `*-inline` route that redirects
   back with the new id in the flash.
+
+- **A screen that changes a tenant-level switch** (`Admin\SolutionController`, `SolutionsPresenter`, `Console/AdminSolutions`)
+  authorizes with the permission of the settings it edits, writes only through the domain's single writer with the
+  staff user as the actor (so the journal names them), redirects `303` to the index with a flashed toast, and asks
+  for confirmation only where the switch stops running work (turning off, not on). Whether the tenant may do it is
+  asked in one presenter method that the controller repeats before writing.
 
 - **Temporary exception: `UsageBar`.** `resources/js/pages/Console/AdminUsage/UsageBar.vue` is used by two screens (the usage
   page and the dashboard card) although a control a second screen needs belongs in the kit. It waits for a kit release;

@@ -74,6 +74,23 @@ final class SolutionActivatorTest extends FeatureTestCase
         $this->assertNull($event->reason);
     }
 
+    public function test_the_latest_journal_entry_of_each_solution_comes_in_one_read(): void
+    {
+        $this->inTenant(function (): void {
+            $activator = $this->app->make(SolutionActivator::class);
+            $activator->activate('feedback', ActivationActor::console());
+            $activator->deactivate('feedback', ActivationActor::user('0198a1b2-0000-7000-8000-000000000001', 'Ann'));
+            $activator->activate('survey', ActivationActor::console());
+
+            $latest = $this->app->make(SolutionActivationStoreInterface::class)->latestEvents();
+
+            $this->assertSame(['feedback', 'survey'], array_keys($latest));
+            $this->assertSame(ActivationAction::Deactivated, $latest['feedback']->action);
+            $this->assertSame('Ann', $latest['feedback']->actorLabel);
+            $this->assertSame(ActivationAction::Activated, $latest['survey']->action);
+        });
+    }
+
     public function test_a_solution_that_is_not_installed_cannot_be_activated(): void
     {
         $this->inTenant(function (): void {

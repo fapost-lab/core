@@ -14,6 +14,11 @@ down, and the decision to build a channel — or to declare Composer the channel
 - [ ] fog: whether distribution rides on the existing package channel or needs its own, and what a
       paid closed extension needs in order to be installable. It cannot be stated before an
       outsider's build shows which contracts are actually touched (after: the first-solution spec)
+- [ ] fog: the version story of the kit (`@fapost/ui`) and the extension contract — when each
+      reaches 1.0 and how a Solution states the range it builds against. Carried over from
+      `ui-foundation` (closed 2026-10-16); the `0.x` rule is already in ADR
+      `20261015-ui-kit-package-shape`, and 1.0 waits for a Solution living on the kit (after: the
+      first-solution spec)
 - [ ] The recon pass written up as a decision: the channel, the boundary, and what is not being
       built
 

@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\SearchController as AdminSearchController;
+use App\Http\Controllers\Admin\SolutionController as AdminSolutionController;
 use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessController;
 use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
@@ -196,6 +197,10 @@ final class ConsoleRouteInterceptionTest extends FeatureTestCase
             'admin support access' => ['console.admin.support-access.index', AdminSupportAccessController::class, 'index', 'GET', 'admin/support-access'],
             // Usage and limits: a new screen, never a Filament one.
             'admin usage' => ['console.admin.usage.index', AdminUsageController::class, 'index', 'GET', 'admin/usage'],
+            // Solutions: a new screen, never a Filament one.
+            'admin solutions'            => ['console.admin.solutions.index', AdminSolutionController::class, 'index', 'GET', 'admin/solutions'],
+            'admin solutions activate'   => ['console.admin.solutions.activate', AdminSolutionController::class, 'activate', 'POST', 'admin/solutions/{solution}/activate'],
+            'admin solutions deactivate' => ['console.admin.solutions.deactivate', AdminSolutionController::class, 'deactivate', 'POST', 'admin/solutions/{solution}/deactivate'],
             // Admin search palette: Filament's global search had no route.
             'admin search' => ['console.admin.search', AdminSearchController::class, '', 'GET', 'admin/search'],
             // App switcher: the user's own rail, in both panels.

@@ -17,6 +17,7 @@ use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionActivator;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionUiBundleReader;
+use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Solution\Services\SolutionUiPublisher;
 use App\Infrastructure\Solution\SolutionCoreRegistrarFactory;
 use Fapost\Foundation\Console\Contracts\ConsoleExtensionsInterface;
@@ -54,6 +55,7 @@ final class SolutionServiceProvider extends ServiceProvider
             $app->publicPath(),
         ));
         $this->app->singletonIf(PublishedSolutionUi::class);
+        $this->app->singletonIf(SolutionUiCompatibility::class, static fn (Application $app): SolutionUiCompatibility => new SolutionUiCompatibility((array) config('solutions.console_runtime', [])));
 
         $this->app->bind(InstalledSolutionCatalogInterface::class, CoreInstalledSolutionCatalog::class);
 

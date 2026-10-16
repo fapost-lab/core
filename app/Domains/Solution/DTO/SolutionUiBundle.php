@@ -19,6 +19,9 @@ final readonly class SolutionUiBundle
      * @param  array<string, string>  $pages  Path => file relative to the bundle directory
      * @param  array<string, string>  $components  Path => file relative to the bundle directory
      * @param  list<string>  $css  files relative to the bundle directory
+     * @param  string|null  $kit  range of the console kit the bundle was built against; null in a cache older than this field
+     * @param  string|null  $vue  range of Vue it was built against
+     * @param  string|null  $inertia  range of Inertia it was built against
      */
     public function __construct(
         public string $solutionId,
@@ -26,6 +29,9 @@ final readonly class SolutionUiBundle
         public array $pages,
         public array $components,
         public array $css,
+        public ?string $kit = null,
+        public ?string $vue = null,
+        public ?string $inertia = null,
     ) {
     }
 
@@ -40,6 +46,9 @@ final readonly class SolutionUiBundle
             pages: array_map(strval(...), (array) $data['pages']),
             components: array_map(strval(...), (array) $data['components']),
             css: array_values(array_map(strval(...), (array) $data['css'])),
+            kit: isset($data['kit']) ? (string) $data['kit'] : null,
+            vue: isset($data['vue']) ? (string) $data['vue'] : null,
+            inertia: isset($data['inertia']) ? (string) $data['inertia'] : null,
         );
     }
 
@@ -52,7 +61,7 @@ final readonly class SolutionUiBundle
     }
 
     /**
-     * @return array{solutionId: string, hash: string, pages: array<string, string>, components: array<string, string>, css: list<string>}
+     * @return array{solutionId: string, hash: string, pages: array<string, string>, components: array<string, string>, css: list<string>, kit: string|null, vue: string|null, inertia: string|null}
      */
     public function toArray(): array
     {
@@ -62,6 +71,9 @@ final readonly class SolutionUiBundle
             'pages'      => $this->pages,
             'components' => $this->components,
             'css'        => $this->css,
+            'kit'        => $this->kit,
+            'vue'        => $this->vue,
+            'inertia'    => $this->inertia,
         ];
     }
 }

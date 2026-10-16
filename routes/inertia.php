@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\SearchController as AdminSearchController;
+use App\Http\Controllers\Admin\SolutionController as AdminSolutionController;
 use App\Http\Controllers\Admin\SupportAccessController as AdminSupportAccessController;
 use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsController;
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
@@ -146,6 +147,11 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
 
         // Usage and limits: what the tenant uses against each limit, read only; a new screen, so its own URI.
         Route::get('admin/usage', [AdminUsageController::class, 'index'])->name('console.admin.usage.index');
+
+        // Solutions: the installed ones and whether this tenant has each on; turning one on or off is the tenant's own write.
+        Route::get('admin/solutions', [AdminSolutionController::class, 'index'])->name('console.admin.solutions.index');
+        Route::post('admin/solutions/{solution}/activate', [AdminSolutionController::class, 'activate'])->where('solution', '[a-z][a-z0-9_]{1,31}')->name('console.admin.solutions.activate');
+        Route::post('admin/solutions/{solution}/deactivate', [AdminSolutionController::class, 'deactivate'])->where('solution', '[a-z][a-z0-9_]{1,31}')->name('console.admin.solutions.deactivate');
 
         // `assistant` is no screen but may be bookmarked: it sends on to an assistant the user may open.
         Route::get('assistant', [AssistantHomeController::class, 'index'])->name('console.entry');

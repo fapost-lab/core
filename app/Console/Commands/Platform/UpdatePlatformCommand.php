@@ -11,6 +11,7 @@ use App\Domains\Solution\DTO\SolutionDiscovery;
 use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
+use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Solution\Services\SolutionUiPublisher;
 use Illuminate\Console\Command;
 
@@ -38,6 +39,7 @@ final class UpdatePlatformCommand extends Command
         ActionHandlerRegistry $actions,
         SolutionUiPublisher $publisher,
         PublishedSolutionUi $published,
+        SolutionUiCompatibility $compatibility,
     ): int {
         $discovery = $discoverer->discover();
 
@@ -55,6 +57,21 @@ final class UpdatePlatformCommand extends Command
 
         foreach ($ui['warnings'] as $warning) {
             $this->components->warn($warning);
+        }
+
+        // A bundle built for another kit, Vue or Inertia than this platform ships is a warning here and a refusal on the
+        // activation screen (adr-20261014-solution-console-ui, Stability).
+        foreach ($ui['sources'] as $source) {
+            foreach (null === $source->bundle ? [] : $compatibility->mismatches($source->bundle) as $mismatch) {
+                $this->components->warn(sprintf(
+                    '%s: console UI is built for %s %s%s, this platform ships %s; the Solution cannot be activated until it is rebuilt.',
+                    $source->solutionId,
+                    $mismatch->component,
+                    $mismatch->required,
+                    $mismatch->unreadable ? ' (a range that cannot be read)' : '',
+                    $mismatch->provided,
+                ));
+            }
         }
 
         if ([] !== $ui['problems']) {
