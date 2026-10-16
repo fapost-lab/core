@@ -14,6 +14,7 @@ use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Media\DTO\DispatchResult;
+use App\Domains\Media\DTO\PublicMediaLink;
 use App\Domains\Media\Exceptions\MediaDeletedException;
 use App\Domains\Media\Exceptions\MediaNotFoundException;
 use App\Domains\Media\Models\MediaFile;
@@ -69,6 +70,7 @@ final readonly class FlowMessageSender implements MessageSenderInterface
         $chatId  = (string)$channelContact->contact->external_id;
 
         $contentType = SendMessageContentType::from((string)$payload['content_type']);
+        $publicLink  = null;
 
         if ($contentType->requiresMediaUrl()) {
             // The upload below may deliver the message itself (Telegram, cache miss) and never reach
@@ -78,19 +80,20 @@ final readonly class FlowMessageSender implements MessageSenderInterface
 
             $dispatch                    = $this->resolveMediaDispatch($payload, $channel, $chatId, $tenantId);
             $payload['provider_file_id'] = $dispatch->providerFileId;
+            $publicLink                  = $dispatch->publicLink;
 
             if ($dispatch->alreadyDelivered) {
                 // Upload-as-send (Telegram cache miss): the media dispatcher already
                 // delivered the bytes and this path never reaches MessageSender, so
                 // capture the transcript here rather than lose the outbound message.
-                $message = $this->buildOutboundMessage($tenantId, $contactId, $sessionId, (string)$session->assistant_id, $channel, $chatId, $payload, $contentType);
+                $message = $this->buildOutboundMessage($tenantId, $contactId, $sessionId, (string)$session->assistant_id, $channel, $chatId, $payload, $contentType, $publicLink);
                 $this->captureOutbound($message, $dispatch->deliveredMessageId);
 
                 return $dispatch->deliveredMessageId ?? 'default';
             }
         }
 
-        $message = $this->buildOutboundMessage($tenantId, $contactId, $sessionId, (string)$session->assistant_id, $channel, $chatId, $payload, $contentType);
+        $message = $this->buildOutboundMessage($tenantId, $contactId, $sessionId, (string)$session->assistant_id, $channel, $chatId, $payload, $contentType, $publicLink);
 
         // Delivered through MessageSender, which owns the outbound transcript capture.
         $result = $this->sender->send($message);
@@ -127,6 +130,7 @@ final readonly class FlowMessageSender implements MessageSenderInterface
         string $chatId,
         array $payload,
         SendMessageContentType $contentType,
+        ?PublicMediaLink $publicLink = null,
     ): OutboundMessage {
         return new OutboundMessage(
             idempotencyKey: $this->idempotencyKey($sessionId, $payload),
@@ -135,7 +139,7 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             channelType: $channel->type->value,
             transportToken: $channel->token,
             chatId: $chatId,
-            payload: $this->toMessagePayload($payload, $contentType),
+            payload: $this->toMessagePayload($payload, $contentType, $publicLink),
             metadata: [
                 'flow_session_id' => $sessionId,
                 'parse_mode'      => 'HTML',
@@ -214,8 +218,12 @@ final readonly class FlowMessageSender implements MessageSenderInterface
     /**
      * @param  array<string, mixed>  $payload
      */
-    private function toMessagePayload(array $payload, SendMessageContentType $contentType): MessagePayload
+    private function toMessagePayload(array $payload, SendMessageContentType $contentType, ?PublicMediaLink $publicLink = null): MessagePayload
     {
+        if (null !== $publicLink && $contentType->requiresMediaUrl()) {
+            return $this->toLinkPayload($payload, $contentType, $publicLink);
+        }
+
         return match ($contentType) {
             SendMessageContentType::Text => new MessagePayload(
                 type: 'text',
@@ -251,6 +259,36 @@ final readonly class FlowMessageSender implements MessageSenderInterface
                 media: ['voice' => (string)$payload['provider_file_id']],
             ),
         };
+    }
+
+    /**
+     * Media for a channel that fetches it by URL: the link and what the connector needs to pick a message type.
+     * `type` stays what the content type implies, as a hint; the connector chooses by `mime_type`.
+     *
+     * @param  array<string, mixed>  $payload
+     */
+    private function toLinkPayload(array $payload, SendMessageContentType $contentType, PublicMediaLink $link): MessagePayload
+    {
+        $media = [
+            'url'       => $link->url,
+            'mime_type' => $link->mimeType,
+            'size'      => $link->size,
+            'file_name' => $link->fileName,
+            'kind'      => $link->kind->value,
+        ];
+
+        $type = match ($contentType) {
+            SendMessageContentType::Image => 'photo',
+            SendMessageContentType::Video => 'video',
+            SendMessageContentType::Voice => 'voice',
+            default                       => 'document',
+        };
+
+        return new MessagePayload(
+            type: $type,
+            text: SendMessageContentType::Voice === $contentType ? '' : (string)($payload['caption'] ?? ''),
+            media: $media,
+        );
     }
 
     /**

@@ -10,7 +10,7 @@ optional one, built outside Core first.
 Goal: a package outside Core can be a channel. Done when: a fixture connector, installed through Composer,
 is found and validated by `platform:update` and registers a channel type whose sender Core reaches.
 
-- [ ] `connector-manifest-discovery` — Connector manifest and discovery: `type: fapost-connector` and its `extra.fapost` schema in
+- [x] `connector-manifest-discovery` — Connector manifest and discovery: `type: fapost-connector` and its `extra.fapost` schema in
       Foundation's parser; `platform:update` discovers, validates and catalogs connectors beside Solutions,
       with no per-tenant activation; a connector boots for the whole installation
 - [ ] `connector-channel-registrar` — Connector registrar with a channel surface: sender, adapter and ingress spec, webhook registrar,
@@ -49,7 +49,7 @@ location requests, media — with no Viber code in Core.
 
 - [x] `ingress-hmac-body-signature` — Body-HMAC ingress signatures: a signature scheme over the raw body in `IngressSpec`, executed by PHP
       and the Go gateway, with shared golden fixtures
-- [ ] `public-media-links` — Public media links: Core hands a connector a signed, expiring public URL for a media asset, for
+- [x] `public-media-links` — Public media links: Core hands a connector a signed, expiring public URL for a media asset, for
       channels that send media by URL; the media uploader becomes optional
 - [ ] Viber connector package — `fapost/connector-viber`: ingress and `conversation_started`, webhook
       registration, text, keyboards, contact and location requests, media by URL, settings schema,

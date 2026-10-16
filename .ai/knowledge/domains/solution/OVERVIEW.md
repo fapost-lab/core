@@ -34,6 +34,7 @@ paths:
   - tests/Feature/Console/AdminSolutionsConsoleTest.php
   - config/solutions.php
   - tests/Support/FakeSolutionEntitlement.php
+  - "tests/Fixtures/Connectors/**"
   - "testing/**"
   - "tests/Feature/Testing/**"
 reviewed_at: 2026-10-16
@@ -75,6 +76,15 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   It wraps each provider in `booting`/`booted` callbacks that open and close the console registry for that
   Solution's id, and freezes the registry once the application has booted (`solutions.freeze_console_registry`,
   off in `phpunit.xml` only, because tests register fixture Solutions after boot).
+- Connectors (`adr-20261016-connector-package-type`, experimental): packages of `type: fapost-connector`
+  are found by the same `InstalledPackagesReader` scan; `SolutionManifestValidator` skips them silently,
+  `ConnectorManifestValidator` applies Foundation's `ConnectorManifestParser`, then checks the provider
+  extends `AbstractConnectorServiceProvider` and that no two connectors share an id or a channel type.
+  `SolutionDiscoverer::discoverAll()` returns both discoveries (`ExtensionDiscovery`) after removing ids
+  claimed by a Solution and a connector at once; `discover()` keeps returning the Solution half.
+  `InstalledConnectors` is the catalog; `SolutionCache` keeps it under a `connectors` key of the same file
+  (a file without that key is stale for connectors only). `SolutionServiceProvider` registers connector
+  providers before the Solution ones, with no activation and, for now, no registrar.
 - Console UI (`adr-20261014-solution-console-ui`, experimental; rules in `conventions/solution-console-ui.md`):
   - `Console/ConsoleExtensionRegistry` implements Foundation's `ConsoleExtensionsInterface`: a process
     singleton (it depends on the image, never on a tenant) that accepts declarations only inside a Solution
@@ -166,7 +176,10 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   `tests/Fixtures/Solutions/Showcase`, installed by `tests/Support/InstallsShowcaseSolution.php`.
 - A real Composer-installed Solution lives outside Core: `fapost-lab/solution-hello-world` (id `hello`, one action,
   one console page from a committed `dist/`), installed by the composer overlay and tested inside Core by its own CI on
-  Core's main and latest release. It is the check that the overlay → installed.json → manifest → provider → bundle path
+  Core's main and latest release, and by Core's CI (job `solution` in `.github/workflows/ci.yml`) on every Core
+  pull request, at a pinned commit: a change in the Solution's repository never turns a Core PR red, and the pin is
+  moved on purpose in a Core PR. It is the interim form of the first-solution roadmap item that tests a generated
+  package in Core's CI. It is the check that the overlay → installed.json → manifest → provider → bundle path
   works for a package Core never names; the fixtures above cannot prove that, because FakeVendor builds the vendor tree.
   Its tests use only Foundation and the Solution testing kit below.
 - The Solution testing kit is `testing/` (`Fapost\Testing\`, Core's autoload-dev, `@experimental`), documented in

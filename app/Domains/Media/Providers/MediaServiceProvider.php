@@ -22,6 +22,7 @@ use App\Domains\Media\Policies\MediaFolderPolicy;
 use App\Domains\Media\Preview\MediaPreviewRegistry;
 use App\Domains\Media\Preview\MediaPreviewType;
 use App\Domains\Media\Registries\ChannelMediaDownloaderRegistry;
+use App\Domains\Media\Registries\ChannelMediaLinkPolicyRegistry;
 use App\Domains\Media\Registries\ChannelMediaUploaderRegistry;
 use App\Domains\Media\Repositories\EloquentMediaBlobRepository;
 use App\Domains\Media\Repositories\EloquentMediaChannelRefRepository;
@@ -33,6 +34,9 @@ use App\Domains\Media\Services\MediaReferenceTracker;
 use App\Domains\Media\Services\MediaService;
 use App\Domains\Media\Services\MediaStorageGate;
 use App\Domains\Media\Services\MediaUploader;
+use App\Domains\Media\Services\PublicMediaLinkIssuer;
+use App\Domains\Media\Services\PublicMediaLinkResolver;
+use App\Domains\Media\Services\PublicMediaLinkSigner;
 use App\Domains\Media\Services\StoredMediaBytes;
 use App\Domains\Media\Storage\StoragePathFactory;
 use App\Domains\Media\Storage\TenantMediaDisk;
@@ -40,8 +44,11 @@ use App\Domains\Tenancy\Services\TenantUsageCounters;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\Container\Container;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -61,6 +68,7 @@ final class MediaServiceProvider extends ServiceProvider
 
         $this->registerBuiltInPreviewTypes();
         $this->registerStorageLimit();
+        $this->registerPublicLinkRateLimit();
     }
 
     public function register(): void
@@ -81,6 +89,24 @@ final class MediaServiceProvider extends ServiceProvider
                 $app->tagged('media.channel.downloader'),
             ),
         );
+
+        $this->app->singleton(
+            ChannelMediaLinkPolicyRegistry::class,
+            static fn (Container $app): ChannelMediaLinkPolicyRegistry => new ChannelMediaLinkPolicyRegistry(
+                $app->tagged('media.channel.link'),
+            ),
+        );
+
+        // Keys are read when resolved, not captured at boot, and nothing here is static (worker-safety).
+        $this->app->bind(
+            PublicMediaLinkSigner::class,
+            static fn (): PublicMediaLinkSigner => new PublicMediaLinkSigner(
+                (string)config('app.key'),
+                array_values(array_map('strval', (array)config('app.previous_keys', []))),
+            ),
+        );
+        $this->app->scoped(PublicMediaLinkIssuer::class);
+        $this->app->bind(PublicMediaLinkResolver::class);
 
         $this->app->singleton(MediaBlobRepositoryInterface::class, EloquentMediaBlobRepository::class);
         $this->app->singleton(MediaChannelRefRepositoryInterface::class, EloquentMediaChannelRefRepository::class);
@@ -111,6 +137,22 @@ final class MediaServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton(MediaPreviewRegistry::class);
+    }
+
+    /**
+     * One link, one budget: a provider fetching a file asks for it once or twice, so the key is the link itself.
+     * A guessed signature never repeats, which is why a scan is not what this limits; it caps a leaked link that is
+     * hammered while it is still valid.
+     */
+    private function registerPublicLinkRateLimit(): void
+    {
+        RateLimiter::for('media-public-link', static fn (Request $request): Limit => Limit::perMinute(
+            (int)config('media.public_links.per_minute', 60),
+        )->by(implode('|', [
+            (string)$request->route('file'),
+            (string)$request->route('expires'),
+            (string)$request->route('signature'),
+        ])));
     }
 
     /**

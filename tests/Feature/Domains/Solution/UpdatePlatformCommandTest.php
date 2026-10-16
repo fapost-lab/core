@@ -93,6 +93,61 @@ final class UpdatePlatformCommandTest extends TestCase
             ->assertExitCode(1);
     }
 
+    public function test_validate_only_lists_the_installed_connectors(): void
+    {
+        $this->vendor->package(FakeVendor::connectorComposer(), '1.4.0')->write();
+
+        $this->artisan('platform:update', ['--validate-only' => true])
+            ->expectsOutputToContain('Connector manifests are valid (1 installed)')
+            ->expectsOutputToContain('acme/fapost-connector-echo')
+            ->assertExitCode(0);
+
+        $this->assertFileDoesNotExist($this->cache->path());
+    }
+
+    public function test_validate_only_fails_on_an_invalid_connector_manifest(): void
+    {
+        $this->vendor->package(FakeVendor::connectorComposer(['channels' => null]))->write();
+
+        $this->artisan('platform:update', ['--validate-only' => true])
+            ->expectsOutputToContain('acme/fapost-connector-echo: extra.fapost.channels: required')
+            ->assertExitCode(1);
+    }
+
+    public function test_a_connector_violation_stops_the_update_before_migrations_and_cache(): void
+    {
+        $this->registerFeedbackActions();
+        $this->vendor->package(FakeVendor::solutionComposer())->package(FakeVendor::connectorComposer(['provider' => 'Acme\\Missing']))->write();
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('1 manifest problem(s). Nothing was changed.')
+            ->expectsOutputToContain('acme/fapost-connector-echo: extra.fapost.provider')
+            ->assertExitCode(1);
+
+        $this->assertSame(0, $this->migrations);
+        $this->assertFileDoesNotExist($this->cache->path());
+    }
+
+    public function test_a_valid_update_caches_the_connectors_with_the_solutions(): void
+    {
+        $this->registerFeedbackActions();
+        $this->vendor->package(FakeVendor::solutionComposer())->package(FakeVendor::connectorComposer())->write();
+
+        $this->artisan('platform:update')->assertExitCode(0);
+
+        $this->assertSame('echo', $this->cache->connectors()[0]->id ?? null);
+        $this->assertSame('feedback', $this->cache->read()[0]->id ?? null);
+    }
+
+    public function test_solutions_cache_records_the_connectors_too(): void
+    {
+        $this->vendor->package(FakeVendor::connectorComposer())->write();
+
+        $this->artisan('solutions:cache')->assertExitCode(0);
+
+        $this->assertSame('echo', $this->cache->connectors()[0]->id ?? null);
+    }
+
     public function test_a_declared_action_that_is_not_registered_fails_the_update_before_migrations_and_cache(): void
     {
         $this->registerFeedbackActions(score: false);

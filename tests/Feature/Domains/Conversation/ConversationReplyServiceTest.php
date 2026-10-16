@@ -15,11 +15,13 @@ use App\Domains\Conversation\Exceptions\ConversationReplyUndeliverableException;
 use App\Domains\Conversation\Models\Conversation;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Media\DTO\DispatchResult;
+use App\Domains\Media\DTO\PublicMediaLink;
 use App\Domains\Media\Enums\MediaSource;
 use App\Domains\Media\Models\MediaBlob;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use Carbon\CarbonImmutable;
 use Fapost\Foundation\Media\Enums\MediaKind;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
@@ -49,6 +51,17 @@ final class ConversationReplyServiceTest extends FeatureTestCase
         return [
             'jpeg goes as a photo'    => ['image/jpeg', 'photo', 'photo'],
             'heic goes as a document' => ['image/heic', 'document', 'document'],
+        ];
+    }
+
+    /**
+     * @return array<string, array{string, string, string}>
+     */
+    public static function linkAttachments(): array
+    {
+        return [
+            'jpeg is a photo of kind image' => ['image/jpeg', 'photo', 'image'],
+            'pdf is a document'             => ['application/pdf', 'document', 'document'],
         ];
     }
 
@@ -219,6 +232,44 @@ final class ConversationReplyServiceTest extends FeatureTestCase
             $mock->shouldReceive('send')
                 ->once()
                 ->withArgs(fn (OutboundMessage $message): bool => $type === $message->payload->type && 'file-1' === ($message->payload->media[$field] ?? null))
+                ->andReturn(new DeliveryResult(sent: true, providerMessageId: 'p-1'));
+        });
+
+        app(ConversationReplyServiceInterface::class)->send($conversation, 'see attached', 'staff-1', (string) $mediaFile->getKey());
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('linkAttachments')]
+    public function test_a_link_channel_gets_the_public_link_instead_of_a_file_id(string $mime, string $type, string $kind): void
+    {
+        [$conversation] = $this->threadWithLinkedContact();
+        $mediaFile      = $this->mediaFile($mime);
+
+        $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: self::TENANT_ID, schemaName: 'main'));
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::allowing());
+        $this->mock(MediaDispatcherInterface::class, function (MockInterface $mock) use ($mime, $kind): void {
+            $mock->shouldReceive('ensureUploadedToChannel')->once()->andReturn(new DispatchResult(
+                providerFileId: null,
+                publicLink: new PublicMediaLink(
+                    url: 'https://main.example.test/media/public/f/1/sig/e.bin',
+                    expiresAt: CarbonImmutable::now()->addHour(),
+                    mimeType: $mime,
+                    size: 10,
+                    fileName: 'e.bin',
+                    kind: MediaKind::from($kind),
+                ),
+            ));
+        });
+        $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock) use ($type, $mime, $kind): void {
+            $mock->shouldReceive('send')
+                ->once()
+                ->withArgs(fn (OutboundMessage $message): bool => $type === $message->payload->type
+                    && [
+                        'url'       => 'https://main.example.test/media/public/f/1/sig/e.bin',
+                        'mime_type' => $mime,
+                        'size'      => 10,
+                        'file_name' => 'e.bin',
+                        'kind'      => $kind,
+                    ] === $message->payload->media)
                 ->andReturn(new DeliveryResult(sent: true, providerMessageId: 'p-1'));
         });
 

@@ -42,6 +42,10 @@ services:
 		tags:
 			- phpat.test
 	-
+		class: Tests\Architecture\PublicMediaLinkSignerTest
+		tags:
+			- phpat.test
+	-
 		class: Tests\Architecture\TestingKitBoundaryTest
 		tags:
 			- phpat.test

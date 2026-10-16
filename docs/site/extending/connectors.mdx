@@ -1,0 +1,81 @@
+---
+title: "Connectors"
+description: "Packages that bring a messaging channel to an installation."
+---
+
+<Warning>
+  Experimental. Core finds, validates and boots connector packages, but a connector
+  cannot register a channel yet: the registration surface (sender, ingress, webhook
+  registration) comes in a later Foundation release. Today a new provider is still a
+  Core change — see [Channel drivers](/extending/channel-drivers).
+</Warning>
+
+A connector brings one or more messaging channels — Telegram, Viber — to an
+installation. It is a Composer package, installed when the image is built, like a
+[Solution](/extending/solutions). Unlike a Solution it is not activated per tenant:
+once installed, its channel types exist for the whole installation, and which tenant
+may use them is the operator's decision.
+
+## The manifest
+
+A connector describes itself in its own `composer.json`: `"type": "fapost-connector"`
+and an `extra.fapost` block. Core reads it on `platform:update` without running your code.
+
+```json
+{
+  "name": "acme/fapost-connector-viber",
+  "type": "fapost-connector",
+  "require": { "fapost/foundation": ">=0.21 <1.0" },
+  "extra": {
+    "fapost": {
+      "schema": 1,
+      "id": "viber",
+      "name": "Viber",
+      "description": "Viber bots through the REST Bot API.",
+      "provider": "Acme\\ConnectorViber\\ViberConnectorServiceProvider",
+      "channels": ["viber"]
+    }
+  }
+}
+```
+
+| Field | Required | Rule |
+|---|---|---|
+| `type` | yes | `fapost-connector` |
+| `extra.fapost.schema` | yes | An integer; `1` is the only supported number |
+| `extra.fapost.id` | yes | The same rule as a Solution's id. Ids are one space: a connector's id may not equal any installed Solution's or connector's |
+| `extra.fapost.name` | yes | One line, 1 to 60 characters, in English |
+| `extra.fapost.description` | no | Up to 280 characters |
+| `extra.fapost.provider` | yes | The class name of your service provider; it must exist and extend `Fapost\Foundation\Lifecycle\AbstractConnectorServiceProvider` |
+| `extra.fapost.channels` | yes | A non-empty list of unique channel types, each `^[a-z][a-z0-9_]{1,31}$`. A channel type belongs to one connector only |
+| `extra.fapost.x-*` | no | Ignored; for your own tooling |
+| `extra.laravel.providers` | no | Must be absent or empty: Core boots your provider |
+| `require.fapost/foundation` | yes | A constraint; `fapost/core` may not be required |
+
+Any other field is an error. When two packages claim one id, or two connectors one
+channel type, none of them is booted and `platform:update` stops with nothing changed.
+
+The rules live in Foundation (`Fapost\Foundation\Connector\Manifest\ConnectorManifestParser`),
+a pure function you can run in your package's CI.
+
+## The service provider
+
+```php
+final class ViberConnectorServiceProvider extends AbstractConnectorServiceProvider
+{
+    protected function registerBindings(): void
+    {
+        // container bindings
+    }
+}
+```
+
+`registerBindings()` runs in `register()`, `bootConnector()` in `boot()`. Core boots
+connectors before Solutions.
+
+## Installing
+
+Add the package to your image through the build overlay
+([Building your own images](/self-hosting/docker-compose#building-your-own-images)), then run
+`php artisan platform:update`: it lists the installed connectors with their channel
+types, or refuses with every manifest problem it found.

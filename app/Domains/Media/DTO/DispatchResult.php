@@ -15,13 +15,17 @@ namespace App\Domains\Media\DTO;
  *
  * `deliveredMessageId` is the platform-side message id of the upload-as-send call, useful
  * for logging or downstream operations (edit/delete).
+ *
+ * For a channel that sends media by URL, `publicLink` is set and `providerFileId` is null: nothing was uploaded and
+ * the caller puts the link into the outgoing payload.
  */
 final readonly class DispatchResult
 {
     public function __construct(
-        public string $providerFileId,
+        public ?string $providerFileId,
         public bool $alreadyDelivered = false,
         public ?string $deliveredMessageId = null,
+        public ?PublicMediaLink $publicLink = null,
     ) {
     }
 }
