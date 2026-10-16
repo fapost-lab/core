@@ -1430,6 +1430,15 @@ return [
                 'inertia' => 'Inertia',
             ],
         ],
+        'entitlement' => [
+            'badge'            => 'Not in your plan',
+            'paused'           => 'Paused',
+            'not_entitled'     => 'This Solution is not included in your plan.',
+            'unavailable'      => 'Your plan could not be checked right now. Try again later.',
+            'paused_note'      => 'It is on for this workspace but does not run, because it is not included in your plan. Its data is kept, and it runs again by itself once it is included.',
+            'off_note'         => 'It is not included in your plan, so it cannot be turned on.',
+            'unavailable_note' => 'Your plan could not be checked right now, so Solutions cannot be turned on. Those already on keep running.',
+        ],
         'deactivate_dialog' => [
             'title'       => 'Turn off :name?',
             'description' => 'Flows that call its actions will stop at the error output of that node with the reason solution_inactive, and what it added to the console disappears. Its data is kept and comes back if you turn it on again.',
@@ -1445,7 +1454,7 @@ return [
             'deactivated'      => 'Solution :solution is off. Its data is kept.',
             'already_inactive' => 'Solution :solution was already off.',
             'not_allowed'      => 'This workspace may not turn that Solution on.',
-            'kit_mismatch'     => 'Solution :solution was not turned on. :reasons',
+            'refused'          => 'Solution :solution was not turned on. :reasons',
         ],
     ],
 

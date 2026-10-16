@@ -11,6 +11,7 @@ use App\Domains\Solution\Services\InstalledSolutions;
 use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
+use App\Domains\Solution\Services\SolutionEntitlements;
 use App\Domains\Solution\Services\SolutionManifestValidator;
 use App\Domains\Solution\Services\SolutionUiPublisher;
 use App\Http\Shell\SolutionExtensions;
@@ -121,7 +122,7 @@ trait InstallsShowcaseSolution
      */
     private function forgetSolutionState(): void
     {
-        foreach ([ActiveSolutions::class, PublishedSolutionUi::class, SolutionUi::class, SolutionUiMapInterface::class, SolutionExtensions::class] as $abstract) {
+        foreach ([ActiveSolutions::class, SolutionEntitlements::class, PublishedSolutionUi::class, SolutionUi::class, SolutionUiMapInterface::class, SolutionExtensions::class] as $abstract) {
             $this->app->forgetInstance($abstract);
         }
     }

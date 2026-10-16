@@ -11,11 +11,13 @@ use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\Infrastructure\CoreInstalledSolutionCatalog;
 use App\Domains\Solution\Infrastructure\EloquentSolutionActivationStore;
 use App\Domains\Solution\Services\ActiveSolutions;
+use App\Domains\Solution\Services\AllSolutionsEntitled;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\InstalledSolutions;
 use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionActivator;
 use App\Domains\Solution\Services\SolutionCache;
+use App\Domains\Solution\Services\SolutionEntitlements;
 use App\Domains\Solution\Services\SolutionUiBundleReader;
 use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Solution\Services\SolutionUiPublisher;
@@ -23,6 +25,7 @@ use App\Infrastructure\Solution\SolutionCoreRegistrarFactory;
 use Fapost\Foundation\Console\Contracts\ConsoleExtensionsInterface;
 use Fapost\Foundation\Lifecycle\AbstractSolutionServiceProvider;
 use Fapost\Foundation\Solution\Contracts\InstalledSolutionCatalogInterface;
+use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\ServiceProvider;
@@ -63,6 +66,11 @@ final class SolutionServiceProvider extends ServiceProvider
         // memo per tenant id, so no process holds one tenant's answer for another or past a deactivation.
         $this->app->bind(SolutionActivationStoreInterface::class, EloquentSolutionActivationStore::class);
         $this->app->scoped(ActiveSolutions::class);
+        // What a tenant may run is the operator's answer. bindIf: an operator package registers before this provider
+        // and its binding wins; without one every installed Solution is entitled. Asked through the scoped,
+        // tenant-keyed SolutionEntitlements only.
+        $this->app->bindIf(SolutionEntitlementInterface::class, AllSolutionsEntitled::class);
+        $this->app->scoped(SolutionEntitlements::class);
         $this->app->bind(SolutionActivator::class);
 
         // Implemented outside the domain, in App\Infrastructure\Solution: it writes into the registries of the

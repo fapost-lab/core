@@ -33,6 +33,7 @@ paths:
   - "resources/js/pages/Console/AdminSolutions/**"
   - tests/Feature/Console/AdminSolutionsConsoleTest.php
   - config/solutions.php
+  - tests/Support/FakeSolutionEntitlement.php
 reviewed_at: 2026-10-16
 ---
 # Solution
@@ -92,11 +93,19 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   `solution_activations` (state, one row per Solution) and `solution_activation_events` (append-only
   journal), behind `Contracts/SolutionActivationStoreInterface` and `Infrastructure/EloquentSolutionActivationStore`.
   - `ActiveSolutions` (`isActive`, `ids`) is the only source of the effective state (raw rows and the journal are read through the store port: `all()`, `events()`). Bound `scoped`, memoised per tenant id,
-    one lazy indexed query. Active = stored `active` AND installed with a valid manifest, so a removed
-    package or a broken manifest makes a Solution inactive with no write; reading never writes.
+    one lazy indexed query. Active = stored `active` AND installed with a valid manifest AND entitled by the
+    operator, so a removed package, a broken manifest or a lost entitlement makes a Solution inactive with no
+    write; reading never writes. `isEntitled()`/`entitlement()` tell screens and commands why one does not run.
+  - Entitlement (amendment of the activation ADR, 2026-10-16): Foundation's `SolutionEntitlementInterface` is asked
+    only by the `scoped` `Services/SolutionEntitlements` (memo per tenant id, one question per tenant and scope, an
+    exception reported once and remembered as unavailable). Default `AllSolutionsEntitled` (`bindIf`). Fail open in
+    `ActiveSolutions` (the factor is left out), fail closed in `SolutionActivator::activate`
+    (`SolutionEntitlementUnavailableException`); a Solution not entitled is refused for every actor
+    (`SolutionNotEntitledException`). The operator is not asked when the tenant has nothing stored active and installed.
   - `SolutionActivator` (`activate`, `deactivate`) is the only writer, with an `ActivationActor` (`user`,
     `console`, `operator`, `system`). Idempotent; row and journal entry in one transaction under a row
-    lock; activating a Solution that is not installed throws `SolutionNotInstalledException`,
+    lock; activating a Solution that is not installed throws `SolutionNotInstalledException` (not entitled:
+    `SolutionNotEntitledException`; entitlement unreadable: `SolutionEntitlementUnavailableException`),
     deactivating one is allowed; it then drops its tenant's memo. Default: nothing active.
   - `solutions:activate|deactivate|list` need `--tenant=<slug>` and run inside `runForTenant()`.
     The `onActivate`/`onDeactivate` hooks are not called yet.
@@ -131,7 +140,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   PHPat (`SolutionBoundariesTest`) forbids a dependency on any other `App\Domains` namespace, and
   forbids facades and `Illuminate\Database` outside `Infrastructure` and `Providers`, so discovery
   and the services run without a database.
-- Not here yet: registrar methods other than `registerActionHandler`, the entitlement check, per-phase migrations of a Solution, the `migrations` manifest field, and hiding the UI of an active Solution whose kit range fails (`SolutionUi::isServable()` is the seam; `first-solution` phase 0).
+- Not here yet: registrar methods other than `registerActionHandler`, per-phase migrations of a Solution, the `migrations` manifest field, and hiding the UI of an active Solution whose kit range fails (`SolutionUi::isServable()` is the seam; `first-solution` phase 0).
   Plugins (`type: fapost-plugin`) are reserved and not discovered.
 - The Foundation constraint is not re-checked in Core: Composer refuses to install a package whose
   `require["fapost/foundation"]` does not fit the locked version, and a package Composer did not

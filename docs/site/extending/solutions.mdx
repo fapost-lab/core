@@ -95,8 +95,11 @@ own schema, so it goes with the tenant's backup and is removed with the tenant.
 
 - A Solution is **off by default** for every tenant, new or existing, until it is activated.
 - It counts as active only while the tenant has it activated **and** it is installed in the image with a
-  valid manifest. Remove the package, or break its manifest, and it is inactive for every tenant; bring it
-  back and it is active again where the tenant had left it on. Nothing is written in between.
+  valid manifest **and** the operator entitles the tenant to it (an operator package may limit which Solutions a
+  tenant runs, for example by plan; without one every Solution is entitled — see
+  [Solution entitlement](/reference/foundation-contracts#solution-entitlement)). Remove the package, break its
+  manifest or lose the entitlement, and it is inactive; bring it back and it is active again where the tenant had
+  left it on. Nothing is written in between, and your Solution learns of it only as `solution_inactive`.
 - Deactivating never touches the Solution's data. The activation record stays, and every change is
   journalled with who made it, when, and why.
 - A change is seen by the next request or job of any process; a job already running keeps the answer it

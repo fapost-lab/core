@@ -39,6 +39,15 @@ const translations = {
         unreadable: ':runtime: built for ":required", unreadable; ships :provided.',
         runtime: { kit: 'Interface kit', vue: 'Vue', inertia: 'Inertia' },
       },
+      entitlement: {
+        badge: 'Not in your plan',
+        paused: 'Paused',
+        not_entitled: 'Not included.',
+        unavailable: 'Could not check.',
+        paused_note: 'Paused, data kept.',
+        off_note: 'Not in your plan, cannot be turned on.',
+        unavailable_note: 'Plan could not be checked.',
+      },
       deactivate_dialog: { title: 'Turn off :name?', description: 'Data is kept.', confirm: 'Turn off now' },
       missing: { title: 'No longer installed', description: 'Still on, package gone.' },
     },
@@ -57,6 +66,7 @@ function solution(over: Partial<SolutionRow> = {}): SolutionRow {
     ui: null,
     lastChange: null,
     canActivate: true,
+    entitlement: { state: 'entitled', paused: false, action: null },
     urls: { activate: '/admin/solutions/feedback/activate', deactivate: '/admin/solutions/feedback/deactivate' },
     ...over,
   }
@@ -215,6 +225,49 @@ describe('solutions page', () => {
     await wrapper.get('[data-test="missing-ghost"] [data-test="deactivate"]').trigger('click')
 
     expect(post.mock.calls[0]?.[0]).toBe('/admin/solutions/ghost/deactivate')
+  })
+
+  it('shows a Solution the plan does not include with the operator button, and cannot turn it on', () => {
+    const wrapper = mount(Index, {
+      props: {
+        solutions: [solution({ canActivate: false, entitlement: { state: 'not_entitled', paused: false, action: { label: 'See plans', url: 'https://ops.example.test/plans' } } })],
+        missing: [],
+      },
+    })
+
+    expect(wrapper.get('[data-test="not-entitled"]').text()).toBe('Not in your plan')
+    expect(wrapper.get('[data-test="entitlement"]').text()).toContain('Not in your plan, cannot be turned on.')
+    const action = wrapper.get('[data-test="entitlement-action"]')
+    expect(action.text()).toBe('See plans')
+    expect(action.attributes('href')).toBe('https://ops.example.test/plans')
+    expect(action.attributes('target')).toBe('_blank')
+    expect(wrapper.get('[data-test="activate"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('shows a paused Solution that left the plan, and lets it be turned off', async () => {
+    const wrapper = mount(Index, {
+      attachTo: document.body,
+      props: { solutions: [solution({ active: false, canActivate: false, entitlement: { state: 'not_entitled', paused: true, action: null } })], missing: [] },
+    })
+
+    expect(wrapper.get('[data-test="state"]').text()).toBe('Paused')
+    expect(wrapper.get('[data-test="entitlement"]').text()).toContain('Paused, data kept.')
+    expect(wrapper.find('[data-test="entitlement-action"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="activate"]').exists()).toBe(false)
+
+    await wrapper.get('[data-test="deactivate"]').trigger('click')
+    await flushPromises()
+    expect(document.body.textContent).toContain('Turn off Feedback?')
+  })
+
+  it('says once that the plan could not be checked', () => {
+    const unavailable = { state: 'unavailable' as const, paused: false, action: null }
+    const wrapper = mount(Index, {
+      props: { solutions: [solution({ canActivate: false, entitlement: unavailable }), solution({ id: 'survey', canActivate: false, entitlement: unavailable })], missing: [] },
+    })
+
+    expect(wrapper.findAll('[data-test="entitlement-unavailable"]')).toHaveLength(1)
+    expect(wrapper.find('[data-test="not-entitled"]').exists()).toBe(false)
   })
 
   it('shows an empty state when nothing is installed', () => {

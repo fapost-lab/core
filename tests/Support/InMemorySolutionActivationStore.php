@@ -14,7 +14,7 @@ use Closure;
 /**
  * A store that keeps one list per tenant id, read from the tenant context, standing in for "the schema
  * of the tenant the caller is switched into". SQLite has no schemas, so this is how a test gives two
- * tenants different answers. Counts its reads.
+ * tenants different answers. Counts its reads and its writes.
  */
 final class InMemorySolutionActivationStore implements SolutionActivationStoreInterface
 {
@@ -22,6 +22,9 @@ final class InMemorySolutionActivationStore implements SolutionActivationStoreIn
     public array $active = [];
 
     public int $reads = 0;
+
+    /** @var int how many calls changed a row (each would journal one entry in the real store) */
+    public int $writes = 0;
 
     /**
      * @param  Closure(): TenantContextInterface  $tenantContext  resolved on each use: the context is scoped and a worker replaces it between jobs
@@ -67,6 +70,7 @@ final class InMemorySolutionActivationStore implements SolutionActivationStoreIn
             }
 
             $this->active[$tenantId] = [...$current, $solutionId];
+            ++$this->writes;
 
             return ActivationChange::Activated;
         }
@@ -76,6 +80,7 @@ final class InMemorySolutionActivationStore implements SolutionActivationStoreIn
         }
 
         $this->active[$tenantId] = array_values(array_diff($current, [$solutionId]));
+        ++$this->writes;
 
         return ActivationChange::Deactivated;
     }
