@@ -146,6 +146,97 @@ jobs:
         if: matrix.database == 'sqlite'
         run: composer run test:arch
 
+  # A real external Solution, installed into this change's Core the way an
+  # operator installs one, and its own test suite run against it. Core's
+  # fixtures build their vendor tree by hand (tests/Support/FakeVendor.php), so
+  # they cannot prove the overlay → installed.json → manifest → provider path,
+  # nor that what Solution tests build on still works. Without this job such a
+  # break surfaces later, in the Solution's CI, against a Core already merged.
+  #
+  # The interim form of the first-solution roadmap item "Core's CI generates,
+  # installs and tests a fresh package on every run": once the generator
+  # exists, a generated package replaces or joins this one.
+  solution:
+    name: Solution (hello-world)
+    runs-on: ubuntu-latest
+
+    env:
+      # Pinned to a commit, not a branch: a change in the Solution's repository
+      # must never turn a Core pull request red that did not cause it. The pin
+      # is moved on purpose, in a Core pull request, when the Solution's tests
+      # change (for example to use the Solution testing kit); the commit only
+      # has to be reachable on some branch of that repository, merged or not.
+      SOLUTION_REPOSITORY: fapost-lab/solution-hello-world
+      SOLUTION_REF: 0a6a67b808428763c67268f92d053b7823e3e054
+      SOLUTION_PACKAGE: fapost/solution-hello-world
+      SOLUTION_PATH: packages/solution-hello-world
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Under packages/, where the overlay and Core's tooling expect a package
+      # checkout to be. The repository is public, so no token of its own.
+      - name: Check out the Solution
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ env.SOLUTION_REPOSITORY }}
+          ref: ${{ env.SOLUTION_REF }}
+          persist-credentials: false
+          path: ${{ env.SOLUTION_PATH }}
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo_pgsql, pdo_sqlite, intl, bcmath, zip, gd, pcntl, sockets, redis
+          coverage: none
+        env:
+          fail-fast: true
+
+      # The same key as the PHP job, so both read one cache: the overlay keeps
+      # Core's locked versions and only adds the Solution, which is a path
+      # repository and never downloaded.
+      - name: Cache Composer packages
+        uses: actions/cache@v6
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ runner.os }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-
+
+      - name: Describe the overlay
+        run: |
+          cat > composer.overlay.json <<JSON
+          {
+            "repositories": [{ "type": "path", "url": "${SOLUTION_PATH}" }],
+            "require": { "${SOLUTION_PACKAGE}": "@dev" }
+          }
+          JSON
+
+      - name: Install Core with the Solution
+        # COMPOSER_AUTH: see the PHP job's install step.
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ secrets.GITHUB_TOKEN }}"}}'
+        # The script is run directly, because through `composer overlay`
+        # --no-scripts would switch the overlay itself off. Core's post-update
+        # scripts run development tooling a CI checkout has no use for; package
+        # discovery runs in the next step. --require-overlay: a lost overlay
+        # file must fail the job, not pass as a Core-only install.
+        run: php tools/composer-overlay.php --require-overlay -- --no-scripts --no-interaction --no-progress --prefer-dist
+
+      - name: Prepare environment
+        # Composer commands after the overlay read the overlaid manifest.
+        env:
+          COMPOSER: composer.local.json
+        run: |
+          cp .env.example .env
+          php artisan key:generate --ansi
+          composer run-script post-autoload-dump --no-interaction
+
+      - name: Solution tests
+        # The Solution's own phpunit.xml (SQLite in memory); its bootstrap
+        # finds Core's autoloader by walking up from packages/.
+        working-directory: ${{ env.SOLUTION_PATH }}
+        run: php ../../vendor/bin/phpunit -c phpunit.xml
+
   gateway:
     name: Gateway
     runs-on: ubuntu-latest

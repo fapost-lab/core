@@ -174,7 +174,10 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   `tests/Fixtures/Solutions/Showcase`, installed by `tests/Support/InstallsShowcaseSolution.php`.
 - A real Composer-installed Solution lives outside Core: `fapost-lab/solution-hello-world` (id `hello`, one action,
   one console page from a committed `dist/`), installed by the composer overlay and tested inside Core by its own CI on
-  Core's main and latest release. It is the check that the overlay → installed.json → manifest → provider → bundle path
+  Core's main and latest release, and by Core's CI (job `solution` in `.github/workflows/ci.yml`) on every Core
+  pull request, at a pinned commit: a change in the Solution's repository never turns a Core PR red, and the pin is
+  moved on purpose in a Core PR. It is the interim form of the first-solution roadmap item that tests a generated
+  package in Core's CI. It is the check that the overlay → installed.json → manifest → provider → bundle path
   works for a package Core never names; the fixtures above cannot prove that, because FakeVendor builds the vendor tree.
   Its tests still import `App\…` (no Solution testing kit in Foundation yet) — a recorded gap, not a pattern.
 - The lifecycle proof is one suite, `tests/Feature/Domains/Solution/SolutionLifecycleTest.php`: the fixtures `feedback` (actions)
