@@ -23,7 +23,7 @@ import { fallbackOptions, firstError, isTab, keptFallback, tabsWithErrors } from
 import type { SelectOption, TenantSettingsPageProps, TenantSettingsState, TenantSettingsTab } from './types'
 
 /**
- * The tenant's settings: one form in three tabs, saved as a whole by one button under them. The open tab is kept in
+ * The tenant's settings: one form in four tabs, saved as a whole by one button under them. The open tab is kept in
  * the address (`?tab=`), and a tab holding a server error is marked and opened. The content base language is shown
  * locked once a flow has been published (drafts do not lock it); the server refuses a change to it as well.
  */
@@ -43,7 +43,7 @@ const form = useForm<TenantSettingsState>({ ...props.settings, available_languag
 const errors = computed(() => form.errors as Record<string, string | undefined>)
 const errorTabs = computed(() => tabsWithErrors(errors.value))
 const fallbackChoices = computed(() => fallbackOptions(props.options.languages, form.available_languages))
-const tabs: TenantSettingsTab[] = ['languages', 'runtime', 'broadcasts']
+const tabs: TenantSettingsTab[] = ['languages', 'runtime', 'broadcasts', 'conversations']
 
 watch(
   () => form.available_languages,
@@ -259,6 +259,30 @@ function save(): void {
               v-slot="{ invalid, describedBy }"
             >
               <Switch id="broadcast_backpressure" v-model="form.broadcast_backpressure" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
+            </FormField>
+          </FormSection>
+        </TabsContent>
+
+        <TabsContent value="conversations">
+          <FormSection :title="t.sections.conversations.title" :description="t.sections.conversations.description">
+            <FormField
+              id="conversation_logging"
+              :label="t.fields.conversation_logging"
+              :hint="t.fields.conversation_logging_help"
+              :error="form.errors.conversation_logging"
+              v-slot="{ invalid, describedBy }"
+            >
+              <Switch id="conversation_logging" v-model="form.conversation_logging" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
+            </FormField>
+
+            <FormField
+              id="conversation_media_fetch"
+              :label="t.fields.conversation_media_fetch"
+              :hint="t.fields.conversation_media_fetch_help"
+              :error="form.errors.conversation_media_fetch"
+              v-slot="{ invalid, describedBy }"
+            >
+              <Switch id="conversation_media_fetch" v-model="form.conversation_media_fetch" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
             </FormField>
           </FormSection>
         </TabsContent>

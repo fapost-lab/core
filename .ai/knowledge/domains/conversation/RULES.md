@@ -13,7 +13,7 @@ paths:
   - config/conversation.php
   - "database/migrations/tenant/*conversation*"
   - "tests/*/Domains/Conversation/**"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-10-17
 ---
 # Conversation rules
 
@@ -45,6 +45,21 @@ broken.
 - **Retention drops whole monthly partitions of the current tenant schema only.** Never row
   `DELETE`s; threads (`conversations`) and media are not touched; the partition listing is
   filtered to `current_schema()` because every tenant schema has identically named partitions.
-  Retention is per install (`conversation.retention_days`, null = keep forever). Enforced:
-  `PartitionRetentionTest`, `PruneConversationMessagesCommandTest`,
+  Retention is one value for the whole installation: the platform setting `conversation.retention_days`
+  (`PartitionRetention::SETTING`, 0–3650, 0 = keep forever), read by `conversations:prune` at run time through
+  `PlatformSettingsReaderInterface`; `CONVERSATION_RETENTION_DAYS` is only its default. Why not per tenant:
+  dropping is irreversible and storage volume is the operator's concern; a per-tenant value capped by the
+  platform would be a new feature, and plan limits belong to the operator package. Enforced:
+  `PartitionRetentionTest`, `PruneConversationMessagesCommandTest`, `PruneConversationRetentionSettingTest`,
   `ConversationPartitionManagerPgsqlTest` (real PostgreSQL, group `pgsql`).
+- **Whether a tenant keeps a transcript and downloads inbound media is that tenant's setting, read at run
+  time through `ConversationSettings`.** `TenantSettings::conversation_logging` / `conversation_media_fetch`
+  are nullable: null (what the settings migration stores) means the install default from
+  `CONVERSATION_LOGGING` / `CONVERSATION_MEDIA_FETCH`, so an upgrade changes nothing until a tenant admin saves
+  Tenant settings. `ConversationSettings` is scoped, memoized per tenant id and reads a fresh `TenantSettings`
+  (a tenant switch hides the scoped one). The logger skips the dispatch only when the context's tenant is the
+  entry's; `PersistConversationMessageJob` decides inside `runForTenant()`, which is the authoritative check.
+  Known edge: with the log off, a new inbound message on a thread an operator still holds is dropped by
+  `MessageRouter` (`staff_handled`) and not written, so nobody sees it; the screen tells the admin to return
+  held threads to the bot first. Enforced: `ConversationSettingsTest` (two tenants on pgsql),
+  `ConversationLoggerTest`, `PersistConversationMessageJobSettingsTest`, `AdminTenantSettingsConsoleTest`.

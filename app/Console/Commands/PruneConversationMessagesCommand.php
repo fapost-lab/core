@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Domains\Conversation\Retention\PartitionRetention;
 use App\Domains\Conversation\Store\Postgres\ConversationPartitionManager;
+use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Carbon\CarbonImmutable;
@@ -16,10 +17,10 @@ use Throwable;
 /**
  * Drops every tenant's expired conversation_messages monthly partitions.
  *
- * Retention is per install (`conversation.retention_days`); null keeps the
- * transcript forever and the command does nothing. Only whole partitions of the
- * current tenant schema are dropped — never rows, threads or media. Dropping is
- * irreversible.
+ * Retention is per install, the platform setting `conversation.retention_days` (Platform settings, or
+ * `CONVERSATION_RETENTION_DAYS` as its default); 0 keeps the transcript forever and the command does
+ * nothing. Only whole partitions of the current tenant schema are dropped — never rows, threads or
+ * media. Dropping is irreversible.
  */
 final class PruneConversationMessagesCommand extends Command
 {
@@ -33,22 +34,17 @@ final class PruneConversationMessagesCommand extends Command
         private readonly TenantRepositoryInterface $tenants,
         private readonly TenantSwitcher $tenantSwitcher,
         private readonly DatabaseManager $database,
+        private readonly PlatformSettingsReaderInterface $platformSettings,
     ) {
         parent::__construct();
     }
 
     public function handle(): int
     {
-        $retentionDays = config('conversation.retention_days');
+        $retentionDays = $this->platformSettings->integer(PartitionRetention::SETTING);
 
-        if (! is_int($retentionDays) || $retentionDays <= 0) {
-            $raw = env('CONVERSATION_RETENTION_DAYS');
-
-            if (null !== $raw && '' !== $raw) {
-                $this->warn('CONVERSATION_RETENTION_DAYS is set but rejected: it must be a plain positive whole number of days.');
-            }
-
-            $this->info('Conversation retention is disabled (CONVERSATION_RETENTION_DAYS is not set); nothing to prune.');
+        if ($retentionDays <= 0) {
+            $this->info('Conversation retention is disabled (keep forever); set it in Platform settings or with platform:settings:set. Nothing to prune.');
 
             return self::SUCCESS;
         }

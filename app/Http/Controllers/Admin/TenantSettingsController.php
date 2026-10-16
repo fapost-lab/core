@@ -15,8 +15,8 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * The tenant's settings in the admin panel, inside the console shell's admin mode: one form in three tabs (languages,
- * runtime, broadcasts) saved as a whole, with the permission and the rules of the Filament page it replaced.
+ * The tenant's settings in the admin panel, inside the console shell's admin mode: one form in four tabs (languages,
+ * runtime, broadcasts, conversations) saved as a whole, with the permission and the rules of the Filament page it replaced.
  *
  * These are the tenant's own runtime settings ({@see TenantSettingsEditor}), not the plan quotas an operator package
  * answers through the quota contracts.

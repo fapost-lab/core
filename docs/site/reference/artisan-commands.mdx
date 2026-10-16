@@ -110,7 +110,7 @@ Options: `--tenant` for a single slug and `--json`.
 
 | Command | Does |
 |---|---|
-| `conversations:prune` | Drop `conversation_messages` monthly partitions older than `CONVERSATION_RETENTION_DAYS`, in every active tenant. Does nothing when the variable is unset |
+| `conversations:prune` | Drop `conversation_messages` monthly partitions older than the platform setting `conversation.retention_days` (default from `CONVERSATION_RETENTION_DAYS`), in every active tenant. Does nothing when it is `0` or unset |
 
 `conversations:prune` accepts `--dry-run`. Dropping is irreversible; threads and
 media are kept. See [Conversation retention](/self-hosting/observability#conversation-retention).

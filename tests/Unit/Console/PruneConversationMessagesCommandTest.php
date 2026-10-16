@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Unit\Console;
 
 use App\Console\Commands\PruneConversationMessagesCommand;
+use App\Domains\Conversation\Retention\PartitionRetention;
+use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
@@ -35,23 +37,9 @@ final class PruneConversationMessagesCommandTest extends TestCase
 
     public function test_it_does_nothing_when_retention_is_disabled(): void
     {
-        config(['conversation.retention_days' => null]);
-
         $repository = Mockery::mock(TenantRepositoryInterface::class);
         $repository->shouldNotReceive('findAllActive');
-
-        $this->app->instance(
-            PruneConversationMessagesCommand::class,
-            new PruneConversationMessagesCommand(
-                $repository,
-                new TenantSwitcher(
-                    new TenantContext(),
-                    Mockery::mock(TenantDatabaseManagerInterface::class),
-                    Mockery::mock(PermissionRegistrar::class),
-                ),
-                Mockery::mock(DatabaseManager::class),
-            ),
-        );
+        $this->bindCommandWith($repository, 0);
 
         $this->artisan('conversations:prune')
             ->expectsOutputToContain('retention is disabled')
@@ -60,7 +48,6 @@ final class PruneConversationMessagesCommandTest extends TestCase
 
     public function test_it_drops_only_expired_partitions_in_every_tenant_schema(): void
     {
-        config(['conversation.retention_days' => 30]);
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-03-15 00:00:00 UTC'));
 
         $alpha = $this->tenant('alpha');
@@ -83,7 +70,6 @@ final class PruneConversationMessagesCommandTest extends TestCase
 
     public function test_dry_run_counts_partitions_without_dropping_them(): void
     {
-        config(['conversation.retention_days' => 30]);
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-03-15 00:00:00 UTC'));
 
         $alpha = $this->tenant('alpha');
@@ -100,7 +86,6 @@ final class PruneConversationMessagesCommandTest extends TestCase
 
     public function test_a_failing_tenant_does_not_stop_the_remaining_ones_and_fails_the_run(): void
     {
-        config(['conversation.retention_days' => 30]);
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-03-15 00:00:00 UTC'));
 
         $alpha = $this->tenant('alpha');
@@ -122,22 +107,24 @@ final class PruneConversationMessagesCommandTest extends TestCase
             ->assertFailed();
     }
 
-    public function test_it_warns_when_the_retention_env_is_set_but_rejected(): void
+    private function bindCommandWith(TenantRepositoryInterface $repository, int $retentionDays): void
     {
-        putenv('CONVERSATION_RETENTION_DAYS=12m');
-        $_ENV['CONVERSATION_RETENTION_DAYS'] = '12m';
+        $reader = Mockery::mock(PlatformSettingsReaderInterface::class);
+        $reader->shouldReceive('integer')->with(PartitionRetention::SETTING)->andReturn($retentionDays);
 
-        try {
-            config(['conversation.retention_days' => null]);
-
-            $this->artisan('conversations:prune')
-                ->expectsOutputToContain('set but rejected')
-                ->expectsOutputToContain('retention is disabled')
-                ->assertSuccessful();
-        } finally {
-            putenv('CONVERSATION_RETENTION_DAYS');
-            unset($_ENV['CONVERSATION_RETENTION_DAYS']);
-        }
+        $this->app->instance(
+            PruneConversationMessagesCommand::class,
+            new PruneConversationMessagesCommand(
+                $repository,
+                new TenantSwitcher(
+                    new TenantContext(),
+                    Mockery::mock(TenantDatabaseManagerInterface::class),
+                    Mockery::mock(PermissionRegistrar::class),
+                ),
+                Mockery::mock(DatabaseManager::class),
+                $reader,
+            ),
+        );
     }
 
     /**
@@ -170,9 +157,12 @@ final class PruneConversationMessagesCommandTest extends TestCase
             return $this->connections[spl_object_id($this->currentTenant)];
         });
 
+        $reader = Mockery::mock(PlatformSettingsReaderInterface::class);
+        $reader->shouldReceive('integer')->with(PartitionRetention::SETTING)->andReturn(30);
+
         $this->app->instance(
             PruneConversationMessagesCommand::class,
-            new PruneConversationMessagesCommand($repository, $switcher, $database),
+            new PruneConversationMessagesCommand($repository, $switcher, $database, $reader),
         );
     }
 

@@ -14,6 +14,15 @@ final class TenantSettings extends Settings
 
     public bool $broadcast_backpressure = true;
 
+    /**
+     * Whether the tenant keeps a transcript; null = the install default (`CONVERSATION_LOGGING`). The settings
+     * migration adds it as null, so an existing tenant keeps the install default until someone stores a value.
+     */
+    public ?bool $conversation_logging = null;
+
+    /** Whether inbound attachments are downloaded into the tenant's media storage; null = the install default (`CONVERSATION_MEDIA_FETCH`). */
+    public ?bool $conversation_media_fetch = null;
+
     public int $flow_session_ttl = 86400;
 
     public int $max_retry_attempts = 3;

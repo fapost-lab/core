@@ -63,6 +63,22 @@ final class AdminPlatformSettingsConsoleTest extends FeatureTestCase
                 ->etc());
     }
 
+    public function test_the_conversation_retention_is_listed_with_its_bounds(): void
+    {
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('groups', function ($groups): bool {
+                $setting = collect($groups)->flatMap(static fn (array $group): array => $group['settings'])->firstWhere('key', 'conversation.retention_days');
+
+                return null !== $setting
+                    && 'conversation_retention_days' === $setting['field']
+                    && 'integer' === $setting['type']
+                    && 0 === $setting['min']
+                    && 3650 === $setting['max']
+                    && 'days' === $setting['unit'];
+            })->etc());
+    }
+
     public function test_an_unset_setting_shows_no_stored_value(): void
     {
         $this->actingAs($this->admin())

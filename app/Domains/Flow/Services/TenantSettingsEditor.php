@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Conversation\Settings\ConversationSettings;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Settings\TenantSettings;
 
 /**
  * The tenant's settings screen in the admin panel: the language matrix (content base, available, fallback), the
- * messaging limit, the flow runtime defaults and the broadcast pacing — every field of {@see TenantSettings} except
+ * messaging limit, the flow runtime defaults and the broadcast pacing and the conversation log — every field of {@see TenantSettings} except
  * the webhook ones, which no screen edits and which a save leaves as stored.
  *
  * It lives in Flow, not Tenancy, because the one rule that is not a plain value check is a flow-content rule: the
@@ -22,6 +23,7 @@ final readonly class TenantSettingsEditor
     public function __construct(
         private TenantSettings $settings,
         private TenantContextInterface $tenant,
+        private ConversationSettings $conversation,
     ) {
     }
 
@@ -41,22 +43,25 @@ final readonly class TenantSettingsEditor
     }
 
     /**
-     * The values the form starts from.
+     * The values the form starts from. The conversation fields are the effective ones: a tenant that has stored
+     * none sees the install default, which a save then stores explicitly.
      *
-     * @return array{content_base_language: string, available_languages: list<string>, fallback_language: string, messaging_rate_limit: int, broadcast_chunk_size: int, broadcast_backpressure: bool, flow_session_ttl: int, max_retry_attempts: int, flow_fallback_message: string}
+     * @return array{content_base_language: string, available_languages: list<string>, fallback_language: string, messaging_rate_limit: int, broadcast_chunk_size: int, broadcast_backpressure: bool, conversation_logging: bool, conversation_media_fetch: bool, flow_session_ttl: int, max_retry_attempts: int, flow_fallback_message: string}
      */
     public function state(): array
     {
         return [
-            'content_base_language'  => $this->settings->content_base_language,
-            'available_languages'    => array_values($this->settings->available_languages),
-            'fallback_language'      => $this->settings->fallback_language,
-            'messaging_rate_limit'   => $this->settings->messaging_rate_limit,
-            'broadcast_chunk_size'   => $this->settings->broadcast_chunk_size,
-            'broadcast_backpressure' => $this->settings->broadcast_backpressure,
-            'flow_session_ttl'       => $this->settings->flow_session_ttl,
-            'max_retry_attempts'     => $this->settings->max_retry_attempts,
-            'flow_fallback_message'  => $this->settings->flow_fallback_message,
+            'content_base_language'    => $this->settings->content_base_language,
+            'available_languages'      => array_values($this->settings->available_languages),
+            'fallback_language'        => $this->settings->fallback_language,
+            'messaging_rate_limit'     => $this->settings->messaging_rate_limit,
+            'broadcast_chunk_size'     => $this->settings->broadcast_chunk_size,
+            'broadcast_backpressure'   => $this->settings->broadcast_backpressure,
+            'conversation_logging'     => $this->conversation->loggingEnabled(),
+            'conversation_media_fetch' => $this->conversation->mediaFetchEnabled(),
+            'flow_session_ttl'         => $this->settings->flow_session_ttl,
+            'max_retry_attempts'       => $this->settings->max_retry_attempts,
+            'flow_fallback_message'    => $this->settings->flow_fallback_message,
         ];
     }
 
@@ -77,7 +82,7 @@ final readonly class TenantSettingsEditor
      * Writes the validated form. A locked base language is kept as stored whatever is passed; the request refuses a
      * change to it before this is reached.
      *
-     * @param  array{content_base_language: string, available_languages: list<string>, fallback_language: string, messaging_rate_limit: int, broadcast_chunk_size: int, broadcast_backpressure: bool, flow_session_ttl: int, max_retry_attempts: int, flow_fallback_message: string}  $fields
+     * @param  array{content_base_language: string, available_languages: list<string>, fallback_language: string, messaging_rate_limit: int, broadcast_chunk_size: int, broadcast_backpressure: bool, conversation_logging: bool, conversation_media_fetch: bool, flow_session_ttl: int, max_retry_attempts: int, flow_fallback_message: string}  $fields
      */
     public function save(array $fields): void
     {
@@ -85,14 +90,16 @@ final readonly class TenantSettingsEditor
             $this->settings->content_base_language = $fields['content_base_language'];
         }
 
-        $this->settings->available_languages    = self::languageList($fields['available_languages']);
-        $this->settings->fallback_language      = $fields['fallback_language'];
-        $this->settings->messaging_rate_limit   = $fields['messaging_rate_limit'];
-        $this->settings->broadcast_chunk_size   = $fields['broadcast_chunk_size'];
-        $this->settings->broadcast_backpressure = $fields['broadcast_backpressure'];
-        $this->settings->flow_session_ttl       = $fields['flow_session_ttl'];
-        $this->settings->max_retry_attempts     = $fields['max_retry_attempts'];
-        $this->settings->flow_fallback_message  = $fields['flow_fallback_message'];
+        $this->settings->available_languages      = self::languageList($fields['available_languages']);
+        $this->settings->fallback_language        = $fields['fallback_language'];
+        $this->settings->messaging_rate_limit     = $fields['messaging_rate_limit'];
+        $this->settings->broadcast_chunk_size     = $fields['broadcast_chunk_size'];
+        $this->settings->broadcast_backpressure   = $fields['broadcast_backpressure'];
+        $this->settings->conversation_logging     = $fields['conversation_logging'];
+        $this->settings->conversation_media_fetch = $fields['conversation_media_fetch'];
+        $this->settings->flow_session_ttl         = $fields['flow_session_ttl'];
+        $this->settings->max_retry_attempts       = $fields['max_retry_attempts'];
+        $this->settings->flow_fallback_message    = $fields['flow_fallback_message'];
         $this->settings->save();
     }
 }

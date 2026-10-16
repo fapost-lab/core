@@ -16,13 +16,16 @@ use Carbon\CarbonImmutable;
  */
 final readonly class PartitionRetention
 {
+    /** The platform setting that holds the retention in days; 0 keeps the transcript forever. */
+    public const string SETTING = 'conversation.retention_days';
+
     public function __construct(
         private int $retentionDays,
     ) {
     }
 
     /**
-     * Strict parser for CONVERSATION_RETENTION_DAYS: only a plain positive
+     * Strict parser for CONVERSATION_RETENTION_DAYS, the install default of the platform setting: only a plain positive
      * whole number (int or digit string) enables pruning; anything else
      * (`12m`, `true`, `0`, `-5`, empty, unset) yields null = keep forever.
      */

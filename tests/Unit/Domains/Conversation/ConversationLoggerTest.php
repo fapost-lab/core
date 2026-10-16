@@ -13,6 +13,7 @@ use App\Domains\Conversation\Enums\MessageSenderType;
 use App\Domains\Conversation\Jobs\PersistConversationMessageJob;
 use App\Domains\Conversation\Jobs\UpdateConversationDeliveryStatusJob;
 use App\Domains\Conversation\Services\ConversationLogger;
+use App\Domains\Conversation\Settings\ConversationSettings;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Exceptions\TenantNotResolvedException;
@@ -41,6 +42,42 @@ final class ConversationLoggerTest extends TestCase
         Bus::assertNotDispatched(PersistConversationMessageJob::class);
     }
 
+    public function test_log_does_nothing_when_the_current_tenant_is_the_entrys_and_its_log_is_off(): void
+    {
+        Bus::fake();
+
+        $this->makeLogger(enabled: false, resolvedTenantId: 'tenant-1')->log($this->entry());
+
+        Bus::assertNotDispatched(PersistConversationMessageJob::class);
+    }
+
+    public function test_log_dispatches_when_another_tenant_is_in_context_and_the_job_decides(): void
+    {
+        Bus::fake();
+
+        $this->makeLogger(enabled: false, resolvedTenantId: 'tenant-2')->log($this->entry());
+
+        Bus::assertDispatched(PersistConversationMessageJob::class);
+    }
+
+    public function test_log_dispatches_without_a_tenant_in_context(): void
+    {
+        Bus::fake();
+
+        $this->makeLogger(enabled: false, resolvedTenantId: null)->log($this->entry());
+
+        Bus::assertDispatched(PersistConversationMessageJob::class);
+    }
+
+    public function test_update_delivery_status_does_nothing_when_the_log_is_off(): void
+    {
+        Bus::fake();
+
+        $this->makeLogger(enabled: false)->updateDeliveryStatus('pmid-1', DeliveryStatus::Delivered);
+
+        Bus::assertNotDispatched(UpdateConversationDeliveryStatusJob::class);
+    }
+
     public function test_update_delivery_status_dispatches_job_with_current_tenant(): void
     {
         Bus::fake();
@@ -65,10 +102,14 @@ final class ConversationLoggerTest extends TestCase
         Bus::assertNotDispatched(UpdateConversationDeliveryStatusJob::class);
     }
 
+    /**
+     * The settings are built on a context with no tenant, so they answer the install default ($enabled); what a
+     * stored tenant value does is covered by ConversationSettingsTest.
+     */
     private function makeLogger(bool $enabled, ?string $resolvedTenantId = 'tenant-1'): ConversationLogger
     {
         return new ConversationLogger(
-            enabled: $enabled,
+            settings: new ConversationSettings($this->tenantContext(null), $enabled, true),
             logger: new NullLogger(),
             tenantContext: $this->tenantContext($resolvedTenantId),
         );

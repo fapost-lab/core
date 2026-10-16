@@ -3,7 +3,7 @@ import type { SelectOption } from '../Settings/types'
 
 export type { SelectOption }
 
-export type TenantSettingsTab = 'languages' | 'runtime' | 'broadcasts'
+export type TenantSettingsTab = 'languages' | 'runtime' | 'broadcasts' | 'conversations'
 
 interface Section {
   title: string
@@ -15,7 +15,7 @@ export interface TenantSettingsTranslations {
   description: string
   saved: string
   tabs: Record<TenantSettingsTab, string>
-  sections: { languages: Section; messaging: Section; flow: Section; broadcasts: Section }
+  sections: { languages: Section; messaging: Section; flow: Section; broadcasts: Section; conversations: Section }
   fields: {
     content_base_language: string
     content_base_language_help: string
@@ -33,6 +33,10 @@ export interface TenantSettingsTranslations {
     broadcast_chunk_size: string
     broadcast_backpressure: string
     broadcast_backpressure_help: string
+    conversation_logging: string
+    conversation_logging_help: string
+    conversation_media_fetch: string
+    conversation_media_fetch_help: string
     language_placeholder: string
     languages_placeholder: string
     languages_selected: string
@@ -57,6 +61,8 @@ export interface TenantSettingsState {
   messaging_rate_limit: number
   broadcast_chunk_size: number
   broadcast_backpressure: boolean
+  conversation_logging: boolean
+  conversation_media_fetch: boolean
   flow_session_ttl: number
   max_retry_attempts: number
   flow_fallback_message: string

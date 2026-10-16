@@ -1,6 +1,6 @@
 import type { SelectOption, TenantSettingsTab } from './types'
 
-const TABS: TenantSettingsTab[] = ['languages', 'runtime', 'broadcasts']
+const TABS: TenantSettingsTab[] = ['languages', 'runtime', 'broadcasts', 'conversations']
 
 const FIELD_TABS: Record<string, TenantSettingsTab> = {
   content_base_language: 'languages',
@@ -12,6 +12,8 @@ const FIELD_TABS: Record<string, TenantSettingsTab> = {
   flow_fallback_message: 'runtime',
   broadcast_chunk_size: 'broadcasts',
   broadcast_backpressure: 'broadcasts',
+  conversation_logging: 'conversations',
+  conversation_media_fetch: 'conversations',
 }
 
 export function isTab(value: unknown): value is TenantSettingsTab {

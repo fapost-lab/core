@@ -201,17 +201,19 @@ final class TenantSettingsCacheIsolationTest extends TestCase
     private function payloads(string $language, int $rateLimit): array
     {
         return [
-            'messaging_rate_limit'   => $rateLimit,
-            'broadcast_chunk_size'   => 100,
-            'broadcast_backpressure' => true,
-            'flow_session_ttl'       => 86400,
-            'max_retry_attempts'     => 3,
-            'flow_fallback_message'  => 'An error occurred.',
-            'webhook_timeout'        => 10,
-            'webhook_rate_limit'     => 60,
-            'content_base_language'  => 'en',
-            'available_languages'    => ['en'],
-            'fallback_language'      => $language,
+            'messaging_rate_limit'     => $rateLimit,
+            'broadcast_chunk_size'     => 100,
+            'broadcast_backpressure'   => true,
+            'flow_session_ttl'         => 86400,
+            'max_retry_attempts'       => 3,
+            'flow_fallback_message'    => 'An error occurred.',
+            'webhook_timeout'          => 10,
+            'webhook_rate_limit'       => 60,
+            'content_base_language'    => 'en',
+            'available_languages'      => ['en'],
+            'fallback_language'        => $language,
+            'conversation_logging'     => null,
+            'conversation_media_fetch' => null,
         ];
     }
 

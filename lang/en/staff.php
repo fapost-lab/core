@@ -17,9 +17,10 @@ return [
         'subtitle'   => 'Tenant-wide configuration shared across all assistants.',
         'saved'      => 'Settings saved',
         'tabs'       => [
-            'languages'  => 'Languages',
-            'runtime'    => 'Runtime',
-            'broadcasts' => 'Broadcasts',
+            'languages'     => 'Languages',
+            'runtime'       => 'Runtime',
+            'broadcasts'    => 'Broadcasts',
+            'conversations' => 'Conversations',
         ],
         'sections' => [
             'messaging' => 'Messaging',
@@ -35,6 +36,8 @@ return [
             'messaging_rate_limit'       => 'Messages per minute (per chat)',
             'broadcast_chunk_size'       => 'Broadcast chunk size',
             'broadcast_backpressure'     => 'Broadcast backpressure',
+            'conversation_logging'       => 'Conversation log',
+            'conversation_media_fetch'   => 'Download inbound media',
             'flow_session_ttl'           => 'Flow session TTL (seconds)',
             'max_retry_attempts'         => 'Max node retry attempts',
             'flow_fallback_message'      => 'Flow fallback message',
