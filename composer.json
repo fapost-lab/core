@@ -32,7 +32,7 @@
         "spatie/laravel-activitylog": "^5.0",
         "spatie/laravel-data": "^4.20",
         "spatie/laravel-permission": "^8.3",
-        "spatie/laravel-settings": "^3.7"
+        "spatie/laravel-settings": "^3.9"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^3.7",
