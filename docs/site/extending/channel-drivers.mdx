@@ -42,7 +42,7 @@ is authenticated and deduplicated through an `IngressSpec`, exposed by
 | Piece | Role |
 |---|---|
 | `IngressSpec` | The declarative description of a provider's webhook contract |
-| `SignatureScheme` | How the request is verified — for example `header_equals` |
+| `SignatureScheme` | How the request is verified — for example `header_equals` (a header equals the channel secret) or `hmac_sha256` (a header carries an HMAC-SHA256 of the raw body, keyed by the channel secret) |
 | `SignedRequest` | The request as presented for verification |
 | `IngressSpecExecutor` | Applies a spec to an incoming request |
 | `WebhookRegistrarInterface` / `WebhookRegistrationPayload` | Registering the webhook with the provider |

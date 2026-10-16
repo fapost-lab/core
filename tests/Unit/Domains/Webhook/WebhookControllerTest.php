@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Webhook;
 
+use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Contact\Enums\PlatformEnum;
+use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
 use App\Domains\Webhook\Contracts\WebhookRegistryResolverInterface;
 use App\Domains\Webhook\DTOs\WebhookRegistryEntry;
 use App\Domains\Webhook\Exceptions\WebhookRegistryException;
@@ -57,6 +59,31 @@ final class WebhookControllerTest extends TestCase
         );
 
         $response
+            ->assertOk()
+            ->assertJson(['ok' => true]);
+
+        Bus::assertNothingDispatched();
+    }
+
+    public function test_an_adapter_without_a_spec_never_verifies_against_an_empty_secret(): void
+    {
+        Bus::fake();
+
+        $this->mock(WebhookRegistryResolverInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('resolve')->once()->with('test-hash')->andReturn($this->makeEntry('channel-1', ''));
+        });
+
+        $adapter = $this->mock(ChannelAdapterInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('verifySignature')->never();
+        });
+
+        $this->mock(ChannelRegistryInterface::class, function (MockInterface $mock) use ($adapter): void {
+            $mock->shouldReceive('adapter')->with('telegram')->andReturn($adapter);
+        });
+
+        Redis::shouldReceive('set')->never();
+
+        $this->postJson('/webhook/telegram/test-hash', ['update_id' => 555])
             ->assertOk()
             ->assertJson(['ok' => true]);
 
