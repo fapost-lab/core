@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
-use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Services\PlatformSettings;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\PlatformSettingsRequest;
@@ -12,7 +11,6 @@ use Fapost\Foundation\Settings\DTO\PlatformSettingDefinition;
 use Fapost\Foundation\Settings\DTO\PlatformSettingValue;
 use Fapost\Foundation\Settings\Exceptions\InvalidPlatformSettingsException;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -20,7 +18,7 @@ use Inertia\Response;
 /**
  * The platform-wide settings of a single-tenant deployment, in the admin panel: what the platform answers by default
  * and what an administrator has changed, grouped as the settings declare. Only for administrators of a deployment in
- * `single` mode (see {@see PlatformSettingsRequest::guard()}); in `host` mode the operator owns these settings.
+ * `single` mode (see {@see PlatformSettingsRequest::allows()}); in `host` mode the operator owns these settings.
  */
 final class PlatformSettingsController extends Controller
 {
@@ -29,12 +27,8 @@ final class PlatformSettingsController extends Controller
     ) {
     }
 
-    public function edit(Request $request): Response
+    public function edit(PlatformSettingsRequest $request): Response
     {
-        $user = $request->user();
-
-        PlatformSettingsRequest::guard($user instanceof User ? $user : null);
-
         $values = [];
 
         foreach ($this->settings->values() as $value) {

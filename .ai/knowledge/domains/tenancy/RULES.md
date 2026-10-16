@@ -285,7 +285,7 @@ broken.
   (`CorePlatformSettings`, plain `bind`). Who edits: in `single` mode the tenant's `admin` role (never the
   platform support user) on `admin/platform-settings`; in `host` mode that screen answers 404 (a tenant admin
   would change every tenant) and the `platform:settings` commands or an operator panel are the way. That check
-  is `PlatformSettingsRequest::guard()` in the controller and the FormRequest, not a Gate ability or a policy,
+  is `PlatformSettingsRequest::allows()` (the FormRequest both actions type-hint) in the controller and the FormRequest, not a Gate ability or a policy,
   because `Gate::before` passes an admin on every ability. The screen's field labels are the lang keys
   `console.platform_settings.fields.<key with dots as underscores>`, falling back to the field's English
   label; the Foundation definition carries no translation key. Packages

@@ -21,13 +21,15 @@ use Illuminate\Foundation\Http\FormRequest;
 final class PlatformSettingsRequest extends FormRequest
 {
     /**
-     * The screen exists in single mode only, and only for an administrator who is not the platform support user. This
-     * is not a Gate ability on purpose: administrators pass every ability through `Gate::before`.
+     * The screen exists in single mode only (404 otherwise), and only for an administrator who is not the platform
+     * support user. This is not a Gate ability on purpose: administrators pass every ability through `Gate::before`.
+     * Both the screen and the save type-hint this request, so both are authorized here.
      */
-    public static function guard(?User $user): void
+    public static function allows(?User $user): bool
     {
         abort_unless(TenancyResolutionMode::Single === TenancyResolutionMode::fromConfig(), 404);
-        abort_unless(null !== $user && $user->isAdmin() && ! $user->isPlatformSupport(), 403);
+
+        return null !== $user && $user->isAdmin() && ! $user->isPlatformSupport();
     }
 
     /**
@@ -42,9 +44,7 @@ final class PlatformSettingsRequest extends FormRequest
     {
         $user = $this->user();
 
-        self::guard($user instanceof User ? $user : null);
-
-        return true;
+        return self::allows($user instanceof User ? $user : null);
     }
 
     /**
