@@ -48,7 +48,9 @@ use App\Domains\Tenancy\Services\TenantUsageCounters;
 use App\Domains\Tenancy\Services\UnlimitedTenantLimits;
 use App\Domains\Tenancy\Services\UnlimitedUsageMeter;
 use App\Domains\Tenancy\Services\WebhookRegistryWriter;
+use App\Domains\Tenancy\Settings\TenantSettings;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
+use Closure;
 use Fapost\Foundation\Quota\Contracts\LimitNoticeInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\Contracts\PeriodUsageInterface;
@@ -62,10 +64,13 @@ use Fapost\Foundation\Tenancy\Contracts\TenantDirectoryInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantRenamerInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantReservationInterface;
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Database\Connection;
 use Illuminate\Foundation\Console\AboutCommand;
 use Illuminate\Support\ServiceProvider;
+use Spatie\LaravelSettings\SettingsCache;
+use Spatie\LaravelSettings\SettingsMapper;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
@@ -167,6 +172,25 @@ final class DomainServiceProvider extends ServiceProvider
                 $app->make(CoreBootstrapInterface::class)->reset();
             });
         });
+
+        // TenantSettings is bound scoped, and a scoped instance is forgotten between queue jobs but not inside
+        // runForTenant(): a sync job or a nested switch would otherwise read the instance already loaded for the
+        // outer tenant. Forget it on entry and again on exit, so each side resolves it afresh for its own tenant;
+        // the scoped abstract stays registered, so forgetScopedInstances() still clears it between jobs.
+        // The settings mapper is scoped the same way and its per-class config remembers whether the last load
+        // came from the cache and which properties are locked, so it is forgotten with it.
+        $this->app->afterResolving(TenantSwitcher::class, function (TenantSwitcher $switcher, $app): void {
+            $switcher->registerContextHook(static function () use ($app): Closure {
+                $forget = static function () use ($app): void {
+                    $app->forgetInstance(TenantSettings::class);
+                    $app->forgetInstance(SettingsMapper::class);
+                };
+
+                $forget();
+
+                return $forget;
+            });
+        });
     }
 
     /**
@@ -175,11 +199,30 @@ final class DomainServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->checkHostModeDeployment();
+        $this->isolateSettingsCachePerTenant();
 
         $this->app->booted(function (): void {
             if (! $this->app->environment('testing')) {
                 $this->app->make(LimitRegistry::class)->freeze();
             }
+        });
+    }
+
+    /**
+     * Keeps tenant settings cached under a key of the tenant's own.
+     *
+     * The settings cache store is shared by every tenant and every worker, and the key spatie builds
+     * from the class alone would serve one tenant's settings to another. The prefix mirrors the
+     * per-tenant permission cache key. The resolver reads the tenant context on every call and keeps
+     * nothing itself, so it is safe in a worker that serves many tenants; with no tenant it answers
+     * `landlord`, never an empty prefix, so that key cannot collide with a tenant's.
+     */
+    private function isolateSettingsCachePerTenant(): void
+    {
+        SettingsCache::resolvePrefixUsing(static function (): string {
+            $context = Container::getInstance()->make(TenantContextInterface::class);
+
+            return $context->isResolved() ? 'tenant.' . $context->get()->getId() : 'landlord';
         });
     }
 
