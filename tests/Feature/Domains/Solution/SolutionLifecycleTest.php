@@ -34,6 +34,8 @@ use App\Http\Shell\SolutionUi;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
 use Fapost\Foundation\Solution\DTO\SolutionEntitlement;
+use Fapost\Foundation\Solution\DTO\SolutionGrant;
+use Fapost\Foundation\Solution\Enums\SolutionGrantSource;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -288,6 +290,34 @@ final class SolutionLifecycleTest extends FeatureTestCase
         $this->assertCount(2, $this->calls->calls);
         $this->assertConsoleOf(visible: false);
         $this->assertSame($journal + 1, DB::table('solution_activation_events')->count());
+    }
+
+    public function test_a_plan_grant_runs_the_solution_everywhere_with_nothing_stored_and_its_end_stops_it(): void
+    {
+        $operator = new FakeSolutionEntitlement();
+        $this->app->instance(SolutionEntitlementInterface::class, $operator);
+
+        $this->artisan('platform:update')->assertExitCode(0);
+        $operator->default = SolutionEntitlement::grants([new SolutionGrant('feedback', SolutionGrantSource::Plan), new SolutionGrant('showcase', SolutionGrantSource::Addon)]);
+        $this->forgetSolutionState();
+
+        // Nothing was turned on: the grant alone runs the flow action, the builder palette and the console.
+        $this->assertSame(0, DB::table('solution_activations')->count());
+        $this->assertSame('success', $this->flowResult($this->alpha)['end_status']);
+        $this->inTenant($this->alpha, fn () => $this->assertNotSame([], $this->app->make(LoadBuilderFlowService::class)->availableActions()));
+        $this->assertConsoleOf(visible: true);
+
+        // The tenant cannot turn a granted Solution off.
+        $this->artisan('solutions:deactivate', ['solution' => 'feedback', '--tenant' => 'main'])->assertExitCode(1);
+
+        // The plan no longer includes it: stopped everywhere, with nothing written.
+        $operator->default = SolutionEntitlement::grants([]);
+        $this->forgetSolutionState();
+
+        $this->assertSame(['end_status' => 'failed', 'call_error' => 'solution_inactive: feedback'], $this->flowResult($this->alpha));
+        $this->assertConsoleOf(visible: false);
+        $this->assertSame(0, DB::table('solution_activations')->count());
+        $this->assertSame(0, DB::table('solution_activation_events')->count());
     }
 
     /**

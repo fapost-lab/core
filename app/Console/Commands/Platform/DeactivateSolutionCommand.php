@@ -6,12 +6,14 @@ namespace App\Console\Commands\Platform;
 
 use App\Domains\Solution\DTO\ActivationActor;
 use App\Domains\Solution\Enums\ActivationChange;
+use App\Domains\Solution\Exceptions\SolutionGrantedException;
 use App\Domains\Solution\Services\SolutionActivator;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 
 /**
- * Turns a Solution off for one tenant, installed or not. Its data stays. Idempotent.
+ * Turns a Solution off for one tenant, installed or not. Its data stays. Idempotent. Refused for a Solution the operator
+ * grants (its plan's bundle, a running add-on): only the operator ends a grant.
  */
 final class DeactivateSolutionCommand extends SolutionTenantCommand
 {
@@ -33,11 +35,17 @@ final class DeactivateSolutionCommand extends SolutionTenantCommand
         }
 
         return $this->runForTenantOption($tenants, $switcher, function () use ($solution, $reason): int {
-            $change = $this->laravel->make(SolutionActivator::class)->deactivate(
-                $solution,
-                ActivationActor::console(),
-                is_string($reason) && '' !== $reason ? $reason : null,
-            );
+            try {
+                $change = $this->laravel->make(SolutionActivator::class)->deactivate(
+                    $solution,
+                    ActivationActor::console(),
+                    is_string($reason) && '' !== $reason ? $reason : null,
+                );
+            } catch (SolutionGrantedException $exception) {
+                $this->components->error($exception->getMessage());
+
+                return self::FAILURE;
+            }
 
             if (ActivationChange::Unchanged === $change) {
                 $this->components->info(sprintf('Solution "%s" was not active for tenant "%s".', $solution, $this->option('tenant')));

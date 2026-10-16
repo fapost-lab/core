@@ -42,13 +42,29 @@ const translations = {
         runtime: { kit: 'Interface kit', vue: 'Vue', inertia: 'Inertia' },
       },
       entitlement: {
-        badge: 'Not in your plan',
+        badge: 'Not connected',
         paused: 'Paused',
         not_entitled: 'Not included.',
         unavailable: 'Could not check.',
         paused_note: 'Paused, data kept.',
-        off_note: 'Not in your plan, cannot be turned on.',
+        off_note: 'Not available for your plan.',
         unavailable_note: 'Plan could not be checked.',
+      },
+      grant: {
+        plan_badge: 'Included in your plan',
+        addon_badge: 'Add-on',
+        until: 'until :date',
+        plan_note: 'Included in your plan.',
+        addon_note: 'Connected as an add-on.',
+        addon_until: 'Connected as an add-on until :date.',
+      },
+      offer: {
+        connect: 'Connect',
+        connect_price: 'Connect · :price',
+        request_sent: 'Request sent',
+        trial_note: 'Free trial of :days days starts right away.',
+        request_note: 'Sends a request to the operator.',
+        pending_note: 'Your request was sent.',
       },
       deactivate_dialog: { title: 'Turn off :name?', description: 'Data is kept.', confirm: 'Turn off now' },
       missing: { title: 'No longer installed', description: 'Still on, package gone.' },
@@ -69,7 +85,9 @@ function solution(over: Partial<SolutionRow> = {}): SolutionRow {
     lastChange: null,
     canActivate: true,
     entitlement: { state: 'entitled', paused: false, action: null },
-    urls: { activate: '/admin/solutions/feedback/activate', deactivate: '/admin/solutions/feedback/deactivate' },
+    grant: null,
+    offer: null,
+    urls: { activate: '/admin/solutions/feedback/activate', deactivate: '/admin/solutions/feedback/deactivate', connect: '/admin/solutions/feedback/connect' },
     ...over,
   }
 }
@@ -255,34 +273,104 @@ describe('solutions page', () => {
     expect(post.mock.calls[0]?.[0]).toBe('/admin/solutions/ghost/deactivate')
   })
 
-  it('badges a Solution the plan does not include, and explains it with the operator button in the details', async () => {
+  it('badges a Solution that is not connected, and explains it with the operator button in the details', async () => {
     const wrapper = mountPage([
       solution({ canActivate: false, entitlement: { state: 'not_entitled', paused: false, action: { label: 'See plans', url: 'https://ops.example.test/plans' } } }),
     ])
 
-    expect(wrapper.get('[data-test="not-entitled"]').text()).toBe('Not in your plan')
-    expect(wrapper.get('[data-test="activate"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-test="not-entitled"]').text()).toBe('Not connected')
+    expect(wrapper.find('[data-test="activate"]').exists()).toBe(false)
     expect(wrapper.find('[data-test="entitlement"]').exists()).toBe(false)
 
     await openDetails(wrapper)
 
-    expect(dialog('[data-test="entitlement"]')?.textContent).toContain('Not in your plan, cannot be turned on.')
+    expect(dialog('[data-test="entitlement"]')?.textContent).toContain('Not available for your plan.')
     const action = dialog('[data-test="entitlement-action"]')
     expect(action?.textContent?.trim()).toBe('See plans')
     expect(action?.getAttribute('href')).toBe('https://ops.example.test/plans')
     expect(action?.getAttribute('target')).toBe('_blank')
   })
 
-  it('shows a paused Solution that left the plan, and lets it be turned off', async () => {
-    const wrapper = mountPage([solution({ active: false, canActivate: false, entitlement: { state: 'not_entitled', paused: true, action: null } })])
+  it('shows a Solution included in the plan as on, with no turn on or turn off', () => {
+    const wrapper = mountPage([solution({ active: true, grant: { source: 'plan', note: null, endsAt: null, endsAtLabel: null } })])
+    const card = wrapper.get('[data-test="solution-feedback"]')
 
-    expect(wrapper.get('[data-test="state"]').text()).toBe('Paused')
+    expect(card.get('[data-test="state"]').text()).toBe('On')
+    expect(card.get('[data-test="grant-badge"]').text()).toBe('Included in your plan')
+    expect(card.find('[data-test="activate"]').exists()).toBe(false)
+    expect(card.find('[data-test="deactivate"]').exists()).toBe(false)
+    expect(card.find('[data-test="details"]').exists()).toBe(true)
+  })
+
+  it('shows an add-on with its end date and explains it in the details', async () => {
+    const wrapper = mountPage([
+      solution({ active: true, grant: { source: 'addon', note: null, endsAt: '2026-12-01T00:00:00+00:00', endsAtLabel: 'December 1, 2026' } }),
+    ])
+
+    expect(wrapper.get('[data-test="grant-badge"]').text()).toBe('Add-on · until December 1, 2026')
+    expect(wrapper.find('[data-test="deactivate"]').exists()).toBe(false)
+
+    await openDetails(wrapper)
+    expect(dialog('[data-test="grant"]')?.textContent).toContain('Connected as an add-on until December 1, 2026.')
+  })
+
+  it('offers to connect a Solution with its price and posts to the connect url', async () => {
+    const offer = { name: 'Feedback Pro', description: 'More feedback.', trialDays: 14, price: '$9 / month', requestPending: false }
+    const wrapper = mountPage([solution({ canActivate: false, entitlement: { state: 'not_entitled', paused: false, action: null }, offer })])
+
+    expect(wrapper.get('[data-test="not-entitled"]').text()).toBe('Not connected')
+    expect(wrapper.get('[data-test="state"]').text()).toBe('Off')
+    expect(wrapper.get('[data-test="connect"]').text()).toBe('Connect · $9 / month')
+
+    await wrapper.get('[data-test="connect"]').trigger('click')
+    expect(post.mock.calls[0]?.[0]).toBe('/admin/solutions/feedback/connect')
+
+    await openDetails(wrapper)
+    expect(dialog('[data-test="offer"]')?.textContent).toContain('Feedback Pro')
+    expect(dialog('[data-test="offer-note"]')?.textContent).toContain('Free trial of 14 days')
+  })
+
+  it('labels the connect button without a price', () => {
+    const offer = { name: 'Feedback Pro', description: null, trialDays: 0, price: null, requestPending: false }
+    const wrapper = mountPage([solution({ canActivate: false, entitlement: { state: 'not_entitled', paused: false, action: null }, offer })])
+
+    expect(wrapper.get('[data-test="connect"]').text()).toBe('Connect')
+  })
+
+  it('shows a disabled Request sent while a request waits', async () => {
+    const offer = { name: 'Feedback Pro', description: null, trialDays: 0, price: null, requestPending: true }
+    const wrapper = mountPage([solution({ canActivate: false, entitlement: { state: 'not_entitled', paused: false, action: null }, offer })])
+    const button = wrapper.get('[data-test="request-sent"]')
+
+    expect(button.text()).toBe('Request sent')
+    expect(button.attributes('disabled')).toBeDefined()
+    expect(wrapper.find('[data-test="connect"]').exists()).toBe(false)
+
+    await openDetails(wrapper)
+    expect(dialog('[data-test="offer-note"]')?.textContent).toContain('Your request was sent.')
+  })
+
+  it('says a Solution is not available when there is no offer, and shows no button', () => {
+    const wrapper = mountPage([solution({ canActivate: false, entitlement: { state: 'not_entitled', paused: false, action: null } })])
+    const card = wrapper.get('[data-test="solution-feedback"]')
+
+    expect(card.get('[data-test="not-available"]').text()).toBe('Not available for your plan.')
+    expect(card.find('[data-test="connect"]').exists()).toBe(false)
+    expect(card.find('[data-test="activate"]').exists()).toBe(false)
+    expect(card.find('[data-test="deactivate"]').exists()).toBe(false)
+  })
+
+  it('shows a paused Solution as off on the card, and lets it be turned off from the details', async () => {
+    const wrapper = mountPage([solution({ active: true, canActivate: false, entitlement: { state: 'not_entitled', paused: true, action: null } })])
+
+    expect(wrapper.get('[data-test="state"]').text()).toBe('Off')
     expect(wrapper.find('[data-test="activate"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="deactivate"]').exists()).toBe(false)
 
     await openDetails(wrapper)
     expect(dialog('[data-test="entitlement"]')?.textContent).toContain('Paused, data kept.')
     expect(dialog('[data-test="entitlement-action"]')).toBeNull()
-    await wrapper.get('[data-test="deactivate"]').trigger('click')
+    ;(dialog('[data-test="details-deactivate"]') as HTMLElement).click()
     await flushPromises()
     expect(document.body.textContent).toContain('Turn off Feedback?')
   })

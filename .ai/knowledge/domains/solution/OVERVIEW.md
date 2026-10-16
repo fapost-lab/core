@@ -37,6 +37,7 @@ paths:
   - "tests/Fixtures/Connectors/**"
   - "testing/**"
   - "tests/Feature/Testing/**"
+  - tests/Support/FakeSolutionStorefront.php
 reviewed_at: 2026-10-16
 ---
 # Solution
@@ -109,29 +110,37 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
 - Activation per tenant lives in the tenant's schema (`adr-20261014-solution-activation-in-tenant-schema`):
   `solution_activations` (state, one row per Solution) and `solution_activation_events` (append-only
   journal), behind `Contracts/SolutionActivationStoreInterface` and `Infrastructure/EloquentSolutionActivationStore`.
-  - `ActiveSolutions` (`isActive`, `ids`) is the only source of the effective state (raw rows and the journal are read through the store port: `all()`, `events()`). Bound `scoped`, memoised per tenant id,
-    one lazy indexed query. Active = stored `active` AND installed with a valid manifest AND entitled by the
-    operator, so a removed package, a broken manifest or a lost entitlement makes a Solution inactive with no
-    write; reading never writes. `isEntitled()`/`entitlement()` tell screens and commands why one does not run.
-  - Entitlement (amendment of the activation ADR, 2026-10-16): Foundation's `SolutionEntitlementInterface` is asked
+  - `ActiveSolutions` (`isActive`, `ids`, `grantFor`) is the only source of the effective state (raw rows and the journal are read through the store port: `all()`, `events()`). Bound `scoped`, memoised per tenant id,
+    one lazy indexed query. Active = installed with a valid manifest AND (granted by the operator OR stored `active` and
+    allowed by the operator), so a removed package, a broken manifest or a lost grant or entitlement makes a Solution
+    inactive with no write; reading never writes the tenant's state. `isEntitled()`/`entitlement()`/`grantFor()` tell screens and commands why one does or does not run.
+  - Entitlement (amendments of the activation ADR, 2026-10-16): Foundation's `SolutionEntitlementInterface` is asked
     only by the `scoped` `Services/SolutionEntitlements` (memo per tenant id, one question per tenant and scope, an
-    exception reported once and remembered as unavailable). Default `AllSolutionsEntitled` (`bindIf`). Fail open in
-    `ActiveSolutions` (the factor is left out), fail closed in `SolutionActivator::activate`
-    (`SolutionEntitlementUnavailableException`); a Solution not entitled is refused for every actor
-    (`SolutionNotEntitledException`). The operator is not asked when the tenant has nothing stored active and installed.
+    exception reported once and remembered as unavailable). Default `AllSolutionsEntitled` (`bindIf`): everything allowed, nothing granted.
+    A **grant** (Foundation 0.25 `SolutionGrant`, source `plan` or `addon`) runs a Solution with no stored row and cannot be turned off
+    by the tenant; so the operator is asked whenever a Solution is installed. Fail open in `ActiveSolutions`: stored-active plus the grants of
+    the last successful answer, kept per tenant for `LAST_ANSWER_TTL_SECONDS` (24 h) by `Contracts/SolutionGrantSnapshotStoreInterface`
+    (`Infrastructure/CacheSolutionGrantSnapshotStore`, the shared cache store, key `fapost:solution-grants:<tenant id>`; not kept for the default).
+    Fail closed in `SolutionActivator::activate` (`SolutionEntitlementUnavailableException`); a Solution not entitled is refused for every actor
+    (`SolutionNotEntitledException`); a granted one is `Unchanged` on activate and refused on deactivate (`SolutionGrantedException`), also while the operator cannot answer when it is in the last grants.
+  - Storefront: Foundation's experimental `SolutionStorefrontInterface` (default `Services/NoSolutionStorefront`, `bindIf`) lists the operator's
+    offers and connects one (trial or request). Asked only by `SolutionsPresenter` and `Admin\SolutionController::connect`, never in a job.
   - `SolutionActivator` (`activate`, `deactivate`) is the only writer, with an `ActivationActor` (`user`,
     `console`, `operator`, `system`). Idempotent; row and journal entry in one transaction under a row
     lock; activating a Solution that is not installed throws `SolutionNotInstalledException` (not entitled:
     `SolutionNotEntitledException`; entitlement unreadable: `SolutionEntitlementUnavailableException`),
     deactivating one is allowed; it then drops its tenant's memo. Default: nothing active.
-  - `solutions:activate|deactivate|list` need `--tenant=<slug>` and run inside `runForTenant()`.
-    The `onActivate`/`onDeactivate` hooks are not called yet.
+  - `solutions:activate|deactivate|list` need `--tenant=<slug>` and run inside `runForTenant()`; `list` shows the source
+    (`plan`, `addon`, `manual`). The `onActivate`/`onDeactivate` hooks are not called, and a grant has no moment to call them in:
+    a Solution must not rely on activation for per-tenant setup (migrations for every tenant, lazy initialisation).
   - The activation screen is `admin/solutions` (`Admin\SolutionController`, props from `Http/Shell/SolutionsPresenter`,
     page `Console/AdminSolutions`), behind `manage_settings` like tenant settings and usage. It lists only valid Solutions
     (a failing manifest never reaches the catalog, and `platform:update` refuses it first) plus stored-active rows whose
     package is gone ("no longer installed", which can only be turned off). Activate and deactivate are POSTs through
     `SolutionActivator` with `ActivationActor::user(id, name)`, so the journal names the staff user; deactivation asks for
-    confirmation and says the data is kept. What a Solution "registers" is its manifest actions plus its declarations in
+    confirmation and says the data is kept. A granted Solution shows its source (plan or add-on, with an end) and no Turn off; one
+    the operator offers shows Connect (with its price) or Request sent; one with neither says Not connected and "not available for
+    your plan"; Turn off of a not-connected but stored-active Solution is in Details. What a Solution "registers" is its manifest actions plus its declarations in
     `ConsoleExtensionRegistry`, shown whether or not it is on. `SolutionsPresenter::isActivatable()` is the one place the
     entitlement step (`solution-entitlement-seam`) will be asked what a tenant may have; the controller checks it again.
   - `SolutionUiCompatibility` follows `adr-20261014-solution-console-ui` (Stability): the `kit` range a bundle declares

@@ -115,3 +115,42 @@ installed Solution.
 - Rejected: a per-id `isEntitled` question (N calls a screen, no "unrestricted"), the operator writing deactivations
   through Core (loses the automatic return and writes without a person), entitlement inside `TenantAccessState`, and a
   Redis cache in Core.
+
+## Amendment 2026-10-16 (2): grants run with nothing stored, and the storefront
+
+Task `solution-auto-activation` (owner, 2026-10-16: "every Solution in the plan is turned on automatically, and off
+automatically when it leaves the bundle"; a bundled Solution has no Turn off; a Solution outside the plan can be
+connected as an add-on). Foundation 0.25 lets the operator **grant** a Solution (`SolutionEntitlement::grants()`,
+`SolutionGrant` with source `plan` or `addon`) as well as allow it.
+
+- Effective = installed ∩ (granted ∪ (stored `active` ∩ allowed)), still answered only by `ActiveSolutions`. A grant
+  needs no row: nothing is written when a plan, a bundle or an add-on changes, and nothing is journaled. The audit of
+  grants is the operator's history (subscriptions, add-ons, requests), as for entitlement.
+- `SolutionActivator::activate` on a granted Solution writes nothing and answers `Unchanged`; `deactivate` refuses it
+  (`SolutionGrantedException`) for every actor, CLI included, with no `--force`: only the operator ends a grant. While the
+  operator cannot answer, a Solution in the kept last grants (below) is refused the same way. A
+  stored row of a granted Solution is ignored while the grant lasts, so a bundled Solution the tenant had turned off
+  runs anyway (owner, gate of this task).
+- Because a grant has no row, Core asks the operator whenever a Solution is installed (once per tenant and scope),
+  not only when the tenant stored one as active. Without installed Solutions it still asks nothing.
+- Operator outage (owner, gate of this task, replacing the agent's proposal to let granted Solutions stop): the grants
+  of each successful answer are kept per tenant for `SolutionEntitlements::LAST_ANSWER_TTL_SECONDS` (24 h, a code
+  constant) through `SolutionGrantSnapshotStoreInterface`, implemented on the application's shared cache store under
+  `fapost:solution-grants:<tenant id>` (the tenant id is always passed, never read from ambient context). While the
+  operator cannot answer, `ActiveSolutions` runs stored-active ∪ those grants (installed only). An answer without
+  grants clears the snapshot; Core's default `AllSolutionsEntitled` keeps none. A failing cache is reported and
+  ignored. Turning on and connecting stay fail closed. This is a cache of the operator's answer, not tenant state:
+  the rule "reading never writes" is about the tenant's schema, which a read still never touches. Rejected: the
+  snapshot in the tenant schema (a database write on the hot path), process memory (lost on restart, not shared).
+- Per-tenant setup does not hang on the moment of activation: a grant has none, and Core still does not call
+  `onActivate`/`onDeactivate`. A Solution creates its tables by migrations that run for every tenant and initialises
+  anything else lazily. If a hook is ever needed, the path is an operator event Core reacts to with a tenant job that
+  journals (actor `plan`) and calls the hooks, the computation staying the truth; not built.
+- `Solution\Contracts\SolutionStorefrontInterface` (experimental, Foundation 0.25; Core default `NoSolutionStorefront`,
+  `bindIf`) lists the operator's offers for a tenant and connects one (a trial, or a request the operator approves).
+  Asked only by the Solutions screen and its `connect` POST (`manage_settings`), never from a job; refused while the
+  entitlement answer cannot be had; Core writes nothing and drops its memo of the tenant's answer after a connect.
+  Offers are shown only for installed Solutions the answer neither grants nor allows.
+- Rejected: the operator writing activations into tenant schemas on plan, bundle or add-on changes (fan-out jobs over
+  every tenant of a plan, retries, reconcile, and drift between "paid" and "on" — the failure the computation rules
+  out), and offers inside the entitlement answer (the storefront would be computed on every job).

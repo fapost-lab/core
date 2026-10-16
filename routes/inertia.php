@@ -156,6 +156,7 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::get('admin/solutions', [AdminSolutionController::class, 'index'])->name('console.admin.solutions.index');
         Route::post('admin/solutions/{solution}/activate', [AdminSolutionController::class, 'activate'])->where('solution', '[a-z][a-z0-9_]{1,31}')->name('console.admin.solutions.activate');
         Route::post('admin/solutions/{solution}/deactivate', [AdminSolutionController::class, 'deactivate'])->where('solution', '[a-z][a-z0-9_]{1,31}')->name('console.admin.solutions.deactivate');
+        Route::post('admin/solutions/{solution}/connect', [AdminSolutionController::class, 'connect'])->where('solution', '[a-z][a-z0-9_]{1,31}')->name('console.admin.solutions.connect');
 
         // `assistant` is no screen but may be bookmarked: it sends on to an assistant the user may open.
         Route::get('assistant', [AssistantHomeController::class, 'index'])->name('console.entry');
