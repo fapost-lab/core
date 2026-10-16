@@ -274,7 +274,7 @@ final class PublicMediaLinkTest extends FeatureTestCase
     private function storeBlob(string $tenantId, string $mime): MediaBlob
     {
         $tenant = $this->tenant($tenantId);
-        $id     = mb_strtolower((string)\Illuminate\Support\Str::ulid());
+        $id     = mb_strtolower(\Illuminate\Support\Str::ulid()->toRfc4122());
         $path   = "tenants/{$tenantId}/image/2026-05/zz/{$id}.jpg";
 
         $this->app->make(TenantMediaDisk::class)->resolve($tenant)->put($path, self::BYTES);
