@@ -24,7 +24,7 @@ an activated Solution provides, and stops reaching it after deactivation.
 - [x] `solution-core-registrar` — Core implementation of `CoreRegistrarInterface`: an activated Solution's action handlers
       resolve in the flow runtime, and a name collision with Core fails at registration instead of
       overwriting (after: activation storage — registration has to ask what is active)
-- [ ] Lifecycle test suite over the whole chain: install → activate → handler available →
+- [ ] `solution-lifecycle-suite` — Lifecycle test suite over the whole chain: install → activate → handler available →
       deactivate → gone, with the tenant boundary asserted
 
 ## Phase 3 — An operator can do it without a developer
