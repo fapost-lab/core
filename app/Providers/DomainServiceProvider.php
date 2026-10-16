@@ -48,6 +48,7 @@ use App\Domains\Tenancy\Services\TenantUsageCounters;
 use App\Domains\Tenancy\Services\UnlimitedTenantLimits;
 use App\Domains\Tenancy\Services\UnlimitedUsageMeter;
 use App\Domains\Tenancy\Services\WebhookRegistryWriter;
+use App\Domains\Tenancy\Settings\BuiltTenantSettings;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use Closure;
@@ -175,20 +176,44 @@ final class DomainServiceProvider extends ServiceProvider
 
         // TenantSettings is bound scoped, and a scoped instance is forgotten between queue jobs but not inside
         // runForTenant(): a sync job or a nested switch would otherwise read the instance already loaded for the
-        // outer tenant. Forget it on entry and again on exit, so each side resolves it afresh for its own tenant;
-        // the scoped abstract stays registered, so forgetScopedInstances() still clears it between jobs.
-        // The settings mapper is scoped the same way and its per-class config remembers whether the last load
-        // came from the cache and which properties are locked, so it is forgotten with it.
+        // outer tenant. The instance the container built is hidden for the length of the switch and put back
+        // afterwards; one bound with instance() (a test's TenantSettings::fake()) is left where it is. The settings
+        // mapper is scoped the same way and its per-class config remembers whether the last load came from the
+        // cache and which properties are locked, so it is forgotten on both sides of the switch.
+        $this->app->scoped(BuiltTenantSettings::class);
+        $this->app->extend(TenantSettings::class, static function (TenantSettings $settings, $app): TenantSettings {
+            $app->make(BuiltTenantSettings::class)->instance = $settings;
+
+            return $settings;
+        });
         $this->app->afterResolving(TenantSwitcher::class, function (TenantSwitcher $switcher, $app): void {
             $switcher->registerContextHook(static function () use ($app): Closure {
-                $forget = static function () use ($app): void {
-                    $app->forgetInstance(TenantSettings::class);
+                // Answers the instance it hid, or null when the container holds none it built (nothing, or a fake).
+                $hideBuilt = static function () use ($app): ?TenantSettings {
+                    $built  = $app->make(BuiltTenantSettings::class);
+                    $hidden = null;
+
+                    if (null !== $built->instance && $app->make(TenantSettings::class) === $built->instance) {
+                        $hidden = $built->instance;
+                        $app->forgetInstance(TenantSettings::class);
+                    }
+
+                    $built->instance = null;
                     $app->forgetInstance(SettingsMapper::class);
+
+                    return $hidden;
                 };
 
-                $forget();
+                $outer = $hideBuilt();
 
-                return $forget;
+                return static function () use ($app, $hideBuilt, $outer): void {
+                    $hideBuilt();
+
+                    if (null !== $outer) {
+                        $app->instance(TenantSettings::class, $outer);
+                        $app->make(BuiltTenantSettings::class)->instance = $outer;
+                    }
+                };
             });
         });
     }

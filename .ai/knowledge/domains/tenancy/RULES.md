@@ -107,9 +107,12 @@ broken.
   `SettingsCache::resolvePrefixUsing()`: every key becomes `tenant.<id>.settings.<class>`, or
   `landlord.settings.<class>` with no tenant (never an empty prefix). The resolver reads the scoped
   tenant context on each call and holds nothing, so it is worker-safe although spatie stores it
-  statically. A `TenantSwitcher` context hook forgets the scoped `TenantSettings` and spatie's
-  scoped `SettingsMapper` (its per-class config remembers the cache flag and locked properties) on
-  entry and on exit, so each side resolves them afresh for its own tenant. Why: the cache store is
+  statically. A `TenantSwitcher` context hook hides the `TenantSettings` instance the container
+  built (tracked by the scoped `BuiltTenantSettings`) for the length of the switch and puts it back on
+  exit, and forgets spatie's scoped `SettingsMapper` (its per-class config remembers the cache flag
+  and locked properties) on both sides, so each side resolves them afresh for its own tenant. An
+  instance bound with `instance()` — a test's `TenantSettings::fake()` — is left bound through the
+  switch. Why: the cache store is
   shared by every tenant and worker, and the class-only key spatie builds served one tenant's
   settings to another once `SETTINGS_CACHE_ENABLED` was on; a sync job or nested switch reused the
   outer tenant's instance even without the cache. Limits: `settings:clear-cache` clears only the
