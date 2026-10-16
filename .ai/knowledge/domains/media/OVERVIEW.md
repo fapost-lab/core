@@ -55,7 +55,10 @@ definitions reference which file, so a file in use is not deleted silently.
 ## Entry points
 
 - Bindings: `Providers/MediaServiceProvider.php`. Uploader, dispatcher, ingestor and
-  `MediaService` are `scoped`; registries and repositories are singletons.
+  `MediaService` are `scoped`. The three channel registries (uploader, downloader, link policy) are `scoped` too:
+  they build their services from the `media.channel.*` tags, and a connector's media service may depend on
+  tenant-scoped bindings, so a registry must never outlive a request or job
+  (`adr-20261016-connector-package-type`). Repositories are singletons.
 - HTTP: `routes/media.php` (`auth`, `tenant`, `verified`; the signed raw-file route drops
   `auth`), controllers in `app/Http/Controllers/Media`.
 - Public media links: `routes/media-public.php` (`tenant` and a per-link throttle only, no `web`),

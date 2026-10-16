@@ -7,6 +7,7 @@ namespace App\Domains\Channels\Contracts;
 use App\Domains\Channels\ChannelIntegrationDefinition;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
+use Fapost\Foundation\Channel\ChannelInboundAdapterInterface;
 use Fapost\Foundation\Channel\WebhookRegistrarInterface;
 use Fapost\Foundation\Messaging\ProviderSenderInterface;
 
@@ -31,7 +32,7 @@ interface ChannelRegistryInterface
     public function webhookRegistrar(ChannelTypeEnum|string $channelType): ?WebhookRegistrarInterface;
 
     /**
-     * Resolve the inbound adapter for the given channel type.
+     * Resolve the inbound adapter for the given channel type: a built-in one, or a connector's declarative one.
      */
-    public function adapter(ChannelTypeEnum|string $channelType): ?ChannelAdapterInterface;
+    public function adapter(ChannelTypeEnum|string $channelType): ChannelAdapterInterface|ChannelInboundAdapterInterface|null;
 }

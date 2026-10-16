@@ -17,7 +17,7 @@ paths:
   - app/Console/Commands/Ops/MigrateIngressCommand.php
   - app/Console/Commands/Ops/PublishIngressSpecsCommand.php
   - app/Console/Commands/Ops/WebhookRegistryHealthCommand.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-16
 ---
 # Channel ingress
 
@@ -65,7 +65,12 @@ in `gateway/`. Code lives in `app/Domains/Webhook` — the folder name predates 
 
 ## Entry points
 
-- `POST /webhook/{channel}/{hash}` → `Http/WebhookController.php` → `Jobs/IncomingMessageJob.php`.
+- `POST /webhook/{channel}/{hash}` → `Http/WebhookController.php` → `Jobs/IncomingMessageJob.php`. A connector's
+  inbound adapter (`Fapost\Foundation\Channel\ChannelInboundAdapterInterface`) has no verification code: the
+  controller always verifies it and derives its idempotency key through its `IngressSpec`. A connector's webhook
+  is not reachable yet in either runtime: the registry entry and `IncomingMessageJob` still cast the platform to
+  `PlatformEnum`, and `IngressSpecResolver` publishes specs only for `ChannelTypeEnum` cases. Opening both is the
+  `open-channel-types` task.
 - Gateway-produced jobs: `Jobs/RawIncomingMessageHandler.php`.
 - Gateway: `gateway/cmd/gateway/main.go`, `gateway/internal/ingress/handler.go`.
 - Runtime choice: `IngressDriver::fromConfig`, `Services/WebhookUrlGenerator::usesGateway`.

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Solution\Providers;
 
 use App\Domains\Solution\Console\ConsoleExtensionRegistry;
+use App\Domains\Solution\Contracts\ConnectorRegistrarFactoryInterface;
 use App\Domains\Solution\Contracts\SolutionActivationStoreInterface;
 use App\Domains\Solution\Contracts\SolutionRegistrarFactoryInterface;
+use App\Domains\Solution\DTO\InstalledConnector;
 use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\Infrastructure\CoreInstalledSolutionCatalog;
 use App\Domains\Solution\Infrastructure\EloquentSolutionActivationStore;
@@ -22,8 +24,10 @@ use App\Domains\Solution\Services\SolutionEntitlements;
 use App\Domains\Solution\Services\SolutionUiBundleReader;
 use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Solution\Services\SolutionUiPublisher;
+use App\Infrastructure\Solution\ConnectorChannelRegistrarFactory;
 use App\Infrastructure\Solution\SolutionCoreRegistrarFactory;
 use Fapost\Foundation\Console\Contracts\ConsoleExtensionsInterface;
+use Fapost\Foundation\Lifecycle\AbstractConnectorServiceProvider;
 use Fapost\Foundation\Lifecycle\AbstractSolutionServiceProvider;
 use Fapost\Foundation\Solution\Contracts\InstalledSolutionCatalogInterface;
 use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
@@ -78,10 +82,13 @@ final class SolutionServiceProvider extends ServiceProvider
         // Implemented outside the domain, in App\Infrastructure\Solution: it writes into the registries of the
         // domains a Solution extends.
         $this->app->singleton(SolutionRegistrarFactoryInterface::class, SolutionCoreRegistrarFactory::class);
+        $this->app->singleton(ConnectorRegistrarFactoryInterface::class, ConnectorChannelRegistrarFactory::class);
 
         // Connectors come first: they bring channels for the whole installation, which a Solution's flows may rely on.
-        // There is no activation and no registrar for them yet, only the provider.
-        foreach ($this->app->make(InstalledConnectors::class)->all() as $connector) {
+        // There is no activation for them, only the provider and a registrar for their channels.
+        $connectors = $this->app->make(InstalledConnectors::class)->all();
+
+        foreach ($connectors as $connector) {
             $this->app->register($this->app->resolveProvider($connector->provider));
         }
 
@@ -100,7 +107,16 @@ final class SolutionServiceProvider extends ServiceProvider
         // Runs after every provider's register() and before the first boot(): the registries are bound
         // and not yet frozen, and a Solution's registerExtensions() comes before its bootSolution().
         // boot() of this provider would be too late, Laravel boots the Solution providers first.
-        $this->app->booting(fn () => $this->registerExtensions($solutions));
+        $this->app->booting(function () use ($connectors, $solutions): void {
+            $this->registerChannels($connectors);
+
+            // Tests register fixture connectors after boot, so phpunit.xml leaves this open too (config/solutions.php).
+            if ((bool) config('solutions.freeze_console_registry', true)) {
+                $this->app->make(ConnectorRegistrarFactoryInterface::class)->freeze();
+            }
+
+            $this->registerExtensions($solutions);
+        });
     }
 
     public function boot(): void
@@ -113,6 +129,31 @@ final class SolutionServiceProvider extends ServiceProvider
                 $this->app->make(ConsoleExtensionRegistry::class)->freeze();
             }
         });
+    }
+
+    /**
+     * Gives every connector its own registrar and lets it register its channels, before any Solution registers
+     * anything. A violation is an exception, for the same reason as in {@see registerExtensions()}.
+     *
+     * @param  list<InstalledConnector>  $connectors
+     */
+    public function registerChannels(array $connectors): void
+    {
+        $factory = $this->app->make(ConnectorRegistrarFactoryInterface::class);
+
+        foreach ($connectors as $connector) {
+            $provider = $this->app->getProvider($connector->provider);
+
+            if (!$provider instanceof AbstractConnectorServiceProvider) {
+                throw new LogicException(sprintf('Connector "%s" (%s): provider %s is not registered.', $connector->id, $connector->package, $connector->provider));
+            }
+
+            $provider->registerChannelsWith($factory->forConnector($connector));
+        }
+
+        // Registration builds a throwaway media service per class, outside any tenant, and its scoped dependencies
+        // would otherwise stay in the container for the rest of a PHP-FPM request.
+        $this->app->forgetScopedInstances();
     }
 
     /**

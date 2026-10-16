@@ -7,10 +7,10 @@ A channel has two halves: **ingress**, which accepts and verifies what the provi
 sends you, and **egress**, which delivers what the assistant says back.
 
 <Warning>
-  A channel ships as a [Connector](/extending/connectors) package. Core already
-  finds and boots connectors, but there is no registration entry point for a
-  connector to add its channel with yet: the contracts below exist and are stable,
-  and a new provider is still a Core change until that entry point ships.
+  A channel ships as a [Connector](/extending/connectors) package that registers
+  the contracts below through `ConnectorRegistrarInterface`. A channel of a
+  connector's type cannot be created in the console yet, because channel types are
+  still a closed list in Core. Telegram is built into Core and uses the same contracts.
 </Warning>
 
 ## Identity

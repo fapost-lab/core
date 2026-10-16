@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Channels\Providers;
 
 use App\Domains\Channels\ChannelRegistry;
+use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Policies\ChannelPolicy;
@@ -30,11 +31,15 @@ final class ChannelsServiceProvider extends ServiceProvider
         $this->app->register(TelegramChannelServiceProvider::class);
         $this->app->register(WhatsAppChannelServiceProvider::class);
 
+        // Depends on the image alone (class names), never on a tenant, so a process may keep it.
+        $this->app->singleton(ConnectorChannels::class);
+
         $this->app->singleton(
             ChannelRegistryInterface::class,
             fn ($app): ChannelRegistry => new ChannelRegistry(
                 definitions: $app->tagged('channels.integration'),
                 container: $app,
+                connectorChannels: $app->make(ConnectorChannels::class),
             )
         );
     }
