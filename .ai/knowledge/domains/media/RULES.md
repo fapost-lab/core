@@ -21,7 +21,8 @@ paths:
   - "app/Http/Controllers/Admin/Media*Controller.php"
   - "app/Http/Requests/Admin/*Media*"
   - "resources/js/pages/Console/Media/**"
-reviewed_at: 2026-10-15
+  - routes/media-public.php
+reviewed_at: 2026-10-16
 ---
 # Media rules
 
@@ -60,6 +61,27 @@ broken.
   a `media.blob.object_delete_failed` warning logs the path and the orphaned object stays for an operator,
   because the file is already gone and a 500 would not bring it back. Without this the storage limit would
   never get space back. Enforced: `MediaApiTest`, `MediaResourceTest`, `CleanupSoftDeletedMediaJobTest`.
+
+- **A public media link opens one file of one tenant, briefly, and only while the file exists.** A channel
+  that sends media by URL (Foundation `ChannelMediaLinkPolicyInterface`, tag `media.channel.link`) gets a link
+  that `PublicMediaLinkIssuer` mints in the dispatcher just before delivery; nothing else mints one
+  (`PublicMediaLinkSigner::sign()` is called only there; the signer is used only by the issuer and
+  `PublicMediaLinkResolver`). The signature is HMAC-SHA256 under a key derived from `APP_KEY` with HKDF info
+  `fapost.media.public-link.v1`, over the tenant id, file id, blob id, expiry and the last path segment, so a
+  link of tenant A refuses on B's host and after the file changes blob. The resolver looks the file up only in
+  the request's tenant and never in the trash, so a soft-deleted file refuses, and a stored object that is gone
+  refuses too. Expiry is checked
+  against `media.public_links.max_ttl_seconds` too (plus 60 s of clock skew), so a mis-minted link cannot live
+  for ever. Previous keys (`app.previous_keys`) still verify; a malformed one is reported and skipped. Every
+  refusal is the same 404 and logs `media.public_link.refused` with file, tenant and reason, never the URL.
+  The route (`routes/media-public.php`) is outside the `web` group (no session, no cookie), throttled per link,
+  and serves as an attachment under `sandbox` CSP and `nosniff`; a type outside `media.allowed_mime_types` goes
+  out as `application/octet-stream`. Why: the link opens a tenant's file with no login, so a mistake leaks
+  silently to people who never asked for it. Enforced: `PublicMediaLinkTest` (two tenants, host mode),
+  `PublicMediaLinkSignerTest`, PHPat `PublicMediaLinkSignerTest`, `PublicMediaLinkSigningTest`.
+- **A channel type with an uploader uploads; one with a link policy gets a link; one with neither fails.** The
+  uploader wins when both exist, so Telegram never changes path; a link writes nothing to `media_channel_refs`;
+  neither throws `ChannelMediaUploaderNotRegisteredException`. Enforced: `MediaDispatcherTest`.
 
 ## Rules
 

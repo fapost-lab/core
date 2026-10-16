@@ -48,6 +48,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
             Route::middleware('web')->group(base_path('routes/builder.php'));
             Route::middleware('web')->group(base_path('routes/media.php'));
+            // No `web` group: an anonymous fetch by a messenger must start no session and set no cookie.
+            Route::group([], base_path('routes/media-public.php'));
             Route::middleware('web')->group(base_path('routes/tma.php'));
 
             // The console: the admin and assistant screens, sign-in and the routes of Solutions.

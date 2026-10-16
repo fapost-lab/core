@@ -106,6 +106,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Public links (channels that fetch media by URL, e.g. Viber)
+    |--------------------------------------------------------------------------
+    | ttl_seconds     — default life of an issued link; a channel may ask for another.
+    | max_ttl_seconds — ceiling for issuing AND for opening: a link whose expiry lies further
+    |                   away than this is refused even if its signature is valid.
+    | per_minute      — requests per minute for one link.
+    */
+    'public_links' => [
+        'ttl_seconds'     => 3600,
+        'max_ttl_seconds' => 86400,
+        'per_minute'      => 60,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Channel provider limits
     |--------------------------------------------------------------------------
     | Surfaced as `provider_warnings` on upload responses so the picker can hint
