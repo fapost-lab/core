@@ -90,8 +90,9 @@ final readonly class NavigationBuilder
      */
     public function admin(User $user): array
     {
-        $staff = __('staff.navigation.group');
-        $media = __('media.navigation_group');
+        $staff  = __('staff.navigation.group');
+        $media  = __('media.navigation_group');
+        $system = __('console.navigation.system');
 
         $entries = [
             $this->entry(null, 'console.admin.dashboard', __('console.navigation.dashboard'), 'home', -100, true),
@@ -108,9 +109,9 @@ final readonly class NavigationBuilder
                 $user->can(Permission::ViewMedia->value) || $user->can(Permission::ManageMedia->value),
             ),
             $this->entry($media, 'console.admin.translations.index', __('staff.tenant_translations.navigation'), 'languages', 60, $user->can(Permission::ManageTranslations->value)),
-            $this->entry(null, 'console.admin.tenant-settings.edit', __('staff.tenant_settings.navigation'), 'sliders-horizontal', 100, $user->can(Permission::ManageSettings->value)),
-            $this->entry(null, 'console.admin.usage.index', __('console.usage.navigation'), 'gauge', 90, $user->can(Permission::ManageSettings->value)),
-            $this->entry(null, 'console.admin.solutions.index', __('console.solutions.navigation'), 'puzzle', 95, $user->can(Permission::ManageSettings->value)),
+            $this->entry($system, 'console.admin.tenant-settings.edit', __('staff.tenant_settings.navigation'), 'sliders-horizontal', 100, $user->can(Permission::ManageSettings->value)),
+            $this->entry($system, 'console.admin.usage.index', __('console.usage.navigation'), 'gauge', 90, $user->can(Permission::ManageSettings->value)),
+            $this->entry($system, 'console.admin.solutions.index', __('console.solutions.navigation'), 'puzzle', 95, $user->can(Permission::ManageSettings->value)),
         ];
 
         return $this->groups($entries, []);
