@@ -32,7 +32,7 @@ an activated Solution provides, and stops reaching it after deactivation.
 Goal: turning a Solution on is a panel action, not a deploy. Done when: a staff user with the right
 permission activates and deactivates a Solution for their tenant and sees the result in a flow.
 
-- [ ] `solution-activation-screen` — Activation screen on the kit (console/admin): install state, activate, deactivate, what the
+- [x] `solution-activation-screen` — Activation screen on the kit (console/admin): install state, activate, deactivate, what the
       Solution registers through the ui-foundation extension contract, and the reason when its kit
       range does not match Core's (after: activation storage — the screen edits that state; after:
       ui-foundation phase 3 — the screen is built on the kit)
