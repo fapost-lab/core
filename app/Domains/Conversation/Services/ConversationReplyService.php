@@ -13,6 +13,7 @@ use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Conversation\Exceptions\ConversationReplyUndeliverableException;
 use App\Domains\Conversation\Models\Conversation;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
+use App\Domains\Media\DTO\PublicMediaLink;
 use App\Domains\Media\Exceptions\MediaDeletedException;
 use App\Domains\Media\Exceptions\MediaNotFoundException;
 use App\Domains\Media\Models\MediaFile;
@@ -130,7 +131,7 @@ final readonly class ConversationReplyService implements ConversationReplyServic
             $conversation,
             $channel,
             $chatId,
-            $this->mediaPayload($kind, (string) $dispatch->providerFileId, $caption),
+            $this->mediaPayload($kind, (string) $dispatch->providerFileId, $caption, $dispatch->publicLink),
             $staffUserId,
             $idempotencyKey,
         );
@@ -150,8 +151,26 @@ final readonly class ConversationReplyService implements ConversationReplyServic
         return $this->sender->send($message);
     }
 
-    private function mediaPayload(MediaKind $kind, string $providerFileId, string $caption): MessagePayload
+    private function mediaPayload(MediaKind $kind, string $providerFileId, string $caption, ?PublicMediaLink $publicLink = null): MessagePayload
     {
+        if (null !== $publicLink) {
+            // A channel that fetches media by URL: the link and what the connector needs to pick its message type.
+            $media = [
+                'url'       => $publicLink->url,
+                'mime_type' => $publicLink->mimeType,
+                'size'      => $publicLink->size,
+                'file_name' => $publicLink->fileName,
+                'kind'      => $publicLink->kind->value,
+            ];
+
+            return match ($kind) {
+                MediaKind::Image => new MessagePayload(type: 'photo', text: $caption, media: $media),
+                MediaKind::Video => new MessagePayload(type: 'video', text: $caption, media: $media),
+                MediaKind::Audio => new MessagePayload(type: 'voice', text: '', media: $media),
+                default          => new MessagePayload(type: 'document', text: $caption, media: $media),
+            };
+        }
+
         return match ($kind) {
             MediaKind::Image => new MessagePayload(type: 'photo', text: $caption, media: ['photo' => $providerFileId]),
             MediaKind::Video => new MessagePayload(type: 'video', text: $caption, media: ['video' => $providerFileId]),

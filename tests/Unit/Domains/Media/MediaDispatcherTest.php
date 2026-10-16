@@ -12,12 +12,20 @@ use App\Domains\Media\Exceptions\MediaDeletedException;
 use App\Domains\Media\Models\MediaBlob;
 use App\Domains\Media\Models\MediaChannelRef;
 use App\Domains\Media\Models\MediaFile;
+use App\Domains\Media\Registries\ChannelMediaLinkPolicyRegistry;
 use App\Domains\Media\Registries\ChannelMediaUploaderRegistry;
 use App\Domains\Media\Services\MediaDispatcher;
+use App\Domains\Media\Services\PublicMediaExtension;
+use App\Domains\Media\Services\PublicMediaLinkIssuer;
+use App\Domains\Media\Services\PublicMediaLinkSigner;
+use App\Domains\Tenancy\Services\TenantContext;
+use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Carbon\CarbonImmutable;
 use Fapost\Foundation\Channel\ChannelInterface;
+use Fapost\Foundation\Media\ChannelMediaLinkPolicyInterface;
 use Fapost\Foundation\Media\ChannelMediaUploaderInterface;
 use Fapost\Foundation\Media\DTO\UploadResult;
+use Fapost\Foundation\Media\Enums\MediaKind;
 use Fapost\Foundation\Media\MediaBlobReadInterface;
 use Mockery;
 use Tests\TestCase;
@@ -52,7 +60,7 @@ final class MediaDispatcherTest extends TestCase
 
         $registry = new ChannelMediaUploaderRegistry();
 
-        $dispatcher = new MediaDispatcher($refs, $registry);
+        $dispatcher = $this->makeDispatcher($refs, $registry);
 
         $result = $dispatcher->ensureUploadedToChannel($media, $channel);
         $this->assertSame('provider-x', $result->providerFileId);
@@ -84,7 +92,7 @@ final class MediaDispatcherTest extends TestCase
 
         $registry = new ChannelMediaUploaderRegistry([$uploader]);
 
-        $dispatcher = new MediaDispatcher($refs, $registry);
+        $dispatcher = $this->makeDispatcher($refs, $registry);
 
         $result = $dispatcher->ensureUploadedToChannel($media, $channel);
         $this->assertSame('provider-y', $result->providerFileId);
@@ -121,7 +129,7 @@ final class MediaDispatcherTest extends TestCase
 
         $registry = new ChannelMediaUploaderRegistry([$uploader]);
 
-        $dispatcher = new MediaDispatcher($refs, $registry);
+        $dispatcher = $this->makeDispatcher($refs, $registry);
 
         $result = $dispatcher->ensureUploadedToChannel($media, $channel);
         $this->assertSame('provider-new', $result->providerFileId);
@@ -149,7 +157,7 @@ final class MediaDispatcherTest extends TestCase
 
         $registry = new ChannelMediaUploaderRegistry([$uploader]);
 
-        $dispatcher = new MediaDispatcher($refs, $registry);
+        $dispatcher = $this->makeDispatcher($refs, $registry);
 
         $result = $dispatcher->ensureUploadedToChannel($media, $channel);
 
@@ -169,7 +177,7 @@ final class MediaDispatcherTest extends TestCase
 
         $registry = new ChannelMediaUploaderRegistry();
 
-        $dispatcher = new MediaDispatcher($refs, $registry);
+        $dispatcher = $this->makeDispatcher($refs, $registry);
 
         $this->expectException(ChannelMediaUploaderNotRegisteredException::class);
 
@@ -187,11 +195,107 @@ final class MediaDispatcherTest extends TestCase
         $refs = Mockery::mock(MediaChannelRefRepositoryInterface::class);
         $refs->shouldNotReceive('find');
 
-        $dispatcher = new MediaDispatcher($refs, new ChannelMediaUploaderRegistry());
+        $dispatcher = $this->makeDispatcher($refs, new ChannelMediaUploaderRegistry());
 
         $this->expectException(MediaDeletedException::class);
 
         $dispatcher->ensureUploadedToChannel($media, $channel);
+    }
+
+    public function test_a_link_policy_channel_gets_a_public_link_and_no_ref_is_written(): void
+    {
+        CarbonImmutable::setTestNow('2026-05-01 12:00:00');
+
+        $media   = $this->makeMedia($this->makeBlob('blob-link'));
+        $channel = $this->makeChannel('channel-link', ChannelTypeEnum::WhatsApp);
+
+        $refs = Mockery::mock(MediaChannelRefRepositoryInterface::class);
+        $refs->shouldNotReceive('find');
+        $refs->shouldNotReceive('upsert');
+
+        $dispatcher = $this->makeDispatcher($refs, new ChannelMediaUploaderRegistry(), $this->policyRegistry('whatsapp', 7200));
+
+        $result = $dispatcher->ensureUploadedToChannel($media, $channel);
+
+        $this->assertNull($result->providerFileId);
+        $this->assertFalse($result->alreadyDelivered);
+        $this->assertNotNull($result->publicLink);
+        $this->assertStringContainsString('/media/public/media-blob-link/', $result->publicLink->url);
+        $this->assertStringEndsWith('/photo.jpeg', $result->publicLink->url);
+        $this->assertSame('image/jpeg', $result->publicLink->mimeType);
+        $this->assertSame(100, $result->publicLink->size);
+        $this->assertSame(MediaKind::Image, $result->publicLink->kind);
+        $this->assertSame(CarbonImmutable::now()->getTimestamp() + 7200, $result->publicLink->expiresAt->getTimestamp());
+    }
+
+    public function test_an_uploader_wins_over_a_link_policy_of_the_same_type(): void
+    {
+        $media   = $this->makeMedia($this->makeBlob('blob-both'));
+        $channel = $this->makeChannel('channel-both', ChannelTypeEnum::Telegram);
+
+        $refs = Mockery::mock(MediaChannelRefRepositoryInterface::class);
+        $refs->shouldReceive('find')->andReturnNull();
+        $refs->shouldReceive('upsert')->once()->andReturn(new MediaChannelRef());
+
+        $uploader = Mockery::mock(ChannelMediaUploaderInterface::class);
+        $uploader->shouldReceive('channelType')->andReturn('telegram');
+        $uploader->shouldReceive('upload')->once()->andReturn(new UploadResult('tg-id'));
+
+        $dispatcher = $this->makeDispatcher(
+            $refs,
+            new ChannelMediaUploaderRegistry([$uploader]),
+            $this->policyRegistry('telegram'),
+        );
+
+        $result = $dispatcher->ensureUploadedToChannel($media, $channel);
+
+        $this->assertSame('tg-id', $result->providerFileId);
+        $this->assertNull($result->publicLink);
+    }
+
+    public function test_a_soft_deleted_file_gets_no_link_even_for_a_link_policy_channel(): void
+    {
+        $media             = $this->makeMedia($this->makeBlob('blob-link-del'));
+        $media->deleted_at = CarbonImmutable::now();
+
+        $dispatcher = $this->makeDispatcher(
+            Mockery::mock(MediaChannelRefRepositoryInterface::class),
+            new ChannelMediaUploaderRegistry(),
+            $this->policyRegistry('whatsapp'),
+        );
+
+        $this->expectException(MediaDeletedException::class);
+
+        $dispatcher->ensureUploadedToChannel($media, $this->makeChannel('channel-link-del', ChannelTypeEnum::WhatsApp));
+    }
+
+    private function makeDispatcher(
+        MediaChannelRefRepositoryInterface $refs,
+        ChannelMediaUploaderRegistry $uploaders,
+        ?ChannelMediaLinkPolicyRegistry $policies = null,
+    ): MediaDispatcher {
+        $tenantContext = new TenantContext();
+        $tenantContext->set(new RuntimeTenant(id: 'tenant-1', schemaName: 'main'));
+
+        return new MediaDispatcher(
+            $refs,
+            $uploaders,
+            $policies ?? new ChannelMediaLinkPolicyRegistry(),
+            new PublicMediaLinkIssuer(
+                new PublicMediaLinkSigner('base64:' . base64_encode(str_repeat('k', 32))),
+                new PublicMediaExtension(),
+            ),
+            $tenantContext,
+        );
+    }
+
+    private function policyRegistry(string $type, ?int $ttl = null): ChannelMediaLinkPolicyRegistry
+    {
+        $policy = Mockery::mock(ChannelMediaLinkPolicyInterface::class);
+        $policy->shouldReceive('channelType')->andReturn($type);
+        $policy->shouldReceive('linkTtlSeconds')->andReturn($ttl);
+
+        return new ChannelMediaLinkPolicyRegistry([$policy]);
     }
 
     private function makeBlob(string $id): MediaBlob

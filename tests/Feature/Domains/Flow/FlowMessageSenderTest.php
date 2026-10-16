@@ -19,9 +19,11 @@ use App\Domains\Flow\Services\FlowMessageSender;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Media\DTO\DispatchResult;
+use App\Domains\Media\DTO\PublicMediaLink;
 use App\Domains\Media\Enums\MediaSource;
 use App\Domains\Media\Models\MediaBlob;
 use App\Domains\Media\Models\MediaFile;
+use Carbon\CarbonImmutable;
 use Fapost\Foundation\Media\Enums\MediaKind;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
@@ -287,6 +289,105 @@ final class FlowMessageSenderTest extends FeatureTestCase
         ]);
 
         $this->assertSame('provider-img', $providerMessageId);
+    }
+
+    public function test_a_link_channel_gets_the_public_link_in_the_media_payload(): void
+    {
+        $tenantId  = '00000000-0000-0000-0000-000000000003';
+        $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+        $contact   = Contact::factory()->forTenant($tenantId)->create(['external_id' => 'chat-link']);
+
+        $channel = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $assistant->getKey(),
+            'tenant_id'    => $tenantId,
+            'type'         => ChannelTypeEnum::WhatsApp,
+            'token'        => 'token-link',
+            'is_active'    => true,
+        ]));
+
+        ChannelContact::query()->create([
+            'contact_id'          => $contact->getKey(),
+            'channel_id'          => $channel->getKey(),
+            'last_interaction_at' => now(),
+        ]);
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Link Flow',
+            'nodes'     => [],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        $session = FlowSession::query()->create([
+            'tenant_id'          => $tenantId,
+            'assistant_id'       => $assistant->getKey(),
+            'contact_id'         => $contact->getKey(),
+            'flow_definition_id' => (string) $definition->getKey(),
+            'flow_version'       => 1,
+            'current_node_id'    => 'node-img',
+            'state'              => [],
+            'status'             => 'active',
+            'version'            => 1,
+        ]);
+
+        $blob = MediaBlob::query()->create([
+            'tenant_id'    => $tenantId,
+            'content_hash' => str_repeat('b', 64),
+            'storage_path' => 'tenants/test/media/link.jpg',
+            'storage_disk' => 'local',
+            'size'         => 100,
+            'mime_type'    => 'image/jpeg',
+        ]);
+
+        $mediaFile = MediaFile::query()->create([
+            'tenant_id' => $tenantId,
+            'blob_id'   => $blob->id,
+            'name'      => 'photo.jpg',
+            'kind'      => MediaKind::Image,
+            'metadata'  => [],
+            'source'    => MediaSource::Upload,
+        ]);
+
+        $sender = $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('send')->once()->withArgs(
+                fn ($message): bool => 'photo' === $message->payload->type
+                                       && 'Nice photo' === $message->payload->text
+                                       && [
+                                           'url'       => 'https://main.example.test/media/public/f/1/sig/photo.jpeg',
+                                           'mime_type' => 'image/jpeg',
+                                           'size'      => 100,
+                                           'file_name' => 'photo.jpeg',
+                                           'kind'      => 'image',
+                                       ] === $message->payload->media
+            )->andReturn(new DeliveryResult(sent: true, providerMessageId: 'provider-link'));
+        });
+
+        $dispatcher = Mockery::mock(MediaDispatcherInterface::class);
+        $dispatcher->shouldReceive('ensureUploadedToChannel')->once()->andReturn(
+            new DispatchResult(providerFileId: null, publicLink: new PublicMediaLink(
+                url: 'https://main.example.test/media/public/f/1/sig/photo.jpeg',
+                expiresAt: CarbonImmutable::now()->addHour(),
+                mimeType: 'image/jpeg',
+                size: 100,
+                fileName: 'photo.jpeg',
+                kind: MediaKind::Image,
+            )),
+        );
+
+        $flowSender        = new FlowMessageSender($sender, $dispatcher, $this->recordingLogger(), new ConversationCaptureFactory(), UsageGates::gate());
+        $providerMessageId = $flowSender->send($tenantId, (string) $contact->getKey(), (string) $session->getKey(), [
+            'node_id'         => 'node-img',
+            'idempotency_key' => 'idem-link',
+            'session_id'      => (string) $session->getKey(),
+            'content_type'    => 'image',
+            'media_file_id'   => $mediaFile->id,
+            'caption'         => 'Nice photo',
+        ]);
+
+        $this->assertSame('provider-link', $providerMessageId);
     }
 
     public function test_image_send_skips_outbound_when_dispatcher_already_delivered(): void

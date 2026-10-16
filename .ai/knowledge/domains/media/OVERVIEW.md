@@ -20,7 +20,8 @@ paths:
   - "app/Http/Controllers/Admin/Media*Controller.php"
   - "app/Http/Requests/Admin/*Media*"
   - "resources/js/pages/Console/Media/**"
-reviewed_at: 2026-10-15
+  - routes/media-public.php
+reviewed_at: 2026-10-16
 ---
 # Media
 
@@ -38,6 +39,11 @@ definitions reference which file, so a file in use is not deleted silently.
   and channel), model, repository and dispatcher all live here. Channels only contributes
   uploader and downloader adapters, through the container tags `media.channel.uploader` and
   `media.channel.downloader`.
+- **A channel receives media in one of two ways, decided by Media's dispatcher.** A channel with an uploader
+  (Telegram) gets a provider file id, cached per blob and channel. A channel that can only fetch media by URL
+  (Viber) declares a link policy and gets a signed public link minted per send, never cached and never stored;
+  it reaches the payload as `media.url` with `mime_type`, `size`, `file_name` and `kind`. The channel never mints
+  links.
 - Depends on Flow's concrete `FlowDefinition` for reference tracking, through a
   `FlowDefinition::saved` hook registered in `Providers/MediaServiceProvider.php`. *(inferred:
   this dependency points the wrong way; Flow could report references to Media through a port)*
@@ -52,6 +58,10 @@ definitions reference which file, so a file in use is not deleted silently.
   `MediaService` are `scoped`; registries and repositories are singletons.
 - HTTP: `routes/media.php` (`auth`, `tenant`, `verified`; the signed raw-file route drops
   `auth`), controllers in `app/Http/Controllers/Media`.
+- Public media links: `routes/media-public.php` (`tenant` and a per-link throttle only, no `web`),
+  `app/Http/Controllers/Media/PublicMediaController.php` over `PublicMediaLinkResolver`; links are minted by
+  `PublicMediaLinkIssuer` on the tenant's own host (`TenantHost::urlFor`), with lifetimes from
+  `media.public_links`.
 - `app/Jobs/Media/CleanupSoftDeletedMediaJob.php` (queue `messaging.system`, daily).
 - Admin UI: `app/Http/Controllers/Admin/MediaController.php` and `MediaFolderController.php` on the
   `admin` stack (pages `resources/js/pages/Console/Media`), over `MediaLibraryService` and

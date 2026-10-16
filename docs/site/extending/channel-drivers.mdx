@@ -70,6 +70,16 @@ exposes a typing or processing indicator through a `ProcessingIndicatorHandle`;
 `ChannelMediaUploaderInterface` and `ChannelMediaDownloaderInterface` handle media
 in each direction.
 
+A provider that accepts pictures, video and files only as a URL it fetches itself
+registers `ChannelMediaLinkPolicyInterface` instead of an uploader, tagged
+`media.channel.link`. Core then puts a signed public link to the file in the outgoing
+payload, issued just before delivery and valid for a limited time: `media.url`, with
+`mime_type`, `size` (bytes), `file_name` (with its extension) and `kind` (`image`,
+`video`, `audio` or `document`). The payload's `type` is shaped for channels that
+upload, so choose the provider's message type from `mime_type`. The link is the only
+way to the file without signing in, so the sender never logs it, never stores it and
+never builds links of its own. A channel type with an uploader keeps uploading.
+
 ## Rate limits are preventive
 
 Provider rate limits and backpressure are handled before sending, not as a

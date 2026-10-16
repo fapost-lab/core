@@ -41,6 +41,10 @@ services:
 		class: Tests\Architecture\MigrationTest
 		tags:
 			- phpat.test
+	-
+		class: Tests\Architecture\PublicMediaLinkSignerTest
+		tags:
+			- phpat.test
 
 parameters:
 	level: 0
