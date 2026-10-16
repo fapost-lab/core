@@ -40,8 +40,9 @@ trait InstallsShowcaseSolution
 
     /**
      * @param  string|null  $package  a copy of the fixture package to install instead, as a test changed it
+     * @param  list<array<string, mixed>>  $alsoInstalled  composer.json of further packages to install beside it
      */
-    protected function installShowcase(bool $publish = true, ?string $package = null): void
+    protected function installShowcase(bool $publish = true, ?string $package = null, array $alsoInstalled = []): void
     {
         $this->removeShowcase();
 
@@ -50,7 +51,13 @@ trait InstallsShowcaseSolution
             json_decode((string) file_get_contents(($package ?? self::showcasePackage()) . '/composer.json'), true, 512, JSON_THROW_ON_ERROR),
             $package ?? self::showcasePackage(),
             '1.0.0',
-        )->write();
+        );
+
+        foreach ($alsoInstalled as $composer) {
+            $this->showcaseVendor->package($composer);
+        }
+
+        $this->showcaseVendor->write();
 
         $this->showcasePublic = dirname($this->showcaseVendor->path) . '/public';
         mkdir($this->showcasePublic, 0o777, true);
