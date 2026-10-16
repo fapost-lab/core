@@ -82,6 +82,11 @@ return [
     // The close button of the kit's dialogs and sheets.
     'close' => 'Close',
 
+    'footer' => [
+        'rights'     => 'All rights reserved.',
+        'powered_by' => 'Powered by',
+    ],
+
     // Shared by every list screen built on the kit's DataTable.
     'table' => [
         'search'          => 'Search',
@@ -377,6 +382,7 @@ return [
             'inactive' => 'Only an active channel has a webhook to register.',
         ],
         'bot_pending' => 'Awaiting registration',
+        'unavailable' => 'Unavailable',
         'status'      => [
             'active'   => 'Active',
             'inactive' => 'Inactive',

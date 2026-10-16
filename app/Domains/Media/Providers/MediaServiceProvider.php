@@ -54,6 +54,9 @@ use Illuminate\Support\ServiceProvider;
 /**
  * Wires Media Domain bindings, the channel adapter registries, and the listener that
  * keeps media_file_references in sync with FlowDefinition saves.
+ *
+ * The three channel registries are scoped, not singletons: they hold the services built from the connector tags, and a
+ * service that injects a scoped binding would stay pinned to the first job's tenant for the whole worker process.
  */
 final class MediaServiceProvider extends ServiceProvider
 {
@@ -76,21 +79,21 @@ final class MediaServiceProvider extends ServiceProvider
         $this->app->singleton(StoragePathFactory::class);
         $this->app->singleton(TenantMediaDisk::class);
 
-        $this->app->singleton(
+        $this->app->scoped(
             ChannelMediaUploaderRegistry::class,
             static fn (Container $app): ChannelMediaUploaderRegistry => new ChannelMediaUploaderRegistry(
                 $app->tagged('media.channel.uploader'),
             ),
         );
 
-        $this->app->singleton(
+        $this->app->scoped(
             ChannelMediaDownloaderRegistry::class,
             static fn (Container $app): ChannelMediaDownloaderRegistry => new ChannelMediaDownloaderRegistry(
                 $app->tagged('media.channel.downloader'),
             ),
         );
 
-        $this->app->singleton(
+        $this->app->scoped(
             ChannelMediaLinkPolicyRegistry::class,
             static fn (Container $app): ChannelMediaLinkPolicyRegistry => new ChannelMediaLinkPolicyRegistry(
                 $app->tagged('media.channel.link'),

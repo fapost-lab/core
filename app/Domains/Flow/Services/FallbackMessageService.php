@@ -54,7 +54,7 @@ final readonly class FallbackMessageService implements FallbackMessageServiceInt
                     idempotencyKey: 'fallback:' . (string)$contact->getKey() . ':' . Str::ulid(),
                     tenantId: (string)$contact->tenant_id,
                     channelId: (string)$channel->getKey(),
-                    channelType: $channel->type->value,
+                    channelType: $channel->type,
                     transportToken: $channel->token,
                     chatId: (string)$channelContact->contact->external_id,
                     payload: new MessagePayload(

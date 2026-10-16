@@ -27,7 +27,7 @@ final class WebhookRegistryEntryTest extends TestCase
         $this->assertSame('assistant-1', $entry->assistantId);
         $this->assertSame('channel-1', $entry->channelId);
         $this->assertSame('main', $entry->schema);
-        $this->assertSame(PlatformEnum::Telegram, $entry->platform);
+        $this->assertSame(PlatformEnum::Telegram->value, $entry->platform);
         $this->assertSame('secret', $entry->secretToken);
     }
 
@@ -46,7 +46,7 @@ final class WebhookRegistryEntryTest extends TestCase
         $this->assertSame('assistant-1', $entry->assistantId);
         $this->assertSame('channel-1', $entry->channelId);
         $this->assertSame('main', $entry->schema);
-        $this->assertSame(PlatformEnum::Telegram, $entry->platform);
+        $this->assertSame(PlatformEnum::Telegram->value, $entry->platform);
         $this->assertSame('secret', $entry->secretToken);
     }
 }

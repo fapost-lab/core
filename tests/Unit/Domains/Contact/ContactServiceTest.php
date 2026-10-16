@@ -53,13 +53,13 @@ final class ContactServiceTest extends FeatureTestCase
 
             $a = $service->findOrCreate(
                 $tenant->getId(),
-                PlatformEnum::Telegram,
+                PlatformEnum::Telegram->value,
                 'ext-1',
                 ['username' => 'u1'],
             );
             $b = $service->findOrCreate(
                 $tenant->getId(),
-                PlatformEnum::Telegram,
+                PlatformEnum::Telegram->value,
                 'ext-1',
                 ['username' => 'ignored'],
             );
@@ -79,8 +79,8 @@ final class ContactServiceTest extends FeatureTestCase
         $this->runInTenant($tenant, function () use ($tenant): void {
             $service = app(ContactServiceInterface::class);
 
-            $tg = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram, 'same-id', []);
-            $wa = $service->findOrCreate($tenant->getId(), PlatformEnum::WhatsApp, 'same-id', []);
+            $tg = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram->value, 'same-id', []);
+            $wa = $service->findOrCreate($tenant->getId(), PlatformEnum::WhatsApp->value, 'same-id', []);
 
             $this->assertNotSame($tg->id, $wa->id);
         });
@@ -103,7 +103,7 @@ final class ContactServiceTest extends FeatureTestCase
             ]);
 
             $service = app(ContactServiceInterface::class);
-            $contact = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram, 'u-1', []);
+            $contact = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram->value, 'u-1', []);
 
             $service->findOrCreateChannelContact($contact, $channel->id);
             $service->findOrCreateChannelContact($contact, $channel->id);
@@ -129,7 +129,7 @@ final class ContactServiceTest extends FeatureTestCase
             ]);
 
             $service = app(ContactServiceInterface::class);
-            $contact = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram, 'u-2', []);
+            $contact = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram->value, 'u-2', []);
 
             $service->findOrCreateChannelContact($contact, $channel->id);
             $firstAt = $contact->channelContacts()->firstOrFail()->last_interaction_at;
@@ -163,8 +163,8 @@ final class ContactServiceTest extends FeatureTestCase
 
             $service = app(ContactServiceInterface::class);
 
-            $c1 = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram, 'stable', ['k' => 1]);
-            $c2 = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram, 'stable', ['k' => 2]);
+            $c1 = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram->value, 'stable', ['k' => 1]);
+            $c2 = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram->value, 'stable', ['k' => 2]);
             $this->assertSame($c1->id, $c2->id);
             $this->assertSame(['k' => 1], $c1->fresh()->meta);
 
@@ -180,7 +180,7 @@ final class ContactServiceTest extends FeatureTestCase
 
         $this->runInTenant($tenant, function () use ($tenant): void {
             $service = app(ContactServiceInterface::class);
-            $contact = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram, 'lang-user', []);
+            $contact = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram->value, 'lang-user', []);
 
             $updated = $service->updateLanguage($contact->id, 'es');
 

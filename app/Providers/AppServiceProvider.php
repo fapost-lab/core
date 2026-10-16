@@ -6,6 +6,8 @@ namespace App\Providers;
 
 use App\Console\Platform\ArtisanPlatformMigrator;
 use App\Console\Platform\PlatformMigratorInterface;
+use App\Console\Platform\TenantUnservedChannelsFinder;
+use App\Console\Platform\UnservedChannelsFinderInterface;
 use App\Domains\Flow\Logging\DatabaseAnalyticsWriter;
 use App\Domains\Shared\Infrastructure\ModelAttributeRegistry;
 use App\Http\Shell\SolutionExtensions;
@@ -34,6 +36,7 @@ final class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(PlatformMigratorInterface::class, ArtisanPlatformMigrator::class);
+        $this->app->bind(UnservedChannelsFinderInterface::class, TenantUnservedChannelsFinder::class);
 
         Auth::provider('legacy-uuid-eloquent', function ($app, array $config): LegacyUuidUserProvider {
             /** @var class-string<\Illuminate\Contracts\Auth\Authenticatable&\Illuminate\Database\Eloquent\Model> $model */

@@ -84,7 +84,12 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   claimed by a Solution and a connector at once; `discover()` keeps returning the Solution half.
   `InstalledConnectors` is the catalog; `SolutionCache` keeps it under a `connectors` key of the same file
   (a file without that key is stale for connectors only). `SolutionServiceProvider` registers connector
-  providers before the Solution ones, with no activation and, for now, no registrar.
+  providers before the Solution ones, with no activation. In the same `booting()` callback, before the Solutions,
+  each connector gets its own registrar through `registerChannelsWith()` (port `Contracts/ConnectorRegistrarFactoryInterface`,
+  implementation `App\Infrastructure\Solution\ConnectorChannelRegistrar`). It accepts only types the manifest
+  declares, refuses a built-in type (`ChannelTypeEnum`) and a duplicate, checks every class against its Foundation
+  interface and each media class's `channelType()`, then adds the channel to `Channels\ConnectorChannels` and tags its
+  media classes into Media's registries. `platform:update` refuses a declared type the connector did not register.
 - Console UI (`adr-20261014-solution-console-ui`, experimental; rules in `conventions/solution-console-ui.md`):
   - `Console/ConsoleExtensionRegistry` implements Foundation's `ConsoleExtensionsInterface`: a process
     singleton (it depends on the image, never on a tenant) that accepts declarations only inside a Solution

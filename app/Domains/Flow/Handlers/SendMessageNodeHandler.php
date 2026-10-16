@@ -643,7 +643,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                 'language' => $contact instanceof Contact ? ($contact->language ?? '') : '',
                 'name'     => $meta['name'] ?? $meta['first_name'] ?? '',
                 'username' => $meta['username'] ?? '',
-                'channel'  => $contact instanceof Contact ? ($contact->platform ?? '') : '',
+                'channel'  => $contact instanceof Contact ? $contact->platform : '',
             ],
         ]);
     }

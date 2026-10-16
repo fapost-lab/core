@@ -42,8 +42,10 @@ sessions. The platform is extended from outside through public contracts, not by
 
 `app/Infrastructure/<X>` also holds the seams that compose two domains so neither knows the other:
 `app/Infrastructure/Solution` writes a Solution's actions into the Flow registry and answers Flow's
-`ActionAvailabilityInterface` from `ActiveSolutions`. `Domains/Flow` and `Infrastructure/Flow` do not depend
-on `Domains/Solution` (`SolutionBoundariesTest`).
+`ActionAvailabilityInterface` from `ActiveSolutions`; it also writes a connector's channels into
+`Channels\ConnectorChannels` and tags its media services into Media's registries. `Domains/Flow` and
+`Infrastructure/Flow` do not depend on `Domains/Solution`, and `Domains/Channels` and `Domains/Media` depend on
+neither `Domains/Solution` nor `Infrastructure` (`SolutionBoundariesTest`).
 
 `Presale` (the public site's lead form) and `Shared` (base model concerns) carry no domain
 logic and have no knowledge pack.
@@ -60,7 +62,7 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   Foundation, a primitive with no domain meaning into Support, anything with one domain's meaning
   stays in Core (ADR-05).
 - **The extension packages are separate repositories.** Core consumes them through VCS
-  repositories (`fapost/foundation ^0.22`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
+  repositories (`fapost/foundation ^0.23`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
   symlinked over `vendor/` by `composer dev:link` (`tools/dev-link-packages.php`). The console kit is
   one too: the npm package `@fapost/ui` (`fapost-lab/ui`), checked out in `packages/fapost-ui` and
   linked over `node_modules/` by `npm run dev:link` (`tools/dev-link-npm.mjs`); it depends on nothing
@@ -82,8 +84,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   (`Flow/Action/ActionHandlerRegistry`). The builder's former vendor-component glob
   (`vendorComponents.ts`) is removed: Solution UI goes to the console prebuilt
   (`adr-20261014-solution-console-ui`). Connector packages (`type: fapost-connector`) are found,
-  validated and booted for the whole installation beside Solutions, but cannot register a channel yet
-  (`adr-20261016-connector-package-type`, experimental). The Solution manifest, a data
+  validated and booted for the whole installation beside Solutions, and register their channels through
+  their own registrar; channel types are open strings, so a connector's channel is created, receives and sends
+  like a built-in one (`adr-20261016-connector-package-type`, experimental). The Solution manifest, a data
   block in the package's `composer.json`, is read and validated by `platform:update` (`solution`
   domain). A tenant's Solution activation is stored in its schema and read only through `ActiveSolutions`
   (`adr-20261014-solution-activation-in-tenant-schema`). Core implements `CoreRegistrarInterface` for

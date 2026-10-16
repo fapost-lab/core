@@ -34,12 +34,16 @@ Run each stage's skill in order, and mark it as you enter it:
 .ai/scripts/jig task autopilot <id> stage <analyze|plan|implement|review|verify|consolidate|...>
 ```
 
-- **Review in a fresh context.** Hand review (and architecture review) to a subagent that has
-  not seen the implementation, with the task id, the base and the skill to follow. It records
-  findings and signs the receipt; you fix, set `fixed`, and send it back to re-review.
-- **A `delegate:` line hands a stage to a helper** on the model it names — implement, review or
+- **Review in a fresh context.** Review and architecture review go to a reader who has not seen
+  the implementation, briefed as [jig-review](../jig-review/SKILL.md) §1 says. It records findings
+  and signs the receipt; you fix, set `fixed`, and a new reviewer does the re-review.
+- **A `delegate:` line for this session's runtime hands a stage to a helper** on the model it names — implement, review or
   both ([delegation](../jig-task/references/delegation.md)). Without one, you implement, and the
   review subagent runs on the session's model.
+- **An `executor:` line choosing another runtime takes precedence** for its stage. Start
+  its CLI from the task worktree under the bounded permissions in the same reference,
+  then check the diff, findings and receipt before moving on. A failed selected process
+  stops that stage; do not replace it with this session.
 - **The full set is CI's under `verify.full_run: ci`.** Verify with `jig verify`, never with
   `--full` or the stack's runner unfiltered; `full set left to CI` is not a gap to fill.
 - **Each repair costs one attempt.** A repair is one loop of fixing after a blocking finding or
@@ -120,8 +124,16 @@ and on their phone as it happens, when they set up Telegram messages: one short 
 | The gate of a T3/T4 task, or a re-classification into one | Write the design as usual, then `jig task gate <id> approved --by agent`, `jig task autopilot <id> approve --reason "<what was approved>"`, and in `task.md` (`jig task artifact append <id> task --from -`): "Human gate — approved by the agent (unattended)". Put `design.md` verbatim in the pull request under `## Design — approved by the agent, not a human` |
 | A decision nobody made | The most cautious option that is easiest to undo. `jig task autopilot <id> decide --reason "<what you chose, and why>"` |
 | A destructive operation | Never. Find another way or leave that part out, and say so with `decide --reason` |
-| `repair` exited 3 | The run ends unfinished: stage what there is and run `jig task ship <id> --message-file <file> --draft`. The body starts with `Not finished: <why>`. A draft is never merged; the run stays `stopped`, and the status page shows it waiting. `resume` is refused in an unattended run |
+| `repair` exited 3 | The run ends unfinished: stage what there is and run `jig task ship <id> --message-file <file> --draft`. The body starts with `Not finished: <why>`. A draft is never merged; the run stays `stopped`, and the status page shows it waiting. `resume` is refused after the repair limit, including with `--by human` |
 | The class turns out lower | Lower it with `jig task set <id> class <Tn> --reason "<why>"`, except out of T3/T4 below T3: the script refuses that unattended, so keep the route. `end` comes after the knowledge decision, never to start a fresh run |
+
+If a person independently answers a run that is already `stopped` in an unattended clone,
+quote their actual answer and run `jig task autopilot <id> resume --answer "<their answer>" --by human`.
+This recovery is allowed only before the two-repair limit; it preserves the repair count, so a
+repair-limit stop still ends in a draft. Never invent the answer to resume yourself. The run
+stays unattended: if the design changed, approve the current T3/T4 gate with `--by agent` and
+show the design and the quoted answer in the pull request. A person's answer to one decision
+is not their approval of the whole design.
 
 What never changes: a P0/P1 is never dismissed, the gates are never worked around, and nothing
 is merged but by `task ship`. Before shipping, put `jig task autopilot <id> report`'s

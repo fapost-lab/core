@@ -55,10 +55,33 @@ holds the Solution manifest (`adr-20261010-solution-manifest-is-data-in-composer
   `type`, which Packagist and `composer show` see.
 - Separate id spaces per kind: cheaper now, impossible to merge once outside packages exist.
 
+## Amendment, 2026-10-16: channel registration
+
+- A connector registers its channels through its own `Fapost\Foundation\Connector\ConnectorRegistrarInterface`
+  (`registerChannel(ConnectorChannel)`), not through `CoreRegistrarInterface`: of that interface's seven methods a
+  connector would support none. A `ConnectorChannel` names classes (sender, inbound adapter, optional webhook
+  registrar and media services); Core builds each inside the request or job that uses it, never shared across
+  them (the media registries are scoped).
+- A connector's inbound adapter (`Channel\ChannelInboundAdapterInterface`) declares verification and the
+  idempotency key only through `IngressSpec`, executed by Core and the gateway; it ships no verification code. A
+  provider whose signature the spec cannot express extends `SignatureScheme`. Rejected: moving Core's
+  `ChannelAdapterInterface` to Foundation, which ties the public contract to `Illuminate\Http\Request` and to code
+  the gateway cannot run.
+- A channel type is a string in Core's code and data, owned by whichever integration registered it;
+  `ChannelTypeEnum` lists only the built-in ones. A channel whose type nobody serves stays untouched and
+  unavailable; `platform:update` warns about it, never refuses.
+- Telegram stays built into Core on these seams (owner, 2026-10-16); a connector may never register a type Core
+  serves itself. "Built-in" means any `ChannelTypeEnum` case, the WhatsApp stub included: it fails closed, and the
+  task that brings a WhatsApp connector removes the stub from Core to free the type.
+- A connector's media services reach the Media domain through the same `media.channel.*` container tags Telegram
+  uses (Infrastructure tags them); Media never reads `ConnectorChannels`. The Media channel registries are scoped,
+  so a connector service lives for one request or job and is never shared across them. Tenant migrations, translations and the public link of a connector channel are not in the
+  registrar yet; they arrive with the tasks that first need them.
+
 ## Consequences
 
-- Third parties can describe a channel package today; it does nothing until the connector registrar
-  exists, which is why the format is marked experimental.
+- Third parties can describe a channel package, register its channels, and its channels work end to end; the
+  format stays experimental until a connector can describe its own settings fields.
 - `SolutionManifestValidator` no longer warns about `fapost-connector` packages; the domain `solution`
   now catalogs two kinds of package, and its name lags behind its responsibility.
 - The Solution cache file carries a second key; a cache without it is stale for connectors only.

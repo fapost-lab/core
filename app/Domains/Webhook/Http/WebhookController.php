@@ -11,6 +11,7 @@ use App\Domains\Webhook\Exceptions\InvalidSignatureException;
 use App\Domains\Webhook\Exceptions\WebhookRegistryException;
 use App\Domains\Webhook\Jobs\IncomingMessageJob;
 use App\Domains\Webhook\Services\ChannelAdapterResolver;
+use Fapost\Foundation\Channel\ChannelInboundAdapterInterface;
 use Fapost\Foundation\Channel\Ingress\IngressSpecExecutor;
 use Fapost\Foundation\Channel\Ingress\ProvidesIngressSpecInterface;
 use Fapost\Foundation\Channel\Ingress\SignedRequest;
@@ -33,6 +34,7 @@ use Illuminate\Support\Facades\Redis;
  * Verification runs through the adapter's declarative IngressSpec whenever the
  * adapter publishes one, so this controller and any external ingress gateway
  * execute byte-identical rules. Adapters without a spec keep using their own
+ * verification code. A connector's adapter always has one: it ships no
  * verification code.
  */
 final class WebhookController extends Controller
@@ -77,7 +79,7 @@ final class WebhookController extends Controller
                     schema: $entry->schema,
                     assistantId: $entry->assistantId,
                     channelId: $entry->channelId,
-                    platform: $entry->platform->value,
+                    platform: $entry->platform,
                     rawPayload: $request->json()->all(),
                     idempotencyKey: $idempotencyKey,
                     receivedAt: time(),
@@ -97,7 +99,7 @@ final class WebhookController extends Controller
      * against an absent header and pass. The spec executor refuses it itself,
      * for every scheme but `none`.
      */
-    private function verify(ChannelAdapterInterface $adapter, Request $request, string $secret): bool
+    private function verify(ChannelAdapterInterface|ChannelInboundAdapterInterface $adapter, Request $request, string $secret): bool
     {
         if (! $adapter instanceof ProvidesIngressSpecInterface) {
             return '' !== $secret && $adapter->verifySignature($request, $secret);
@@ -110,7 +112,7 @@ final class WebhookController extends Controller
         );
     }
 
-    private function idempotencyKey(ChannelAdapterInterface $adapter, Request $request, string $channelId): string
+    private function idempotencyKey(ChannelAdapterInterface|ChannelInboundAdapterInterface $adapter, Request $request, string $channelId): string
     {
         if (! $adapter instanceof ProvidesIngressSpecInterface) {
             return $adapter->extractIdempotencyKey($request, $channelId);

@@ -7,7 +7,6 @@ namespace App\Domains\Channels\Services;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
-use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Services\RecordLimitWatch;
@@ -55,7 +54,7 @@ final readonly class ChannelService implements ChannelServiceInterface
         $channel = new Channel([
             'assistant_id' => $assistant->getKey(),
             'tenant_id'    => $assistant->tenant_id,
-            'type'         => ChannelTypeEnum::from((string)$normalized['type']),
+            'type'         => (string)$normalized['type'],
             'token'        => (string)$normalized['token'],
             'secret_token' => (string)$normalized['secret_token'],
             'config'       => is_array($normalized['config'] ?? null) ? $normalized['config'] : [],
@@ -84,7 +83,7 @@ final readonly class ChannelService implements ChannelServiceInterface
         ]);
 
         if (array_key_exists('type', $allowed)) {
-            $channel->type = ChannelTypeEnum::from((string)$allowed['type']);
+            $channel->type = (string)$allowed['type'];
             unset($allowed['type']);
         }
 
@@ -145,7 +144,7 @@ final readonly class ChannelService implements ChannelServiceInterface
                 tenantId: $tenant->getId(),
                 schema: $tenant->getSchemaName(),
                 channelId: (string)$channel->getKey(),
-                channelType: $channel->type->value,
+                channelType: $channel->type,
                 webhookPublicHash: $channel->webhook_public_hash,
                 token: null,
                 secretToken: null,

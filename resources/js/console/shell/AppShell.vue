@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { inject, provide } from 'vue'
+import { computed, inject, provide } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { Toaster } from '@fapost/ui/components/sonner'
 import { KIT_MESSAGES } from '@fapost/ui/lib/messages'
@@ -19,6 +19,8 @@ import type { ShellPageProps } from './types'
  *
  * Inertia's flash data (`success`, `error`) is shown here as toasts, after every visit; they follow the console's theme.
  *
+ * The footer under every page credits the installation (`app.name`) and the platform it runs on.
+ *
  * The kit's own strings (DataTable, the close button of dialogs and sheets) come from here too: the shell provides
  * them under KIT_MESSAGES from the console lang files, read on every render, so a language switch reaches them.
  */
@@ -32,16 +34,23 @@ useFlashToasts()
 const dark = useIsDark()
 // What the application adds to the shell's slots (`slots.ts`); nothing without a provider.
 const slotted = inject(SHELL_SLOT, null)
+const t = computed(() => page.props.translations.console)
+const year = new Date().getFullYear()
 </script>
 
 <template>
-  <div class="bg-background text-foreground flex min-h-screen">
-    <div class="sticky top-0 hidden h-screen shrink-0 lg:block">
-      <AppRail />
+  <div class="bg-background text-foreground flex min-h-dvh">
+    <!-- The columns stretch to the row, so their backgrounds reach the bottom of a long page; only their content is sticky. -->
+    <div class="bg-rail border-rail-border hidden shrink-0 border-r lg:block [&>div>nav]:border-r-0">
+      <div class="sticky top-0 h-dvh">
+        <AppRail />
+      </div>
     </div>
 
-    <aside class="bg-sidebar text-sidebar-foreground border-sidebar-border sticky top-0 hidden h-screen w-[236px] shrink-0 border-r lg:block">
-      <ShellSidebar />
+    <aside class="bg-sidebar text-sidebar-foreground border-sidebar-border hidden w-[236px] shrink-0 border-r lg:block">
+      <div class="sticky top-0 h-dvh">
+        <ShellSidebar />
+      </div>
     </aside>
 
     <div class="flex min-w-0 flex-1 flex-col">
@@ -52,6 +61,15 @@ const slotted = inject(SHELL_SLOT, null)
           <slot />
         </div>
       </main>
+      <footer class="text-faint-foreground border-border border-t px-4 py-4 text-xs sm:px-6 lg:px-8">
+        <div class="flex w-full max-w-[1200px] flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <span>&copy; {{ year }} {{ page.props.shell.appName }}. {{ t.footer.rights }}</span>
+          <span>
+            {{ t.footer.powered_by }}
+            <a href="https://fapost.in" target="_blank" rel="noopener" class="text-muted-foreground hover:text-foreground font-medium transition-colors">FaPost</a>
+          </span>
+        </div>
+      </footer>
     </div>
 
     <component :is="slotted" v-if="slotted" place="floating" />

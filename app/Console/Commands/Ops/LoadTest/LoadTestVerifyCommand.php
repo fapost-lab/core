@@ -304,7 +304,7 @@ final class LoadTestVerifyCommand extends Command
                 ? implode(', ', array_map(static fn (string $status, int $count): string => "{$status}={$count}", array_keys($sessionStatusCounts), $sessionStatusCounts))
                 : '(none)',
         );
-        $this->components->twoColumnDetail('MessageSender rate limit', "{$rateLimit}/min per channel+chat (config messaging.rate_limit_per_minute)");
+        $this->components->twoColumnDetail('MessageSender rate limit', "{$rateLimit}/min per channel+chat (platform default messaging.rate_limit_per_minute; a tenant's Tenant settings value wins)");
 
         if ($report->hasLeaks()) {
             $this->table(

@@ -14,7 +14,7 @@
 # it lives in these run-scoped globals and in the log.
 _HK_VIA=""          # tier that decided the last remote state: forge|ancestry|none
 _HK_FORGE_KIND=""   # github|gitlab|none — resolved once per run
-_HK_FORGE_PRS=""    # "<head><TAB><base><TAB><state>" lines, fetched once per run (C1)
+_HK_FORGE_PRS=""    # "<head><TAB><base><TAB><state><TAB><head-commit>" lines, fetched once per run (C1)
 _HK_STALE_REMOTE=0  # 1 when the fetch or the forge tier could not answer
 _HK_FORGE_TOKEN=""  # github|gitlab|none|failed — the run marker's forge= field
 _HK_VERBOSE=0       # 1 with --verbose: also print one decision line per task
@@ -30,6 +30,8 @@ cmd_housekeeping() {
   jig_require_init
   # shellcheck source=lib/task.sh
   . "$JIG_LIB/task.sh"
+  # shellcheck source=lib/forgecache.sh
+  . "$JIG_LIB/forgecache.sh"
 
   local dry=0
   while [ $# -gt 0 ]; do
@@ -78,12 +80,17 @@ cmd_housekeeping() {
       printf 'another housekeeping run holds this clone; skipping\n'
       return 0
     fi
+    # A run writes its log line by line and may move workspaces to trash: one
+    # change of the clone, counted once when the run ends, however it ends
+    # (jig_revision_bump, common.sh). Registered before the first write.
+    jig_on_exit 'jig_revision_bump'
   fi
 
   _HK_DEFAULT_BASE=$(cfg git.base_branch main)
   _hk_fetch "$dry"
   _hk_check_latest_release "$dry" "$runtime"
   _hk_forge_init
+  [ "$dry" = 1 ] || _hk_forge_cache_write
   _hk_base_reflog_init "$tasks_dir"
 
   # A run boundary in the log. Without it the log is an undifferentiated
@@ -624,6 +631,92 @@ _hk_forge_init() {
   return 0
 }
 
+# _hk_forge_ci — `<head>\t<base>\t<ci>` for every open pull request on GitHub,
+# for the forge cache; nothing on another forge or when gh does not answer.
+#
+# A second list call, asked only when the cache is written. Asked in the first
+# call for all 200, the check rollup made it about six times slower (13 s and
+# 680 KB against 2 s, measured on this repository on 2026-10-15); for the open
+# ones alone it costs about 1 s. A merged or closed pull request's checks are
+# not asked. GitLab's list carries no pipeline, so its CI stays unknown rather
+# than cost a call per merge request.
+#
+# The checks are read into one word the way `task ship` reads them
+# (_jig_ship_checks_github, common.sh, through `gh pr checks`): a check re-run
+# counts once, at its newest run, as gh keeps only that one per workflow and
+# name; a skipped or neutral check counts as neither, a cancelled one as
+# failed, anything unfinished as pending. red, pending, green, or none when no
+# check ran. gh's own --jq, not jq (ADR-0002).
+_hk_forge_ci() {
+  [ "$_HK_FORGE_KIND" = github ] || return 0
+  # shellcheck disable=SC2016 # $c is the --jq expression's variable, not the shell's
+  gh pr list --state open --limit 200 \
+    --json headRefName,baseRefName,statusCheckRollup \
+    --jq '.[] | [.statusCheckRollup // []
+          | group_by((.workflowName // "") + "/" + (.name // .context // ""))[]
+          | max_by(.startedAt // .completedAt // "")
+          | if .__typename == "StatusContext" then
+              (if .state == "SUCCESS" then "pass"
+               elif .state == "ERROR" or .state == "FAILURE" then "fail"
+               else "pending" end)
+            elif .status != "COMPLETED" then "pending"
+            elif .conclusion == "SUCCESS" then "pass"
+            elif .conclusion == "SKIPPED" or .conclusion == "NEUTRAL" then "skip"
+            elif .conclusion == "FAILURE" or .conclusion == "ERROR" or .conclusion == "TIMED_OUT"
+              or .conclusion == "ACTION_REQUIRED" or .conclusion == "CANCELLED" then "fail"
+            else "pending" end] as $c
+        | "\(.headRefName)\t\(.baseRefName)\t\(
+            if any($c[]; . == "fail") then "red"
+            elif any($c[]; . == "pending") then "pending"
+            elif any($c[]; . == "pass") then "green"
+            else "none" end)"' 2>/dev/null || true
+}
+
+# _HK_PR_STATE_AWK — the awk function that reads a forge's word for a pull
+# request's state as open, merged or closed (empty for any other), shared by
+# _hk_forge_state and the forge cache so the two cannot read a state apart.
+_HK_PR_STATE_AWK='
+  function prstate(s) {
+    s = tolower(s)
+    if (s == "opened") return "open"
+    if (s == "locked") return "closed"
+    if (s == "open" || s == "merged" || s == "closed") return s
+    return ""
+  }'
+
+# _hk_forge_cache_write — keep what this run heard from the forge in the forge
+# cache (lib/forgecache.sh) for the reads that never ask it: one line per pull
+# request, `<head>\t<base>\t<state>\t<ci>\t<fetched_at>`, the state normalised
+# as _hk_forge_state normalises it. Only after a list the forge answered: a run
+# without a forge or with a failed one leaves the last cache as it is, every
+# entry still carrying the time it was heard. Never fails the run.
+_hk_forge_cache_write() {
+  local at rows ci
+  case "$_HK_FORGE_KIND" in
+    github | gitlab) ;;
+    *) return 0 ;;
+  esac
+  forgecache_owned || return 0
+  ci=$(_hk_forge_ci)
+  at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  # One stream, each line tagged with the list it came from: the checks first,
+  # so every pull request row can be joined to them in one pass.
+  rows=$({
+    printf '%s\n' "$ci" | awk '$0 != "" { print "C\t" $0 }'
+    printf '%s\n' "$_HK_FORGE_PRS" | awk '$0 != "" { print "P\t" $0 }'
+  } | awk -F '\t' -v at="$at" "$_HK_PR_STATE_AWK"'
+    $1 == "C" { if (NF >= 4 && !(($2 FS $3) in ci)) ci[$2 FS $3] = $4; next }
+    $1 == "P" && NF >= 4 && $2 != "" && $3 != "" {
+      s = prstate($4)
+      if (s == "") next
+      c = "-"
+      if (s == "open" && (($2 FS $3) in ci)) c = ci[$2 FS $3]
+      if (c != "green" && c != "red" && c != "pending" && c != "none") c = "-"
+      print $2 "\t" $3 "\t" s "\t" c "\t" at
+    }') || return 0
+  forgecache_write "$rows"
+}
+
 # _hk_forge_state <branch> <base> — merged|open|closed from the newest pull
 # request of <branch> into <base>; `wrong-base <other>` when there is none but
 # one into another branch was merged; nothing otherwise (fall through to
@@ -631,26 +724,16 @@ _hk_forge_init() {
 # that is how a phase merged into `main` instead of its epic, or stacked on
 # another phase's branch, would read as done (ADR-0039).
 _hk_forge_state() {
-  local branch="$1" base="$2" line raw
+  local branch="$1" base="$2" line
   [ "$_HK_FORGE_KIND" = "none" ] && return 0
   [ -n "$_HK_FORGE_PRS" ] || return 0
 
-  line=$(printf '%s\n' "$_HK_FORGE_PRS" | awk -F'\t' -v b="$branch" -v base="$base" '
-    $1 == b && $2 == base { print $3; found = 1; exit }
-    $1 == b && other == "" && tolower($3) == "merged" { other = $2 }
+  line=$(printf '%s\n' "$_HK_FORGE_PRS" | awk -F'\t' -v b="$branch" -v base="$base" "$_HK_PR_STATE_AWK"'
+    $1 == b && $2 == base { print prstate($3); found = 1; exit }
+    $1 == b && other == "" && prstate($3) == "merged" { other = $2 }
     END { if (!found && other != "") print "wrong-base " other }')
   [ -n "$line" ] || return 0
-  case "$line" in
-    wrong-base\ *) printf '%s\n' "$line"; return 0 ;;
-  esac
-
-  raw=$(printf '%s' "$line" | tr '[:upper:]' '[:lower:]')
-  case "$raw" in
-    merged) printf 'merged\n' ;;
-    open|opened) printf 'open\n' ;;
-    closed|locked) printf 'closed\n' ;;
-    *) return 0 ;;
-  esac
+  printf '%s\n' "$line"
 }
 
 # _hk_ancestry_state <branch> <base_commit> <base> — merged|unknown, judged
@@ -1192,7 +1275,11 @@ _hk_worktree_retire() {
 # _hk_worktree_ignored <path> — the paths `git worktree remove` would delete
 # without a word: what the project ignores, as git reports it, one per line and
 # relative to the worktree. Whole ignored directories come back as one entry,
-# so a tree full of dependencies is a handful of lines, not thousands. `-z`
+# so a tree full of dependencies is a handful of lines, not thousands — but only
+# in the `normal` untracked mode, so it is asked for by name. A person's own
+# `status.showUntrackedFiles=all` otherwise lists every file inside them: 43 621
+# lines for one worktree with vendor/ and node_modules/ (measured, 2026-10-16),
+# and a find for each in _hk_worktree_unshared. `-z`
 # spares the quoting git otherwise puts around a path with a space, a quote or a
 # byte above ASCII in it — measured: without `-z` those come back as
 # `"with space/"` and no `[ -e ]` finds them again. The NUL stays inside the
@@ -1204,7 +1291,7 @@ _hk_worktree_retire() {
 # pipeline carry git's failure out, and the caller reads that as an uncertainty,
 # never as "nothing is ignored".
 _hk_worktree_ignored() {
-  git -C "$1" status --porcelain -z --ignored 2>/dev/null \
+  git -C "$1" status --porcelain -z --ignored --untracked-files=normal 2>/dev/null \
     | tr '\0' '\n' \
     | sed -n 's/^!! //p'
 }
@@ -1257,22 +1344,40 @@ _hk_repo_holds_work() {
 # nor a link inside one is followed — .ai/workspace/tasks is itself the link
 # that borrows another checkout's workspaces (the fallback shape holds one link
 # per task under it instead), and it leads into another checkout entirely.
+#
+# Ignored files are listed one by one even in the normal mode (*.pyc beside
+# the sources), so the walk stays cheap per entry: a file other than a `.git`
+# of its own holds no repository and gets no find, and find's answer is read
+# from a here-document, not a process substitution — bash 3.2 keeps every
+# process substitution opened in a loop until the function returns, one
+# descriptor per ignored path (measured; on 2026-10-16 that ran the system's
+# file table out).
 _hk_worktree_unshared() {
-  local path="$1" list="$2" rel dot repo
+  local path="$1" list="$2" rel dot dots repo
   while IFS= read -r rel; do
     # git marks a directory with a trailing slash; find implementations differ
     # on whether they double it into the paths they print.
     rel=${rel%/}
     [ -n "$rel" ] || continue
     [ -e "$path/$rel" ] || continue
+    case "/$rel" in
+      */.git) ;;
+      *) [ -d "$path/$rel" ] || continue ;;
+    esac
+    dots=$(find "$path/$rel" -name .git -prune -print 2>/dev/null) || true
+    [ -n "$dots" ] || continue
     while IFS= read -r dot; do
       repo=${dot%/.git}
       [ "$repo" != "$dot" ] || continue
       _hk_repo_holds_work "$repo" || continue
       printf '%s\n' "$repo"
       return 0
-    done < <(find "$path/$rel" -name .git -prune -print 2>/dev/null)
-  done < <(printf '%s\n' "$list")
+    done <<EOF
+$dots
+EOF
+  done <<EOF
+$list
+EOF
   return 1
 }
 

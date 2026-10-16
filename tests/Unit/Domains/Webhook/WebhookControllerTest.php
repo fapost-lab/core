@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Mockery\MockInterface;
+use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
 use Tests\TestCase;
 
 final class WebhookControllerTest extends TestCase
@@ -168,6 +169,50 @@ final class WebhookControllerTest extends TestCase
         );
     }
 
+    public function test_a_connector_adapter_is_verified_and_deduplicated_through_its_ingress_spec(): void
+    {
+        Bus::fake();
+        $this->registryReturns(new EchoInboundAdapter(), $this->makeEntry('channel-5', 'echo-secret'));
+
+        Redis::shouldReceive('set')
+            ->once()
+            ->with('processed:echo:channel-5:42', '1', 'EX', 86400, 'NX')
+            ->andReturn(true);
+
+        $this->postJson('/webhook/telegram/ok-hash', ['id' => 42, 'text' => 'hi'], ['X-Echo-Secret' => 'echo-secret'])
+            ->assertOk();
+
+        Bus::assertDispatched(
+            IncomingMessageJob::class,
+            static fn (IncomingMessageJob $job): bool => 'echo:channel-5:42' === $job->payload->idempotencyKey
+                && 42 === $job->payload->rawPayload['id'],
+        );
+    }
+
+    public function test_a_connector_adapter_rejects_a_forged_secret(): void
+    {
+        Bus::fake();
+        $this->registryReturns(new EchoInboundAdapter(), $this->makeEntry('channel-5', 'echo-secret'));
+
+        Redis::shouldReceive('set')->never();
+
+        $this->postJson('/webhook/telegram/ok-hash', ['id' => 42], ['X-Echo-Secret' => 'forged'])->assertOk();
+
+        Bus::assertNothingDispatched();
+    }
+
+    public function test_a_connector_adapter_never_verifies_against_an_empty_secret(): void
+    {
+        Bus::fake();
+        $this->registryReturns(new EchoInboundAdapter(), $this->makeEntry('channel-5', ''));
+
+        Redis::shouldReceive('set')->never();
+
+        $this->postJson('/webhook/telegram/ok-hash', ['id' => 42])->assertOk();
+
+        Bus::assertNothingDispatched();
+    }
+
     public function test_returns_200_without_db_access(): void
     {
         Bus::fake();
@@ -192,6 +237,17 @@ final class WebhookControllerTest extends TestCase
         )->assertOk();
     }
 
+    private function registryReturns(object $adapter, WebhookRegistryEntry $entry): void
+    {
+        $this->mock(WebhookRegistryResolverInterface::class, function (MockInterface $mock) use ($entry): void {
+            $mock->shouldReceive('resolve')->once()->with('ok-hash')->andReturn($entry);
+        });
+
+        $this->mock(ChannelRegistryInterface::class, function (MockInterface $mock) use ($adapter): void {
+            $mock->shouldReceive('adapter')->with('telegram')->andReturn($adapter);
+        });
+    }
+
     private function makeEntry(
         string $channelId = 'channel-1',
         string $secretToken = 'secret',
@@ -204,7 +260,7 @@ final class WebhookControllerTest extends TestCase
             assistantId: $assistantId,
             channelId: $channelId,
             schema: $schema,
-            platform: PlatformEnum::Telegram,
+            platform: PlatformEnum::Telegram->value,
             secretToken: $secretToken,
         );
     }

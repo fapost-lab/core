@@ -136,7 +136,7 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             idempotencyKey: $this->idempotencyKey($sessionId, $payload),
             tenantId: $tenantId,
             channelId: (string)$channel->getKey(),
-            channelType: $channel->type->value,
+            channelType: $channel->type,
             transportToken: $channel->token,
             chatId: $chatId,
             payload: $this->toMessagePayload($payload, $contentType, $publicLink),

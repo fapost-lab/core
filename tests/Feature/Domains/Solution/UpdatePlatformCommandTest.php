@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Solution;
 
 use App\Console\Platform\PlatformMigratorInterface;
+use App\Console\Platform\UnservedChannelsFinderInterface;
+use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionManifestValidator;
+use Fapost\Foundation\Connector\ConnectorChannel;
 use Fapost\Foundation\Solution\Manifest\ManifestParser;
 use Symfony\Component\Console\Output\OutputInterface;
+use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
+use Tests\Fixtures\Connectors\Echo\EchoSender;
 use Tests\Fixtures\Solution\Actions\FeedbackScoreAction;
 use Tests\Fixtures\Solution\Actions\FeedbackSubmitAction;
 use Tests\Support\FakeVendor;
@@ -30,6 +35,9 @@ final class UpdatePlatformCommandTest extends TestCase
 
     private bool $migrationsSucceed = true;
 
+    /** @var list<array{tenant: string, type: string, count: int}> */
+    private array $unserved = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -44,6 +52,17 @@ final class UpdatePlatformCommandTest extends TestCase
             new InstalledPackagesReader($this->vendor->path),
             new SolutionManifestValidator(new ManifestParser()),
         ));
+        $this->unserved = [];
+        $this->app->instance(UnservedChannelsFinderInterface::class, new class ($this) implements UnservedChannelsFinderInterface {
+            public function __construct(private readonly UpdatePlatformCommandTest $test)
+            {
+            }
+
+            public function find(): array
+            {
+                return $this->test->unserved();
+            }
+        });
         $this->app->instance(PlatformMigratorInterface::class, new class ($this) implements PlatformMigratorInterface {
             public function __construct(private readonly UpdatePlatformCommandTest $test)
             {
@@ -61,6 +80,14 @@ final class UpdatePlatformCommandTest extends TestCase
         $this->vendor->cleanup();
 
         parent::tearDown();
+    }
+
+    /**
+     * @return list<array{tenant: string, type: string, count: int}>
+     */
+    public function unserved(): array
+    {
+        return $this->unserved;
     }
 
     public function recordMigration(): bool
@@ -95,6 +122,7 @@ final class UpdatePlatformCommandTest extends TestCase
 
     public function test_validate_only_lists_the_installed_connectors(): void
     {
+        $this->registerEchoChannel();
         $this->vendor->package(FakeVendor::connectorComposer(), '1.4.0')->write();
 
         $this->artisan('platform:update', ['--validate-only' => true])
@@ -131,12 +159,57 @@ final class UpdatePlatformCommandTest extends TestCase
     public function test_a_valid_update_caches_the_connectors_with_the_solutions(): void
     {
         $this->registerFeedbackActions();
+        $this->registerEchoChannel();
         $this->vendor->package(FakeVendor::solutionComposer())->package(FakeVendor::connectorComposer())->write();
 
         $this->artisan('platform:update')->assertExitCode(0);
 
         $this->assertSame('echo', $this->cache->connectors()[0]->id ?? null);
         $this->assertSame('feedback', $this->cache->read()[0]->id ?? null);
+    }
+
+    public function test_a_declared_channel_type_that_is_not_registered_fails_the_update_before_migrations_and_cache(): void
+    {
+        $this->vendor->package(FakeVendor::connectorComposer())->write();
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('"echo" declares channel type "echo" but does not register it')
+            ->expectsOutputToContain('Nothing was changed')
+            ->assertExitCode(1);
+
+        $this->assertSame(0, $this->migrations);
+        $this->assertFileDoesNotExist($this->cache->path());
+    }
+
+    public function test_channels_of_a_type_nothing_serves_are_warned_about_per_tenant_and_never_refuse_the_update(): void
+    {
+        $this->registerFeedbackActions();
+        $this->vendor->package(FakeVendor::solutionComposer(), '1.2.0')->write();
+        $this->unserved = [
+            ['tenant' => 'acme', 'type' => 'viber', 'count' => 3],
+            ['tenant' => 'globex', 'type' => 'viber', 'count' => 1],
+        ];
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('Tenant "acme" has 3 channel(s) of type "viber"')
+            ->expectsOutputToContain('Tenant "globex" has 1 channel(s) of type "viber"')
+            ->assertExitCode(0);
+
+        $this->assertSame(1, $this->migrations);
+        $this->assertFileExists($this->cache->path());
+    }
+
+    public function test_a_channel_type_registered_by_another_connector_does_not_count(): void
+    {
+        $this->app->make(ConnectorChannels::class)->add(
+            new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class),
+            'someone-else',
+        );
+        $this->vendor->package(FakeVendor::connectorComposer())->write();
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('"echo" declares channel type "echo" but does not register it')
+            ->assertExitCode(1);
     }
 
     public function test_solutions_cache_records_the_connectors_too(): void
@@ -245,6 +318,14 @@ final class UpdatePlatformCommandTest extends TestCase
     /**
      * What the booted application holds once the fixture Solution has registered its handlers.
      */
+    private function registerEchoChannel(): void
+    {
+        $this->app->make(ConnectorChannels::class)->add(
+            new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class),
+            'echo',
+        );
+    }
+
     private function registerFeedbackActions(bool $score = true): void
     {
         $registry = $this->app->make(ActionHandlerRegistry::class);

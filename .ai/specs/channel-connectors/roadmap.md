@@ -13,10 +13,10 @@ is found and validated by `platform:update` and registers a channel type whose s
 - [x] `connector-manifest-discovery` — Connector manifest and discovery: `type: fapost-connector` and its `extra.fapost` schema in
       Foundation's parser; `platform:update` discovers, validates and catalogs connectors beside Solutions,
       with no per-tenant activation; a connector boots for the whole installation
-- [ ] `connector-channel-registrar` — Connector registrar with a channel surface: sender, adapter and ingress spec, webhook registrar,
+- [x] `connector-channel-registrar` — Connector registrar with a channel surface: sender, adapter and ingress spec, webhook registrar,
       media uploader and downloader, translations, public link; a connector's own tenant migrations
       (after: Connector manifest and discovery — the registrar is handed to discovered connectors)
-- [ ] `open-channel-types` — Open channel types: types are strings owned by a registered connector, `ChannelTypeEnum` and
+- [x] `open-channel-types` — Open channel types: types are strings owned by a registered connector, `ChannelTypeEnum` and
       `PlatformEnum` no longer close the list; ingress specs are published and removed per registered type;
       channels of a type with no connector show as unavailable and `platform:update` names them (after:
       Connector registrar with a channel surface — the registry is filled through it)

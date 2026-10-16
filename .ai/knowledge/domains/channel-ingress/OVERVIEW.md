@@ -17,7 +17,7 @@ paths:
   - app/Console/Commands/Ops/MigrateIngressCommand.php
   - app/Console/Commands/Ops/PublishIngressSpecsCommand.php
   - app/Console/Commands/Ops/WebhookRegistryHealthCommand.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-16
 ---
 # Channel ingress
 
@@ -65,7 +65,13 @@ in `gateway/`. Code lives in `app/Domains/Webhook` — the folder name predates 
 
 ## Entry points
 
-- `POST /webhook/{channel}/{hash}` → `Http/WebhookController.php` → `Jobs/IncomingMessageJob.php`.
+- `POST /webhook/{channel}/{hash}` → `Http/WebhookController.php` → `Jobs/IncomingMessageJob.php`. A connector's
+  inbound adapter (`Fapost\Foundation\Channel\ChannelInboundAdapterInterface`) has no verification code: the
+  controller always verifies it and derives its idempotency key through its `IngressSpec`. The platform is a plain
+  string along the whole path (`WebhookRegistryEntry`, `ChannelAdapterResolver`, `IncomingMessageJob`). Specs are
+  published for every type in `ChannelRegistry::types()`; `IngressSpecPublisher` keeps the published types in the
+  Redis set `ingress:specs` and deletes `ingress:spec:{type}` for a type no longer registered. A webhook of a type
+  with no adapter is logged and answered 200; the job logs and returns without retrying.
 - Gateway-produced jobs: `Jobs/RawIncomingMessageHandler.php`.
 - Gateway: `gateway/cmd/gateway/main.go`, `gateway/internal/ingress/handler.go`.
 - Runtime choice: `IngressDriver::fromConfig`, `Services/WebhookUrlGenerator::usesGateway`.

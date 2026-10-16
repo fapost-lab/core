@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Solution;
 
 use App\Console\Platform\PlatformMigratorInterface;
+use App\Console\Platform\UnservedChannelsFinderInterface;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
@@ -47,6 +48,7 @@ use Tests\Support\FakeSolutionEntitlement;
 use Tests\Support\FakeVendor;
 use Tests\Support\InMemorySolutionActivationStore;
 use Tests\Support\InstallsShowcaseSolution;
+use Tests\Support\NoUnservedChannels;
 
 /**
  * The whole life of a Solution in one booted application, from the image to the tenant that switched it off: two
@@ -84,6 +86,7 @@ final class SolutionLifecycleTest extends FeatureTestCase
         $this->app->scoped(FeedbackProbe::class);
 
         $this->migrations = 0;
+        $this->app->instance(UnservedChannelsFinderInterface::class, new NoUnservedChannels());
         $this->app->instance(PlatformMigratorInterface::class, new class ($this) implements PlatformMigratorInterface {
             public function __construct(private readonly SolutionLifecycleTest $test)
             {

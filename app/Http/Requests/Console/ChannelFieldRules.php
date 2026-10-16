@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Console;
 
+use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Telegram\TelegramWebhookOptions;
 use Illuminate\Validation\Rule;
@@ -26,17 +27,17 @@ final class ChannelFieldRules
     private const int MAX_ENTRIES = 50;
 
     /**
-     * @param  ChannelTypeEnum|null  $type      the type of the channel: the one sent when creating (null: not a known type,
-     *                                          so only the type rule can fail), the stored one when changing
-     * @param  bool                  $creating  a token and a secret are required; changing, an empty one keeps what is stored
+     * @param  string|null  $type      the type of the channel: the one sent when creating (null: not a registered type,
+     *                                 so only the type rule can fail), the stored one when changing
+     * @param  bool         $creating  a token and a secret are required; changing, an empty one keeps what is stored
      *
      * @return array<string, list<mixed>>
      */
-    public static function rules(?ChannelTypeEnum $type, bool $creating): array
+    public static function rules(?string $type, bool $creating): array
     {
         $secret = ['string', 'max:65535'];
 
-        if (ChannelTypeEnum::Telegram === $type) {
+        if (ChannelTypeEnum::Telegram->value === $type) {
             $secret[] = 'regex:' . self::TELEGRAM_SECRET;
         }
 
@@ -48,13 +49,13 @@ final class ChannelFieldRules
         ];
 
         if ($creating) {
-            $rules['type'] = ['required', 'string', Rule::enum(ChannelTypeEnum::class)];
+            $rules['type'] = ['required', 'string', Rule::in(app(ChannelRegistryInterface::class)->types())];
         }
 
         return match ($type) {
-            ChannelTypeEnum::Telegram => $rules + self::telegramRules(),
-            null                      => $rules,
-            default                   => $rules + self::entryRules(),
+            ChannelTypeEnum::Telegram->value => $rules + self::telegramRules(),
+            null                             => $rules,
+            default                          => $rules + self::entryRules(),
         };
     }
 
@@ -63,7 +64,7 @@ final class ChannelFieldRules
      *
      * @return array<string, mixed>
      */
-    public static function fields(array $validated, ChannelTypeEnum $type, bool $creating): array
+    public static function fields(array $validated, string $type, bool $creating): array
     {
         $fields = [
             'is_active' => (bool) $validated['is_active'],
@@ -71,7 +72,7 @@ final class ChannelFieldRules
         ];
 
         if ($creating) {
-            $fields['type'] = $type->value;
+            $fields['type'] = $type;
         }
 
         foreach (['token', 'secret_token'] as $secret) {
@@ -120,9 +121,9 @@ final class ChannelFieldRules
      *
      * @return array<string, mixed>
      */
-    private static function config(array $validated, ChannelTypeEnum $type): array
+    private static function config(array $validated, string $type): array
     {
-        if (ChannelTypeEnum::Telegram === $type) {
+        if (ChannelTypeEnum::Telegram->value === $type) {
             /** @var array{allowed_updates: list<string>, max_connections: int|string} $config */
             $config = $validated['config'];
 

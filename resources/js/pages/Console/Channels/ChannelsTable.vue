@@ -94,6 +94,7 @@ function destroy(): void {
 
     <template #cell-type="{ row }">
       <Badge variant="info">{{ row.typeLabel }}</Badge>
+      <Badge v-if="!row.available" variant="warning" class="ml-2">{{ t.unavailable }}</Badge>
     </template>
 
     <template #cell-handle="{ row }">
@@ -121,22 +122,22 @@ function destroy(): void {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem v-if="can.update" as-child>
+          <DropdownMenuItem v-if="can.update && row.available" as-child>
             <Link :href="row.editUrl">
               <Pencil aria-hidden="true" />
               {{ common.edit }}
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem v-if="can.update && row.webhook === 'failed'" @select="registerAgain(row)">
+          <DropdownMenuItem v-if="can.update && row.available && row.webhook === 'failed'" @select="registerAgain(row)">
             <RefreshCw aria-hidden="true" />
             {{ t.webhook.register_again }}
           </DropdownMenuItem>
-          <DropdownMenuItem v-if="can.rotate" variant="destructive" @select="askAboutRotation(row)">
+          <DropdownMenuItem v-if="can.rotate && row.available" variant="destructive" @select="askAboutRotation(row)">
             <KeyRound aria-hidden="true" />
             {{ t.rotate }}
           </DropdownMenuItem>
           <template v-if="can.delete">
-            <DropdownMenuSeparator v-if="can.update || can.rotate" />
+            <DropdownMenuSeparator v-if="row.available && (can.update || can.rotate)" />
             <DropdownMenuItem variant="destructive" @select="askAboutDeletion(row)">
               <Trash2 aria-hidden="true" />
               {{ common.delete }}

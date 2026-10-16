@@ -7,6 +7,7 @@ namespace App\Domains\Channels;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
+use Fapost\Foundation\Channel\ChannelInboundAdapterInterface;
 use Fapost\Foundation\Channel\WebhookRegistrarInterface;
 use Fapost\Foundation\Messaging\ProviderSenderInterface;
 use Illuminate\Contracts\Container\Container;
@@ -14,6 +15,11 @@ use InvalidArgumentException;
 
 /**
  * Container-backed registry for published channel integrations.
+ *
+ * Built-in integrations come from the container tag and keep the {@see ChannelTypeEnum} filter. A connector's channel
+ * comes from {@see ConnectorChannels}, which is read on every lookup, not copied at construction: connectors register
+ * at boot, and this singleton may be built before. Its type was checked against the connector's manifest and against
+ * the built-in types when it was registered, so the enum filter does not apply to it.
  */
 final class ChannelRegistry implements ChannelRegistryInterface
 {
@@ -28,6 +34,7 @@ final class ChannelRegistry implements ChannelRegistryInterface
     public function __construct(
         iterable $definitions,
         private readonly Container $container,
+        private readonly ?ConnectorChannels $connectorChannels = null,
     ) {
         foreach ($definitions as $definition) {
             if (null === ChannelTypeEnum::tryFrom($definition->channelType)) {
@@ -47,9 +54,47 @@ final class ChannelRegistry implements ChannelRegistryInterface
     /**
      * {@inheritDoc}
      */
+    public function types(): array
+    {
+        $types = array_keys($this->definitionsByType);
+
+        foreach ($this->connectorChannels?->all() ?? [] as $channel) {
+            $types[] = $channel->type;
+        }
+
+        return array_values(array_unique($types));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function has(string $channelType): bool
+    {
+        return null !== $this->definition($channelType);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function label(string $channelType): string
+    {
+        $builtIn = ChannelTypeEnum::tryFrom($channelType);
+
+        if (null !== $builtIn) {
+            return __($builtIn->labelKey());
+        }
+
+        return $this->connectorChannels?->nameOf($channelType) ?? $channelType;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public function definition(ChannelTypeEnum|string $channelType): ?ChannelIntegrationDefinition
     {
-        return $this->definitionsByType[$this->normalizeType($channelType)] ?? null;
+        $type = $this->normalizeType($channelType);
+
+        return $this->definitionsByType[$type] ?? $this->connectorDefinition($type);
     }
 
     /**
@@ -91,7 +136,7 @@ final class ChannelRegistry implements ChannelRegistryInterface
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function adapter(ChannelTypeEnum|string $channelType): ?ChannelAdapterInterface
+    public function adapter(ChannelTypeEnum|string $channelType): ChannelAdapterInterface|ChannelInboundAdapterInterface|null
     {
         $class = $this->definition($channelType)?->adapterClass;
 
@@ -99,8 +144,25 @@ final class ChannelRegistry implements ChannelRegistryInterface
             return null;
         }
 
-        /** @var ChannelAdapterInterface */
+        /** @var ChannelAdapterInterface|ChannelInboundAdapterInterface */
         return $this->container->make($class);
+    }
+
+    private function connectorDefinition(string $type): ?ChannelIntegrationDefinition
+    {
+        $channel = $this->connectorChannels?->find($type);
+
+        if (null === $channel) {
+            return null;
+        }
+
+        return new ChannelIntegrationDefinition(
+            channelType: $channel->type,
+            senderClass: $channel->sender,
+            webhookRegistrarClass: $channel->webhookRegistrar,
+            adapterClass: $channel->inbound,
+            connectorId: $this->connectorChannels->ownerOf($type),
+        );
     }
 
     /**

@@ -58,10 +58,12 @@ touches or the stage it is in. Read the document, not a summary of it.
 | Nothing survives a queue job: scoped bindings, tenant switching, no static state | `conventions/worker-safety.md` |
 | Named queues by purpose, rate limits and backpressure | `conventions/queues.md` |
 | Admin UI language versus content language | `conventions/multilingual.md` |
+| Runtime settings in the database and the admin; what may stay in `.env` | `conventions/runtime-settings.md` |
 | Where documentation lives and what is a record rather than a plan | `conventions/docs-layout.md` |
 | When a change must update docs.fapost.in | `conventions/published-docs-updates.md` |
 | How the project is verified, and the PHPat trap | `conventions/verification.md` (stage: verify) |
 | Proposing a release after a merge | `conventions/release-proposals.md` (stage: consolidate) |
+| Worktrees in `packages/` repositories, and who removes them | `conventions/package-worktrees.md` (stages: implement, consolidate) |
 | Explicit tenant context, landlord access only through Tenancy | `domains/tenancy/RULES.md` |
 | Flow runtime isolation, handler registry and versioning, state namespaces | `domains/flow/RULES.md` |
 | Builder: schema-driven rendering, overrides | `domains/flow-builder/RULES.md` |

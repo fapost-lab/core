@@ -54,7 +54,7 @@ final class WebhookRegistryResolverTest extends TestCase
         $entry = $this->resolver->resolve('abc123');
 
         $this->assertSame('tenant-1', $entry->tenantId);
-        $this->assertSame(PlatformEnum::Telegram, $entry->platform);
+        $this->assertSame(PlatformEnum::Telegram->value, $entry->platform);
     }
 
     public function test_throws_when_hash_not_in_redis_or_landlord(): void
@@ -103,7 +103,7 @@ final class WebhookRegistryResolverTest extends TestCase
 
         $this->assertSame('tenant-2', $entry->tenantId);
         $this->assertSame('chan-2', $entry->channelId);
-        $this->assertSame(PlatformEnum::Telegram, $entry->platform);
+        $this->assertSame(PlatformEnum::Telegram->value, $entry->platform);
     }
 
     public function test_non_leader_does_own_db_lookup_without_deleting_lock(): void

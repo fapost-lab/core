@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Domains\Webhook\Services;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
-use App\Domains\Channels\Enums\ChannelTypeEnum;
 use Fapost\Foundation\Channel\Ingress\IngressSpec;
 use Fapost\Foundation\Channel\Ingress\ProvidesIngressSpecInterface;
 
@@ -48,9 +47,9 @@ final readonly class IngressSpecResolver
     {
         $platforms = [];
 
-        foreach (ChannelTypeEnum::cases() as $type) {
-            if (null !== $this->specFor($type->value)) {
-                $platforms[] = $type->value;
+        foreach ($this->channelRegistry->types() as $type) {
+            if (null !== $this->specFor($type)) {
+                $platforms[] = $type;
             }
         }
 

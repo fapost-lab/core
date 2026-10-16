@@ -3,7 +3,7 @@
     "description": "Fixture connector used by the discovery tests.",
     "type": "fapost-connector",
     "require": {
-        "fapost/foundation": "^0.21"
+        "fapost/foundation": "^0.23"
     },
     "extra": {
         "fapost": {
