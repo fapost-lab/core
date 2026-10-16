@@ -169,7 +169,7 @@ webhooks and tokens stay as they are.
   by host, so a slug is not an address) and `Failed`. `isInputError()` is true for every reason except
   `Failed`, and only `Failed` is worth repeating.
 - The old host redirects `GET` and `HEAD` requests to the same path and query on the new host with
-  HTTP 302 until `redirectUntil`, and only while the tenant is `Active`: the old host of an `Inactive` or `Suspended` tenant, which can be renamed, answers 404 (30 days by default, `TENANCY_RENAME_REDIRECT_DAYS`; `null` when
+  HTTP 302 until `redirectUntil`, and only while the tenant is `Active`: the old host of an `Inactive` or `Suspended` tenant, which can be renamed, answers 404 (the platform setting `tenancy.rename.redirect_days`, 30 days unless `TENANCY_RENAME_REDIRECT_DAYS` or a stored value says otherwise; `null` when
   the redirect is switched off). Any other method gets 404 at once, so a link issued before the
   rename, such as a staff activation or a password reset, still works through the redirect during that
   period; a support-access grant does not and must be issued again.
@@ -521,6 +521,33 @@ Your implementation:
 
 Core treats an exception as `null` and reports it: a faulty operator never stops the notification.
 Bind it in your package's service provider; Core binds its default only when nothing is bound yet.
+
+## Platform settings
+
+<Note>Experimental: may change in a minor release.</Note>
+
+`Settings\Contracts\PlatformSettingsInterface` reads and changes Core's platform-wide settings — values for the
+whole installation, not one tenant, such as `flow.execution.max_iterations`. Implemented by Core; an operator
+package calls it to show the settings in its own panel.
+
+- `definitions(): list<PlatformSettingDefinition>`, ordered by group then key. A definition carries `key`, `type`
+  (`Enums\PlatformSettingType`: `Integer`, `Boolean`, `Text`, `Choice`; more may come in a minor release),
+  `default` (the installation's default, `.env` included; it may lie outside the bounds), English `label`,
+  `description` and `group`, `unit`, `min`, `max`, `choices`, and `hostModeOnly` for a setting that only has an
+  effect when tenants are resolved by host. `violation($value)` says in English why a value would be refused, or
+  `null`: the same check Core applies.
+- `values(): list<PlatformSettingValue>`: `key`, the `value` in effect, its `default`, and `stored` — whether a value
+  was stored or the default applies.
+- `update(array $changes, string $actor)`: key ⇒ value; `null` removes the stored value so the default applies again,
+  and keys left out are not changed. Every change is recorded with the actor (for example `operator:<id>`). A
+  refusal is `Exceptions\InvalidPlatformSettingsException`, whose `violations` name each refused key; nothing is
+  written then.
+
+- **Must** render fields from `definitions()`, never from a list of keys of its own.
+- **Must not** read or write Core's `platform_settings` tables or read Core's config for these values; keep `values()`
+  beyond one request.
+
+Core reads the settings once per request or queue job, so a change applies from the next one, without a restart.
 
 ## Retrieval
 

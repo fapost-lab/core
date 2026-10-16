@@ -10,7 +10,7 @@ from the public API `start()`, `resume()`, `runSession()`, `resumeFromNode()` an
 flowchart TD
     START([start / resume / runSession]) --> BUDGET
 
-    BUDGET{iterations ><br/>flow.execution.max_iterations<br/>default 100}
+    BUDGET{iterations ><br/>flow.execution.max_iterations<br/>platform setting, default 100}
     BUDGET -- yes --> ERR_BUDGET([session = failed<br/>FlowExecutionLimitExceededException])
     BUDGET -- no --> CUR
 
@@ -105,7 +105,7 @@ flowchart TD
 
 | Condition | Result |
 |-----------|--------|
-| Iteration budget exceeded (`config/flow.php`, `execution.max_iterations`, env `FLOW_MAX_ITERATIONS`, default 100) | session `failed`, `FlowExecutionLimitExceededException` |
+| Iteration budget exceeded (platform setting `flow.execution.max_iterations`, default from env `FLOW_MAX_ITERATIONS`, 100) | session `failed`, `FlowExecutionLimitExceededException` |
 | No current node / node not in the graph / node without type | `InvalidFlowGraphException::sessionHasNoCurrentNode()` / `missingNode()` / `nodeMissingType()` |
 | No handler for `type@version` | `HandlerNotFoundException` |
 | Handler throws | session `failed`, failed flow log, exception rethrown to the queue retry policy |

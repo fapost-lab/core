@@ -1554,6 +1554,32 @@ return [
         'description' => 'The application that provides it is not active or failed to load. Try again later or contact your administrator.',
         'back'        => 'Go back',
     ],
+    // The platform settings screen of the admin panel (single-tenant deployments).
+    'platform_settings' => [
+        'navigation'     => 'Platform settings',
+        'title'          => 'Platform settings',
+        'description'    => 'Values that apply to the whole platform on this deployment. Leave a field empty to use its default.',
+        'saved'          => 'Platform settings saved',
+        'default'        => 'Default: :value',
+        'stored'         => 'Changed',
+        'not_stored'     => 'Default in use',
+        'use_default'    => 'Use default',
+        'default_option' => 'Use default',
+        'range'          => 'From :min to :max',
+        'min'            => 'At least :min',
+        'max'            => 'At most :max',
+        'on'             => 'On',
+        'off'            => 'Off',
+        'groups'         => [
+            'flow'    => 'Flow',
+            'tenants' => 'Tenants',
+        ],
+        'fields' => [
+            'flow_execution_max_iterations' => ['label' => 'Maximum flow iterations', 'description' => 'How many steps one flow run may take before it is stopped, which protects against endless loops.'],
+            'tenancy_rename_redirect_days'  => ['label' => 'Rename redirect period', 'description' => 'How many days the old address of a renamed tenant keeps redirecting to the new one.'],
+        ],
+    ],
+
     // What Solutions add to Core's screens (extension-contract).
     'extensions' => [
         'row_actions' => 'More actions: :name',

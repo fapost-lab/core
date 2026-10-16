@@ -83,3 +83,12 @@ default home of settings across Core and every package.
   schema and read by nothing).
 - Existing `env()` settings that fail these criteria are moved by follow-up tasks; until each one
   lands, its `.env` variable keeps working as the default.
+
+## Update 2026-10-16: Core's platform settings store exists
+
+Task `core-platform-settings` built the store this decision asked for: landlord tables
+`platform_settings` and `platform_setting_events` owned by Tenancy, read through the scoped
+`PlatformSettings`, edited on `admin/platform-settings` in single mode and through `platform:settings`
+or Foundation's `PlatformSettingsInterface` in host mode (`domains/tenancy/RULES.md`). Where the text above
+says Core has no such store yet, read it as historical.
+

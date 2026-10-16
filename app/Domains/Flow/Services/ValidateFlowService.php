@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Services;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowTriggerConfigValidatorInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
@@ -21,12 +22,16 @@ use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Domains\Flow\Subflow\CallGraphValidator;
 use App\Domains\Media\Models\MediaFile;
+use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Exception;
 use InvalidArgumentException;
 
 final readonly class ValidateFlowService
 {
+    /** The step budget a literal loop count is checked against when no platform settings are given (tests). */
+    private const int DEFAULT_STEP_BUDGET = 100;
+
     public function __construct(
         private NodeHandlerRegistryInterface $registry,
         private DataAccessorRegistryInterface $dataAccessors,
@@ -34,6 +39,7 @@ final readonly class ValidateFlowService
         private TenantEventRepositoryInterface $tenantEvents,
         private TenantContextInterface $tenantContext,
         private ?CallGraphValidator $callGraphValidator = null,
+        private ?PlatformSettingsReaderInterface $platformSettings = null,
     ) {
     }
 
@@ -1050,18 +1056,20 @@ final readonly class ValidateFlowService
             }
         }
 
-        // Rule 8.8: for literal counted mode, warn if count exceeds budget.
+        // Rule 8.8: for literal counted mode, warn if count exceeds the platform's step budget.
         $mode        = is_string($config['mode'] ?? null) ? $config['mode'] : 'counted';
         $countSource = is_array($config['count_source'] ?? null) ? $config['count_source'] : null;
 
         if ('counted' === $mode && is_array($countSource) && 'literal' === ($countSource['type'] ?? null)) {
             $literal = $countSource['value'] ?? null;
 
-            if (is_numeric($literal) && (int) $literal > 100) {
+            $budget = $this->platformSettings?->integer(FlowEngineInterface::MAX_ITERATIONS_SETTING) ?? self::DEFAULT_STEP_BUDGET;
+
+            if (is_numeric($literal) && (int) $literal > $budget) {
                 $errors[] = new FlowValidationErrorDto(
                     path: "{$path}.config.count_source",
                     code: 'loop_count_exceeds_budget',
-                    message: "Static loop count {$literal} exceeds the recommended maximum of 100 iterations per session.",
+                    message: "Static loop count {$literal} exceeds the recommended maximum of {$budget} iterations per session.",
                 );
             }
         }

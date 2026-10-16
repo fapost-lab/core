@@ -12,6 +12,12 @@ use Fapost\Foundation\DTO\IncomingMessage;
 interface FlowEngineInterface
 {
     /**
+     * The platform setting that caps the steps of one engine run (env default `FLOW_MAX_ITERATIONS`);
+     * past it the session fails with `FlowExecutionLimitExceededException`.
+     */
+    public const string MAX_ITERATIONS_SETTING = 'flow.execution.max_iterations';
+
+    /**
      * @param  array<string, mixed>  $initialState  Merged into session state after system bootstrap keys are set
      */
     public function start(
