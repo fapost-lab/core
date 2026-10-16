@@ -5,20 +5,15 @@ declare(strict_types=1);
 namespace Tests\Support;
 
 use App\Domains\Solution\Providers\SolutionServiceProvider;
-use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\InstalledSolutions;
-use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
-use App\Domains\Solution\Services\SolutionEntitlements;
 use App\Domains\Solution\Services\SolutionManifestValidator;
 use App\Domains\Solution\Services\SolutionUiPublisher;
-use App\Http\Shell\SolutionExtensions;
 use App\Http\Shell\SolutionRoutes;
-use App\Http\Shell\SolutionUi;
-use App\Http\Shell\SolutionUiMapInterface;
 use Fapost\Foundation\Solution\Manifest\ManifestParser;
+use Fapost\Testing\Support\SolutionRequestState;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Route;
 
@@ -122,8 +117,6 @@ trait InstallsShowcaseSolution
      */
     private function forgetSolutionState(): void
     {
-        foreach ([ActiveSolutions::class, SolutionEntitlements::class, PublishedSolutionUi::class, SolutionUi::class, SolutionUiMapInterface::class, SolutionExtensions::class] as $abstract) {
-            $this->app->forgetInstance($abstract);
-        }
+        SolutionRequestState::forget($this->app);
     }
 }

@@ -57,6 +57,7 @@
     },
     "autoload-dev": {
         "psr-4": {
+            "Fapost\\Testing\\": "testing/",
             "Tests\\": "tests/"
         }
     },

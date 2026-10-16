@@ -59,3 +59,171 @@ runtime.
 **Tenant isolation** matters wherever your code touches persistence. A test that
 sets up two tenants and asserts one cannot see the other's rows is worth more than
 several tests of the happy path.
+
+## Testing a Solution package
+
+A Solution is not an application: its tests run inside a checkout of Core, against the real
+application, with the package installed by the [composer overlay](/extending/development-setup).
+Core ships a testing kit for that, under the `Fapost\Testing` namespace. A Solution's tests use the
+kit, Foundation and Laravel — never a `use App\…`, `Database\…` or `Tests\…` class of Core. Those
+are Core's internals and change without notice; the kit is what Core keeps working for you.
+
+<Warning>
+  The testing kit is **experimental** (see the [stability policy](/extending/stability-policy)):
+  its methods may change in a minor release before 1.0, with a changelog entry. It ships with
+  Core's development dependencies, so it is present wherever Core is installed with them —
+  locally and in your package's CI — and absent from production images.
+</Warning>
+
+A working example of everything below is the public
+[Hello World Solution](https://github.com/fapost-lab/solution-hello-world).
+
+### Bootstrap
+
+PHPUnit has to find Core before the kit can be loaded, so the package's `tests/bootstrap.php`
+locates it — from `FAPOST_CORE_PATH`, or by walking up from the package to the first directory with
+`artisan` and `vendor/autoload.php` — and hands the rest to the kit:
+
+```php tests/bootstrap.php
+<?php
+
+declare(strict_types=1);
+
+$core = getenv('FAPOST_CORE_PATH') ?: (static function (string $dir): string {
+    while (dirname($dir) !== $dir) {
+        $dir = dirname($dir);
+
+        if (is_file($dir . '/artisan') && is_file($dir . '/vendor/autoload.php')) {
+            return $dir;
+        }
+    }
+
+    fwrite(STDERR, "FaPost Core was not found. Set FAPOST_CORE_PATH.\n");
+
+    exit(1);
+})(__DIR__);
+
+require $core . '/vendor/autoload.php';
+
+Fapost\Testing\PackageAutoloader::register(dirname(__DIR__));
+```
+
+`PackageAutoloader::register()` maps the `autoload` and `autoload-dev` namespaces of your
+`composer.json` onto your checkout, ahead of Core's own autoloader. Your test classes become
+loadable, and tests run from a git worktree of the package exercise that worktree's `src/`.
+
+The environment goes in `phpunit.xml`: both connections on in-memory SQLite and the single-tenant
+mode, and the optional services off — the settings Core's own `phpunit.xml` uses.
+
+```xml phpunit.xml
+<phpunit bootstrap="tests/bootstrap.php" colors="true">
+    <testsuites>
+        <testsuite name="Package">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+    <php>
+        <ini name="memory_limit" value="512M"/>
+        <env name="APP_ENV" value="testing"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <env name="BROADCAST_CONNECTION" value="null"/>
+        <env name="CACHE_STORE" value="array"/>
+        <env name="DB_CONNECTION" value="sqlite"/>
+        <env name="DB_DATABASE" value=":memory:"/>
+        <env name="DB_URL" value=""/>
+        <env name="LANDLORD_DB_DRIVER" value="sqlite"/>
+        <env name="LANDLORD_DB_DATABASE" value=":memory:"/>
+        <env name="TENANT_DB_CONNECTION" value="sqlite"/>
+        <env name="TENANT_SLUG" value="main"/>
+        <!-- A developer .env with TENANCY_RESOLUTION=host must not change the mode of the tests. -->
+        <env name="TENANCY_RESOLUTION" value="single" force="true"/>
+        <env name="MAIL_MAILER" value="array"/>
+        <env name="QUEUE_CONNECTION" value="sync"/>
+        <env name="SESSION_DRIVER" value="array"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+    </php>
+</phpunit>
+```
+
+Run the tests from the package directory with Core's PHPUnit:
+
+```bash
+php ../../vendor/bin/phpunit -c phpunit.xml
+```
+
+### The test case
+
+Extend `Fapost\Testing\SolutionTestCase`. It boots Core, migrates a fresh database with one
+tenant, `main`, renders pages without a Vite manifest, and points the web root at a throwaway
+directory, so publishing your bundle never touches Core's `public/`.
+
+| Method | What it does |
+|---|---|
+| `publishSolutionUi(string $id)` | Checks your prebuilt console bundle as `platform:update` does, fails on any problem reported for your Solution, and publishes it |
+| `activateSolution(string $id, string $tenant = 'main')` | Activates the Solution for the tenant, as `solutions:activate` does |
+| `deactivateSolution(string $id, string $tenant = 'main')` | Deactivates it again |
+| `actingAsStaff(string $role = 'admin')` | Signs in a new staff user with the role: `admin`, `content_manager` or `analyst` |
+| `getConsole(string $path)` | Requests a console path on the tenant's host and returns the `TestResponse` |
+| `assertSolutionPage($response, string $component, ?Closure $props = null)` | Asserts the response is your Solution's page, `"<id>::<Page>"`, and hands the page to `$props` for assertions on its props |
+| `callAction(string $action, array $parameters = [], string $tenant = 'main')` | Runs your action the way a `call` node's test call does, inside the tenant, and returns an `ActionCallResult` |
+| `assertActionRegistered(string $action, string $handlerClass)` | Asserts Core registered the action, owned by your Solution, with your handler class |
+
+Each method that changes what a tenant can see also clears what Core remembers within one request,
+so the next request in the test sees the change, as a real one would.
+
+`ActionCallResult` carries `success`, `body` and `errorCode`, with `assertSucceeded()` and
+`assertRefused(string $errorCode)`. An action of a Solution the tenant has not activated is
+refused with `solution_inactive`.
+
+What the kit does not wrap is public already: the installed catalog is Foundation's
+`InstalledSolutionCatalogInterface`, the manifest check is `php artisan platform:update
+--validate-only`, and your provider is `$this->app->getProvider(...)`.
+
+```php tests/Feature/HelloWorldSolutionTest.php
+use Fapost\Foundation\Solution\Contracts\InstalledSolutionCatalogInterface;
+use Fapost\HelloWorld\Actions\GreetAction;
+use Fapost\Testing\SolutionTestCase;
+
+final class HelloWorldSolutionTest extends SolutionTestCase
+{
+    public function test_it_is_installed_with_a_valid_manifest(): void
+    {
+        $this->assertTrue($this->app->make(InstalledSolutionCatalogInterface::class)->has('hello'));
+        $this->assertActionRegistered('hello.greet', GreetAction::class);
+    }
+
+    public function test_the_page_is_served_once_the_solution_is_activated(): void
+    {
+        $this->publishSolutionUi('hello');
+        $this->actingAsStaff()->getConsole('/apps/hello/home')->assertNotFound();
+
+        $this->activateSolution('hello');
+
+        $this->assertSolutionPage(
+            $this->getConsole('/apps/hello/home'),
+            'hello::Home',
+            fn ($page) => $page->where('greeting', 'Hello, world!'),
+        );
+    }
+
+    public function test_the_action_answers_only_while_the_solution_is_active(): void
+    {
+        $this->callAction('hello.greet', ['name' => 'Ada'])->assertRefused('solution_inactive');
+
+        $this->activateSolution('hello');
+
+        $result = $this->callAction('hello.greet', ['name' => 'Ada'])->assertSucceeded();
+        $this->assertSame('Hello, Ada!', $result->body['greeting']);
+    }
+}
+```
+
+### In CI
+
+Your package's CI checks Core out, checks the package out under Core's `packages/` directory,
+installs Core with the package through the overlay, and runs the tests as above. The Hello World
+Solution's workflow does exactly that, against Core's `main` and its latest release. The kit is
+part of Core, so a package is always tested against the kit of the Core it runs in.

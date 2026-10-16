@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Fixtures\Solutions\Showcase;
 
+use App\Domains\Solution\Services\InstalledSolutions;
 use Fapost\Foundation\Console\Contracts\ConsoleExtensionsInterface;
 use Fapost\Foundation\Console\DTO\ConsoleApplication;
 use Fapost\Foundation\Console\DTO\ContextAction;
@@ -93,7 +94,16 @@ final class ShowcaseServiceProvider extends AbstractSolutionServiceProvider
         });
     }
 
+    /**
+     * The package registers no action, unless a test installed a copy whose manifest declares `showcase.ping`
+     * (the testing kit's self-test).
+     */
     protected function registerExtensions(CoreRegistrarInterface $registrar): void
     {
+        $declared = $this->app->make(InstalledSolutions::class)->find('showcase')?->actions ?? [];
+
+        if (in_array('showcase.ping', $declared, true)) {
+            $registrar->registerActionHandler(ShowcasePingAction::class);
+        }
     }
 }
