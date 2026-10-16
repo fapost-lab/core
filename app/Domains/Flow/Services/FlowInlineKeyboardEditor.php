@@ -63,7 +63,7 @@ final readonly class FlowInlineKeyboardEditor implements InlineKeyboardEditorInt
                     idempotencyKey: 'remove_keyboard:' . $sessionId . ':' . Str::ulid(),
                     tenantId: $tenantId,
                     channelId: (string)$channel->getKey(),
-                    channelType: $channel->type->value,
+                    channelType: $channel->type,
                     transportToken: $channel->token,
                     chatId: (string)$channelContact->contact->external_id,
                     payload: new MessagePayload(type: 'remove_keyboard', text: ''),

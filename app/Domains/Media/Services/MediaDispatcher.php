@@ -52,7 +52,7 @@ final readonly class MediaDispatcher implements MediaDispatcherInterface
             throw MediaDeletedException::forId($media->id);
         }
 
-        $channelType = $channel->type->value;
+        $channelType = $channel->type;
         $linkPolicy  = $this->uploaderRegistry->has($channelType)
             ? null
             : $this->linkPolicyRegistry->forChannelType($channelType);
@@ -74,7 +74,7 @@ final readonly class MediaDispatcher implements MediaDispatcherInterface
             );
         }
 
-        $uploader = $this->uploaderRegistry->forChannelType($channel->type->value);
+        $uploader = $this->uploaderRegistry->forChannelType($channel->type);
         $result   = $uploader->upload($blob, $channel, $context);
 
         $this->refs->upsert(

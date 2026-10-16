@@ -104,10 +104,33 @@ final class ChannelRegistryTest extends TestCase
         $this->assertNull($registry->definition('telegram')?->connectorId);
     }
 
+    public function test_it_lists_the_built_in_types_then_the_connectors(): void
+    {
+        $registry = new ChannelRegistry([
+            new ChannelIntegrationDefinition(channelType: 'telegram', senderClass: TelegramSender::class),
+        ], $this->app, $this->connectorChannels());
+
+        $this->assertSame(['telegram', 'echo'], $registry->types());
+        $this->assertTrue($registry->has('telegram'));
+        $this->assertTrue($registry->has('echo'));
+        $this->assertFalse($registry->has('viber'));
+    }
+
+    public function test_a_built_in_type_is_labelled_by_translation_and_a_connector_type_by_its_name(): void
+    {
+        $registry = new ChannelRegistry([
+            new ChannelIntegrationDefinition(channelType: 'telegram', senderClass: TelegramSender::class),
+        ], $this->app, $this->connectorChannels());
+
+        $this->assertSame('Telegram', $registry->label('telegram'));
+        $this->assertSame('Echo Connector', $registry->label('echo'));
+        $this->assertSame('viber', $registry->label('viber'));
+    }
+
     private function connectorChannels(): ConnectorChannels
     {
         $channels = new ConnectorChannels();
-        $channels->add(new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class), 'echo');
+        $channels->add(new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class), 'echo', 'Echo Connector');
 
         return $channels;
     }

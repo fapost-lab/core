@@ -23,9 +23,15 @@ final class ConnectorChannels
     /** @var array<string, string> */
     private array $owners = [];
 
+    /** @var array<string, string> */
+    private array $names = [];
+
     private bool $frozen = false;
 
-    public function add(ConnectorChannel $channel, string $connectorId): void
+    /**
+     * @param  string|null  $connectorName  the connector's display name from its manifest, shown for the type
+     */
+    public function add(ConnectorChannel $channel, string $connectorId, ?string $connectorName = null): void
     {
         if ($this->frozen) {
             throw new LogicException('Connector channels are registered at boot only.');
@@ -33,6 +39,10 @@ final class ConnectorChannels
 
         $this->channels[$channel->type] = $channel;
         $this->owners[$channel->type]   = $connectorId;
+
+        if (null !== $connectorName && '' !== $connectorName) {
+            $this->names[$channel->type] = $connectorName;
+        }
     }
 
     /**
@@ -59,6 +69,14 @@ final class ConnectorChannels
     public function ownerOf(string $type): ?string
     {
         return $this->owners[$type] ?? null;
+    }
+
+    /**
+     * Display name of the connector that registered the type, when it gave one.
+     */
+    public function nameOf(string $type): ?string
+    {
+        return $this->names[$type] ?? null;
     }
 
     /**

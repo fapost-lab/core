@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Channels\Services;
 
-use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryReaderInterface;
@@ -28,6 +28,7 @@ final readonly class IngressMigrator
         private WebhookUrlGenerator $urlGenerator,
         private TenantRepositoryInterface $tenants,
         private TenantSwitcher $switcher,
+        private ChannelRegistryInterface $channelRegistry,
     ) {
     }
 
@@ -40,14 +41,14 @@ final readonly class IngressMigrator
     {
         $drift = [];
 
-        foreach (ChannelTypeEnum::cases() as $type) {
+        foreach ($this->channelRegistry->types() as $type) {
             $count = $this->reader->countIngressDrift(
-                $type->value,
-                $this->urlGenerator->baseFor($type->value),
+                $type,
+                $this->urlGenerator->baseFor($type),
             );
 
             if ($count > 0) {
-                $drift[$type->value] = $count;
+                $drift[$type] = $count;
             }
         }
 
@@ -130,7 +131,7 @@ final readonly class IngressMigrator
                 tenantId: $tenantId,
                 schema: $schema,
                 channelId: (string) $channel->getKey(),
-                channelType: $channel->type->value,
+                channelType: $channel->type,
                 webhookPublicHash: $channel->webhook_public_hash,
                 token: null,
                 secretToken: null,

@@ -67,6 +67,9 @@ holds the Solution manifest (`adr-20261010-solution-manifest-is-data-in-composer
   provider whose signature the spec cannot express extends `SignatureScheme`. Rejected: moving Core's
   `ChannelAdapterInterface` to Foundation, which ties the public contract to `Illuminate\Http\Request` and to code
   the gateway cannot run.
+- A channel type is a string in Core's code and data, owned by whichever integration registered it;
+  `ChannelTypeEnum` lists only the built-in ones. A channel whose type nobody serves stays untouched and
+  unavailable; `platform:update` warns about it, never refuses.
 - Telegram stays built into Core on these seams (owner, 2026-10-16); a connector may never register a type Core
   serves itself. "Built-in" means any `ChannelTypeEnum` case, the WhatsApp stub included: it fails closed, and the
   task that brings a WhatsApp connector removes the stub from Core to free the type.
@@ -77,8 +80,8 @@ holds the Solution manifest (`adr-20261010-solution-manifest-is-data-in-composer
 
 ## Consequences
 
-- Third parties can describe a channel package and, since the amendment, register its channels; a channel of
-  that type cannot be created until channel types are open, which is why the format is marked experimental.
+- Third parties can describe a channel package, register its channels, and its channels work end to end; the
+  format stays experimental until a connector can describe its own settings fields.
 - `SolutionManifestValidator` no longer warns about `fapost-connector` packages; the domain `solution`
   now catalogs two kinds of package, and its name lags behind its responsibility.
 - The Solution cache file carries a second key; a cache without it is stale for connectors only.

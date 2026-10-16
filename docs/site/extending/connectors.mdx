@@ -4,9 +4,9 @@ description: "Packages that bring a messaging channel to an installation."
 ---
 
 <Warning>
-  Experimental. Core finds and boots connector packages and accepts their channel
-  registrations, but a channel of a connector's type cannot be created in the console
-  yet: channel types are still a closed list in Core. Opening it is the next step.
+  Experimental. A connector's channel can be created in the console and receives and
+  sends messages, but its settings form is a generic list of keys and values until
+  connectors can describe their own fields.
 </Warning>
 
 A connector brings one or more messaging channels — Telegram, Viber — to an
@@ -122,6 +122,13 @@ final class ViberInboundAdapter implements ChannelInboundAdapterInterface
 
 If your provider signs requests in a way no `SignatureScheme` covers, the scheme is
 extended in Foundation and the gateway; a connector cannot ship its own check.
+
+## When a connector is removed
+
+Channels of a type no connector serves any more stay in the database untouched. The
+console marks them unavailable and lets you delete them; their incoming webhooks are
+logged and acknowledged without being processed, and `php artisan platform:update`
+lists them per tenant. Installing the connector again brings them back.
 
 ## Installing
 

@@ -27,7 +27,7 @@ final class ChannelAdapterResolverTest extends TestCase
             channelRegistry: $registry,
         );
 
-        $resolved = $resolver->resolve(PlatformEnum::Telegram);
+        $resolved = $resolver->resolve(PlatformEnum::Telegram->value);
 
         $this->assertSame($adapter, $resolved);
     }
@@ -43,6 +43,6 @@ final class ChannelAdapterResolverTest extends TestCase
 
         $this->expectException(AdapterNotFoundException::class);
 
-        $resolver->resolve(PlatformEnum::WhatsApp);
+        $resolver->resolve(PlatformEnum::WhatsApp->value);
     }
 }

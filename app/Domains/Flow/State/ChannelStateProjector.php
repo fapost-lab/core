@@ -36,7 +36,7 @@ final readonly class ChannelStateProjector
 
         return [
             'id'   => (string)$channel->getKey(),
-            'type' => $channel->type->value,
+            'type' => $channel->type,
             // Both spellings: `bot_username` for composing text by hand,
             // `bot_handle` for dropping the ready-to-paste `@name` in.
             'bot_username' => $channel->publicUsername(),

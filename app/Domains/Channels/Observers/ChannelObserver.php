@@ -166,7 +166,7 @@ final readonly class ChannelObserver
                     tenantId: $tenant->getId(),
                     schema: $tenant->getSchemaName(),
                     channelId: (string)$channel->getKey(),
-                    channelType: $channel->type->value,
+                    channelType: $channel->type,
                     webhookPublicHash: $channel->webhook_public_hash,
                     token: $register ? null : $channel->token,
                     secretToken: $register ? null : $channel->secret_token,

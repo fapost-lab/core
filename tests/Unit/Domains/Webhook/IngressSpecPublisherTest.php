@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Webhook;
 
+use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Telegram\TelegramAdapter;
 use App\Domains\Webhook\Services\IngressSpecPublisher;
 use App\Domains\Webhook\Services\IngressSpecResolver;
 use Fapost\Foundation\Channel\Ingress\IngressSpec;
+use Fapost\Foundation\Connector\ConnectorChannel;
 use Illuminate\Support\Facades\Redis;
 use Mockery;
 use Mockery\MockInterface;
+use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
+use Tests\Fixtures\Connectors\Echo\EchoSender;
 use Tests\TestCase;
 
 final class IngressSpecPublisherTest extends TestCase
@@ -26,7 +30,7 @@ final class IngressSpecPublisherTest extends TestCase
             ->with('ingress:spec:telegram', Mockery::capture($captured))
             ->andReturn(true);
 
-        Redis::shouldReceive('del')->andReturn(1);
+        $this->allowRedisIndex();
 
         $published = $this->publisher()->publishAll();
 
@@ -59,11 +63,50 @@ final class IngressSpecPublisherTest extends TestCase
             ->with('ingress:spec:whatsapp')
             ->andReturn(1);
 
-        Redis::shouldReceive('del')->andReturn(1);
+        $this->allowRedisIndex();
 
         $published = $this->publisher()->publishAll();
 
         $this->assertArrayNotHasKey('whatsapp', $published);
+    }
+
+    public function test_a_connector_channel_spec_is_published_and_indexed(): void
+    {
+        $this->registerEcho();
+
+        $captured = null;
+
+        Redis::shouldReceive('set')->with('ingress:spec:telegram', Mockery::any())->andReturn(true);
+        Redis::shouldReceive('set')
+            ->once()
+            ->with('ingress:spec:echo', Mockery::capture($captured))
+            ->andReturn(true);
+        Redis::shouldReceive('sadd')->once()->with('ingress:specs', 'echo')->andReturn(1);
+        Redis::shouldReceive('sadd')->with('ingress:specs', 'telegram')->andReturn(1);
+        $this->allowRedisIndex();
+
+        $published = $this->publisher()->publishAll();
+
+        $this->assertArrayHasKey('echo', $published);
+        $this->assertSame('header_equals', json_decode((string) $captured, true, flags: JSON_THROW_ON_ERROR)['scheme']);
+        $this->assertContains('echo', app(IngressSpecResolver::class)->declarativePlatforms());
+    }
+
+    /**
+     * A removed connector must not leave its spec behind: the gateway would keep verifying (and accepting)
+     * webhooks of a type nothing serves.
+     */
+    public function test_the_spec_of_a_type_that_is_no_longer_registered_is_removed(): void
+    {
+        Redis::shouldReceive('set')->andReturn(true);
+        Redis::shouldReceive('smembers')->with('ingress:specs')->andReturn(['telegram', 'echo']);
+        Redis::shouldReceive('del')->once()->with('ingress:spec:echo')->andReturn(1);
+        Redis::shouldReceive('srem')->once()->with('ingress:specs', 'echo')->andReturn(1);
+        $this->allowRedisIndex();
+
+        $published = $this->publisher()->publishAll();
+
+        $this->assertArrayNotHasKey('echo', $published);
     }
 
     public function test_resolver_returns_null_when_no_adapter_is_registered(): void
@@ -109,6 +152,26 @@ final class IngressSpecPublisherTest extends TestCase
 
         $this->assertNotEmpty($known, 'No adapters resolvable through the enum — publisher would publish nothing.');
         $this->assertInstanceOf(TelegramAdapter::class, $registry->adapter(ChannelTypeEnum::Telegram->value));
+    }
+
+    private function registerEcho(): void
+    {
+        $this->app->make(ConnectorChannels::class)->add(
+            new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class),
+            'echo',
+            'Echo',
+        );
+    }
+
+    /**
+     * The index set of published types, empty before the publish.
+     */
+    private function allowRedisIndex(): void
+    {
+        Redis::shouldReceive('smembers')->with('ingress:specs')->andReturn([]);
+        Redis::shouldReceive('sadd')->andReturn(1);
+        Redis::shouldReceive('srem')->andReturn(1);
+        Redis::shouldReceive('del')->andReturn(1);
     }
 
     private function publisher(): IngressSpecPublisher

@@ -260,7 +260,7 @@ final class WebhookControllerTest extends TestCase
             assistantId: $assistantId,
             channelId: $channelId,
             schema: $schema,
-            platform: PlatformEnum::Telegram,
+            platform: PlatformEnum::Telegram->value,
             secretToken: $secretToken,
         );
     }

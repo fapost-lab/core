@@ -15,16 +15,19 @@ paths:
   - "app/Http/Requests/Console/*Contact*"
   - "resources/js/pages/Console/Contacts/**"
   - "resources/js/pages/Console/ContactSegments/**"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-10-16
 ---
 # Contact
 
 ## Responsibility
 
 Contact owns the identity of the people assistants talk to — one contact per tenant, platform
-and external id — and the link between a contact and a channel (`ChannelContact`, with
+and external id, the platform being a plain string (a channel type, or `email`; `Services/ContactPlatforms` lists
+what the filters and segment rules offer) — and the link between a contact and a channel (`ChannelContact`, with
 `last_interaction_at`). It groups contacts three ways: tags (free-form strings), groups
-(explicit member lists) and segments (saved rules evaluated on demand). It also holds
+(explicit member lists) and segments (saved rules evaluated on demand). A segment rule on a platform no
+installed integration serves any more is kept and still evaluated, but the segment cannot be saved again until that
+condition is removed (`ContactSegmentRequest` validates against `ContactPlatforms`, failing closed). It also holds
 `SendContactNotificationJob`, which fans Flow's `notify` node out to contacts.
 
 ## Boundaries

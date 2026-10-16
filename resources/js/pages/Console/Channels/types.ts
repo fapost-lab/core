@@ -8,6 +8,7 @@ export interface ChannelsTranslations {
   edit_title: string
   columns: { type: string; bot: string; active: string; updated: string }
   bot_pending: string
+  unavailable: string
   webhook: { failed: string; failed_hint: string; failed_at: string; register_again: string }
   status: { active: string; inactive: string }
   sections: { connection: { title: string; description: string }; behaviour: { title: string; description: string } }
@@ -57,6 +58,8 @@ export interface ChannelRow extends Record<string, unknown> {
   id: string
   type: string
   typeLabel: string
+  /** False when no installed integration serves the type: the channel can only be deleted. */
+  available: boolean
   handle: string | null
   url: string | null
   isActive: boolean
@@ -89,6 +92,7 @@ export interface EditableChannel {
   id: string
   type: string
   typeLabel: string
+  available: boolean
   isActive: boolean
   webhook: 'failed' | null
   webhookAt: string | null

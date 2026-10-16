@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Enums\ChannelWebhookStatus;
@@ -16,6 +17,7 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
 use Database\Seeders\TenantAclSeeder;
+use Fapost\Foundation\Connector\ConnectorChannel;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Bus;
@@ -24,6 +26,8 @@ use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
+use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
+use Tests\Fixtures\Connectors\Echo\EchoSender;
 
 /**
  * Channels on the Inertia console: the assistant's list and the channel limit, creating and changing a channel by its
@@ -112,6 +116,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
                     'id'                 => (string) $channel->getKey(),
                     'type'               => 'telegram',
                     'typeLabel'          => 'Telegram',
+                    'available'          => true,
                     'handle'             => '@help_bot',
                     'url'                => 'https://t.me/help_bot',
                     'isActive'           => true,
@@ -251,7 +256,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
         $channel = Channel::query()->sole();
 
-        $this->assertSame(ChannelTypeEnum::Telegram, $channel->type);
+        $this->assertSame(ChannelTypeEnum::Telegram->value, $channel->type);
         $this->assertSame(self::TENANT_ID, $channel->tenant_id);
         $this->assertSame((string) $this->assistant->getKey(), $channel->assistant_id);
         $this->assertSame(self::TOKEN, $channel->token);
@@ -277,7 +282,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
         $channel = Channel::query()->sole();
 
-        $this->assertSame(ChannelTypeEnum::WhatsApp, $channel->type);
+        $this->assertSame(ChannelTypeEnum::WhatsApp->value, $channel->type);
         $this->assertFalse($channel->is_active);
         $this->assertEquals(['phone_id' => '123', 'flag' => ''], $channel->config);
         $this->assertSame([], $this->registry->calls);
@@ -364,6 +369,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
                     'id'                 => (string) $channel->getKey(),
                     'type'               => 'telegram',
                     'typeLabel'          => 'Telegram',
+                    'available'          => true,
                     'isActive'           => true,
                     'webhook'            => null,
                     'webhookAt'          => null,
@@ -426,7 +432,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
             ->assertRedirect();
 
         $channel->refresh();
-        $this->assertSame(ChannelTypeEnum::Telegram, $channel->type);
+        $this->assertSame(ChannelTypeEnum::Telegram->value, $channel->type);
         $this->assertFalse($channel->is_active);
         // The whole config is replaced by what the form sent.
         $this->assertEquals(['allowed_updates' => ['message', 'callback_query'], 'max_connections' => 25], $channel->config);
@@ -767,6 +773,88 @@ final class ChannelsConsoleTest extends FeatureTestCase
         $this->get($this->listUrl())->assertRedirect(route('console.auth.login'));
     }
 
+    public function test_a_connector_channel_type_is_offered_and_a_channel_of_it_is_created(): void
+    {
+        $this->registerEcho();
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->get($this->listUrl('/create'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('types', [
+                    ['value' => 'telegram', 'label' => 'Telegram'],
+                    ['value' => 'whatsapp', 'label' => 'WhatsApp'],
+                    ['value' => 'echo', 'label' => 'Echo'],
+                ])
+                ->etc());
+
+        $this->post($this->listUrl(), [
+            'type'           => 'echo',
+            'token'          => self::TOKEN,
+            'secret_token'   => 'echo secret',
+            'is_active'      => true,
+            'config_entries' => [['key' => 'region', 'value' => 'eu']],
+        ])
+            ->assertRedirect("/assistant/{$this->assistant->getKey()}/channels")
+            ->assertInertiaFlash('success', 'Channel created.');
+
+        $channel = Channel::query()->sole();
+
+        $this->assertSame('echo', $channel->type);
+        $this->assertEquals(['region' => 'eu'], $channel->config);
+        $this->assertNull($channel->publicUrl());
+
+        $this->get($this->listUrl())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.type', 'echo')
+                ->where('table.rows.0.typeLabel', 'Echo')
+                ->where('table.rows.0.available', true)
+                ->etc());
+    }
+
+    public function test_a_type_nothing_serves_is_not_accepted_when_creating(): void
+    {
+        $this->actingAs($this->admin())
+            ->post($this->listUrl(), [
+                'type'           => 'echo',
+                'token'          => self::TOKEN,
+                'secret_token'   => 'echo secret',
+                'is_active'      => true,
+                'config_entries' => [],
+            ])
+            ->assertSessionHasErrors('type');
+
+        $this->assertSame(0, Channel::query()->count());
+    }
+
+    public function test_a_channel_whose_type_lost_its_integration_is_listed_as_unavailable_and_can_only_be_deleted(): void
+    {
+        $channel = $this->channel(['type' => 'viber', 'config' => ['a' => 'b']]);
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.type', 'viber')
+                ->where('table.rows.0.typeLabel', 'viber')
+                ->where('table.rows.0.available', false)
+                ->where('table.rows.0.handle', null)
+                ->etc());
+
+        $this->get($this->listUrl("/{$channel->getKey()}/edit"))->assertStatus(409);
+        $this->put($this->listUrl("/{$channel->getKey()}"), ['is_active' => false, 'config_entries' => []])->assertStatus(409);
+        $this->assertTrue($channel->refresh()->is_active);
+
+        $hash = $channel->webhook_public_hash;
+        $this->post($this->listUrl("/{$channel->getKey()}/rotate-webhook"))->assertStatus(409);
+        $this->post($this->listUrl("/{$channel->getKey()}/register-webhook"))->assertStatus(409);
+        $this->assertSame($hash, $channel->refresh()->webhook_public_hash);
+
+        $this->delete($this->listUrl("/{$channel->getKey()}"))->assertRedirect();
+
+        $this->assertSame(0, Channel::query()->count());
+    }
+
     /**
      * The real bus, and Telegram answering every call with a refusal.
      */
@@ -785,6 +873,15 @@ final class ChannelsConsoleTest extends FeatureTestCase
             'assistant_id' => ($assistant ?? $this->assistant)->getKey(),
             ...$attributes,
         ]);
+    }
+
+    private function registerEcho(): void
+    {
+        $this->app->make(ConnectorChannels::class)->add(
+            new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class),
+            'echo',
+            'Echo',
+        );
     }
 
     /**

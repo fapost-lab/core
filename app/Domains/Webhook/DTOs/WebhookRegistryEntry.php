@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Webhook\DTOs;
 
-use App\Domains\Contact\Enums\PlatformEnum;
 use JsonException;
 use Spatie\LaravelData\Data;
-use ValueError;
 
 final class WebhookRegistryEntry extends Data
 {
@@ -16,7 +14,7 @@ final class WebhookRegistryEntry extends Data
         public readonly string $assistantId,
         public readonly string $channelId,
         public readonly string $schema,
-        public readonly PlatformEnum $platform,
+        public readonly string $platform,
         public readonly string $secretToken,
     ) {
     }
@@ -24,7 +22,6 @@ final class WebhookRegistryEntry extends Data
     /**
      * Build entry from a landlord webhook_registry row (DB fallback path).
      *
-     * @throws ValueError When platform value is not a valid PlatformEnum case.
      */
     public static function fromLandlord(object $row): self
     {
@@ -33,14 +30,13 @@ final class WebhookRegistryEntry extends Data
             assistantId: $row->assistant_id,
             channelId: $row->channel_id,
             schema: $row->schema,
-            platform: PlatformEnum::from($row->platform),
+            platform: (string) $row->platform,
             secretToken: $row->secret_token,
         );
     }
 
     /**
      * @throws JsonException
-     * @throws ValueError
      */
     public static function fromRedis(string $json): self
     {
@@ -61,7 +57,7 @@ final class WebhookRegistryEntry extends Data
             assistantId: $data['assistant_id'],
             channelId: $data['channel_id'],
             schema: $data['schema'],
-            platform: PlatformEnum::from($data['platform'] ?? $data['channel']),
+            platform: $data['platform'] ?? $data['channel'],
             secretToken: $data['secret_token'],
         );
     }
@@ -82,7 +78,7 @@ final class WebhookRegistryEntry extends Data
             'assistant_id' => $this->assistantId,
             'channel_id'   => $this->channelId,
             'schema'       => $this->schema,
-            'channel'      => $this->platform->value,
+            'channel'      => $this->platform,
             'secret_token' => $this->secretToken,
         ];
     }

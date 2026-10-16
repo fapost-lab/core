@@ -85,8 +85,8 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   (`vendorComponents.ts`) is removed: Solution UI goes to the console prebuilt
   (`adr-20261014-solution-console-ui`). Connector packages (`type: fapost-connector`) are found,
   validated and booted for the whole installation beside Solutions, and register their channels through
-  their own registrar; a channel of a connector's type cannot be created yet, because channel types are still
-  closed (`adr-20261016-connector-package-type`, experimental). The Solution manifest, a data
+  their own registrar; channel types are open strings, so a connector's channel is created, receives and sends
+  like a built-in one (`adr-20261016-connector-package-type`, experimental). The Solution manifest, a data
   block in the package's `composer.json`, is read and validated by `platform:update` (`solution`
   domain). A tenant's Solution activation is stored in its schema and read only through `ActiveSolutions`
   (`adr-20261014-solution-activation-in-tenant-schema`). Core implements `CoreRegistrarInterface` for

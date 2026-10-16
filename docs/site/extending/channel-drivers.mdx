@@ -6,12 +6,11 @@ description: "Adding support for a new messaging provider."
 A channel has two halves: **ingress**, which accepts and verifies what the provider
 sends you, and **egress**, which delivers what the assistant says back.
 
-<Warning>
+<Note>
   A channel ships as a [Connector](/extending/connectors) package that registers
-  the contracts below through `ConnectorRegistrarInterface`. A channel of a
-  connector's type cannot be created in the console yet, because channel types are
-  still a closed list in Core. Telegram is built into Core and uses the same contracts.
-</Warning>
+  the contracts below through `ConnectorRegistrarInterface`. Telegram is built into
+  Core and uses the same contracts.
+</Note>
 
 ## Identity
 

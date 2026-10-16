@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Console;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
-use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Contact\Services\AssistantContactService;
 use App\Domains\Contact\Services\ContactCard;
 use App\Domains\Contact\Services\ContactGroupService;
+use App\Domains\Contact\Services\ContactPlatforms;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use App\Http\Requests\Console\UpdateContactGroupsRequest;
@@ -38,6 +38,7 @@ final class ContactController extends Controller
         private readonly ContactCard $card,
         private readonly ContactGroupService $groups,
         private readonly CurrentAssistantInterface $assistant,
+        private readonly ContactPlatforms $platforms,
     ) {
     }
 
@@ -63,7 +64,7 @@ final class ContactController extends Controller
                 fn (Contact $contact): array => [
                     'id'         => (string) $contact->getKey(),
                     'shortId'    => mb_substr((string) $contact->getKey(), 0, 8),
-                    'platform'   => $contact->platform->value,
+                    'platform'   => $contact->platform,
                     'externalId' => $contact->external_id,
                     'name'       => $this->displayName($contact),
                     'language'   => '' === (string) $contact->language ? null : $contact->language,
@@ -71,13 +72,7 @@ final class ContactController extends Controller
                     'viewUrl'    => $this->url('show', ['record' => $contact->getKey()]),
                 ],
             ),
-            'platforms' => array_map(
-                static fn (PlatformEnum $platform): array => [
-                    'value' => $platform->value,
-                    'label' => trans('console.contacts.platforms.' . $platform->value),
-                ],
-                PlatformEnum::cases(),
-            ),
+            'platforms' => $this->platforms->options(),
             'languages' => $this->contacts->languageOptions($assistant),
             'urls'      => ['index' => $this->url('index')],
         ]);
@@ -100,7 +95,7 @@ final class ContactController extends Controller
         return Inertia::render('Console/Contacts/Show', [
             'contact' => [
                 'id'         => (string) $key,
-                'platform'   => $contact->platform->value,
+                'platform'   => $contact->platform,
                 'externalId' => $contact->external_id,
                 'language'   => '' === (string) $contact->language ? null : $contact->language,
                 'username'   => $this->metaText($contact, 'username'),

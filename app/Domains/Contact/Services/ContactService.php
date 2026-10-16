@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Domains\Contact\Services;
 
 use App\Domains\Contact\Contracts\ContactServiceInterface;
-use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -25,7 +24,7 @@ final readonly class ContactService implements ContactServiceInterface
      */
     public function findOrCreate(
         string $tenantId,
-        PlatformEnum $platform,
+        string $platform,
         string $externalId,
         array $meta = [],
         ?string $defaultLanguage = null,

@@ -199,7 +199,7 @@ final readonly class ConversationReplyService implements ConversationReplyServic
             idempotencyKey: $idempotencyKey,
             tenantId: (string) $conversation->tenant_id,
             channelId: (string) $channel->getKey(),
-            channelType: $channel->type->value,
+            channelType: $channel->type,
             transportToken: $channel->token,
             chatId: $chatId,
             payload: $payload,

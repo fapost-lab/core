@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Domains\Messaging\Typing;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
-use App\Domains\Channels\Enums\ChannelTypeEnum;
 use Fapost\Foundation\Messaging\TypingCapableProviderInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -36,7 +35,7 @@ final readonly class TypingIndicatorService
      *   • starting the indicator threw and was swallowed.
      */
     public function start(
-        ChannelTypeEnum|string $channelType,
+        string $channelType,
         string $chatId,
         string $transportToken,
     ): ?TypingSession {
@@ -50,7 +49,7 @@ final readonly class TypingIndicatorService
             $handle = $sender->indicateProcessing($chatId, $transportToken);
         } catch (Throwable $exception) {
             $this->logger->debug('typing.start_failed', [
-                'channel' => $channelType instanceof ChannelTypeEnum ? $channelType->value : $channelType,
+                'channel' => $channelType,
                 'chat_id' => $chatId,
                 'error'   => $exception->getMessage(),
             ]);

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Webhook\Services;
 
-use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use Fapost\Foundation\Channel\Ingress\IngressSpec;
 use Illuminate\Support\Facades\Redis;
 use JsonException;
@@ -19,14 +19,22 @@ use JsonException;
  *
  * Publishing is derived entirely from the adapters currently registered, which
  * is what keeps a new channel — including one shipped by a plugin — a pure PHP
- * change: register the adapter, republish, and the gateway can verify it.
+ * change: register the adapter, republish, and the gateway can verify it. A type that is no longer registered (a
+ * removed connector) loses its spec on the next publish: the types written so far are kept in a Redis set, so no key
+ * scan is needed and no process keeps the list.
  */
 final readonly class IngressSpecPublisher
 {
     private const string KEY_PREFIX = 'ingress:spec:';
 
+    /**
+     * Types a spec was published for. Not under {@see KEY_PREFIX}: a type could be named like it.
+     */
+    private const string INDEX_KEY = 'ingress:specs';
+
     public function __construct(
         private IngressSpecResolver $resolver,
+        private ChannelRegistryInterface $channelRegistry,
     ) {
     }
 
@@ -45,19 +53,25 @@ final readonly class IngressSpecPublisher
     public function publishAll(): array
     {
         $published = [];
+        $types     = $this->channelRegistry->types();
 
-        foreach (ChannelTypeEnum::cases() as $type) {
-            $spec = $this->resolver->specFor($type->value);
+        foreach ($types as $type) {
+            $spec = $this->resolver->specFor($type);
 
             if (null === $spec) {
-                $this->forget($type->value);
+                $this->forget($type);
 
                 continue;
             }
 
-            Redis::set($this->key($type->value), json_encode($spec, JSON_THROW_ON_ERROR));
+            Redis::set($this->key($type), json_encode($spec, JSON_THROW_ON_ERROR));
+            Redis::sadd(self::INDEX_KEY, $type);
 
-            $published[$type->value] = $spec;
+            $published[$type] = $spec;
+        }
+
+        foreach (array_diff($this->indexed(), $types) as $gone) {
+            $this->forget($gone);
         }
 
         return $published;
@@ -66,6 +80,17 @@ final readonly class IngressSpecPublisher
     public function forget(string $platform): void
     {
         Redis::del($this->key($platform));
+        Redis::srem(self::INDEX_KEY, $platform);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function indexed(): array
+    {
+        $members = Redis::smembers(self::INDEX_KEY);
+
+        return is_array($members) ? array_values(array_map(strval(...), $members)) : [];
     }
 
     private function key(string $platform): string

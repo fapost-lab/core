@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domains\Contact\Services;
 
-use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Tenancy\Enums\RefusedWork;
 use App\Domains\Tenancy\Services\PeriodQuota;
 use Carbon\CarbonImmutable;
@@ -40,12 +39,12 @@ final readonly class InboundContactGate
      */
     public function admit(
         string $tenantId,
-        PlatformEnum $platform,
+        string $platform,
         string $externalUserId,
         string $channelId,
         CarbonImmutable $occurredAt,
     ): bool {
-        $subjectHash = hash('sha256', $tenantId . '|' . $platform->value . '|' . $externalUserId);
+        $subjectHash = hash('sha256', $tenantId . '|' . $platform . '|' . $externalUserId);
 
         $decision = $this->quota->consume(self::LIMIT_KEY, 'contact:' . $subjectHash, $occurredAt, RefusedWork::InboundMessage);
 
