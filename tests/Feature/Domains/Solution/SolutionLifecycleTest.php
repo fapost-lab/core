@@ -31,6 +31,8 @@ use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Http\Shell\SolutionUi;
 use Database\Seeders\TenantAclSeeder;
+use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
+use Fapost\Foundation\Solution\DTO\SolutionEntitlement;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
@@ -41,6 +43,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Tests\Feature\FeatureTestCase;
 use Tests\Fixtures\Solution\FeedbackCalls;
 use Tests\Fixtures\Solution\FeedbackProbe;
+use Tests\Support\FakeSolutionEntitlement;
 use Tests\Support\FakeVendor;
 use Tests\Support\InMemorySolutionActivationStore;
 use Tests\Support\InstallsShowcaseSolution;
@@ -50,7 +53,8 @@ use Tests\Support\InstallsShowcaseSolution;
  * fixture packages installed (`feedback`, which brings actions, and `showcase`, which brings console UI),
  * `platform:update` validating and publishing them, activation for tenant alpha, a real flow whose `call` node reaches
  * the action through the FlowEngine, the builder's test call, the console pages, then tenant beta answering
- * `solution_inactive` throughout, deactivation, reactivation, and a worker serving both tenants job after job.
+ * `solution_inactive` throughout, deactivation, reactivation, and a worker serving both tenants job after job. A third
+ * test takes the entitlement away and gives it back: computed, with nothing written.
  *
  * Each link has unit tests of its own; this is the proof that they hold together. On PostgreSQL the second tenant has
  * a schema of its own and the real activation store is used throughout. SQLite has no schemas, so there the store is
@@ -238,6 +242,49 @@ final class SolutionLifecycleTest extends FeatureTestCase
             ['activated', 'deactivated'],
             DB::table('solution_activation_events')->where('solution_id', 'feedback')->orderBy('id')->pluck('action')->all(),
         );
+    }
+
+    public function test_losing_the_entitlement_stops_the_solution_everywhere_and_getting_it_back_resumes_it_with_nothing_written(): void
+    {
+        $operator = new FakeSolutionEntitlement();
+        $this->app->instance(SolutionEntitlementInterface::class, $operator);
+
+        $this->artisan('platform:update')->assertExitCode(0);
+        $this->artisan('solutions:activate', ['solution' => 'feedback', '--tenant' => 'main'])->assertExitCode(0);
+        $this->artisan('solutions:activate', ['solution' => 'showcase', '--tenant' => 'main'])->assertExitCode(0);
+        $this->forgetSolutionState();
+
+        $this->assertSame('success', $this->flowResult($this->alpha)['end_status']);
+        $this->assertConsoleOf(visible: true);
+        $journal = DB::table('solution_activation_events')->count();
+
+        // The operator stops including both: the flow is refused, the builder and the console lose them.
+        $operator->default = SolutionEntitlement::only([]);
+        $this->forgetSolutionState();
+
+        $this->assertSame(['end_status' => 'failed', 'call_error' => 'solution_inactive: feedback'], $this->flowResult($this->alpha));
+        $this->assertCallRefused($this->alpha);
+        $this->inTenant($this->alpha, fn () => $this->assertSame([], $this->app->make(LoadBuilderFlowService::class)->availableActions()));
+        $this->assertConsoleOf(visible: false);
+        $this->assertServedTo($this->alpha, false);
+        $this->assertCount(1, $this->calls->calls);
+
+        // A command cannot turn it on either.
+        $this->artisan('solutions:deactivate', ['solution' => 'showcase', '--tenant' => 'main'])->assertExitCode(0);
+        $this->artisan('solutions:activate', ['solution' => 'showcase', '--tenant' => 'main'])->assertExitCode(1);
+
+        // The rows keep the tenant's intent; nothing was journaled for the loss.
+        $this->assertSame('active', DB::table('solution_activations')->where('solution_id', 'feedback')->value('status'));
+        $this->assertSame($journal + 1, DB::table('solution_activation_events')->count(), 'Only the explicit deactivation.');
+
+        // The entitlement comes back: feedback runs again by itself; showcase, turned off meanwhile, stays off.
+        $operator->default = null;
+        $this->forgetSolutionState();
+
+        $this->assertSame('success', $this->flowResult($this->alpha)['end_status']);
+        $this->assertCount(2, $this->calls->calls);
+        $this->assertConsoleOf(visible: false);
+        $this->assertSame($journal + 1, DB::table('solution_activation_events')->count());
     }
 
     /**

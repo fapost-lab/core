@@ -87,3 +87,31 @@ outlive its package.
   tenant id; the journal is never edited or pruned.
 - Reversal: before release, delete the migration and the code. After release, a tenant migration that
   drops both tables, losing the history; moving the tables to the landlord would mean copying every schema.
+
+## Amendment 2026-10-16: entitlement is the third factor
+
+Task `solution-entitlement-seam` added the factor this ADR left room for. Foundation 0.20's
+`SolutionEntitlementInterface::entitlementFor(tenantId): SolutionEntitlement` is answered by an operator package
+(`all()` or `only(ids, ?action)`); Core binds `AllSolutionsEntitled` with `bindIf`, so self-hosted runs every
+installed Solution.
+
+- Effective = stored `active` ∩ installed ∩ entitled, still answered only by `ActiveSolutions`, so the runtime
+  availability port, the builder palette, the console UI and `solutions:list` follow with no change of their own.
+- The contract is called only by the `scoped` `SolutionEntitlements`, memoised per tenant id, so the operator is asked
+  at most once per tenant per request or job, and, when only what runs is needed, not at all for a tenant whose
+  stored-active ∩ installed set is empty (the screen and `solutions:list` ask anyway, to say why).
+  Core keeps no cross-process cache: the operator knows when the answer changes, and caches it (MUST in the contract).
+- Losing the entitlement is computed, never written: the row stays `active`, nothing is journaled, the data is kept,
+  and the Solution runs again with the first scope after the entitlement returns (owner, 2026-10-14, В2 of the
+  storage design). The flow sees the existing `solution_inactive`; no new error code. The audit of entitlement
+  changes is the operator's own history (add-on subscriptions), not this journal.
+- Failure of the operator: fail open for what runs (the factor is left out, so only what the tenant turned on keeps
+  running — nothing new can start), fail closed for turning one on (`SolutionEntitlementUnavailableException`; a person
+  is there to retry), like `ByteQuota` splits staff and inbound paths. The exception is reported once per scope.
+- `SolutionActivator::activate` refuses a Solution that is not entitled (`SolutionNotEntitledException`) for every actor,
+  `solutions:activate` included (no `--force`); `deactivate` needs no entitlement. The activation screen shows
+  "not in your plan" (with the operator's optional button), "paused" (stored active, not entitled; can be turned off)
+  and "could not check".
+- Rejected: a per-id `isEntitled` question (N calls a screen, no "unrestricted"), the operator writing deactivations
+  through Core (loses the automatic return and writes without a person), entitlement inside `TenantAccessState`, and a
+  Redis cache in Core.

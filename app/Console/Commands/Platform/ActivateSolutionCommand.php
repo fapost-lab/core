@@ -6,13 +6,16 @@ namespace App\Console\Commands\Platform;
 
 use App\Domains\Solution\DTO\ActivationActor;
 use App\Domains\Solution\Enums\ActivationChange;
+use App\Domains\Solution\Exceptions\SolutionEntitlementUnavailableException;
+use App\Domains\Solution\Exceptions\SolutionNotEntitledException;
 use App\Domains\Solution\Exceptions\SolutionNotInstalledException;
 use App\Domains\Solution\Services\SolutionActivator;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 
 /**
- * Turns an installed Solution on for one tenant. Idempotent.
+ * Turns an installed Solution on for one tenant. Idempotent. Refused, like on the screen, for a Solution the operator
+ * does not entitle the tenant to, or while the operator's answer cannot be had; there is no way around it.
  */
 final class ActivateSolutionCommand extends SolutionTenantCommand
 {
@@ -29,7 +32,7 @@ final class ActivateSolutionCommand extends SolutionTenantCommand
         return $this->runForTenantOption($tenants, $switcher, function () use ($solution): int {
             try {
                 $change = $this->laravel->make(SolutionActivator::class)->activate($solution, ActivationActor::console());
-            } catch (SolutionNotInstalledException $exception) {
+            } catch (SolutionNotInstalledException|SolutionNotEntitledException|SolutionEntitlementUnavailableException $exception) {
                 $this->components->error($exception->getMessage());
 
                 return self::FAILURE;

@@ -19,9 +19,10 @@ import type { LastChange, MissingRow, RangeMismatch, SolutionRow, SolutionsPageP
 /**
  * The installed Solutions and whether this workspace has each one on. Turning one on is a single click; turning one off
  * asks first, because flows that call its actions stop. Both are POSTs to the server, which decides whether they are
- * allowed; the buttons only reflect what the server already said.
+ * allowed; the buttons only reflect what the server already said. A Solution the workspace's plan does not include cannot
+ * be turned on; one turned on before it left the plan is shown as paused and can still be turned off.
  */
-defineProps<{
+const props = defineProps<{
   solutions: SolutionRow[]
   missing: MissingRow[]
 }>()
@@ -29,6 +30,8 @@ defineProps<{
 const page = usePage<SolutionsPageProps>()
 const t = computed(() => page.props.translations.console.solutions)
 const common = computed(() => page.props.translations.console.form)
+
+const entitlementUnavailable = computed(() => props.solutions.some((solution) => solution.entitlement.state === 'unavailable'))
 
 const busy = ref(false)
 const toTurnOff = ref<{ name: string; url: string } | null>(null)
@@ -80,6 +83,10 @@ function registrationLabel(point: keyof typeof t.value.points, label: string | n
       <p class="text-muted-foreground text-sm">{{ t.description }}</p>
     </div>
 
+    <p v-if="entitlementUnavailable" class="text-muted-foreground rounded-lg border px-4 py-3 text-sm" data-test="entitlement-unavailable">
+      {{ t.entitlement.unavailable_note }}
+    </p>
+
     <EmptyState
       v-if="solutions.length === 0 && missing.length === 0"
       :icon="Puzzle"
@@ -94,9 +101,11 @@ function registrationLabel(point: keyof typeof t.value.points, label: string | n
           <div class="flex flex-col gap-1">
             <CardTitle class="font-display flex flex-wrap items-center gap-3">
               {{ solution.name }}
-              <StatusDot :tone="solution.active ? 'success' : 'neutral'" data-test="state">
+              <StatusDot v-if="solution.entitlement.paused" tone="warning" data-test="state">{{ t.entitlement.paused }}</StatusDot>
+              <StatusDot v-else :tone="solution.active ? 'success' : 'neutral'" data-test="state">
                 {{ solution.active ? t.state.active : t.state.inactive }}
               </StatusDot>
+              <Badge v-if="solution.entitlement.state === 'not_entitled'" variant="warning" data-test="not-entitled">{{ t.entitlement.badge }}</Badge>
             </CardTitle>
             <CardDescription v-if="solution.description">{{ solution.description }}</CardDescription>
             <p class="text-muted-foreground text-[13px]">
@@ -105,7 +114,7 @@ function registrationLabel(point: keyof typeof t.value.points, label: string | n
           </div>
 
           <Button
-            v-if="solution.active"
+            v-if="solution.active || solution.entitlement.paused"
             variant="outline"
             :disabled="busy"
             data-test="deactivate"
@@ -119,6 +128,22 @@ function registrationLabel(point: keyof typeof t.value.points, label: string | n
 
       <CardContent class="flex flex-col gap-4">
         <p v-if="solution.lastChange" class="text-muted-foreground text-[13px]" data-test="last-change">{{ changeText(solution.lastChange) }}</p>
+
+        <div v-if="solution.entitlement.state === 'not_entitled'" class="flex flex-col items-start gap-2" data-test="entitlement">
+          <p class="text-sm">{{ solution.entitlement.paused ? t.entitlement.paused_note : t.entitlement.off_note }}</p>
+          <Button
+            v-if="solution.entitlement.action"
+            as="a"
+            :href="solution.entitlement.action.url"
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="outline"
+            size="sm"
+            data-test="entitlement-action"
+          >
+            {{ solution.entitlement.action.label }}
+          </Button>
+        </div>
 
         <div v-if="solution.ui && solution.ui.mismatches.length > 0" class="flex flex-col gap-1.5" data-test="kit-mismatch">
           <Badge variant="warning" class="self-start">{{ t.kit.title }}</Badge>

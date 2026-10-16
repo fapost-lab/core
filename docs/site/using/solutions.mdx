@@ -15,7 +15,8 @@ Everything starts off. A Solution you never turned on does nothing in your flows
 One card per Solution:
 
 - its name, description, version and package;
-- whether it is **On** or **Off**, and who last changed that and when (times are in UTC);
+- whether it is **On**, **Off** or **Paused** (on, but not in your plan), and who last changed that and when
+  (times are in UTC);
 - **What it adds** — the flow actions it provides (the ones you pick in a `call` node) and, when it has a
   console interface, its application, its pages and the places it adds to existing screens: actions,
   dashboard widgets, settings tabs, table columns and shell elements.
@@ -38,6 +39,20 @@ Click **Turn off** and confirm. From then on:
 - whatever it added to the console disappears;
 - **its data is kept.** Turning it off never deletes anything the Solution stored, and turning it on again
   brings it back as it was.
+
+## Not included in your plan
+
+On a platform that sells Solutions by plan, whoever runs it decides which Solutions your workspace may use.
+A Solution your plan does not include says **Not in your plan**: **Turn on** stays disabled, and a request that
+skips the button is refused with the same reason. When the platform offers one, the card has a button to its
+plans or contact page.
+
+If a Solution you had on leaves your plan, its card says **Paused**. It does nothing in flows or in the console,
+exactly as if it were off, but nothing is changed: **its data is kept, and it runs again by itself** as soon as
+your plan includes it. You can still turn it off; then it stays off when it comes back to your plan.
+
+If your plan cannot be checked for a moment, the page says so and nothing can be turned on until it can; the
+Solutions you already have on keep running.
 
 ## A console interface that does not fit
 
