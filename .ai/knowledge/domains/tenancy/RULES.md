@@ -28,6 +28,7 @@ paths:
   - app/Providers/HorizonServiceProvider.php
   - docker/compose.yaml
   - "tests/Feature/Http/**"
+  - tests/Unit/Domains/Tenancy/TenantSettingsCacheIsolationTest.php
 reviewed_at: 2026-10-16
 ---
 # Tenancy rules
@@ -101,6 +102,25 @@ broken.
   `permission:cache-reset` clears only the platform key, not the tenants'. Role writes flush the
   key once more after their transaction commits (`RoleWriterService`), so a load racing the commit
   cannot cache the old grants. Enforced: `TenantSwitcherTest`.
+- **Each tenant's settings are cached under a key of its own, and a switch never carries the
+  loaded settings across.** `DomainServiceProvider` registers spatie's
+  `SettingsCache::resolvePrefixUsing()`: every key becomes `tenant.<id>.settings.<class>`, or
+  `landlord.settings.<class>` with no tenant (never an empty prefix). The resolver reads the scoped
+  tenant context on each call and holds nothing, so it is worker-safe although spatie stores it
+  statically. A `TenantSwitcher` context hook hides the `TenantSettings` instance the container
+  built (tracked by the scoped `BuiltTenantSettings`) for the length of the switch and puts it back on
+  exit, and forgets spatie's scoped `SettingsMapper` (its per-class config remembers the cache flag
+  and locked properties) on both sides, so each side resolves them afresh for its own tenant. An
+  instance bound with `instance()` — a test's `TenantSettings::fake()` — is left bound through the
+  switch. Why: the cache store is
+  shared by every tenant and worker, and the class-only key spatie builds served one tenant's
+  settings to another once `SETTINGS_CACHE_ENABLED` was on; a sync job or nested switch reused the
+  outer tenant's instance even without the cache. Limits: `settings:clear-cache` clears only the
+  keys of the context it runs in; a write that bypasses `save()` (a settings migration, raw SQL)
+  does not invalidate the tenant's entry and the TTL is unset, so clear that tenant's key; a service
+  that took `TenantSettings` in its constructor before a switch (`FlowOrchestrator`, `DropPolicy`,
+  `GlobalCommandExecutor`) keeps that instance — resolve it inside the switch. The hook needs
+  spatie/laravel-settings ^3.9. Enforced: `TenantSettingsCacheIsolationTest`.
 - **Schema names are validated before they reach SQL** (`^[a-z][a-z0-9_]*$`, in
   `TenantDatabaseManager`). Why: the name is interpolated into `SET search_path`.
 - **Two slugs never map to one physical schema.** The schema name is derived only by
