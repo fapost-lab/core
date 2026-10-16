@@ -40,7 +40,9 @@ marked `@experimental` in their PHPDoc and on this site, and they are the one
 exception to "not broken within a major version": an experimental contract may
 change in a minor release of `fapost/foundation`, and the change is described in
 its changelog. The [console UI](/extending/console-ui) contract is experimental
-today. While the platform is pre-1.0 a constraint such as `^0.15` accepts one
+today. So is the [Solution testing kit](/extending/testing#testing-a-solution-package)
+(`Fapost\Testing`), which ships with Core rather than Foundation: it may change in a
+minor release of Core, described in Core's release notes. While the platform is pre-1.0 a constraint such as `^0.15` accepts one
 minor only, so such a change reaches your package when you raise the constraint.
 
 ## What is not covered

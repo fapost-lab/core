@@ -35,6 +35,8 @@ paths:
   - config/solutions.php
   - tests/Support/FakeSolutionEntitlement.php
   - "tests/Fixtures/Connectors/**"
+  - "testing/**"
+  - "tests/Feature/Testing/**"
 reviewed_at: 2026-10-16
 ---
 # Solution
@@ -179,7 +181,17 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   moved on purpose in a Core PR. It is the interim form of the first-solution roadmap item that tests a generated
   package in Core's CI. It is the check that the overlay → installed.json → manifest → provider → bundle path
   works for a package Core never names; the fixtures above cannot prove that, because FakeVendor builds the vendor tree.
-  Its tests still import `App\…` (no Solution testing kit in Foundation yet) — a recorded gap, not a pattern.
+  Its tests use only Foundation and the Solution testing kit below.
+- The Solution testing kit is `testing/` (`Fapost\Testing\`, Core's autoload-dev, `@experimental`), documented in
+  `docs/site/extending/testing.mdx`. It lives in Core, not Foundation or its own package, because a Solution's tests
+  always run inside a Core checkout: the kit is always the version of the Core under test, and a Core change that breaks
+  it fails Core's CI in the same pull request (gate of `solution-testing-kit`, 2026-10-16). `Fapost\Testing\Support`
+  and `Concerns` are `@internal`. Keep three things honest when changing Solution internals: Core's `FeatureTestCase`
+  uses the kit's `PreparesCoreDatabase`, so the database set-up is one; the singletons a new request would not carry
+  are listed once, in `SolutionRequestState`, which `InstallsShowcaseSolution` uses too — a new per-request Solution
+  singleton goes there; and `tests/Feature/Testing/SolutionTestCaseTest.php` exercises every kit method on the
+  showcase fixture (with the `showcase.ping` action). State shared across test classes in one process lives in
+  `CoreDatabaseState`, never in a trait's static property: a trait static is copied per using class.
 - The lifecycle proof is one suite, `tests/Feature/Domains/Solution/SolutionLifecycleTest.php`: the fixtures `feedback` (actions)
   and `showcase` (console UI) installed together, `platform:update --validate-only` and the full update, activation for
   tenant A, a real flow whose `call` node reaches the action through the FlowEngine, the builder's test call, the

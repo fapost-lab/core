@@ -45,6 +45,10 @@ services:
 		class: Tests\Architecture\PublicMediaLinkSignerTest
 		tags:
 			- phpat.test
+	-
+		class: Tests\Architecture\TestingKitBoundaryTest
+		tags:
+			- phpat.test
 
 parameters:
 	level: 0
@@ -52,6 +56,7 @@ parameters:
 		- app
 		- database
 		- tests/Architecture
+		- testing
 
 	ignoreErrors:
 		# laravel/framework 12.68 annotates the Redis facade as

@@ -67,3 +67,6 @@ domain rules named as its source; this file is the index of what holds and how i
   only when registered in `phpstan.neon`, and `php artisan test tests/Architecture` reports
   success while checking nothing. Source: `.ai/rules/architecture.md`. Enforced:
   `tests/Unit/Architecture/RuleRegistrationTest.php`.
+- **Core never depends on the Solution testing kit.** `testing/` (`Fapost\Testing\`) is autoload-dev and absent
+  from production images; the kit depends on Core, not the other way round. Source: `domains/solution/OVERVIEW.md`.
+  Enforced: `tests/Architecture/TestingKitBoundaryTest.php` (`App`, `Database`).
