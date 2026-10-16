@@ -26,17 +26,17 @@ is found and validated by `platform:update` and registers a channel type whose s
 Goal: nothing in Core outside Telegram's module knows Telegram. Done when: Telegram, still inside Core, is
 reached only through the connector registrar, with its existing tests untouched and green.
 
-- [ ] Telegram on the registrar — Telegram's module registers itself through the connector registrar like
+- [ ] `telegram-on-registrar` — Telegram on the registrar: Telegram's module registers itself through the connector registrar like
       an outside package would, instead of Core's hard-coded provider list (after: Open channel types —
       it needs the open types to register into)
-- [ ] Channel settings from the connector's schema — Core's channel screens and request rules draw a
+- [ ] `channel-settings-schema` — Channel settings from the connector's schema: Core's channel screens and request rules draw a
       connector's declared fields instead of `isTelegram` branches; `telegram_bot_username` moves into
       `channels.config`; provider config and media limits come from the connector (after: Connector
       registrar with a channel surface — the schema is registered on it)
-- [ ] Neutral outgoing message — Flow describes buttons, reply mode and requests for contact or location
+- [ ] `neutral-outgoing-message` — Neutral outgoing message: Flow describes buttons, reply mode and requests for contact or location
       without Bot API structures; Telegram's module translates; capabilities declared per connector
       (after: Connector registrar with a channel surface — capabilities are registered on it)
-- [ ] Capability-aware validation — validation and the builder warn when a flow uses what its assistant's
+- [ ] `capability-aware-validation` — Capability-aware validation: validation and the builder warn when a flow uses what its assistant's
       channels cannot do (after: Neutral outgoing message — it checks against the declared capabilities)
 - [ ] fog: connector config upgrades between versions — depends on the open question (a connector
       migration or a `config_version`), best answered once a second version of a schema exists
@@ -76,8 +76,8 @@ connector contract with Telegram (built in) and Viber (a package) as references.
 
 1. connector-manifest-discovery; ingress-hmac-body-signature; public-media-links
 2. connector-channel-registrar
-3. open-channel-types; Channel settings from the connector's schema; Neutral outgoing message
-4. Telegram on the registrar; Capability-aware validation; Viber connector package
+3. open-channel-types; channel-settings-schema; neutral-outgoing-message
+4. telegram-on-registrar; capability-aware-validation; Viber connector package
 5. Viber end to end
 6. Published docs
 
