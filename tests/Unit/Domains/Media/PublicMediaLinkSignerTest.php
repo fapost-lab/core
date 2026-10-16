@@ -99,11 +99,14 @@ final class PublicMediaLinkSignerTest extends TestCase
         $this->assertTrue($signer->verify($this->claims(), $signer->sign($this->claims())));
     }
 
-    public function test_an_empty_key_is_refused(): void
+    public function test_an_empty_key_refuses_to_sign_but_not_to_be_built(): void
     {
+        // Built during boot (composer's package:discover runs before key:generate): building must not throw.
+        $signer = new PublicMediaLinkSigner('');
+
         $this->expectException(RuntimeException::class);
 
-        new PublicMediaLinkSigner('');
+        $signer->sign($this->claims());
     }
 
     private function claims(): PublicMediaLinkClaims

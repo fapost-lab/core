@@ -21,20 +21,48 @@ final readonly class PublicMediaLinkSigner
 {
     private const string CONTEXT = 'fapost.media.public-link.v1';
 
-    /** @var list<string> */
-    private array $verifyKeys;
-
     /**
+     * Keys are derived on use, never here: the dispatcher builds this class for every channel, Telegram included, and
+     * the application boots without a key during `composer install` (`package:discover`) and before `key:generate`.
+     * A missing or malformed key may only cost public links, never the boot or another channel's media.
+     *
      * @param  string  $appKey  `app.key`, with or without the `base64:` prefix.
      * @param  list<string>  $previousKeys  `app.previous_keys`, same format.
      */
-    public function __construct(string $appKey, array $previousKeys = [])
-    {
-        $keys = [$this->derive($appKey)];
+    public function __construct(
+        private string $appKey,
+        private array $previousKeys = [],
+    ) {
+    }
 
-        // A malformed previous key is reported and skipped: it may only cost the links it signed, never every
-        // media dispatch (the dispatcher builds this class for Telegram too).
-        foreach ($previousKeys as $key) {
+    public function sign(PublicMediaLinkClaims $claims): string
+    {
+        return $this->mac($claims, $this->derive($this->appKey));
+    }
+
+    public function verify(PublicMediaLinkClaims $claims, string $signature): bool
+    {
+        $valid = false;
+
+        foreach ($this->verifyKeys() as $key) {
+            // Every key is tried, so the time taken does not tell which one matched.
+            $valid = hash_equals($this->mac($claims, $key), $signature) || $valid;
+        }
+
+        return $valid;
+    }
+
+    /**
+     * The current key, then each previous key that derives. A malformed previous key is reported and skipped: it may
+     * only cost the links it signed.
+     *
+     * @return list<string>
+     */
+    private function verifyKeys(): array
+    {
+        $keys = [$this->derive($this->appKey)];
+
+        foreach ($this->previousKeys as $key) {
             try {
                 $keys[] = $this->derive($key);
             } catch (RuntimeException $exception) {
@@ -42,24 +70,7 @@ final readonly class PublicMediaLinkSigner
             }
         }
 
-        $this->verifyKeys = $keys;
-    }
-
-    public function sign(PublicMediaLinkClaims $claims): string
-    {
-        return $this->mac($claims, $this->verifyKeys[0]);
-    }
-
-    public function verify(PublicMediaLinkClaims $claims, string $signature): bool
-    {
-        $valid = false;
-
-        foreach ($this->verifyKeys as $key) {
-            // Every key is tried, so the time taken does not tell which one matched.
-            $valid = hash_equals($this->mac($claims, $key), $signature) || $valid;
-        }
-
-        return $valid;
+        return $keys;
     }
 
     private function mac(PublicMediaLinkClaims $claims, string $key): string
