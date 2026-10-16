@@ -92,11 +92,15 @@ final class WebhookController extends Controller
     /**
      * Verify through the declarative spec when the adapter publishes one,
      * falling back to the adapter's own implementation otherwise.
+     *
+     * The adapter's own code never sees an empty secret: it may compare one
+     * against an absent header and pass. The spec executor refuses it itself,
+     * for every scheme but `none`.
      */
     private function verify(ChannelAdapterInterface $adapter, Request $request, string $secret): bool
     {
         if (! $adapter instanceof ProvidesIngressSpecInterface) {
-            return $adapter->verifySignature($request, $secret);
+            return '' !== $secret && $adapter->verifySignature($request, $secret);
         }
 
         return $this->specExecutor->verify(
