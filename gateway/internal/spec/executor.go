@@ -24,7 +24,14 @@ var placeholderPattern = regexp.MustCompile(`\{([^}]+)\}`)
 //
 // Every comparison is constant-time: a timing oracle here would leak the channel
 // secret to anyone who knows the public hash, which travels in the URL.
+//
+// An empty secret refuses every scheme that reads one: compared directly it
+// matches an absent header, and as an HMAC key it lets anyone sign.
 func (s Spec) Verify(r *Request, secret string) bool {
+	if s.Scheme != SchemeNone && secret == "" {
+		return false
+	}
+
 	switch s.Scheme {
 	case SchemeNone:
 		return true

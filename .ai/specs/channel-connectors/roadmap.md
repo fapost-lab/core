@@ -47,7 +47,7 @@ Goal: a channel Core never knew works through the contract alone. Done when: an 
 `fapost/connector-viber` through the overlay talks to a real Viber bot — text, buttons, contact and
 location requests, media — with no Viber code in Core.
 
-- [ ] `ingress-hmac-body-signature` — Body-HMAC ingress signatures: a signature scheme over the raw body in `IngressSpec`, executed by PHP
+- [x] `ingress-hmac-body-signature` — Body-HMAC ingress signatures: a signature scheme over the raw body in `IngressSpec`, executed by PHP
       and the Go gateway, with shared golden fixtures
 - [ ] `public-media-links` — Public media links: Core hands a connector a signed, expiring public URL for a media asset, for
       channels that send media by URL; the media uploader becomes optional
