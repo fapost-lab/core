@@ -162,6 +162,11 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   built by `tests/Support/FakeVendor.php` from the fixture package in `tests/Fixtures/Solution`. The console
   fixture `showcase` (every point, both route kinds, a committed hand-written `dist/`) is
   `tests/Fixtures/Solutions/Showcase`, installed by `tests/Support/InstallsShowcaseSolution.php`.
+- A real Composer-installed Solution lives outside Core: `fapost-lab/solution-hello-world` (id `hello`, one action,
+  one console page from a committed `dist/`), installed by the composer overlay and tested inside Core by its own CI on
+  Core's main and latest release. It is the check that the overlay → installed.json → manifest → provider → bundle path
+  works for a package Core never names; the fixtures above cannot prove that, because FakeVendor builds the vendor tree.
+  Its tests still import `App\…` (no Solution testing kit in Foundation yet) — a recorded gap, not a pattern.
 - The lifecycle proof is one suite, `tests/Feature/Domains/Solution/SolutionLifecycleTest.php`: the fixtures `feedback` (actions)
   and `showcase` (console UI) installed together, `platform:update --validate-only` and the full update, activation for
   tenant A, a real flow whose `call` node reaches the action through the FlowEngine, the builder's test call, the
