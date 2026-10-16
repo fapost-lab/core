@@ -61,6 +61,11 @@ domain rules named as its source; this file is the index of what holds and how i
   lang files; text sent to contacts is resolved through `LanguageResolverInterface` and the content
   translator chain, never as a literal in a handler or sender; a button or select `value` is never
   translated. Source: `conventions/multilingual.md`, ADR-15. Review only.
+- **A setting an operator or admin may change at runtime lives in the database and is managed from the admin.**
+  A tenant's setting in the tenant admin, a platform-wide one in Core's platform settings, a package's in that
+  package's own admin; `.env` keeps only secrets, Laravel and infrastructure settings and once-per-install values,
+  and an `.env` value may only seed a stored setting's default. Binds Core and every package and Solution. Source:
+  `adr-20261016-runtime-settings-in-database`, `conventions/runtime-settings.md`. Review only.
 - **Published documentation lives in `docs/site/` and is not restated under `docs/`.** Source:
   `conventions/docs-layout.md`, `conventions/published-docs-updates.md`. Review only.
 - **Architecture rules run through PHPStan, never as a PHPUnit directory.** A PHPat class runs
