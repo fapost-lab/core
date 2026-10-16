@@ -9,9 +9,10 @@ domain behaviour — distributed as a Composer package under your own vendor.
 <Note>
   The external Solution lifecycle is partly built in Core. The manifest below is
   read and validated by `platform:update` today, and a tenant's activation of a
-  Solution is stored and switched with `solutions:activate` and `solutions:deactivate`.
+  Solution is stored and switched with `solutions:activate` and `solutions:deactivate` or from
+  the **Solutions** page of the admin panel.
   Core also registers the action handlers a Solution declares and refuses them for a tenant
-  that has not activated it. The activation screen, the other registrar methods and the
+  that has not activated it. The other registrar methods and the
   release tooling around them are still being built. Treat this page as the contract you will be held to,
   not as a finished walkthrough.
 </Note>
@@ -102,7 +103,10 @@ own schema, so it goes with the tenant's backup and is removed with the tenant.
   was given at its first question.
 
 An operator switches it with `solutions:activate` and `solutions:deactivate`, each with a required
-`--tenant=<slug>`; see the [command reference](/reference/artisan-commands#solutions).
+`--tenant=<slug>`; see the [command reference](/reference/artisan-commands#solutions). A staff user with the
+right to manage settings does the same from the **Solutions** page of the admin panel, which also lists what
+your Solution registers and why its console interface does not fit and it cannot be turned on; see
+[Solutions](/using/solutions). The journal records that user as the actor.
 
 ### Checking it
 

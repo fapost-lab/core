@@ -28,6 +28,11 @@ paths:
   - tests/Architecture/SolutionBoundariesTest.php
   - "tests/Fixtures/Solutions/**"
   - tests/Support/InstallsShowcaseSolution.php
+  - app/Http/Controllers/Admin/SolutionController.php
+  - app/Http/Shell/SolutionsPresenter.php
+  - "resources/js/pages/Console/AdminSolutions/**"
+  - tests/Feature/Console/AdminSolutionsConsoleTest.php
+  - config/solutions.php
 reviewed_at: 2026-10-16
 ---
 # Solution
@@ -95,6 +100,23 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
     deactivating one is allowed; it then drops its tenant's memo. Default: nothing active.
   - `solutions:activate|deactivate|list` need `--tenant=<slug>` and run inside `runForTenant()`.
     The `onActivate`/`onDeactivate` hooks are not called yet.
+  - The activation screen is `admin/solutions` (`Admin\SolutionController`, props from `Http/Shell/SolutionsPresenter`,
+    page `Console/AdminSolutions`), behind `manage_settings` like tenant settings and usage. It lists only valid Solutions
+    (a failing manifest never reaches the catalog, and `platform:update` refuses it first) plus stored-active rows whose
+    package is gone ("no longer installed", which can only be turned off). Activate and deactivate are POSTs through
+    `SolutionActivator` with `ActivationActor::user(id, name)`, so the journal names the staff user; deactivation asks for
+    confirmation and says the data is kept. What a Solution "registers" is its manifest actions plus its declarations in
+    `ConsoleExtensionRegistry`, shown whether or not it is on. `SolutionsPresenter::isActivatable()` is the one place the
+    entitlement step (`solution-entitlement-seam`) will be asked what a tenant may have; the controller checks it again.
+  - `SolutionUiCompatibility` follows `adr-20261014-solution-console-ui` (Stability): the `kit` range a bundle declares
+    (kept on `SolutionUiBundle`, with `vue` and `inertia`; null in a cache older than that) is checked with `composer/semver`
+    (a direct dependency since 2026-10-16, owner-approved by the ADR) against `config/solutions.php: console_runtime`;
+    Vue and Inertia are checked by major, i.e. whether the range admits any version of the shipped major. A range the
+    library cannot read counts as a mismatch. `ConsoleRuntimeConfigTest` holds the config equal to `package-lock.json`.
+    A mismatch makes `SolutionsPresenter::isActivatable()` false: the card shows the reason beside a disabled button, the
+    controller refuses a direct POST with a flashed reason, and `platform:update` warns (exit 0). Turning off is always
+    allowed. Not done: an already-active Solution whose range fails after a Core upgrade is still served its UI, because
+    `SolutionUi::isServable()` still passes every bundle (the ADR says it should not; `first-solution` phase 0).
 - `platform:update` also checks that every action a valid manifest declares is registered in the booted
   `ActionHandlerRegistry` (`<package>: extra.fapost.actions[i]: "<id>" is declared but not registered`, exit 1), after the manifest and console UI checks and before any migration.
 - `platform:update` (`app/Console/Commands/Platform`): validate the manifests and the console UI bundles, then
@@ -109,7 +131,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   PHPat (`SolutionBoundariesTest`) forbids a dependency on any other `App\Domains` namespace, and
   forbids facades and `Illuminate\Database` outside `Infrastructure` and `Providers`, so discovery
   and the services run without a database.
-- Not here yet: registrar methods other than `registerActionHandler`, the activation screen, the entitlement check, per-phase migrations of a Solution, the `migrations` manifest field, and the kit/Vue/Inertia range check of a bundle (`SolutionUi::isServable()` is its seam; `first-solution` phase 0).
+- Not here yet: registrar methods other than `registerActionHandler`, the entitlement check, per-phase migrations of a Solution, the `migrations` manifest field, and hiding the UI of an active Solution whose kit range fails (`SolutionUi::isServable()` is the seam; `first-solution` phase 0).
   Plugins (`type: fapost-plugin`) are reserved and not discovered.
 - The Foundation constraint is not re-checked in Core: Composer refuses to install a package whose
   `require["fapost/foundation"]` does not fit the locked version, and a package Composer did not
@@ -125,6 +147,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
 - `app/Console/Commands/Platform/UpdatePlatformCommand.php`
 - `app/Domains/Solution/Services/ActiveSolutions.php`, `SolutionActivator.php`
 - `app/Console/Commands/Platform/ActivateSolutionCommand.php`, `DeactivateSolutionCommand.php`, `ListSolutionsCommand.php`
+- `app/Http/Controllers/Admin/SolutionController.php`, `app/Http/Shell/SolutionsPresenter.php`, `resources/js/pages/Console/AdminSolutions/`
 - `app/Domains/Solution/Console/ConsoleExtensionRegistry.php`, `Services/SolutionUiPublisher.php`
 - Tests: `tests/Unit/Domains/Solution`, `tests/Feature/Domains/Solution`; a throwaway vendor tree is
   built by `tests/Support/FakeVendor.php` from the fixture package in `tests/Fixtures/Solution`. The console

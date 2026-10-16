@@ -287,7 +287,7 @@ console's copy is connected to the toaster on the page.
 |---|---|---|
 | `schema` | yes | An integer; `1` is the only supported number |
 | `solution` | yes | Your Solution `id`, the same as in the manifest |
-| `kit`, `vue`, `inertia` | yes | The version ranges of `@fapost/ui`, Vue and Inertia the bundle was built against; non-empty |
+| `kit`, `vue`, `inertia` | yes | The version ranges of `@fapost/ui`, Vue and Inertia the bundle was built against; non-empty. Core reads them with Composer's version syntax (`^0.1`, `~1.2`, `>=0.1,<0.3`, `^0.1 \|\| ^0.2`); a range it cannot read counts as a mismatch. `kit` is compared with the exact version the console ships; `vue` and `inertia` are compared by major only. A mismatch stops the Solution from being activated |
 | `pages` | no | `Path` (without `<id>::`) to a `.js` file |
 | `components` | no | The same, for components mounted on Core's screens; every component your PHP declarations name must be here |
 | `css` | no | A list of `.css` files, attached before any of your modules is mounted |
@@ -397,14 +397,17 @@ permissions. Prefix your own CSS classes so they cannot collide with the kit's.
   [`@fapost/ui`](https://www.npmjs.com/package/@fapost/ui) to build and type-check
   against it. Until the preset exists a bundle is built with your own Vite
   configuration in library mode, with the specifiers above external.
-- **The version check.** `kit`, `vue` and `inertia` are required and recorded but
-  not yet compared with the console's: a bundle built against an incompatible kit
-  is served anyway.
+- **The version check.** `kit`, `vue` and `inertia` are compared with the versions
+  the console ships (the syntax is in the table above). `platform:update` warns about
+  a mismatch, and the [Solutions page](/using/solutions#a-console-interface-that-does-not-fit)
+  of the admin panel refuses to turn the Solution on and says why. A Solution that was
+  already on when a Core upgrade made its range fail stays on, and can be turned off.
 - **The derived image.** Publication writes to the `public/` of the container that
   runs `platform:update`. The Docker Compose installation serves static files from
   its separate `web` image, which does not see that directory, so it does not serve
   `/solutions/` yet; the recipe for an image with a Solution's assets published is
   still to be written. A single-tree install — development, bare metal — serves
   them as soon as the command has run.
-- **The activation screen.** Activation is switched with `solutions:activate` and
-  `solutions:deactivate`; see [Building a Solution](/extending/solutions#activation).
+- **Activation.** A tenant turns a Solution on from the Solutions page of the admin
+  panel or with `solutions:activate` and `solutions:deactivate`; see
+  [Building a Solution](/extending/solutions#activation).

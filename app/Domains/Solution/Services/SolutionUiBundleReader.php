@@ -115,7 +115,7 @@ final readonly class SolutionUiBundleReader
             $id,
             $directory,
             $path,
-            new SolutionUiBundle($id, mb_substr(hash('sha256', $contents), 0, self::HASH_LENGTH), $bundle->pages, $bundle->components, $bundle->css),
+            new SolutionUiBundle($id, mb_substr(hash('sha256', $contents), 0, self::HASH_LENGTH), $bundle->pages, $bundle->components, $bundle->css, $bundle->kit, $bundle->vue, $bundle->inertia),
             [],
             $files,
             $warnings,
