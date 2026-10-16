@@ -62,21 +62,25 @@ const bars = computed(() =>
       </div>
     </div>
 
-    <table class="sr-only">
-      <thead>
-        <tr>
-          <th scope="col">{{ labels.day }}</th>
-          <th scope="col">{{ labels.executed }}</th>
-          <th scope="col">{{ labels.failed }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="bar in bars" :key="bar.date">
-          <th scope="row">{{ bar.label }}</th>
-          <td>{{ bar.executed }}</td>
-          <td>{{ bar.failed }}</td>
-        </tr>
-      </tbody>
-    </table>
+    <!-- The wrapper is what hides the table: a table grows to its rows whatever its height, so `sr-only` on the table
+         itself left a full-height box below the shell and stretched the page. -->
+    <div class="sr-only">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">{{ labels.day }}</th>
+            <th scope="col">{{ labels.executed }}</th>
+            <th scope="col">{{ labels.failed }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="bar in bars" :key="bar.date">
+            <th scope="row">{{ bar.label }}</th>
+            <td>{{ bar.executed }}</td>
+            <td>{{ bar.failed }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 </template>
