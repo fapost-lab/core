@@ -41,6 +41,11 @@ final class SolutionManifestValidator
                 $watched[] = $package->composerPath;
             }
 
+            // A connector is validated by ConnectorManifestValidator; its composer.json is still watched above.
+            if (ManifestSchema::CONNECTOR_PACKAGE_TYPE === $package->type) {
+                continue;
+            }
+
             if (ManifestSchema::PACKAGE_TYPE !== $package->type) {
                 $warnings[] = sprintf(
                     '%s: carries extra.fapost but its type is "%s", not "%s"; Core ignores it',

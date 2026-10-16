@@ -12,6 +12,7 @@ use App\Domains\Solution\Infrastructure\CoreInstalledSolutionCatalog;
 use App\Domains\Solution\Infrastructure\EloquentSolutionActivationStore;
 use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Solution\Services\AllSolutionsEntitled;
+use App\Domains\Solution\Services\InstalledConnectors;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\InstalledSolutions;
 use App\Domains\Solution\Services\PublishedSolutionUi;
@@ -32,8 +33,8 @@ use Illuminate\Support\ServiceProvider;
 use LogicException;
 
 /**
- * Wires the Solution domain and boots the service provider of every installed Solution with a valid
- * manifest. A Solution's provider is never listed in `extra.laravel.providers`: Laravel's package
+ * Wires the Solution domain and boots the service provider of every installed connector and Solution with a valid
+ * manifest, connectors first. A Solution's provider is never listed in `extra.laravel.providers`: Laravel's package
  * discovery would boot it whether or not its manifest holds up.
  *
  * Around each Solution provider's `boot()` the console registry is opened for that Solution's id and closed again, so
@@ -48,6 +49,7 @@ final class SolutionServiceProvider extends ServiceProvider
         $this->app->singletonIf(InstalledPackagesReader::class, fn ($app): InstalledPackagesReader => new InstalledPackagesReader($app->basePath('vendor')));
         $this->app->singletonIf(SolutionCache::class, fn ($app): SolutionCache => new SolutionCache($app->bootstrapPath('cache/fapost-solutions.php')));
         $this->app->singletonIf(InstalledSolutions::class);
+        $this->app->singletonIf(InstalledConnectors::class);
         $this->app->singletonIf(ConsoleExtensionRegistry::class);
         $this->app->singletonIf(ConsoleExtensionsInterface::class, static fn (Application $app): ConsoleExtensionRegistry => $app->make(ConsoleExtensionRegistry::class));
         // The web root is read when the publisher is made, so a test can point it elsewhere first.
@@ -76,6 +78,12 @@ final class SolutionServiceProvider extends ServiceProvider
         // Implemented outside the domain, in App\Infrastructure\Solution: it writes into the registries of the
         // domains a Solution extends.
         $this->app->singleton(SolutionRegistrarFactoryInterface::class, SolutionCoreRegistrarFactory::class);
+
+        // Connectors come first: they bring channels for the whole installation, which a Solution's flows may rely on.
+        // There is no activation and no registrar for them yet, only the provider.
+        foreach ($this->app->make(InstalledConnectors::class)->all() as $connector) {
+            $this->app->register($this->app->resolveProvider($connector->provider));
+        }
 
         $solutions = $this->app->make(InstalledSolutions::class)->all();
 

@@ -34,6 +34,7 @@ paths:
   - tests/Feature/Console/AdminSolutionsConsoleTest.php
   - config/solutions.php
   - tests/Support/FakeSolutionEntitlement.php
+  - "tests/Fixtures/Connectors/**"
 reviewed_at: 2026-10-16
 ---
 # Solution
@@ -73,6 +74,15 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   It wraps each provider in `booting`/`booted` callbacks that open and close the console registry for that
   Solution's id, and freezes the registry once the application has booted (`solutions.freeze_console_registry`,
   off in `phpunit.xml` only, because tests register fixture Solutions after boot).
+- Connectors (`adr-20261016-connector-package-type`, experimental): packages of `type: fapost-connector`
+  are found by the same `InstalledPackagesReader` scan; `SolutionManifestValidator` skips them silently,
+  `ConnectorManifestValidator` applies Foundation's `ConnectorManifestParser`, then checks the provider
+  extends `AbstractConnectorServiceProvider` and that no two connectors share an id or a channel type.
+  `SolutionDiscoverer::discoverAll()` returns both discoveries (`ExtensionDiscovery`) after removing ids
+  claimed by a Solution and a connector at once; `discover()` keeps returning the Solution half.
+  `InstalledConnectors` is the catalog; `SolutionCache` keeps it under a `connectors` key of the same file
+  (a file without that key is stale for connectors only). `SolutionServiceProvider` registers connector
+  providers before the Solution ones, with no activation and, for now, no registrar.
 - Console UI (`adr-20261014-solution-console-ui`, experimental; rules in `conventions/solution-console-ui.md`):
   - `Console/ConsoleExtensionRegistry` implements Foundation's `ConsoleExtensionsInterface`: a process
     singleton (it depends on the image, never on a tenant) that accepts declarations only inside a Solution
