@@ -17,11 +17,12 @@
 #
 # `agent.git`, `autopilot.git`, `agent.ci_timeout`, `autopilot.unattended`,
 # `autopilot.parallel` and `route.depth` are also in JIG_CFG_LOCAL_ONLY_KEYS
-# below (with `run.exec`, `run.path` and the two `claude.*_model` keys): they
+# below (with `run.exec`, `run.path` and the `claude.*_model` and
+# `codex.*_model` and `executor.*` keys): they
 # answer
 # *only* from this list, never falling back to the project layer the way every
 # other key here does.
-JIG_CFG_LOCAL_KEYS="housekeeping.cadence housekeeping.fetch housekeeping.trash_ttl housekeeping.abandoned_ttl housekeeping.stale_after checkout.busy_ttl verify.busy_ttl git.worktree_root git.delete_merged_branches agent.git autopilot.git agent.ci_timeout autopilot.unattended autopilot.parallel route.depth release.merge run.exec run.path claude.implement_model claude.review_model notify.telegram.token notify.telegram.chat_id notify.autopilot notify.interactive"
+JIG_CFG_LOCAL_KEYS="housekeeping.cadence housekeeping.fetch housekeeping.trash_ttl housekeeping.abandoned_ttl housekeeping.stale_after checkout.busy_ttl verify.busy_ttl git.worktree_root git.delete_merged_branches agent.git autopilot.git agent.ci_timeout autopilot.unattended autopilot.parallel route.depth release.merge run.exec run.path claude.implement_model claude.review_model codex.implement_model codex.review_model executor.implement_runtime executor.review_runtime executor.implement_model executor.review_model notify.telegram.token notify.telegram.chat_id notify.autopilot notify.interactive"
 
 # Keys whose project-layer value `cfg` never reads at all: only the local
 # file and the default answer. A key belongs here, rather than merely in
@@ -51,12 +52,16 @@ JIG_CFG_LOCAL_KEYS="housekeeping.cadence housekeeping.fetch housekeeping.trash_t
 # (adr-20261001-checks-run-where-the-project-runs). `run.path` is the same
 # question for a host runtime that is not first on PATH (Laravel Herd): a
 # directory on one person's machine.
-# `claude.implement_model` and `claude.review_model` name the model a stage is
+# The `claude.*_model` and `codex.*_model` keys name the model a stage is
 # handed to when the agent delegates it to a subagent: which model is worth
 # its cost depends on one person's plan, runtime and budget, and a committed
 # value would spend every contributor's. Jig carries the value as an opaque
 # string and never interprets it; empty means no delegation
 # (adr-20261005-jig-names-the-roles-not-the-models).
+# `executor.*_runtime` selects which installed runtime owns a stage. This is
+# personal because it chooses a process, account and permission boundary;
+# `executor.*_model` is an optional opaque model for that external process.
+# Neither setting grants the process a new permission in a project config.
 # `notify.telegram.token` and `notify.telegram.chat_id` say where one person's
 # Telegram messages go, and `notify.autopilot` whether their autopilot runs
 # send any: a committed token is a bot anyone can use once it is pushed, and a
@@ -66,7 +71,7 @@ JIG_CFG_LOCAL_KEYS="housekeeping.cadence housekeeping.fetch housekeeping.trash_t
 # hook they opted into (adr-20261010-a-waiting-session-reaches-telegram).
 # `jig_config_project_ignored` reports a project-layer value here so it does
 # not silently do nothing.
-JIG_CFG_LOCAL_ONLY_KEYS="agent.git autopilot.git agent.ci_timeout autopilot.unattended autopilot.parallel route.depth release.merge run.exec run.path claude.implement_model claude.review_model notify.telegram.token notify.telegram.chat_id notify.autopilot notify.interactive"
+JIG_CFG_LOCAL_ONLY_KEYS="agent.git autopilot.git agent.ci_timeout autopilot.unattended autopilot.parallel route.depth release.merge run.exec run.path claude.implement_model claude.review_model codex.implement_model codex.review_model executor.implement_runtime executor.review_runtime executor.implement_model executor.review_model notify.telegram.token notify.telegram.chat_id notify.autopilot notify.interactive"
 
 # Path of the config file for the current project (JIG_PROJECT must be set).
 jig_config_file() { printf '%s/%s/config.yaml\n' "$JIG_PROJECT" "$JIG_AI_DIR"; }
@@ -179,6 +184,12 @@ run.exec auto
 run.path auto
 claude.implement_model
 claude.review_model
+codex.implement_model
+codex.review_model
+executor.implement_runtime
+executor.review_runtime
+executor.implement_model
+executor.review_model
 notify.telegram.token
 notify.telegram.chat_id
 notify.autopilot true
@@ -554,7 +565,7 @@ _cfg_parallel() {
 # - run.path: `auto` or the absolute path of a directory, unquoted — read as
 #   one value, so a blank inside it is kept (Herd's macOS home has one); a
 #   relative one would name a different folder from wherever verify starts;
-# - claude.implement_model and claude.review_model: anything — the value is
+# - claude.*_model and codex.*_model: anything — the value is
 #   the runtime's to understand, never Jig's
 #   (adr-20261005-jig-names-the-roles-not-the-models);
 # - notify.telegram.chat_id: a chat id, digits with an optional `-`, or an
@@ -632,7 +643,13 @@ jig_config_value_problem() {
         \"* | \'*) printf 'quoted; write the path without quotes\n'; return 1 ;;
       esac
       ;;
-    claude.implement_model | claude.review_model) ;;
+    executor.implement_runtime | executor.review_runtime)
+      case "$value" in
+        claude | codex) ;;
+        *) printf 'not a runtime: claude or codex\n'; return 1 ;;
+      esac
+      ;;
+    claude.implement_model | claude.review_model | codex.implement_model | codex.review_model | executor.implement_model | executor.review_model) ;;
     notify.telegram.chat_id)
       _cfg_chat_id "$value" \
         || { printf 'not a chat id: digits (a group starts with -), or @name\n'; return 1; }
@@ -877,6 +894,10 @@ _config_set() {
     return 0
   fi
   mv "$_CONFIG_TMP" "$file"
+  # A setting can change what a read reports (the git level and unattended
+  # mode decide what a person may do next), so a written one raises the
+  # clone's revision.
+  jig_record_changed
   i=0
   while [ "$i" -lt "$n" ]; do
     printf 'config: %s: %s (%s)\n' "${args[i]}" "${args[i + 1]}" "$shown"
@@ -988,6 +1009,7 @@ _config_unset() {
   # it that it did not already satisfy.
   if [ "$removed" -gt 0 ]; then
     mv "$_CONFIG_TMP" "$file"
+    jig_record_changed
   else
     rm -f "$_CONFIG_TMP"
   fi
