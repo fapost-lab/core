@@ -42,8 +42,9 @@ The SaaS package's renewal link: `SAAS_RENEWAL_URL` seeds the default, `Platform
 `saas_settings` through `SettingsCache` and answers the stored value when an Owner set one in
 Platform settings. A tenant's setting on a worker path: the message sender reads
 `TenantSettings::messaging_rate_limit` at send time through the scoped `TenantMessagingRateLimit`,
-memoized per tenant id (not through the scoped `TenantSettings` instance, which a tenant switch inside
-one scope does not replace); `MESSAGING_RATE_LIMIT_PER_MINUTE` is only a fallback outside a tenant
+memoized per tenant id and read from a fresh `TenantSettings` (a tenant switch hides the scoped
+instance for its length and restores it on exit, so the memo cannot lean on that instance serving the
+right tenant); `MESSAGING_RATE_LIMIT_PER_MINUTE` is only a fallback outside a tenant
 or when the tenant's row is absent — every tenant stores 30 at provisioning, because a settings
 migration may not read config to seed from `.env`. Before that fix the sender read only `.env` and the field
 on the settings screen did nothing — two places, and the visible one ignored.

@@ -116,6 +116,20 @@ final class TenantSettingsCacheIsolationTest extends TestCase
         $this->assertSame([['de', 11], ['fr', 22], ['de', 11]], $seen);
     }
 
+    public function test_the_outer_instance_is_restored_after_a_switch(): void
+    {
+        $switcher = $this->app->make(TenantSwitcher::class);
+
+        $switcher->runForTenant($this->tenant('a'), function () use ($switcher): void {
+            $outer = $this->app->make(TenantSettings::class);
+
+            $inner = $switcher->runForTenant($this->tenant('b'), fn (): TenantSettings => $this->app->make(TenantSettings::class));
+
+            $this->assertNotSame($outer, $inner);
+            $this->assertSame($outer, $this->app->make(TenantSettings::class));
+        });
+    }
+
     public function test_settings_bound_before_a_switch_stay_bound_through_it(): void
     {
         // Built once before the fake replaces it, as a test's setUp may do.
