@@ -10,13 +10,13 @@ optional one, built outside Core first.
 Goal: a package outside Core can be a channel. Done when: a fixture connector, installed through Composer,
 is found and validated by `platform:update` and registers a channel type whose sender Core reaches.
 
-- [ ] Connector manifest and discovery — `type: fapost-connector` and its `extra.fapost` schema in
+- [ ] `connector-manifest-discovery` — Connector manifest and discovery: `type: fapost-connector` and its `extra.fapost` schema in
       Foundation's parser; `platform:update` discovers, validates and catalogs connectors beside Solutions,
       with no per-tenant activation; a connector boots for the whole installation
-- [ ] Connector registrar with a channel surface — sender, adapter and ingress spec, webhook registrar,
+- [ ] `connector-channel-registrar` — Connector registrar with a channel surface: sender, adapter and ingress spec, webhook registrar,
       media uploader and downloader, translations, public link; a connector's own tenant migrations
       (after: Connector manifest and discovery — the registrar is handed to discovered connectors)
-- [ ] Open channel types — types are strings owned by a registered connector, `ChannelTypeEnum` and
+- [ ] `open-channel-types` — Open channel types: types are strings owned by a registered connector, `ChannelTypeEnum` and
       `PlatformEnum` no longer close the list; ingress specs are published and removed per registered type;
       channels of a type with no connector show as unavailable and `platform:update` names them (after:
       Connector registrar with a channel surface — the registry is filled through it)
@@ -47,9 +47,9 @@ Goal: a channel Core never knew works through the contract alone. Done when: an 
 `fapost/connector-viber` through the overlay talks to a real Viber bot — text, buttons, contact and
 location requests, media — with no Viber code in Core.
 
-- [ ] Body-HMAC ingress signatures — a signature scheme over the raw body in `IngressSpec`, executed by PHP
+- [ ] `ingress-hmac-body-signature` — Body-HMAC ingress signatures: a signature scheme over the raw body in `IngressSpec`, executed by PHP
       and the Go gateway, with shared golden fixtures
-- [ ] Public media links — Core hands a connector a signed, expiring public URL for a media asset, for
+- [ ] `public-media-links` — Public media links: Core hands a connector a signed, expiring public URL for a media asset, for
       channels that send media by URL; the media uploader becomes optional
 - [ ] Viber connector package — `fapost/connector-viber`: ingress and `conversation_started`, webhook
       registration, text, keyboards, contact and location requests, media by URL, settings schema,
@@ -83,9 +83,9 @@ data change.
 
 ## Waves
 
-1. Connector manifest and discovery; Body-HMAC ingress signatures; Public media links
-2. Connector registrar with a channel surface
-3. Open channel types; Channel settings from the connector's schema; Neutral outgoing message
+1. connector-manifest-discovery; ingress-hmac-body-signature; public-media-links
+2. connector-channel-registrar
+3. open-channel-types; Channel settings from the connector's schema; Neutral outgoing message
 4. Telegram on the registrar; Capability-aware validation; Viber connector package
 5. Viber end to end
 6. Telegram connector package
