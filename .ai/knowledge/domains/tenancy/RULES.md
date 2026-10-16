@@ -167,6 +167,10 @@ broken.
   `canCreate()` announces nothing. A record limit also announces after the record that took the last
   place is saved (`RecordLimitWatch::afterSaved()` from the five creation sites, on `afterCommit`, so a
   rolled-back record announces nothing). A new gate calls `LimitAnnouncer`, not the event directly.
+  A per-period unit the operator's meter flagged `approaching` (`UsageDecision::approaching()`) is
+  announced the same way, only from `PeriodQuota`, as `LimitApproaching` (`LimitAnnouncer::approaching()`);
+  the unit is allowed all the same, a fail-open answer carries no flag, and Core sets no threshold of its
+  own and none for records or bytes.
   Only Core's five creation sites call the watch (a Solution's record key gets refusal notices only), and
   two concurrent creates that both count N-2 miss the "filled" notice: accepted imprecision.
   Enforced: `RecordQuotaTest`, `PeriodQuotaTest`, `LimitNotificationTest`; the "only from" part is review only.

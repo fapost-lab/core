@@ -36,6 +36,11 @@ final class FakeUsageMeter implements UsageMeterInterface
         return new self(UsageDecision::refused($limit, $used, 'Limit reached.', $periodEndsAt));
     }
 
+    public static function approaching(int $limit = 10, int $used = 8, ?DateTimeImmutable $periodEndsAt = null): self
+    {
+        return new self(UsageDecision::approaching($limit, $used, $periodEndsAt));
+    }
+
     public static function failing(Throwable $failure): self
     {
         return new self(UsageDecision::allowed(), $failure);

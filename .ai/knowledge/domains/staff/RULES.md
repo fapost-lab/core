@@ -85,6 +85,13 @@ broken.
   `SerializesModels` would restore the `User` outside the tenant. Recipients are active admins with
   status Active, the platform support user excluded (`StaffRecipientResolver::admins()`); the
   recipient's language is `users.locale`: an explicit switch (`LocaleController`) always updates it, sign-in (`RememberUserLocale`) fills it only while empty.
+  `NotifyAdminsOfLimit` also listens to `LimitApproaching` (a per-period limit the operator flagged as
+  close): the warning has its own episode key (`ap{period end}` / `am{Y-m}`, against `p…` / `m…`), so it
+  never silences the notice that the limit is used up in the same period; the same job and the same
+  channels (database + mail, `kind` `limit_approaching`). `SendLimitNoticeJob::$reason` is a plain
+  nullable property, not a promoted one: a job queued by an older release has none and falls back to the
+  reason inferred from `refused`, and the field must never become required while such jobs may be in the
+  queue. The operator is asked with `LimitNoticeReason::Approaching`.
   Enforced: `LimitNotificationTest`, `LimitEpisodeTest`, `RuntimeJobAccessModeTest`.
 - **`LimitNoticeInterface` (Foundation) replaces only the "what to do next" block of the limit
   notification.** It may read the operator's tables and answer in the asked locale; it must not repeat

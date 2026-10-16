@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Staff\Notifications;
 
 use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Support\LimitNoticeFormat;
 use App\Domains\Tenancy\Events\LimitReached;
 use Fapost\Foundation\Quota\DTO\LimitNotice;
 use Fapost\Foundation\Quota\Enums\LimitKind;
@@ -119,36 +120,16 @@ final class LimitReachedNotification extends Notification
      */
     private function action(): array
     {
-        if (null !== $this->notice && null !== $this->notice->actionLabel && null !== $this->notice->actionUrl) {
-            return ['label' => $this->notice->actionLabel, 'url' => $this->notice->actionUrl];
-        }
-
-        return ['label' => __('limits.open_panel'), 'url' => $this->panelUrl];
+        return LimitNoticeFormat::action($this->notice, $this->panelUrl);
     }
 
     private function label(): string
     {
-        $translation = 'limits.keys.' . $this->event->key;
-        $label       = __($translation);
-
-        return $label === $translation ? $this->fallbackLabel : $label;
+        return LimitNoticeFormat::label($this->event->key, $this->fallbackLabel);
     }
 
     private function amount(int $value): string
     {
-        if (LimitKind::Bytes !== $this->event->kind) {
-            return number_format($value, 0, '.', ' ');
-        }
-
-        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
-        $size  = (float) $value;
-        $unit  = 0;
-
-        while ($size >= 1024 && $unit < count($units) - 1) {
-            $size /= 1024;
-            ++$unit;
-        }
-
-        return mb_rtrim(mb_rtrim(number_format($size, 1, '.', ' '), '0'), '.') . ' ' . $units[$unit];
+        return LimitNoticeFormat::amount($value, $this->event->kind);
     }
 }

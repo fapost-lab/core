@@ -23,6 +23,7 @@ use Fapost\Foundation\Quota\Contracts\LimitNoticeInterface;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
 use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Quota\DTO\LimitNotice;
+use Fapost\Foundation\Quota\DTO\UsageDecision;
 use Fapost\Foundation\Quota\Enums\LimitNoticeReason;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Contracts\Bus\Dispatcher as BusDispatcher;
@@ -299,6 +300,196 @@ final class LimitNotificationTest extends FeatureTestCase
         $this->assertSame(['reached'], $reasons);
     }
 
+    public function test_a_warning_notifies_every_active_admin_once_by_database_and_mail(): void
+    {
+        $first  = $this->admin();
+        $second = $this->admin();
+        $this->admin(['is_active' => false]);
+        $this->userWithRole(RoleEnum::Analyst);
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::approaching(500, 400, new DateTimeImmutable('2030-11-05 00:00:00 UTC')));
+
+        $this->consumeOutbound();
+
+        $this->assertSame(1, $this->notificationsOf($first));
+        $this->assertSame(1, $this->notificationsOf($second));
+        $this->assertSame(2, DB::table('notifications')->count());
+
+        $data = $this->storedNotification($first);
+        $this->assertSame('Limit almost used up: Outbound messages', $data['title']);
+        $this->assertSame('limit_approaching', $data['kind']);
+        $this->assertSame('outbound_messages', $data['key']);
+        $this->assertSame(500, $data['limit']);
+        $this->assertSame(400, $data['used']);
+        $this->assertStringContainsString('Used 400 of 500 (80%) in the current period.', $data['body']);
+        $this->assertStringContainsString('The period ends on November 5, 2030.', $data['body']);
+        $this->assertStringContainsString('this work will be turned away until the limit is raised or a new period starts', $data['body']);
+        $this->assertStringContainsString('To raise the limit, contact the platform administrator.', $data['body']);
+        $this->assertSame('Open the panel', $data['action']['label']);
+
+        $recipients = array_map(static fn ($message): string => $message->getOriginalMessage()->getTo()[0]->getAddress(), $this->sentMail());
+        $this->assertEqualsCanonicalizing([$first->email, $second->email], $recipients);
+        $this->assertStringContainsString('Limit almost used up: Outbound messages', $this->sentMail()[0]->getOriginalMessage()->getSubject());
+    }
+
+    public function test_the_percentage_is_rounded_down(): void
+    {
+        $admin = $this->admin();
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::approaching(1000, 799));
+
+        $this->consumeOutbound();
+
+        $this->assertStringContainsString('Used 799 of 1 000 (79%)', $this->storedNotification($admin)['body']);
+    }
+
+    public function test_a_warning_without_a_period_says_nothing_about_its_end_and_is_sent_once_per_month(): void
+    {
+        $admin = $this->admin();
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::approaching(500, 400));
+
+        $this->consumeOutbound();
+        $this->consumeOutbound();
+
+        $this->assertSame(1, $this->notificationsOf($admin));
+        $this->assertStringNotContainsString('The period ends', $this->storedNotification($admin)['body']);
+    }
+
+    public function test_a_second_flagged_decision_in_the_same_period_sends_nothing_and_queues_nothing(): void
+    {
+        $admin = $this->admin();
+        $end   = new DateTimeImmutable('+10 days');
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::approaching(500, 400, $end));
+        $this->consumeOutbound();
+
+        Queue::fake();
+        $this->consumeOutbound();
+
+        Queue::assertNothingPushed();
+        $this->assertSame(1, $this->notificationsOf($admin));
+        $this->assertCount(1, $this->sentMail());
+    }
+
+    public function test_a_flagged_decision_in_the_next_period_warns_again(): void
+    {
+        $admin = $this->admin();
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::approaching(500, 400, new DateTimeImmutable('+10 days')));
+        $this->consumeOutbound();
+
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::approaching(500, 400, new DateTimeImmutable('+40 days')));
+        $this->consumeOutbound();
+
+        $this->assertSame(2, $this->notificationsOf($admin));
+    }
+
+    public function test_the_notice_that_the_limit_is_used_up_follows_a_warning_in_the_same_period(): void
+    {
+        $admin = $this->admin();
+        $end   = new DateTimeImmutable('+10 days');
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::approaching(500, 400, $end));
+        $this->consumeOutbound();
+
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::denying(500, 500, $end));
+        $this->consumeOutbound();
+        $this->consumeOutbound();
+
+        $kinds = DB::table('notifications')->where('notifiable_id', $admin->getKey())->get()
+            ->map(static fn ($row): string => json_decode((string) $row->data, true, 512, JSON_THROW_ON_ERROR)['kind'])
+            ->all();
+
+        $this->assertEqualsCanonicalizing(['limit_approaching', 'limit_reached'], $kinds);
+    }
+
+    public function test_an_allowed_decision_without_the_flag_warns_nobody(): void
+    {
+        $this->admin();
+        Queue::fake();
+        $this->app->instance(UsageMeterInterface::class, new FakeUsageMeter(UsageDecision::allowed(500, 450)));
+
+        $this->consumeOutbound();
+
+        Queue::assertNothingPushed();
+        $this->assertSame(0, DB::table('notifications')->count());
+    }
+
+    public function test_the_warning_follows_the_language_of_each_recipient(): void
+    {
+        $russian   = $this->admin(['locale' => 'ru']);
+        $ukrainian = $this->admin(['locale' => 'uk']);
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::approaching(500, 400, new DateTimeImmutable('2030-11-05 00:00:00 UTC')));
+
+        $this->consumeOutbound();
+
+        $ru = $this->storedNotification($russian);
+        $uk = $this->storedNotification($ukrainian);
+        $this->assertSame('Лимит почти исчерпан: Исходящие сообщения', $ru['title']);
+        $this->assertStringContainsString('Использовано 400 из 500 (80%) в текущем периоде.', $ru['body']);
+        $this->assertStringContainsString('Период заканчивается 5 ноября 2030', $ru['body']);
+        $this->assertStringContainsString('Чтобы поднять лимит, обратитесь к администратору платформы.', $ru['body']);
+        $this->assertSame('Ліміт майже вичерпано: Вихідні повідомлення', $uk['title']);
+        $this->assertStringContainsString('Використано 400 з 500 (80%) у поточному періоді.', $uk['body']);
+    }
+
+    public function test_the_operator_is_asked_for_the_approaching_wording_and_its_text_replaces_the_block(): void
+    {
+        $admin = $this->admin();
+        $asked = [];
+        $this->app->instance(LimitNoticeInterface::class, new class ($asked) implements LimitNoticeInterface {
+            /** @param list<string> $asked */
+            public function __construct(public array &$asked)
+            {
+            }
+
+            public function noticeFor(string $tenantId, string $key, string $locale, LimitNoticeReason $reason): LimitNotice
+            {
+                $this->asked[] = $tenantId . ':' . $key . ':' . $locale . ':' . $reason->value;
+
+                return new LimitNotice('Move to the Pro plan.', 'Plans', 'https://shell.example/plans');
+            }
+        });
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::approaching(500, 400, new DateTimeImmutable('+10 days')));
+
+        $this->consumeOutbound();
+
+        $data = $this->storedNotification($admin);
+        $this->assertStringContainsString('Move to the Pro plan.', $data['body']);
+        $this->assertStringNotContainsString('contact the platform administrator', $data['body']);
+        $this->assertSame(['label' => 'Plans', 'url' => 'https://shell.example/plans'], $data['action']);
+        $this->assertSame([self::TENANT_ID . ':outbound_messages:en:approaching'], $asked);
+    }
+
+    public function test_a_job_queued_before_the_reason_field_existed_is_still_handled(): void
+    {
+        $admin = $this->admin();
+        $asked = [];
+        $this->app->instance(LimitNoticeInterface::class, new class ($asked) implements LimitNoticeInterface {
+            /** @param list<string> $asked */
+            public function __construct(public array &$asked)
+            {
+            }
+
+            public function noticeFor(string $tenantId, string $key, string $locale, LimitNoticeReason $reason): ?LimitNotice
+            {
+                $this->asked[] = $reason->value;
+
+                return null;
+            }
+        });
+
+        $at      = (new DateTimeImmutable())->format(DATE_ATOM);
+        $refused = $this->legacyJob(new SendLimitNoticeJob(self::TENANT_ID, 'assistants', 'records', 2, 2, 'record_creation', $at, null, 'limit_notice:t:assistants:l2'));
+        $filled  = $this->legacyJob(new SendLimitNoticeJob(self::TENANT_ID, 'assistants', 'records', 3, 3, null, $at, null, 'limit_notice:t:assistants:l3'));
+
+        $this->assertNull($refused->reason);
+        $this->app->call([$refused, 'handle']);
+        $this->app->call([$filled, 'handle']);
+
+        $this->assertSame(['refused', 'reached'], $asked);
+        $this->assertSame(2, $this->notificationsOf($admin));
+        $this->assertSame(
+            ['limit_reached', 'limit_reached'],
+            DB::table('notifications')->get()->map(static fn ($row): string => json_decode((string) $row->data, true, 512, JSON_THROW_ON_ERROR)['kind'])->all(),
+        );
+    }
+
     public function test_an_operator_that_throws_is_reported_and_core_writes_its_own_text(): void
     {
         $reported = [];
@@ -401,6 +592,22 @@ final class LimitNotificationTest extends FeatureTestCase
         $job = new SendLimitNoticeJob(self::TENANT_ID, 'assistants', 'records', 1, 1, null, (new DateTimeImmutable())->format(DATE_ATOM), null, 'k');
 
         $this->assertSame('messaging.system', $job->queue);
+    }
+
+    /**
+     * The job as an older release serialized it: without the `reason` property.
+     */
+    private function legacyJob(SendLimitNoticeJob $job): SendLimitNoticeJob
+    {
+        unset($job->reason);
+
+        $payload = serialize($job);
+        $this->assertStringNotContainsString('"reason"', $payload);
+
+        $restored = unserialize($payload);
+        $this->assertInstanceOf(SendLimitNoticeJob::class, $restored);
+
+        return $restored;
     }
 
     private function consumeOutbound(): void

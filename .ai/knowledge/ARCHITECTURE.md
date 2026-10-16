@@ -60,7 +60,7 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   Foundation, a primitive with no domain meaning into Support, anything with one domain's meaning
   stays in Core (ADR-05).
 - **The extension packages are separate repositories.** Core consumes them through VCS
-  repositories (`fapost/foundation ^0.17`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
+  repositories (`fapost/foundation ^0.18`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
   symlinked over `vendor/` by `composer dev:link` (`tools/dev-link-packages.php`). The console kit is
   one too: the npm package `@fapost/ui` (`fapost-lab/ui`), checked out in `packages/fapost-ui` and
   linked over `node_modules/` by `npm run dev:link` (`tools/dev-link-npm.mjs`); it depends on nothing

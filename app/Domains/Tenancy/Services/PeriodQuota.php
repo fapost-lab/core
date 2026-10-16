@@ -25,6 +25,9 @@ use Throwable;
  * inside a tenant switch) and fails open: an operator outage (its database, its cache, a bug) must
  * not silence every tenant's bots at once, so an answer that cannot be had is reported and counts
  * as allowed, as in {@see TenantAccessStates}.
+ *
+ * An allowed decision the operator flagged as approaching is announced through
+ * {@see LimitAnnouncer::approaching()}; the unit is allowed all the same.
  */
 final readonly class PeriodQuota
 {
@@ -85,6 +88,9 @@ final readonly class PeriodQuota
                     $decision->periodEndsAt,
                 );
             }
+        } elseif ($decision->approaching && null !== $decision->limit && null !== $decision->used) {
+            // The operator flags at most once per period; the flag is a plain property read on the hot path.
+            $this->announcer->approaching($key, $decision->limit, $decision->used, $decision->periodEndsAt);
         }
 
         return $decision;
