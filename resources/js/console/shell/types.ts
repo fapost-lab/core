@@ -89,6 +89,8 @@ export interface ShellConfig {
     logoutUrl: string
     supportLeaveUrl: string
     locales: string[]
+    /** The installation's name (`app.name`), the holder of the copyright in the footer. */
+    appName: string
 }
 
 /** The notification bell (see `HandleInertiaRequests::notifications()`); the list loads when it opens. */
@@ -161,6 +163,7 @@ export interface ConsoleTranslations {
     }
     applications: ApplicationsTranslations
     support: { banner: string; leave: string }
+    footer: { rights: string; powered_by: string }
     dashboard: Record<string, string | Record<string, string>>
     /** The close button of the kit's dialogs and sheets. */
     close: string
