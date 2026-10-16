@@ -16,10 +16,13 @@ use Spatie\LaravelSettings\Exceptions\MissingSettings;
  * life of the scope (a request or a job). Bound `scoped`, never as a singleton: a long-lived worker must not
  * carry one job's answer into the next, or a change in Tenant settings would wait for a restart.
  *
- * The memo is keyed by tenant id rather than leaning on the scoped {@see TenantSettings} instance, because
- * `TenantSwitcher::runForTenant()` does not drop scoped instances: that object may belong to another tenant
- * served earlier in the same scope. A fresh `new TenantSettings()` loads lazily from the connection that is
- * current, which is the tenant's own, so it is deliberately not resolved from the container.
+ * The memo is keyed by tenant id, and the settings are read from a fresh `new TenantSettings()` rather than the
+ * scoped instance. `TenantSwitcher::runForTenant()` hides the scoped instance the container built for the length
+ * of a switch and restores it on exit, so inside a switch the container would answer a fresh one too. The fresh
+ * build stays for another reason: the "stored row is absent" check below reads a flag that is only valid right
+ * after a load, and a container instance loaded earlier (lazily, on first property access, possibly before the
+ * tenant's row changed) would not reload. A fresh instance loads lazily from the connection that is current,
+ * which is the tenant's own.
  *
  * The configured value is only a platform fallback: it applies outside a tenant and to a tenant whose row is
  * absent or unusable; provisioning stores 30 in every tenant schema (ADR `adr-20261016-runtime-settings-in-database`).
