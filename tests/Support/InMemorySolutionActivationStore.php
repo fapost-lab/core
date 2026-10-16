@@ -50,6 +50,11 @@ final class InMemorySolutionActivationStore implements SolutionActivationStoreIn
         return [];
     }
 
+    public function latestEvents(): array
+    {
+        return [];
+    }
+
     public function change(string $solutionId, SolutionActivationStatus $target, ActivationActor $actor, ?string $reason): ActivationChange
     {
         $tenantId = ($this->tenantContext)()->get()->getId();

@@ -92,6 +92,16 @@ final class SolutionUiPublicationTest extends TestCase
         $this->assertDirectoryDoesNotExist(public_path('solutions'));
     }
 
+    public function test_a_bundle_built_for_another_kit_is_a_warning_not_a_failure(): void
+    {
+        $package = $this->copyPackage(static fn (array $ui): array => ['kit' => '^2.0'] + $ui);
+        $this->installShowcase(publish: false, package: $package);
+
+        $this->artisan('platform:update', ['--validate-only' => true])
+            ->expectsOutputToContain('showcase: console UI is built for kit ^2.0, this platform ships')
+            ->assertExitCode(0);
+    }
+
     public function test_a_broken_description_stops_the_update_before_migrations(): void
     {
         $package = $this->copyPackage(static fn (array $ui): array => ['kit' => '', 'x-ok' => 1, 'extra' => true] + $ui);
