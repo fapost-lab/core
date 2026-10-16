@@ -31,25 +31,19 @@ final class FakeVendor
      */
     public static function solutionComposer(array $fapost = [], array $root = []): array
     {
-        $composer = json_decode((string) file_get_contents(dirname(__DIR__) . '/Fixtures/Solution/packages/feedback/composer.json'), true);
+        return self::adjust(dirname(__DIR__) . '/Fixtures/Solution/packages/feedback/composer.json', $fapost, $root);
+    }
 
-        foreach ($fapost as $key => $value) {
-            if (null === $value) {
-                unset($composer['extra']['fapost'][$key]);
-            } else {
-                $composer['extra']['fapost'][$key] = $value;
-            }
-        }
-
-        foreach ($root as $key => $value) {
-            if (null === $value) {
-                unset($composer[$key]);
-            } else {
-                $composer[$key] = $value;
-            }
-        }
-
-        return $composer;
+    /**
+     * composer.json of the fixture connector (tests/Fixtures/Connectors/Echo/package), with the changes given.
+     *
+     * @param  array<string, mixed>  $fapost  replaces keys of extra.fapost; a null value removes the key
+     * @param  array<string, mixed>  $root  replaces top-level keys; a null value removes the key
+     * @return array<string, mixed>
+     */
+    public static function connectorComposer(array $fapost = [], array $root = []): array
+    {
+        return self::adjust(dirname(__DIR__) . '/Fixtures/Connectors/Echo/package/composer.json', $fapost, $root);
     }
 
     /**
@@ -117,5 +111,33 @@ final class FakeVendor
     public function cleanup(): void
     {
         (new Filesystem())->deleteDirectory(dirname($this->path));
+    }
+
+    /**
+     * @param  array<string, mixed>  $fapost
+     * @param  array<string, mixed>  $root
+     * @return array<string, mixed>
+     */
+    private static function adjust(string $file, array $fapost, array $root): array
+    {
+        $composer = json_decode((string) file_get_contents($file), true);
+
+        foreach ($fapost as $key => $value) {
+            if (null === $value) {
+                unset($composer['extra']['fapost'][$key]);
+            } else {
+                $composer['extra']['fapost'][$key] = $value;
+            }
+        }
+
+        foreach ($root as $key => $value) {
+            if (null === $value) {
+                unset($composer[$key]);
+            } else {
+                $composer[$key] = $value;
+            }
+        }
+
+        return $composer;
     }
 }

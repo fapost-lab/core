@@ -23,8 +23,13 @@ Work through these in order. The first one that matches is your answer.
     continue.
   </Step>
 
+  <Step title="Does it connect a messaging channel?">
+    A package that lets assistants talk over a messenger Core does not ship —
+    receiving its webhooks, sending through its API — is a **Connector**.
+  </Step>
+
   <Step title="Does it register runtime behaviour?">
-    Node handlers, message transports, artisan commands, routes, schedules — these
+    Node handlers, artisan commands, routes, schedules — these
     are a **Plugin**. A Plugin extends what Core can do without adding a product
     module of its own.
   </Step>

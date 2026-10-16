@@ -10,7 +10,7 @@ optional one, built outside Core first.
 Goal: a package outside Core can be a channel. Done when: a fixture connector, installed through Composer,
 is found and validated by `platform:update` and registers a channel type whose sender Core reaches.
 
-- [ ] `connector-manifest-discovery` — Connector manifest and discovery: `type: fapost-connector` and its `extra.fapost` schema in
+- [x] `connector-manifest-discovery` — Connector manifest and discovery: `type: fapost-connector` and its `extra.fapost` schema in
       Foundation's parser; `platform:update` discovers, validates and catalogs connectors beside Solutions,
       with no per-tenant activation; a connector boots for the whole installation
 - [ ] `connector-channel-registrar` — Connector registrar with a channel surface: sender, adapter and ingress spec, webhook registrar,

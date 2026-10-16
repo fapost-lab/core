@@ -42,6 +42,20 @@ final class InstalledPackagesReaderTest extends TestCase
         $this->assertSame(['acme/fapost-feedback', 'acme/typo'], $names);
     }
 
+    public function test_it_picks_out_a_connector_by_its_type(): void
+    {
+        $this->vendor
+            ->package(FakeVendor::connectorComposer(root: ['extra' => null]))
+            ->package(['name' => 'acme/lib', 'type' => 'library'])
+            ->write();
+
+        $packages = (new InstalledPackagesReader($this->vendor->path))->candidates();
+
+        $this->assertCount(1, $packages);
+        $this->assertSame('acme/fapost-connector-echo', $packages[0]->name);
+        $this->assertSame('fapost-connector', $packages[0]->type);
+    }
+
     public function test_it_reads_the_package_version_type_and_manifest(): void
     {
         $this->vendor->package(FakeVendor::solutionComposer(), '1.2.0')->write();
