@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Tenancy;
 
 use App\Domains\Tenancy\Enums\RefusedWork;
+use App\Domains\Tenancy\Events\LimitApproaching;
 use App\Domains\Tenancy\Events\LimitReached;
 use App\Domains\Tenancy\Services\LimitAnnouncer;
 use App\Domains\Tenancy\Services\LimitRegistry;
@@ -16,6 +17,7 @@ use App\Providers\DomainServiceProvider;
 use DateTimeImmutable;
 use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
+use Fapost\Foundation\Quota\DTO\UsageDecision;
 use Fapost\Foundation\Quota\Enums\LimitKind;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -154,6 +156,46 @@ final class PeriodQuotaTest extends TestCase
         $this->quota(FakeUsageMeter::failing(new RuntimeException('down')))->consume('visits', 'u', new DateTimeImmutable());
 
         Event::assertNotDispatched(LimitReached::class);
+    }
+
+    public function test_a_flagged_unit_announces_the_approaching_limit_and_is_allowed(): void
+    {
+        Event::fake([LimitReached::class, LimitApproaching::class]);
+        $end = new DateTimeImmutable('2026-11-01T00:00:00+00:00');
+
+        $decision = $this->quota(FakeUsageMeter::approaching(10, 8, $end))->consume('visits', 'u', new DateTimeImmutable());
+
+        $this->assertTrue($decision->allowed);
+        Event::assertNotDispatched(LimitReached::class);
+        Event::assertDispatchedTimes(LimitApproaching::class, 1);
+        Event::assertDispatched(LimitApproaching::class, static fn (LimitApproaching $event): bool => self::TENANT_ID === $event->tenantId
+            && 'visits' === $event->key
+            && 10 === $event->limit
+            && 8 === $event->used
+            && $end === $event->periodEndsAt);
+    }
+
+    public function test_an_unflagged_allowed_unit_does_not_announce_an_approaching_limit(): void
+    {
+        Event::fake([LimitApproaching::class]);
+
+        $this->quota(new FakeUsageMeter(UsageDecision::allowed(10, 9)))->consume('visits', 'u', new DateTimeImmutable());
+        $this->quota(FakeUsageMeter::failing(new RuntimeException('down')))->consume('visits', 'u', new DateTimeImmutable());
+
+        Event::assertNotDispatched(LimitApproaching::class);
+    }
+
+    public function test_a_failing_listener_does_not_change_an_approaching_decision(): void
+    {
+        $this->app->make(ExceptionHandler::class)->reportable(static fn (RuntimeException $e): bool => false);
+        $this->app->make(Dispatcher::class)->listen(LimitApproaching::class, static function (): never {
+            throw new RuntimeException('listener is down');
+        });
+
+        $decision = $this->quota(FakeUsageMeter::approaching(10, 8))->consume('visits', 'u', new DateTimeImmutable());
+
+        $this->assertTrue($decision->allowed);
+        $this->assertTrue($decision->approaching);
     }
 
     public function test_a_failing_listener_does_not_change_the_refusal(): void

@@ -38,6 +38,13 @@ return [
         'bytes'      => 'New files are not stored until the limit is raised or files are deleted.',
     ],
 
+    'approaching' => [
+        'title'       => 'Limit almost used up: :limit',
+        'usage'       => 'Used :used of :limit (:percent%) in the current period.',
+        'period_ends' => 'The period ends on :date.',
+        'consequence' => 'Once the limit is used up, this work will be turned away until the limit is raised or a new period starts.',
+    ],
+
     'who_to_ask' => 'To raise the limit, contact the platform administrator.',
 
     'open_panel' => 'Open the panel',

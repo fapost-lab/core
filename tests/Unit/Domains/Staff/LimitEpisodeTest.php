@@ -6,6 +6,7 @@ namespace Tests\Unit\Domains\Staff;
 
 use App\Domains\Staff\Support\LimitEpisode;
 use App\Domains\Tenancy\Enums\RefusedWork;
+use App\Domains\Tenancy\Events\LimitApproaching;
 use App\Domains\Tenancy\Events\LimitReached;
 use Carbon\CarbonImmutable;
 use DateTimeImmutable;
@@ -89,6 +90,31 @@ final class LimitEpisodeTest extends TestCase
         $other = LimitEpisode::of(new LimitReached('01k99999999999999999999999', 'assistants', LimitKind::Records, 3, 3, null, $at));
 
         $this->assertNotSame($mine->cacheKey, $other->cacheKey);
+    }
+
+    public function test_a_warning_has_its_own_key_in_the_same_period_as_a_refusal(): void
+    {
+        $at  = new DateTimeImmutable('2026-10-10 12:00:00 UTC');
+        $end = new DateTimeImmutable('2026-11-05 00:00:00 UTC');
+
+        $refusal = LimitEpisode::of($this->event(LimitKind::PerPeriod, 500, $at, $end));
+        $warning = LimitEpisode::of(new LimitApproaching(self::TENANT, 'assistants', 500, 400, $at, $end));
+        $later   = LimitEpisode::of(new LimitApproaching(self::TENANT, 'assistants', 500, 410, $at->modify('+3 days'), $end));
+
+        $this->assertSame('limit_notice:' . self::TENANT . ':assistants:ap' . $end->getTimestamp(), $warning->cacheKey);
+        $this->assertNotSame($refusal->cacheKey, $warning->cacheKey);
+        $this->assertSame($warning->cacheKey, $later->cacheKey);
+        $this->assertEquals($refusal->expiresAt, $warning->expiresAt);
+    }
+
+    public function test_a_warning_without_a_period_is_the_calendar_month_under_its_own_prefix(): void
+    {
+        $at      = new DateTimeImmutable('2026-10-31 23:30:00 UTC');
+        $refusal = LimitEpisode::of($this->event(LimitKind::PerPeriod, 500, $at));
+        $warning = LimitEpisode::of(new LimitApproaching(self::TENANT, 'assistants', 500, 400, $at));
+
+        $this->assertSame('limit_notice:' . self::TENANT . ':assistants:am2026-10', $warning->cacheKey);
+        $this->assertNotSame($refusal->cacheKey, $warning->cacheKey);
     }
 
     private function event(LimitKind $kind, int $limit, DateTimeImmutable $at, ?DateTimeImmutable $periodEndsAt = null): LimitReached

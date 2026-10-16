@@ -6,13 +6,16 @@ namespace App\Domains\Staff\Listeners;
 
 use App\Domains\Staff\Jobs\SendLimitNoticeJob;
 use App\Domains\Staff\Support\LimitEpisode;
+use App\Domains\Tenancy\Events\LimitApproaching;
 use App\Domains\Tenancy\Events\LimitReached;
 use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Contracts\Cache\Repository;
 use Throwable;
 
 /**
- * Starts the notification of a tenant's admins about a limit, once per limit and episode.
+ * Starts the notification of a tenant's admins about a limit, once per limit and episode: that it
+ * refused work or was filled ({@see LimitReached}), or that it is close to being used up
+ * ({@see LimitApproaching}). The two have separate episodes.
  *
  * Runs synchronously on the path that was just refused work, so it does one atomic `add` on the cache
  * and, only for the first refusal of an episode, queues {@see SendLimitNoticeJob}. It never throws: a
@@ -26,7 +29,7 @@ final readonly class NotifyAdminsOfLimit
     ) {
     }
 
-    public function handle(LimitReached $event): void
+    public function handle(LimitReached|LimitApproaching $event): void
     {
         $episode = null;
 
