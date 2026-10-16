@@ -8,7 +8,6 @@ use App\Domains\Assistant\Contracts\AssistantRepositoryInterface;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Contracts\ContactServiceInterface;
-use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Contact\Services\InboundContactGate;
 use App\Domains\Conversation\Capture\ConversationCaptureFactory;
 use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
@@ -19,11 +18,13 @@ use App\Domains\Tenancy\Queue\StoppedTenantAction;
 use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use App\Domains\Webhook\Exceptions\AdapterNotFoundException;
 use App\Domains\Webhook\Services\ChannelAdapterResolver;
 use Carbon\CarbonImmutable;
 use Fapost\Foundation\DTO\InboundWebhookPayload;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Webhook ingress job. Performs only transport-level work and then hands
@@ -32,7 +33,8 @@ use Illuminate\Foundation\Queue\Queueable;
  *
  * Execution order (must be strictly preserved):
  *   1. Switch to tenant schema.
- *   2. Normalize raw payload → IncomingMessage via channel adapter.
+ *   2. Normalize raw payload → IncomingMessage via channel adapter; no adapter for the type ends the job (logged,
+ *      not retried).
  *   3. Resolve the assistant.
  *   4. Ask the active-contact gate; a refused sender is recorded and the job ends
  *      before anything about them is stored.
@@ -93,8 +95,22 @@ final class IncomingMessageJob implements ShouldQueue, TenantAccessGatedJob
                 $captureFactory,
                 $contactGate,
             ): void {
-                $platform       = PlatformEnum::from($this->payload->platform);
-                $adapter        = $adapterResolver->resolve($platform);
+                $platform = $this->payload->platform;
+
+                // The channel's integration may be gone since the webhook was accepted (a removed connector): the
+                // message is dropped, and a retry would fail the same way.
+                try {
+                    $adapter = $adapterResolver->resolve($platform);
+                } catch (AdapterNotFoundException $exception) {
+                    Log::warning('Inbound message dropped: no integration serves the channel type.', [
+                        'tenant_id'  => $this->payload->tenantId,
+                        'channel_id' => $this->payload->channelId,
+                        'platform'   => $platform,
+                    ]);
+
+                    return;
+                }
+
                 $inboundMessage = $adapter->normalize($this->payload->rawPayload);
 
                 $assistant = $assistants->findById($this->payload->assistantId);

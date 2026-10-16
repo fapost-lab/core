@@ -17,6 +17,23 @@ use Fapost\Foundation\Messaging\ProviderSenderInterface;
 interface ChannelRegistryInterface
 {
     /**
+     * Every channel type that has an integration: the built-in ones, then the connectors'.
+     *
+     * @return list<string>
+     */
+    public function types(): array;
+
+    /**
+     * Whether an integration serves the type. A channel row may hold a type that none serves any more.
+     */
+    public function has(string $channelType): bool;
+
+    /**
+     * Name of the type for people: a built-in type's translation, or the name of the connector that owns it.
+     */
+    public function label(string $channelType): string;
+
+    /**
      * Return the declarative integration definition for the given channel type.
      */
     public function definition(ChannelTypeEnum|string $channelType): ?ChannelIntegrationDefinition;

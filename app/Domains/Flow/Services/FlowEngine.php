@@ -338,7 +338,7 @@ final readonly class FlowEngine implements FlowEngineInterface
                 throw HandlerNotFoundException::forTypeAndVersion($type, $version, $exception);
             }
 
-            $platform         = $incomingStep?->platform ?? $contact->platform->value;
+            $platform         = $incomingStep?->platform ?? $contact->platform;
             $resolvedLanguage = $this->languageResolver->resolve($contact, $session);
 
             $idempotencyKey = null !== $incomingStep

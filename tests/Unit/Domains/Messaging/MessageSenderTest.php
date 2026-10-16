@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Messaging;
 
+use App\Domains\Channels\ChannelRegistry;
+use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Conversation\Capture\ConversationCaptureFactory;
 use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
@@ -16,6 +18,7 @@ use App\Domains\Messaging\TenantMessagingRateLimit;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Carbon\CarbonImmutable;
 use Closure;
+use Fapost\Foundation\Connector\ConnectorChannel;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessagePayload;
 use Fapost\Foundation\Messaging\OutboundMessage;
@@ -26,6 +29,8 @@ use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use Illuminate\Redis\Connections\Connection;
 use Mockery;
 use Mockery\MockInterface;
+use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
+use Tests\Fixtures\Connectors\Echo\EchoSender;
 use Tests\Support\FakeUsageMeter;
 use Tests\Support\UsageGates;
 use Tests\TestCase;
@@ -100,6 +105,40 @@ final class MessageSenderTest extends TestCase
         $this->assertTrue($result->sent);
         $this->assertSame('provider-message-1', $result->providerMessageId);
         $this->assertSame(1, $provider->calls);
+    }
+
+    public function test_a_connector_channel_type_is_delivered_by_the_connectors_own_sender(): void
+    {
+        $connection = $this->mock(Connection::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('set')->once()->with('msg:sent:idem-echo', 'processing', 'EX', 86400, 'NX')->andReturn(true);
+            $mock->shouldReceive('pipeline')->once()->andReturn([1, true]);
+            $mock->shouldReceive('set')->once()->with('msg:sent:idem-echo', '1', 'EX', 86400);
+        });
+
+        $channels = new ConnectorChannels();
+        $channels->add(new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class), 'echo', 'Echo');
+
+        $sender = new MessageSender(
+            new ChannelRegistry([], $this->app, $channels),
+            $this->redisFactory($connection),
+            $this->rateLimit(),
+            $this->nullConversationLogger(),
+            new ConversationCaptureFactory(),
+            UsageGates::gate(),
+        );
+
+        $result = $sender->send(new OutboundMessage(
+            idempotencyKey: 'idem-echo',
+            tenantId: 'tenant-1',
+            channelId: 'channel-1',
+            channelType: 'echo',
+            transportToken: 'token',
+            chatId: 'chat-1',
+            payload: new MessagePayload(type: 'text', text: 'Hello'),
+        ));
+
+        $this->assertTrue($result->sent);
+        $this->assertSame('echo-1', $result->providerMessageId);
     }
 
     public function test_pipeline_sends_incr_and_expire_for_rate_key(): void

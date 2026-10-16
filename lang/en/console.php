@@ -382,6 +382,7 @@ return [
             'inactive' => 'Only an active channel has a webhook to register.',
         ],
         'bot_pending' => 'Awaiting registration',
+        'unavailable' => 'Unavailable',
         'status'      => [
             'active'   => 'Active',
             'inactive' => 'Inactive',

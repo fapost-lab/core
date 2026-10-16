@@ -79,7 +79,7 @@ final class WebhookController extends Controller
                     schema: $entry->schema,
                     assistantId: $entry->assistantId,
                     channelId: $entry->channelId,
-                    platform: $entry->platform->value,
+                    platform: $entry->platform,
                     rawPayload: $request->json()->all(),
                     idempotencyKey: $idempotencyKey,
                     receivedAt: time(),

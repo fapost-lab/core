@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Channels\Models;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\Casts\ChannelTypeCast;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Enums\ChannelWebhookStatus;
 use App\Domains\Channels\Observers\ChannelObserver;
@@ -25,7 +26,7 @@ use Illuminate\Support\Str;
  * Mutations of `webhook_public_hash` must go through
  * {@see \App\Domains\Channels\Services\ChannelService::rotateWebhookHash()}.
  *
- * @property ChannelTypeEnum     $type
+ * @property string              $type
  * @property-read Assistant|null $assistant
  * @method static Builder<static>|Channel active()
  * @method static \Database\Factories\ChannelFactory factory($count = null, $state = [])
@@ -100,7 +101,7 @@ final class Channel extends Model implements ChannelInterface
 
     public function getType(): string
     {
-        return $this->type->value;
+        return $this->type;
     }
 
     /**
@@ -128,8 +129,8 @@ final class Channel extends Model implements ChannelInterface
     public function publicUsername(): ?string
     {
         $username = match ($this->type) {
-            ChannelTypeEnum::Telegram => $this->telegram_bot_username,
-            ChannelTypeEnum::WhatsApp => null,
+            ChannelTypeEnum::Telegram->value => $this->telegram_bot_username,
+            default                          => null,
         };
 
         return '' === (string)$username ? null : (string)$username;
@@ -155,8 +156,8 @@ final class Channel extends Model implements ChannelInterface
         $username = $this->publicUsername();
 
         return match ($this->type) {
-            ChannelTypeEnum::Telegram => null === $username ? null : 'https://t.me/' . $username,
-            ChannelTypeEnum::WhatsApp => null,
+            ChannelTypeEnum::Telegram->value => null === $username ? null : 'https://t.me/' . $username,
+            default                          => null,
         };
     }
 
@@ -216,7 +217,7 @@ final class Channel extends Model implements ChannelInterface
     protected function casts(): array
     {
         return [
-            'type'              => ChannelTypeEnum::class,
+            'type'              => ChannelTypeCast::class,
             'token'             => 'encrypted',
             'secret_token'      => 'encrypted',
             'config'            => 'array',

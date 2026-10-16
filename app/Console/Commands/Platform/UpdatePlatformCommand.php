@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Console\Commands\Platform;
 
 use App\Console\Platform\PlatformMigratorInterface;
+use App\Console\Platform\UnservedChannelsFinderInterface;
 use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Solution\DTO\ConnectorDiscovery;
@@ -26,6 +27,8 @@ use Illuminate\Console\Command;
  * (`fapost-ui.json`, the files it lists, the components the Solution's PHP declarations name), stops the command before
  * the database, `public/` or the cache is touched. `--validate-only` stops after that check and needs no database,
  * so an extension's CI and a derived image's build can run it.
+ *
+ * After the migrations it warns, per tenant and type, about channels no installed integration serves any more.
  */
 final class UpdatePlatformCommand extends Command
 {
@@ -45,6 +48,7 @@ final class UpdatePlatformCommand extends Command
         PublishedSolutionUi $published,
         SolutionUiCompatibility $compatibility,
         ConnectorChannels $connectorChannels,
+        UnservedChannelsFinderInterface $unserved,
     ): int {
         $all       = $discoverer->discoverAll();
         $discovery = $all->solutions;
@@ -128,6 +132,16 @@ final class UpdatePlatformCommand extends Command
             $this->components->error('Migrations failed. The Solution catalog was not cached; fix the failure and run the update again.');
 
             return self::FAILURE;
+        }
+
+        // Never a refusal: the channels stay, unavailable, and come back when the connector is installed again.
+        foreach ($unserved->find() as $row) {
+            $this->components->warn(sprintf(
+                'Tenant "%s" has %d channel(s) of type "%s", which no installed integration serves; they are unavailable until its connector is installed again.',
+                $row['tenant'],
+                $row['count'],
+                $row['type'],
+            ));
         }
 
         $bundles = $publisher->publish($ui['sources']);

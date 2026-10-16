@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Contact\Models;
 
-use App\Domains\Contact\Enums\PlatformEnum;
+use App\Domains\Channels\Casts\ChannelTypeCast;
 use Database\Factories\ContactFactory;
 use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Fapost\Support\Models\BaseModel;
@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Stores platform-specific identity and arbitrary metadata. Computed attributes can be extended via
  * {@see BaseModel} (e.g. via HR solution).
  *
- * @property PlatformEnum            $platform
+ * @property string                  $platform
  * @property-read \Illuminate\Database\Eloquent\Collection<int, ChannelContact> $channelContacts
  * @property-read int|null           $channel_contacts_count
  * @property-read bool|null          $channel_contacts_exists
@@ -106,7 +106,7 @@ final class Contact extends BaseModel
     protected function casts(): array
     {
         return [
-            'platform'         => PlatformEnum::class,
+            'platform'         => ChannelTypeCast::class,
             'language'         => 'string',
             'is_authenticated' => 'boolean',
             'meta'             => 'array',

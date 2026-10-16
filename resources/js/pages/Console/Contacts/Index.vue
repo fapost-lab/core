@@ -19,7 +19,7 @@ import { rowValue, SolutionActions, useSolutionColumns } from '../../../console/
 import CopyButton from './CopyButton.vue'
 import type { ContactRow, ContactsPageProps } from './types'
 
-defineProps<{
+const props = defineProps<{
   table: { rows: ContactRow[]; meta: TableMeta; state: TableState; defaults: TableDefaults & { perPageOptions: number[] } }
   platforms: { value: string; label: string }[]
   languages: string[]
@@ -46,7 +46,7 @@ const coreColumns = computed<DataTableColumn[]>(() => [
 const { columns, extra } = useSolutionColumns('contacts', coreColumns)
 
 function platformLabel(value: string): string {
-  return t.value.platforms[value] ?? value
+  return t.value.platforms[value] ?? props.platforms.find((option) => option.value === value)?.label ?? value
 }
 
 function label(row: ContactRow): string {

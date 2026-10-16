@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Concerns;
 
+use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Telegram\TelegramWebhookOptions;
@@ -33,8 +34,9 @@ trait PresentsChannels
 
         return [
             'id'                 => (string) $channel->getKey(),
-            'type'               => $channel->type->value,
-            'typeLabel'          => trans($channel->type->labelKey()),
+            'type'               => $channel->type,
+            'typeLabel'          => $this->typeLabel($channel),
+            'available'          => $this->isAvailable($channel),
             'handle'             => $channel->publicHandle(),
             'url'                => $channel->publicUrl(),
             'isActive'           => $channel->is_active,
@@ -54,13 +56,14 @@ trait PresentsChannels
      */
     protected function editableChannel(Channel $channel, string $registerWebhookUrl): array
     {
-        $isTelegram = ChannelTypeEnum::Telegram === $channel->type;
+        $isTelegram = ChannelTypeEnum::Telegram->value === $channel->type;
         $config     = is_array($channel->config) ? $channel->config : [];
 
         return [
             'id'                 => (string) $channel->getKey(),
-            'type'               => $channel->type->value,
-            'typeLabel'          => trans($channel->type->labelKey()),
+            'type'               => $channel->type,
+            'typeLabel'          => $this->typeLabel($channel),
+            'available'          => $this->isAvailable($channel),
             'isActive'           => $channel->is_active,
             'webhook'            => $this->webhookState($channel),
             'webhookAt'          => $channel->webhook_status_at?->toIso8601String(),
@@ -86,11 +89,11 @@ trait PresentsChannels
      */
     protected function channelFormOptions(): array
     {
-        $types = [];
-
-        foreach (ChannelTypeEnum::cases() as $type) {
-            $types[] = ['value' => $type->value, 'label' => trans($type->labelKey())];
-        }
+        $registry = app(ChannelRegistryInterface::class);
+        $types    = array_map(
+            static fn (string $type): array => ['value' => $type, 'label' => $registry->label($type)],
+            $registry->types(),
+        );
 
         $updates = [];
 
@@ -109,6 +112,28 @@ trait PresentsChannels
                 'default' => TelegramWebhookOptions::MAX_CONNECTIONS_DEFAULT,
             ],
         ];
+    }
+
+    /**
+     * Refuses to open or change the settings of a channel whose type nothing serves.
+     */
+    protected function abortIfUnavailable(Channel $channel): void
+    {
+        abort_unless($this->isAvailable($channel), 409, 'The channel type is not available.');
+    }
+
+    /**
+     * Whether an integration still serves the channel's type. A channel of a removed connector is listed, marked, and
+     * only deleted: its settings belong to an integration that is not there to read them.
+     */
+    private function isAvailable(Channel $channel): bool
+    {
+        return app(ChannelRegistryInterface::class)->has($channel->type);
+    }
+
+    private function typeLabel(Channel $channel): string
+    {
+        return app(ChannelRegistryInterface::class)->label($channel->type);
     }
 
     /**

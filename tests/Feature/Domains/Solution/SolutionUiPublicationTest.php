@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Solution;
 
 use App\Console\Platform\PlatformMigratorInterface;
+use App\Console\Platform\UnservedChannelsFinderInterface;
 use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionCache;
 use Illuminate\Filesystem\Filesystem;
 use Symfony\Component\Console\Output\OutputInterface;
 use Tests\Support\InstallsShowcaseSolution;
+use Tests\Support\NoUnservedChannels;
 use Tests\TestCase;
 
 /**
@@ -29,6 +31,7 @@ final class SolutionUiPublicationTest extends TestCase
     {
         parent::setUp();
 
+        $this->app->instance(UnservedChannelsFinderInterface::class, new NoUnservedChannels());
         $this->app->instance(PlatformMigratorInterface::class, new class ($this) implements PlatformMigratorInterface {
             public function __construct(private readonly SolutionUiPublicationTest $test)
             {

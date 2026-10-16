@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Console;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
-use App\Domains\Channels\Enums\ChannelTypeEnum;
+use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Services\AssistantChannelService;
 use Illuminate\Foundation\Http\FormRequest;
@@ -65,12 +65,12 @@ final class ChannelRequest extends FormRequest
         return $this->channel ??= $channels->findFor($assistant->get(), (string) $this->route('record'));
     }
 
-    private function channelType(AssistantChannelService $channels, CurrentAssistantInterface $assistant): ?ChannelTypeEnum
+    private function channelType(AssistantChannelService $channels, CurrentAssistantInterface $assistant): ?string
     {
         if (null === $this->route('record')) {
             $type = $this->input('type');
 
-            return is_string($type) ? ChannelTypeEnum::tryFrom($type) : null;
+            return is_string($type) && $this->container->make(ChannelRegistryInterface::class)->has($type) ? $type : null;
         }
 
         return $this->channel($channels, $assistant)->type;

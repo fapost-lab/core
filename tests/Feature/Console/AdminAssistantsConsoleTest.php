@@ -413,7 +413,7 @@ final class AdminAssistantsConsoleTest extends FeatureTestCase
             ->assertInertiaFlash('success', 'Channel saved.');
 
         $channel->refresh();
-        $this->assertSame(ChannelTypeEnum::Telegram, $channel->type);
+        $this->assertSame(ChannelTypeEnum::Telegram->value, $channel->type);
         $this->assertSame(self::TOKEN, $channel->token);
         $this->assertSame(10, $channel->config['max_connections']);
     }

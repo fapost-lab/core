@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Console;
 
-use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Contact\Enums\SegmentConditionType;
 use App\Domains\Contact\Enums\SegmentMatch;
 use App\Domains\Contact\Enums\SegmentOperator;
@@ -12,6 +11,7 @@ use App\Domains\Contact\Enums\SegmentValueArity;
 use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Contact\Services\AssistantContactService;
+use App\Domains\Contact\Services\ContactPlatforms;
 use App\Domains\Contact\Services\ContactSegmentResolver;
 use App\Domains\Contact\Services\ContactSegmentService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -194,7 +194,7 @@ final class ContactSegmentRequest extends FormRequest
         foreach ($values as $value) {
             $message = match ($type) {
                 SegmentConditionType::Language => 1 === preg_match(AssistantContactService::LANGUAGE_PATTERN, $value) ? null : 'segment.validation.language',
-                SegmentConditionType::Platform => null === PlatformEnum::tryFrom($value) ? 'segment.validation.platform' : null,
+                SegmentConditionType::Platform => ! app(ContactPlatforms::class)->has($value) ? 'segment.validation.platform' : null,
                 SegmentConditionType::Group    => isset($existingGroups[$value]) ? null : 'segment.validation.group_missing',
                 default                        => null,
             };

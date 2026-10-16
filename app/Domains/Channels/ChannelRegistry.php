@@ -54,6 +54,42 @@ final class ChannelRegistry implements ChannelRegistryInterface
     /**
      * {@inheritDoc}
      */
+    public function types(): array
+    {
+        $types = array_keys($this->definitionsByType);
+
+        foreach ($this->connectorChannels?->all() ?? [] as $channel) {
+            $types[] = $channel->type;
+        }
+
+        return array_values(array_unique($types));
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function has(string $channelType): bool
+    {
+        return null !== $this->definition($channelType);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function label(string $channelType): string
+    {
+        $builtIn = ChannelTypeEnum::tryFrom($channelType);
+
+        if (null !== $builtIn) {
+            return __($builtIn->labelKey());
+        }
+
+        return $this->connectorChannels?->nameOf($channelType) ?? $channelType;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
     public function definition(ChannelTypeEnum|string $channelType): ?ChannelIntegrationDefinition
     {
         $type = $this->normalizeType($channelType);

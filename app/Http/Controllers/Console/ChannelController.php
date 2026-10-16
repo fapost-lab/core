@@ -127,6 +127,7 @@ final class ChannelController extends Controller
         $channel = $this->channels->findFor($this->assistant->get(), $record);
 
         Gate::authorize('update', $channel);
+        $this->abortIfUnavailable($channel);
 
         return Inertia::render('Console/Channels/Edit', [
             'channel' => $this->editableChannel($channel, $this->url('register-webhook', ['record' => $channel->getKey()])),
@@ -141,6 +142,7 @@ final class ChannelController extends Controller
     public function update(ChannelRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $channel = $this->channels->findFor($this->assistant->get(), $record);
+        $this->abortIfUnavailable($channel);
         $updated = $this->channels->update($channel, $request->fields());
 
         // Switching a channel off deregisters its webhook, which is another thing to check than a rejected token.
@@ -161,6 +163,7 @@ final class ChannelController extends Controller
         $channel = $this->channels->findFor($this->assistant->get(), $record);
 
         Gate::authorize('rotateWebhook', $channel);
+        $this->abortIfUnavailable($channel);
 
         $rotated = $this->channels->rotateWebhookHash($channel);
 
@@ -177,6 +180,7 @@ final class ChannelController extends Controller
         $channel = $this->channels->findFor($this->assistant->get(), $record);
 
         Gate::authorize('update', $channel);
+        $this->abortIfUnavailable($channel);
 
         if (! $channel->is_active) {
             return $this->backToList(trans('console.channels.register_webhook.inactive'), 'error');

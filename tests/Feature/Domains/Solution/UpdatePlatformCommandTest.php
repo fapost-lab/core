@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Solution;
 
 use App\Console\Platform\PlatformMigratorInterface;
+use App\Console\Platform\UnservedChannelsFinderInterface;
 use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Solution\Services\InstalledPackagesReader;
@@ -34,6 +35,9 @@ final class UpdatePlatformCommandTest extends TestCase
 
     private bool $migrationsSucceed = true;
 
+    /** @var list<array{tenant: string, type: string, count: int}> */
+    private array $unserved = [];
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -48,6 +52,17 @@ final class UpdatePlatformCommandTest extends TestCase
             new InstalledPackagesReader($this->vendor->path),
             new SolutionManifestValidator(new ManifestParser()),
         ));
+        $this->unserved = [];
+        $this->app->instance(UnservedChannelsFinderInterface::class, new class ($this) implements UnservedChannelsFinderInterface {
+            public function __construct(private readonly UpdatePlatformCommandTest $test)
+            {
+            }
+
+            public function find(): array
+            {
+                return $this->test->unserved();
+            }
+        });
         $this->app->instance(PlatformMigratorInterface::class, new class ($this) implements PlatformMigratorInterface {
             public function __construct(private readonly UpdatePlatformCommandTest $test)
             {
@@ -65,6 +80,14 @@ final class UpdatePlatformCommandTest extends TestCase
         $this->vendor->cleanup();
 
         parent::tearDown();
+    }
+
+    /**
+     * @return list<array{tenant: string, type: string, count: int}>
+     */
+    public function unserved(): array
+    {
+        return $this->unserved;
     }
 
     public function recordMigration(): bool
@@ -156,6 +179,24 @@ final class UpdatePlatformCommandTest extends TestCase
 
         $this->assertSame(0, $this->migrations);
         $this->assertFileDoesNotExist($this->cache->path());
+    }
+
+    public function test_channels_of_a_type_nothing_serves_are_warned_about_per_tenant_and_never_refuse_the_update(): void
+    {
+        $this->registerFeedbackActions();
+        $this->vendor->package(FakeVendor::solutionComposer(), '1.2.0')->write();
+        $this->unserved = [
+            ['tenant' => 'acme', 'type' => 'viber', 'count' => 3],
+            ['tenant' => 'globex', 'type' => 'viber', 'count' => 1],
+        ];
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('Tenant "acme" has 3 channel(s) of type "viber"')
+            ->expectsOutputToContain('Tenant "globex" has 1 channel(s) of type "viber"')
+            ->assertExitCode(0);
+
+        $this->assertSame(1, $this->migrations);
+        $this->assertFileExists($this->cache->path());
     }
 
     public function test_a_channel_type_registered_by_another_connector_does_not_count(): void

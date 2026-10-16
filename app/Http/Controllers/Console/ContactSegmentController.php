@@ -6,13 +6,13 @@ namespace App\Http\Controllers\Console;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
-use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Contact\Enums\SegmentConditionType;
 use App\Domains\Contact\Enums\SegmentMatch;
 use App\Domains\Contact\Enums\SegmentOperator;
 use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Contact\Services\ContactGroupService;
+use App\Domains\Contact\Services\ContactPlatforms;
 use App\Domains\Contact\Services\ContactSegmentService;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
@@ -38,6 +38,7 @@ final class ContactSegmentController extends Controller
         private readonly ContactGroupService $groups,
         private readonly ContactTagRepositoryInterface $tags,
         private readonly CurrentAssistantInterface $assistant,
+        private readonly ContactPlatforms $platforms,
     ) {
     }
 
@@ -202,11 +203,8 @@ final class ContactSegmentController extends Controller
     private function options(): array
     {
         return [
-            'platforms' => array_map(
-                static fn (PlatformEnum $platform): array => ['value' => $platform->value, 'label' => trans('console.contacts.platforms.' . $platform->value)],
-                PlatformEnum::cases(),
-            ),
-            'groups' => $this->groups->query()->orderBy('name')->get()
+            'platforms' => $this->platforms->options(),
+            'groups'    => $this->groups->query()->orderBy('name')->get()
                 ->map(static fn (ContactGroup $group): array => ['id' => (string) $group->getKey(), 'name' => $group->name])
                 ->all(),
             'languages' => $this->segments->languageOptions(),

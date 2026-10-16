@@ -6,7 +6,6 @@ namespace App\Domains\Contact\Services;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
-use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -37,6 +36,7 @@ final readonly class AssistantContactService
     public function __construct(
         private TenantContextInterface $tenants,
         private ContactTagRepositoryInterface $tags,
+        private ContactPlatforms $platforms,
     ) {
     }
 
@@ -78,13 +78,11 @@ final readonly class AssistantContactService
      */
     public function filterByPlatform(Builder $query, string $value): bool
     {
-        $platform = PlatformEnum::tryFrom($value);
-
-        if (null === $platform) {
+        if (! $this->platforms->has($value)) {
             return false;
         }
 
-        $query->where('contacts.platform', $platform->value);
+        $query->where('contacts.platform', $value);
 
         return true;
     }

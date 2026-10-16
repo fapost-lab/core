@@ -76,7 +76,7 @@ final readonly class ConnectorChannelRegistrar implements ConnectorRegistrarInte
         $downloader = $this->mediaService($channel->mediaDownloader, ChannelMediaDownloaderInterface::class, 'mediaDownloader', $type);
         $linkPolicy = $this->mediaService($channel->mediaLinkPolicy, ChannelMediaLinkPolicyInterface::class, 'mediaLinkPolicy', $type);
 
-        $this->channels->add($channel, $this->connector->id);
+        $this->channels->add($channel, $this->connector->id, $this->connector->name);
 
         foreach ([
             self::TAG_MEDIA_UPLOADER    => $uploader,
