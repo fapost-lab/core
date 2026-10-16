@@ -40,9 +40,13 @@ wins. A setting that guards access fails closed when it cannot be read.
 
 The SaaS package's renewal link: `SAAS_RENEWAL_URL` seeds the default, `PlatformSettings` reads
 `saas_settings` through `SettingsCache` and answers the stored value when an Owner set one in
-Platform settings. Counter-example: `MESSAGING_RATE_LIMIT_PER_MINUTE` is read by the message sender
-from `.env`, while the tenant admin edits `TenantSettings::messaging_rate_limit`, which nothing
-applies — two places, and the visible one does nothing.
+Platform settings. A tenant's setting on a worker path: the message sender reads
+`TenantSettings::messaging_rate_limit` at send time through the scoped `TenantMessagingRateLimit`,
+memoized per tenant id (not through the scoped `TenantSettings` instance, which a tenant switch inside
+one scope does not replace); `MESSAGING_RATE_LIMIT_PER_MINUTE` is only a fallback outside a tenant
+or when the tenant's row is absent — every tenant stores 30 at provisioning, because a settings
+migration may not read config to seed from `.env`. Before that fix the sender read only `.env` and the field
+on the settings screen did nothing — two places, and the visible one ignored.
 
 ## Rationale
 
