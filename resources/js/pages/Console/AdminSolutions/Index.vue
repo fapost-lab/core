@@ -10,11 +10,13 @@ import { Head, router, usePage } from '@inertiajs/vue3'
 import { Puzzle } from '@lucide/vue'
 import { Badge, StatusDot } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@fapost/ui/components/card'
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@fapost/ui/components/card'
 import { ConfirmDialog } from '@fapost/ui/components/confirm-dialog'
 import { EmptyState } from '@fapost/ui/components/empty-state'
 import { interpolate } from '@console/shell'
-import type { LastChange, MissingRow, RangeMismatch, SolutionRow, SolutionsPageProps } from './types'
+import DetailsDialog from './DetailsDialog.vue'
+import { changeText } from './format'
+import type { MissingRow, SolutionRow, SolutionsPageProps } from './types'
 
 /**
  * The installed Solutions and whether this workspace has each one on. Turning one on is a single click; turning one off
@@ -37,6 +39,16 @@ const busy = ref(false)
 const toTurnOff = ref<{ name: string; url: string } | null>(null)
 const confirmOpen = ref(false)
 
+// The dialog reads the row from the props by id, so it stays current after a toggle refreshes them.
+const selectedId = ref<string | null>(null)
+const detailsOpen = ref(false)
+const selected = computed(() => props.solutions.find((solution) => solution.id === selectedId.value) ?? null)
+
+function openDetails(solution: SolutionRow): void {
+  selectedId.value = solution.id
+  detailsOpen.value = true
+}
+
 function send(url: string): void {
   if (busy.value) {
     return
@@ -55,22 +67,6 @@ function turnOff(): void {
   if (toTurnOff.value) {
     send(toTurnOff.value.url)
   }
-}
-
-function changeText(change: LastChange): string {
-  return interpolate(t.value.last_change[change.action], { actor: change.actor ?? t.value.last_change.unknown, date: change.atLabel })
-}
-
-function mismatchText(mismatch: RangeMismatch): string {
-  return interpolate(mismatch.unreadable ? t.value.kit.unreadable : t.value.kit.mismatch, {
-    runtime: t.value.kit.runtime[mismatch.component],
-    required: mismatch.required,
-    provided: mismatch.provided,
-  })
-}
-
-function registrationLabel(point: keyof typeof t.value.points, label: string | null, key: string): string {
-  return `${t.value.points[point]}: ${label ?? key}`
 }
 </script>
 
@@ -95,24 +91,28 @@ function registrationLabel(point: keyof typeof t.value.points, label: string | n
       class="rounded-xl border border-dashed py-12"
     />
 
-    <Card v-for="solution in solutions" :key="solution.id" :data-test="`solution-${solution.id}`" :data-active="solution.active">
-      <CardHeader>
-        <div class="flex flex-wrap items-start justify-between gap-3">
-          <div class="flex flex-col gap-1">
-            <CardTitle class="font-display flex flex-wrap items-center gap-3">
-              {{ solution.name }}
-              <StatusDot v-if="solution.entitlement.paused" tone="warning" data-test="state">{{ t.entitlement.paused }}</StatusDot>
-              <StatusDot v-else :tone="solution.active ? 'success' : 'neutral'" data-test="state">
-                {{ solution.active ? t.state.active : t.state.inactive }}
-              </StatusDot>
-              <Badge v-if="solution.entitlement.state === 'not_entitled'" variant="warning" data-test="not-entitled">{{ t.entitlement.badge }}</Badge>
-            </CardTitle>
-            <CardDescription v-if="solution.description">{{ solution.description }}</CardDescription>
-            <p class="text-muted-foreground text-[13px]">
-              <span v-if="solution.version">{{ interpolate(t.version, { version: solution.version }) }} · </span>{{ interpolate(t.package, { package: solution.package }) }}
-            </p>
-          </div>
+    <div v-if="solutions.length > 0" class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3" data-test="solutions-grid">
+      <Card v-for="solution in solutions" :key="solution.id" class="h-full" :data-test="`solution-${solution.id}`" :data-active="solution.active">
+        <CardHeader>
+          <CardTitle class="font-display flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            {{ solution.name }}
+            <StatusDot v-if="solution.entitlement.paused" tone="warning" data-test="state">{{ t.entitlement.paused }}</StatusDot>
+            <StatusDot v-else :tone="solution.active ? 'success' : 'neutral'" data-test="state">
+              {{ solution.active ? t.state.active : t.state.inactive }}
+            </StatusDot>
+            <Badge v-if="solution.entitlement.state === 'not_entitled'" variant="warning" data-test="not-entitled">{{ t.entitlement.badge }}</Badge>
+            <Badge v-if="solution.ui && solution.ui.mismatches.length > 0" variant="warning" data-test="kit-badge">{{ t.kit.badge }}</Badge>
+          </CardTitle>
+        </CardHeader>
 
+        <CardContent class="flex flex-col gap-1">
+          <p v-if="solution.description" class="text-muted-foreground truncate text-sm" :title="solution.description" data-test="summary">{{ solution.description }}</p>
+          <p class="text-muted-foreground truncate text-[13px]">
+            <span v-if="solution.version">{{ interpolate(t.version, { version: solution.version }) }} · </span>{{ interpolate(t.package, { package: solution.package }) }}
+          </p>
+        </CardContent>
+
+        <CardFooter class="mt-auto flex flex-wrap gap-2">
           <Button
             v-if="solution.active || solution.entitlement.paused"
             variant="outline"
@@ -123,63 +123,10 @@ function registrationLabel(point: keyof typeof t.value.points, label: string | n
             {{ t.deactivate }}
           </Button>
           <Button v-else :disabled="busy || !solution.canActivate" data-test="activate" @click="send(solution.urls.activate)">{{ t.activate }}</Button>
-        </div>
-      </CardHeader>
-
-      <CardContent class="flex flex-col gap-4">
-        <p v-if="solution.lastChange" class="text-muted-foreground text-[13px]" data-test="last-change">{{ changeText(solution.lastChange) }}</p>
-
-        <div v-if="solution.entitlement.state === 'not_entitled'" class="flex flex-col items-start gap-2" data-test="entitlement">
-          <p class="text-sm">{{ solution.entitlement.paused ? t.entitlement.paused_note : t.entitlement.off_note }}</p>
-          <Button
-            v-if="solution.entitlement.action"
-            as="a"
-            :href="solution.entitlement.action.url"
-            target="_blank"
-            rel="noopener noreferrer"
-            variant="outline"
-            size="sm"
-            data-test="entitlement-action"
-          >
-            {{ solution.entitlement.action.label }}
-          </Button>
-        </div>
-
-        <div v-if="solution.ui && solution.ui.mismatches.length > 0" class="flex flex-col gap-1.5" data-test="kit-mismatch">
-          <Badge variant="warning" class="self-start">{{ t.kit.title }}</Badge>
-          <p class="text-muted-foreground text-sm">{{ t.kit.description }}</p>
-          <ul class="text-sm">
-            <li v-for="mismatch in solution.ui.mismatches" :key="mismatch.component" :data-test="`mismatch-${mismatch.component}`">{{ mismatchText(mismatch) }}</li>
-          </ul>
-        </div>
-
-        <div class="flex flex-col gap-1.5">
-          <h2 class="text-sm font-medium">{{ t.registers.title }}</h2>
-
-          <p v-if="solution.actions.length === 0 && !solution.ui" class="text-muted-foreground text-sm" data-test="registers-none">{{ t.registers.none }}</p>
-
-          <div v-if="solution.actions.length > 0" class="flex flex-col gap-1" data-test="actions">
-            <span class="text-muted-foreground text-[13px]">{{ t.registers.actions }}</span>
-            <ul class="flex flex-wrap gap-1.5">
-              <li v-for="action in solution.actions" :key="action"><Badge variant="neutral" class="font-mono">{{ action }}</Badge></li>
-            </ul>
-          </div>
-
-          <div v-if="solution.ui" class="flex flex-col gap-1" data-test="ui">
-            <span class="text-muted-foreground text-[13px]">{{ t.ui.title }}</span>
-            <p v-if="!solution.active && solution.ui.state === 'published'" class="text-muted-foreground text-[13px]">{{ t.ui.inactive_note }}</p>
-            <p v-if="solution.ui.state === 'not_published'" class="text-sm" data-test="not-published">{{ t.ui.not_published }}</p>
-            <p v-if="solution.ui.application" class="text-sm">{{ interpolate(t.ui.application, { label: solution.ui.application }) }}</p>
-            <ul v-if="solution.ui.registrations.length > 0" class="flex flex-wrap gap-1.5">
-              <li v-for="registration in solution.ui.registrations" :key="`${registration.point}.${registration.key}`">
-                <Badge variant="info">{{ registrationLabel(registration.point, registration.label, registration.key) }}</Badge>
-              </li>
-            </ul>
-            <p v-if="solution.ui.pages.length > 0" class="text-muted-foreground text-[13px]">{{ t.ui.pages }}: {{ solution.ui.pages.join(', ') }}</p>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+          <Button variant="ghost" data-test="details" @click="openDetails(solution)">{{ t.details }}</Button>
+        </CardFooter>
+      </Card>
+    </div>
 
     <Card v-if="missing.length > 0" data-test="missing">
       <CardHeader>
@@ -191,13 +138,15 @@ function registrationLabel(point: keyof typeof t.value.points, label: string | n
           <li v-for="row in missing" :key="row.id" class="flex flex-wrap items-center justify-between gap-3" :data-test="`missing-${row.id}`">
             <div class="flex flex-col">
               <span class="font-mono text-sm">{{ row.id }}</span>
-              <span v-if="row.lastChange" class="text-muted-foreground text-[13px]">{{ changeText(row.lastChange) }}</span>
+              <span v-if="row.lastChange" class="text-muted-foreground text-[13px]">{{ changeText(t, row.lastChange) }}</span>
             </div>
             <Button variant="outline" :disabled="busy" data-test="deactivate" @click="send(row.urls.deactivate)">{{ t.deactivate }}</Button>
           </li>
         </ul>
       </CardContent>
     </Card>
+
+    <DetailsDialog v-model:open="detailsOpen" :solution="selected" />
 
     <ConfirmDialog
       v-model:open="confirmOpen"

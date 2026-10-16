@@ -72,11 +72,12 @@ export interface SolutionsTranslations {
   state: Record<'active' | 'inactive', string>
   activate: string
   deactivate: string
+  details: string
   last_change: Record<'activated' | 'deactivated' | 'unknown', string>
   registers: { title: string; actions: string; none: string }
   ui: { title: string; application: string; pages: string; not_published: string; inactive_note: string }
   points: Record<RegistrationPoint, string>
-  kit: { title: string; description: string; mismatch: string; unreadable: string; runtime: Record<RangeMismatch['component'], string> }
+  kit: { badge: string; title: string; description: string; mismatch: string; unreadable: string; runtime: Record<RangeMismatch['component'], string> }
   entitlement: { badge: string; paused: string; not_entitled: string; unavailable: string; paused_note: string; off_note: string; unavailable_note: string }
   deactivate_dialog: { title: string; description: string; confirm: string }
   missing: { title: string; description: string }

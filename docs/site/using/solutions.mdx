@@ -12,11 +12,12 @@ Everything starts off. A Solution you never turned on does nothing in your flows
 
 ## What the page shows
 
-One card per Solution:
+Solutions are shown as compact cards. Each card has the name, whether it is **On**, **Off** or **Paused** (on, but
+not in your plan), a one-line description, the version and package, and the **Turn on** or **Turn off** button.
 
-- its name, description, version and package;
-- whether it is **On**, **Off** or **Paused** (on, but not in your plan), and who last changed that and when
-  (times are in UTC);
+**Details** opens the rest:
+
+- the full description, and who last changed the state and when (times are in UTC);
 - **What it adds** — the flow actions it provides (the ones you pick in a `call` node) and, when it has a
   console interface, its application, its pages and the places it adds to existing screens: actions,
   dashboard widgets, settings tabs, table columns and shell elements.
@@ -44,7 +45,7 @@ Click **Turn off** and confirm. From then on:
 
 On a platform that sells Solutions by plan, whoever runs it decides which Solutions your workspace may use.
 A Solution your plan does not include says **Not in your plan**: **Turn on** stays disabled, and a request that
-skips the button is refused with the same reason. When the platform offers one, the card has a button to its
+skips the button is refused with the same reason. When the platform offers one, **Details** has a button to its
 plans or contact page.
 
 If a Solution you had on leaves your plan, its card says **Paused**. It does nothing in flows or in the console,
@@ -57,7 +58,7 @@ Solutions you already have on keep running.
 ## A console interface that does not fit
 
 A Solution's console interface is built against a version of the interface kit, Vue and Inertia. When the
-console ships a version outside what the Solution declares, its card says **Cannot be turned on** and lists
+console ships a version outside what the Solution declares, its card says **Interface does not fit**, and **Details** lists
 each one: what it was built for and what this platform ships. **Turn on** stays disabled, and a request that
 skips the button is refused with the same reason. The Solution's data and its flow actions are untouched; ask
 whoever maintains the Solution for a build that matches. A Solution that is already on can still be turned
