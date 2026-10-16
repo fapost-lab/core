@@ -44,6 +44,20 @@ Use a repository or port where the domain crosses a persistence boundary or
 another bounded context. Do not query Eloquent directly from a domain service that
 has a repository available.
 
+## Settings
+
+A setting that an operator or a tenant admin may want to change while the
+platform runs is stored in the database and edited in the admin, not read from
+`.env`. A tenant's setting belongs in the tenant's settings screen; a package's
+setting belongs in that package's own store and admin, never in Core's. An
+environment variable may at most seed the default a fresh installation starts
+with.
+
+`.env` keeps only secrets and credentials, Laravel and infrastructure settings
+(connections, drivers, cache, queue, mail transport, logging), and values set
+once per installation and never changed afterwards, such as the tenancy
+resolution mode. This holds for Core and for every package and Solution.
+
 ## Creating things
 
 Prefer `php artisan make:* --no-interaction` for new Laravel artifacts where it
