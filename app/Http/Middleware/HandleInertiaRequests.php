@@ -118,9 +118,9 @@ final class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Fixed endpoints and choices of the shell.
+     * Fixed endpoints and choices of the shell, and the installation name its footer credits.
      *
-     * @return array{localeUrl: string, logoutUrl: string, supportLeaveUrl: string, locales: list<string>}
+     * @return array{localeUrl: string, logoutUrl: string, supportLeaveUrl: string, locales: list<string>, appName: string}
      */
     private function shell(): array
     {
@@ -129,6 +129,8 @@ final class HandleInertiaRequests extends Middleware
             'logoutUrl'       => route('console.auth.logout', [], false),
             'supportLeaveUrl' => route('support.leave', [], false),
             'locales'         => SetLocale::SUPPORTED_LOCALES,
+            // The installation's own name, the holder of the copyright in the footer.
+            'appName' => (string) config('app.name', 'FaPost'),
         ];
     }
 
