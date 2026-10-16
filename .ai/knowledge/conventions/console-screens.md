@@ -146,6 +146,10 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   created from inside a form (a flow's new group) uses its own `*-inline` route that redirects
   back with the new id in the flash.
 
+- **Temporary exception: `UsageBar`.** `resources/js/pages/Console/AdminUsage/UsageBar.vue` is used by two screens (the usage
+  page and the dashboard card) although a control a second screen needs belongs in the kit. It waits for a kit release;
+  follow-up task `kit-meter-component` moves it to `@fapost/ui` as `Meter`. Do not copy this exception.
+
 ## Example
 
 `ContactGroupController`, `ContactGroupService`, `ContactGroupRequest`,

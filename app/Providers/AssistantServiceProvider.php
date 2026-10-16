@@ -22,6 +22,7 @@ use App\Domains\Channels\Services\ChannelWebhookRegistry;
 use App\Domains\Channels\Services\ChannelWebhookStatusRecorder;
 use App\Domains\Channels\Services\ChannelWebhookSyncOutcome;
 use App\Domains\Tenancy\Services\TenantSwitcher;
+use App\Domains\Tenancy\Services\TenantUsageCounters;
 use Closure;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
@@ -86,5 +87,7 @@ final class AssistantServiceProvider extends ServiceProvider
             kind: LimitKind::Records,
             description: 'How many assistants a tenant can have at a time.',
         ));
+
+        $this->app->make(TenantUsageCounters::class)->register(Assistant::LIMIT_KEY, Assistant::countForLimit(...));
     }
 }

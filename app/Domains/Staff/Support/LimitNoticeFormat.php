@@ -44,7 +44,7 @@ final class LimitNoticeFormat
     }
 
     /**
-     * The operator's button when it gave a complete one, else the tenant's panel.
+     * The operator's button when it gave a complete one, else the tenant's usage page.
      *
      * @return array{label: string, url: string}
      */
@@ -54,6 +54,6 @@ final class LimitNoticeFormat
             return ['label' => $notice->actionLabel, 'url' => $notice->actionUrl];
         }
 
-        return ['label' => __('limits.open_panel'), 'url' => $panelUrl];
+        return ['label' => __('limits.view_usage'), 'url' => $panelUrl];
     }
 }

@@ -257,6 +257,7 @@ the label as its slug stops being served once the label is declared.
 | `Quota\Contracts\RecordQuotaInterface` | Asking whether the current tenant may create one more record under a key. Implemented by Core; Core and Solutions call it |
 | `Quota\Contracts\UsageMeterInterface` | Counting use of a per-period key and saying whether it fits. Implemented by an operator package; Core's default allows everything and records nothing |
 | `Quota\Contracts\TenantUsageInterface` | Reading how much of a `Records` or `Bytes` key a tenant uses now. Implemented by Core; an operator package calls it |
+| `Quota\Contracts\PeriodUsageInterface` | Reporting how much of each `PerPeriod` key a tenant has used in the current period, with an optional upgrade button, for the tenant admin's usage page. Implemented by an operator package; Core's default reports nothing |
 | `Quota\Contracts\LimitNoticeInterface` | The operator's "what to do next" wording in the notification a tenant's admins get when a limit refuses work. Implemented by an operator package; Core's default returns `null` and Core writes its own text |
 
 `LimitRegistryInterface` has `register(LimitDefinition)`, `find(string $key)` and `all()` (ordered by
@@ -321,13 +322,61 @@ or `Bytes` key the tenant uses now, counted by Core in the tenant's own schema: 
 `media_storage`. It is for showing "used of limit", never for enforcing one. Core counts with the same
 code that enforces the limit, so a refusal and the figure you show cannot disagree.
 
-- It answers `null` for a key Core does not count (today only `media_storage`; `PerPeriod` keys are
-  always `null`, you count those), for a tenant that does not exist, and for one still being provisioned.
+- It answers for every `Records` key Core registers (`assistants`, `flows`, `channels`, `staff`) and for
+  `media_storage`. It answers `null` for a key Core does not count (`PerPeriod` keys are always `null`,
+  you count those, and so is a key a Solution registers without a counter), for a tenant that does not exist, and for one still being provisioned.
   Treat `null` as "not reported", not as zero.
 - Call it outside a tenant context. Core switches to the tenant, counts and restores the context you
   had, also when counting fails.
 - Each call switches to the tenant's schema and runs a query: cache the answer, and do not call it for
   every row of a list.
+
+### Reporting use to the tenant
+
+The tenant's admins see "used of limit" on the **Usage and limits** page. Core counts `Records` and
+`Bytes` keys itself; for `PerPeriod` keys it asks you, through
+`PeriodUsageInterface::reportFor(string $tenantId, string $locale): ?PeriodUsageReport`.
+
+`Quota\DTO\PeriodUsageReport` carries `usage`, a list of `Quota\DTO\PeriodUsage` (one per key you
+report), and an optional action, an `actionLabel` and an absolute http(s) `actionUrl` given together,
+for example "Upgrade plan". A `PeriodUsage` carries the `key`, `used` (at least 0, it may exceed the
+limit by the parallel workers), `limit` (`null` for no limit), and the period as `periodStartsAt`
+(inclusive) and `periodEndsAt` (exclusive). A key you do not list is shown as "no data", never as
+zero; Core ignores entries whose key is not a registered `PerPeriod` key. Both classes throw
+`InvalidArgumentException` on a negative number, a period that does not end after it starts, a
+duplicate key, or an action with only a label or only a URL.
+
+```
+PeriodUsageInterface (Quota\Contracts\PeriodUsageInterface)
+
+Implementation (operator package)
+MAY:      read its own tables; cache the report per tenant for a short time (Core shows what it gets);
+          report only the keys it limits or counts; give one action (an upgrade page) or none.
+MUST:     answer for the period that contains "now", with the same used, limit and period end its
+          UsageMeterInterface counts and refuses by, so the screen and the refusal never disagree;
+          answer cheaply, one indexed query or a cache hit, because Core calls it while rendering a page;
+          return null for an unknown tenant; give an absolute http(s) action URL.
+MUST NOT: count or record anything (it is a read); report Records or Bytes keys (Core counts them);
+          throw for "nothing to report" (null is the answer); call Core's classes, write Core's tables
+          or a tenant schema; keep any tenant's data in object properties between calls.
+
+Caller (Core)
+MUST:     call at most once per page view, never per key and never on a gate or a job's hot path;
+          report an exception and show every per-period row as "Unavailable" (not "No data", which is null or an absent key), a faulty operator never breaks the page;
+          ignore entries whose key is not a registered PerPeriod key.
+MUST NOT: use the numbers to enforce anything; enforcement stays in UsageMeterInterface.
+Why:      the operator owns the period and the counter; Core owns the screen and the people who read it.
+          One call per page keeps the operator's storage off every request.
+```
+
+Core calls it when the usage page or the admin dashboard is opened. If it throws, Core reports the
+exception and shows every per-period row as "Unavailable" (the figures could not be read); `null`, or a
+key missing from the report, reads "No data" instead. The limit shown for a reported key is
+the one in your report, so a plan change that your `TenantLimitsInterface` has cached for an hour does
+not make the row disagree with its own count. Core marks a row "almost used up" from 80% of the limit;
+that is a fixed display threshold, not your notification threshold.
+
+Bind it in your package's service provider; Core binds its default only when nothing is bound yet.
 
 ### Counting use over a period
 

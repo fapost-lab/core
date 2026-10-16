@@ -24,6 +24,7 @@ use App\Domains\Staff\Services\RoleWriterService;
 use App\Domains\Staff\Services\UserService;
 use App\Domains\Tenancy\Events\LimitApproaching;
 use App\Domains\Tenancy\Events\LimitReached;
+use App\Domains\Tenancy\Services\TenantUsageCounters;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
@@ -101,5 +102,7 @@ final class StaffServiceProvider extends ServiceProvider
             kind: LimitKind::Records,
             description: 'How many staff accounts a tenant can have at a time; deactivated accounts and the platform support user do not count, invited and suspended ones do.',
         ));
+
+        $this->app->make(TenantUsageCounters::class)->register(User::LIMIT_KEY, User::countForLimit(...));
     }
 }

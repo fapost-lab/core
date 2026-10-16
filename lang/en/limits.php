@@ -47,7 +47,7 @@ return [
 
     'who_to_ask' => 'To raise the limit, contact the platform administrator.',
 
-    'open_panel' => 'Open the panel',
+    'view_usage' => 'View usage',
 
     'mail' => [
         'greeting' => 'Hello, :name.',

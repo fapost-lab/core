@@ -27,7 +27,7 @@ final class LimitApproachingNotification extends Notification
 {
     /**
      * @param  string  $fallbackLabel  English name of the limit, for a key that has no translation
-     * @param  string  $panelUrl  where the admin opens the panel, on the tenant's own host
+     * @param  string  $panelUrl  the tenant's usage page on its own host, where the button leads when the operator gave none
      */
     public function __construct(
         private readonly LimitApproaching $event,

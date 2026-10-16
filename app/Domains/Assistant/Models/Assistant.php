@@ -86,6 +86,14 @@ final class Assistant extends BaseModel
     ];
 
     /**
+     * How many assistants the tenant has.
+     */
+    public static function countForLimit(): int
+    {
+        return self::query()->count();
+    }
+
+    /**
      * @return HasMany<Channel, $this>
      */
     public function channels(): HasMany

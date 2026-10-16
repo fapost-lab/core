@@ -1346,6 +1346,40 @@ return [
         'empty_hint'   => 'When support signs in to help you, the entry appears here.',
     ],
 
+    'usage' => [
+        'navigation'  => 'Usage and limits',
+        'title'       => 'Usage and limits',
+        'description' => 'How much of each limit this workspace uses right now. The figures are those of the moment you opened the page.',
+        'no_limits'   => 'No limits are set on this installation.',
+        'sections'    => [
+            'records' => [
+                'title'       => 'Records',
+                'description' => 'What the workspace holds at a time.',
+            ],
+            'per_period' => [
+                'title'       => 'Per period',
+                'description' => 'Use that resets every period.',
+                'until'       => 'Period until :date',
+            ],
+            'bytes' => [
+                'title'       => 'Storage',
+                'description' => 'Space taken by stored files.',
+            ],
+        ],
+        'of'    => ':used of :limit',
+        'only'  => 'Limit: :limit',
+        'meter' => ':name, :percent% used',
+        'state' => [
+            'unlimited'    => 'Unlimited',
+            'not_reported' => 'No data',
+            'unavailable'  => 'Unavailable',
+            'near'         => 'Almost used up',
+            'reached'      => 'Limit reached',
+        ],
+        'empty'      => 'There are no limits to show.',
+        'empty_hint' => 'Limits appear here when the platform or your plan defines them.',
+    ],
+
     'admin_dashboard' => [
         'title'       => 'Dashboard',
         'description' => 'The workspace at a glance. Figures refresh every minute.',
@@ -1366,6 +1400,14 @@ return [
             'sessions_hint'   => 'Paused or awaiting user input',
             'staff'           => 'Staff users',
             'staff_hint'      => 'People with access to this workspace',
+        ],
+        'usage' => [
+            'title'       => 'Limits and usage',
+            'description' => 'The limits closest to being used up.',
+            'all'         => 'All limits',
+            'none'        => 'No limits are set on this installation.',
+            'more'        => 'Showing :shown of :total limits.',
+            'unavailable' => 'Some figures are unavailable right now. Open the full page to see which.',
         ],
         'activity' => [
             'title'       => 'Flow activity',

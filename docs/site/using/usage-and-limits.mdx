@@ -1,0 +1,51 @@
+---
+title: "Usage and limits"
+description: "How much of each limit your workspace uses, and what the states on the page mean."
+---
+
+**Usage and limits** in the admin panel menu shows how much of each limit the
+workspace uses right now. It is open to anyone who can manage tenant
+[settings](/using/tenant-settings), which by default means administrators, the
+same people who get the [limit notices](/using/users#limit-notices).
+
+The figures are those of the moment you opened the page; reload to refresh them.
+
+## What it shows
+
+Three cards, each with one row per limit:
+
+- **Records** — what the workspace holds at a time: assistants, flows, channels
+  and staff accounts. Deleting a record frees its place.
+- **Per period** — use that starts again every period, such as active contacts,
+  outgoing messages or calls. The card says when the current period ends (UTC).
+  These figures come from the platform operator, so they appear only where an
+  operator provides them.
+- **Storage** — the space taken by stored media files.
+
+A row reads "3 of 5" with a bar underneath. The numbers for records and storage are
+counted by FaPost with the same rule that refuses a new record, so the page and a
+refusal never disagree: staff accounts do not include deactivated accounts or the
+platform support user.
+
+## What the states mean
+
+| Shown | Meaning |
+|---|---|
+| Bar only | Below 80% of the limit |
+| **Almost used up** | 80% or more of the limit is used |
+| **Limit reached** | The limit is used up, or the limit is zero, or the use is over a limit that was lowered. Existing records stay; only new ones are refused |
+| **Unlimited** | No limit applies to this row |
+| **No data** | A limit is set, but the use has not been reported; the row shows the limit alone |
+| **Unavailable** | The figure could not be read right now. This is not "unlimited": try again later |
+
+If the platform operator offers a way to raise limits (for example an upgrade page),
+a button appears at the top right of the page.
+
+On an installation that has no limits, every row says **Unlimited** and the page
+says that no limits are set.
+
+## On the dashboard
+
+The administrator's dashboard has a **Limits and usage** card with the limits that
+are closest to being used up, and a link to the full page. It is shown to the same
+people as the page, and it does not refresh on its own.
