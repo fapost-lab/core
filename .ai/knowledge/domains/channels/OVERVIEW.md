@@ -17,7 +17,7 @@ paths:
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
   - "database/migrations/tenant/*channels*"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-10-16
 ---
 # Channels
 
@@ -50,7 +50,13 @@ Messaging, and its tests still use the `Tests\Unit\Domains\Messaging\Telegram` n
 
 ## Entry points
 
-- `ChannelRegistry.php`, `ChannelIntegrationDefinition.php` (tagged `channels.integration`).
+- `ChannelRegistry.php`, `ChannelIntegrationDefinition.php` (tagged `channels.integration`). Built-in
+  definitions come from the tag and stay limited to `ChannelTypeEnum`; connector channels
+  (`adr-20261016-connector-package-type`) come from `ConnectorChannels`, a process singleton filled once at boot by
+  `App\Infrastructure\Solution\ConnectorChannelRegistrar`, and are read on every lookup, so the registry may be
+  resolved before or after boot. A definition carries the owning `connectorId` (null for a built-in). `adapter()`
+  returns Core's `ChannelAdapterInterface` for a built-in or Foundation's `ChannelInboundAdapterInterface` for a
+  connector. Telegram stays a built-in on these seams; a connector may never register a built-in type.
 - `Telegram/TelegramChannelServiceProvider.php` — the reference integration; tags
   `channels.telegram_delivery`, `media.channel.uploader`, `media.channel.downloader`.
 - `Services/ChannelService.php`, `Observers/ChannelObserver.php`. `ChannelService::reregisterWebhook` is the

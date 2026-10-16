@@ -6,13 +6,17 @@ namespace Tests\Unit\Domains\Channels;
 
 use App\Domains\Channels\ChannelIntegrationDefinition;
 use App\Domains\Channels\ChannelRegistry;
+use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Channels\Telegram\TelegramAdapter;
 use App\Domains\Channels\Telegram\TelegramSender;
 use App\Domains\Channels\Telegram\TelegramWebhookRegistrar;
+use Fapost\Foundation\Connector\ConnectorChannel;
 use Fapost\Foundation\Messaging\ProviderSenderInterface;
 use Illuminate\Contracts\Container\Container;
 use Mockery;
 use Mockery\MockInterface;
+use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
+use Tests\Fixtures\Connectors\Echo\EchoSender;
 use Tests\TestCase;
 
 final class ChannelRegistryTest extends TestCase
@@ -58,5 +62,53 @@ final class ChannelRegistryTest extends TestCase
         $this->assertNull($registry->sender('viber'));
         $this->assertNull($registry->webhookRegistrar('viber'));
         $this->assertNull($registry->adapter('viber'));
+    }
+
+    public function test_a_connector_channel_is_served_through_the_same_calls(): void
+    {
+        $registry = new ChannelRegistry([], $this->app, $this->connectorChannels());
+
+        $this->assertInstanceOf(EchoSender::class, $registry->sender('echo'));
+        $this->assertInstanceOf(EchoInboundAdapter::class, $registry->adapter('echo'));
+        $this->assertNull($registry->webhookRegistrar('echo'));
+        $this->assertSame('echo', $registry->definition('echo')?->connectorId);
+        $this->assertNull($registry->definition('echo')?->webhookRegistrarClass);
+    }
+
+    public function test_services_of_a_connector_channel_are_built_per_call(): void
+    {
+        $registry = new ChannelRegistry([], $this->app, $this->connectorChannels());
+
+        $this->assertNotSame($registry->sender('echo'), $registry->sender('echo'));
+        $this->assertNotSame($registry->adapter('echo'), $registry->adapter('echo'));
+    }
+
+    public function test_a_channel_registered_after_the_registry_was_built_is_found(): void
+    {
+        $channels = new ConnectorChannels();
+        $registry = new ChannelRegistry([], $this->app, $channels);
+
+        $this->assertNull($registry->sender('echo'));
+
+        $channels->add(new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class), 'echo');
+
+        $this->assertInstanceOf(EchoSender::class, $registry->sender('echo'));
+    }
+
+    public function test_a_built_in_definition_has_no_connector(): void
+    {
+        $registry = new ChannelRegistry([
+            new ChannelIntegrationDefinition(channelType: 'telegram', senderClass: TelegramSender::class),
+        ], $this->app, $this->connectorChannels());
+
+        $this->assertNull($registry->definition('telegram')?->connectorId);
+    }
+
+    private function connectorChannels(): ConnectorChannels
+    {
+        $channels = new ConnectorChannels();
+        $channels->add(new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class), 'echo');
+
+        return $channels;
     }
 }
