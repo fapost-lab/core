@@ -136,7 +136,7 @@ broken.
   `schema_name` is set once at provisioning and never derived from the slug again, so a rename is
   one conditional UPDATE of `tenants.slug` plus a `tenant_slug_aliases` row, in one landlord
   transaction. A former slug stays reserved for that tenant permanently (`check()`/`reserve()`
-  answer Taken); only its redirect window ends (`TENANCY_RENAME_REDIRECT_DAYS`, default 30). Every
+  answer Taken); only its redirect window ends (platform setting `tenancy.rename.redirect_days`, default `TENANCY_RENAME_REDIRECT_DAYS`, 30). Every
   slug claim — rename and `reserveSlug` — takes the same `pg_advisory_xact_lock` on pgsql, and
   `reserve()` re-reads its reservation key after taking it. Rename is refused for Pending tenants
   and outside host mode. Enforced: `CoreTenantRenamerTest`, `HostResolutionTest`,
@@ -249,6 +249,28 @@ broken.
   gateway "Class@method" handler must run the job's middleware itself. Every queued job in `app/` is either listed as runtime (and gated) or as keeping running. Enforced:
   `StoppedTenantRequestTest`, `StoppedTenantRuntimeTest`, `RespectsTenantAccessModeTest`,
   `RuntimeJobAccessModeTest` (`adr-20261008-access-mode-is-a-mode-not-a-status`).
+
+- **Core's platform-wide settings are read and written only through `PlatformSettings`.** It is the only
+  reader and writer of the landlord tables `platform_settings` (a ULID id, a unique key and its json value; no row means the default)
+  and `platform_setting_events` (every change with its actor, also a reset). Fields are registered in the
+  worker-lifetime `PlatformSettingRegistry` (immutable fields naming a config key for the default, frozen
+  after boot outside testing); the service is bound `scoped` and reads the table once per request or job,
+  with no cross-process cache, so a stored change applies from the next request or job and a running one
+  keeps what it read. A stored value the field no longer accepts, and an unreadable table (reported once),
+  answer the default (inside a caller's landlord transaction the read runs in a savepoint, so a failed read
+  never aborts it on PostgreSQL; `TenantSlugChanger` reads before its transaction anyway); no platform setting
+  guards access yet, so none fails closed. Writes check every key
+  first (`InvalidPlatformSettingsException`, nothing written), then lock each row. Other domains read
+  through `PlatformSettingsReaderInterface`; an operator package uses Foundation's `PlatformSettingsInterface`
+  (`CorePlatformSettings`, plain `bind`). Who edits: in `single` mode the tenant's `admin` role (never the
+  platform support user) on `admin/platform-settings`; in `host` mode that screen answers 404 (a tenant admin
+  would change every tenant) and the `platform:settings` commands or an operator panel are the way. That check
+  is `PlatformSettingsRequest::guard()` in the controller and the FormRequest, not a Gate ability or a policy,
+  because `Gate::before` passes an admin on every ability. The screen's field labels are the lang keys
+  `console.platform_settings.fields.<key with dots as underscores>`, falling back to the field's English
+  label; the Foundation definition carries no translation key. Packages
+  and Solutions do not register fields here. Enforced: `PlatformSettingsTest`,
+  `AdminPlatformSettingsConsoleTest`, `PlatformSettingsCommandTest`; the "only through" part is review only.
 
 ## Rules
 

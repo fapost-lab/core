@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
+use App\Http\Controllers\Admin\PlatformSettingsController as AdminPlatformSettingsController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\SearchController as AdminSearchController;
 use App\Http\Controllers\Admin\SolutionController as AdminSolutionController;
@@ -142,6 +143,9 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         // Tenant settings: languages with the base-language lock, runtime limits, broadcast pacing; one form saved whole.
         Route::get('admin/tenant-settings', [AdminTenantSettingsController::class, 'edit'])->name('console.admin.tenant-settings.edit');
         Route::put('admin/tenant-settings', [AdminTenantSettingsController::class, 'update'])->name('console.admin.tenant-settings.update');
+        // Platform settings: the deployment-wide values of a single-tenant install; the controller answers 404 in host mode.
+        Route::get('admin/platform-settings', [AdminPlatformSettingsController::class, 'edit'])->name('console.admin.platform-settings.edit');
+        Route::put('admin/platform-settings', [AdminPlatformSettingsController::class, 'update'])->name('console.admin.platform-settings.update');
         // Support access log: read only, and never a Filament screen, so the name is the console's own.
         Route::get('admin/support-access', [AdminSupportAccessController::class, 'index'])->name('console.admin.support-access.index');
 

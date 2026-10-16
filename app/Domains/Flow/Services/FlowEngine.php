@@ -32,6 +32,7 @@ use App\Domains\Flow\Logging\FlowLogWriter;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\State\SystemStateKeys;
+use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use DateTimeImmutable;
 use Fapost\Foundation\Analytics\Contracts\AnalyticsWriterInterface;
 use Fapost\Foundation\Analytics\DTO\AnalyticsEvent;
@@ -42,7 +43,6 @@ use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
-use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\ConnectionInterface;
 use LogicException;
 use Psr\Log\LoggerInterface;
@@ -63,7 +63,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         private LanguageResolverInterface $languageResolver,
         private ConnectionInterface $connection,
         private AfterCommitDispatcherInterface $afterCommitDispatcher,
-        private Repository $config,
+        private PlatformSettingsReaderInterface $platformSettings,
         private \App\Domains\Flow\Expression\ExpressionEngineRegistry $expressionEngines,
         private \App\Domains\Flow\Contracts\DataAccessorRegistryInterface $dataAccessors,
         private \App\Domains\Flow\History\HistoryWriterFactory $historyWriterFactory,
@@ -279,7 +279,7 @@ final readonly class FlowEngine implements FlowEngineInterface
         Contact $contact,
         bool $resumedAfterDelay = false,
     ): void {
-        $maxIterations         = (int)$this->config->get("flow.execution.max_iterations", 100);
+        $maxIterations         = $this->platformSettings->integer(FlowEngineInterface::MAX_ITERATIONS_SETTING);
         $iterations            = 0;
         $incomingStep          = $incoming;
         $resumedAfterDelayStep = $resumedAfterDelay;

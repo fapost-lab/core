@@ -10,6 +10,7 @@ use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Services\ValidateFlowService;
+use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use Fapost\Foundation\Contracts\DataAccessorInterface;
@@ -642,6 +643,30 @@ final class ValidateFlowServiceTest extends TestCase
         $this->assertNotContains('loop_missing_loop_end', $codes);
     }
 
+    public function test_a_literal_loop_count_is_checked_against_the_platform_step_budget(): void
+    {
+        $nodes = [
+            'loop_1' => [
+                'id'      => 'loop_1',
+                'type'    => 'loop',
+                'version' => 1,
+                'config'  => ['mode' => 'counted', 'count_source' => ['type' => 'literal', 'value' => 150]],
+            ],
+            'end_1' => [
+                'id'      => 'end_1',
+                'type'    => 'loop_end',
+                'version' => 1,
+                'config'  => ['loop_node_id' => 'loop_1'],
+            ],
+        ];
+        $edges = [['id' => 'e1', 'from' => 'loop_1', 'to' => 'end_1', 'handle' => 'loop']];
+
+        $codes = static fn ($result): array => array_map(static fn ($e) => $e->code, $result->errors);
+
+        $this->assertContains('loop_count_exceeds_budget', $codes($this->makeServiceWithLoop()->execute(nodes: $nodes, edges: $edges)));
+        $this->assertNotContains('loop_count_exceeds_budget', $codes($this->makeServiceWithLoop(stepBudget: 200)->execute(nodes: $nodes, edges: $edges)));
+    }
+
     public function test_loop_end_paired_with_another_loop_does_not_satisfy_reachability(): void
     {
         $service = $this->makeServiceWithLoop();
@@ -719,7 +744,7 @@ final class ValidateFlowServiceTest extends TestCase
         );
     }
 
-    private function makeServiceWithLoop(): ValidateFlowService
+    private function makeServiceWithLoop(?int $stepBudget = null): ValidateFlowService
     {
         $registry = new NodeHandlerRegistry($this->app->make(NodeHandlerFactoryInterface::class));
         $registry->register(LoopStubHandler::class);
@@ -732,6 +757,7 @@ final class ValidateFlowServiceTest extends TestCase
             triggerValidator: new NullTriggerConfigValidator(),
             tenantEvents: new NullTenantEventRepository(),
             tenantContext: new NullTenantContext(),
+            platformSettings: null === $stepBudget ? null : new FixedStepBudget($stepBudget),
         );
     }
 
@@ -1096,5 +1122,27 @@ final class SubflowStubHandler implements NodeHandlerInterface
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         return NodeExecutionResult::executed();
+    }
+}
+
+final readonly class FixedStepBudget implements PlatformSettingsReaderInterface
+{
+    public function __construct(private int $steps)
+    {
+    }
+
+    public function integer(string $key): int
+    {
+        return $this->steps;
+    }
+
+    public function boolean(string $key): bool
+    {
+        throw new LogicException($key);
+    }
+
+    public function text(string $key): string
+    {
+        throw new LogicException($key);
     }
 }

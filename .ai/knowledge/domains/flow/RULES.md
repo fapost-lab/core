@@ -18,7 +18,7 @@ paths:
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
   - tests/Architecture/EgressGuardTest.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-16
 ---
 # Flow rules
 
@@ -78,7 +78,8 @@ broken.
   Adding a writer means editing the whitelist, on purpose.
 - **A session runs the definition it started with.** `flow_definition_id` is set once, and
   definitions cannot be deleted while sessions reference them (`restrictOnDelete`).
-- **Execution is bounded.** The engine stops after `flow.execution.max_iterations`; a lost
+- **Execution is bounded.** The engine stops after the platform setting `flow.execution.max_iterations`
+  (`FlowEngineInterface::MAX_ITERATIONS_SETTING`, read through the scoped `PlatformSettingsReaderInterface`); a lost
   session lock aborts with `SessionLockLostException`.
 
 ## Rules

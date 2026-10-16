@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Tenancy\Services;
 
+use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Exceptions\InvalidTenantSlugException;
 use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
@@ -25,6 +26,9 @@ use RuntimeException;
  *
  * Slug claims (this and {@see TenantProvisioningService::reserveSlug()}) take one advisory lock on
  * PostgreSQL, so a claim cannot slip in between another claim's check and its write.
+ *
+ * How long the old slug redirects is the platform setting `tenancy.rename.redirect_days`, read when
+ * the tenant is renamed; a later change of the setting leaves redirects already set up as they are.
  */
 final readonly class TenantSlugChanger
 {
@@ -32,7 +36,7 @@ final readonly class TenantSlugChanger
         private TenantRepositoryInterface $tenants,
         private TenantSlugPolicy $slugPolicy,
         private LoggerInterface $logger,
-        private int $redirectDays = 30,
+        private PlatformSettingsReaderInterface $platformSettings,
     ) {
     }
 
@@ -47,8 +51,12 @@ final readonly class TenantSlugChanger
     {
         $this->slugPolicy->assertAssignable($newSlug);
 
+        // Read before the transaction: a failed read inside it would abort the landlord transaction on
+        // PostgreSQL even though the settings answer their default.
+        $redirectDays = $this->platformSettings->integer('tenancy.rename.redirect_days');
+
         try {
-            $change = $this->tenants->transaction(fn (): SlugChange => $this->changeLocked($tenantId, $newSlug));
+            $change = $this->tenants->transaction(fn (): SlugChange => $this->changeLocked($tenantId, $newSlug, $redirectDays));
         } catch (UniqueConstraintViolationException $exception) {
             // A concurrent claim that holds no advisory lock (SQLite, or a write outside Core) won the unique index.
             throw TenantRenameException::slugTaken($newSlug, $exception);
@@ -65,7 +73,7 @@ final readonly class TenantSlugChanger
         return $change;
     }
 
-    private function changeLocked(string $tenantId, string $newSlug): SlugChange
+    private function changeLocked(string $tenantId, string $newSlug, int $redirectDays): SlugChange
     {
         $this->tenants->lockSlugClaims();
 
@@ -98,7 +106,7 @@ final readonly class TenantSlugChanger
             throw new RuntimeException("Tenant [{$tenantId}] changed while it was being renamed.");
         }
 
-        $redirectUntil = $this->redirectDays > 0 ? $now->addDays($this->redirectDays) : null;
+        $redirectUntil = $redirectDays > 0 ? $now->addDays($redirectDays) : null;
         $this->tenants->addFormerSlug($previousSlug, $tenantId, $redirectUntil, $now);
 
         return new SlugChange($tenant, $previousSlug, true, $redirectUntil);

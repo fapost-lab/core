@@ -95,6 +95,8 @@ return [
     |                 is read when a tenant is renamed and stored with the former
     |                 slug, so changing it does not move redirects already issued.
     |                 The former slug stays reserved for the tenant either way.
+    |                 Only the default of the platform setting
+    |                 `tenancy.rename.redirect_days`: a stored value wins.
     |
     */
     'rename' => [

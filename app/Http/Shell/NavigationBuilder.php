@@ -20,6 +20,7 @@ use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\SupportAccessEntry;
 use App\Domains\Staff\Models\User;
+use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use Closure;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
@@ -112,6 +113,14 @@ final readonly class NavigationBuilder
             $this->entry($system, 'console.admin.tenant-settings.edit', __('staff.tenant_settings.navigation'), 'sliders-horizontal', 100, $user->can(Permission::ManageSettings->value)),
             $this->entry($system, 'console.admin.usage.index', __('console.usage.navigation'), 'gauge', 90, $user->can(Permission::ManageSettings->value)),
             $this->entry($system, 'console.admin.solutions.index', __('console.solutions.navigation'), 'puzzle', 95, $user->can(Permission::ManageSettings->value)),
+            $this->entry(
+                $system,
+                'console.admin.platform-settings.edit',
+                __('console.platform_settings.navigation'),
+                'settings',
+                110,
+                TenancyResolutionMode::Single === TenancyResolutionMode::fromConfig() && $user->isAdmin() && ! $user->isPlatformSupport(),
+            ),
         ];
 
         return $this->groups($entries, []);
