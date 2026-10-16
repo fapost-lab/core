@@ -48,7 +48,8 @@ team — with no `App\…` import and no change made to Core for its benefit.
       and the flow messages whoever the tenant configured (after: the package — the event is
       raised by its writes)
 - [ ] fog: customers reaching the widget — a mini-app extension point, a bot command, or both; the
-      UI extension contract has no mini-app point yet
+      UI extension contract has no mini-app point yet (carried over from `ui-foundation`, closed
+      2026-10-16, where it stood as "a mini-app extension point")
 
 ## Phase 2 — The FaPost board
 

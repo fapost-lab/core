@@ -11,7 +11,7 @@ paths:
   - "app/Http/Shell/**"
   - vite.config.ts
 summary: "How a Solution adds to the console: server-side declarations on named Core targets, pages by <id>::Path, a prebuilt dist/ on Core's shared Vue, Inertia and kit through an import map; supersedes ADR-06 for Solutions"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-10-16
 ---
 # A Solution adds to the console through server-side declarations and a prebuilt bundle on Core's shared modules
 
@@ -183,7 +183,7 @@ Why:      one Vue instance and one kit are what make prebuilt bundles work witho
   application id, which is the Solution `id`, so the manifest's rule that an `id` never changes now also protects
   page names, URLs, asset paths and pins.
 - Every kit change after `0.1.0` is a change to a run-time interface installed Solutions depend on.
-- How long an old kit major stays served after 1.0 is left open (spec `ui-foundation`, the version-story fog item).
+- How long an old kit major stays served after 1.0 is left open (the version-story fog item, moved from `ui-foundation` to `ecosystem-distribution` on 2026-10-16).
 
 ## Amendments
 

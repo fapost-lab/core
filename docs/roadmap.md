@@ -28,7 +28,6 @@ A developer inside the Laravel ecosystem can stand up FaPost, extend it through 
 |---|---|---|:---:|---|
 | 2 | First-contact path — installation, a seeded demo assistant and self-hosting docs, with a named target time from install to a working assistant | idea-brief.md §6 Risks | M | spec `.ai/specs/first-contact-path/` |
 | 4 | Solution activation lifecycle — manifest validation, activation storage and registry, the activation screen (on the kit, step 5), and the lifecycle tests that prove install → activate → handler available | idea-brief.md §7 Recommendation | M | spec `.ai/specs/solution-activation-lifecycle/` |
-| 5 | UI foundation — Core's operator UI on Inertia: every admin and console screen moved off Filament onto one kit and token source shared with the builder, an app switcher, and the contract by which a Solution adds its own application; Filament and Livewire leave Core | idea-brief.md §6 Risks; widened by the owner, 2026-10-06 | XL | spec `.ai/specs/ui-foundation/` |
 | 6 | First solution built through the public contracts only — Feedback (bug reports and suggestions with votes, for a tenant's own team and for the FaPost team), installed through the composer overlay with its UI prebuilt, so nothing in Core is rebuilt; plus the `artisan` scaffold every later Solution starts from | idea-brief.md §7 Recommendation; subject changed by the owner, 2026-10-07 | L | spec `.ai/specs/first-solution/` |
 | 7 | Extension documentation for outsiders — the Extending section rewritten against contracts that survived a real build | idea-brief.md §3 Users | M | spec `.ai/specs/extension-docs/` |
 | 8 | Ecosystem distribution → see [Not yet specified](#not-yet-specified) | idea-brief.md §7 Recommendation | fog | spec `.ai/specs/ecosystem-distribution/` |
@@ -91,10 +90,10 @@ taken whenever a lane is free: `remove-dead-transactional-job` (`messaging.trans
 - The extension contracts live in their own repositories, absent from this working tree and symlinked in for local development → [`ARCHITECTURE.md`](../.ai/knowledge/ARCHITECTURE.md)
 - The extension surface is partly built already: the action handler registry and the builder component publish contract exist, activation and manifest validation do not → [`ARCHITECTURE.md`](../.ai/knowledge/ARCHITECTURE.md)
 - The bet is tested on the owner's own client rollouts carried out through the public contracts, not on a showcase for buyers → [`idea-brief.md §7 Recommendation`](./idea-brief.md)
-- Core's operator UI leaves Filament for Inertia + Vue on one kit (`@fapost/ui`) shared with the builder; built on `main` behind a switch, visible once at the cut-over; Filament stays only in the closed SaaS package (owner, 2026-10-06) → [`ui-foundation`](../.ai/specs/ui-foundation/spec.md)
-- **D4** — a Solution's UI ships prebuilt in its package and is loaded through Core's import map; installing a Solution never rebuilds Core, and PHP arrives through the composer overlay (owner, 2026-10-07) → [`first-solution`](../.ai/specs/first-solution/spec.md), [`ui-foundation`](../.ai/specs/ui-foundation/spec.md)
-- **D5** — the public site keeps its own palette; the token source covers the operator surfaces only (owner, 2026-10-07) → [`ui-foundation`](../.ai/specs/ui-foundation/spec.md)
-- Solutions are independent applications on top of Core, reached through an app switcher; Core's menu never receives a Solution's entries (owner, 2026-10-07) → [`ui-foundation`](../.ai/specs/ui-foundation/spec.md)
+- Core's operator UI leaves Filament for Inertia + Vue on one kit (`@fapost/ui`) shared with the builder; built on `main` behind a switch, visible once at the cut-over; Filament stays only in the closed SaaS package (owner, 2026-10-06) → `ui-foundation` (spec closed 2026-10-16; ADRs `20261014-solution-console-ui`, `20261015-ui-kit-package-shape`)
+- **D4** — a Solution's UI ships prebuilt in its package and is loaded through Core's import map; installing a Solution never rebuilds Core, and PHP arrives through the composer overlay (owner, 2026-10-07) → [`first-solution`](../.ai/specs/first-solution/spec.md), `ui-foundation` (spec closed 2026-10-16)
+- **D5** — the public site keeps its own palette; the token source covers the operator surfaces only (owner, 2026-10-07) → `ui-foundation` (spec closed 2026-10-16; ADRs `20261014-solution-console-ui`, `20261015-ui-kit-package-shape`)
+- Solutions are independent applications on top of Core, reached through an app switcher; Core's menu never receives a Solution's entries (owner, 2026-10-07) → `ui-foundation` (spec closed 2026-10-16; ADRs `20261014-solution-console-ui`, `20261015-ui-kit-package-shape`)
 
 ## Dependency graph
 
@@ -139,5 +138,6 @@ Contract edits that step 4 or step 6 turn out to need happen in the foundation p
 
 | Step | Shipped | Link |
 |---|---|---|
+| 5 · UI foundation | 2026-10-16 | Every admin and console screen on Inertia + Vue, Filament and Livewire gone from Core (Core v0.10.0), the kit published as [`@fapost/ui`](https://www.npmjs.com/package/@fapost/ui) from `fapost-lab/ui` (Core v0.11.0), the app switcher and the Solution console contract. Spec closed; its two open questions moved to `first-solution` (mini-app point) and `ecosystem-distribution` (kit and contract versions); decisions live in ADRs `20261014-solution-console-ui` and `20261015-ui-kit-package-shape`. |
 | 3 · Positioning rewrite | 2026-09-23 | Project description and landing rebuilt on the three pillars — task `positioning-rewrite`. |
 | 1 · Ship the replacement | 2026-09-22 | Every production-readiness criterion closed, the concurrency suite running against real Redis and a load test of 100 concurrent sessions with no state leakage — [`platform/ROADMAP.md`](./platform/ROADMAP.md) § Критерии «Production Ready». Rolling the platform out to real clients is operational work and carries no spec. |
