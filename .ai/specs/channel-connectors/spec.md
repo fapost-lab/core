@@ -17,6 +17,11 @@ extend functionality will be zip packages."
 
 And, to make sure the contract is right: "let's build a Viber connector straight away."
 
+Changed by the owner at the gate of `connector-channel-registrar`, the same day: "if Core needs at least
+one connector, there is no point in moving Telegram into a separate package, all the more since we want
+it on by default. I propose to keep it in Core, but on the new contracts; for now we just prepare the
+contracts for building new connectors."
+
 ## Goal and problem
 
 - Who is worse off without this, and how: anyone who needs a messenger Core does not ship. A new
@@ -25,8 +30,9 @@ And, to make sure the contract is right: "let's build a Viber connector straight
   installation that uses only one messenger still carries the code of all of them.
 - What is true when the work is done: a messenger is added to an installation by adding a Composer
   package to its image; Core's code contains nothing provider-specific and no closed list of channel
-  types; Telegram is one such package, required by Core's distribution, and works exactly as it does
-  today; Viber is a second one, optional, built outside Core against the contract before Telegram moves.
+  types outside the built-in ones; Telegram stays built into Core, reached through the same contracts an
+  outside connector uses, and works exactly as it does today; Viber is the first outside connector,
+  optional, built against the contract.
 
 ## What Viber tests that Telegram does not (paper check, 2026-10-16)
 
@@ -90,8 +96,9 @@ runtime-plugin draft; what still applies to Composer connectors is kept below.
     which tenant may use which channel type is decided elsewhere (the shell, through the entitlement
     seam). And if a tenant-level switch turns out to be needed: it is a field of the entitlement, not a
     reason to make connectors Solutions.
-  - … Core's distribution requiring the Telegram package does not let Core's code lean on it. Only an
-    architecture test keeps `App\` free of the connector's namespace.
+  - … Telegram, staying in Core, does not lean on Core internals an outside connector cannot reach. Only
+    review and the rule that its module registers through the same contracts keep it honest; Viber is the
+    test that the contracts are enough.
 - The main trade-off: a Composer connector is a deploy — a new messenger means a new image — in exchange
   for Composer resolving its dependencies, migrations and a prebuilt UI being allowed, and no code
   arriving in running processes. For something without which Core cannot talk to anyone, the deploy is
@@ -102,7 +109,7 @@ runtime-plugin draft; what still applies to Composer connectors is kept below.
   - The neutral message model lies — a flow validates but fails at send time on one provider (button
     count and length, WhatsApp's 24-hour window and templates); provider 4xx in the middle of a dialogue,
     completion rates that differ by channel.
-  - Telegram regresses during extraction — 95 test files rewritten against the seams quietly change pinned
+  - Telegram regresses while it moves onto the contracts — 95 test files rewritten against the seams quietly change pinned
     behaviour (callback data, media, rate limit edges) while staying green; support reports of messages
     that "look different". Hence: the seams come first with the old tests untouched, and the tests move
     with the module only after.
@@ -124,7 +131,9 @@ runtime-plugin draft; what still applies to Composer connectors is kept below.
   - Connectors out of process (a service per connector talking to Core over a queue or HTTP) — a real
     isolation boundary, but a deploy per connector, a network hop on every send and a second runtime to
     operate.
-  - Seams only, with Telegram kept in Core — rejected: Core would not become minimal.
+  - Telegram extracted into its own connector package, required by Core — the plan until the owner's change
+    on 2026-10-16: Core needs at least one channel and Telegram is on by default, so a separate package
+    buys a second repository and release cycle for nothing; the contracts are proven by Viber instead.
 
 ## Scope and non-goals
 
@@ -138,9 +147,10 @@ runtime-plugin draft; what still applies to Composer connectors is kept below.
   - A channel-neutral outgoing message with connector capabilities, and capability-aware validation and
     builder warnings.
   - Core's channel screens drawn from the connector's schema instead of Telegram branches.
-  - Telegram moved onto the seams, then extracted into its own connector package, required by Core.
+  - Telegram moved onto the seams inside Core: its module reaches Core through the same contracts an
+    outside connector uses.
   - A Viber connector, `fapost/connector-viber`, optional, installed through the overlay, built before
-    Telegram moves; and what it needs from Core: a body-HMAC ingress scheme, public media links.
+    Telegram is moved onto the seams; and what it needs from Core: a body-HMAC ingress scheme, public media links.
 - Not doing:
   - Runtime zip plugins: they stay with `plugin-runtime-contract-idea` and `ecosystem-distribution`.
   - Integrations that are not messaging channels (CRM, payments): they already have action handlers and
@@ -164,15 +174,12 @@ runtime-plugin draft; what still applies to Composer connectors is kept below.
 - Being deploy-time, a connector may ship tenant migrations for its own prefixed tables and a prebuilt UI
   bundle under the same rules a Solution follows; it may not reach landlord data. This removes the
   first draft's open question about WhatsApp's tables.
-- Telegram leaves Core: first Core's seams exist and Telegram, still inside Core, moves onto them (the
-  contract proven on the hardest channel we have), then the module moves to its own connector package.
-  Rejected: keeping Telegram in Core as the reference, because Core would not become minimal and the
-  contract would be proven only on channels nobody uses yet.
-- Core's `composer.json` requires the Telegram connector as a distribution dependency, so the published
-  image talks to Telegram out of the box; Core's code never references the connector (an architecture
-  test), and Core's tests run on a fake channel connector. An installation that wants no Telegram builds
-  its own image. Rejected: adding Telegram only through the overlay, because a bare Core from the
-  repository would talk to no messenger and the published image would need a second build pipeline.
+- Telegram stays in Core as the built-in channel, on the new contracts: its module moves onto the seams
+  and is reached only through them, but it is not extracted (owner, 2026-10-16). A connector package may not
+  take a channel type Core serves itself. Rejected: extracting Telegram into a connector package required
+  by Core's distribution (the earlier decision of this spec), because Core cannot work without a channel
+  and Telegram is on by default, so a separate package adds a repository and a release cycle and proves
+  nothing Viber does not.
 - This spec covers messaging channels only (ingress, delivery, media, webhook registration). Rejected:
   one "connector" type for channels and integrations (CRM, payments), because integrations already have
   their surface (action handlers, data accessors) and are a different contract.
@@ -181,14 +188,12 @@ runtime-plugin draft; what still applies to Composer connectors is kept below.
   and the builder warn when a flow uses what the channel cannot do. Rejected: keeping Telegram's Bot API
   shape as the common format, because every later channel would inherit Telegram's limits (the 64-byte
   callback data among them).
-- The contract is proven by a second, real channel before Telegram leaves Core: a Viber connector built as
-  an outside package right after the seams, so the gaps it finds are fixed while Telegram is still in Core
-  and cheap to change. Rejected: building Viber alongside the Telegram extraction, because every contract
-  change Viber forces would then have to be chased into an already extracted package.
+- The contract is proven by a second, real channel: a Viber connector built as an outside package right
+  after the seams, so the gaps it finds are fixed in the contract while it is still cheap to change.
 - Viber is an optional product connector, `fapost/connector-viber`: supported, but Core does not require
   it; an installation adds it through the build overlay, which proves the outside install path too.
   Rejected: a reference implementation only, because a contract proven on code nobody runs proves less;
-  bundling it like Telegram, because Core's distribution should require only what it cannot work without.
+  building it into Core like Telegram, because Core should carry only the channel it cannot work without.
 - The connector is built and tested on recorded requests and responses; the end-to-end check runs on the
   owner's Viber bot created before February 2024 (the old commercial model), as its own item before the
   package is called done.
@@ -203,8 +208,8 @@ runtime-plugin draft; what still applies to Composer connectors is kept below.
 - How a connector's stored `config` is upgraded between versions — a connector's own migration now
   that it may ship them, or a `config_version` with an upgrade function run lazily on read. Decides the
   settings-schema item.
-- Where the Telegram Mini App's host goes — answered by `telegram-mini-app-strategy-idea`. A connector may
-  now ship a prebuilt bundle, so moving the host with Telegram is possible; whether it is right is that
+- Where the Telegram Mini App's host goes — answered by `telegram-mini-app-strategy-idea`. Telegram stays in
+  Core, so the host stays there by default; whether a connector should be able to ship one is that
   task's question.
 - `CallbackDataCodec` and persistent inline buttons: Core's neutral concept or Telegram's implementation
   detail — Viber's 4 KB `tracking_data` and lack of message editing point to Telegram's detail. Decided in

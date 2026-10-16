@@ -1,9 +1,9 @@
 # Roadmap — Channel connectors as packages
 
 Destination: a messenger is added to an installation by adding a `fapost-connector` Composer package to
-its image; Core's code contains nothing provider-specific and no closed list of channel types; Telegram is
-such a package, required by Core's distribution, and behaves exactly as it does today; Viber is a second,
-optional one, built outside Core first.
+its image; Core has no closed list of channel types and reaches every channel through the same contracts;
+Telegram stays built into Core on those contracts and behaves exactly as it does today; Viber is the first
+outside connector, optional, and proves the contract.
 
 ## Phase 1 — The connector package type
 
@@ -57,29 +57,20 @@ location requests, media — with no Viber code in Core.
       Channel settings from the connector's schema, Neutral outgoing message — it is built on them;
       after: Body-HMAC ingress signatures, Public media links — Viber needs both)
 - [ ] Viber end to end — the package installed through the overlay against the owner's pre-2024 bot; the
-      gaps found go back into the contract before Telegram moves (after: Viber connector package)
+      gaps found go back into the contract (after: Viber connector package)
 - [ ] fog: session windows — how broadcasting and quotas treat bot-initiated messages outside a 24-hour
       window; to be shaped with WhatsApp in view
 
-## Phase 4 — Telegram as a connector
+## Phase 4 — The contract written down
 
-Goal: Core is free of Telegram. Done when: Core's code has no Telegram and its tests pass on a fake
-channel connector; an installation upgraded across the change keeps every Telegram channel working with no
-data change.
+Goal: someone outside the project can write a connector. Done when: the published docs describe the
+connector contract with Telegram (built in) and Viber (a package) as references.
 
-- [ ] Telegram connector package — the module and its tests move to their own repository as
-      `fapost-connector`, required by Core's `composer.json`; an architecture test keeps `App\` off its
-      namespace; Core's tests run on a fake connector (after: all of Phase 2 — the module moves only once
-      nothing outside it knows Telegram; after: Viber end to end — the contract changes Viber forces land
-      before Telegram is outside)
-- [ ] Upgrade path proven — an installation with live Telegram channels upgraded to a Core without
-      Telegram code, rows untouched (type stays `telegram`), webhooks and specs unchanged (after: Telegram
-      connector package)
 - [ ] Published docs — `docs/site/extending/channel-drivers.mdx` rewritten from "a new provider is a Core
-      change" to the connector contract, with Telegram as the reference; the extension model gains the
-      connector beside Solution and Plugin (after: Telegram connector package)
-- [ ] fog: the Telegram Mini App's host — waits on `telegram-mini-app-strategy-idea`; a connector may ship a
-      prebuilt bundle, so the host can move with Telegram if that task says so
+      change" to the connector contract, with Telegram and Viber as references (after: Viber end to end —
+      the docs describe the contract the outsider proved)
+- [ ] fog: the Telegram Mini App's host — waits on `telegram-mini-app-strategy-idea`; Telegram stays in
+      Core, so its host stays there unless that task decides otherwise
 
 ## Waves
 
@@ -88,8 +79,7 @@ data change.
 3. open-channel-types; Channel settings from the connector's schema; Neutral outgoing message
 4. Telegram on the registrar; Capability-aware validation; Viber connector package
 5. Viber end to end
-6. Telegram connector package
-7. Upgrade path proven; Published docs
+6. Published docs
 
 <!--
 Rules (jig-idea §8):
