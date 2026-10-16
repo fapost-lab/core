@@ -6,6 +6,7 @@ return [
     'navigation' => [
         'dashboard' => 'Dashboard',
         'menu'      => 'Menu',
+        'system'    => 'System',
     ],
 
     'breadcrumbs' => [
