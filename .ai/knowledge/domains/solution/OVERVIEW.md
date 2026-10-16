@@ -28,7 +28,7 @@ paths:
   - tests/Architecture/SolutionBoundariesTest.php
   - "tests/Fixtures/Solutions/**"
   - tests/Support/InstallsShowcaseSolution.php
-reviewed_at: 2026-10-14
+reviewed_at: 2026-10-16
 ---
 # Solution
 
@@ -130,3 +130,11 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   built by `tests/Support/FakeVendor.php` from the fixture package in `tests/Fixtures/Solution`. The console
   fixture `showcase` (every point, both route kinds, a committed hand-written `dist/`) is
   `tests/Fixtures/Solutions/Showcase`, installed by `tests/Support/InstallsShowcaseSolution.php`.
+- The lifecycle proof is one suite, `tests/Feature/Domains/Solution/SolutionLifecycleTest.php`: the fixtures `feedback` (actions)
+  and `showcase` (console UI) installed together, `platform:update --validate-only` and the full update, activation for
+  tenant A, a real flow whose `call` node reaches the action through the FlowEngine, the builder's test call, the
+  console pages, tenant B answering `solution_inactive` throughout, deactivation, reactivation and a worker-like
+  sequence with `forgetScopedInstances()` between jobs. On PostgreSQL tenant B has a real schema and the Eloquent
+  store is used; SQLite has no schemas, so the scenario there uses `InMemorySolutionActivationStore`, and a second
+  test drives the same chain through `solutions:activate|deactivate` on the real store. Change the chain (a new
+  link, a new refusal) and extend that suite, not only the unit test of the link.
