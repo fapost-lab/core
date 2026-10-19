@@ -71,6 +71,19 @@ credentials, plus a mechanism to move from where to where. That is on the integr
   `--from`, `--to`, `--tenant`, `--delete-source`, `--dry-run`, iterating tenants through the tenant
   switcher. Rejected: a stop-copy-switch cutover — it needs a maintenance window, and a half-done copy
   turns into 404s.
+- **A move is tracked as an operation; where a file lives stays on the blob** (owner's proposal of
+  2026-10-19, refined). `media_blobs.storage_disk` is the only record of a blob's location, and the
+  per-blob swap is the only "migrated" fact. The operation is a row in `media_storage_moves` (from,
+  to, status `running|paused|cancelled|done|failed`, timestamps, counters), at most one active per
+  tenant (partial unique index), resumed from that row after a worker restart; per-blob failures go
+  to `media_storage_move_failures` (blob, error, attempts) for display and retry. The job selects
+  `storage_disk = :from` on every chunk, not a snapshot of ids, so a blob reused by dedup during the
+  move is still picked up. Writes go only to the new storage from the moment the move starts.
+  Progress is live: moved ÷ (moved + `count(storage_disk = :from)`), shown in the admin as a bar
+  through Inertia polling, with failures, retry, pause and cancel; cancel rolls nothing back.
+  Rejected: a separate per-blob "migrated" table — a second source of truth for location that every
+  read would have to consult; rejected: reading the new storage first and falling back to the old —
+  doubles latency on every miss and hides a lost copy until the source is deleted.
 - **Switching storage is a move.** The admin's "connect a bucket" makes it the active storage for new
   files and offers to move the rest; there is no bare pointer change that leaves files behind
   unannounced. Moving back to operator storage is gated by the `media_storage` limit before each
