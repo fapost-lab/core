@@ -28,6 +28,7 @@
         "laravel/horizon": "^5.45",
         "laravel/reverb": "^1.12",
         "laravel/tinker": "^3.0",
+        "league/flysystem-aws-s3-v3": "^3.0",
         "romanzipp/laravel-queue-monitor": "^5.4",
         "spatie/laravel-activitylog": "^5.0",
         "spatie/laravel-data": "^4.20",
