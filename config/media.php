@@ -14,6 +14,27 @@ declare(strict_types=1);
 return [
     /*
     |--------------------------------------------------------------------------
+    | Storage
+    |--------------------------------------------------------------------------
+    | The installation's media disk, used by every tenant without its own
+    | `media.storage`. `local` keeps files under storage/app; `s3` takes any
+    | S3-compatible server (MinIO: set the endpoint and path-style). Keys are
+    | `tenants/{id}/…` on both, so switching copies `tenants/` first — Core does
+    | not move stored files.
+    */
+    'storage' => [
+        'driver'                  => env('MEDIA_STORAGE_DRIVER', 'local'),
+        'bucket'                  => env('MEDIA_S3_BUCKET'),
+        'root'                    => env('MEDIA_S3_ROOT', ''),
+        'region'                  => env('MEDIA_S3_REGION', 'us-east-1'),
+        'key'                     => env('MEDIA_S3_KEY'),
+        'secret'                  => env('MEDIA_S3_SECRET'),
+        'endpoint'                => env('MEDIA_S3_ENDPOINT'),
+        'use_path_style_endpoint' => env('MEDIA_S3_USE_PATH_STYLE_ENDPOINT', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Upload limits
     |--------------------------------------------------------------------------
     | max_size_bytes — applied to the raw upload regardless of channel; rejects
