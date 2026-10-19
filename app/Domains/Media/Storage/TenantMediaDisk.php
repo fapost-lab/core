@@ -25,8 +25,8 @@ use InvalidArgumentException;
  */
 final class TenantMediaDisk
 {
-    /** Recorded on media_blobs.storage_disk when the installation disk holds the blob. */
-    public const string INSTALLATION_DISK = 'media';
+    /** Recorded on media_blobs.storage_disk when the tenant's own `media.storage` holds the blob. */
+    public const string TENANT_DISK = 'tenant';
 
     public function resolve(TenantInterface $tenant): Filesystem
     {
@@ -52,18 +52,19 @@ final class TenantMediaDisk
     }
 
     /**
-     * Disk name as recorded on media_blobs.storage_disk: the tenant's own driver when the
-     * tenant overrides storage, {@see self::INSTALLATION_DISK} otherwise.
+     * Disk name as recorded on media_blobs.storage_disk: the installation disk's driver
+     * (`local`, `s3`), so a blob still says where it was written after the installation
+     * switches disks, or {@see self::TENANT_DISK} when the tenant's own storage holds it.
      */
     public function diskName(TenantInterface $tenant): string
     {
-        $config = $this->tenantConfig($tenant);
-
-        if (null === $config) {
-            return self::INSTALLATION_DISK;
+        if (null !== $this->tenantConfig($tenant)) {
+            return self::TENANT_DISK;
         }
 
-        return is_string($config['driver'] ?? null) ? $config['driver'] : 'local';
+        $driver = $this->installationConfig()['driver'] ?? null;
+
+        return is_string($driver) ? $driver : 'local';
     }
 
     /**

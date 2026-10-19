@@ -91,14 +91,18 @@ final class TenantMediaDiskTest extends TestCase
         (new TenantMediaDisk())->resolve(new RuntimeTenant(id: 't1', schemaName: 't1', config: []));
     }
 
-    public function test_disk_name_is_the_installation_disk_or_the_tenant_driver(): void
+    public function test_disk_name_is_the_installation_driver_or_tenant(): void
     {
         $installation = new RuntimeTenant(id: 't1', schemaName: 't1', config: []);
-        $s3           = new RuntimeTenant(id: 't2', schemaName: 't2', config: ['media' => ['storage' => ['driver' => 's3']]]);
+        $own          = new RuntimeTenant(id: 't2', schemaName: 't2', config: ['media' => ['storage' => ['driver' => 's3']]]);
 
         $resolver = new TenantMediaDisk();
 
-        $this->assertSame(TenantMediaDisk::INSTALLATION_DISK, $resolver->diskName($installation));
-        $this->assertSame('s3', $resolver->diskName($s3));
+        config(['media.storage.driver' => 'local']);
+        $this->assertSame('local', $resolver->diskName($installation));
+
+        config(['media.storage.driver' => 's3']);
+        $this->assertSame('s3', $resolver->diskName($installation));
+        $this->assertSame(TenantMediaDisk::TENANT_DISK, $resolver->diskName($own));
     }
 }

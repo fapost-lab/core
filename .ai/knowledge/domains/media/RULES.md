@@ -40,7 +40,8 @@ broken.
   local by default, s3 (endpoint and path-style for MinIO) optional, anything else throws; a tenant
   override is never merged with the installation's, so it cannot borrow its credentials
   (`TenantMediaDisk`, `TenantMediaDiskTest`). Every read uses the disk resolved now, not the blob's
-  `storage_disk` (which records `media` or the tenant driver, for diagnosis): switching the
+  `storage_disk` (which records the installation driver, `local` or `s3`, or `tenant` for the tenant's
+own storage — so a later per-blob router and a move command can tell where a blob was written): switching the
   installation disk does not move files, so a populated installation copies `tenants/` first
   (self-hosting docs). Why not per-blob routing yet: owner decision 2026-10-19, demo first; per-tenant
   storage and blob-routed reads are spec `tenant-own-storage`.
