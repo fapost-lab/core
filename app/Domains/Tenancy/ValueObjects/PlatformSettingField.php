@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Tenancy\ValueObjects;
 
+use App\Domains\Tenancy\Enums\PlatformSettingFormat;
 use Fapost\Foundation\Settings\DTO\PlatformSettingDefinition;
 use Fapost\Foundation\Settings\Enums\PlatformSettingType;
 use InvalidArgumentException;
@@ -23,8 +24,9 @@ final readonly class PlatformSettingField
      * @param  string  $configKey  where the installation's default is configured, such as "flow.execution.max_iterations"
      * @param  int|bool|string  $fallback  the default when that key is missing or of another type
      * @param  list<string>  $choices
+     * @param  PlatformSettingFormat|null  $format  a shape the text must have, beyond its length
      *
-     * @throws InvalidArgumentException when the field could not be described (see {@see PlatformSettingDefinition})
+     * @throws InvalidArgumentException when the field could not be described (see {@see PlatformSettingDefinition}), or has a format but is not text, or its fallback breaks the format
      */
     public function __construct(
         public string $key,
@@ -39,17 +41,26 @@ final readonly class PlatformSettingField
         public ?int $max = null,
         public array $choices = [],
         public bool $hostModeOnly = false,
+        public ?PlatformSettingFormat $format = null,
     ) {
+        if (null !== $format && PlatformSettingType::Text !== $type) {
+            throw new InvalidArgumentException(sprintf('Platform setting "%s" has a format but is not text.', $key));
+        }
+
         $this->definition($fallback);
+
+        if (is_string($fallback) && null !== $format && null !== $format->violation($fallback)) {
+            throw new InvalidArgumentException(sprintf('The default of platform setting "%s" %s', $key, $format->violation($fallback)));
+        }
     }
 
     /**
      * The definition with the installation's default: the configured value when it has the field's
-     * type, otherwise the fallback.
+     * type and, if the field has a format, passes it; otherwise the fallback.
      */
     public function definition(mixed $configured): PlatformSettingDefinition
     {
-        $default = $this->hasType($configured) ? $configured : $this->fallback;
+        $default = $this->hasType($configured) && $this->fitsFormat($configured) ? $configured : $this->fallback;
 
         return new PlatformSettingDefinition(
             key: $this->key,
@@ -64,6 +75,25 @@ final readonly class PlatformSettingField
             choices: $this->choices,
             hostModeOnly: $this->hostModeOnly,
         );
+    }
+
+    /**
+     * Why the value is refused: by the definition (type, length, bounds, choices), then by the format.
+     */
+    public function violation(PlatformSettingDefinition $definition, mixed $value): ?string
+    {
+        $violation = $definition->violation($value);
+
+        if (null !== $violation || null === $this->format || ! is_string($value)) {
+            return $violation;
+        }
+
+        return $this->format->violation($value);
+    }
+
+    private function fitsFormat(mixed $value): bool
+    {
+        return null === $this->format || ! is_string($value) || null === $this->format->violation($value);
     }
 
     /**

@@ -15,6 +15,7 @@ use App\Domains\Tenancy\Contracts\WebhookRegistryReaderInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Database\TenantDatabaseManager;
 use App\Domains\Tenancy\Database\TenantPostgresConnection;
+use App\Domains\Tenancy\Enums\PlatformSettingFormat;
 use App\Domains\Tenancy\Infrastructure\CorePlatformSettings;
 use App\Domains\Tenancy\Infrastructure\CoreSupportAccess;
 use App\Domains\Tenancy\Infrastructure\CoreTenantDirectory;
@@ -55,6 +56,7 @@ use App\Domains\Tenancy\Settings\BuiltTenantSettings;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use App\Domains\Tenancy\ValueObjects\PlatformSettingField;
+use App\Http\Shell\SolutionsPresenter;
 use Closure;
 use Fapost\Foundation\Quota\Contracts\LimitNoticeInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
@@ -241,6 +243,19 @@ final class DomainServiceProvider extends ServiceProvider
             min: 0,
             max: 365,
             hostModeOnly: true,
+        ));
+
+        // Registered here, not in SolutionServiceProvider: PHPat (SolutionBoundariesTest) allows the Solution domain no Tenancy dependency but its Contracts.
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: SolutionsPresenter::MARKETPLACE_URL_SETTING,
+            type: PlatformSettingType::Text,
+            configKey: 'solutions.marketplace_url',
+            fallback: 'https://docs.fapost.in/self-hosting/solutions-directory',
+            label: 'Solutions marketplace',
+            description: 'Where the Solutions page of the admin panel links to find more Solutions, on a platform that does not sell them itself. An http or https address. Empty hides the link: store it with platform:settings:set solutions.marketplace_url "" or set SOLUTIONS_MARKETPLACE_URL to empty.',
+            group: 'Solutions',
+            max: 2048,
+            format: PlatformSettingFormat::Url,
         ));
 
         $this->app->booted(function (): void {

@@ -12,6 +12,7 @@ use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Support\CallbackDataCodec;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Media\DTO\DispatchResult;
 use App\Domains\Media\DTO\PublicMediaLink;
@@ -21,6 +22,9 @@ use App\Domains\Media\Models\MediaFile;
 use App\Domains\Messaging\OutboundVolumeGate;
 use Fapost\Foundation\Flow\Enums\KeyboardMode;
 use Fapost\Foundation\Media\DTO\UploadContext;
+use Fapost\Foundation\Messaging\Button;
+use Fapost\Foundation\Messaging\ButtonAction;
+use Fapost\Foundation\Messaging\ButtonSet;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessagePayload;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
@@ -232,7 +236,7 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             SendMessageContentType::TextWithKeyboard => new MessagePayload(
                 type: 'keyboard',
                 text: (string)($payload['text'] ?? ''),
-                keyboard: $this->buildKeyboard(
+                buttons: $this->buildButtons(
                     buttons: is_array($payload['buttons'] ?? null) ? $payload['buttons'] : [],
                     keyboardMode: KeyboardMode::from((string)$payload['keyboard_mode']),
                     sessionId: (string)$payload['session_id'],
@@ -292,11 +296,14 @@ final readonly class FlowMessageSender implements MessageSenderInterface
     }
 
     /**
-     * @param  list<array<string, mixed>>  $buttons
+     * The stored buttons of a node as a channel-neutral set, ordered by row, then by position in the row.
+     * An inline keyboard becomes callback buttons whose payload is the session and button ids; a reply keyboard
+     * becomes reply buttons, except those marked `special`, which ask the user to share a contact or a location.
+     * A node without buttons gives no set: the message goes out as plain text.
      *
-     * @return array<string, mixed>
+     * @param  list<array<string, mixed>>  $buttons
      */
-    private function buildKeyboard(array $buttons, KeyboardMode $keyboardMode, string $sessionId): array
+    private function buildButtons(array $buttons, KeyboardMode $keyboardMode, string $sessionId): ?ButtonSet
     {
         $rows = [];
 
@@ -315,39 +322,28 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             $rowIndex = (int)($button['row'] ?? 0);
             $rows[$rowIndex] ??= [];
 
+            $label = (string)($button['label'] ?? '');
+
             $rows[$rowIndex][] = match ($keyboardMode) {
-                KeyboardMode::Inline => [
-                    'text'          => (string)($button['label'] ?? ''),
-                    'callback_data' => $this->encodeCallbackData($sessionId, (string)($button['id'] ?? '')),
-                ],
-                // Special platform-native button types (request_contact, request_location)
-                // are sent via ReplyKeyboard. The 'special' field is passed through directly
-                // to the Telegram API so the platform sends the native share button.
-                KeyboardMode::Reply => array_filter([
-                    'text'             => (string)($button['label'] ?? ''),
-                    'request_contact'  => ($button['special'] ?? null) === 'request_contact' ? true : null,
-                    'request_location' => ($button['special'] ?? null) === 'request_location' ? true : null,
-                ], static fn (mixed $v): bool => null !== $v),
+                KeyboardMode::Inline => new Button(
+                    $label,
+                    ButtonAction::Callback,
+                    CallbackDataCodec::encode($sessionId, (string)($button['id'] ?? '')),
+                ),
+                KeyboardMode::Reply => new Button($label, match ($button['special'] ?? null) {
+                    'request_contact'  => ButtonAction::ShareContact,
+                    'request_location' => ButtonAction::ShareLocation,
+                    default            => ButtonAction::Reply,
+                }),
             };
         }
 
+        if ([] === $rows) {
+            return null;
+        }
+
         ksort($rows);
-        $normalizedRows = array_values($rows);
 
-        return match ($keyboardMode) {
-            KeyboardMode::Inline => ['inline_keyboard' => $normalizedRows],
-            KeyboardMode::Reply  => [
-                'keyboard'          => $normalizedRows,
-                'one_time_keyboard' => true,
-                'resize_keyboard'   => true,
-            ],
-        };
-    }
-
-    private function encodeCallbackData(string $sessionId, string $buttonId): string
-    {
-        // Telegram callback_data limit is 64 bytes.
-        // Two UUIDs without dashes = 32 + 32 = 64 chars exactly.
-        return str_replace('-', '', $sessionId) . str_replace('-', '', $buttonId);
+        return new ButtonSet(array_values($rows));
     }
 }

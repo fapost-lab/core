@@ -70,6 +70,13 @@ exposes a typing or processing indicator through a `ProcessingIndicatorHandle`;
 `ChannelMediaUploaderInterface` and `ChannelMediaDownloaderInterface` handle media
 in each direction.
 
+A message with buttons carries them as a channel-neutral `ButtonSet` in
+`MessagePayload::$buttons` (each button is a callback, a reply, a contact request or a
+location request); the sender translates it into the provider's format. What a channel
+can show is declared through `ChannelCapabilities`, and a press on a callback button is
+reported back as an `IncomingMessage` of type `CallbackQuery` whose `text` is the payload
+unchanged. See [Connectors](/extending/connectors#buttons-and-capabilities).
+
 A provider that accepts pictures, video and files only as a URL it fetches itself
 registers `ChannelMediaLinkPolicyInterface` instead of an uploader, tagged
 `media.channel.link`. Core then puts a signed public link to the file in the outgoing

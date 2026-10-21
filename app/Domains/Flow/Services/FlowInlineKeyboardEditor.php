@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Models\FlowSession;
+use Fapost\Foundation\Messaging\ChannelCapability;
 use Fapost\Foundation\Messaging\MessagePayload;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Fapost\Foundation\Messaging\OutboundMessage;
@@ -15,13 +17,17 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Removes the inline keyboard from a previously sent flow message
+ * Removes the buttons from a previously sent flow message
  * by dispatching a remove_keyboard OutboundMessage through the standard sender pipeline.
+ *
+ * A channel that does not declare {@see ChannelCapability::RemoveButtons} is sent nothing: its buttons go away with the
+ * next message. The registry is a singleton that holds no tenant data, so this editor may be built per use.
  */
 final readonly class FlowInlineKeyboardEditor implements InlineKeyboardEditorInterface
 {
     public function __construct(
         private OutboundMessageSenderInterface $sender,
+        private ChannelRegistryInterface $channelRegistry,
     ) {
     }
 
@@ -57,6 +63,10 @@ final readonly class FlowInlineKeyboardEditor implements InlineKeyboardEditorInt
             }
 
             $channel = $channelContact->channel;
+
+            if (! $this->channelRegistry->capabilities($channel->type)->supports(ChannelCapability::RemoveButtons)) {
+                return;
+            }
 
             $this->sender->send(
                 new OutboundMessage(

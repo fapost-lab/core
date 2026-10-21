@@ -1439,6 +1439,7 @@ return [
         'activate'    => 'Turn on',
         'deactivate'  => 'Turn off',
         'details'     => 'Details',
+        'marketplace' => 'Find more Solutions',
         'last_change' => [
             'activated'   => 'Turned on by :actor, :date',
             'deactivated' => 'Turned off by :actor, :date',
@@ -1639,11 +1640,13 @@ return [
             'flow'          => 'Flow',
             'conversations' => 'Conversations',
             'tenants'       => 'Tenants',
+            'solutions'     => 'Solutions',
         ],
         'fields' => [
             'flow_execution_max_iterations' => ['label' => 'Maximum flow iterations', 'description' => 'How many steps one flow run may take before it is stopped, which protects against endless loops.'],
             'conversation_retention_days'   => ['label' => 'Conversation retention', 'description' => 'How many days a message transcript is kept, for every tenant. 0 keeps it forever. A message lives between this many days and about 31 days more; dropping is irreversible. Threads and media are never touched.'],
             'tenancy_rename_redirect_days'  => ['label' => 'Rename redirect period', 'description' => 'How many days the old address of a renamed tenant keeps redirecting to the new one.'],
+            'solutions_marketplace_url'     => ['label' => 'Solutions marketplace', 'description' => 'Where the Solutions page links to find more Solutions. Empty hides the link (set it empty with the platform:settings:set command).'],
         ],
     ],
 

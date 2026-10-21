@@ -10,6 +10,7 @@ use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
 use Fapost\Foundation\Channel\ChannelInboundAdapterInterface;
 use Fapost\Foundation\Channel\Settings\ChannelProfileInterface;
 use Fapost\Foundation\Channel\WebhookRegistrarInterface;
+use Fapost\Foundation\Messaging\ChannelCapabilities;
 use Fapost\Foundation\Messaging\ProviderSenderInterface;
 
 /**
@@ -38,6 +39,12 @@ interface ChannelRegistryInterface
      * Return the declarative integration definition for the given channel type.
      */
     public function definition(ChannelTypeEnum|string $channelType): ?ChannelIntegrationDefinition;
+
+    /**
+     * What the channel type can do beyond text and media: a built-in integration's declaration, else the
+     * connector's. A type nothing serves has none.
+     */
+    public function capabilities(string $channelType): ChannelCapabilities;
 
     /**
      * Resolve the outbound sender for the given channel type.

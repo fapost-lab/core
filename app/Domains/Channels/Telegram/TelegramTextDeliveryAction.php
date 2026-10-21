@@ -21,8 +21,22 @@ final class TelegramTextDeliveryAction implements TelegramDeliveryActionInterfac
                 chatId: $message->chatId,
                 text: $message->payload->text,
                 parseMode: isset($message->metadata['parse_mode']) ? (string)$message->metadata['parse_mode'] : null,
-                replyMarkup: is_array($message->payload->keyboard) ? $message->payload->keyboard : null,
+                replyMarkup: $this->replyMarkup($message),
             )
         );
+    }
+
+    /**
+     * The neutral buttons when the message has them; otherwise the raw markup older senders still set.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function replyMarkup(OutboundMessage $message): ?array
+    {
+        if (null !== $message->payload->buttons) {
+            return TelegramReplyMarkup::fromButtons($message->payload->buttons);
+        }
+
+        return is_array($message->payload->keyboard) ? $message->payload->keyboard : null;
     }
 }

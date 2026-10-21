@@ -13,6 +13,9 @@ use Fapost\Foundation\DTO\IncomingMedia;
 use Fapost\Foundation\DTO\IncomingMessage;
 use Fapost\Foundation\DTO\IncomingMessageType;
 use Fapost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Messaging\Button;
+use Fapost\Foundation\Messaging\ButtonAction;
+use Fapost\Foundation\Messaging\ButtonSet;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessagePayload;
 use Fapost\Foundation\Messaging\OutboundMessage;
@@ -241,5 +244,67 @@ final class ConversationCaptureFactoryTest extends TestCase
         $this->assertSame(MessageSenderType::Assistant, $entry->senderType);
         $this->assertNull($entry->senderStaffUserId);
         $this->assertSame($origin, $entry->origin);
+    }
+
+    public function test_outbound_buttons_are_stored_as_labels_and_actions_without_the_payload(): void
+    {
+        $entry = $this->outboundEntry(new MessagePayload(
+            type: 'keyboard',
+            text: 'Choose',
+            buttons: new ButtonSet([[new Button('Yes', payload: 'secret-token')], [new Button('No', payload: 'secret-token-2')]]),
+        ));
+
+        $this->assertSame([
+            'buttons' => [
+                [['label' => 'Yes', 'action' => 'callback']],
+                [['label' => 'No', 'action' => 'callback']],
+            ],
+        ], $entry->payload);
+    }
+
+    public function test_reply_button_actions_are_stored(): void
+    {
+        $entry = $this->outboundEntry(new MessagePayload(
+            type: 'keyboard',
+            text: 'Share',
+            buttons: new ButtonSet([[new Button('Contact', ButtonAction::ShareContact)]]),
+        ));
+
+        $this->assertSame(['buttons' => [[['label' => 'Contact', 'action' => 'share_contact']]]], $entry->payload);
+    }
+
+    public function test_a_legacy_raw_keyboard_is_still_stored_as_before(): void
+    {
+        $keyboard = ['inline_keyboard' => [[['text' => 'Yes', 'callback_data' => 'x']]]];
+
+        $entry = $this->outboundEntry(new MessagePayload(type: 'keyboard', text: 'Choose', keyboard: $keyboard));
+
+        $this->assertSame(['keyboard' => $keyboard], $entry->payload);
+    }
+
+    public function test_a_message_without_buttons_has_an_empty_payload(): void
+    {
+        $this->assertSame([], $this->outboundEntry(new MessagePayload(type: 'text', text: 'Hi'))->payload);
+    }
+
+    private function outboundEntry(MessagePayload $payload): \App\Domains\Conversation\DTO\MessageLogEntry
+    {
+        $entry = (new ConversationCaptureFactory())->forOutbound(
+            new OutboundMessage(
+                idempotencyKey: 'k-1',
+                tenantId: 't-1',
+                channelId: 'ch-1',
+                channelType: 'telegram',
+                transportToken: 'token',
+                chatId: 'chat-1',
+                payload: $payload,
+                metadata: ['contact_id' => 'ct-1', 'assistant_id' => 'a-1'],
+            ),
+            new DeliveryResult(sent: true, providerMessageId: 'p-1'),
+        );
+
+        $this->assertNotNull($entry);
+
+        return $entry;
     }
 }

@@ -38,7 +38,7 @@ paths:
   - "testing/**"
   - "tests/Feature/Testing/**"
   - tests/Support/FakeSolutionStorefront.php
-reviewed_at: 2026-10-16
+reviewed_at: 2026-10-21
 ---
 # Solution
 
@@ -125,6 +125,13 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
     (`SolutionNotEntitledException`); a granted one is `Unchanged` on activate and refused on deactivate (`SolutionGrantedException`), also while the operator cannot answer when it is in the last grants.
   - Storefront: Foundation's experimental `SolutionStorefrontInterface` (default `Services/NoSolutionStorefront`, `bindIf`) lists the operator's
     offers and connects one (trial or request). Asked only by `SolutionsPresenter` and `Admin\SolutionController::connect`, never in a job.
+  - Directory link: only while the storefront is the default `NoSolutionStorefront` (a self-hosted installation, no operator to sell
+    anything), the screen shows a "Find more Solutions" link to the platform setting `solutions.marketplace_url` (default: the
+    docs page `self-hosting/solutions-directory`; a stored empty value hides it). An operator's storefront replaces the link, it never
+    sits beside it. The setting is registered in `App\Providers\DomainServiceProvider`, not in `SolutionServiceProvider`: PHPat
+    (`SolutionBoundariesTest`) lets this domain depend on Tenancy only through `Tenancy\Contracts`, and the registry and
+    `PlatformSettingField` are not contracts. A further Solution setting follows the same exception, until the registry is reachable
+    through a contract. Its value is a URL checked by the Core-side `PlatformSettingFormat::Url` (absolute http(s), or empty).
   - `SolutionActivator` (`activate`, `deactivate`) is the only writer, with an `ActivationActor` (`user`,
     `console`, `operator`, `system`). Idempotent; row and journal entry in one transaction under a row
     lock; activating a Solution that is not installed throws `SolutionNotInstalledException` (not entitled:

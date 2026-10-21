@@ -60,6 +60,25 @@ final class PlatformSettingsCommandTest extends FeatureTestCase
         $this->assertNothingStored();
     }
 
+    public function test_set_refuses_an_address_that_is_not_http_or_https_and_stores_nothing(): void
+    {
+        $this->artisan('platform:settings:set', ['key' => 'solutions.marketplace_url', 'value' => 'not-a-url'])->assertFailed();
+        $this->artisan('platform:settings:set', ['key' => 'solutions.marketplace_url', 'value' => 'ftp://x.y'])->assertFailed();
+
+        $this->assertNothingStored();
+    }
+
+    public function test_set_accepts_an_address_and_an_empty_value(): void
+    {
+        $this->artisan('platform:settings:set', ['key' => 'solutions.marketplace_url', 'value' => 'https://example.com/s'])->assertSuccessful();
+        $this->app->forgetScopedInstances();
+        $this->assertSame('https://example.com/s', $this->app->make(PlatformSettings::class)->text('solutions.marketplace_url'));
+
+        $this->artisan('platform:settings:set', ['key' => 'solutions.marketplace_url', 'value' => ''])->assertSuccessful();
+        $this->app->forgetScopedInstances();
+        $this->assertSame('', $this->app->make(PlatformSettings::class)->text('solutions.marketplace_url'));
+    }
+
     public function test_an_unknown_key_fails(): void
     {
         $this->artisan('platform:settings:set', ['key' => 'no.such_setting', 'value' => '1'])->assertFailed();

@@ -17,7 +17,7 @@ paths:
   - "tests/Unit/Domains/Messaging/**"
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
-reviewed_at: 2026-10-16
+reviewed_at: 2026-10-21
 ---
 # Channels rules
 
@@ -68,6 +68,17 @@ broken.
   sub-namespace of `App\Domains\Channels` except the shared layers (`Contracts`, `DTOs`, `Enums`,
   `Models`, `Observers`, `Policies`, `Providers`, `Services`), so a new provider is covered
   automatically and a new shared layer must be added to that exclusion list.
+- **Flow describes buttons through Foundation's `ButtonSet` (what a press does); a channel declares
+  `ChannelCapabilities`; translation into a provider's markup lives in the provider module
+  (Telegram: `TelegramReplyMarkup`). Flow never builds provider markup.** Decisions behind it:
+  capabilities are declarative flags on the integration definition (`ChannelCapability`, read through
+  `ChannelRegistry::capabilities()`), not marker interfaces on the sender; `CallbackDataCodec` is a Core
+  concept with a 64-byte payload limit, so a button payload fits the strictest channel and a connector
+  never has to know the limit; removing the buttons of a sent message is sent only to a channel that
+  declares `RemoveButtons` (the editor, `FlowInlineKeyboardEditor`, decides, not the driver); the
+  transcript stores `buttons` (label and action, no payload) and still reads legacy `keyboard` rows.
+  Why: a second messenger must not require Flow to learn its markup. Enforced: `TelegramReplyMarkup`
+  characterization tests; the rest review only.
 - **A new messenger is a new integration, not a branch.** Add a `ChannelIntegrationDefinition`
   tagged `channels.integration` with its adapter, sender and registrar, in its own provider —
   `Telegram/TelegramChannelServiceProvider.php` is the model — and declare its settings, public link
