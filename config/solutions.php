@@ -41,7 +41,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Only the default of the platform setting `solutions.marketplace_url`: the address the Solutions page of the admin
-    | panel links to, on a platform that does not sell Solutions itself. A value stored in Platform settings wins. Empty
+    | panel links to, on a self-hosted installation (single resolution mode) that does not sell Solutions itself. A value stored in Platform settings wins. Empty
     | hides the link.
     |
     */

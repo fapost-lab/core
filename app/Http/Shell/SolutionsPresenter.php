@@ -19,6 +19,7 @@ use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Fapost\Foundation\Console\DTO\ContextAction;
@@ -40,7 +41,7 @@ use Throwable;
  * own toggle) or offers it to connect (the operator's storefront) and, when it ships a console UI, whether the bundle is
  * published and fits the kit Core ships.
  * A Solution whose package is gone but whose activation is still stored is listed apart, so it can be put out.
- * On a platform with no storefront of its own it also carries the address where more Solutions are found, from the
+ * On a self-hosted platform with no storefront of its own it also carries the address where more Solutions are found, from the
  * platform setting {@see self::MARKETPLACE_URL_SETTING}.
  *
  * Only valid Solutions are shown: the catalog is closed to a package whose manifest fails, and `platform:update`
@@ -178,12 +179,13 @@ final readonly class SolutionsPresenter
     }
 
     /**
-     * Where to find more Solutions, only on a platform whose storefront is the default one (no operator sells them);
-     * null when another storefront is bound or the setting is empty.
+     * Where to find more Solutions, only on a self-hosted installation (single resolution mode) whose storefront is the
+     * default one (no operator sells them); null in host mode (the SaaS tenant has no directory to install from), when
+     * another storefront is bound or when the setting is empty.
      */
     private function marketplaceUrl(): ?string
     {
-        if (! $this->storefront instanceof NoSolutionStorefront) {
+        if (TenancyResolutionMode::Single !== TenancyResolutionMode::fromConfig() || ! $this->storefront instanceof NoSolutionStorefront) {
             return null;
         }
 
