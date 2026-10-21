@@ -6,7 +6,7 @@ import { Checkbox } from '@fapost/ui/components/checkbox'
 import { Label } from '@fapost/ui/components/label'
 import type { ChannelsPageProps, SelectOption } from './types'
 
-/** The Telegram update types a webhook receives, as a grid of checkboxes with a way to pick or clear them all. */
+/** A list of values out of a fixed set, as a grid of checkboxes with a way to pick or clear them all. */
 const props = defineProps<{
   idPrefix: string
   options: SelectOption[]

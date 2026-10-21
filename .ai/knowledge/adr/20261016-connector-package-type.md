@@ -78,10 +78,31 @@ holds the Solution manifest (`adr-20261010-solution-manifest-is-data-in-composer
   so a connector service lives for one request or job and is never shared across them. Tenant migrations, translations and the public link of a connector channel are not in the
   registrar yet; they arrive with the tasks that first need them.
 
+## Amendment, 2026-10-16: channel profile
+
+- A channel type describes what Core cannot know (its settings, the link to its bot, the largest files it takes)
+  through a `Fapost\Foundation\Channel\Settings\ChannelProfileInterface`, named by `ConnectorChannel::$profile` as a class
+  like every other service. Telegram declares the same profile for itself; no Core code outside
+  `app/Domains/Channels/Telegram/` branches on the type. Rejected: a settings schema in the package manifest (the
+  manifest describes the package, the link is code, and the registrar loads the code anyway); a settings component
+  shipped by each connector (a UI bundle per connector, and the rules would leave Core).
+- Core validates and renders a setting from its declared type (`Text`, `Integer`, `Boolean`, `Choice`, `Choices`);
+  Foundation checks only that a declaration is consistent. Rejected: validation in Foundation, a second rule engine
+  beside Laravel's whose errors the form could not show.
+- A profile holds no secrets: `channels.config` is plain JSON and reaches queued jobs. A `managed` field is written by
+  the integration (a bot name from the provider) past the model's events; the form neither shows nor accepts it and
+  saving keeps it. Core stores only what the schema names, so a type without a profile keeps no `config`. Only a
+  built-in integration writes a managed value for now: Foundation offers a connector no way to hand Core a value to
+  store, and a package never writes Core's tables (runtime-settings ADR). That seam is open work before Viber, which
+  needs its account URI from the provider.
+- Media limits are a separate class tagged `media.channel.limits`, like the uploader, so Media still knows no channel.
+- Settings texts are English in the declaration, with an optional translation prefix; `loadTranslationsFrom` is the
+  connector's own call, as are its configuration files (`mergeConfigFrom`).
+
 ## Consequences
 
 - Third parties can describe a channel package, register its channels, and its channels work end to end; the
-  format stays experimental until a connector can describe its own settings fields.
+  format stays experimental until the first real connector (Viber) has used the profile.
 - `SolutionManifestValidator` no longer warns about `fapost-connector` packages; the domain `solution`
   now catalogs two kinds of package, and its name lags behind its responsibility.
 - The Solution cache file carries a second key; a cache without it is stale for connectors only.

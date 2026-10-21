@@ -96,13 +96,15 @@ final class ChannelServiceTest extends FeatureTestCase
                 'config.allowed_updates' => ['message', 'callback_query'],
                 'config.max_connections' => 50,
                 'config.parse_mode'      => 'HTML',
+                'config.bot_username'    => 'spoofed_bot',
                 'is_active'              => true,
             ]);
         });
 
         $this->assertSame(['message', 'callback_query'], $channel->config['allowed_updates'] ?? null);
         $this->assertSame(50, $channel->config['max_connections'] ?? null);
-        $this->assertSame('HTML', $channel->config['parse_mode'] ?? null);
+        // Only what the profile declares is stored, and a managed key never comes from the input.
+        $this->assertSame(['allowed_updates', 'max_connections'], array_keys($channel->config));
     }
 
     public function test_create_writes_to_redis_registry(): void

@@ -139,32 +139,4 @@ return [
         'max_ttl_seconds' => 86400,
         'per_minute'      => 60,
     ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Channel provider limits
-    |--------------------------------------------------------------------------
-    | Surfaced as `provider_warnings` on upload responses so the picker can hint
-    | "this file will not deliver via Telegram" before the author wires it into
-    | a send_message node. Sizes are in bytes.
-    |
-    | Telegram bot API caps:
-    |   photo upload: 10 MB
-    |   audio:        50 MB
-    |   video:        50 MB
-    |   document:     50 MB
-    |   voice:        50 MB
-    |
-    | Source: https://core.telegram.org/bots/api#sending-files
-    */
-    'channel_limits' => [
-        'telegram' => [
-            'image'    => 10 * 1024 * 1024,
-            'video'    => 50 * 1024 * 1024,
-            'audio'    => 50 * 1024 * 1024,
-            'document' => 50 * 1024 * 1024,
-            'sticker'  => 512 * 1024,
-            'other'    => 50 * 1024 * 1024,
-        ],
-    ],
 ];

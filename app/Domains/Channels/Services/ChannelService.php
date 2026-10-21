@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Channels\Services;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Models\Channel;
@@ -31,6 +32,7 @@ final readonly class ChannelService implements ChannelServiceInterface
         private TenantContextInterface $tenantContext,
         private RecordQuotaInterface $recordQuota,
         private RecordLimitWatch $limitWatch,
+        private ChannelRegistryInterface $integrations,
     ) {
     }
 
@@ -56,8 +58,8 @@ final readonly class ChannelService implements ChannelServiceInterface
             'tenant_id'    => $assistant->tenant_id,
             'type'         => (string)$normalized['type'],
             'token'        => (string)$normalized['token'],
-            'secret_token' => (string)$normalized['secret_token'],
-            'config'       => is_array($normalized['config'] ?? null) ? $normalized['config'] : [],
+            'secret_token' => (string)($normalized['secret_token'] ?? ''),
+            'config'       => $this->settingsFor((string)$normalized['type'], [], is_array($normalized['config'] ?? null) ? $normalized['config'] : []),
             'is_active'    => (bool)($normalized['is_active'] ?? true),
         ]);
         $channel->save();
@@ -88,7 +90,7 @@ final readonly class ChannelService implements ChannelServiceInterface
         }
 
         if (array_key_exists('config', $allowed)) {
-            $channel->config = is_array($allowed['config']) ? $allowed['config'] : [];
+            $channel->config = $this->settingsFor($channel->type, is_array($channel->config) ? $channel->config : [], is_array($allowed['config']) ? $allowed['config'] : []);
             unset($allowed['config']);
         }
 
@@ -207,6 +209,32 @@ final readonly class ChannelService implements ChannelServiceInterface
         }
 
         return $normalized;
+    }
+
+    /**
+     * The config a channel is saved with: the editable settings the integration declared, taken from the request, and
+     * the managed ones, kept as stored (a bot name the provider reported is not the form's to change). Anything the
+     * schema does not name is dropped. The keys follow the schema, so an unchanged config stays byte-identical and
+     * saving the form does not look like a change to the webhook.
+     *
+     * @param  array<string, mixed>  $stored     the config the channel has now; empty for a new one, so a managed key is never taken from input
+     * @param  array<string, mixed>  $submitted
+     *
+     * @return array<string, mixed>
+     */
+    private function settingsFor(string $type, array $stored, array $submitted): array
+    {
+        $config = [];
+
+        foreach ($this->integrations->profile($type)->settings()->fields as $field) {
+            $source = $field->managed ? $stored : $submitted;
+
+            if (array_key_exists($field->key, $source)) {
+                $config[$field->key] = $source[$field->key];
+            }
+        }
+
+        return $config;
     }
 
     private function generateWebhookPublicHash(): string

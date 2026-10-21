@@ -26,6 +26,9 @@ MUST NOT: log, store or put into an exception message a payload's `media.url` (a
 MUST NOT: mint a media link itself; take the one Core put in the payload
 MUST:     (a connector) declare inbound verification and the idempotency key through `IngressSpec` only
 MUST NOT: (a connector) register a channel type Core serves itself
+MUST:     declare its settings, public link and media limits through a ChannelProfileInterface and a
+          ChannelMediaLimitsInterface, as Telegram does; no code outside the driver branches on its type
+MUST NOT: put a secret in a profile setting (`channels.config` is plain JSON and reaches queued jobs)
 ```
 
 ## Example

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domains\Media\Services;
 
+use Fapost\Foundation\Media\ChannelMediaLimitsInterface;
 use Fapost\Foundation\Media\Enums\MediaKind;
 
 /**
- * Compares an uploaded file's size against per-channel provider limits and surfaces
+ * Compares an uploaded file's size against the provider limits each channel integration declares and surfaces
  * the resulting list of warnings to the picker.
  *
  * Warnings are advisory: they never block the upload. The picker uses them to flag
@@ -17,10 +18,10 @@ use Fapost\Foundation\Media\Enums\MediaKind;
 final readonly class ChannelLimitInspector
 {
     /**
-     * @param  array<string, array<string, int>>  $limits  Keyed channel_type → kind → max bytes.
+     * @param  iterable<ChannelMediaLimitsInterface>  $limits  What each channel type's integration declared.
      */
     public function __construct(
-        private array $limits,
+        private iterable $limits = [],
     ) {
     }
 
@@ -31,15 +32,15 @@ final readonly class ChannelLimitInspector
     {
         $warnings = [];
 
-        foreach ($this->limits as $channelType => $perKind) {
-            $limit = $perKind[$kind->value] ?? null;
+        foreach ($this->limits as $channelLimits) {
+            $limit = $channelLimits->maxBytes($kind);
 
-            if (! is_int($limit) || $sizeBytes <= $limit) {
+            if (null === $limit || $sizeBytes <= $limit) {
                 continue;
             }
 
             $warnings[] = [
-                'channel_type' => $channelType,
+                'channel_type' => $channelLimits->channelType(),
                 'kind'         => $kind->value,
                 'limit_bytes'  => $limit,
                 'actual_bytes' => $sizeBytes,

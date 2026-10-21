@@ -11,14 +11,13 @@ import { Button } from '@fapost/ui/components/button'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { interpolate } from '@console/shell'
 import ChannelForm from './ChannelForm.vue'
-import type { ChannelsPageProps, EditableChannel, MaxConnections, SelectOption } from './types'
+import type { ChannelTypeOption, ChannelsPageProps, EditableChannel, SettingsByType } from './types'
 import WebhookStatus from './WebhookStatus.vue'
 
 const props = defineProps<{
   channel: EditableChannel
-  types: SelectOption[]
-  telegramUpdates: SelectOption[]
-  maxConnections: MaxConnections
+  types: ChannelTypeOption[]
+  settings: SettingsByType
   urls: { index: string; submit: string }
 }>()
 
@@ -56,8 +55,7 @@ function registerAgain(): void {
       :submit-url="urls.submit"
       :cancel-url="urls.index"
       :types="types"
-      :telegram-updates="telegramUpdates"
-      :max-connections="maxConnections"
+      :settings="settings"
       :channel="channel"
     />
   </div>

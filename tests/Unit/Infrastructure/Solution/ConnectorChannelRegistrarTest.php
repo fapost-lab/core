@@ -9,10 +9,17 @@ use App\Domains\Media\Registries\ChannelMediaLinkPolicyRegistry;
 use App\Domains\Solution\DTO\InstalledConnector;
 use App\Infrastructure\Solution\ConnectorChannelRegistrar;
 use App\Infrastructure\Solution\ConnectorChannelRegistrarFactory;
+use Fapost\Foundation\Channel\Settings\ChannelProfileInterface;
+use Fapost\Foundation\Channel\Settings\ChannelPublicLink;
+use Fapost\Foundation\Channel\Settings\ChannelSettingField;
+use Fapost\Foundation\Channel\Settings\ChannelSettingsSchema;
+use Fapost\Foundation\Channel\Settings\ChannelSettingType;
 use Fapost\Foundation\Connector\ConnectorChannel;
 use Fapost\Foundation\Media\ChannelMediaLinkPolicyInterface;
 use LogicException;
 use stdClass;
+use Tests\Fixtures\Connectors\Echo\EchoChannelMediaLimits;
+use Tests\Fixtures\Connectors\Echo\EchoChannelProfile;
 use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
 use Tests\Fixtures\Connectors\Echo\EchoMediaLinkPolicy;
 use Tests\Fixtures\Connectors\Echo\EchoSender;
@@ -139,6 +146,58 @@ final class ConnectorChannelRegistrarTest extends TestCase
         ));
     }
 
+    public function test_the_profile_and_the_media_limits_are_accepted_and_the_limits_are_tagged(): void
+    {
+        $this->registrar()->registerChannel(new ConnectorChannel(
+            type: 'echo',
+            sender: EchoSender::class,
+            inbound: EchoInboundAdapter::class,
+            profile: EchoChannelProfile::class,
+            mediaLimits: EchoChannelMediaLimits::class,
+        ));
+
+        $this->assertSame(EchoChannelProfile::class, $this->channels->find('echo')?->profile);
+
+        $tagged = array_filter(
+            iterator_to_array($this->app->tagged(ConnectorChannelRegistrar::TAG_MEDIA_LIMITS), false),
+            static fn (object $limits): bool => $limits instanceof EchoChannelMediaLimits,
+        );
+
+        $this->assertCount(1, $tagged);
+    }
+
+    public function test_a_profile_that_is_not_a_profile_is_refused(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('registers profile ' . EchoSender::class . ', which must implement ' . ChannelProfileInterface::class);
+
+        $this->registrar()->registerChannel(new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class, profile: EchoSender::class));
+    }
+
+    public function test_a_profile_for_another_channel_type_is_refused(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('with profile ' . OtherTypeProfile::class . ', whose channelType() is "other"');
+
+        $this->registrar()->registerChannel(new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class, profile: OtherTypeProfile::class));
+    }
+
+    public function test_a_profile_whose_settings_contradict_themselves_is_refused(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('whose settings are invalid: Channel setting "mode" needs its choices.');
+
+        $this->registrar()->registerChannel(new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class, profile: BrokenProfile::class));
+    }
+
+    public function test_media_limits_for_another_channel_type_are_refused(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('with mediaLimits ' . OtherTypeLimits::class . ', whose channelType() is "other"');
+
+        $this->registrar()->registerChannel(new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class, mediaLimits: OtherTypeLimits::class));
+    }
+
     public function test_a_refused_channel_leaves_nothing_behind(): void
     {
         try {
@@ -189,6 +248,55 @@ final class OtherTypeLinkPolicy implements ChannelMediaLinkPolicyInterface
     }
 
     public function linkTtlSeconds(): ?int
+    {
+        return null;
+    }
+}
+
+final class OtherTypeProfile implements ChannelProfileInterface
+{
+    public function channelType(): string
+    {
+        return 'other';
+    }
+
+    public function settings(): ChannelSettingsSchema
+    {
+        return new ChannelSettingsSchema();
+    }
+
+    public function publicLink(array $config): ?ChannelPublicLink
+    {
+        return null;
+    }
+}
+
+final class BrokenProfile implements ChannelProfileInterface
+{
+    public function channelType(): string
+    {
+        return 'echo';
+    }
+
+    public function settings(): ChannelSettingsSchema
+    {
+        return new ChannelSettingsSchema([new ChannelSettingField('mode', ChannelSettingType::Choice, 'Mode')]);
+    }
+
+    public function publicLink(array $config): ?ChannelPublicLink
+    {
+        return null;
+    }
+}
+
+final class OtherTypeLimits implements \Fapost\Foundation\Media\ChannelMediaLimitsInterface
+{
+    public function channelType(): string
+    {
+        return 'other';
+    }
+
+    public function maxBytes(\Fapost\Foundation\Media\Enums\MediaKind $kind): ?int
     {
         return null;
     }

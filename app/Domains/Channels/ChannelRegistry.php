@@ -8,6 +8,7 @@ use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
 use Fapost\Foundation\Channel\ChannelInboundAdapterInterface;
+use Fapost\Foundation\Channel\Settings\ChannelProfileInterface;
 use Fapost\Foundation\Channel\WebhookRegistrarInterface;
 use Fapost\Foundation\Messaging\ChannelCapabilities;
 use Fapost\Foundation\Messaging\ProviderSenderInterface;
@@ -157,6 +158,23 @@ final class ChannelRegistry implements ChannelRegistryInterface
         return $this->container->make($class);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @throws \Illuminate\Contracts\Container\BindingResolutionException
+     */
+    public function profile(string $channelType): ChannelProfileInterface
+    {
+        $class = $this->definition($channelType)?->profileClass;
+
+        if (null === $class) {
+            return new EmptyChannelProfile($channelType);
+        }
+
+        /** @var ChannelProfileInterface */
+        return $this->container->make($class);
+    }
+
     private function connectorDefinition(string $type): ?ChannelIntegrationDefinition
     {
         $channel = $this->connectorChannels?->find($type);
@@ -172,6 +190,7 @@ final class ChannelRegistry implements ChannelRegistryInterface
             adapterClass: $channel->inbound,
             connectorId: $this->connectorChannels->ownerOf($type),
             capabilities: $channel->capabilities,
+            profileClass: $channel->profile,
         );
     }
 

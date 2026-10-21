@@ -29,16 +29,8 @@ export interface ChannelsTranslations {
     copy: string
     copied: string
     config: string
-    allowed_updates: string
-    allowed_updates_help: string
     select_all: string
     clear_all: string
-    max_connections: string
-    max_connections_help: string
-    config_key: string
-    config_value: string
-    config_add: string
-    config_remove: string
   }
   empty: string
   empty_hint: string
@@ -76,16 +68,32 @@ export interface SelectOption {
   label: string
 }
 
-export interface MaxConnections {
-  min: number
-  max: number
-  default: number
+/** A channel type the form offers. */
+export interface ChannelTypeOption extends SelectOption {
+  /** False when the provider has no webhook secret: the form then neither shows nor requires one. */
+  usesSecretToken: boolean
 }
 
-export interface ConfigEntry {
+/** What a setting holds; the server builds the rules from it. */
+export type SettingType = 'text' | 'integer' | 'boolean' | 'choice' | 'choices'
+
+export type SettingValue = string | number | boolean | string[] | null
+
+/** One setting an integration declared for its channel type, labelled in the interface language. */
+export interface SettingField {
   key: string
-  value: string
+  type: SettingType
+  label: string
+  help: string | null
+  required: boolean
+  default: SettingValue
+  min: number | null
+  max: number | null
+  choices: SelectOption[]
 }
+
+/** The settings of every channel type, by type. */
+export type SettingsByType = Record<string, SettingField[]>
 
 /** A channel as the edit page receives it. The token and the secret token are never sent. */
 export interface EditableChannel {
@@ -100,6 +108,6 @@ export interface EditableChannel {
   webhookHash: string
   handle: string | null
   url: string | null
-  telegram: { allowedUpdates: string[]; maxConnections: number } | null
-  configEntries: ConfigEntry[] | null
+  /** The stored value of each editable setting, by key. */
+  settings: Record<string, SettingValue>
 }

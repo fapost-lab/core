@@ -9,14 +9,17 @@ use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Solution\DTO\InstalledConnector;
 use Fapost\Foundation\Channel\ChannelInboundAdapterInterface;
+use Fapost\Foundation\Channel\Settings\ChannelProfileInterface;
 use Fapost\Foundation\Channel\WebhookRegistrarInterface;
 use Fapost\Foundation\Connector\ConnectorChannel;
 use Fapost\Foundation\Connector\ConnectorRegistrarInterface;
 use Fapost\Foundation\Media\ChannelMediaDownloaderInterface;
+use Fapost\Foundation\Media\ChannelMediaLimitsInterface;
 use Fapost\Foundation\Media\ChannelMediaLinkPolicyInterface;
 use Fapost\Foundation\Media\ChannelMediaUploaderInterface;
 use Fapost\Foundation\Messaging\ProviderSenderInterface;
 use Illuminate\Contracts\Container\Container;
+use InvalidArgumentException;
 use LogicException;
 
 /**
@@ -41,6 +44,8 @@ final readonly class ConnectorChannelRegistrar implements ConnectorRegistrarInte
     public const string TAG_MEDIA_DOWNLOADER = 'media.channel.downloader';
 
     public const string TAG_MEDIA_LINK_POLICY = 'media.channel.link';
+
+    public const string TAG_MEDIA_LIMITS = 'media.channel.limits';
 
     public function __construct(
         private InstalledConnector $connector,
@@ -76,12 +81,17 @@ final readonly class ConnectorChannelRegistrar implements ConnectorRegistrarInte
         $downloader = $this->mediaService($channel->mediaDownloader, ChannelMediaDownloaderInterface::class, 'mediaDownloader', $type);
         $linkPolicy = $this->mediaService($channel->mediaLinkPolicy, ChannelMediaLinkPolicyInterface::class, 'mediaLinkPolicy', $type);
 
+        $limits = $this->mediaService($channel->mediaLimits, ChannelMediaLimitsInterface::class, 'mediaLimits', $type);
+
+        $this->checkProfile($channel->profile, $type);
+
         $this->channels->add($channel, $this->connector->id, $this->connector->name);
 
         foreach ([
             self::TAG_MEDIA_UPLOADER    => $uploader,
             self::TAG_MEDIA_DOWNLOADER  => $downloader,
             self::TAG_MEDIA_LINK_POLICY => $linkPolicy,
+            self::TAG_MEDIA_LIMITS      => $limits,
         ] as $tag => $class) {
             if (null !== $class) {
                 $this->container->tag($class, $tag);
@@ -103,7 +113,7 @@ final readonly class ConnectorChannelRegistrar implements ConnectorRegistrarInte
 
         $this->expect($class, $interface, $field);
 
-        /** @var ChannelMediaUploaderInterface|ChannelMediaDownloaderInterface|ChannelMediaLinkPolicyInterface $instance */
+        /** @var ChannelMediaUploaderInterface|ChannelMediaDownloaderInterface|ChannelMediaLinkPolicyInterface|ChannelMediaLimitsInterface $instance */
         $instance = $this->container->make($class);
 
         if ($instance->channelType() !== $type) {
@@ -111,6 +121,33 @@ final readonly class ConnectorChannelRegistrar implements ConnectorRegistrarInte
         }
 
         return $class;
+    }
+
+    /**
+     * A profile must exist, implement its interface, answer for the same channel type and describe settings that
+     * hold together: the schema is built once here, so a contradictory declaration surfaces at boot. Built from one
+     * throwaway instance, so the constructor has to be cheap and touch no tenant data.
+     */
+    private function checkProfile(?string $class, string $type): void
+    {
+        if (null === $class) {
+            return;
+        }
+
+        $this->expect($class, ChannelProfileInterface::class, 'profile');
+
+        /** @var ChannelProfileInterface $profile */
+        $profile = $this->container->make($class);
+
+        if ($profile->channelType() !== $type) {
+            $this->fail('registers channel type "%s" with profile %s, whose channelType() is "%s"', $type, $class, $profile->channelType());
+        }
+
+        try {
+            $profile->settings();
+        } catch (InvalidArgumentException $exception) {
+            $this->fail('registers channel type "%s" with profile %s, whose settings are invalid: %s', $type, $class, $exception->getMessage());
+        }
     }
 
     /**

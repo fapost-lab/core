@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Flow;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\State\ChannelStateProjector;
 use DateTimeInterface;
+use Fapost\Foundation\Connector\ConnectorChannel;
 use Tests\Feature\FeatureTestCase;
+use Tests\Fixtures\Connectors\Echo\EchoChannelProfile;
+use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
+use Tests\Fixtures\Connectors\Echo\EchoSender;
 
 final class ChannelStateProjectorTest extends FeatureTestCase
 {
@@ -25,7 +30,7 @@ final class ChannelStateProjectorTest extends FeatureTestCase
 
         $this->link($contact->getKey(), $channel->getKey(), now());
 
-        $state = (new ChannelStateProjector())->project(
+        $state = $this->app->make(ChannelStateProjector::class)->project(
             (string)$contact->getKey(),
             (string)$assistant->getKey(),
         );
@@ -48,7 +53,7 @@ final class ChannelStateProjectorTest extends FeatureTestCase
         $this->link($contact->getKey(), $stale->getKey(), now()->subDay());
         $this->link($contact->getKey(), $recent->getKey(), now());
 
-        $state = (new ChannelStateProjector())->project(
+        $state = $this->app->make(ChannelStateProjector::class)->project(
             (string)$contact->getKey(),
             (string)$assistant->getKey(),
         );
@@ -64,7 +69,7 @@ final class ChannelStateProjectorTest extends FeatureTestCase
 
         $this->link($contact->getKey(), $channel->getKey(), now());
 
-        $state = (new ChannelStateProjector())->project(
+        $state = $this->app->make(ChannelStateProjector::class)->project(
             (string)$contact->getKey(),
             (string)$assistant->getKey(),
         );
@@ -77,7 +82,7 @@ final class ChannelStateProjectorTest extends FeatureTestCase
         $assistant = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
         $contact   = Contact::factory()->forTenant(self::TENANT_ID)->create();
 
-        $state = (new ChannelStateProjector())->project(
+        $state = $this->app->make(ChannelStateProjector::class)->project(
             (string)$contact->getKey(),
             (string)$assistant->getKey(),
         );
@@ -93,7 +98,7 @@ final class ChannelStateProjectorTest extends FeatureTestCase
 
         $this->link($contact->getKey(), $channel->getKey(), now());
 
-        $state = (new ChannelStateProjector())->project(
+        $state = $this->app->make(ChannelStateProjector::class)->project(
             (string)$contact->getKey(),
             (string)$assistant->getKey(),
         );
@@ -103,20 +108,40 @@ final class ChannelStateProjectorTest extends FeatureTestCase
         $this->assertNull($state['link']);
     }
 
+    public function test_it_projects_the_link_a_connectors_profile_builds(): void
+    {
+        $this->app->make(ConnectorChannels::class)->add(
+            new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class, profile: EchoChannelProfile::class),
+            'echo',
+        );
+        $assistant = Assistant::factory()->create(['tenant_id' => self::TENANT_ID]);
+        $contact   = Contact::factory()->forTenant(self::TENANT_ID)->create();
+        $channel   = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $assistant->getKey(),
+            'tenant_id'    => self::TENANT_ID,
+            'type'         => 'echo',
+            'config'       => ['account_name' => 'acme'],
+        ]));
+
+        $this->link($contact->getKey(), $channel->getKey(), now());
+
+        $state = $this->app->make(ChannelStateProjector::class)->project((string)$contact->getKey(), (string)$assistant->getKey());
+
+        $this->assertSame('echo', $state['type']);
+        $this->assertSame('acme', $state['bot_username']);
+        $this->assertSame('@acme', $state['bot_handle']);
+        $this->assertSame('https://echo.example/acme', $state['link']);
+    }
+
     private function channel(string $assistantId, ?string $username, bool $isActive = true): Channel
     {
-        return Channel::withoutEvents(function () use ($assistantId, $username, $isActive): Channel {
-            $channel = Channel::factory()->create([
-                'assistant_id' => $assistantId,
-                'tenant_id'    => self::TENANT_ID,
-                'type'         => ChannelTypeEnum::Telegram,
-                'is_active'    => $isActive,
-            ]);
-
-            $channel->forceFill(['telegram_bot_username' => $username])->save();
-
-            return $channel;
-        });
+        return Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $assistantId,
+            'tenant_id'    => self::TENANT_ID,
+            'type'         => ChannelTypeEnum::Telegram,
+            'config'       => null === $username ? [] : ['bot_username' => $username],
+            'is_active'    => $isActive,
+        ]));
     }
 
     private function link(string $contactId, string $channelId, DateTimeInterface $lastInteractionAt): void

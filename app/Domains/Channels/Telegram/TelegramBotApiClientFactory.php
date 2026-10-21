@@ -7,7 +7,7 @@ namespace App\Domains\Channels\Telegram;
 final class TelegramBotApiClientFactory
 {
     /**
-     * @param  string  $apiBaseUrl  Bot API origin (`services.telegram.api_base_url`); a local stub replaces it in load tests.
+     * @param  string  $apiBaseUrl  Bot API origin (`telegram.api_base_url`); a local stub replaces it in load tests.
      */
     public function __construct(
         private readonly string $apiBaseUrl = 'https://api.telegram.org',

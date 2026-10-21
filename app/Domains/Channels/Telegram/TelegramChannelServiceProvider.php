@@ -7,6 +7,7 @@ namespace App\Domains\Channels\Telegram;
 use App\Domains\Channels\ChannelIntegrationDefinition;
 use App\Domains\Channels\Telegram\Contracts\TelegramBotIdentityStoreInterface;
 use App\Domains\Channels\Telegram\Media\TelegramMediaDownloader;
+use App\Domains\Channels\Telegram\Media\TelegramMediaLimits;
 use App\Domains\Channels\Telegram\Media\TelegramMediaUploader;
 use Fapost\Foundation\Messaging\ChannelCapabilities;
 use Fapost\Foundation\Messaging\ChannelCapability;
@@ -22,8 +23,10 @@ final class TelegramChannelServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->mergeConfigFrom(__DIR__ . '/config/telegram.php', 'telegram');
+
         $this->app->bind(TelegramBotApiClientFactory::class, fn ($app): TelegramBotApiClientFactory => new TelegramBotApiClientFactory(
-            (string) $app->make('config')->get('services.telegram.api_base_url', 'https://api.telegram.org'),
+            (string) $app->make('config')->get('telegram.api_base_url', 'https://api.telegram.org'),
         ));
         $this->app->bind(TelegramBotIdentityStoreInterface::class, TelegramBotIdentityStore::class);
         $this->app->bind(
@@ -45,6 +48,8 @@ final class TelegramChannelServiceProvider extends ServiceProvider
         $this->app->bind(TelegramAdapter::class);
         $this->app->bind(TelegramMediaUploader::class);
         $this->app->bind(TelegramMediaDownloader::class);
+        $this->app->bind(TelegramChannelProfile::class);
+        $this->app->bind(TelegramMediaLimits::class);
 
         $this->app->singleton(
             'channels.integration.telegram',
@@ -61,6 +66,7 @@ final class TelegramChannelServiceProvider extends ServiceProvider
                     ChannelCapability::RemoveButtons,
                     ChannelCapability::PersistentButtons,
                 ]),
+                profileClass: TelegramChannelProfile::class,
             )
         );
     }
@@ -82,5 +88,6 @@ final class TelegramChannelServiceProvider extends ServiceProvider
 
         $this->app->tag([TelegramMediaUploader::class], 'media.channel.uploader');
         $this->app->tag([TelegramMediaDownloader::class], 'media.channel.downloader');
+        $this->app->tag([TelegramMediaLimits::class], 'media.channel.limits');
     }
 }

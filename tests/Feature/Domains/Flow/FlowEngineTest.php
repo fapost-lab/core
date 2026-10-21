@@ -498,18 +498,13 @@ final class FlowEngineTest extends FeatureTestCase
 
         $contact = Contact::factory()->forTenant($tenantId)->create();
 
-        $channel = Channel::withoutEvents(function () use ($assistant, $tenantId): Channel {
-            $channel = Channel::factory()->create([
-                'assistant_id' => $assistant->getKey(),
-                'tenant_id'    => $tenantId,
-                'type'         => ChannelTypeEnum::Telegram,
-                'is_active'    => true,
-            ]);
-
-            $channel->forceFill(['telegram_bot_username' => 'engine_demo_bot'])->save();
-
-            return $channel;
-        });
+        $channel = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $assistant->getKey(),
+            'tenant_id'    => $tenantId,
+            'type'         => ChannelTypeEnum::Telegram,
+            'config'       => ['bot_username' => 'engine_demo_bot'],
+            'is_active'    => true,
+        ]));
 
         ChannelContact::query()->create([
             'contact_id'          => $contact->getKey(),
