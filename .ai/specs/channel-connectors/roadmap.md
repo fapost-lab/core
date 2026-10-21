@@ -29,7 +29,7 @@ reached only through the connector registrar, with its existing tests untouched 
 - [ ] `telegram-on-registrar` — Telegram on the registrar: Telegram's module registers itself through the connector registrar like
       an outside package would, instead of Core's hard-coded provider list (after: Open channel types —
       it needs the open types to register into)
-- [ ] `channel-settings-schema` — Channel settings from the connector's schema: Core's channel screens and request rules draw a
+- [x] `channel-settings-schema` — Channel settings from the connector's schema: Core's channel screens and request rules draw a
       connector's declared fields instead of `isTelegram` branches; `telegram_bot_username` moves into
       `channels.config`; provider config and media limits come from the connector (after: Connector
       registrar with a channel surface — the schema is registered on it)
