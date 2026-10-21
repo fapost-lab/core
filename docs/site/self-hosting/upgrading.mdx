@@ -45,6 +45,11 @@ rather than an event:
 APP_VERSION=1.4.2
 ```
 
+The console footer shows the release the running image was built from, next to
+"Powered by FaPost", so after an upgrade you can see it took. An image you build
+yourself with `docker/compose.build.yaml` shows the `APP_VERSION` it was built
+with, or `dev` without one.
+
 ## Solutions are checked first
 
 A Solution is a Composer package whose `composer.json` carries a manifest (see

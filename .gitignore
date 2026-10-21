@@ -76,3 +76,6 @@ CLAUDE.local.md
 .ai/workspace
 .ai/runtime
 .claude/worktrees/
+
+# Written by the image build (docker/Dockerfile), never committed
+/VERSION

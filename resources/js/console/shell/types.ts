@@ -91,6 +91,8 @@ export interface ShellConfig {
     locales: string[]
     /** The installation's name (`app.name`), the holder of the copyright in the footer. */
     appName: string
+    /** The release this installation runs (`app.version`): an image tag such as `v0.18.2`, or `dev`. */
+    version: string
 }
 
 /** The notification bell (see `HandleInertiaRequests::notifications()`); the list loads when it opens. */

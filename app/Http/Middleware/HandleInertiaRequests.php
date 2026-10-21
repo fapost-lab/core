@@ -118,9 +118,9 @@ final class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Fixed endpoints and choices of the shell, and the installation name its footer credits.
+     * Fixed endpoints and choices of the shell, and the installation name and release its footer shows.
      *
-     * @return array{localeUrl: string, logoutUrl: string, supportLeaveUrl: string, locales: list<string>, appName: string}
+     * @return array{localeUrl: string, logoutUrl: string, supportLeaveUrl: string, locales: list<string>, appName: string, version: string}
      */
     private function shell(): array
     {
@@ -131,6 +131,8 @@ final class HandleInertiaRequests extends Middleware
             'locales'         => SetLocale::SUPPORTED_LOCALES,
             // The installation's own name, the holder of the copyright in the footer.
             'appName' => (string) config('app.name', 'FaPost'),
+            // The release this installation runs, from the image (`dev` in a checkout).
+            'version' => (string) config('app.version', 'dev'),
         ];
     }
 

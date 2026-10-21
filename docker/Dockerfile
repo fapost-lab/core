@@ -134,8 +134,12 @@ RUN mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cac
 # docker/check-image-assets.sh keeps this in step with the `web` image.
 COPY --from=assets --chown=www-data:www-data /build/public/build ./public/build
 
+# The release tag, read by config('app.version') for the console footer. Kept in
+# the image rather than the code; an image built FROM this one (the SaaS image)
+# inherits the file. Last on purpose: it changes on every release.
 ARG VERSION=dev
 LABEL org.opencontainers.image.version=$VERSION
+RUN printf '%s' "$VERSION" > VERSION
 
 USER www-data
 
