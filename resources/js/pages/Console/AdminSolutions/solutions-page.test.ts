@@ -29,6 +29,7 @@ const translations = {
       activate: 'Turn on',
       deactivate: 'Turn off',
       details: 'Details',
+      marketplace: 'Find more Solutions',
       last_change: { activated: 'Turned on by :actor, :date', deactivated: 'Turned off by :actor, :date', unknown: 'someone' },
       registers: { title: 'What it adds', actions: 'Flow actions', none: 'Adds nothing.' },
       ui: { title: 'Console', application: 'Application: :label', pages: 'Pages', not_published: 'Not published yet.', inactive_note: 'Hidden while off.' },
@@ -108,8 +109,8 @@ async function openDetails(wrapper: ReturnType<typeof mount>, id = 'feedback'): 
   await flushPromises()
 }
 
-function mountPage(solutions: SolutionRow[], missing: MissingRow[] = []) {
-  return mount(Index, { attachTo: document.body, props: { solutions, missing } })
+function mountPage(solutions: SolutionRow[], missing: MissingRow[] = [], marketplaceUrl: string | null = null) {
+  return mount(Index, { attachTo: document.body, props: { solutions, missing, marketplaceUrl } })
 }
 
 const published = (over: Partial<NonNullable<SolutionRow['ui']>> = {}): NonNullable<SolutionRow['ui']> => ({
@@ -122,6 +123,19 @@ const published = (over: Partial<NonNullable<SolutionRow['ui']>> = {}): NonNulla
 })
 
 describe('solutions page', () => {
+  it('links to where more Solutions are found when the server gives an address', () => {
+    const link = mountPage([solution()], [], 'https://example.com/solutions').get('[data-test="marketplace-link"]')
+
+    expect(link.attributes('href')).toBe('https://example.com/solutions')
+    expect(link.attributes('target')).toBe('_blank')
+    expect(link.attributes('rel')).toBe('noopener noreferrer')
+    expect(link.text()).toBe('Find more Solutions')
+  })
+
+  it('shows no link when the server gives no address', () => {
+    expect(mountPage([solution()]).find('[data-test="marketplace-link"]').exists()).toBe(false)
+  })
+
   it('shows a compact card: identity, state, one-line summary and the buttons, but not the details', () => {
     const wrapper = mountPage([solution()])
     const card = wrapper.get('[data-test="solution-feedback"]')

@@ -14,8 +14,10 @@ use App\Domains\Solution\DTO\UiRangeMismatch;
 use App\Domains\Solution\Enums\SolutionActivationStatus;
 use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Solution\Services\InstalledSolutions;
+use App\Domains\Solution\Services\NoSolutionStorefront;
 use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionUiCompatibility;
+use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
@@ -38,6 +40,8 @@ use Throwable;
  * own toggle) or offers it to connect (the operator's storefront) and, when it ships a console UI, whether the bundle is
  * published and fits the kit Core ships.
  * A Solution whose package is gone but whose activation is still stored is listed apart, so it can be put out.
+ * On a platform with no storefront of its own it also carries the address where more Solutions are found, from the
+ * platform setting {@see self::MARKETPLACE_URL_SETTING}.
  *
  * Only valid Solutions are shown: the catalog is closed to a package whose manifest fails, and `platform:update`
  * refuses it before a tenant could see it. Built per request, with no state of its own: it reads the tenant's activation through the scoped registry.
@@ -46,6 +50,8 @@ use Throwable;
  */
 final readonly class SolutionsPresenter
 {
+    public const string MARKETPLACE_URL_SETTING = 'solutions.marketplace_url';
+
     /**
      * The console points, by the name the screen shows them under.
      *
@@ -68,11 +74,12 @@ final readonly class SolutionsPresenter
         private SolutionUiCompatibility $compatibility,
         private SolutionStorefrontInterface $storefront,
         private TenantContextInterface $tenantContext,
+        private PlatformSettingsReaderInterface $settings,
     ) {
     }
 
     /**
-     * @return array{solutions: list<array<string, mixed>>, missing: list<array<string, mixed>>}
+     * @return array{solutions: list<array<string, mixed>>, missing: list<array<string, mixed>>, marketplaceUrl: string|null}
      */
     public function page(): array
     {
@@ -101,7 +108,7 @@ final readonly class SolutionsPresenter
             }
         }
 
-        return ['solutions' => $solutions, 'missing' => $missing];
+        return ['solutions' => $solutions, 'missing' => $missing, 'marketplaceUrl' => $this->marketplaceUrl()];
     }
 
     /**
@@ -168,6 +175,21 @@ final readonly class SolutionsPresenter
         }
 
         return false;
+    }
+
+    /**
+     * Where to find more Solutions, only on a platform whose storefront is the default one (no operator sells them);
+     * null when another storefront is bound or the setting is empty.
+     */
+    private function marketplaceUrl(): ?string
+    {
+        if (! $this->storefront instanceof NoSolutionStorefront) {
+            return null;
+        }
+
+        $url = mb_trim($this->settings->text(self::MARKETPLACE_URL_SETTING));
+
+        return '' === $url ? null : $url;
     }
 
     /**

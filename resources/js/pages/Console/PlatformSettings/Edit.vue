@@ -20,7 +20,7 @@ import type { PlatformSettingItem, PlatformSettingsGroup, PlatformSettingsPagePr
 
 /**
  * The platform settings of a single-tenant deployment: every setting with its default and whether a value is stored,
- * saved as a whole. An empty field, or "Use default", sends null and the server removes the stored value.
+ * saved as the changed fields only. An empty field, or "Use default", sends null and the server removes the stored value.
  */
 const props = defineProps<{
   groups: PlatformSettingsGroup[]
@@ -31,7 +31,18 @@ const page = usePage<PlatformSettingsPageProps>()
 const t = computed(() => page.props.translations.console.platform_settings)
 const common = computed(() => page.props.translations.console.form)
 
-const form = useForm<Record<string, SettingValue | null>>(initialValues(props.groups))
+const form = useForm<Record<string, SettingValue | null>>({ ...initialValues(props.groups) })
+
+/**
+ * Only what differs from the stored values is sent: an untouched field (a stored empty value included) is left alone by
+ * the server. The stored values are read from the props at submit time, since a save keeps the page mounted and only
+ * refreshes its props.
+ */
+form.transform((data) => {
+  const stored = initialValues(props.groups)
+
+  return Object.fromEntries(Object.entries(data).filter(([field, value]) => value !== stored[field]))
+})
 
 function defaultText(setting: PlatformSettingItem): string {
   const value = typeof setting.default === 'boolean' ? (setting.default ? t.value.on : t.value.off) : String(setting.default)

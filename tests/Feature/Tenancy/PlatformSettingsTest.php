@@ -88,12 +88,12 @@ final class PlatformSettingsTest extends FeatureTestCase
         $definitions = $this->settings()->definitions();
         $keys        = array_map(static fn (PlatformSettingDefinition $d): string => $d->key, $definitions);
 
-        $this->assertSame([PartitionRetention::SETTING, self::ITERATIONS, self::REDIRECT], $keys, 'Conversations, then Flow, then Tenants.');
+        $this->assertSame([PartitionRetention::SETTING, self::ITERATIONS, 'solutions.marketplace_url', self::REDIRECT], $keys, 'Conversations, then Flow, then Solutions, then Tenants.');
         $this->assertSame(300, $definitions[1]->default);
         $this->assertSame(10, $definitions[1]->min);
         $this->assertSame(10000, $definitions[1]->max);
         $this->assertFalse($definitions[1]->hostModeOnly);
-        $this->assertTrue($definitions[2]->hostModeOnly);
+        $this->assertTrue($definitions[3]->hostModeOnly);
     }
 
     public function test_a_refused_change_writes_nothing(): void
@@ -214,7 +214,7 @@ final class PlatformSettingsTest extends FeatureTestCase
         $contract->update([self::REDIRECT => 3], 'operator:9');
 
         $this->assertSame(3, $this->settings()->integer(self::REDIRECT));
-        $this->assertCount(3, $contract->definitions());
+        $this->assertCount(4, $contract->definitions());
         $this->assertSame('operator:9', PlatformSettingEvent::query()->sole()->changed_by);
     }
 
