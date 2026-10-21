@@ -12,6 +12,7 @@ redeploy. Settings of one tenant are on the tenant's own [Settings](/using/tenan
 |---|---|---|---|
 | `flow.execution.max_iterations` | `FLOW_MAX_ITERATIONS` | 10–10000 | How many nodes one flow run may pass through before the session fails. It stops a loop in a flow from holding a worker; one loop iteration costs its body plus two steps. The builder warns about a literal loop count above it |
 | `conversation.retention_days` | `CONVERSATION_RETENTION_DAYS` | 0–3650 | How many days the conversation transcript is kept, for every tenant; `0` keeps it forever. The daily `conversations:prune` drops whole monthly partitions older than that, so a message lives between that many days and about 31 days longer. Irreversible; threads and media are kept |
+| `solutions.marketplace_url` | `SOLUTIONS_MARKETPLACE_URL` | http or https address, or empty | Where **Find more Solutions** on the admin Solutions page links, on a platform that does not sell Solutions itself. Defaults to the [Solutions directory](/self-hosting/solutions-directory); empty hides the link. On the admin screen an empty field resets to the default, so empty it with `platform:settings:set solutions.marketplace_url ""` |
 | `tenancy.rename.redirect_days` | `TENANCY_RENAME_REDIRECT_DAYS` | 0–365 | How many days the old address of a renamed tenant forwards to the new one; `0` switches forwarding off. Has an effect only with `TENANCY_RESOLUTION=host`, and is read when a tenant is renamed |
 
 The values are kept in the landlord tables `platform_settings` and `platform_setting_events` (every

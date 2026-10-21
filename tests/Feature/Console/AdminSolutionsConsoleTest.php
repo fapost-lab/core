@@ -14,6 +14,7 @@ use App\Domains\Solution\Infrastructure\SolutionActivationRecord;
 use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
+use App\Domains\Tenancy\Services\PlatformSettings;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Database\Seeders\TenantAclSeeder;
@@ -328,6 +329,42 @@ final class AdminSolutionsConsoleTest extends FeatureTestCase
 
         $this->assertSame(0, SolutionActivationRecord::query()->count());
         $this->assertSame(0, SolutionActivationEventRecord::query()->count());
+    }
+
+    public function test_a_platform_without_a_storefront_links_to_the_default_marketplace(): void
+    {
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('marketplaceUrl', 'https://docs.fapost.in/self-hosting/solutions-directory')->etc());
+    }
+
+    public function test_a_stored_marketplace_address_replaces_the_default(): void
+    {
+        $this->app->make(PlatformSettings::class)->update(['solutions.marketplace_url' => 'https://example.com/solutions'], 'cli:test');
+        $this->app->forgetScopedInstances();
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('marketplaceUrl', 'https://example.com/solutions')->etc());
+    }
+
+    public function test_an_empty_marketplace_address_hides_the_link(): void
+    {
+        $this->app->make(PlatformSettings::class)->update(['solutions.marketplace_url' => ''], 'cli:test');
+        $this->app->forgetScopedInstances();
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('marketplaceUrl', null)->etc());
+    }
+
+    public function test_an_operator_storefront_hides_the_marketplace_link(): void
+    {
+        $this->storefront();
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('marketplaceUrl', null)->etc());
     }
 
     public function test_a_solution_in_the_plan_is_on_with_nothing_stored_and_shows_no_turn_off(): void

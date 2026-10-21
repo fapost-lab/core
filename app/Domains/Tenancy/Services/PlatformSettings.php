@@ -151,7 +151,7 @@ final class PlatformSettings implements PlatformSettingsReaderInterface
                 continue;
             }
 
-            $violation = null === $value ? null : $this->describe($field)->violation($value);
+            $violation = null === $value ? null : $field->violation($this->describe($field), $value);
 
             if (null === $violation) {
                 $accepted[$key] = $value;
@@ -209,7 +209,9 @@ final class PlatformSettings implements PlatformSettingsReaderInterface
     {
         $stored = $this->rows()[$definition->key] ?? null;
 
-        if (null === $stored || null !== $definition->violation($stored)) {
+        $field = $this->registry->find($definition->key);
+
+        if (null === $stored || null === $field || null !== $field->violation($definition, $stored)) {
             return null;
         }
 

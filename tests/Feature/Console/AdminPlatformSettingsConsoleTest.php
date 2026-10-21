@@ -132,6 +132,18 @@ final class AdminPlatformSettingsConsoleTest extends FeatureTestCase
         $this->assertSame(300, $this->freshSettings()->integer(self::KEY));
     }
 
+    public function test_saving_another_field_keeps_a_link_hidden_by_an_empty_value(): void
+    {
+        app(PlatformSettings::class)->update(['solutions.marketplace_url' => ''], 'cli:test');
+        $this->app->forgetScopedInstances();
+
+        $this->actingAs($this->admin())->put($this->url(), [self::FIELD => '300'])->assertSessionHasNoErrors();
+
+        $this->assertSame(300, $this->freshSettings()->integer(self::KEY));
+        $this->assertTrue($this->storedState('solutions.marketplace_url'));
+        $this->assertSame('', $this->freshSettings()->text('solutions.marketplace_url'));
+    }
+
     public function test_the_host_mode_only_setting_cannot_be_saved_here(): void
     {
         $this->actingAs($this->admin())

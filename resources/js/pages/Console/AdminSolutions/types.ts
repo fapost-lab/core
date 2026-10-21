@@ -92,6 +92,7 @@ export interface SolutionsTranslations {
   activate: string
   deactivate: string
   details: string
+  marketplace: string
   last_change: Record<'activated' | 'deactivated' | 'unknown', string>
   registers: { title: string; actions: string; none: string }
   ui: { title: string; application: string; pages: string; not_published: string; inactive_note: string }

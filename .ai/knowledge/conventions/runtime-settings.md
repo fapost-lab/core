@@ -11,7 +11,7 @@ paths:
   - "app/Domains/Tenancy/Services/PlatformSetting*.php"
   - app/Domains/Tenancy/ValueObjects/PlatformSettingField.php
 summary: A setting an operator or tenant admin may change at runtime is stored in the database and edited in the admin of its scope; .env keeps only secrets, infrastructure and once-per-install values.
-reviewed_at: 2026-10-16
+reviewed_at: 2026-10-21
 ---
 # Runtime settings live in the database, not in `.env`
 
@@ -24,7 +24,8 @@ setting, not an environment variable (`adr-20261016-runtime-settings-in-database
 - a tenant's setting goes into the tenant's settings (Core: `TenantSettings`, edited on the tenant
   admin's settings screen; a Solution: its own settings in the tenant admin);
 - a platform-wide setting of Core goes into Core's platform settings store: a `PlatformSettingField`
-  registered in `PlatformSettingRegistry` from the owning domain's provider `boot()` (its default names a
+  registered in `PlatformSettingRegistry` from the owning domain's provider `boot()` (a domain PHPat keeps off
+  Tenancy's internals, such as Solution, registers it from `App\Providers\DomainServiceProvider` instead; its default names a
   config key, so the `.env` variable keeps working as the default), read through
   `PlatformSettingsReaderInterface` (Tenancy contract, scoped). The landlord tables, the admin screen
   (single mode only), the `platform:settings` commands and Foundation's `PlatformSettingsInterface` (for an

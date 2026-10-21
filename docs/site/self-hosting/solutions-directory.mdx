@@ -1,0 +1,78 @@
+---
+title: "Solutions directory"
+description: "Solutions you can install on your own FaPost installation, and how to install one."
+---
+
+A **Solution** is an extension package: it adds flow actions and console screens to the platform. The
+**Solutions** page of the admin panel lists the Solutions installed on your installation; this page lists
+the ones you can find and install. On a platform you run yourself, that page links here through
+**Find more Solutions**.
+
+## Available Solutions
+
+| Solution | Package | What it adds |
+|---|---|---|
+| [Hello World](https://github.com/fapost-lab/solution-hello-world) | `fapost/solution-hello-world` | The smallest working Solution: a greeting action for the `call` node and one console page. Start here to see the whole path working, or as the template for your own |
+
+Building your own? See [Building a Solution](/extending/solutions).
+
+## Installing a Solution
+
+A Solution is a Composer package added on top of Core with a **composer overlay**, so Core's own
+`composer.json` and `composer.lock` stay untouched.
+
+<Steps>
+  <Step title="Describe the package in composer.overlay.json">
+    At Core's root (the file is git-ignored), name the package's repository and a version:
+
+    ```json
+    {
+      "repositories": [{ "type": "vcs", "url": "https://github.com/fapost-lab/solution-hello-world" }],
+      "require": { "fapost/solution-hello-world": "dev-main" }
+    }
+    ```
+  </Step>
+
+  <Step title="Install it">
+    ```bash
+    composer overlay
+    ```
+
+    It installs the package against Core's locked versions and refuses one that would move them. In an
+    image or CI, add `-- --require-overlay` so a missing overlay file is an error.
+  </Step>
+
+  <Step title="Update the platform">
+    ```bash
+    php artisan platform:update
+    ```
+
+    It checks the Solution's manifest and console interface, runs migrations and publishes the interface.
+    A Solution that fails the checks is refused here and never reaches the admin panel.
+  </Step>
+
+  <Step title="Turn it on">
+    Installing does not turn a Solution on. Each workspace turns it on from **Solutions** in the admin panel
+    ([Solutions](/using/solutions)), or with `php artisan solutions:activate <id> --tenant=<slug>`.
+  </Step>
+</Steps>
+
+A plain `composer install` (an upgrade or a rebuild) drops the overlay package until `composer overlay` is run
+again, and later Composer commands run with `COMPOSER=composer.local.json`; see
+[keep using the overlaid manifest](/extending/development-setup#packages-core-does-not-require).
+
+The overlay file, post-install steps and the options of `composer overlay` are described in
+[Development setup](/extending/development-setup#packages-core-does-not-require).
+
+## Changing the link
+
+The **Find more Solutions** link is the [platform setting](/self-hosting/platform-settings)
+`solutions.marketplace_url`, by default this page. Point it at your own catalogue, or make it empty to hide
+the link:
+
+```bash
+php artisan platform:settings:set solutions.marketplace_url https://example.com/solutions
+php artisan platform:settings:set solutions.marketplace_url ""
+```
+
+A platform that sells Solutions through an operator package shows its own offers instead, and no link.

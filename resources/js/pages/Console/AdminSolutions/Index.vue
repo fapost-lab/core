@@ -7,7 +7,7 @@ export default { layout: AppShell }
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
-import { Puzzle } from '@lucide/vue'
+import { ExternalLink, Puzzle } from '@lucide/vue'
 import { Badge, StatusDot } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@fapost/ui/components/card'
@@ -23,11 +23,13 @@ import type { MissingRow, SolutionRow, SolutionsPageProps } from './types'
  * asks first, because flows that call its actions stop. Both are POSTs to the server, which decides whether they are
  * allowed; the buttons only reflect what the server already said. A Solution the plan or an add-on grants is on with no
  * button; one that is not connected shows Connect when the operator offers it, and otherwise cannot be turned on. One
- * turned on before it stopped being connected can still be turned off from Details.
+ * turned on before it stopped being connected can still be turned off from Details. On a platform that does not sell
+ * Solutions itself, the server hands over where to find more, and the header links there.
  */
 const props = defineProps<{
   solutions: SolutionRow[]
   missing: MissingRow[]
+  marketplaceUrl: string | null
 }>()
 
 const page = usePage<SolutionsPageProps>()
@@ -118,7 +120,20 @@ function turnOff(): void {
 
   <div class="flex w-full flex-col gap-5">
     <div class="flex flex-col gap-1">
-      <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+        <a
+          v-if="marketplaceUrl"
+          :href="marketplaceUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-primary inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline"
+          data-test="marketplace-link"
+        >
+          {{ t.marketplace }}
+          <ExternalLink class="size-3.5" aria-hidden="true" />
+        </a>
+      </div>
       <p class="text-muted-foreground text-sm">{{ t.description }}</p>
     </div>
 
