@@ -7,8 +7,8 @@ domains:
 paths: []
 source: docs/reference/specs/builder/storage/08-contact-card-groups.md
 summary: The contact card shows attributes as a profile plus collapsible groups
-source_hash: c148fdc4ee6358ab3bced8288b3c1d91da0c8a01
-reviewed_at: 2026-10-10
+source_hash: 3894e90ef347e39cc887ac1b4e598fc3ac6f366b
+reviewed_at: 2026-10-21
 ---
 # 08 · Contact card — attribute groups as sections
 

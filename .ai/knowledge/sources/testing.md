@@ -10,8 +10,8 @@ paths:
   - .github/workflows/ci.yml
 source: docs/site/contributing/testing.mdx
 summary: "How to run and write tests: PostgreSQL locally, CI jobs, gateway golden files"
-source_hash: e47f311e26b9df13e891589ebf35039cf381a53b
-reviewed_at: 2026-10-05
+source_hash: a49061315f9d0b45a142b46f10233839683653ff
+reviewed_at: 2026-10-21
 ---
 # Testing and architecture checks
 

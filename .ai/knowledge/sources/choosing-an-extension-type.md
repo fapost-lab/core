@@ -6,7 +6,8 @@ domains: []
 paths: []
 source: docs/site/extending/choosing-an-extension-type.mdx
 summary: When a change is a Feature, a Solution or a Plugin
-source_hash: afcffc30dfaa3c1b74696f921dfd0e3ef5569b5f
+source_hash: 1f5e70aba127e43ba0b66beed98bd9373581714b
+reviewed_at: 2026-10-21
 ---
 # Choosing an extension type
 

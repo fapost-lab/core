@@ -8,8 +8,8 @@ paths:
   - "app/Domains/Flow/Action/**"
 source: docs/site/extending/plugins.mdx
 summary: "Writing a Plugin: provider, manifest and the registrar methods"
-source_hash: 0d519627232893d56f644dcac6a2908c82f8e556
-reviewed_at: 2026-10-05
+source_hash: a84d8e514f5507d8f70f79734b7011c3ecd86da2
+reviewed_at: 2026-10-21
 ---
 # Building a Plugin
 

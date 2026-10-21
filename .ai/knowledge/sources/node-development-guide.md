@@ -9,8 +9,8 @@ paths:
   - "app/Domains/Flow/Registry/**"
 source: docs/platform/runtime/flow/06-node-development-guide.md
 summary: "Step-by-step guide to adding a node handler: registration, result, state, builder UI"
-source_hash: 2e9eebac6c7d9b1b4b0c54953e1bf219103858b0
-reviewed_at: 2026-10-14
+source_hash: 35194c21c50ce860b968508297ed86065bd254c7
+reviewed_at: 2026-10-21
 ---
 # 06. Node Development Guide
 

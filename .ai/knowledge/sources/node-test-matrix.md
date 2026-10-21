@@ -9,8 +9,8 @@ paths:
   - "tests/Feature/Domains/Flow/**"
 source: docs/platform/runtime/flow/08-node-test-matrix.md
 summary: Which tests a new or changed node handler needs before it merges
-source_hash: 79886bcb30e6a130e61b30528735575d23d0f4d4
-reviewed_at: 2026-10-05
+source_hash: 3ffd8aae765e859d942cfc46cec623f2eed25288
+reviewed_at: 2026-10-21
 ---
 # 08. Node Test Matrix
 
