@@ -178,11 +178,11 @@ Nothing changes unless you set `MEDIA_STORAGE_DRIVER=s3`. An installation that a
 has media must copy it to the bucket before switching; Core does not move stored files.
 See [Media storage](/self-hosting/configuration#media-storage).
 
-## Skip the 0.17.0 core image
+## Core images before 0.18.0 lack the console
 
-The `core` image of 0.17.0 was built without the compiled console, so every console page
-(`/admin/login` included) answers 500 on an installation from the Compose file. Upgrade
-straight to 0.18.0 or later; if you are already on 0.17.0, pull 0.18.0.
+The `core` images from 0.10.0 to 0.17.0 were built without the compiled console, so on an
+installation from the Compose file every console page (`/admin/login` included) answers
+500 while the `web` image looks healthy. Use 0.18.0 or later.
 
 ## Channel settings follow the channel type
 
