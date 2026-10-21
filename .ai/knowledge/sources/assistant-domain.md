@@ -8,8 +8,8 @@ paths:
   - "app/Domains/Assistant/**"
 source: docs/platform/architecture/platform/04-assistant-domain.md
 summary: Ownership of assistant, channel, flow and session; webhook registry and session lock key shape
-source_hash: 8b8632d68b4069858989279c6a48f8019deee6e3
-reviewed_at: 2026-10-05
+source_hash: 78cafa170cab361f27377ff7525f43d6be38e63f
+reviewed_at: 2026-10-21
 ---
 # 04 — Assistant Domain (Assistants + Channels)
 

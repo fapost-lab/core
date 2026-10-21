@@ -12,8 +12,8 @@ paths:
   - "lang/**"
 source: docs/platform/architecture/adr/15-multilingual.md
 summary: Admin UI language vs content language, the resolution chain and tenant_translations
-source_hash: e6be0794419df08ed505e0bd85b6555a7f416918
-reviewed_at: 2026-10-05
+source_hash: 5f1788521cb956fceefb42bb752da1804ee359b2
+reviewed_at: 2026-10-21
 ---
 # ADR-15 — Мультиязычность
 

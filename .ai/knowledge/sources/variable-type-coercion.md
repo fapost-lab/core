@@ -8,8 +8,8 @@ paths:
   - "app/Domains/Flow/State/Variables/**"
 source: docs/reference/specs/builder/storage/10-variable-type-coercion.md
 summary: Type-aware variable coercion and the per-tenant variable schema registry
-source_hash: 8080bdcbc82eda8b0cfcef957bf3225b84269c22
-reviewed_at: 2026-10-05
+source_hash: 38855eb9b88326a0147964bc8920006f0da36cb6
+reviewed_at: 2026-10-21
 ---
 # 10 · Variable Type Coercion + Schema Registry
 
