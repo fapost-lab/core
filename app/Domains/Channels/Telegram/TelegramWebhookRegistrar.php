@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Channels\Telegram;
 
-use App\Domains\Channels\Telegram\Contracts\TelegramBotIdentityStoreInterface;
 use App\Domains\Channels\Telegram\Dto\SetWebhookDto;
 use App\Domains\Webhook\Services\WebhookUrlGenerator;
+use Fapost\Foundation\Channel\Settings\ManagedChannelSettingsInterface;
 use Fapost\Foundation\Channel\WebhookRegistrarInterface;
 use Fapost\Foundation\Channel\WebhookRegistrationPayload;
 
@@ -18,7 +18,7 @@ final readonly class TelegramWebhookRegistrar implements WebhookRegistrarInterfa
     public function __construct(
         private TelegramBotApiClientFactory $clientFactory,
         private WebhookUrlGenerator $webhookUrlGenerator,
-        private TelegramBotIdentityStoreInterface $identityStore,
+        private ManagedChannelSettingsInterface $managedSettings,
     ) {
     }
 
@@ -44,10 +44,9 @@ final readonly class TelegramWebhookRegistrar implements WebhookRegistrarInterfa
 
         $bot = $client->getMe();
 
-        $this->identityStore->saveUsername(
-            $payload->channelId,
-            is_string($bot['result']['username'] ?? null) ? $bot['result']['username'] : null,
-        );
+        $this->managedSettings->report($payload->channelId, [
+            'bot_username' => is_string($bot['result']['username'] ?? null) ? $bot['result']['username'] : null,
+        ]);
     }
 
     /**

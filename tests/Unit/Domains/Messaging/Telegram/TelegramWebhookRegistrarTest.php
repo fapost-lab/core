@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Messaging\Telegram;
 
-use App\Domains\Channels\Telegram\Contracts\TelegramBotIdentityStoreInterface;
 use App\Domains\Channels\Telegram\TelegramBotApiClientFactory;
 use App\Domains\Channels\Telegram\TelegramWebhookRegistrar;
 use App\Domains\Webhook\Services\WebhookUrlGenerator;
+use Fapost\Foundation\Channel\Settings\ManagedChannelSettingsInterface;
 use Fapost\Foundation\Channel\WebhookRegistrationPayload;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
@@ -30,10 +30,10 @@ final class TelegramWebhookRegistrarTest extends TestCase
             ], 200),
         ]);
 
-        $identityStore = $this->mock(TelegramBotIdentityStoreInterface::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('saveUsername')->with('channel-1', 'sample_bot')->once();
+        $managedSettings = $this->mock(ManagedChannelSettingsInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('report')->with('channel-1', ['bot_username' => 'sample_bot'])->once();
         });
-        $registrar = new TelegramWebhookRegistrar(new TelegramBotApiClientFactory(), new WebhookUrlGenerator('https://hooks.example.com'), $identityStore);
+        $registrar = new TelegramWebhookRegistrar(new TelegramBotApiClientFactory(), new WebhookUrlGenerator('https://hooks.example.com'), $managedSettings);
 
         $registrar->register(new WebhookRegistrationPayload(
             channelId: 'channel-1',
@@ -67,10 +67,10 @@ final class TelegramWebhookRegistrarTest extends TestCase
             ], 200),
         ]);
 
-        $identityStore = $this->mock(TelegramBotIdentityStoreInterface::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('saveUsername')->with('channel-1', 'sample_bot')->once();
+        $managedSettings = $this->mock(ManagedChannelSettingsInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('report')->with('channel-1', ['bot_username' => 'sample_bot'])->once();
         });
-        $registrar = new TelegramWebhookRegistrar(new TelegramBotApiClientFactory(), new WebhookUrlGenerator('https://hooks.example.com'), $identityStore);
+        $registrar = new TelegramWebhookRegistrar(new TelegramBotApiClientFactory(), new WebhookUrlGenerator('https://hooks.example.com'), $managedSettings);
 
         $registrar->register(new WebhookRegistrationPayload(
             channelId: 'channel-1',
@@ -93,8 +93,8 @@ final class TelegramWebhookRegistrarTest extends TestCase
         $registrar = new TelegramWebhookRegistrar(
             new TelegramBotApiClientFactory(),
             new WebhookUrlGenerator('https://hooks.example.com'),
-            $this->mock(TelegramBotIdentityStoreInterface::class, function (MockInterface $mock): void {
-                $mock->shouldNotReceive('saveUsername');
+            $this->mock(ManagedChannelSettingsInterface::class, function (MockInterface $mock): void {
+                $mock->shouldNotReceive('report');
             }),
         );
 

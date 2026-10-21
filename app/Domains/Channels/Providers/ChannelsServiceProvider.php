@@ -9,9 +9,11 @@ use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Policies\ChannelPolicy;
+use App\Domains\Channels\Services\ChannelManagedSettings;
 use App\Domains\Channels\Telegram\TelegramChannelServiceProvider;
 use App\Domains\Channels\WhatsApp\WhatsAppChannelServiceProvider;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
+use Fapost\Foundation\Channel\Settings\ManagedChannelSettingsInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
@@ -33,6 +35,9 @@ final class ChannelsServiceProvider extends ServiceProvider
 
         // Depends on the image alone (class names), never on a tenant, so a process may keep it.
         $this->app->singleton(ConnectorChannels::class);
+
+        // Built per resolution and keeping nothing: it reads and writes the current tenant's channel each time.
+        $this->app->bind(ManagedChannelSettingsInterface::class, ChannelManagedSettings::class);
 
         $this->app->singleton(
             ChannelRegistryInterface::class,

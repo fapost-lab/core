@@ -15,7 +15,7 @@ use Illuminate\Support\Str;
  * What the Telegram channel tells Core about itself: the settings of its webhook, the bot name the provider reports
  * and the link that opens the bot. Declared with the same Foundation contract a connector uses.
  *
- * `bot_username` is managed: {@see TelegramBotIdentityStore} writes it after each webhook registration, the form
+ * `bot_username` is managed: {@see TelegramWebhookRegistrar} reports it through {@see \Fapost\Foundation\Channel\Settings\ManagedChannelSettingsInterface} after each webhook registration, the form
  * never sends it, and saving the form keeps it.
  */
 final class TelegramChannelProfile implements ChannelProfileInterface

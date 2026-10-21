@@ -160,7 +160,7 @@ final class ViberProfile implements ChannelProfileInterface
                     key: 'account_uri',
                     type: ChannelSettingType::Text,
                     label: 'Account URI',
-                    help: 'The URI from the bot\'s Viber profile, without the domain.',
+                    managed: true,
                 ),
             ],
             usesSecretToken: false,
@@ -178,6 +178,32 @@ final class ViberProfile implements ChannelProfileInterface
 }
 ```
 
+A managed value is reported when the provider has told it, for example in the registrar that
+sets the webhook:
+
+```php
+final readonly class ViberWebhookRegistrar implements WebhookRegistrarInterface
+{
+    public function __construct(
+        private ViberClientFactory $clients,
+        private ManagedChannelSettingsInterface $managedSettings,
+    ) {
+    }
+
+    public function register(WebhookRegistrationPayload $payload): void
+    {
+        $account = $this->clients->make($payload->token)->setWebhook(/* ... */);
+
+        $this->managedSettings->report($payload->channelId, ['account_uri' => $account['uri'] ?? null]);
+    }
+
+    public function deregister(WebhookRegistrationPayload $payload): void
+    {
+        // ...
+    }
+}
+```
+
 A setting is one of five types: `Text`, `Integer`, `Boolean`, `Choice` (one value of
 `choices`) and `Choices` (a list of them). Core builds the validation rules and the form control
 from the type, `min`, `max`, `required` and `choices`; you never validate a value yourself.
@@ -190,11 +216,17 @@ token.
   and falls back to your English text. Load your translation files with `loadTranslationsFrom`
   in your provider. A help text may use `:min`, `:max` and `:default`.
 - **Managed fields.** A field with `managed: true` holds a value the integration reads from the
-  provider, such as Telegram's bot name. The form neither shows nor accepts it, and saving the
-  form keeps the stored value. Only Core's built-in integrations can write one today: Foundation
-  has no way yet for a connector to hand Core a value to store, and a connector never writes
-  Core's tables itself. Until it does, declare such a value as an ordinary field the operator
-  fills in.
+  provider, such as Telegram's bot name or Viber's account URI. The form neither shows nor
+  accepts it, and saving the form keeps the stored value. You never write it yourself: inject
+  `Fapost\Foundation\Channel\Settings\ManagedChannelSettingsInterface` into your webhook
+  registrar and call `report($payload->channelId, ['account_uri' => $uri])` after the provider
+  answers (see below). It needs the channel's id and runs in the channel's tenant, which the
+  registrar has; the inbound adapter has neither, so it cannot report a value yet. A
+  `null` removes the key. Core checks each value against the field's type, `min`, `max` and
+  `choices`, stores it, and does not synchronize the provider again because of it. A key that
+  is not a managed field of your schema, or a value that does not fit, throws
+  `InvalidManagedSettingException`: that is a mistake in the connector, and it shows in the
+  failed job. A channel deleted in the meantime is ignored.
 - **Secret token.** Set `usesSecretToken: false` when the provider has no webhook secret; the
   form then does not ask for one. A `secretTokenPattern` (PCRE, no delimiters) restricts what an
   operator may enter.
