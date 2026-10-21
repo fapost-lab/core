@@ -70,6 +70,10 @@ final class ViberConnectorServiceProvider extends AbstractConnectorServiceProvid
             inbound: ViberInboundAdapter::class,
             webhookRegistrar: ViberWebhookRegistrar::class,
             mediaLinkPolicy: ViberMediaLinkPolicy::class,
+            capabilities: new ChannelCapabilities([
+                ChannelCapability::CallbackButtons,
+                ChannelCapability::ReplyButtons,
+            ]),
         ));
     }
 }
@@ -93,11 +97,34 @@ it, so constructors must be cheap and must not touch tenant data.
 | `mediaUploader` | no | `Fapost\Foundation\Media\ChannelMediaUploaderInterface` |
 | `mediaDownloader` | no | `Fapost\Foundation\Media\ChannelMediaDownloaderInterface` |
 | `mediaLinkPolicy` | no | `Fapost\Foundation\Media\ChannelMediaLinkPolicyInterface` |
+| `capabilities` | no | A `Fapost\Foundation\Messaging\ChannelCapabilities` listing what the channel can do beyond text and media |
 
 Boot fails, naming your connector, when you register a type your manifest does not
 declare, a type Core serves itself (such as `telegram`), a type twice, a class that does
 not implement its interface, or a media class whose `channelType()` is another type.
 `platform:update` also refuses a declared type you never register.
+
+## Buttons and capabilities
+
+A channel that declares no `capabilities` is text and media only, and Core sends it
+nothing else. Declare what the channel can do with `ChannelCapability`:
+`CallbackButtons`, `ReplyButtons`, `ShareContact`, `ShareLocation`, `RemoveButtons`
+(strip the buttons of a message already sent) and `PersistentButtons` (callback buttons
+of older messages stay pressable).
+
+Core describes the buttons of a message by what a press does, not by where a channel
+draws them: `MessagePayload::$buttons` is a `ButtonSet` of rows of `Button`. Each button
+has a `label` and an action: `Callback` (the press returns a hidden payload),
+`Reply` (the press sends the label as the user's message), `ShareContact` or
+`ShareLocation`. A set holds either callback buttons only or none. Translate it into the
+provider's format in your sender. Core's flow messages carry `buttons` and leave
+`MessagePayload::$keyboard` null; `keyboard` is deprecated, so a sender that reads only
+it shows no buttons.
+
+When the user presses a `Callback` button, report it as an `IncomingMessage` of type
+`IncomingMessageType::CallbackQuery` whose `text` is the button's payload, unchanged.
+How the provider delivers the press is the connector's business. The payload is at most
+`Button::MAX_PAYLOAD_BYTES` (64) bytes and Core treats it as opaque to you.
 
 ## Inbound webhooks
 

@@ -14,6 +14,7 @@ use Carbon\CarbonImmutable;
 use DateTimeImmutable;
 use Fapost\Foundation\DTO\IncomingMedia;
 use Fapost\Foundation\DTO\IncomingMessage;
+use Fapost\Foundation\Messaging\Button;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\OutboundMessage;
 
@@ -83,7 +84,7 @@ final class ConversationCaptureFactory
 
         $origin    = MessageOrigin::tryFrom((string) ($metadata['origin'] ?? '')) ?? MessageOrigin::Flow;
         $originRef = is_array($metadata['origin_ref'] ?? null) ? $metadata['origin_ref'] : [];
-        $keyboard  = $message->payload->keyboard;
+        $payload   = $this->outboundPayload($message);
 
         // An operator reply is still an outbound message on the same funnel, but
         // the transcript must attribute it to the person, not to the assistant.
@@ -102,7 +103,7 @@ final class ConversationCaptureFactory
             senderType: $isStaffReply ? MessageSenderType::Staff : MessageSenderType::Assistant,
             contentType: MessageContentType::fromOutbound($message->payload->type),
             text: $message->payload->text,
-            payload: null !== $keyboard ? ['keyboard' => $keyboard] : [],
+            payload: $payload,
             media: [],
             providerMessageId: $result->providerMessageId,
             replyToProviderMessageId: null,
@@ -113,6 +114,31 @@ final class ConversationCaptureFactory
             occurredAt: CarbonImmutable::now('UTC'),
             senderStaffUserId: $staffUserId,
         );
+    }
+
+    /**
+     * The transcript payload of an outbound message: its buttons as labels with their action (the callback payload
+     * is an internal token and stays out), or, for a message that still carries raw provider markup, that markup.
+     *
+     * @return array<string, mixed>
+     */
+    private function outboundPayload(OutboundMessage $message): array
+    {
+        $buttons = $message->payload->buttons;
+
+        if (null !== $buttons) {
+            return ['buttons' => array_map(
+                static fn (array $row): array => array_map(
+                    static fn (Button $button): array => ['label' => $button->label, 'action' => $button->action->value],
+                    $row,
+                ),
+                $buttons->rows,
+            )];
+        }
+
+        $keyboard = $message->payload->keyboard;
+
+        return null !== $keyboard ? ['keyboard' => $keyboard] : [];
     }
 
     private function stringOrNull(mixed $value): ?string

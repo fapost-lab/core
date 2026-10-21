@@ -321,12 +321,29 @@ final class ConversationController extends Controller
     }
 
     /**
-     * The labels of the inline keyboard a bot message carried, for the transcript to show what the contact could press.
+     * The labels of the buttons a bot message carried, for the transcript to show what the contact could press.
+     * Reads the neutral `buttons` first, then the raw `keyboard` markup older messages were stored with.
      *
      * @return list<string>
      */
     private function buttons(ConversationMessage $message): array
     {
+        $neutral = is_array($message->payload) ? ($message->payload['buttons'] ?? null) : null;
+
+        if (is_array($neutral)) {
+            $labels = [];
+
+            foreach (Arr::flatten($neutral, 1) as $button) {
+                $label = is_array($button) ? ($button['label'] ?? null) : null;
+
+                if (is_string($label) && '' !== $label) {
+                    $labels[] = $label;
+                }
+            }
+
+            return $labels;
+        }
+
         $keyboard = is_array($message->payload) ? ($message->payload['keyboard'] ?? null) : null;
 
         if (! is_array($keyboard)) {

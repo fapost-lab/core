@@ -11,6 +11,8 @@ use App\Domains\Channels\Telegram\TelegramAdapter;
 use App\Domains\Channels\Telegram\TelegramSender;
 use App\Domains\Channels\Telegram\TelegramWebhookRegistrar;
 use Fapost\Foundation\Connector\ConnectorChannel;
+use Fapost\Foundation\Messaging\ChannelCapabilities;
+use Fapost\Foundation\Messaging\ChannelCapability;
 use Fapost\Foundation\Messaging\ProviderSenderInterface;
 use Illuminate\Contracts\Container\Container;
 use Mockery;
@@ -125,6 +127,54 @@ final class ChannelRegistryTest extends TestCase
         $this->assertSame('Telegram', $registry->label('telegram'));
         $this->assertSame('Echo Connector', $registry->label('echo'));
         $this->assertSame('viber', $registry->label('viber'));
+    }
+
+    public function test_capabilities_come_from_a_built_in_definition(): void
+    {
+        $registry = new ChannelRegistry([
+            new ChannelIntegrationDefinition(
+                channelType: 'telegram',
+                senderClass: TelegramSender::class,
+                capabilities: new ChannelCapabilities([ChannelCapability::CallbackButtons]),
+            ),
+        ], $this->app);
+
+        $this->assertTrue($registry->capabilities('telegram')->supports(ChannelCapability::CallbackButtons));
+        $this->assertFalse($registry->capabilities('telegram')->supports(ChannelCapability::RemoveButtons));
+    }
+
+    public function test_capabilities_come_from_a_connector_channel(): void
+    {
+        $channels = new ConnectorChannels();
+        $channels->add(new ConnectorChannel(
+            type: 'echo',
+            sender: EchoSender::class,
+            inbound: EchoInboundAdapter::class,
+            capabilities: new ChannelCapabilities([ChannelCapability::ReplyButtons]),
+        ), 'echo');
+        $registry = new ChannelRegistry([], $this->app, $channels);
+
+        $this->assertTrue($registry->capabilities('echo')->supports(ChannelCapability::ReplyButtons));
+        $this->assertFalse($registry->capabilities('echo')->supports(ChannelCapability::CallbackButtons));
+    }
+
+    public function test_a_channel_that_declares_nothing_and_an_unknown_type_have_no_capabilities(): void
+    {
+        $registry = new ChannelRegistry([], $this->app, $this->connectorChannels());
+
+        $this->assertSame([], $registry->capabilities('echo')->features);
+        $this->assertSame([], $registry->capabilities('viber')->features);
+    }
+
+    public function test_the_built_in_telegram_channel_declares_every_capability(): void
+    {
+        $registry = $this->app->make(\App\Domains\Channels\Contracts\ChannelRegistryInterface::class);
+
+        foreach (ChannelCapability::cases() as $capability) {
+            $this->assertTrue($registry->capabilities('telegram')->supports($capability), $capability->value);
+        }
+
+        $this->assertSame([], $registry->capabilities('whatsapp')->features);
     }
 
     private function connectorChannels(): ConnectorChannels

@@ -8,6 +8,8 @@ use App\Domains\Channels\ChannelIntegrationDefinition;
 use App\Domains\Channels\Telegram\Contracts\TelegramBotIdentityStoreInterface;
 use App\Domains\Channels\Telegram\Media\TelegramMediaDownloader;
 use App\Domains\Channels\Telegram\Media\TelegramMediaUploader;
+use Fapost\Foundation\Messaging\ChannelCapabilities;
+use Fapost\Foundation\Messaging\ChannelCapability;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -51,6 +53,14 @@ final class TelegramChannelServiceProvider extends ServiceProvider
                 senderClass: TelegramSender::class,
                 webhookRegistrarClass: TelegramWebhookRegistrar::class,
                 adapterClass: TelegramAdapter::class,
+                capabilities: new ChannelCapabilities([
+                    ChannelCapability::CallbackButtons,
+                    ChannelCapability::ReplyButtons,
+                    ChannelCapability::ShareContact,
+                    ChannelCapability::ShareLocation,
+                    ChannelCapability::RemoveButtons,
+                    ChannelCapability::PersistentButtons,
+                ]),
             )
         );
     }
