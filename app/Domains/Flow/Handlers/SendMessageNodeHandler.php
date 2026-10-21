@@ -37,6 +37,7 @@ use Fapost\Support\Builder\Schema\Fields\TextField;
 use Fapost\Support\Builder\Schema\Fields\ToggleField;
 use Fapost\Support\Builder\Schema\Schema;
 use Fapost\Support\Builder\Schema\Section;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Throwable;
 
@@ -55,6 +56,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
         private readonly PersistentButtonRegistryInterface $persistentButtonRegistry,
         private readonly VariableResolverInterface $variableResolver,
         private readonly SendMessageTimeoutSchedulerInterface $timeoutScheduler,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -241,9 +243,18 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                 errorMessage: 'limit_reached: ' . $exception->getMessage(),
             );
         } catch (Throwable $exception) {
-            return NodeExecutionResult::executed(
+            $this->logger->warning('flow.send_message_failed', [
+                'tenant_id'  => $context->tenantId,
+                'session_id' => $context->sessionId,
+                'node_id'    => $nodeId,
+                'exception'  => $exception,
+            ]);
+
+            return new NodeExecutionResult(
+                status: NodeExecutionStatus::Executed,
                 sourceHandle: 'error',
                 metadata: ['error' => $exception->getMessage(), 'error_type' => 'send_failure'],
+                errorMessage: 'send_failure: ' . $exception->getMessage(),
             );
         }
 

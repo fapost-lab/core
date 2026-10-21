@@ -48,6 +48,8 @@ use Fapost\Foundation\Flow\Enums\StateNamespace;
 use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Mockery;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use RuntimeException;
 use Tests\Support\FakeUsageMeter;
 use Tests\Support\UsageGates;
@@ -926,6 +928,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             Mockery::mock(PersistentButtonRegistryInterface::class),
             new VariableResolver(),
             Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
+            new NullLogger(),
         );
 
         $context = new NodeExecutionContext(
@@ -984,6 +987,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             Mockery::mock(PersistentButtonRegistryInterface::class),
             new VariableResolver(),
             Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
+            new NullLogger(),
         );
 
         $context = new NodeExecutionContext(
@@ -1378,7 +1382,15 @@ final class BuiltInNodeHandlersTest extends TestCase
         $translator = Mockery::mock(ContentTranslatorInterface::class);
         $translator->shouldReceive('resolveField')->andReturn('hello');
 
-        $handler = $this->makeHandler($sender, $translator);
+        $logger = Mockery::mock(LoggerInterface::class);
+        $logger->shouldReceive('warning')
+            ->once()
+            ->with('flow.send_message_failed', Mockery::on(
+                static fn (array $context): bool => 'node-err' === $context['node_id']
+                    && $context['exception'] instanceof RuntimeException,
+            ));
+
+        $handler = $this->makeHandler($sender, $translator, logger: $logger);
         $result  = $handler->execute([
             'id'     => 'node-err',
             'config' => ['content_type' => 'text', 'text' => ['en' => 'hello']],
@@ -1387,6 +1399,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $this->assertSame(NodeExecutionStatus::Executed, $result->status);
         $this->assertSame('error', $result->sourceHandle);
         $this->assertSame('send_failure', $result->metadata['error_type']);
+        $this->assertSame('send_failure: connection refused', $result->errorMessage);
         $this->assertArrayNotHasKey(SystemStateKeys::SENT_MESSAGES, $result->stateChanges);
     }
 
@@ -1529,6 +1542,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             Mockery::mock(PersistentButtonRegistryInterface::class),
             new VariableResolver(),
             Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
+            new NullLogger(),
         );
 
         $persistedButtons = [
@@ -1620,6 +1634,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         MessageSenderInterface $sender,
         ContentTranslatorInterface $translator,
         ?SendMessageTimeoutSchedulerInterface $timeouts = null,
+        ?LoggerInterface $logger = null,
     ): SendMessageNodeHandler {
         return new SendMessageNodeHandler(
             $sender,
@@ -1629,6 +1644,7 @@ final class BuiltInNodeHandlersTest extends TestCase
             Mockery::mock(PersistentButtonRegistryInterface::class),
             new VariableResolver(),
             $timeouts ?? Mockery::mock(SendMessageTimeoutSchedulerInterface::class),
+            $logger ?? new NullLogger(),
         );
     }
 
