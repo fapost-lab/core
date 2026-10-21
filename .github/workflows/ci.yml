@@ -1,9 +1,9 @@
 # The checks a change has to pass before it reaches main.
 #
 # Runs on every pull request and on every push to main, so a merged change is
-# checked once more on the exact commit a release tag would point at. The three
-# parts of the repository (PHP application, Go gateway, Vue builder) have
-# nothing in common at build time, so they are separate jobs and run at once.
+# checked once more on the exact commit a release tag would point at. The parts
+# of the repository (PHP application, Go gateway, Vue builder, container images)
+# have nothing in common at build time, so they are separate jobs and run at once.
 
 name: CI
 
@@ -273,3 +273,38 @@ jobs:
       # The production image runs this same build; a change that breaks it
       # should fail here rather than at release time.
       - run: npm run build
+
+  images:
+    name: Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # Both published targets, built as the publish workflow builds them
+      # (single platform, loaded locally rather than pushed).
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: core
+          load: true
+          tags: fapost-check/core
+          cache-from: type=gha,scope=ci-core
+          cache-to: type=gha,mode=max,scope=ci-core
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: docker/Dockerfile
+          target: web
+          load: true
+          tags: fapost-check/web
+          cache-from: type=gha,scope=ci-web
+          cache-to: type=gha,mode=max,scope=ci-web
+
+      # The console view needs the Vite manifest in the PHP container; a core
+      # image built without it passes every PHP test and fails in production.
+      - run: docker/check-image-assets.sh fapost-check/core fapost-check/web

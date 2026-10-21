@@ -127,6 +127,13 @@ RUN mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cac
     && composer run-script post-autoload-dump --no-interaction \
     && rm -f /usr/bin/composer
 
+# The compiled front-end. `@vite` in the console view reads public/build/manifest.json
+# from this container, not from nginx: without it every console page answers 500
+# although the web tier serves the assets fine. After the RUN above on purpose, so
+# a front-end change does not invalidate the Composer layer.
+# docker/check-image-assets.sh keeps this in step with the `web` image.
+COPY --from=assets --chown=www-data:www-data /build/public/build ./public/build
+
 ARG VERSION=dev
 LABEL org.opencontainers.image.version=$VERSION
 
