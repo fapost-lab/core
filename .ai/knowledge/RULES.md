@@ -30,8 +30,10 @@ domain rules named as its source; this file is the index of what holds and how i
   Enforced: `tests/Architecture/IdStrategyTest.php` (models in `App\Domains\*\Models` and Eloquent models in `App\Domains\*\Infrastructure`, with named
   exceptions such as the composite-key `FlowCallgraphEdge`).
 - **A tenant's effective Solution activation is answered only by `ActiveSolutions`.** It is bound `scoped`,
-  memoised per tenant id, and answers stored-active AND installed with a valid manifest; no other code
-  decides "is it on" from `solution_activations` or keeps activation in a singleton, a static or a cross-process cache.
+  memoised per tenant id, and answers installed with a valid manifest AND (granted by the operator OR stored-active and
+  allowed); no other code decides "is it on" from `solution_activations` or keeps activation in a singleton, a static or a
+  cross-process cache. The one cross-process copy is the operator's last grants per tenant (`SolutionEntitlements`, 24 h, key
+  by tenant id), a cache of the operator's answer read only while the operator cannot answer.
   Raw rows and the journal are read only through `SolutionActivationStoreInterface` (`all()`, `events()`, used by
   `solutions:list` and later screens), and only `SolutionActivator` writes them. Source: `adr-20261014-solution-activation-in-tenant-schema`,
   `conventions/worker-safety.md`. Enforced: `SolutionBoundariesTest` (the domain touches the database only in

@@ -18,7 +18,7 @@ sessions. The platform is extended from outside through public contracts, not by
 | Laravel application | PHP 8.4, Laravel 12, PHP-FPM | Webhook ingress, the console (admin and assistant screens), builder and mini-app endpoints |
 | Queue workers | Laravel Horizon | Flow execution, message delivery, transcript logging, trigger fan-out |
 | Ingress gateway | Go, optional | Verifies, rate-limits, deduplicates and enqueues webhook deliveries in front of the application |
-| Landlord schema | PostgreSQL | Tenants and the webhook registry |
+| Landlord schema | PostgreSQL | Tenants, the webhook registry and Core's platform-wide settings |
 | Tenant schemas | PostgreSQL | Every domain's data, one schema per tenant, selected by switching the connection's search path |
 | Redis | Redis | Queues, locks, cache, sessions and the webhook spec registry |
 | Front ends | Inertia + Vue 3 (console, builder), Vue 3 + vue-router (mini app), Tailwind (public site) | Separately built surfaces |
@@ -62,7 +62,7 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   Foundation, a primitive with no domain meaning into Support, anything with one domain's meaning
   stays in Core (ADR-05).
 - **The extension packages are separate repositories.** Core consumes them through VCS
-  repositories (`fapost/foundation ^0.23`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
+  repositories (`fapost/foundation ^0.25`, `fapost/support ^0.2`); they are absent from this working tree and, for local development,
   symlinked over `vendor/` by `composer dev:link` (`tools/dev-link-packages.php`). The console kit is
   one too: the npm package `@fapost/ui` (`fapost-lab/ui`), checked out in `packages/fapost-ui` and
   linked over `node_modules/` by `npm run dev:link` (`tools/dev-link-npm.mjs`); it depends on nothing
@@ -97,9 +97,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   implemented by `ConsoleExtensionRegistry` in the `solution` domain, filtered per request and
   rendered by `app/Http/Shell` (`SolutionExtensions`, `SolutionRoutes`, `SolutionImportMap`,
   `SolutionUi`) and `resources/js/console/solutions/`, and `platform:update` publishes the
-  prebuilt bundles; its rules are `conventions/solution-console-ui.md`. Absent: the other registrar
-  methods, the activation screen, the entitlement check, and
-  the author's half of Solution UI (the Vite preset, the kit-range check, the derived-image
+  prebuilt bundles; its rules are `conventions/solution-console-ui.md`. The activation screen
+  (`admin/solutions`) and the operator's entitlement (grants, allowed, the storefront) are in the Solution domain's
+  overview. Absent: the other registrar methods, and the author's half of Solution UI (the Vite preset, the kit-range check, the derived-image
   recipe — `first-solution` phase 0).
 - **Landlord data is reached only through Tenancy.** Other domains depend on
   `Tenancy/Contracts`; the `landlord` connection is opened only inside Tenancy infrastructure. Only the SaaS operator

@@ -34,14 +34,16 @@ final class TenantSettingsRequest extends FormRequest
             'content_base_language' => ['required', 'string', $language],
             'available_languages'   => ['required', 'array', 'list', 'min:1'],
             // A blank pick is dropped, as Filament did; what is left must not be empty (checked after).
-            'available_languages.*'  => ['nullable', 'string', $language],
-            'fallback_language'      => ['required', 'string', $language],
-            'messaging_rate_limit'   => ['required', 'integer', 'min:1'],
-            'broadcast_chunk_size'   => ['required', 'integer', 'min:1'],
-            'broadcast_backpressure' => ['required', 'boolean'],
-            'flow_session_ttl'       => ['required', 'integer', 'min:60'],
-            'max_retry_attempts'     => ['required', 'integer', 'min:0'],
-            'flow_fallback_message'  => ['nullable', 'string'],
+            'available_languages.*'    => ['nullable', 'string', $language],
+            'fallback_language'        => ['required', 'string', $language],
+            'messaging_rate_limit'     => ['required', 'integer', 'min:1'],
+            'broadcast_chunk_size'     => ['required', 'integer', 'min:1'],
+            'broadcast_backpressure'   => ['required', 'boolean'],
+            'conversation_logging'     => ['required', 'boolean'],
+            'conversation_media_fetch' => ['required', 'boolean'],
+            'flow_session_ttl'         => ['required', 'integer', 'min:60'],
+            'max_retry_attempts'       => ['required', 'integer', 'min:0'],
+            'flow_fallback_message'    => ['nullable', 'string'],
         ];
     }
 
@@ -84,7 +86,7 @@ final class TenantSettingsRequest extends FormRequest
     {
         $attributes = [];
 
-        foreach (['content_base_language', 'available_languages', 'fallback_language', 'messaging_rate_limit', 'broadcast_chunk_size', 'broadcast_backpressure', 'flow_session_ttl', 'max_retry_attempts', 'flow_fallback_message'] as $field) {
+        foreach (['content_base_language', 'available_languages', 'fallback_language', 'messaging_rate_limit', 'broadcast_chunk_size', 'broadcast_backpressure', 'conversation_logging', 'conversation_media_fetch', 'flow_session_ttl', 'max_retry_attempts', 'flow_fallback_message'] as $field) {
             $attributes[$field] = trans('staff.tenant_settings.fields.' . $field);
         }
 
@@ -96,7 +98,7 @@ final class TenantSettingsRequest extends FormRequest
     /**
      * The validated form in the shape {@see TenantSettingsEditor::save()} takes.
      *
-     * @return array{content_base_language: string, available_languages: list<string>, fallback_language: string, messaging_rate_limit: int, broadcast_chunk_size: int, broadcast_backpressure: bool, flow_session_ttl: int, max_retry_attempts: int, flow_fallback_message: string}
+     * @return array{content_base_language: string, available_languages: list<string>, fallback_language: string, messaging_rate_limit: int, broadcast_chunk_size: int, broadcast_backpressure: bool, conversation_logging: bool, conversation_media_fetch: bool, flow_session_ttl: int, max_retry_attempts: int, flow_fallback_message: string}
      */
     public function fields(): array
     {
@@ -104,15 +106,17 @@ final class TenantSettingsRequest extends FormRequest
         $validated = $this->validated();
 
         return [
-            'content_base_language'  => (string) $validated['content_base_language'],
-            'available_languages'    => TenantSettingsEditor::languageList((array) $validated['available_languages']),
-            'fallback_language'      => (string) $validated['fallback_language'],
-            'messaging_rate_limit'   => (int) $validated['messaging_rate_limit'],
-            'broadcast_chunk_size'   => (int) $validated['broadcast_chunk_size'],
-            'broadcast_backpressure' => (bool) $validated['broadcast_backpressure'],
-            'flow_session_ttl'       => (int) $validated['flow_session_ttl'],
-            'max_retry_attempts'     => (int) $validated['max_retry_attempts'],
-            'flow_fallback_message'  => (string) ($validated['flow_fallback_message'] ?? ''),
+            'content_base_language'    => (string) $validated['content_base_language'],
+            'available_languages'      => TenantSettingsEditor::languageList((array) $validated['available_languages']),
+            'fallback_language'        => (string) $validated['fallback_language'],
+            'messaging_rate_limit'     => (int) $validated['messaging_rate_limit'],
+            'broadcast_chunk_size'     => (int) $validated['broadcast_chunk_size'],
+            'broadcast_backpressure'   => (bool) $validated['broadcast_backpressure'],
+            'conversation_logging'     => (bool) $validated['conversation_logging'],
+            'conversation_media_fetch' => (bool) $validated['conversation_media_fetch'],
+            'flow_session_ttl'         => (int) $validated['flow_session_ttl'],
+            'max_retry_attempts'       => (int) $validated['max_retry_attempts'],
+            'flow_fallback_message'    => (string) ($validated['flow_fallback_message'] ?? ''),
         ];
     }
 }

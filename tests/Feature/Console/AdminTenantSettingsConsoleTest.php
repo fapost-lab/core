@@ -84,6 +84,66 @@ final class AdminTenantSettingsConsoleTest extends FeatureTestCase
         $this->assertSame(7, $settings->webhook_timeout);
     }
 
+    public function test_the_form_shows_the_install_default_for_conversation_settings_nobody_stored(): void
+    {
+        config(['conversation.enabled' => false, 'conversation.media.fetch' => true]);
+        $this->app->forgetScopedInstances();
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('settings.conversation_logging', false)
+                ->where('settings.conversation_media_fetch', true)
+                ->etc());
+    }
+
+    public function test_saving_stores_the_conversation_settings_and_they_take_effect(): void
+    {
+        config(['conversation.enabled' => true, 'conversation.media.fetch' => true]);
+
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->put($this->url(), $this->payload(['conversation_logging' => false, 'conversation_media_fetch' => false]))
+            ->assertSessionHasNoErrors();
+
+        $settings = $this->freshSettings();
+        $this->assertFalse($settings->conversation_logging);
+        $this->assertFalse($settings->conversation_media_fetch);
+
+        // The effective answer, as the form and the pipeline read it, follows the stored values.
+        $this->app->forgetScopedInstances();
+        $this->actingAs($admin)->get($this->url())->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('settings.conversation_logging', false)
+            ->where('settings.conversation_media_fetch', false)
+            ->etc());
+    }
+
+    public function test_saving_true_overrides_a_config_default_of_off(): void
+    {
+        config(['conversation.enabled' => false, 'conversation.media.fetch' => false]);
+
+        $this->actingAs($this->admin())
+            ->put($this->url(), $this->payload(['conversation_logging' => true, 'conversation_media_fetch' => true]))
+            ->assertSessionHasNoErrors();
+
+        $settings = $this->freshSettings();
+        $this->assertTrue($settings->conversation_logging);
+        $this->assertTrue($settings->conversation_media_fetch);
+    }
+
+    public function test_the_conversation_settings_must_be_booleans(): void
+    {
+        $this->actingAs($this->admin());
+
+        $this->put($this->url(), $this->payload(['conversation_logging' => 'maybe', 'conversation_media_fetch' => [1]]))
+            ->assertSessionHasErrors(['conversation_logging', 'conversation_media_fetch']);
+
+        $payload = $this->payload();
+        unset($payload['conversation_logging'], $payload['conversation_media_fetch']);
+        $this->put($this->url(), $payload)->assertSessionHasErrors(['conversation_logging', 'conversation_media_fetch']);
+    }
+
     public function test_the_filament_rules_hold(): void
     {
         $this->actingAs($this->admin());
@@ -141,9 +201,10 @@ final class AdminTenantSettingsConsoleTest extends FeatureTestCase
 
         $denied = User::factory()->create();
         $this->actingAs($denied)->get($this->url())->assertForbidden();
-        $this->actingAs($denied)->put($this->url(), $this->payload(['messaging_rate_limit' => 99]))->assertForbidden();
+        $this->actingAs($denied)->put($this->url(), $this->payload(['messaging_rate_limit' => 99, 'conversation_logging' => false]))->assertForbidden();
 
         $this->assertSame(30, $this->freshSettings()->messaging_rate_limit);
+        $this->assertNull($this->freshSettings()->conversation_logging);
     }
 
     public function test_a_visitor_is_sent_to_the_sign_in(): void
@@ -159,15 +220,17 @@ final class AdminTenantSettingsConsoleTest extends FeatureTestCase
     private function payload(array $overrides = []): array
     {
         return array_replace([
-            'content_base_language'  => 'en',
-            'available_languages'    => ['en', 'ru'],
-            'fallback_language'      => 'en',
-            'messaging_rate_limit'   => 45,
-            'broadcast_chunk_size'   => 250,
-            'broadcast_backpressure' => false,
-            'flow_session_ttl'       => 3600,
-            'max_retry_attempts'     => 0,
-            'flow_fallback_message'  => 'Sorry.',
+            'content_base_language'    => 'en',
+            'available_languages'      => ['en', 'ru'],
+            'fallback_language'        => 'en',
+            'messaging_rate_limit'     => 45,
+            'broadcast_chunk_size'     => 250,
+            'broadcast_backpressure'   => false,
+            'conversation_logging'     => false,
+            'conversation_media_fetch' => false,
+            'flow_session_ttl'         => 3600,
+            'max_retry_attempts'       => 0,
+            'flow_fallback_message'    => 'Sorry.',
         ], $overrides);
     }
 

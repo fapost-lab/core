@@ -39,6 +39,23 @@ export interface Entitlement {
   action: { label: string; url: string } | null
 }
 
+/** Why a Solution is on without the workspace turning it on: the plan includes it, or an add-on does (and may end). */
+export interface Grant {
+  source: 'plan' | 'addon'
+  note: string | null
+  endsAt: string | null
+  endsAtLabel: string | null
+}
+
+/** What the workspace may do about a Solution it is not entitled to; `price` arrives formatted. */
+export interface Offer {
+  name: string
+  description: string | null
+  trialDays: number
+  price: string | null
+  requestPending: boolean
+}
+
 export interface SolutionRow {
   id: string
   name: string
@@ -51,7 +68,9 @@ export interface SolutionRow {
   lastChange: LastChange | null
   canActivate: boolean
   entitlement: Entitlement
-  urls: { activate: string; deactivate: string }
+  grant: Grant | null
+  offer: Offer | null
+  urls: { activate: string; deactivate: string; connect: string }
 }
 
 /** A Solution whose activation is still stored but whose package is no longer installed. */
@@ -73,12 +92,15 @@ export interface SolutionsTranslations {
   activate: string
   deactivate: string
   details: string
+  marketplace: string
   last_change: Record<'activated' | 'deactivated' | 'unknown', string>
   registers: { title: string; actions: string; none: string }
   ui: { title: string; application: string; pages: string; not_published: string; inactive_note: string }
   points: Record<RegistrationPoint, string>
   kit: { badge: string; title: string; description: string; mismatch: string; unreadable: string; runtime: Record<RangeMismatch['component'], string> }
   entitlement: { badge: string; paused: string; not_entitled: string; unavailable: string; paused_note: string; off_note: string; unavailable_note: string }
+  grant: { plan_badge: string; addon_badge: string; until: string; plan_note: string; addon_note: string; addon_until: string }
+  offer: { connect: string; connect_price: string; request_sent: string; trial_note: string; request_note: string; pending_note: string }
   deactivate_dialog: { title: string; description: string; confirm: string }
   missing: { title: string; description: string }
 }

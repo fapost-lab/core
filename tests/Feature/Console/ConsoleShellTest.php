@@ -108,7 +108,7 @@ final class ConsoleShellTest extends FeatureTestCase
         $this->assertSame(['console.admin.media.index', 'console.admin.translations.index'], $this->keys($groups[3]));
         $this->assertCount(5, $groups);
         $this->assertSame('System', $groups[4]['label'], 'The System group closes the menu.');
-        $this->assertSame(['console.admin.usage.index', 'console.admin.solutions.index', 'console.admin.tenant-settings.edit'], $this->keys($groups[4]));
+        $this->assertSame(['console.admin.usage.index', 'console.admin.solutions.index', 'console.admin.tenant-settings.edit', 'console.admin.platform-settings.edit'], $this->keys($groups[4]));
     }
 
     public function test_a_user_without_rights_sees_only_the_dashboard_in_the_tenant_wide_menu(): void

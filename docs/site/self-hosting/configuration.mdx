@@ -95,6 +95,36 @@ Network policy on the host (firewall rules, a restricted container network, IMDS
 cloud machines) is a worthwhile second layer, since it also covers code the guard does
 not.
 
+## Media storage
+
+Files uploaded to the media library, and attachments contacts send, are stored on
+the installation's media disk. By default that is `storage/app` on the application
+server. Any S3-compatible object storage (AWS S3, MinIO, …) can hold
+them instead:
+
+| | |
+|---|---|
+| `MEDIA_STORAGE_DRIVER` | `local` (default) or `s3`. |
+| `MEDIA_S3_BUCKET` | The bucket. One bucket serves every tenant: each tenant's files are under `tenants/{tenant id}/`. |
+| `MEDIA_S3_KEY`, `MEDIA_S3_SECRET` | An access key allowed to read, write and delete in that bucket. |
+| `MEDIA_S3_REGION` | `us-east-1` unless your provider needs another. |
+| `MEDIA_S3_ENDPOINT` | Empty for AWS. For another provider, its address, for example `http://minio:9000`. |
+| `MEDIA_S3_USE_PATH_STYLE_ENDPOINT` | `true` for MinIO and most self-hosted servers. |
+| `MEDIA_S3_ROOT` | Optional. A prefix inside the bucket, to share it with something else. |
+
+Keep the bucket private. Core never hands out bucket addresses: every download and
+every file sent to a messenger goes through Core, so the storage only has to be
+reachable from the application, not from the internet.
+
+<Warning>
+  Changing the disk does not move files that are already stored. Files are read from
+  the disk configured now, so after a switch without copying, existing media returns
+  "not found". To switch an installation that has files, stop `horizon` and `scheduler`
+  and keep users out, copy `storage/app/tenants/` to the bucket with the same paths
+  (for example `mc mirror storage/app/tenants local-minio/media/tenants`), then change
+  the variables and restart. Choose the disk before the first upload when you can.
+</Warning>
+
 ## What must change for production
 
 The shipped `.env.example` is a development file. Four values are unsafe as they

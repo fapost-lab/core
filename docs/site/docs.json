@@ -118,6 +118,8 @@
             "group": "Operate",
             "pages": [
               "self-hosting/tenancy",
+              "self-hosting/platform-settings",
+              "self-hosting/solutions-directory",
               "self-hosting/upgrading",
               "self-hosting/observability",
               "self-hosting/troubleshooting"

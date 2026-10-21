@@ -17,10 +17,12 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Global switch
+    | Transcript logging (default only)
     |--------------------------------------------------------------------------
-    | When false, ConversationLogger short-circuits and no persistence job is
-    | dispatched — message processing is unaffected.
+    | The install default of each tenant's `conversation_logging` setting
+    | (Tenant settings > Conversations). A tenant that stored a value follows
+    | its own; when logging is off no message is persisted and message
+    | processing is unaffected. Read per tenant by ConversationSettings.
     */
     'enabled' => (bool) env('CONVERSATION_LOGGING', true),
 
@@ -28,11 +30,13 @@ return [
     |--------------------------------------------------------------------------
     | Retention
     |--------------------------------------------------------------------------
-    | null = keep forever (default). A plain positive whole number of days (anything else disables pruning) lets the daily
-    | `conversations:prune` command drop whole monthly partitions older than
-    | that, so a message lives between N and about N + 31 days. Applies to the
-    | whole installation (a per-tenant value is not supported yet). Dropping is
-    | irreversible; threads and media are never touched.
+    | The default of the platform setting `conversation.retention_days`
+    | (Platform settings, or `platform:settings:set`); a stored value wins.
+    | null = keep forever (default). A plain positive whole number of days
+    | (anything else disables pruning) lets the daily `conversations:prune`
+    | command drop whole monthly partitions older than that, so a message lives
+    | between N and about N + 31 days. One value for the whole installation.
+    | Dropping is irreversible; threads and media are never touched.
     */
     'retention_days' => PartitionRetention::parseDays(env('CONVERSATION_RETENTION_DAYS')),
 
@@ -45,7 +49,8 @@ return [
     'queue' => 'messaging.logging',
 
     'media' => [
-        // Fetch inbound media through the Media domain (disk/path/dedup reused).
+        // The install default of each tenant's `conversation_media_fetch` setting:
+        // fetch inbound media through the Media domain (disk/path/dedup reused).
         'fetch' => (bool) env('CONVERSATION_MEDIA_FETCH', true),
     ],
 ];

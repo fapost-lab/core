@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 return [
+    // Only the default of the platform setting `flow.execution.max_iterations`: a stored value wins
+    // (`platform:settings:set`, or Platform settings in a single-tenant admin).
     'execution' => [
         'max_iterations' => (int) env('FLOW_MAX_ITERATIONS', 100),
     ],

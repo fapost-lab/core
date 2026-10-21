@@ -21,6 +21,8 @@ use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
+use App\Domains\Tenancy\Services\PlatformSettings;
 use DateTimeInterface;
 use Fapost\Foundation\Contracts\DataAccessorInterface;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
@@ -33,6 +35,7 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Mockery\MockInterface;
+use ReflectionProperty;
 use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 
@@ -308,6 +311,59 @@ final class FlowEngineTest extends FeatureTestCase
         $this->assertSame(FlowSessionStatus::Failed, $session->status);
 
         $this->assertDatabaseCount('flow_logs', 4);
+    }
+
+    public function test_a_stored_platform_setting_caps_the_run_instead_of_the_configured_default(): void
+    {
+        Config::set('flow.execution.max_iterations', 100);
+        $this->app->make(PlatformSettings::class)->update([FlowEngineInterface::MAX_ITERATIONS_SETTING => 10], 'test');
+        // The next job: a fresh scope reads the stored value.
+        $this->app->forgetScopedInstances();
+
+        $tenantId  = (string) Str::uuid();
+        $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+        $contact   = Contact::factory()->forTenant($tenantId)->create();
+
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Loop',
+            'nodes'     => [
+                ['id' => 'n0', 'type' => 'infinite_loop_test', 'version' => 1, 'config' => []],
+                ['id' => 'n1', 'type' => 'infinite_loop_test', 'version' => 1, 'config' => []],
+            ],
+            'edges' => [
+                ['id' => 'e0', 'from' => 'n0', 'to' => 'n1', 'handle' => 'next'],
+                ['id' => 'e1', 'from' => 'n1', 'to' => 'n1', 'handle' => 'default'],
+            ],
+            'is_active' => true,
+        ]);
+
+        try {
+            $this->app->make(FlowEngineInterface::class)->start($definition, $contact);
+            $this->fail('Expected FlowExecutionLimitExceededException');
+        } catch (FlowExecutionLimitExceededException) {
+        }
+
+        $this->assertDatabaseCount('flow_logs', 10);
+    }
+
+    public function test_the_engine_of_the_next_job_reads_that_job_s_platform_settings(): void
+    {
+        $first         = $this->app->make(FlowEngineInterface::class);
+        $firstSettings = $this->app->make(PlatformSettingsReaderInterface::class);
+
+        $this->app->forgetScopedInstances();
+
+        $second = $this->app->make(FlowEngineInterface::class);
+        $read   = (new ReflectionProperty($second, 'platformSettings'))->getValue($second);
+
+        $this->assertNotSame($first, $second, 'The engine is rebuilt for every job.');
+        $this->assertSame($this->app->make(PlatformSettingsReaderInterface::class), $read);
+        $this->assertNotSame($firstSettings, $read, 'It never keeps the settings a previous job read.');
     }
 
     public function test_condition_logs_resolved_runtime_value_expression_and_transition(): void

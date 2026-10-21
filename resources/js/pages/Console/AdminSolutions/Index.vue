@@ -7,7 +7,7 @@ export default { layout: AppShell }
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
-import { Puzzle } from '@lucide/vue'
+import { ExternalLink, Puzzle } from '@lucide/vue'
 import { Badge, StatusDot } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@fapost/ui/components/card'
@@ -21,12 +21,15 @@ import type { MissingRow, SolutionRow, SolutionsPageProps } from './types'
 /**
  * The installed Solutions and whether this workspace has each one on. Turning one on is a single click; turning one off
  * asks first, because flows that call its actions stop. Both are POSTs to the server, which decides whether they are
- * allowed; the buttons only reflect what the server already said. A Solution the workspace's plan does not include cannot
- * be turned on; one turned on before it left the plan is shown as paused and can still be turned off.
+ * allowed; the buttons only reflect what the server already said. A Solution the plan or an add-on grants is on with no
+ * button; one that is not connected shows Connect when the operator offers it, and otherwise cannot be turned on. One
+ * turned on before it stopped being connected can still be turned off from Details. On a platform that does not sell
+ * Solutions itself, the server hands over where to find more, and the header links there.
  */
 const props = defineProps<{
   solutions: SolutionRow[]
   missing: MissingRow[]
+  marketplaceUrl: string | null
 }>()
 
 const page = usePage<SolutionsPageProps>()
@@ -58,6 +61,48 @@ function send(url: string): void {
   router.post(url, {}, { preserveScroll: true, onFinish: () => (busy.value = false) })
 }
 
+/** Which footer a card shows; the first match wins, and the server alone decides each of these. */
+type CardState = 'plan' | 'addon' | 'pending' | 'offer' | 'unavailable_to_connect' | 'switch'
+
+function cardState(solution: SolutionRow): CardState {
+  if (solution.grant) {
+    return solution.grant.source
+  }
+
+  if (solution.entitlement.state === 'not_entitled') {
+    if (!solution.offer) {
+      return 'unavailable_to_connect'
+    }
+
+    return solution.offer.requestPending ? 'pending' : 'offer'
+  }
+
+  return 'switch'
+}
+
+/** Whether the card says "On": a granted Solution always runs, a not-entitled one never does, even if it is stored as on. */
+function isOn(solution: SolutionRow): boolean {
+  return solution.grant !== null || (solution.entitlement.state !== 'not_entitled' && solution.active)
+}
+
+function grantBadge(solution: SolutionRow): string {
+  const grant = solution.grant
+
+  if (!grant) {
+    return ''
+  }
+
+  if (grant.source === 'plan') {
+    return t.value.grant.plan_badge
+  }
+
+  return grant.endsAtLabel ? `${t.value.grant.addon_badge} · ${interpolate(t.value.grant.until, { date: grant.endsAtLabel })}` : t.value.grant.addon_badge
+}
+
+function connectLabel(offer: NonNullable<SolutionRow['offer']>): string {
+  return offer.price ? interpolate(t.value.offer.connect_price, { price: offer.price }) : t.value.offer.connect
+}
+
 function askToTurnOff(name: string, url: string): void {
   toTurnOff.value = { name, url }
   confirmOpen.value = true
@@ -75,7 +120,20 @@ function turnOff(): void {
 
   <div class="flex w-full flex-col gap-5">
     <div class="flex flex-col gap-1">
-      <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+      <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+        <a
+          v-if="marketplaceUrl"
+          :href="marketplaceUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-primary inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline"
+          data-test="marketplace-link"
+        >
+          {{ t.marketplace }}
+          <ExternalLink class="size-3.5" aria-hidden="true" />
+        </a>
+      </div>
       <p class="text-muted-foreground text-sm">{{ t.description }}</p>
     </div>
 
@@ -96,10 +154,10 @@ function turnOff(): void {
         <CardHeader>
           <CardTitle class="font-display flex flex-wrap items-center gap-x-3 gap-y-1.5">
             {{ solution.name }}
-            <StatusDot v-if="solution.entitlement.paused" tone="warning" data-test="state">{{ t.entitlement.paused }}</StatusDot>
-            <StatusDot v-else :tone="solution.active ? 'success' : 'neutral'" data-test="state">
-              {{ solution.active ? t.state.active : t.state.inactive }}
+            <StatusDot :tone="isOn(solution) ? 'success' : 'neutral'" data-test="state">
+              {{ isOn(solution) ? t.state.active : t.state.inactive }}
             </StatusDot>
+            <Badge v-if="solution.grant" variant="success" data-test="grant-badge">{{ grantBadge(solution) }}</Badge>
             <Badge v-if="solution.entitlement.state === 'not_entitled'" variant="warning" data-test="not-entitled">{{ t.entitlement.badge }}</Badge>
             <Badge v-if="solution.ui && solution.ui.mismatches.length > 0" variant="warning" data-test="kit-badge">{{ t.kit.badge }}</Badge>
           </CardTitle>
@@ -113,16 +171,25 @@ function turnOff(): void {
         </CardContent>
 
         <CardFooter class="mt-auto flex flex-wrap gap-2">
-          <Button
-            v-if="solution.active || solution.entitlement.paused"
-            variant="outline"
-            :disabled="busy"
-            data-test="deactivate"
-            @click="askToTurnOff(solution.name, solution.urls.deactivate)"
-          >
-            {{ t.deactivate }}
+          <template v-if="cardState(solution) === 'switch'">
+            <Button
+              v-if="solution.active"
+              variant="outline"
+              :disabled="busy"
+              data-test="deactivate"
+              @click="askToTurnOff(solution.name, solution.urls.deactivate)"
+            >
+              {{ t.deactivate }}
+            </Button>
+            <Button v-else :disabled="busy || !solution.canActivate" data-test="activate" @click="send(solution.urls.activate)">{{ t.activate }}</Button>
+          </template>
+          <Button v-else-if="cardState(solution) === 'pending'" disabled data-test="request-sent">{{ t.offer.request_sent }}</Button>
+          <Button v-else-if="cardState(solution) === 'offer' && solution.offer" :disabled="busy" data-test="connect" @click="send(solution.urls.connect)">
+            {{ connectLabel(solution.offer) }}
           </Button>
-          <Button v-else :disabled="busy || !solution.canActivate" data-test="activate" @click="send(solution.urls.activate)">{{ t.activate }}</Button>
+          <p v-else-if="cardState(solution) === 'unavailable_to_connect'" class="text-muted-foreground self-center text-[13px]" data-test="not-available">
+            {{ t.entitlement.off_note }}
+          </p>
           <Button variant="ghost" data-test="details" @click="openDetails(solution)">{{ t.details }}</Button>
         </CardFooter>
       </Card>
@@ -146,7 +213,13 @@ function turnOff(): void {
       </CardContent>
     </Card>
 
-    <DetailsDialog v-model:open="detailsOpen" :solution="selected" />
+    <DetailsDialog
+      v-model:open="detailsOpen"
+      :solution="selected"
+      :busy="busy"
+      @connect="selected && send(selected.urls.connect)"
+      @deactivate="selected && askToTurnOff(selected.name, selected.urls.deactivate)"
+    />
 
     <ConfirmDialog
       v-model:open="confirmOpen"

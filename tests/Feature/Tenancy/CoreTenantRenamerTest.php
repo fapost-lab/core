@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Tenancy;
 
+use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Infrastructure\CoreTenantRenamer;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Models\TenantStatus;
+use App\Domains\Tenancy\Services\PlatformSettings;
 use App\Domains\Tenancy\Services\TenantSlugChanger;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use Carbon\CarbonImmutable;
@@ -16,6 +18,8 @@ use Fapost\Foundation\Tenancy\Enums\SlugProblem;
 use Fapost\Foundation\Tenancy\Exceptions\TenantRenameFailedException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Schema;
 use PDOException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Psr\Log\NullLogger;
@@ -256,6 +260,47 @@ final class CoreTenantRenamerTest extends FeatureTestCase
         $this->assertRefused(RenameFailure::SlugTaken, $this->tenant('other')->getId(), 'acme');
     }
 
+    public function test_a_stored_redirect_period_wins_over_the_configured_default(): void
+    {
+        $this->app->make(PlatformSettings::class)->update(['tenancy.rename.redirect_days' => 7], 'test');
+        $this->app->forgetScopedInstances();
+        $tenant = $this->tenant('acme');
+        $before = CarbonImmutable::now();
+
+        $renamed = $this->renamer()->rename($tenant->getId(), 'acme-new');
+
+        $this->assertNotNull($renamed->redirectUntil);
+        $this->assertEqualsWithDelta($before->addDays(7)->getTimestamp(), $renamed->redirectUntil->getTimestamp(), 10);
+    }
+
+    public function test_a_stored_zero_switches_the_redirect_off(): void
+    {
+        $this->app->make(PlatformSettings::class)->update(['tenancy.rename.redirect_days' => 0], 'test');
+        $this->app->forgetScopedInstances();
+        $tenant = $this->tenant('acme');
+
+        $renamed = $this->renamer()->rename($tenant->getId(), 'acme-new');
+
+        $this->assertNull($renamed->redirectUntil);
+    }
+
+    public function test_an_unreadable_settings_store_renames_with_the_default_period(): void
+    {
+        Exceptions::fake();
+        Schema::connection('landlord')->drop('platform_settings');
+        // A settings service resolved before the fake would keep the real handler and its loaded rows.
+        $this->app->forgetScopedInstances();
+        $tenant = $this->tenant('acme');
+        $before = CarbonImmutable::now();
+
+        $renamed = $this->renamer()->rename($tenant->getId(), 'acme-new');
+
+        $this->assertTrue($renamed->changed);
+        $this->assertNotNull($renamed->redirectUntil);
+        $this->assertEqualsWithDelta($before->addDays(30)->getTimestamp(), $renamed->redirectUntil->getTimestamp(), 10);
+        Exceptions::assertReportedCount(1);
+    }
+
     public function test_losing_a_race_on_the_unique_index_is_a_taken_slug(): void
     {
         $tenant     = $this->tenant('acme');
@@ -328,7 +373,7 @@ final class CoreTenantRenamerTest extends FeatureTestCase
             $repository,
             $this->app->make(TenantSlugPolicy::class),
             new NullLogger(),
-            (int) config('tenancy.rename.redirect_days'),
+            $this->app->make(PlatformSettingsReaderInterface::class),
         );
 
         return new CoreTenantRenamer($changer);

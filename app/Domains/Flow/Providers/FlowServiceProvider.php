@@ -140,7 +140,9 @@ use App\Domains\Media\Contracts\MediaDispatcherInterface;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Services\PlatformSettingRegistry;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
+use App\Domains\Tenancy\ValueObjects\PlatformSettingField;
 use App\Infrastructure\Flow\CachedContentTranslator;
 use App\Infrastructure\Flow\ConnectionAfterCommitDispatcher;
 use App\Infrastructure\Flow\ContainerActionHandlerFactory;
@@ -155,6 +157,7 @@ use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderI
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
+use Fapost\Foundation\Settings\Enums\PlatformSettingType;
 use Illuminate\Database\DatabaseManager;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -196,6 +199,19 @@ final class FlowServiceProvider extends ServiceProvider
             unit: 'calls',
             kind: LimitKind::PerPeriod,
             description: 'Executions of the call node, over any transport, and test calls from the builder. A call over the limit is not made.',
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: FlowEngineInterface::MAX_ITERATIONS_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.execution.max_iterations',
+            fallback: 100,
+            label: 'Steps per flow run',
+            description: 'How many nodes one run of a flow may pass through before the session fails. It stops a loop in a flow from holding a worker; a loop iteration costs its body plus two steps.',
+            group: 'Flow',
+            unit: 'steps',
+            min: 10,
+            max: 10000,
         ));
 
         // Seed Core's system translation keys. Features and Solutions register

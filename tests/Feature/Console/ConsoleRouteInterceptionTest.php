@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
+use App\Http\Controllers\Admin\PlatformSettingsController as AdminPlatformSettingsController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\SearchController as AdminSearchController;
 use App\Http\Controllers\Admin\SolutionController as AdminSolutionController;
@@ -193,6 +194,9 @@ final class ConsoleRouteInterceptionTest extends FeatureTestCase
             'admin media folder update'    => ['console.admin.media.folders.update', AdminMediaFolderController::class, 'update', 'PUT', 'admin/media/folders/{folder}'],
             'admin media folder destroy'   => ['console.admin.media.folders.destroy', AdminMediaFolderController::class, 'destroy', 'DELETE', 'admin/media/folders/{folder}'],
             'admin tenant settings update' => ['console.admin.tenant-settings.update', AdminTenantSettingsController::class, 'update', 'PUT', 'admin/tenant-settings'],
+            // Platform settings: a new screen, never a Filament one.
+            'admin platform settings'        => ['console.admin.platform-settings.edit', AdminPlatformSettingsController::class, 'edit', 'GET', 'admin/platform-settings'],
+            'admin platform settings update' => ['console.admin.platform-settings.update', AdminPlatformSettingsController::class, 'update', 'PUT', 'admin/platform-settings'],
             // Support access log: never a Filament screen.
             'admin support access' => ['console.admin.support-access.index', AdminSupportAccessController::class, 'index', 'GET', 'admin/support-access'],
             // Usage and limits: a new screen, never a Filament one.

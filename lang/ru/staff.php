@@ -17,9 +17,10 @@ return [
         'subtitle'   => 'Общие настройки, разделяемые всеми ассистентами тенанта.',
         'saved'      => 'Настройки сохранены',
         'tabs'       => [
-            'languages'  => 'Языки',
-            'runtime'    => 'Исполнение',
-            'broadcasts' => 'Рассылки',
+            'languages'     => 'Языки',
+            'runtime'       => 'Исполнение',
+            'broadcasts'    => 'Рассылки',
+            'conversations' => 'Диалоги',
         ],
         'sections' => [
             'messaging' => 'Сообщения',
@@ -35,6 +36,8 @@ return [
             'messaging_rate_limit'       => 'Сообщений в минуту (на чат)',
             'broadcast_chunk_size'       => 'Размер чанка рассылки',
             'broadcast_backpressure'     => 'Backpressure для рассылок',
+            'conversation_logging'       => 'Журнал диалогов',
+            'conversation_media_fetch'   => 'Скачивание входящих медиа',
             'flow_session_ttl'           => 'TTL сессии сценария (сек)',
             'max_retry_attempts'         => 'Макс. количество ретраев ноды',
             'flow_fallback_message'      => 'Резервное сообщение сценария',

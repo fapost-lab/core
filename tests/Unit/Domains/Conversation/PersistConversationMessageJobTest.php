@@ -12,6 +12,8 @@ use App\Domains\Conversation\Enums\MessageOrigin;
 use App\Domains\Conversation\Enums\MessageSenderType;
 use App\Domains\Conversation\Jobs\FetchConversationMediaJob;
 use App\Domains\Conversation\Jobs\PersistConversationMessageJob;
+use App\Domains\Conversation\Settings\ConversationSettings;
+use App\Domains\Tenancy\Services\TenantContext;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Bus;
 use ReflectionMethod;
@@ -69,22 +71,24 @@ final class PersistConversationMessageJobTest extends TestCase
     public function test_does_not_dispatch_when_media_fetch_disabled(): void
     {
         Bus::fake();
-        config()->set('conversation.media.fetch', false);
 
         $entry = $this->entry(MessageDirection::Inbound, [
             ['provider_file_id' => 'AgAC', 'kind' => 'photo', 'status' => 'pending'],
         ]);
 
-        $this->fetchMedia($entry, 'msg-4');
+        $this->fetchMedia($entry, 'msg-4', mediaFetch: false);
 
         Bus::assertNotDispatched(FetchConversationMediaJob::class);
     }
 
-    private function fetchMedia(MessageLogEntry $entry, string $messageId): void
+    private function fetchMedia(MessageLogEntry $entry, string $messageId, bool $mediaFetch = true): void
     {
+        // No tenant in context: the settings answer the install default, which is what this decision is made on here.
+        $settings = new ConversationSettings(new TenantContext(), true, $mediaFetch);
+
         $job    = new PersistConversationMessageJob($entry);
         $method = new ReflectionMethod($job, 'fetchMediaIfNeeded');
-        $method->invoke($job, $messageId);
+        $method->invoke($job, $messageId, $settings);
     }
 
     /**

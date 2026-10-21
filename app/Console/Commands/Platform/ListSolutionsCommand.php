@@ -13,7 +13,8 @@ use App\Domains\Tenancy\Services\TenantSwitcher;
 
 /**
  * Lists the installed Solutions and the stored activation rows of one tenant, orphans included, with the
- * effective state. Reads only.
+ * effective state and its source: `plan` or `addon` when the operator grants it, `manual` when the tenant turned it on.
+ * Reads the tenant's state only.
  */
 final class ListSolutionsCommand extends SolutionTenantCommand
 {
@@ -55,6 +56,12 @@ final class ListSolutionsCommand extends SolutionTenantCommand
                         default => 'unknown',
                     },
                     $active->isActive($id) ? 'active' : 'inactive',
+                    match (true) {
+                        ! $active->isActive($id)        => '-',
+                        null !== $active->grantFor($id) => $active->grantFor($id)->source->value,
+                        null === $active->entitlement() => 'unknown',
+                        default                         => 'manual',
+                    },
                 ];
             }
 
@@ -64,7 +71,7 @@ final class ListSolutionsCommand extends SolutionTenantCommand
                 return self::SUCCESS;
             }
 
-            $this->table(['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective'], $rows);
+            $this->table(['Solution', 'Name', 'Version', 'Installed', 'Stored', 'Entitled', 'Effective', 'Source'], $rows);
 
             return self::SUCCESS;
         });

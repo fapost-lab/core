@@ -14,16 +14,26 @@ use App\Domains\Solution\Infrastructure\SolutionActivationRecord;
 use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
+use App\Domains\Tenancy\Services\PlatformSettings;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Database\Seeders\TenantAclSeeder;
+use DateTimeImmutable;
 use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
+use Fapost\Foundation\Solution\Contracts\SolutionStorefrontInterface;
+use Fapost\Foundation\Solution\DTO\SolutionConnectResult;
 use Fapost\Foundation\Solution\DTO\SolutionEntitlement;
+use Fapost\Foundation\Solution\DTO\SolutionGrant;
+use Fapost\Foundation\Solution\DTO\SolutionOffer;
+use Fapost\Foundation\Solution\DTO\SolutionPrice;
+use Fapost\Foundation\Solution\Enums\SolutionGrantSource;
+use Fapost\Foundation\Solution\Enums\SolutionPricePeriod;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Exceptions;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeSolutionEntitlement;
+use Tests\Support\FakeSolutionStorefront;
 use Tests\Support\FakeVendor;
 use Tests\Support\InstallsShowcaseSolution;
 
@@ -315,10 +325,217 @@ final class AdminSolutionsConsoleTest extends FeatureTestCase
             ->from($this->url())
             ->post($this->url('/showcase/activate'))
             ->assertRedirect($this->url())
-            ->assertInertiaFlash('error', 'Solution showcase was not turned on. This Solution is not included in your plan.');
+            ->assertInertiaFlash('error', 'Solution showcase was not turned on. This Solution is not connected to your workspace.');
 
         $this->assertSame(0, SolutionActivationRecord::query()->count());
         $this->assertSame(0, SolutionActivationEventRecord::query()->count());
+    }
+
+    public function test_a_platform_without_a_storefront_links_to_the_default_marketplace(): void
+    {
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('marketplaceUrl', 'https://docs.fapost.in/self-hosting/solutions-directory')->etc());
+    }
+
+    public function test_a_stored_marketplace_address_replaces_the_default(): void
+    {
+        $this->app->make(PlatformSettings::class)->update(['solutions.marketplace_url' => 'https://example.com/solutions'], 'cli:test');
+        $this->app->forgetScopedInstances();
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('marketplaceUrl', 'https://example.com/solutions')->etc());
+    }
+
+    public function test_an_empty_marketplace_address_hides_the_link(): void
+    {
+        $this->app->make(PlatformSettings::class)->update(['solutions.marketplace_url' => ''], 'cli:test');
+        $this->app->forgetScopedInstances();
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('marketplaceUrl', null)->etc());
+    }
+
+    public function test_an_operator_storefront_hides_the_marketplace_link(): void
+    {
+        $this->storefront();
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('marketplaceUrl', null)->etc());
+    }
+
+    public function test_a_solution_in_the_plan_is_on_with_nothing_stored_and_shows_no_turn_off(): void
+    {
+        $this->installShowcase();
+        $this->operator()->default = SolutionEntitlement::grants([new SolutionGrant('showcase', SolutionGrantSource::Plan, note: 'Pro')]);
+        $admin                     = $this->admin();
+
+        $this->actingAs($admin)
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('solutions.0.active', true)
+                ->where('solutions.0.canActivate', false)
+                ->where('solutions.0.grant', ['source' => 'plan', 'note' => 'Pro', 'endsAt' => null, 'endsAtLabel' => null])
+                ->where('solutions.0.offer', null)
+                ->etc());
+
+        $this->actingAs($admin)
+            ->from($this->url())
+            ->post($this->url('/showcase/deactivate'))
+            ->assertRedirect($this->url())
+            ->assertInertiaFlash('error', 'Solution showcase is included in your plan or add-ons, so it cannot be turned off here.');
+
+        $this->assertSame(0, SolutionActivationRecord::query()->count());
+        $this->assertTrue($this->isActive('showcase'));
+    }
+
+    public function test_an_add_on_shows_its_source_and_end(): void
+    {
+        $this->installShowcase();
+        $this->operator()->default = SolutionEntitlement::grants([new SolutionGrant('showcase', SolutionGrantSource::Addon, new DateTimeImmutable('2026-11-01T10:00:00Z'))]);
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('solutions.0.grant.source', 'addon')
+                ->where('solutions.0.grant.endsAt', '2026-11-01T10:00:00+00:00')
+                ->etc());
+    }
+
+    public function test_a_solution_the_operator_offers_shows_connect_with_its_price_and_a_trial_turns_it_on(): void
+    {
+        $this->installShowcase();
+        $operator              = $this->operator();
+        $operator->default     = SolutionEntitlement::only([]);
+        $storefront            = $this->storefront();
+        $storefront->offers    = [new SolutionOffer('showcase', 'Showcase add-on', 'Everything', 14, new SolutionPrice(900, 'EUR', SolutionPricePeriod::Month))];
+        $storefront->onConnect = function () use ($operator): SolutionConnectResult {
+            $operator->default = SolutionEntitlement::grants([new SolutionGrant('showcase', SolutionGrantSource::Addon)]);
+
+            return SolutionConnectResult::trialStarted();
+        };
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('solutions.0.active', false)
+                ->where('solutions.0.entitlement.state', 'not_entitled')
+                ->where('solutions.0.offer', ['name' => 'Showcase add-on', 'description' => 'Everything', 'trialDays' => 14, 'price' => '€9.00 / month', 'requestPending' => false])
+                ->etc());
+
+        $this->actingAs($admin)
+            ->from($this->url())
+            ->post($this->url('/showcase/connect'))
+            ->assertRedirect($this->url())
+            ->assertInertiaFlash('success', 'The trial of showcase has started, and it is on.');
+
+        $this->assertSame([['tenant' => '00000000-0000-0000-0000-000000000001', 'solution' => 'showcase', 'by' => $admin->name]], $storefront->connects);
+        $this->forgetActive();
+        $this->app->forgetScopedInstances();
+        $this->assertTrue($this->isActive('showcase'));
+        $this->assertSame(0, SolutionActivationRecord::query()->count(), 'Core writes nothing on a connect.');
+    }
+
+    public function test_connecting_without_a_trial_sends_a_request_and_the_page_says_it_is_pending(): void
+    {
+        $this->installShowcase();
+        $this->operator()->default = SolutionEntitlement::only([]);
+        $storefront                = $this->storefront();
+        $storefront->offers        = [new SolutionOffer('showcase', 'Showcase add-on', requestPending: true)];
+        $storefront->result        = SolutionConnectResult::alreadyPending();
+        $admin                     = $this->admin();
+
+        $this->actingAs($admin)
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('solutions.0.offer.requestPending', true)
+                ->where('solutions.0.offer.price', null)
+                ->etc());
+
+        $this->actingAs($admin)
+            ->from($this->url())
+            ->post($this->url('/showcase/connect'))
+            ->assertInertiaFlash('success', 'A request for showcase is already waiting for the platform operator.');
+
+        $storefront->result = SolutionConnectResult::refused('Renew your plan first.');
+
+        $this->actingAs($admin)
+            ->from($this->url())
+            ->post($this->url('/showcase/connect'))
+            ->assertInertiaFlash('error', 'Solution showcase was not connected. Renew your plan first.');
+    }
+
+    public function test_a_solution_with_no_offer_cannot_be_connected(): void
+    {
+        $this->installShowcase();
+        $this->operator()->default = SolutionEntitlement::only([]);
+        $storefront                = $this->storefront();
+        $admin                     = $this->admin();
+
+        $this->actingAs($admin)
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('solutions.0.offer', null)->etc());
+
+        $this->actingAs($admin)
+            ->from($this->url())
+            ->post($this->url('/showcase/connect'))
+            ->assertInertiaFlash('error', 'Solution showcase cannot be connected to this workspace.');
+
+        $this->assertSame([], $storefront->connects);
+    }
+
+    public function test_an_offer_for_a_solution_already_allowed_or_granted_is_not_shown(): void
+    {
+        $this->installShowcase();
+        $this->operator()->default  = SolutionEntitlement::only(['showcase']);
+        $this->storefront()->offers = [new SolutionOffer('showcase', 'Showcase add-on')];
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('solutions.0.offer', null)->etc());
+    }
+
+    public function test_connecting_is_refused_while_the_plan_cannot_be_checked_and_a_failing_storefront_offers_nothing(): void
+    {
+        Exceptions::fake();
+        $this->installShowcase();
+        $operator            = $this->operator();
+        $operator->default   = SolutionEntitlement::only([]);
+        $storefront          = $this->storefront();
+        $storefront->offers  = [new SolutionOffer('showcase', 'Showcase add-on')];
+        $storefront->failing = true;
+        $admin               = $this->admin();
+
+        $this->actingAs($admin)
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('solutions.0.offer', null)->etc());
+
+        $storefront->failing = false;
+        $operator->failing   = true;
+        $this->app->forgetScopedInstances();
+
+        $this->actingAs($admin)
+            ->from($this->url())
+            ->post($this->url('/showcase/connect'))
+            ->assertInertiaFlash('error', 'Connecting is not possible right now. Try again later.');
+
+        $this->assertSame([], $storefront->connects);
+    }
+
+    public function test_a_user_without_the_settings_permission_cannot_connect(): void
+    {
+        $this->installShowcase();
+        $storefront = $this->storefront();
+
+        $this->actingAs(User::factory()->create())
+            ->post($this->url('/showcase/connect'))
+            ->assertForbidden();
+
+        $this->assertSame([], $storefront->connects);
     }
 
     public function test_a_solution_that_left_the_plan_is_paused_with_its_row_kept_and_can_be_turned_off(): void
@@ -410,6 +627,14 @@ final class AdminSolutionsConsoleTest extends FeatureTestCase
         $this->app->forgetScopedInstances();
 
         return $operator;
+    }
+
+    private function storefront(): FakeSolutionStorefront
+    {
+        $storefront = new FakeSolutionStorefront();
+        $this->app->instance(SolutionStorefrontInterface::class, $storefront);
+
+        return $storefront;
     }
 
     private function admin(): User

@@ -1,0 +1,46 @@
+---
+title: "Platform settings"
+description: "Settings for the whole installation, not one tenant: where they are kept and who changes them."
+---
+
+A platform setting applies to every tenant of an installation. Its starting value comes from an
+environment variable; once someone stores a value, the stored one wins, and resetting it brings the
+variable's value back. A change applies from the next request or queue job, without a restart or a
+redeploy. Settings of one tenant are on the tenant's own [Settings](/using/tenant-settings) screen.
+
+| Setting | Variable | Range | What it changes |
+|---|---|---|---|
+| `flow.execution.max_iterations` | `FLOW_MAX_ITERATIONS` | 10–10000 | How many nodes one flow run may pass through before the session fails. It stops a loop in a flow from holding a worker; one loop iteration costs its body plus two steps. The builder warns about a literal loop count above it |
+| `conversation.retention_days` | `CONVERSATION_RETENTION_DAYS` | 0–3650 | How many days the conversation transcript is kept, for every tenant; `0` keeps it forever. The daily `conversations:prune` drops whole monthly partitions older than that, so a message lives between that many days and about 31 days longer. Irreversible; threads and media are kept |
+| `solutions.marketplace_url` | `SOLUTIONS_MARKETPLACE_URL` | http or https address, or empty | Where **Find more Solutions** on the admin Solutions page links, on a platform that does not sell Solutions itself. Defaults to the [Solutions directory](/self-hosting/solutions-directory); empty hides the link. On the admin screen an empty field resets to the default, so empty it with `platform:settings:set solutions.marketplace_url ""` |
+| `tenancy.rename.redirect_days` | `TENANCY_RENAME_REDIRECT_DAYS` | 0–365 | How many days the old address of a renamed tenant forwards to the new one; `0` switches forwarding off. Has an effect only with `TENANCY_RESOLUTION=host`, and is read when a tenant is renamed |
+
+The values are kept in the landlord tables `platform_settings` and `platform_setting_events` (every
+change, with who made it), created by the usual `php artisan migrate --database=landlord --force`.
+
+## Who changes them
+
+- **One tenant (`TENANCY_RESOLUTION=single`).** The tenant's administrators: **Platform settings** in the
+  admin panel's System menu. Settings that only matter in host mode are not shown there.
+- **Several tenants (`TENANCY_RESOLUTION=host`).** No tenant's administrator can change them, since they
+  would change every other tenant too; the admin screen does not exist in this mode. Use the commands below,
+  or an operator package's panel, which changes them through Foundation's
+  [`PlatformSettingsInterface`](/reference/foundation-contracts#platform-settings).
+
+## Commands
+
+Both modes:
+
+```bash
+php artisan platform:settings                                   # every setting, its value and where it comes from
+php artisan platform:settings:set flow.execution.max_iterations 500
+php artisan platform:settings:reset flow.execution.max_iterations   # back to the variable's value
+```
+
+A refused value (out of range, wrong type, unknown key) changes nothing and exits non-zero. Changes made
+by a command are recorded as `cli:<user>`.
+
+<Note>
+  If the database cannot be read, every setting answers its environment variable's value, so the platform
+  keeps running on its defaults.
+</Note>

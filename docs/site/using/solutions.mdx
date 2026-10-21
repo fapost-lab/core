@@ -8,12 +8,14 @@ not turn it on: each workspace chooses. **Solutions** in the admin panel menu li
 Solution and lets you turn it on or off for this workspace. It is open to anyone who can manage
 [tenant settings](/using/tenant-settings), which by default means administrators.
 
-Everything starts off. A Solution you never turned on does nothing in your flows or in the console.
+Everything starts off, unless your plan includes it. A Solution you never turned on, and that your plan does not
+include, does nothing in your flows or in the console.
 
 ## What the page shows
 
-Solutions are shown as compact cards. Each card has the name, whether it is **On**, **Off** or **Paused** (on, but
-not in your plan), a one-line description, the version and package, and the **Turn on** or **Turn off** button.
+Solutions are shown as compact cards. Each card has the name, whether it is **On** or **Off**, where it comes from
+(**Included in your plan**, **Add-on**, or **Not connected**), a one-line description, the version and package, and
+the button that fits: **Turn on**, **Turn off**, **Connect**, or none.
 
 **Details** opens the rest:
 
@@ -41,19 +43,37 @@ Click **Turn off** and confirm. From then on:
 - **its data is kept.** Turning it off never deletes anything the Solution stored, and turning it on again
   brings it back as it was.
 
-## Not included in your plan
+## Included in your plan
 
-On a platform that sells Solutions by plan, whoever runs it decides which Solutions your workspace may use.
-A Solution your plan does not include says **Not in your plan**: **Turn on** stays disabled, and a request that
-skips the button is refused with the same reason. When the platform offers one, **Details** has a button to its
-plans or contact page.
+On a platform that sells Solutions by plan, whoever runs it decides which Solutions your workspace gets.
 
-If a Solution you had on leaves your plan, its card says **Paused**. It does nothing in flows or in the console,
-exactly as if it were off, but nothing is changed: **its data is kept, and it runs again by itself** as soon as
-your plan includes it. You can still turn it off; then it stays off when it comes back to your plan.
+A Solution your plan includes is **on by itself**, with no click, and says **Included in your plan**. It has no
+**Turn off** button: it stays on while your plan includes it. If your plan stops including it, or your workspace moves
+to a plan without it, it turns off by itself. Turning off never deletes anything: **its data is kept**, and it comes
+back as it was if your plan includes it again.
 
-If your plan cannot be checked for a moment, the page says so and nothing can be turned on until it can; the
-Solutions you already have on keep running.
+A Solution connected as an **add-on** behaves the same way: on as soon as it is connected, off by itself when the
+add-on ends (for a trial, when the trial ends). **Details** says until when, if the platform says so.
+
+## Not connected
+
+A Solution that is neither in your plan nor connected says **Not connected**. What you can do depends on the platform:
+
+- **Connect**, with its price when the platform quotes one. If the add-on has a free trial, the trial starts at once
+  and the Solution is on. Otherwise a request goes to whoever runs the platform, the button says **Request sent**,
+  and the Solution turns on when they approve it.
+- No button, and **Details** says **Not available for your plan**: the platform does not offer it to your workspace
+  now. If the platform gives one, **Details** has a button to its plans or contact page.
+
+If a Solution you had turned on yourself is no longer connected, it stops working, exactly as if it were off, with
+its data kept. **Details** lets you turn it off to clear it.
+
+If your plan cannot be checked for a moment, the page says so, and nothing can be turned on or connected until it
+can. The Solutions you already have, including those your plan or add-ons include, keep running.
+
+On a platform that does not sell Solutions, every installed Solution can be turned on and off with **Turn on** and
+**Turn off**, as described above. Its page also links to **Find more Solutions**, a list of Solutions you can install
+([Solutions directory](/self-hosting/solutions-directory)); whoever runs the platform can point the link elsewhere or hide it.
 
 ## A console interface that does not fit
 

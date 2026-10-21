@@ -1,9 +1,9 @@
 ---
 title: "Settings"
-description: "Languages, runtime limits, and broadcast behaviour for the whole tenant."
+description: "Languages, runtime limits, broadcast behaviour, and the conversation log for the whole tenant."
 ---
 
-Configuration shared by every assistant in the installation. Three tabs, one
+Configuration shared by every assistant in the installation. Four tabs, one
 **Save** button covering all of them — changes on one tab are not lost by
 switching to another before saving.
 
@@ -61,3 +61,22 @@ paced so it cannot sit in front of the person who just asked a question.
 
 Leave them alone unless a provider is complaining, and change one at a time — the
 two interact, and a change to both at once tells you nothing about which helped.
+
+## Conversations
+
+Whether this tenant keeps a conversation log, and whether inbound attachments are
+downloaded.
+
+- **Keep the conversation log** records every message in the inbox. When it is off,
+  new messages are not written: they stop appearing in the inbox, and new
+  conversations cannot be taken over. Messages are still processed. Return the
+  threads operators hold to the bot first: while an operator holds a thread, the
+  bot does not answer it, and with the log off nobody sees its new messages.
+- **Download inbound media** copies attachments that contacts send into the tenant's
+  media storage, where they count against its storage quota.
+
+Until someone saves a value here, both follow the installation's defaults
+(`CONVERSATION_LOGGING` and `CONVERSATION_MEDIA_FETCH`, both on unless set
+otherwise), and the form shows the value in effect. How long the log is kept is not
+set here: it is one value for the whole installation, in
+[Platform settings](/self-hosting/platform-settings).

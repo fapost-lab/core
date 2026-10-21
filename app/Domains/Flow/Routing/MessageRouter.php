@@ -134,7 +134,8 @@ final readonly class MessageRouter
                 // still be sitting in waiting_input from before the takeover —
                 // classifying first would resume a flow the operator replaced.
                 // The message is already in the transcript (IncomingMessageJob
-                // captures before routing), so nothing is lost by stopping here.
+                // captures before routing), so nothing is lost by stopping here —
+                // unless the tenant turned its conversation log off.
                 if ($this->ownership->isHandledByStaff($this->conversationRef($contact, $assistant, $channel, $message))) {
                     return RoutingOutcome::dropped('staff_handled');
                 }

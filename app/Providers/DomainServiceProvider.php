@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Providers;
 
 use App\Domains\Tenancy\Contracts\CoreBootstrapInterface;
+use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\SupportAccessRedeemerInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
@@ -14,6 +15,8 @@ use App\Domains\Tenancy\Contracts\WebhookRegistryReaderInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Database\TenantDatabaseManager;
 use App\Domains\Tenancy\Database\TenantPostgresConnection;
+use App\Domains\Tenancy\Enums\PlatformSettingFormat;
+use App\Domains\Tenancy\Infrastructure\CorePlatformSettings;
 use App\Domains\Tenancy\Infrastructure\CoreSupportAccess;
 use App\Domains\Tenancy\Infrastructure\CoreTenantDirectory;
 use App\Domains\Tenancy\Infrastructure\CoreTenantProvisioner;
@@ -35,13 +38,14 @@ use App\Domains\Tenancy\Services\LimitRegistry;
 use App\Domains\Tenancy\Services\NoLimitNotice;
 use App\Domains\Tenancy\Services\NoPeriodUsage;
 use App\Domains\Tenancy\Services\PeriodQuota;
+use App\Domains\Tenancy\Services\PlatformSettingRegistry;
+use App\Domains\Tenancy\Services\PlatformSettings;
 use App\Domains\Tenancy\Services\RecordLimitWatch;
 use App\Domains\Tenancy\Services\RecordQuota;
 use App\Domains\Tenancy\Services\RequestHostClassifier;
 use App\Domains\Tenancy\Services\SupportAccessTokenStore;
 use App\Domains\Tenancy\Services\TenantContext;
 use App\Domains\Tenancy\Services\TenantProvisioningService;
-use App\Domains\Tenancy\Services\TenantSlugChanger;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
@@ -51,6 +55,8 @@ use App\Domains\Tenancy\Services\WebhookRegistryWriter;
 use App\Domains\Tenancy\Settings\BuiltTenantSettings;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
+use App\Domains\Tenancy\ValueObjects\PlatformSettingField;
+use App\Http\Shell\SolutionsPresenter;
 use Closure;
 use Fapost\Foundation\Quota\Contracts\LimitNoticeInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
@@ -59,6 +65,8 @@ use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Contracts\TenantLimitsInterface;
 use Fapost\Foundation\Quota\Contracts\TenantUsageInterface;
 use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
+use Fapost\Foundation\Settings\Contracts\PlatformSettingsInterface;
+use Fapost\Foundation\Settings\Enums\PlatformSettingType;
 use Fapost\Foundation\Tenancy\Contracts\SupportAccessInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantDirectoryInterface;
@@ -133,10 +141,6 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->bind(SupportAccessInterface::class, CoreSupportAccess::class);
         $this->app->bind(SupportAccessRedeemerInterface::class, SupportAccessTokenStore::class);
 
-        $this->app->when(TenantSlugChanger::class)
-            ->needs('$redirectDays')
-            ->giveConfig('tenancy.rename.redirect_days', 30);
-
         $this->app->when(TenantProvisioningService::class)
             ->needs('$leaseSeconds')
             ->giveConfig('tenancy.provisioning.lease_seconds', 900);
@@ -160,6 +164,7 @@ final class DomainServiceProvider extends ServiceProvider
             (string) config('permission.cache.key'),
         ));
         $this->registerQuota();
+        $this->registerPlatformSettings();
         $this->registerAccessMode();
 
         $this->app->singleton(WebhookRegistryWriterInterface::class, WebhookRegistryWriter::class);
@@ -226,9 +231,37 @@ final class DomainServiceProvider extends ServiceProvider
         $this->checkHostModeDeployment();
         $this->isolateSettingsCachePerTenant();
 
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: 'tenancy.rename.redirect_days',
+            type: PlatformSettingType::Integer,
+            configKey: 'tenancy.rename.redirect_days',
+            fallback: 30,
+            label: 'Redirect after a rename',
+            description: 'How many days the old address of a renamed tenant still forwards to the new one. 0 switches forwarding off. Read when a tenant is renamed, so it does not change forwarding already set up.',
+            group: 'Tenants',
+            unit: 'days',
+            min: 0,
+            max: 365,
+            hostModeOnly: true,
+        ));
+
+        // Registered here, not in SolutionServiceProvider: PHPat (SolutionBoundariesTest) allows the Solution domain no Tenancy dependency but its Contracts.
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: SolutionsPresenter::MARKETPLACE_URL_SETTING,
+            type: PlatformSettingType::Text,
+            configKey: 'solutions.marketplace_url',
+            fallback: 'https://docs.fapost.in/self-hosting/solutions-directory',
+            label: 'Solutions marketplace',
+            description: 'Where the Solutions page of the admin panel links to find more Solutions, on a platform that does not sell them itself. An http or https address. Empty hides the link: store it with platform:settings:set solutions.marketplace_url "" or set SOLUTIONS_MARKETPLACE_URL to empty.',
+            group: 'Solutions',
+            max: 2048,
+            format: PlatformSettingFormat::Url,
+        ));
+
         $this->app->booted(function (): void {
             if (! $this->app->environment('testing')) {
                 $this->app->make(LimitRegistry::class)->freeze();
+                $this->app->make(PlatformSettingRegistry::class)->freeze();
             }
         });
     }
@@ -269,6 +302,19 @@ final class DomainServiceProvider extends ServiceProvider
         if (! $this->app->runningInConsole()) {
             $check->assertWorkable();
         }
+    }
+
+    /**
+     * Core's platform-wide settings: the field registry lives as long as the worker and holds no
+     * values; the settings themselves are read once per request or job (scoped).
+     */
+    private function registerPlatformSettings(): void
+    {
+        $this->app->singleton(PlatformSettingRegistry::class, fn (): PlatformSettingRegistry => new PlatformSettingRegistry());
+        $this->app->scoped(PlatformSettings::class);
+        $this->app->scoped(PlatformSettingsReaderInterface::class, fn ($app): PlatformSettings => $app->make(PlatformSettings::class));
+        // Plain bind: Core is the only implementation; an operator package calls it and never replaces it.
+        $this->app->bind(PlatformSettingsInterface::class, CorePlatformSettings::class);
     }
 
     /**
