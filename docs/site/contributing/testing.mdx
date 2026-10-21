@@ -76,7 +76,7 @@ GNU Make still executes the recipe lines that call `$(MAKE)`.
 ## Continuous integration
 
 The same checks run in GitHub Actions (`.github/workflows/ci.yml`) on every
-pull request and on every push to `main`. Four jobs run in parallel:
+pull request and on every push to `main`. Five jobs run in parallel:
 
 - **PHP** — Pint in `--test` mode, the PHPUnit suites, the architecture rules.
   The suites run twice, as a matrix: once on SQLite in memory, exactly as
@@ -90,6 +90,10 @@ pull request and on every push to `main`. Four jobs run in parallel:
   tests change, move the pin in a Core pull request.
 - **Gateway** — `go vet` and `go test` in `gateway/`.
 - **Frontend** — `vue-tsc` type check, Vitest, and the production Vite build.
+- **Images** — builds the `core` and `web` image targets and checks that
+  `public/build` (the Vite manifest and assets) is identical in both. The console
+  view reads the manifest in the PHP container, so a `core` image without it
+  passes every PHP test and answers 500 in production.
 
 A pull request is merged only when all of them are green. The push-to-`main` run
 exists so that the commit a release tag points at has been checked as merged,
