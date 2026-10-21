@@ -5,6 +5,9 @@ its image; Core has no closed list of channel types and reaches every channel th
 Telegram stays built into Core on those contracts and behaves exactly as it does today; Viber is the first
 outside connector, optional, and proves the contract.
 
+Epic: epic/channel-connectors
+Release: minor
+
 ## Phase 1 — The connector package type
 
 Goal: a package outside Core can be a channel. Done when: a fixture connector, installed through Composer,
@@ -38,6 +41,9 @@ reached only through the connector registrar, with its existing tests untouched 
       (after: Connector registrar with a channel surface — capabilities are registered on it)
 - [ ] `capability-aware-validation` — Capability-aware validation: validation and the builder warn when a flow uses what its assistant's
       channels cannot do (after: Neutral outgoing message — it checks against the declared capabilities)
+- [ ] `outbound-message-without-token` — Outbound message without the token: the `OutboundMessage` envelope a
+      connector's sender receives no longer carries the channel token into queued payloads; the sender gets it
+      when the job runs (after: Telegram on the registrar — the sender contract is settled there)
 - [ ] fog: connector config upgrades between versions — depends on the open question (a connector
       migration or a `config_version`), best answered once a second version of a schema exists
 
@@ -81,7 +87,7 @@ connector contract with Telegram (built in) and Viber (a package) as references.
 1. connector-manifest-discovery; ingress-hmac-body-signature; public-media-links
 2. connector-channel-registrar
 3. open-channel-types; channel-settings-schema; neutral-outgoing-message
-4. telegram-on-registrar; capability-aware-validation; connector-managed-settings
+4. telegram-on-registrar; capability-aware-validation; connector-managed-settings; outbound-message-without-token
 5. Viber connector package
 6. Viber end to end
 7. Published docs
