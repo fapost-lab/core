@@ -6,7 +6,6 @@ namespace App\Domains\Channels\Contracts;
 
 use App\Domains\Channels\ChannelIntegrationDefinition;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
-use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
 use Fapost\Foundation\Channel\ChannelInboundAdapterInterface;
 use Fapost\Foundation\Channel\Settings\ChannelProfileInterface;
 use Fapost\Foundation\Channel\WebhookRegistrarInterface;
@@ -19,7 +18,7 @@ use Fapost\Foundation\Messaging\ProviderSenderInterface;
 interface ChannelRegistryInterface
 {
     /**
-     * Every channel type that has an integration: the built-in ones, then the connectors'.
+     * Every channel type that has an integration: the built-in ones, then the connectors', in registration order.
      *
      * @return list<string>
      */
@@ -41,8 +40,8 @@ interface ChannelRegistryInterface
     public function definition(ChannelTypeEnum|string $channelType): ?ChannelIntegrationDefinition;
 
     /**
-     * What the channel type can do beyond text and media: a built-in integration's declaration, else the
-     * connector's. A type nothing serves has none.
+     * What the channel type can do beyond text and media, as its integration declared. A type nothing serves has
+     * none.
      */
     public function capabilities(string $channelType): ChannelCapabilities;
 
@@ -57,9 +56,9 @@ interface ChannelRegistryInterface
     public function webhookRegistrar(ChannelTypeEnum|string $channelType): ?WebhookRegistrarInterface;
 
     /**
-     * Resolve the inbound adapter for the given channel type: a built-in one, or a connector's declarative one.
+     * Resolve the inbound adapter for the given channel type.
      */
-    public function adapter(ChannelTypeEnum|string $channelType): ChannelAdapterInterface|ChannelInboundAdapterInterface|null;
+    public function adapter(ChannelTypeEnum|string $channelType): ?ChannelInboundAdapterInterface;
 
     /**
      * The profile that declares the channel type's settings and public link. Always an object: a type whose

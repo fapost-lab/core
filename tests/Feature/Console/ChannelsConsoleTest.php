@@ -97,8 +97,9 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
     public function test_the_list_shows_the_channels_of_the_assistant_only(): void
     {
+        $this->registerEcho();
         $channel = $this->channel(['config' => ['bot_username' => 'help_bot']]);
-        $this->channel(['is_active' => false, 'type' => ChannelTypeEnum::WhatsApp]);
+        $this->channel(['is_active' => false, 'type' => 'echo']);
 
         $this->channel(assistant: Assistant::factory()->create());
         $this->channel(['tenant_id' => self::OTHER_TENANT_ID], Assistant::factory()->create(['tenant_id' => self::OTHER_TENANT_ID]));
@@ -148,7 +149,8 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
     public function test_the_list_sorts_by_the_declared_columns_and_ignores_others(): void
     {
-        $old = $this->channel(['type' => ChannelTypeEnum::WhatsApp]);
+        $this->registerEcho();
+        $old = $this->channel(['type' => 'echo']);
         $new = $this->channel();
         $old->forceFill(['updated_at' => now()->subDay()])->saveQuietly();
 
@@ -161,10 +163,10 @@ final class ChannelsConsoleTest extends FeatureTestCase
             ->assertInertia(fn (AssertableInertia $page) => $page->where('table.rows.0.id', (string) $old->getKey())->etc());
 
         $this->get($this->listUrl('?sort=type'))
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('table.rows.0.type', 'telegram')->etc());
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('table.rows.0.type', 'echo')->etc());
 
         $this->get($this->listUrl('?sort=-type'))
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('table.rows.0.type', 'whatsapp')->etc());
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('table.rows.0.type', 'telegram')->etc());
 
         $this->get($this->listUrl('?sort=token'))
             ->assertInertia(fn (AssertableInertia $page) => $page->where('table.state.sort', '-updated_at')->etc());
@@ -243,9 +245,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
                 ->component('Console/Channels/Create')
                 ->where('types', [
                     ['value' => 'telegram', 'label' => 'Telegram', 'usesSecretToken' => true],
-                    ['value' => 'whatsapp', 'label' => 'WhatsApp', 'usesSecretToken' => true],
                 ])
-                ->where('settings.whatsapp', [])
                 ->has('settings.telegram', 2)
                 ->where('settings.telegram.0.key', 'allowed_updates')
                 ->where('settings.telegram.0.type', 'choices')
@@ -290,9 +290,11 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
     public function test_a_channel_whose_integration_declares_no_settings_keeps_no_config(): void
     {
+        $this->registerEcho();
+
         $this->actingAs($this->admin())
             ->post($this->listUrl(), [
-                'type'         => 'whatsapp',
+                'type'         => 'echo',
                 'token'        => self::TOKEN,
                 'secret_token' => 'any secret, even with spaces',
                 'is_active'    => false,
@@ -303,7 +305,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
         $channel = Channel::query()->sole();
 
-        $this->assertSame(ChannelTypeEnum::WhatsApp->value, $channel->type);
+        $this->assertSame('echo', $channel->type);
         $this->assertFalse($channel->is_active);
         $this->assertSame([], $channel->config);
         $this->assertSame([], $this->registry->calls);
@@ -344,11 +346,12 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
     public function test_the_config_is_always_sent(): void
     {
+        $this->registerEcho();
         $this->actingAs($this->admin());
 
-        $this->post($this->listUrl(), ['type' => 'whatsapp', 'token' => self::TOKEN, 'secret_token' => 'secret', 'is_active' => true])
+        $this->post($this->listUrl(), ['type' => 'echo', 'token' => self::TOKEN, 'secret_token' => 'secret', 'is_active' => true])
             ->assertSessionHasErrors('config');
-        $this->post($this->listUrl(), ['type' => 'whatsapp', 'token' => self::TOKEN, 'secret_token' => 'secret', 'is_active' => true, 'config' => 'text'])
+        $this->post($this->listUrl(), ['type' => 'echo', 'token' => self::TOKEN, 'secret_token' => 'secret', 'is_active' => true, 'config' => 'text'])
             ->assertSessionHasErrors('config');
 
         $this->assertSame(0, Channel::query()->count());
@@ -399,8 +402,9 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
     public function test_the_edit_screen_defaults_a_setting_that_is_not_stored_and_lists_none_for_a_type_without_settings(): void
     {
+        $this->registerEcho();
         $telegram = $this->channel(['config' => []]);
-        $other    = $this->channel(['type' => ChannelTypeEnum::WhatsApp, 'config' => ['phone_id' => '123']]);
+        $other    = $this->channel(['type' => 'echo', 'config' => ['phone_id' => '123']]);
 
         $this->actingAs($this->admin());
 
@@ -438,7 +442,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
         $channel = $this->channel(['config' => ['allowed_updates' => ['poll'], 'max_connections' => 10, 'bot_username' => 'help_bot']]);
 
         $this->actingAs($this->admin())
-            ->put($this->listUrl("/{$channel->getKey()}"), $this->telegramPayload(['type' => 'whatsapp', 'is_active' => false]))
+            ->put($this->listUrl("/{$channel->getKey()}"), $this->telegramPayload(['type' => 'echo', 'is_active' => false]))
             ->assertRedirect();
 
         $channel->refresh();
@@ -462,7 +466,8 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
     public function test_the_settings_of_a_changed_channel_follow_its_stored_type(): void
     {
-        $channel = $this->channel(['type' => ChannelTypeEnum::WhatsApp, 'config' => ['old' => 'x']]);
+        $this->registerEcho();
+        $channel = $this->channel(['type' => 'echo', 'config' => ['old' => 'x']]);
 
         $this->actingAs($this->admin());
 
@@ -804,7 +809,6 @@ final class ChannelsConsoleTest extends FeatureTestCase
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->where('types', [
                     ['value' => 'telegram', 'label' => 'Telegram', 'usesSecretToken' => true],
-                    ['value' => 'whatsapp', 'label' => 'WhatsApp', 'usesSecretToken' => true],
                     ['value' => 'echo', 'label' => 'Echo', 'usesSecretToken' => true],
                 ])
                 ->where('settings.echo', [])
@@ -842,7 +846,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
         $this->actingAs($this->admin())
             ->get($this->listUrl('/create'))
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('types.2', ['value' => 'echo', 'label' => 'Echo', 'usesSecretToken' => false])
+                ->where('types.1', ['value' => 'echo', 'label' => 'Echo', 'usesSecretToken' => false])
                 ->where('settings.echo', fn ($fields) => ['region', 'retries', 'sandbox', 'mode', 'events'] === collect($fields)->pluck('key')->all()
                     && ['text', 'integer', 'boolean', 'choice', 'choices'] === collect($fields)->pluck('type')->all())
                 ->where('settings.echo.0.help', 'Where the account lives.')

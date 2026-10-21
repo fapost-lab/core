@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Domains\Webhook\Services;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
-use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
 use App\Domains\Webhook\Exceptions\AdapterNotFoundException;
 use Fapost\Foundation\Channel\ChannelInboundAdapterInterface;
 
@@ -22,10 +21,9 @@ final readonly class ChannelAdapterResolver
     /**
      * Resolve the adapter for the given external platform or fail explicitly.
      *
-     * A built-in adapter or a connector's {@see ChannelInboundAdapterInterface}; both normalize, and the second one is
-     * always verified through its ingress spec.
+     * Always a {@see ChannelInboundAdapterInterface}: it normalizes, and is verified through its ingress spec.
      */
-    public function resolve(string $platform): ChannelAdapterInterface|ChannelInboundAdapterInterface
+    public function resolve(string $platform): ChannelInboundAdapterInterface
     {
         $adapter = $this->channelRegistry->adapter($platform);
 

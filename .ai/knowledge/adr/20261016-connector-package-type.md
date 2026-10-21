@@ -71,10 +71,11 @@ holds the Solution manifest (`adr-20261010-solution-manifest-is-data-in-composer
   `ChannelTypeEnum` lists only the built-in ones. A channel whose type nobody serves stays untouched and
   unavailable; `platform:update` warns about it, never refuses.
 - Telegram stays built into Core on these seams (owner, 2026-10-16); a connector may never register a type Core
-  serves itself. "Built-in" means any `ChannelTypeEnum` case, the WhatsApp stub included: it fails closed, and the
-  task that brings a WhatsApp connector removes the stub from Core to free the type.
+  serves itself. "Built-in" means any `ChannelTypeEnum` case. Telegram registers through a
+  `BuiltInChannelRegistrar`, which accepts only those cases, over the same checks a connector's registrar uses.
+  The WhatsApp stub is removed (2026-10-21), so the `whatsapp` type is free for a connector.
 - A connector's media services reach the Media domain through the same `media.channel.*` container tags Telegram
-  uses (Infrastructure tags them); Media never reads `ConnectorChannels`. The Media channel registries are scoped,
+  uses (`Channels\ChannelRegistration` tags them, for a connector and a built-in module alike); Media never reads `ConnectorChannels`. The Media channel registries are scoped,
   so a connector service lives for one request or job and is never shared across them. Tenant migrations, translations and the public link of a connector channel are not in the
   registrar yet; they arrive with the tasks that first need them.
 

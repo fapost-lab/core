@@ -42,8 +42,9 @@ sessions. The platform is extended from outside through public contracts, not by
 
 `app/Infrastructure/<X>` also holds the seams that compose two domains so neither knows the other:
 `app/Infrastructure/Solution` writes a Solution's actions into the Flow registry and answers Flow's
-`ActionAvailabilityInterface` from `ActiveSolutions`; it also writes a connector's channels into
-`Channels\ConnectorChannels` and tags its media services into Media's registries. `Domains/Flow` and
+`ActionAvailabilityInterface` from `ActiveSolutions`; it also checks a connector's channels against its manifest and
+hands them to `Channels\ChannelRegistration`, which writes them into `Channels\ConnectorChannels` and tags their media
+services into Media's registries (the same path Telegram's `BuiltInChannelRegistrar` takes). `Domains/Flow` and
 `Infrastructure/Flow` do not depend on `Domains/Solution`, and `Domains/Channels` and `Domains/Media` depend on
 neither `Domains/Solution` nor `Infrastructure` (`SolutionBoundariesTest`).
 
@@ -171,5 +172,6 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   palette by decision (D5, spec `ui-foundation`). The front-end build needs nothing from Composer's
   `vendor/`, so the image's `assets` stage and CI's front-end job build from `package.json` alone, with the kit
   from the public npm registry.
-- **Only one messenger integration is real.** Telegram is implemented; the WhatsApp adapter throws
-  on every method. Channel swappability is a property of the contracts, not yet a demonstrated one.
+- **Only one messenger integration is real.** Telegram is implemented, and it registers through the same
+  registrar contract a connector uses. Channel swappability is a property of the contracts, not yet a
+  demonstrated one: no connector package has shipped a second messenger.

@@ -2,7 +2,7 @@
 id: rule-channels
 type: rule
 status: active
-summary: Send only via MessageSender, new messenger means new integration, queues by purpose
+summary: Send only via MessageSender, a messenger registers through a registrar, queues by purpose
 domains:
   - channels
 topics: []
@@ -79,9 +79,11 @@ broken.
   transcript stores `buttons` (label and action, no payload) and still reads legacy `keyboard` rows.
   Why: a second messenger must not require Flow to learn its markup. Enforced: `TelegramReplyMarkup`
   characterization tests; the rest review only.
-- **A new messenger is a new integration, not a branch.** Add a `ChannelIntegrationDefinition`
-  tagged `channels.integration` with its adapter, sender and registrar, in its own provider —
-  `Telegram/TelegramChannelServiceProvider.php` is the model — and declare its settings, public link
+- **A new messenger is a new integration, not a branch.** A messenger Core ships is a built-in module: a
+  provider extending `AbstractConnectorServiceProvider` that registers one `ConnectorChannel` (adapter, sender,
+  registrar) through the `BuiltInChannelRegistrar`, listed in `ChannelsServiceProvider` —
+  `Telegram/TelegramChannelServiceProvider.php` is the model. A messenger from outside is a connector package
+  and registers through its own registrar; there is no second path. Declare its settings, public link
   and media limits with a `ChannelProfileInterface` and a `ChannelMediaLimitsInterface`, never with a
   branch on the type in the form, the rules, the presenters or the media code. Review only. *(proposed)*
 - **`channels.config` holds only what the channel's profile declares, and the keys the integration

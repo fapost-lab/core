@@ -4,23 +4,27 @@ declare(strict_types=1);
 
 namespace App\Domains\Channels\Telegram;
 
-use App\Domains\Channels\ChannelIntegrationDefinition;
 use App\Domains\Channels\Telegram\Media\TelegramMediaDownloader;
 use App\Domains\Channels\Telegram\Media\TelegramMediaLimits;
 use App\Domains\Channels\Telegram\Media\TelegramMediaUploader;
+use Fapost\Foundation\Connector\ConnectorChannel;
+use Fapost\Foundation\Connector\ConnectorRegistrarInterface;
+use Fapost\Foundation\Lifecycle\AbstractConnectorServiceProvider;
 use Fapost\Foundation\Messaging\ChannelCapabilities;
 use Fapost\Foundation\Messaging\ChannelCapability;
-use Illuminate\Support\ServiceProvider;
 
 /**
- * Boots the Telegram channel integration module.
+ * Boots the Telegram channel module, built in to Core.
+ *
+ * Registers its channel through the same contract a connector package uses; the registrar differs, see
+ * {@see \App\Domains\Channels\BuiltInChannelRegistrar}.
  */
-final class TelegramChannelServiceProvider extends ServiceProvider
+final class TelegramChannelServiceProvider extends AbstractConnectorServiceProvider
 {
     /**
      * Register Telegram-specific sender, webhook, adapter, and delivery services.
      */
-    public function register(): void
+    protected function registerBindings(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/config/telegram.php', 'telegram');
 
@@ -39,7 +43,6 @@ final class TelegramChannelServiceProvider extends ServiceProvider
         $this->app->bind(TelegramVideoDeliveryAction::class);
         $this->app->bind(TelegramVoiceDeliveryAction::class);
         $this->app->bind(TelegramRemoveKeyboardDeliveryAction::class);
-        $this->app->bind(TelegramSignatureVerifier::class);
         $this->app->bind(TelegramInboundNormalizer::class);
         $this->app->bind(TelegramSender::class);
         $this->app->bind(TelegramWebhookRegistrar::class);
@@ -48,31 +51,37 @@ final class TelegramChannelServiceProvider extends ServiceProvider
         $this->app->bind(TelegramMediaDownloader::class);
         $this->app->bind(TelegramChannelProfile::class);
         $this->app->bind(TelegramMediaLimits::class);
-
-        $this->app->singleton(
-            'channels.integration.telegram',
-            static fn (): ChannelIntegrationDefinition => new ChannelIntegrationDefinition(
-                channelType: 'telegram',
-                senderClass: TelegramSender::class,
-                webhookRegistrarClass: TelegramWebhookRegistrar::class,
-                adapterClass: TelegramAdapter::class,
-                capabilities: new ChannelCapabilities([
-                    ChannelCapability::CallbackButtons,
-                    ChannelCapability::ReplyButtons,
-                    ChannelCapability::ShareContact,
-                    ChannelCapability::ShareLocation,
-                    ChannelCapability::RemoveButtons,
-                    ChannelCapability::PersistentButtons,
-                ]),
-                profileClass: TelegramChannelProfile::class,
-            )
-        );
     }
 
     /**
-     * Publish Telegram service tags and the integration definition.
+     * {@inheritDoc}
      */
-    public function boot(): void
+    protected function registerChannels(ConnectorRegistrarInterface $registrar): void
+    {
+        $registrar->registerChannel(new ConnectorChannel(
+            type: 'telegram',
+            sender: TelegramSender::class,
+            inbound: TelegramAdapter::class,
+            webhookRegistrar: TelegramWebhookRegistrar::class,
+            mediaUploader: TelegramMediaUploader::class,
+            mediaDownloader: TelegramMediaDownloader::class,
+            capabilities: new ChannelCapabilities([
+                ChannelCapability::CallbackButtons,
+                ChannelCapability::ReplyButtons,
+                ChannelCapability::ShareContact,
+                ChannelCapability::ShareLocation,
+                ChannelCapability::RemoveButtons,
+                ChannelCapability::PersistentButtons,
+            ]),
+            profile: TelegramChannelProfile::class,
+            mediaLimits: TelegramMediaLimits::class,
+        ));
+    }
+
+    /**
+     * Publish the Telegram delivery actions. The media classes are tagged by the registration of the channel.
+     */
+    protected function bootConnector(): void
     {
         $this->app->tag([
             TelegramTextDeliveryAction::class,
@@ -82,10 +91,5 @@ final class TelegramChannelServiceProvider extends ServiceProvider
             TelegramVoiceDeliveryAction::class,
             TelegramRemoveKeyboardDeliveryAction::class,
         ], 'channels.telegram_delivery');
-        $this->app->tag(['channels.integration.telegram'], 'channels.integration');
-
-        $this->app->tag([TelegramMediaUploader::class], 'media.channel.uploader');
-        $this->app->tag([TelegramMediaDownloader::class], 'media.channel.downloader');
-        $this->app->tag([TelegramMediaLimits::class], 'media.channel.limits');
     }
 }

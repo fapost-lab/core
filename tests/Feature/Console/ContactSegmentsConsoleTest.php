@@ -50,7 +50,7 @@ final class ContactSegmentsConsoleTest extends FeatureTestCase
             'language in'                       => [['type' => 'language', 'operator' => 'in', 'value' => ['en', 'pt-BR', 'en']], ['type' => 'language', 'operator' => 'in', 'value' => ['en', 'pt-BR']]],
             'language eq'                       => [['type' => 'language', 'operator' => 'eq', 'value' => ['uk']], ['type' => 'language', 'operator' => 'eq', 'value' => ['uk']]],
             'platform in'                       => [['type' => 'platform', 'operator' => 'in', 'value' => ['telegram', 'email']], ['type' => 'platform', 'operator' => 'in', 'value' => ['telegram', 'email']]],
-            'platform eq'                       => [['type' => 'platform', 'operator' => 'eq', 'value' => ['whatsapp']], ['type' => 'platform', 'operator' => 'eq', 'value' => ['whatsapp']]],
+            'platform eq'                       => [['type' => 'platform', 'operator' => 'eq', 'value' => ['email']], ['type' => 'platform', 'operator' => 'eq', 'value' => ['email']]],
             'attribute eq'                      => [['type' => 'attribute', 'key' => ' profile.city ', 'operator' => 'eq', 'value' => ['Kyiv']], ['type' => 'attribute', 'key' => 'profile.city', 'operator' => 'eq', 'value' => ['Kyiv']]],
             'attribute ne'                      => [['type' => 'attribute', 'key' => 'age', 'operator' => 'ne', 'value' => ['18']], ['type' => 'attribute', 'key' => 'age', 'operator' => 'ne', 'value' => ['18']]],
             'attribute exists'                  => [['type' => 'attribute', 'key' => 'age', 'operator' => 'exists', 'value' => ['junk']], ['type' => 'attribute', 'key' => 'age', 'operator' => 'exists']],

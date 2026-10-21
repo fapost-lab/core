@@ -34,14 +34,12 @@ in `gateway/`. Code lives in `app/Domains/Webhook` — the folder name predates 
 
 ## Boundaries
 
-- Owns `ChannelAdapterInterface` and `WebhookRegistryResolverInterface`.
+- Owns `WebhookRegistryResolverInterface`. The inbound adapter contract is Foundation's `ChannelInboundAdapterInterface`.
 - Depends on Channels (`ChannelRegistryInterface`, `ChannelTypeEnum`, the `Channel` model),
   Contact (`ContactServiceInterface`), Tenancy (`WebhookRegistryReaderInterface`,
   `TenantSwitcher`, `RuntimeTenant`), Flow (`MessageRouter`), Conversation (logger and capture
   factory) and Assistant.
-- Channels depends back on it for `ChannelAdapterInterface` and `WebhookUrlGenerator`, which
-  makes an import cycle. *(inferred: the adapter port sits in the consumer while the registry
-  returning it sits in Channels)*
+- Channels depends back on it for `WebhookUrlGenerator`, which makes an import cycle.
 - The gateway shares no code with PHP. It is coupled by wire formats only: the Redis keys
   `webhook:<hash>`, `ingress:spec:<platform>` and `processed:<key>`, the registry entry JSON,
   the `InboundWebhookPayload` v1 format, and the Laravel queue job
@@ -54,9 +52,9 @@ in `gateway/`. Code lives in `app/Domains/Webhook` — the folder name predates 
 - Dedup: `WebhookController::markProcessed` sets `processed:{idempotency_key}` (86400 s, `NX`)
   before the job is dispatched, so a duplicate update never reaches the queue.
 - Verification and the idempotency key go through the adapter's declarative `ingressSpec()`
-  (`ProvidesIngressSpecInterface`, executed by `IngressSpecExecutor`) when the adapter has one, so
-  the controller and the gateway run the same rules; an adapter without a spec uses its own
-  `verifySignature` / `extractIdempotencyKey`.
+  (`ProvidesIngressSpecInterface`, executed by `IngressSpecExecutor`), so the controller and the
+  gateway run the same rules. Every adapter has one: built-in and connector adapters alike implement
+  `ChannelInboundAdapterInterface`, and no adapter verifies in its own code.
 - Hash lookup in `Services/WebhookRegistryResolver`: Redis `webhook:{hash}` first; on a miss it reads
   the landlord registry through `WebhookRegistryReaderInterface` and writes the entry back to Redis.
   A short `warming:{hash}` leader lock (5 s) is taken on a miss, but both leader and followers do

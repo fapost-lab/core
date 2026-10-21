@@ -119,7 +119,7 @@ final class MessageSenderTest extends TestCase
         $channels->add(new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class), 'echo', 'Echo');
 
         $sender = new MessageSender(
-            new ChannelRegistry([], $this->app, $channels),
+            new ChannelRegistry($this->app, $channels),
             $this->redisFactory($connection),
             $this->rateLimit(),
             $this->nullConversationLogger(),

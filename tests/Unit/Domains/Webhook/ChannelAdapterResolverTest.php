@@ -7,7 +7,6 @@ namespace Tests\Unit\Domains\Webhook;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Telegram\TelegramAdapter;
 use App\Domains\Channels\Telegram\TelegramInboundNormalizer;
-use App\Domains\Channels\Telegram\TelegramSignatureVerifier;
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Webhook\Exceptions\AdapterNotFoundException;
 use App\Domains\Webhook\Services\ChannelAdapterResolver;
@@ -18,7 +17,7 @@ final class ChannelAdapterResolverTest extends TestCase
 {
     public function test_resolve_returns_registered_platform_adapter(): void
     {
-        $adapter  = new TelegramAdapter(new TelegramSignatureVerifier(), new TelegramInboundNormalizer());
+        $adapter  = new TelegramAdapter(new TelegramInboundNormalizer());
         $registry = $this->mock(ChannelRegistryInterface::class, function (MockInterface $mock) use ($adapter): void {
             $mock->shouldReceive('adapter')->once()->with('telegram')->andReturn($adapter);
         });
@@ -35,7 +34,7 @@ final class ChannelAdapterResolverTest extends TestCase
     public function test_resolve_throws_for_unregistered_platform(): void
     {
         $registry = $this->mock(ChannelRegistryInterface::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('adapter')->once()->with('whatsapp')->andReturn(null);
+            $mock->shouldReceive('adapter')->once()->with('unknown')->andReturn(null);
         });
         $resolver = new ChannelAdapterResolver(
             channelRegistry: $registry,
@@ -43,6 +42,6 @@ final class ChannelAdapterResolverTest extends TestCase
 
         $this->expectException(AdapterNotFoundException::class);
 
-        $resolver->resolve(PlatformEnum::WhatsApp->value);
+        $resolver->resolve('unknown');
     }
 }

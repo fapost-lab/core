@@ -26,7 +26,7 @@ is found and validated by `platform:update` and registers a channel type whose s
 Goal: nothing in Core outside Telegram's module knows Telegram. Done when: Telegram, still inside Core, is
 reached only through the connector registrar, with its existing tests untouched and green.
 
-- [ ] `telegram-on-registrar` — Telegram on the registrar: Telegram's module registers itself through the connector registrar like
+- [x] `telegram-on-registrar` — Telegram on the registrar: Telegram's module registers itself through the connector registrar like
       an outside package would, instead of Core's hard-coded provider list (after: Open channel types —
       it needs the open types to register into)
 - [x] `channel-settings-schema` — Channel settings from the connector's schema: Core's channel screens and request rules draw a

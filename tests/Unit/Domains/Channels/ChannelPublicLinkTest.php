@@ -36,11 +36,6 @@ final class ChannelPublicLinkTest extends TestCase
         $this->assertNull($this->links()->for($this->channel(ChannelTypeEnum::Telegram, ['bot_username' => ''])));
     }
 
-    public function test_whatsapp_channel_has_no_public_link_yet(): void
-    {
-        $this->assertNull($this->links()->for($this->channel(ChannelTypeEnum::WhatsApp, ['bot_username' => 'ignored'])));
-    }
-
     public function test_a_type_nothing_serves_has_no_link(): void
     {
         $this->assertNull($this->links()->for($this->channel('viber', ['bot_username' => 'x'])));

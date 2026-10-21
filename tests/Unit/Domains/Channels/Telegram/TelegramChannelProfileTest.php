@@ -53,10 +53,10 @@ final class TelegramChannelProfileTest extends TestCase
         $registry = $this->app->make(ChannelRegistryInterface::class);
 
         $this->assertInstanceOf(TelegramChannelProfile::class, $registry->profile('telegram'));
-        $this->assertInstanceOf(EmptyChannelProfile::class, $registry->profile('whatsapp'));
+        $this->assertInstanceOf(EmptyChannelProfile::class, $registry->profile('viber'));
         $this->assertInstanceOf(EmptyChannelProfile::class, $registry->profile('nothing-serves-this'));
-        $this->assertSame([], $registry->profile('whatsapp')->settings()->fields);
-        $this->assertTrue($registry->profile('whatsapp')->settings()->usesSecretToken);
-        $this->assertNull($registry->profile('whatsapp')->publicLink(['bot_username' => 'x']));
+        $this->assertSame([], $registry->profile('viber')->settings()->fields);
+        $this->assertTrue($registry->profile('viber')->settings()->usesSecretToken);
+        $this->assertNull($registry->profile('viber')->publicLink(['bot_username' => 'x']));
     }
 }

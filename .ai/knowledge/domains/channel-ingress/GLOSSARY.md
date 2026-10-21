@@ -44,8 +44,9 @@ fixed by `ops:ingress-migrate`.
 
 ## Channel adapter
 
-The per-platform inbound implementation of `ChannelAdapterInterface`: signature verification,
-idempotency key, payload normalisation.
+The per-platform implementation of Foundation's `ChannelInboundAdapterInterface`: payload
+normalisation, plus the declarative `IngressSpec` that Core and the gateway execute for signature
+verification and the idempotency key.
 
 ## Processed key
 

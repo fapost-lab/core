@@ -6,20 +6,17 @@ namespace Tests\Unit\Domains\Webhook;
 
 use App\Domains\Channels\Telegram\TelegramAdapter;
 use App\Domains\Channels\Telegram\TelegramInboundNormalizer;
-use App\Domains\Channels\Telegram\TelegramSignatureVerifier;
 use Fapost\Foundation\Channel\Ingress\IngressSpecExecutor;
 use Fapost\Foundation\Channel\Ingress\SignedRequest;
-use Illuminate\Http\Request;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
- * Guards the single most dangerous failure mode of declarative ingress:
- * the spec and the adapter it describes drifting apart.
+ * Pins Telegram's declarative ingress rules, now the only form they take: the spec is what Core and the ingress
+ * gateway both execute, so a verdict or a key that moves here moves in production.
  *
- * Drift is silent in both directions — a spec that is too lax opens a hole in the
- * gateway, one that is too strict drops real messages — so every fixture is run
- * through both implementations and the verdicts must match exactly.
+ * Drift is silent in both directions: a spec that is too lax opens a hole in the gateway, one that is too strict drops
+ * real messages. The cases are the ones the adapter's own verification code answered before it was removed.
  */
 final class TelegramIngressSpecParityTest extends TestCase
 {
@@ -44,16 +41,16 @@ final class TelegramIngressSpecParityTest extends TestCase
     }
 
     /**
-     * @return array<string, array{0: array<string, mixed>}>
+     * @return array<string, array{0: array<string, mixed>, 1: string}>
      */
     public static function idempotencyCases(): array
     {
         return [
-            'integer update id' => [['update_id' => 987654]],
-            'zero update id'    => [['update_id' => 0]],
-            'string update id'  => [['update_id' => '123']],
-            'absent update id'  => [['message' => ['text' => 'hi']]],
-            'empty body'        => [[]],
+            'integer update id' => [['update_id' => 987654], 'tg:channel-42:987654'],
+            'zero update id'    => [['update_id' => 0], 'tg:channel-42:0'],
+            'string update id'  => [['update_id' => '123'], 'tg:channel-42:123'],
+            'absent update id'  => [['message' => ['text' => 'hi']], 'tg:channel-42:'],
+            'empty body'        => [[], 'tg:channel-42:'],
         ];
     }
 
@@ -61,60 +58,34 @@ final class TelegramIngressSpecParityTest extends TestCase
      * @param  array<string, string>  $headers
      */
     #[DataProvider('signatureCases')]
-    public function test_signature_verdict_matches_adapter(array $headers, bool $expected): void
+    public function test_signature_verdict_follows_the_spec(array $headers, bool $expected): void
     {
-        $body    = '{"update_id":1}';
-        $adapter = $this->adapter();
-
-        $viaAdapter = $adapter->verifySignature($this->httpRequest($body, $headers), self::SECRET);
-        $viaSpec    = (new IngressSpecExecutor())->verify(
-            $adapter->ingressSpec(),
-            SignedRequest::create($body, $headers),
+        $verdict = (new IngressSpecExecutor())->verify(
+            $this->adapter()->ingressSpec(),
+            SignedRequest::create('{"update_id":1}', $headers),
             self::SECRET,
         );
 
-        $this->assertSame($expected, $viaAdapter, 'Adapter disagrees with the expected verdict.');
-        $this->assertSame($viaAdapter, $viaSpec, 'Ingress spec drifted from the adapter implementation.');
+        $this->assertSame($expected, $verdict);
     }
 
     /**
      * @param  array<string, mixed>  $body
      */
     #[DataProvider('idempotencyCases')]
-    public function test_idempotency_key_matches_adapter(array $body): void
+    public function test_idempotency_key_follows_the_spec(array $body, string $expected): void
     {
-        $raw     = (string) json_encode($body, JSON_THROW_ON_ERROR);
-        $adapter = $this->adapter();
-
-        $viaAdapter = $adapter->extractIdempotencyKey($this->httpRequest($raw), 'channel-42');
-        $viaSpec    = (new IngressSpecExecutor())->idempotencyKey(
-            $adapter->ingressSpec(),
-            SignedRequest::create($raw),
+        $key = (new IngressSpecExecutor())->idempotencyKey(
+            $this->adapter()->ingressSpec(),
+            SignedRequest::create((string) json_encode($body, JSON_THROW_ON_ERROR)),
             'channel-42',
         );
 
-        $this->assertSame($viaAdapter, $viaSpec, 'Ingress spec drifted from the adapter implementation.');
-    }
-
-    /**
-     * @param  array<string, string>  $headers
-     */
-    private function httpRequest(string $body, array $headers = []): Request
-    {
-        $server = ['CONTENT_TYPE' => 'application/json'];
-
-        foreach ($headers as $name => $value) {
-            $server['HTTP_' . mb_strtoupper(str_replace('-', '_', $name))] = $value;
-        }
-
-        return Request::create('/webhook/telegram/hash', 'POST', server: $server, content: $body);
+        $this->assertSame($expected, $key);
     }
 
     private function adapter(): TelegramAdapter
     {
-        return new TelegramAdapter(
-            new TelegramSignatureVerifier(),
-            $this->app->make(TelegramInboundNormalizer::class),
-        );
+        return new TelegramAdapter($this->app->make(TelegramInboundNormalizer::class));
     }
 }

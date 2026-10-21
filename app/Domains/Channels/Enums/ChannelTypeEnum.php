@@ -10,7 +10,6 @@ namespace App\Domains\Channels\Enums;
 enum ChannelTypeEnum: string
 {
     case Telegram = 'telegram';
-    case WhatsApp = 'whatsapp';
 
     /**
      * Build translated options for channel-management UI controls.
@@ -35,7 +34,6 @@ enum ChannelTypeEnum: string
     {
         return match ($this) {
             self::Telegram => 'staff.channels.types.telegram',
-            self::WhatsApp => 'staff.channels.types.whatsapp',
         };
     }
 }

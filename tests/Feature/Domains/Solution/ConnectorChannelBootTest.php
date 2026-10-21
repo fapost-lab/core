@@ -125,7 +125,7 @@ final class ConnectorChannelBootTest extends TestCase
         $app->singleton(ConnectorChannels::class);
         $app->singleton(
             ChannelRegistryInterface::class,
-            static fn (Application $app): ChannelRegistry => new ChannelRegistry([], $app, $app->make(ConnectorChannels::class)),
+            static fn (Application $app): ChannelRegistry => new ChannelRegistry($app, $app->make(ConnectorChannels::class)),
         );
         $app->scoped(
             ChannelMediaLinkPolicyRegistry::class,
