@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Providers;
 
+use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Call\Egress\AddressClassifier;
@@ -462,6 +463,7 @@ final class FlowServiceProvider extends ServiceProvider
             InlineKeyboardEditorInterface::class,
             fn ($app): FlowInlineKeyboardEditor => new FlowInlineKeyboardEditor(
                 $app->make(OutboundMessageSenderInterface::class),
+                $app->make(ChannelRegistryInterface::class),
             ),
         );
         $this->app->bind(PersistentButtonRegistryInterface::class, PersistentButtonRegistry::class);

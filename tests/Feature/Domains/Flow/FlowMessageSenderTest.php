@@ -25,6 +25,8 @@ use App\Domains\Media\Models\MediaBlob;
 use App\Domains\Media\Models\MediaFile;
 use Carbon\CarbonImmutable;
 use Fapost\Foundation\Media\Enums\MediaKind;
+use Fapost\Foundation\Messaging\ButtonAction;
+use Fapost\Foundation\Messaging\ButtonSet;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
@@ -82,16 +84,25 @@ final class FlowMessageSenderTest extends FeatureTestCase
         ]);
 
         $sender = $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock) use ($session): void {
-            $mock->shouldReceive('send')->once()->withArgs(fn ($message): bool => 'chat-123' === $message->chatId
+            $mock->shouldReceive('send')->once()->withArgs(function ($message) use ($session): bool {
+                $buttons = $message->payload->buttons;
+
+                return 'chat-123' === $message->chatId
                     && 'keyboard' === $message->payload->type
                     && 'Choose' === $message->payload->text
                     && (string) $session->getKey() === $message->metadata['flow_session_id']
-                                                                                  && CallbackDataCodec::encode(
-                                                                                      (string)$session->getKey(),
-                                                                                      '11111111-1111-4111-8111-111111111111',
-                                                                                  ) === $message->payload->keyboard['inline_keyboard'][0][0]['callback_data'])->andReturn(
-                                                                                      new DeliveryResult(sent: true, providerMessageId: 'provider-1')
-                                                                                  );
+                    && null === $message->payload->keyboard
+                    && $buttons instanceof ButtonSet
+                    && $buttons->expectsCallback()
+                    && 1 === count($buttons->rows)
+                    && 1 === count($buttons->rows[0])
+                    && 'Yes' === $buttons->rows[0][0]->label
+                    && ButtonAction::Callback === $buttons->rows[0][0]->action
+                    && CallbackDataCodec::encode(
+                        (string) $session->getKey(),
+                        '11111111-1111-4111-8111-111111111111',
+                    ) === $buttons->rows[0][0]->payload;
+            })->andReturn(new DeliveryResult(sent: true, providerMessageId: 'provider-1'));
         });
 
         $flowSender = new FlowMessageSender(
@@ -166,14 +177,17 @@ final class FlowMessageSenderTest extends FeatureTestCase
         ]);
 
         $sender = $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('send')->once()->withArgs(
-                fn ($message): bool => 'keyboard' === $message->payload->type
-                    && isset($message->payload->keyboard['keyboard'])
-                    && true === $message->payload->keyboard['one_time_keyboard']
-                    && true === $message->payload->keyboard['resize_keyboard']
-                    && 'Option 1' === $message->payload->keyboard['keyboard'][0][0]['text']
-                    && ! array_key_exists('callback_data', $message->payload->keyboard['keyboard'][0][0])
-            )->andReturn(new DeliveryResult(sent: true, providerMessageId: 'provider-reply'));
+            $mock->shouldReceive('send')->once()->withArgs(function ($message): bool {
+                $buttons = $message->payload->buttons;
+
+                return 'keyboard' === $message->payload->type
+                    && null === $message->payload->keyboard
+                    && $buttons instanceof ButtonSet
+                    && ! $buttons->expectsCallback()
+                    && 'Option 1' === $buttons->rows[0][0]->label
+                    && ButtonAction::Reply === $buttons->rows[0][0]->action
+                    && null === $buttons->rows[0][0]->payload;
+            })->andReturn(new DeliveryResult(sent: true, providerMessageId: 'provider-reply'));
         });
 
         $flowSender = new FlowMessageSender(

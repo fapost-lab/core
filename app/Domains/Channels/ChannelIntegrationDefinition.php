@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Domains\Channels;
 
+use Fapost\Foundation\Messaging\ChannelCapabilities;
+
 /**
  * Declarative description of one channel integration module.
  *
- * `connectorId` is set for a channel a connector brought, and null for a built-in integration.
+ * `connectorId` is set for a channel a connector brought, and null for a built-in integration. `capabilities` is
+ * what the channel can do beyond text and media; nothing declared means text and media only.
  */
 final readonly class ChannelIntegrationDefinition
 {
@@ -17,6 +20,7 @@ final readonly class ChannelIntegrationDefinition
         public ?string $webhookRegistrarClass = null,
         public ?string $adapterClass = null,
         public ?string $connectorId = null,
+        public ChannelCapabilities $capabilities = new ChannelCapabilities(),
     ) {
     }
 }

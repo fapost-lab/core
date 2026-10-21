@@ -9,6 +9,7 @@ use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
 use Fapost\Foundation\Channel\ChannelInboundAdapterInterface;
 use Fapost\Foundation\Channel\WebhookRegistrarInterface;
+use Fapost\Foundation\Messaging\ChannelCapabilities;
 use Fapost\Foundation\Messaging\ProviderSenderInterface;
 use Illuminate\Contracts\Container\Container;
 use InvalidArgumentException;
@@ -99,6 +100,14 @@ final class ChannelRegistry implements ChannelRegistryInterface
 
     /**
      * {@inheritDoc}
+     */
+    public function capabilities(string $channelType): ChannelCapabilities
+    {
+        return $this->definition($channelType)?->capabilities ?? new ChannelCapabilities();
+    }
+
+    /**
+     * {@inheritDoc}
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
@@ -162,6 +171,7 @@ final class ChannelRegistry implements ChannelRegistryInterface
             webhookRegistrarClass: $channel->webhookRegistrar,
             adapterClass: $channel->inbound,
             connectorId: $this->connectorChannels->ownerOf($type),
+            capabilities: $channel->capabilities,
         );
     }
 

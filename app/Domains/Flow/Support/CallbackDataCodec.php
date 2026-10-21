@@ -5,15 +5,17 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Support;
 
 /**
- * Encodes/decodes Telegram callback_data as a compact 64-char hex string
- * containing two UUIDs (session_id + button_id) with dashes stripped.
+ * Core's format of a callback button's payload: a compact 64-char hex string holding two UUIDs (session_id +
+ * button_id) with dashes stripped.
  *
- * Telegram's callback_data limit is 64 bytes; two 16-byte UUIDs as hex fit exactly.
+ * Core invents the payload, a connector carries it opaquely and hands it back verbatim as the text of a
+ * callback_query message. It is bounded by Foundation's Button::MAX_PAYLOAD_BYTES (64); two 16-byte UUIDs as hex fit
+ * exactly.
  */
 final class CallbackDataCodec
 {
     /**
-     * Encodes session_id + button_id into a 64-char hex string safe for Telegram callback_data.
+     * Encodes session_id + button_id into a 64-char hex string, the payload of a callback button.
      */
     public static function encode(string $sessionId, string $buttonId): string
     {
@@ -21,9 +23,9 @@ final class CallbackDataCodec
     }
 
     /**
-     * Decodes a 64-char hex callback_data into session_id and button_id.
+     * Decodes a 64-char hex payload into session_id and button_id.
      *
-     * @return array{session_id: string, button_id: string}|null  null when the data is not in codec format
+     * @return array{session_id: string, button_id: string}|null  null when the payload is not in codec format
      */
     public static function decode(?string $callbackData): ?array
     {
