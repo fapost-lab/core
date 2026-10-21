@@ -33,8 +33,11 @@ final class TelegramTextDeliveryAction implements TelegramDeliveryActionInterfac
      */
     private function replyMarkup(OutboundMessage $message): ?array
     {
-        if (null !== $message->payload->buttons) {
-            return TelegramReplyMarkup::fromButtons($message->payload->buttons);
+        // `?? null`: a payload serialized before foundation 0.26 leaves `buttons` uninitialized after unserialize.
+        $buttons = $message->payload->buttons ?? null;
+
+        if (null !== $buttons) {
+            return TelegramReplyMarkup::fromButtons($buttons);
         }
 
         return is_array($message->payload->keyboard) ? $message->payload->keyboard : null;

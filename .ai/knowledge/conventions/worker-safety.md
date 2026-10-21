@@ -29,7 +29,16 @@ MUST NOT: hold the request, the config repository, the tenant context or the cur
 MUST:     keep mutable request/job state in `scoped` bindings; they are rebuilt for every job
 MUST:     switch tenants through TenantSwitcher::runForTenant(), with the restore in `finally`
 MUST NOT: write to static properties between jobs
+MUST:     read a property a Foundation DTO gained after the last release with `?? null` (or
+          `isset()`) when that DTO travels inside a queued job: a job serialized by the previous
+          version unserializes with the new typed property uninitialized, and a plain read throws
 ```
+
+A queued job outlives a deploy: `jobs` and `failed_jobs` hold what the previous image serialized,
+and PHP's unserialize does not apply a promoted parameter's default. Foundation 0.28 added
+`MessagePayload::$buttons`; a `BroadcastSendJob` queued under 0.25 then failed on every retry with
+`Typed property ... must not be accessed before initialization` (fixed in
+`fix-payload-buttons-unserialize`, pinned by tests that unserialize a 0.25 payload).
 
 This is review-only across the application in general. It is mechanically enforced for the
 Flow runtime specifically, by `tests/Architecture/FlowRuntimeIsolationTest.php` (the engine,

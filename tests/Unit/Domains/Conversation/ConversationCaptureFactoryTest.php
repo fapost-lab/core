@@ -287,6 +287,14 @@ final class ConversationCaptureFactoryTest extends TestCase
         $this->assertSame([], $this->outboundEntry(new MessagePayload(type: 'text', text: 'Hi'))->payload);
     }
 
+    public function test_a_payload_queued_before_buttons_existed_has_an_empty_payload(): void
+    {
+        $payload = unserialize('O:42:"Fapost\\Foundation\\Messaging\\MessagePayload":4:{s:4:"type";s:4:"text";s:4:"text";s:5:"Hello";s:5:"media";N;s:8:"keyboard";N;}');
+
+        $this->assertInstanceOf(MessagePayload::class, $payload);
+        $this->assertSame([], $this->outboundEntry($payload)->payload);
+    }
+
     private function outboundEntry(MessagePayload $payload): \App\Domains\Conversation\DTO\MessageLogEntry
     {
         $entry = (new ConversationCaptureFactory())->forOutbound(

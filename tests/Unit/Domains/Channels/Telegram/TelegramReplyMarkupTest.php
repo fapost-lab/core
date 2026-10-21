@@ -102,6 +102,16 @@ final class TelegramReplyMarkupTest extends TestCase
         Http::assertSent(static fn (Request $request): bool => ! isset($request['reply_markup']));
     }
 
+    public function test_the_text_action_sends_a_payload_queued_before_buttons_existed(): void
+    {
+        $payload = unserialize('O:42:"Fapost\\Foundation\\Messaging\\MessagePayload":4:{s:4:"type";s:4:"text";s:4:"text";s:5:"Hello";s:5:"media";N;s:8:"keyboard";N;}');
+
+        $this->assertInstanceOf(MessagePayload::class, $payload);
+        $this->deliver($payload);
+
+        Http::assertSent(static fn (Request $request): bool => ! isset($request['reply_markup']));
+    }
+
     private function deliver(MessagePayload $payload): void
     {
         Http::fake(['https://api.telegram.org/*' => Http::response(['ok' => true, 'result' => ['message_id' => 1]], 200)]);
