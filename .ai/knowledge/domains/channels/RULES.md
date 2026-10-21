@@ -70,7 +70,15 @@ broken.
   automatically and a new shared layer must be added to that exclusion list.
 - **A new messenger is a new integration, not a branch.** Add a `ChannelIntegrationDefinition`
   tagged `channels.integration` with its adapter, sender and registrar, in its own provider —
-  `Telegram/TelegramChannelServiceProvider.php` is the model. Review only. *(proposed)*
+  `Telegram/TelegramChannelServiceProvider.php` is the model — and declare its settings, public link
+  and media limits with a `ChannelProfileInterface` and a `ChannelMediaLimitsInterface`, never with a
+  branch on the type in the form, the rules, the presenters or the media code. Review only. *(proposed)*
+- **`channels.config` holds only what the channel's profile declares, and the keys the integration
+  manages survive a save.** `ChannelService::update` keeps the editable values from the request and the
+  stored values of `managed` fields, drops every other key, and orders them by the schema (so an
+  unchanged config does not look changed to the webhook sync). The integration writes a managed value
+  (`bot_username`) past the model's events, under a row lock. A field is never secret: `config` reaches
+  queued jobs. Enforced: `ChannelsConsoleTest`, `TelegramBotIdentityStoreTest`.
 - **A channel secret never leaves the request or job that uses it.** A provider client throws
   exceptions whose text went through `SecretRedactor` and does not chain the original (a connection
   error's message carries the URL, and Telegram's URL carries the bot token); a queued job names the

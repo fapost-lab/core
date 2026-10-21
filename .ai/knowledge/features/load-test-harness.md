@@ -24,7 +24,7 @@ throwaway tenants, each with one assistant/Telegram channel/published flow, driv
 Telegram webhook traffic against their contacts through the real HTTP → queue → flow-engine
 pipeline, and checks the result for state leaks. `tools/loadtest/telegram-stub.php` stands in for
 the real Telegram Bot API so no traffic ever reaches `api.telegram.org`
-(`services.telegram.api_base_url`, see `TelegramBotApiClientFactory`).
+(`telegram.api_base_url`, see `TelegramBotApiClientFactory`).
 
 ## Why
 
@@ -48,7 +48,7 @@ its own tenant and contact identity in the text itself, so a leak is a plain str
 - `failed_jobs` is a table shared with everything else that ever ran against the dev database.
   `loadtest:verify` scopes its count to `failed_at >= state.created_at`; an unscoped count picks up
   unrelated pre-existing failures and produces a false failure.
-- `loadtest:seed` refuses to run unless `services.telegram.api_base_url` is already pointed away
+- `loadtest:seed` refuses to run unless `telegram.api_base_url` is already pointed away
   from the real API — creating an active Telegram channel synchronously dispatches
   `SyncChannelWebhookJob::dispatchSync()`, which calls the real `setWebhook`/`getMe` otherwise.
 - The stub is started with `PHP_CLI_SERVER_WORKERS` for concurrency, which preforks worker

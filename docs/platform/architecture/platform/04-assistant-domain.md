@@ -64,9 +64,8 @@ entity.
 | `type` | `ChannelTypeEnum`: `telegram`, `whatsapp` (WhatsApp has no production adapter yet) |
 | `token` | Encrypted |
 | `secret_token` | Encrypted |
-| `telegram_bot_username` | Bot username resolved from Telegram (nullable) |
 | `webhook_public_hash` | Unique, opaque |
-| `config` | JSON: channel-specific |
+| `config` | JSON: the settings the channel type's profile declares; managed keys such as Telegram's `bot_username` are written by the integration |
 | `is_active` | Activity flag |
 
 `ChannelObserver` is the single owner of channel lifecycle side effects: Redis registry sync and provider webhook

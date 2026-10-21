@@ -8,6 +8,7 @@ use App\Console\Platform\TenantUnservedChannelsFinder;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Channels\Models\Channel;
+use App\Domains\Channels\Services\ChannelPublicLinks;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
@@ -100,7 +101,7 @@ final class OpenChannelTypesTest extends FeatureTestCase
 
         $this->assertSame('viber', $found->type);
         $this->assertSame('viber', $found->getType());
-        $this->assertNull($found->publicHandle());
+        $this->assertNull($this->app->make(ChannelPublicLinks::class)->for($found));
     }
 
     public function test_the_finder_counts_channels_of_unserved_types_per_tenant(): void

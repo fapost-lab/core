@@ -30,7 +30,7 @@ use Throwable;
  * Creating an active channel synchronously registers a provider webhook
  * ({@see \App\Domains\Channels\Observers\ChannelObserver} →
  * {@see \App\Jobs\Messaging\SyncChannelWebhookJob::dispatchSync}), which
- * calls the real Telegram origin unless `services.telegram.api_base_url`
+ * calls the real Telegram origin unless `telegram.api_base_url`
  * points elsewhere — so this command refuses to run against the real API.
  */
 final class LoadTestSeedCommand extends Command
@@ -64,11 +64,11 @@ final class LoadTestSeedCommand extends Command
             return self::FAILURE;
         }
 
-        $apiBaseUrl = mb_rtrim((string)$this->config->get('services.telegram.api_base_url', 'https://api.telegram.org'), '/');
+        $apiBaseUrl = mb_rtrim((string)$this->config->get('telegram.api_base_url', 'https://api.telegram.org'), '/');
 
         if ('https://api.telegram.org' === $apiBaseUrl) {
             $this->components->error(
-                'services.telegram.api_base_url still points at the real Telegram API. '
+                'telegram.api_base_url still points at the real Telegram API. '
                 . 'Start tools/loadtest/telegram-stub.php and set TELEGRAM_API_BASE_URL to it before seeding.',
             );
 
@@ -209,7 +209,7 @@ final class LoadTestSeedCommand extends Command
 
         // Active + synchronous: the ChannelObserver dispatches
         // SyncChannelWebhookJob::dispatchSync() right here, which calls
-        // setWebhook/getMe against services.telegram.api_base_url (the stub).
+        // setWebhook/getMe against telegram.api_base_url (the stub).
         $channel = $this->channels->create($assistant, [
             'type'         => 'telegram',
             'token'        => $botToken,

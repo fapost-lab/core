@@ -6,7 +6,6 @@ namespace App\Domains\Channels\Models;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Casts\ChannelTypeCast;
-use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Enums\ChannelWebhookStatus;
 use App\Domains\Channels\Observers\ChannelObserver;
 use Database\Factories\ChannelFactory;
@@ -38,7 +37,6 @@ use Illuminate\Support\Str;
  * @property string              $tenant_id
  * @property string              $token
  * @property string              $secret_token
- * @property string|null         $telegram_bot_username
  * @property string              $webhook_public_hash
  * @property ChannelWebhookStatus|null $webhook_status
  * @property \Illuminate\Support\Carbon|null $webhook_status_at
@@ -52,7 +50,6 @@ use Illuminate\Support\Str;
  * @method static Builder<static>|Channel whereId($value)
  * @method static Builder<static>|Channel whereIsActive($value)
  * @method static Builder<static>|Channel whereSecretToken($value)
- * @method static Builder<static>|Channel whereTelegramBotUsername($value)
  * @method static Builder<static>|Channel whereTenantId($value)
  * @method static Builder<static>|Channel whereToken($value)
  * @method static Builder<static>|Channel whereType($value)
@@ -112,53 +109,11 @@ final class Channel extends Model implements ChannelInterface
     public function getConfig(): array
     {
         return [
-            'token'                 => $this->token,
-            'secret_token'          => $this->secret_token,
-            'webhook_public_hash'   => $this->webhook_public_hash,
-            'telegram_bot_username' => $this->telegram_bot_username,
-            'options'               => is_array($this->config) ? $this->config : [],
+            'token'               => $this->token,
+            'secret_token'        => $this->secret_token,
+            'webhook_public_hash' => $this->webhook_public_hash,
+            'options'             => is_array($this->config) ? $this->config : [],
         ];
-    }
-
-    /**
-     * Provider-reported account name, without the leading `@`. Null until the
-     * provider handshake stored the bot identity
-     * ({@see \App\Domains\Channels\Telegram\TelegramWebhookRegistrar}) or for
-     * channel types that have no public account name.
-     */
-    public function publicUsername(): ?string
-    {
-        $username = match ($this->type) {
-            ChannelTypeEnum::Telegram->value => $this->telegram_bot_username,
-            default                          => null,
-        };
-
-        return '' === (string)$username ? null : (string)$username;
-    }
-
-    /**
-     * Public handle of the channel as a person would address it — `@bot` for
-     * Telegram. Null under the same conditions as {@see publicUsername()}.
-     */
-    public function publicHandle(): ?string
-    {
-        $username = $this->publicUsername();
-
-        return null === $username ? null : '@' . $username;
-    }
-
-    /**
-     * Deep link that opens the channel for an end user, e.g. `https://t.me/bot`.
-     * Null under the same conditions as {@see publicHandle()}.
-     */
-    public function publicUrl(): ?string
-    {
-        $username = $this->publicUsername();
-
-        return match ($this->type) {
-            ChannelTypeEnum::Telegram->value => null === $username ? null : 'https://t.me/' . $username,
-            default                          => null,
-        };
     }
 
     /**

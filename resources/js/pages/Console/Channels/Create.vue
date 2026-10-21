@@ -8,12 +8,11 @@ export default { layout: AppShell }
 import { computed } from 'vue'
 import { Head, usePage } from '@inertiajs/vue3'
 import ChannelForm from './ChannelForm.vue'
-import type { ChannelsPageProps, MaxConnections, SelectOption } from './types'
+import type { ChannelTypeOption, ChannelsPageProps, SettingsByType } from './types'
 
 defineProps<{
-  types: SelectOption[]
-  telegramUpdates: SelectOption[]
-  maxConnections: MaxConnections
+  types: ChannelTypeOption[]
+  settings: SettingsByType
   urls: { index: string; submit: string }
 }>()
 
@@ -32,8 +31,7 @@ const t = computed(() => usePage<ChannelsPageProps>().props.translations.console
       :submit-url="urls.submit"
       :cancel-url="urls.index"
       :types="types"
-      :telegram-updates="telegramUpdates"
-      :max-connections="maxConnections"
+      :settings="settings"
     />
   </div>
 </template>

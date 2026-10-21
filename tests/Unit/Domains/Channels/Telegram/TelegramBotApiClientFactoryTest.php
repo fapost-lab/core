@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
 /**
- * The Bot API origin comes from `services.telegram.api_base_url`, so a load test
+ * The Bot API origin comes from `telegram.api_base_url`, so a load test
  * can point real Telegram traffic at a local stub.
  */
 final class TelegramBotApiClientFactoryTest extends TestCase
@@ -26,7 +26,7 @@ final class TelegramBotApiClientFactoryTest extends TestCase
 
     public function test_clients_use_the_configured_api_base_url(): void
     {
-        config(['services.telegram.api_base_url' => 'http://127.0.0.1:8099/']);
+        config(['telegram.api_base_url' => 'http://127.0.0.1:8099/']);
         Http::fake(['*' => Http::response(['ok' => true, 'result' => ['id' => 1]])]);
 
         $this->app->make(TelegramBotApiClientFactory::class)->make('tok')->getMe();

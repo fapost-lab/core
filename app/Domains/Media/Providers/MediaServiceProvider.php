@@ -132,10 +132,11 @@ final class MediaServiceProvider extends ServiceProvider
             ->needs('$maxDepth')
             ->giveConfig('media.folder.max_depth', 10);
 
-        $this->app->singleton(
+        // Scoped, like the other channel registries: a connector's limits class is built per request, not shared.
+        $this->app->scoped(
             ChannelLimitInspector::class,
-            static fn (): ChannelLimitInspector => new ChannelLimitInspector(
-                (array)config('media.channel_limits', []),
+            static fn (Container $app): ChannelLimitInspector => new ChannelLimitInspector(
+                $app->tagged('media.channel.limits'),
             ),
         );
 

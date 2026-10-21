@@ -5,26 +5,22 @@ declare(strict_types=1);
 namespace App\Http\Requests\Console;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
-use App\Domains\Channels\Enums\ChannelTypeEnum;
-use App\Domains\Channels\Telegram\TelegramWebhookOptions;
+use App\Domains\Channels\Services\ChannelSettingPresenter;
+use Fapost\Foundation\Channel\Settings\ChannelSettingField;
+use Fapost\Foundation\Channel\Settings\ChannelSettingType;
 use Illuminate\Validation\Rule;
 
 /**
  * What the channel form sends, as validation rules and as the fields {@see \App\Domains\Channels\Services\AssistantChannelService}
  * takes. It holds no state, so any screen that edits a channel (the assistant console, the tenant-wide admin) shares it.
  *
- * The settings depend on the channel's type: Telegram has two named ones (`config.allowed_updates`,
- * `config.max_connections`), any other type a free list of key/value pairs (`config_entries`). The type is chosen when
- * the channel is created and does not change afterwards, so a change has no `type` rule and no `type` field.
+ * The settings come from the profile the channel's integration declared ({@see \Fapost\Foundation\Channel\Settings\ChannelProfileInterface}):
+ * each editable field of its schema becomes one rule set under `config.<key>`, whatever the provider. The type is
+ * chosen when the channel is created and does not change afterwards, so a change has no `type` rule and no `type` field.
  */
 final class ChannelFieldRules
 {
-    /**
-     * Telegram accepts a secret token of 1 to 256 characters from `A-Z a-z 0-9 _ -`.
-     */
-    private const string TELEGRAM_SECRET = '/^[A-Za-z0-9_-]{1,256}$/';
-
-    private const int MAX_ENTRIES = 50;
+    private const int MAX_TEXT = 65535;
 
     /**
      * @param  string|null  $type      the type of the channel: the one sent when creating (null: not a registered type,
@@ -35,28 +31,60 @@ final class ChannelFieldRules
      */
     public static function rules(?string $type, bool $creating): array
     {
-        $secret = ['string', 'max:65535'];
+        $registry = app(ChannelRegistryInterface::class);
+        $schema   = null === $type ? null : $registry->profile($type)->settings();
+        $presence = $creating ? ['required'] : ['nullable'];
+        if (null === $schema || $schema->usesSecretToken) {
+            $secret = [...$presence, 'string', 'max:' . self::MAX_TEXT];
 
-        if (ChannelTypeEnum::Telegram->value === $type) {
-            $secret[] = 'regex:' . self::TELEGRAM_SECRET;
+            if (null !== $schema?->secretTokenPattern) {
+                $secret[] = 'regex:' . self::secretTokenRegex($schema->secretTokenPattern);
+            }
+        } else {
+            $secret = ['nullable', 'string', 'max:' . self::MAX_TEXT];
         }
 
-        $presence = $creating ? ['required'] : ['nullable'];
-        $rules    = [
-            'token'        => [...$presence, 'string', 'max:65535'],
-            'secret_token' => [...$presence, ...$secret],
+        $rules = [
+            'token'        => [...$presence, 'string', 'max:' . self::MAX_TEXT],
+            'secret_token' => $secret,
             'is_active'    => ['required', 'boolean'],
         ];
 
         if ($creating) {
-            $rules['type'] = ['required', 'string', Rule::in(app(ChannelRegistryInterface::class)->types())];
+            $rules['type'] = ['required', 'string', Rule::in($registry->types())];
         }
 
-        return match ($type) {
-            ChannelTypeEnum::Telegram->value => $rules + self::telegramRules(),
-            null                             => $rules,
-            default                          => $rules + self::entryRules(),
-        };
+        if (null === $schema) {
+            return $rules;
+        }
+
+        $rules['config'] = ['present', 'array'];
+
+        foreach ($schema->editable() as $field) {
+            $rules = [...$rules, ...self::fieldRules($field)];
+        }
+
+        return $rules;
+    }
+
+    /**
+     * The names the errors speak of: the translated label of each setting, instead of `config.max connections`.
+     *
+     * @return array<string, string>
+     */
+    public static function attributes(?string $type): array
+    {
+        if (null === $type) {
+            return [];
+        }
+
+        $attributes = [];
+
+        foreach (app(ChannelRegistryInterface::class)->profile($type)->settings()->editable() as $field) {
+            $attributes["config.{$field->key}"] = ChannelSettingPresenter::label($field);
+        }
+
+        return $attributes;
     }
 
     /**
@@ -90,57 +118,72 @@ final class ChannelFieldRules
     /**
      * @return array<string, list<mixed>>
      */
-    private static function telegramRules(): array
+    private static function fieldRules(ChannelSettingField $field): array
     {
-        return [
-            'config'                   => ['required', 'array'],
-            'config.allowed_updates'   => ['present', 'array'],
-            'config.allowed_updates.*' => ['string', 'distinct', Rule::in(TelegramWebhookOptions::ALLOWED_UPDATES)],
-            'config.max_connections'   => [
-                'required',
-                'integer',
-                'between:' . TelegramWebhookOptions::MAX_CONNECTIONS_MIN . ',' . TelegramWebhookOptions::MAX_CONNECTIONS_MAX,
+        $key      = "config.{$field->key}";
+        $presence = $field->required ? ['required'] : ['nullable'];
+        $accepted = array_map(strval(...), array_keys($field->choices));
+
+        return match ($field->type) {
+            ChannelSettingType::Text => [
+                $key => [...$presence, 'string', 'max:' . ($field->max ?? self::MAX_TEXT)],
             ],
-        ];
+            ChannelSettingType::Integer => [
+                $key => [
+                    ...$presence,
+                    'integer',
+                    ...(null === $field->min ? [] : ['min:' . $field->min]),
+                    ...(null === $field->max ? [] : ['max:' . $field->max]),
+                ],
+            ],
+            ChannelSettingType::Boolean => [
+                $key => [...$presence, 'boolean'],
+            ],
+            ChannelSettingType::Choice => [
+                $key => [...$presence, 'string', Rule::in($accepted)],
+            ],
+            ChannelSettingType::Choices => [
+                $key       => ['present', 'array', ...($field->required ? ['min:1'] : [])],
+                "{$key}.*" => ['string', 'distinct', Rule::in($accepted)],
+            ],
+        };
     }
 
     /**
-     * @return array<string, list<mixed>>
-     */
-    private static function entryRules(): array
-    {
-        return [
-            'config_entries'         => ['present', 'array', 'max:' . self::MAX_ENTRIES],
-            'config_entries.*.key'   => ['required', 'string', 'max:255', 'distinct'],
-            'config_entries.*.value' => ['nullable', 'string', 'max:65535'],
-        ];
-    }
-
-    /**
+     * Only the editable settings of the schema, typed; managed ones are the integration's and never come from a request.
+     *
      * @param  array<string, mixed>  $validated
      *
      * @return array<string, mixed>
      */
     private static function config(array $validated, string $type): array
     {
-        if (ChannelTypeEnum::Telegram->value === $type) {
-            /** @var array{allowed_updates: list<string>, max_connections: int|string} $config */
-            $config = $validated['config'];
+        $submitted = is_array($validated['config'] ?? null) ? $validated['config'] : [];
+        $config    = [];
 
-            return [
-                'allowed_updates' => array_values($config['allowed_updates']),
-                'max_connections' => (int) $config['max_connections'],
-            ];
-        }
+        foreach (app(ChannelRegistryInterface::class)->profile($type)->settings()->editable() as $field) {
+            $value = $submitted[$field->key] ?? null;
 
-        /** @var list<array{key: string, value?: string|null}> $entries */
-        $entries = $validated['config_entries'] ?? [];
-        $config  = [];
+            if (null === $value) {
+                continue;
+            }
 
-        foreach ($entries as $entry) {
-            $config[$entry['key']] = $entry['value'] ?? '';
+            $config[$field->key] = match ($field->type) {
+                ChannelSettingType::Integer => (int) $value,
+                ChannelSettingType::Boolean => (bool) $value,
+                ChannelSettingType::Choices => array_values((array) $value),
+                default                     => (string) $value,
+            };
         }
 
         return $config;
+    }
+
+    /**
+     * A schema's pattern is PCRE without delimiters; the whole secret has to match it.
+     */
+    private static function secretTokenRegex(string $pattern): string
+    {
+        return '/^(?:' . str_replace('/', '\/', $pattern) . ')$/';
     }
 }

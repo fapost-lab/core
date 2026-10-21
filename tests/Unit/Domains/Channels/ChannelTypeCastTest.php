@@ -6,6 +6,7 @@ namespace Tests\Unit\Domains\Channels;
 
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
+use App\Domains\Channels\Services\ChannelPublicLinks;
 use App\Domains\Contact\Enums\PlatformEnum;
 use App\Domains\Contact\Models\Contact;
 use Tests\TestCase;
@@ -23,11 +24,10 @@ final class ChannelTypeCastTest extends TestCase
 
     public function test_a_type_nothing_serves_still_hydrates(): void
     {
-        $channel = (new Channel())->newFromBuilder(['type' => 'viber', 'telegram_bot_username' => 'x']);
+        $channel = (new Channel())->newFromBuilder(['type' => 'viber', 'config' => '{"bot_username":"x"}']);
 
         $this->assertSame('viber', $channel->type);
-        $this->assertNull($channel->publicUsername());
-        $this->assertNull($channel->publicUrl());
+        $this->assertNull($this->app->make(ChannelPublicLinks::class)->for($channel));
     }
 
     public function test_a_contact_platform_takes_an_enum_case_or_any_string(): void

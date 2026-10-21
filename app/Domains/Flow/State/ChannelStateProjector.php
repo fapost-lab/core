@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\State;
 
 use App\Domains\Channels\Models\Channel;
+use App\Domains\Channels\Services\ChannelPublicLinks;
 
 /**
  * Projects the channel a conversation runs on into `system.channel.*`.
@@ -19,6 +20,10 @@ use App\Domains\Channels\Models\Channel;
  */
 final readonly class ChannelStateProjector
 {
+    public function __construct(private ChannelPublicLinks $links)
+    {
+    }
+
     /**
      * State fragment for `system.channel`, or an empty array when no active
      * channel can be resolved (the flow then reads empty strings rather than
@@ -34,14 +39,16 @@ final readonly class ChannelStateProjector
             return [];
         }
 
+        $link = $this->links->for($channel);
+
         return [
             'id'   => (string)$channel->getKey(),
             'type' => $channel->type,
             // Both spellings: `bot_username` for composing text by hand,
             // `bot_handle` for dropping the ready-to-paste `@name` in.
-            'bot_username' => $channel->publicUsername(),
-            'bot_handle'   => $channel->publicHandle(),
-            'link'         => $channel->publicUrl(),
+            'bot_username' => $link?->username,
+            'bot_handle'   => $link?->handle,
+            'link'         => $link?->url,
         ];
     }
 

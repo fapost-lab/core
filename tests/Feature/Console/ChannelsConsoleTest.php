@@ -10,6 +10,7 @@ use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Enums\ChannelWebhookStatus;
 use App\Domains\Channels\Models\Channel;
+use App\Domains\Channels\Services\ChannelPublicLinks;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
@@ -26,6 +27,7 @@ use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
+use Tests\Fixtures\Connectors\Echo\EchoChannelProfile;
 use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
 use Tests\Fixtures\Connectors\Echo\EchoSender;
 
@@ -95,7 +97,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
     public function test_the_list_shows_the_channels_of_the_assistant_only(): void
     {
-        $channel = $this->channel(['telegram_bot_username' => 'help_bot']);
+        $channel = $this->channel(['config' => ['bot_username' => 'help_bot']]);
         $this->channel(['is_active' => false, 'type' => ChannelTypeEnum::WhatsApp]);
 
         $this->channel(assistant: Assistant::factory()->create());
@@ -239,10 +241,29 @@ final class ChannelsConsoleTest extends FeatureTestCase
             ->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->component('Console/Channels/Create')
-                ->where('types', [['value' => 'telegram', 'label' => 'Telegram'], ['value' => 'whatsapp', 'label' => 'WhatsApp']])
-                ->where('telegramUpdates.0', ['value' => 'message', 'label' => 'Message'])
-                ->has('telegramUpdates', 24)
-                ->where('maxConnections', ['min' => 1, 'max' => 100, 'default' => 40])
+                ->where('types', [
+                    ['value' => 'telegram', 'label' => 'Telegram', 'usesSecretToken' => true],
+                    ['value' => 'whatsapp', 'label' => 'WhatsApp', 'usesSecretToken' => true],
+                ])
+                ->where('settings.whatsapp', [])
+                ->has('settings.telegram', 2)
+                ->where('settings.telegram.0.key', 'allowed_updates')
+                ->where('settings.telegram.0.type', 'choices')
+                ->where('settings.telegram.0.label', 'Allowed updates')
+                ->where('settings.telegram.0.default', [])
+                ->has('settings.telegram.0.choices', 24)
+                ->where('settings.telegram.0.choices.0', ['value' => 'message', 'label' => 'Message'])
+                ->where('settings.telegram.1', [
+                    'key'      => 'max_connections',
+                    'type'     => 'integer',
+                    'label'    => 'Max connections',
+                    'help'     => 'Telegram webhook delivery parallelism, from 1 to 100. Defaults to 40.',
+                    'required' => true,
+                    'default'  => 40,
+                    'min'      => 1,
+                    'max'      => 100,
+                    'choices'  => [],
+                ])
                 ->where('urls', ['index' => "/assistant/{$this->assistant->getKey()}/channels", 'submit' => "/assistant/{$this->assistant->getKey()}/channels"])
                 ->etc());
     }
@@ -267,15 +288,15 @@ final class ChannelsConsoleTest extends FeatureTestCase
         Bus::assertDispatchedSync(SyncChannelWebhookJob::class);
     }
 
-    public function test_a_channel_without_named_settings_takes_its_pairs_as_the_config(): void
+    public function test_a_channel_whose_integration_declares_no_settings_keeps_no_config(): void
     {
         $this->actingAs($this->admin())
             ->post($this->listUrl(), [
-                'type'           => 'whatsapp',
-                'token'          => self::TOKEN,
-                'secret_token'   => 'any secret, even with spaces',
-                'is_active'      => false,
-                'config_entries' => [['key' => 'phone_id', 'value' => '123'], ['key' => 'flag', 'value' => null]],
+                'type'         => 'whatsapp',
+                'token'        => self::TOKEN,
+                'secret_token' => 'any secret, even with spaces',
+                'is_active'    => false,
+                'config'       => ['phone_id' => '123', 'flag' => null],
             ])
             ->assertRedirect()
             ->assertInertiaFlash('success');
@@ -284,7 +305,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
         $this->assertSame(ChannelTypeEnum::WhatsApp->value, $channel->type);
         $this->assertFalse($channel->is_active);
-        $this->assertEquals(['phone_id' => '123', 'flag' => ''], $channel->config);
+        $this->assertSame([], $channel->config);
         $this->assertSame([], $this->registry->calls);
     }
 
@@ -321,20 +342,14 @@ final class ChannelsConsoleTest extends FeatureTestCase
         $this->assertSame(0, Channel::query()->count());
     }
 
-    public function test_the_key_value_settings_are_validated(): void
+    public function test_the_config_is_always_sent(): void
     {
         $this->actingAs($this->admin());
-        $payload = ['type' => 'whatsapp', 'token' => self::TOKEN, 'secret_token' => 'secret', 'is_active' => true];
 
-        $this->post($this->listUrl(), [...$payload, 'config_entries' => [['key' => 'a', 'value' => '1'], ['key' => 'a', 'value' => '2']]])
-            ->assertSessionHasErrors('config_entries.1.key');
-        $this->post($this->listUrl(), [...$payload, 'config_entries' => [['key' => '', 'value' => '1']]])
-            ->assertSessionHasErrors('config_entries.0.key');
-        $this->post($this->listUrl(), [...$payload, 'config_entries' => array_map(
-            static fn (int $i): array => ['key' => "key{$i}", 'value' => 'x'],
-            range(1, 51),
-        )])->assertSessionHasErrors('config_entries');
-        $this->post($this->listUrl(), $payload)->assertSessionHasErrors('config_entries');
+        $this->post($this->listUrl(), ['type' => 'whatsapp', 'token' => self::TOKEN, 'secret_token' => 'secret', 'is_active' => true])
+            ->assertSessionHasErrors('config');
+        $this->post($this->listUrl(), ['type' => 'whatsapp', 'token' => self::TOKEN, 'secret_token' => 'secret', 'is_active' => true, 'config' => 'text'])
+            ->assertSessionHasErrors('config');
 
         $this->assertSame(0, Channel::query()->count());
     }
@@ -354,10 +369,9 @@ final class ChannelsConsoleTest extends FeatureTestCase
     public function test_the_edit_screen_shows_the_channel_without_its_secrets(): void
     {
         $channel = $this->channel([
-            'token'                 => self::TOKEN,
-            'secret_token'          => self::SECRET,
-            'telegram_bot_username' => 'help_bot',
-            'config'                => ['allowed_updates' => ['message'], 'max_connections' => 12],
+            'token'        => self::TOKEN,
+            'secret_token' => self::SECRET,
+            'config'       => ['allowed_updates' => ['message'], 'max_connections' => 12, 'bot_username' => 'help_bot'],
         ]);
 
         $this->actingAs($this->admin())
@@ -377,28 +391,24 @@ final class ChannelsConsoleTest extends FeatureTestCase
                     'webhookHash'        => $channel->webhook_public_hash,
                     'handle'             => '@help_bot',
                     'url'                => 'https://t.me/help_bot',
-                    'telegram'           => ['allowedUpdates' => ['message'], 'maxConnections' => 12],
-                    'configEntries'      => null,
+                    'settings'           => ['allowed_updates' => ['message'], 'max_connections' => 12],
                 ])
                 ->where('urls.submit', "/assistant/{$this->assistant->getKey()}/channels/{$channel->getKey()}")
                 ->etc());
     }
 
-    public function test_the_edit_screen_defaults_the_telegram_connections_and_lists_scalar_pairs_of_other_types(): void
+    public function test_the_edit_screen_defaults_a_setting_that_is_not_stored_and_lists_none_for_a_type_without_settings(): void
     {
         $telegram = $this->channel(['config' => []]);
-        $other    = $this->channel(['type' => ChannelTypeEnum::WhatsApp, 'config' => ['phone_id' => '123', 'retries' => 3, 'nested' => ['a' => 1]]]);
+        $other    = $this->channel(['type' => ChannelTypeEnum::WhatsApp, 'config' => ['phone_id' => '123']]);
 
         $this->actingAs($this->admin());
 
         $this->get($this->listUrl("/{$telegram->getKey()}/edit"))
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('channel.telegram', ['allowedUpdates' => [], 'maxConnections' => 40])->etc());
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('channel.settings', ['allowed_updates' => [], 'max_connections' => 40])->etc());
 
         $this->get($this->listUrl("/{$other->getKey()}/edit"))
-            ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('channel.telegram', null)
-                ->where('channel.configEntries', [['key' => 'phone_id', 'value' => '123'], ['key' => 'retries', 'value' => '3']])
-                ->etc());
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('channel.settings', [])->etc());
     }
 
     public function test_empty_secrets_keep_the_stored_ones_and_filled_ones_replace_them(): void
@@ -425,7 +435,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
     public function test_a_change_keeps_the_type_whatever_the_request_says(): void
     {
-        $channel = $this->channel(['config' => ['allowed_updates' => ['poll'], 'max_connections' => 10]]);
+        $channel = $this->channel(['config' => ['allowed_updates' => ['poll'], 'max_connections' => 10, 'bot_username' => 'help_bot']]);
 
         $this->actingAs($this->admin())
             ->put($this->listUrl("/{$channel->getKey()}"), $this->telegramPayload(['type' => 'whatsapp', 'is_active' => false]))
@@ -434,8 +444,20 @@ final class ChannelsConsoleTest extends FeatureTestCase
         $channel->refresh();
         $this->assertSame(ChannelTypeEnum::Telegram->value, $channel->type);
         $this->assertFalse($channel->is_active);
-        // The whole config is replaced by what the form sent.
-        $this->assertEquals(['allowed_updates' => ['message', 'callback_query'], 'max_connections' => 25], $channel->config);
+        // The settings are replaced by what the form sent; the bot name is the provider's, so it stays.
+        $this->assertSame(['allowed_updates' => ['message', 'callback_query'], 'max_connections' => 25, 'bot_username' => 'help_bot'], $channel->config);
+    }
+
+    public function test_a_managed_setting_is_not_taken_from_the_request(): void
+    {
+        $channel = $this->channel(['config' => ['max_connections' => 10, 'bot_username' => 'help_bot']]);
+
+        $this->actingAs($this->admin())
+            ->put($this->listUrl("/{$channel->getKey()}"), $this->telegramPayload(['config' => ['allowed_updates' => [], 'max_connections' => 11, 'bot_username' => 'evil_bot']]))
+            ->assertRedirect();
+
+        $this->assertSame('help_bot', $channel->refresh()->config['bot_username']);
+        $this->assertSame(11, $channel->config['max_connections']);
     }
 
     public function test_the_settings_of_a_changed_channel_follow_its_stored_type(): void
@@ -444,13 +466,11 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
         $this->actingAs($this->admin());
 
-        // The Telegram fields are no rules for a channel of another type, so its own are required.
-        $this->put($this->listUrl("/{$channel->getKey()}"), $this->telegramPayload())->assertSessionHasErrors('config_entries');
+        // Telegram's settings are no rules for a channel of another type, and are not kept.
+        $this->put($this->listUrl("/{$channel->getKey()}"), $this->telegramPayload())->assertRedirect()->assertSessionDoesntHaveErrors();
+        $this->assertSame([], $channel->refresh()->config);
 
-        $this->put($this->listUrl("/{$channel->getKey()}"), ['is_active' => true, 'config_entries' => [['key' => 'phone_id', 'value' => '9']]])
-            ->assertRedirect();
-
-        $this->assertEquals(['phone_id' => '9'], $channel->refresh()->config);
+        $this->put($this->listUrl("/{$channel->getKey()}"), ['is_active' => true])->assertSessionHasErrors('config');
     }
 
     public function test_a_change_validates_the_secret_format_for_telegram(): void
@@ -517,7 +537,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
         $this->actingAs($this->admin())
             ->get($this->listUrl("/{$channel->getKey()}/edit"))
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('channel.telegram.allowedUpdates', ['message'])->etc());
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('channel.settings.allowed_updates', ['message'])->etc());
     }
 
     public function test_rotating_also_needs_to_see_channels(): void
@@ -575,7 +595,8 @@ final class ChannelsConsoleTest extends FeatureTestCase
 
         $channel = Channel::query()->sole();
 
-        $this->assertSame('help_bot', $channel->telegram_bot_username);
+        $this->assertSame('help_bot', $channel->config['bot_username']);
+        $this->assertSame(25, $channel->config['max_connections']);
         $this->assertSame(ChannelWebhookStatus::Registered, $channel->webhook_status);
         $this->assertNotNull($channel->webhook_status_at);
 
@@ -782,18 +803,19 @@ final class ChannelsConsoleTest extends FeatureTestCase
             ->get($this->listUrl('/create'))
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->where('types', [
-                    ['value' => 'telegram', 'label' => 'Telegram'],
-                    ['value' => 'whatsapp', 'label' => 'WhatsApp'],
-                    ['value' => 'echo', 'label' => 'Echo'],
+                    ['value' => 'telegram', 'label' => 'Telegram', 'usesSecretToken' => true],
+                    ['value' => 'whatsapp', 'label' => 'WhatsApp', 'usesSecretToken' => true],
+                    ['value' => 'echo', 'label' => 'Echo', 'usesSecretToken' => true],
                 ])
+                ->where('settings.echo', [])
                 ->etc());
 
         $this->post($this->listUrl(), [
-            'type'           => 'echo',
-            'token'          => self::TOKEN,
-            'secret_token'   => 'echo secret',
-            'is_active'      => true,
-            'config_entries' => [['key' => 'region', 'value' => 'eu']],
+            'type'         => 'echo',
+            'token'        => self::TOKEN,
+            'secret_token' => 'echo secret',
+            'is_active'    => true,
+            'config'       => ['region' => 'eu'],
         ])
             ->assertRedirect("/assistant/{$this->assistant->getKey()}/channels")
             ->assertInertiaFlash('success', 'Channel created.');
@@ -801,8 +823,9 @@ final class ChannelsConsoleTest extends FeatureTestCase
         $channel = Channel::query()->sole();
 
         $this->assertSame('echo', $channel->type);
-        $this->assertEquals(['region' => 'eu'], $channel->config);
-        $this->assertNull($channel->publicUrl());
+        // The integration declared no profile, so it has no settings to keep, and no link.
+        $this->assertSame([], $channel->config);
+        $this->assertNull($this->app->make(ChannelPublicLinks::class)->for($channel));
 
         $this->get($this->listUrl())
             ->assertInertia(fn (AssertableInertia $page) => $page
@@ -812,15 +835,125 @@ final class ChannelsConsoleTest extends FeatureTestCase
                 ->etc());
     }
 
+    public function test_a_connector_profile_offers_its_settings_and_no_secret_token(): void
+    {
+        $this->registerEcho(profile: true);
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl('/create'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('types.2', ['value' => 'echo', 'label' => 'Echo', 'usesSecretToken' => false])
+                ->where('settings.echo', fn ($fields) => ['region', 'retries', 'sandbox', 'mode', 'events'] === collect($fields)->pluck('key')->all()
+                    && ['text', 'integer', 'boolean', 'choice', 'choices'] === collect($fields)->pluck('type')->all())
+                ->where('settings.echo.0.help', 'Where the account lives.')
+                ->where('settings.echo.3.choices', [['value' => 'fast', 'label' => 'Fast'], ['value' => 'safe', 'label' => 'Safe']])
+                ->where('settings.echo.4.default', ['sent'])
+                ->etc());
+    }
+
+    public function test_a_connector_channel_is_created_with_typed_settings_and_without_a_secret_token(): void
+    {
+        $this->registerEcho(profile: true);
+
+        $this->actingAs($this->admin())
+            ->post($this->listUrl(), $this->echoPayload(['config' => [
+                'events'       => ['read', 'sent'],
+                'mode'         => 'fast',
+                'sandbox'      => true,
+                'retries'      => '3',
+                'region'       => 'us',
+                'account_name' => 'forged',
+                'unknown'      => 'x',
+            ]]))
+            ->assertRedirect("/assistant/{$this->assistant->getKey()}/channels")
+            ->assertInertiaFlash('success', 'Channel created.');
+
+        $channel = Channel::query()->sole();
+
+        // Typed, in the order of the schema, only what it declares and the form may write.
+        $this->assertSame(['region' => 'us', 'retries' => 3, 'sandbox' => true, 'mode' => 'fast', 'events' => ['read', 'sent']], $channel->config);
+        $this->assertSame('', $channel->secret_token);
+    }
+
+    public function test_a_connector_settings_are_validated_by_their_type(): void
+    {
+        $this->registerEcho(profile: true);
+        $this->actingAs($this->admin());
+
+        $valid = ['region' => 'eu', 'retries' => 1, 'sandbox' => false, 'mode' => 'safe', 'events' => ['sent']];
+
+        foreach ([
+            'region'  => [str_repeat('x', 9), 'config.region'],
+            'retries' => [6, 'config.retries'],
+            'sandbox' => ['maybe', 'config.sandbox'],
+            'mode'    => ['turbo', 'config.mode'],
+            'events'  => [['sent', 'sent'], 'config.events.1'],
+        ] as $key => [$value, $error]) {
+            $this->post($this->listUrl(), $this->echoPayload(['config' => [...$valid, $key => $value]]))->assertSessionHasErrors($error);
+        }
+
+        // A required setting must be given: a number, a choice, and at least one of a list.
+        $this->post($this->listUrl(), $this->echoPayload(['config' => [...$valid, 'retries' => null]]))->assertSessionHasErrors('config.retries');
+        $this->post($this->listUrl(), $this->echoPayload(['config' => [...$valid, 'mode' => null]]))->assertSessionHasErrors('config.mode');
+        $this->post($this->listUrl(), $this->echoPayload(['config' => [...$valid, 'events' => []]]))->assertSessionHasErrors('config.events');
+        // An optional one may be left out.
+        $this->post($this->listUrl(), $this->echoPayload(['config' => ['retries' => 0, 'mode' => 'safe', 'events' => ['read']]]))->assertSessionDoesntHaveErrors();
+
+        // The errors name the setting by its label.
+        $this->post($this->listUrl(), $this->echoPayload(['config' => [...$valid, 'retries' => 6]]))
+            ->assertSessionHasErrors(['config.retries' => 'The Retries field must not be greater than 5.']);
+
+        $this->assertSame(1, Channel::query()->count());
+    }
+
+    public function test_saving_the_form_keeps_what_the_integration_wrote_and_the_link_shows(): void
+    {
+        $this->registerEcho(profile: true);
+        $channel = $this->channel(['type' => 'echo', 'config' => ['retries' => 1, 'mode' => 'safe', 'events' => ['sent'], 'account_name' => 'acme']]);
+
+        $this->actingAs($this->admin());
+
+        $this->get($this->listUrl())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.handle', '@acme')
+                ->where('table.rows.0.url', 'https://echo.example/acme')
+                ->etc());
+
+        $this->get($this->listUrl("/{$channel->getKey()}/edit"))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('channel.handle', '@acme')
+                // Typed values, defaults for what is not stored, and nothing of the managed setting.
+                ->where('channel.settings', ['region' => 'eu', 'retries' => 1, 'sandbox' => false, 'mode' => 'safe', 'events' => ['sent']])
+                ->etc());
+
+        $this->put($this->listUrl("/{$channel->getKey()}"), $this->echoPayload(['type' => null, 'config' => ['retries' => 4, 'mode' => 'fast', 'events' => ['failed']]]))
+            ->assertRedirect()
+            ->assertSessionDoesntHaveErrors();
+
+        $this->assertSame(['retries' => 4, 'mode' => 'fast', 'events' => ['failed'], 'account_name' => 'acme'], $channel->refresh()->config);
+    }
+
+    public function test_the_edit_screen_offers_only_choices_the_integration_declared(): void
+    {
+        $this->registerEcho(profile: true);
+        $channel = $this->channel(['type' => 'echo', 'config' => ['retries' => '2', 'mode' => 'retired', 'events' => ['read', 'gone', 9]]]);
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl("/{$channel->getKey()}/edit"))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('channel.settings', ['region' => 'eu', 'retries' => 2, 'sandbox' => false, 'mode' => 'safe', 'events' => ['read']])
+                ->etc());
+    }
+
     public function test_a_type_nothing_serves_is_not_accepted_when_creating(): void
     {
         $this->actingAs($this->admin())
             ->post($this->listUrl(), [
-                'type'           => 'echo',
-                'token'          => self::TOKEN,
-                'secret_token'   => 'echo secret',
-                'is_active'      => true,
-                'config_entries' => [],
+                'type'         => 'echo',
+                'token'        => self::TOKEN,
+                'secret_token' => 'echo secret',
+                'is_active'    => true,
+                'config'       => [],
             ])
             ->assertSessionHasErrors('type');
 
@@ -842,7 +975,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
                 ->etc());
 
         $this->get($this->listUrl("/{$channel->getKey()}/edit"))->assertStatus(409);
-        $this->put($this->listUrl("/{$channel->getKey()}"), ['is_active' => false, 'config_entries' => []])->assertStatus(409);
+        $this->put($this->listUrl("/{$channel->getKey()}"), ['is_active' => false, 'config' => []])->assertStatus(409);
         $this->assertTrue($channel->refresh()->is_active);
 
         $hash = $channel->webhook_public_hash;
@@ -875,10 +1008,10 @@ final class ChannelsConsoleTest extends FeatureTestCase
         ]);
     }
 
-    private function registerEcho(): void
+    private function registerEcho(bool $profile = false): void
     {
         $this->app->make(ConnectorChannels::class)->add(
-            new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class),
+            new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoInboundAdapter::class, profile: $profile ? EchoChannelProfile::class : null),
             'echo',
             'Echo',
         );
@@ -899,6 +1032,22 @@ final class ChannelsConsoleTest extends FeatureTestCase
             'config'       => ['allowed_updates' => ['message', 'callback_query'], 'max_connections' => 25],
             ...$overrides,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     *
+     * @return array<string, mixed>
+     */
+    private function echoPayload(array $overrides = []): array
+    {
+        return array_filter([
+            'type'      => 'echo',
+            'token'     => self::TOKEN,
+            'is_active' => true,
+            'config'    => ['retries' => 2, 'mode' => 'safe', 'events' => ['sent']],
+            ...$overrides,
+        ], static fn (mixed $value): bool => null !== $value);
     }
 
     /**

@@ -4,9 +4,9 @@ description: "Packages that bring a messaging channel to an installation."
 ---
 
 <Warning>
-  Experimental. A connector's channel can be created in the console and receives and
-  sends messages, but its settings form is a generic list of keys and values until
-  connectors can describe their own fields.
+  Experimental. A connector's channel can be created in the console, receives and sends
+  messages and describes its own settings, but the contract may still change in a minor
+  release until the first connector ships.
 </Warning>
 
 A connector brings one or more messaging channels — Telegram, Viber — to an
@@ -70,6 +70,8 @@ final class ViberConnectorServiceProvider extends AbstractConnectorServiceProvid
             inbound: ViberInboundAdapter::class,
             webhookRegistrar: ViberWebhookRegistrar::class,
             mediaLinkPolicy: ViberMediaLinkPolicy::class,
+            profile: ViberProfile::class,
+            mediaLimits: ViberMediaLimits::class,
         ));
     }
 }
@@ -93,11 +95,89 @@ it, so constructors must be cheap and must not touch tenant data.
 | `mediaUploader` | no | `Fapost\Foundation\Media\ChannelMediaUploaderInterface` |
 | `mediaDownloader` | no | `Fapost\Foundation\Media\ChannelMediaDownloaderInterface` |
 | `mediaLinkPolicy` | no | `Fapost\Foundation\Media\ChannelMediaLinkPolicyInterface` |
+| `profile` | no | `Fapost\Foundation\Channel\Settings\ChannelProfileInterface` |
+| `mediaLimits` | no | `Fapost\Foundation\Media\ChannelMediaLimitsInterface` |
 
 Boot fails, naming your connector, when you register a type your manifest does not
 declare, a type Core serves itself (such as `telegram`), a type twice, a class that does
-not implement its interface, or a media class whose `channelType()` is another type.
+not implement its interface, a media class or a profile whose `channelType()` is another
+type, or a profile whose settings contradict themselves.
 `platform:update` also refuses a declared type you never register.
+
+## Settings, public link and media limits
+
+Core knows nothing about your provider, so the channel form, the rules that check it and the
+link to your bot come from a profile you declare:
+
+```php
+final class ViberProfile implements ChannelProfileInterface
+{
+    public function channelType(): string
+    {
+        return 'viber';
+    }
+
+    public function settings(): ChannelSettingsSchema
+    {
+        return new ChannelSettingsSchema(
+            fields: [
+                new ChannelSettingField(
+                    key: 'sender_name',
+                    type: ChannelSettingType::Text,
+                    label: 'Sender name',
+                    max: 28,
+                    required: true,
+                    translationKey: 'viber::channel.sender_name',
+                ),
+                new ChannelSettingField(
+                    key: 'account_uri',
+                    type: ChannelSettingType::Text,
+                    label: 'Account URI',
+                    managed: true,
+                ),
+            ],
+            usesSecretToken: false,
+        );
+    }
+
+    public function publicLink(array $config): ?ChannelPublicLink
+    {
+        $uri = $config['account_uri'] ?? null;
+
+        return is_string($uri) && '' !== $uri
+            ? new ChannelPublicLink($uri, '@' . $uri, 'viber://pa?chatURI=' . $uri)
+            : null;
+    }
+}
+```
+
+A setting is one of five types: `Text`, `Integer`, `Boolean`, `Choice` (one value of
+`choices`) and `Choices` (a list of them). Core builds the validation rules and the form control
+from the type, `min`, `max`, `required` and `choices`; you never validate a value yourself.
+Values live under their `key` in the channel's `config`. A field is never secret, because
+`config` is plain JSON that reaches queued jobs: keep secrets in the channel's token and secret
+token.
+
+- **Texts.** `label`, `help` and the labels of `choices` are English. Set `translationKey` to
+  show a translation: Core looks for `{translationKey}.label`, `.help` and `.choices.{value}`,
+  and falls back to your English text. Load your translation files with `loadTranslationsFrom`
+  in your provider. A help text may use `:min`, `:max` and `:default`.
+- **Managed fields.** A field with `managed: true` is written by your integration, for example a
+  bot name read from the provider after the webhook is registered. The form neither shows nor
+  accepts it, and saving the form keeps the stored value. Write it with a query that skips model
+  events, so the provider is not synchronized again.
+- **Secret token.** Set `usesSecretToken: false` when the provider has no webhook secret; the
+  form then does not ask for one. A `secretTokenPattern` (PCRE, no delimiters) restricts what an
+  operator may enter.
+- **Public link.** `publicLink()` reads the stored `config`, managed fields included, and
+  returns how a person finds the bot: the handle, and a link that opens the chat. Core shows it
+  in the channel list and gives it to flows as `system.channel`.
+- **No profile.** A channel without one has no settings, any secret token and no link.
+- **Your own configuration.** A connector is an ordinary Laravel package: publish and merge
+  its configuration file with `mergeConfigFrom` in your provider.
+
+`mediaLimits` names a class that says how large a file the provider accepts for each kind of
+media; Core warns before someone attaches a larger one.
 
 ## Inbound webhooks
 

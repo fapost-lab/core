@@ -5,11 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Concerns;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
-use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
-use App\Domains\Channels\Telegram\TelegramWebhookOptions;
+use App\Domains\Channels\Services\ChannelPublicLinks;
+use App\Domains\Channels\Services\ChannelSettingPresenter;
 use Closure;
-use Illuminate\Support\Str;
+use Fapost\Foundation\Channel\Settings\ChannelSettingField;
+use Fapost\Foundation\Channel\Settings\ChannelSettingType;
 
 /**
  * What the channel screens show of a channel, for every screen that lists or edits one: the assistant's console and
@@ -31,14 +32,15 @@ trait PresentsChannels
     protected function channelRow(Channel $channel, Closure $url): array
     {
         $record = ['record' => $channel->getKey()];
+        $link   = app(ChannelPublicLinks::class)->for($channel);
 
         return [
             'id'                 => (string) $channel->getKey(),
             'type'               => $channel->type,
             'typeLabel'          => $this->typeLabel($channel),
             'available'          => $this->isAvailable($channel),
-            'handle'             => $channel->publicHandle(),
-            'url'                => $channel->publicUrl(),
+            'handle'             => $link?->handle,
+            'url'                => $link?->url,
             'isActive'           => $channel->is_active,
             'webhook'            => $this->webhookState($channel),
             'updatedAt'          => $channel->updated_at?->toIso8601String(),
@@ -56,8 +58,7 @@ trait PresentsChannels
      */
     protected function editableChannel(Channel $channel, string $registerWebhookUrl): array
     {
-        $isTelegram = ChannelTypeEnum::Telegram->value === $channel->type;
-        $config     = is_array($channel->config) ? $channel->config : [];
+        $link = app(ChannelPublicLinks::class)->for($channel);
 
         return [
             'id'                 => (string) $channel->getKey(),
@@ -69,49 +70,35 @@ trait PresentsChannels
             'webhookAt'          => $channel->webhook_status_at?->toIso8601String(),
             'registerWebhookUrl' => $registerWebhookUrl,
             'webhookHash'        => $channel->webhook_public_hash,
-            'handle'             => $channel->publicHandle(),
-            'url'                => $channel->publicUrl(),
-            'telegram'           => $isTelegram ? [
-                'allowedUpdates' => $this->allowedUpdates($config),
-                'maxConnections' => is_numeric($config['max_connections'] ?? null)
-                    ? (int) $config['max_connections']
-                    : TelegramWebhookOptions::MAX_CONNECTIONS_DEFAULT,
-            ] : null,
-            'configEntries' => $isTelegram ? null : $this->entries($config),
+            'handle'             => $link?->handle,
+            'url'                => $link?->url,
+            'settings'           => $this->settingValues($channel),
         ];
     }
 
     /**
-     * What the form offers: the channel types and the Telegram update types, labelled in the interface language
-     * from the labels the staff screens use, and the bounds of the delivery parallelism.
+     * What the form offers: the channel types, and for each the settings its integration declared (labelled in the
+     * interface language) and whether it uses a secret token.
      *
-     * @return array{types: list<array{value: string, label: string}>, telegramUpdates: list<array{value: string, label: string}>, maxConnections: array{min: int, max: int, default: int}}
+     * @return array{types: list<array{value: string, label: string, usesSecretToken: bool}>, settings: array<string, list<array<string, mixed>>>}
      */
     protected function channelFormOptions(): array
     {
         $registry = app(ChannelRegistryInterface::class);
-        $types    = array_map(
-            static fn (string $type): array => ['value' => $type, 'label' => $registry->label($type)],
-            $registry->types(),
-        );
+        $types    = [];
+        $settings = [];
 
-        $updates = [];
-
-        foreach (TelegramWebhookOptions::ALLOWED_UPDATES as $update) {
-            $key       = "staff.channels.telegram_updates.{$update}";
-            $label     = trans($key);
-            $updates[] = ['value' => $update, 'label' => $label === $key ? Str::headline($update) : $label];
+        foreach ($registry->types() as $type) {
+            $schema  = $registry->profile($type)->settings();
+            $types[] = [
+                'value'           => $type,
+                'label'           => $registry->label($type),
+                'usesSecretToken' => $schema->usesSecretToken,
+            ];
+            $settings[$type] = array_map($this->settingField(...), $schema->editable());
         }
 
-        return [
-            'types'           => $types,
-            'telegramUpdates' => $updates,
-            'maxConnections'  => [
-                'min'     => TelegramWebhookOptions::MAX_CONNECTIONS_MIN,
-                'max'     => TelegramWebhookOptions::MAX_CONNECTIONS_MAX,
-                'default' => TelegramWebhookOptions::MAX_CONNECTIONS_DEFAULT,
-            ],
-        ];
+        return ['types' => $types, 'settings' => $settings];
     }
 
     /**
@@ -148,36 +135,58 @@ trait PresentsChannels
     }
 
     /**
-     * @param  array<array-key, mixed>  $config
+     * A declared setting as the form renders it: texts already translated.
      *
-     * @return list<string>
+     * @return array<string, mixed>
      */
-    private function allowedUpdates(array $config): array
+    private function settingField(ChannelSettingField $field): array
     {
-        $updates = is_array($config['allowed_updates'] ?? null) ? $config['allowed_updates'] : [];
-
-        // Only types the form offers: a stored one outside the list would fail validation with nothing to correct.
-        return array_values(array_filter($updates, static fn (mixed $update): bool => is_string($update) && in_array($update, TelegramWebhookOptions::ALLOWED_UPDATES, true)));
+        return [
+            'key'      => $field->key,
+            'type'     => $field->type->value,
+            'label'    => ChannelSettingPresenter::label($field),
+            'help'     => ChannelSettingPresenter::help($field),
+            'required' => $field->required,
+            'default'  => $field->default,
+            'min'      => $field->min,
+            'max'      => $field->max,
+            'choices'  => ChannelSettingPresenter::choices($field),
+        ];
     }
 
     /**
-     * The settings of a channel without named ones, as the form lists them. Only scalar values can be shown; any
-     * other is left out (and is dropped when the form is saved, as the Filament form dropped it).
+     * The stored value of every editable setting of the channel's type, typed; a missing or unfit one is the default.
+     * Only values the form can offer are given: a stored choice outside the declared ones would fail validation with
+     * nothing to correct.
      *
-     * @param  array<array-key, mixed>  $config
-     *
-     * @return list<array{key: string, value: string}>
+     * @return array<string, bool|int|string|list<string>|null>
      */
-    private function entries(array $config): array
+    private function settingValues(Channel $channel): array
     {
-        $entries = [];
+        $config = is_array($channel->config) ? $channel->config : [];
+        $values = [];
 
-        foreach ($config as $key => $value) {
-            if (is_scalar($value)) {
-                $entries[] = ['key' => (string) $key, 'value' => (string) $value];
-            }
+        foreach (app(ChannelRegistryInterface::class)->profile($channel->type)->settings()->editable() as $field) {
+            $values[$field->key] = $this->settingValue($field, $config[$field->key] ?? null);
         }
 
-        return $entries;
+        return $values;
+    }
+
+    private function settingValue(ChannelSettingField $field, mixed $stored): bool|int|string|array|null
+    {
+        $accepted = array_map(strval(...), array_keys($field->choices));
+
+        $value = match ($field->type) {
+            ChannelSettingType::Text    => is_string($stored) ? $stored : (is_numeric($stored) ? (string) $stored : null),
+            ChannelSettingType::Integer => is_numeric($stored) ? (int) $stored : null,
+            ChannelSettingType::Boolean => is_bool($stored) ? $stored : null,
+            ChannelSettingType::Choice  => is_string($stored) && in_array($stored, $accepted, true) ? $stored : null,
+            ChannelSettingType::Choices => is_array($stored)
+                ? array_values(array_filter($stored, static fn (mixed $item): bool => is_string($item) && in_array($item, $accepted, true)))
+                : null,
+        };
+
+        return $value ?? $field->default;
     }
 }

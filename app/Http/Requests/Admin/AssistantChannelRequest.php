@@ -47,6 +47,14 @@ final class AssistantChannelRequest extends FormRequest
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return ChannelFieldRules::attributes($this->resolvedChannel()->type);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function fields(): array

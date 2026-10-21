@@ -64,6 +64,12 @@ Messaging, and its tests still use the `Tests\Unit\Domains\Messaging\Telegram` n
   (`Rule::in`) and ingress publishing read. A channel whose type `!has()` is unavailable: the console marks it, edit
   and update answer 409, delete works, and `platform:update` warns per tenant and type
   (`app/Console/Platform/TenantUnservedChannelsFinder`).
+- `Contracts/ChannelRegistryInterface::profile()` returns the `Fapost\Foundation\Channel\Settings\ChannelProfileInterface`
+  an integration declared (`ChannelIntegrationDefinition::$profileClass`, `ConnectorChannel::$profile`), or an
+  `EmptyChannelProfile` (no settings, any secret token, no link). The console form, `ChannelFieldRules`, the
+  presenter, `ChannelService::update` and `Services/ChannelPublicLinks` read it; no Core code outside
+  `Telegram/` branches on a channel type. Telegram's is `Telegram/TelegramChannelProfile`; its media limits
+  (`media.channel.limits`) and `config/telegram.php` (merged by its provider) live in the module too.
 - `Telegram/TelegramChannelServiceProvider.php` — the reference integration; tags
   `channels.telegram_delivery`, `media.channel.uploader`, `media.channel.downloader`.
 - `Services/ChannelService.php`, `Observers/ChannelObserver.php`. `ChannelService::reregisterWebhook` is the

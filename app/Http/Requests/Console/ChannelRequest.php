@@ -47,6 +47,14 @@ final class ChannelRequest extends FormRequest
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        return ChannelFieldRules::attributes($this->channelType($this->container->make(AssistantChannelService::class), $this->container->make(CurrentAssistantInterface::class)));
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function fields(): array
