@@ -124,7 +124,8 @@ final class ConversationCaptureFactory
      */
     private function outboundPayload(OutboundMessage $message): array
     {
-        $buttons = $message->payload->buttons;
+        // `?? null`: a payload serialized before foundation 0.26 leaves `buttons` uninitialized after unserialize.
+        $buttons = $message->payload->buttons ?? null;
 
         if (null !== $buttons) {
             return ['buttons' => array_map(
