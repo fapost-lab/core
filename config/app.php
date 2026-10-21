@@ -19,6 +19,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Application Version
+    |--------------------------------------------------------------------------
+    |
+    | The release this installation runs. It is not kept in the code: the image
+    | build writes its tag to the VERSION file (docker/Dockerfile), and a
+    | checkout without that file is a development one.
+    |
+    */
+
+    'version' => (is_file(base_path('VERSION')) ? mb_trim((string) file_get_contents(base_path('VERSION'))) : '') ?: 'dev',
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |
