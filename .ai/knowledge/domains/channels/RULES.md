@@ -87,8 +87,9 @@ broken.
 - **`channels.config` holds only what the channel's profile declares, and the keys the integration
   manages survive a save.** `ChannelService::update` keeps the editable values from the request and the
   stored values of `managed` fields, drops every other key, and orders them by the schema (so an
-  unchanged config does not look changed to the webhook sync). The integration writes a managed value
-  (`bot_username`) past the model's events, under a row lock. A field is never secret: `config` reaches
+  unchanged config does not look changed to the webhook sync). The built-in integration writes a managed
+  value (`bot_username`) past the model's events, under a row lock; a connector package never writes
+  `channels`, and has no seam to store a managed value yet. A field is never secret: `config` reaches
   queued jobs. Enforced: `ChannelsConsoleTest`, `TelegramBotIdentityStoreTest`.
 - **A channel secret never leaves the request or job that uses it.** A provider client throws
   exceptions whose text went through `SecretRedactor` and does not chain the original (a connection

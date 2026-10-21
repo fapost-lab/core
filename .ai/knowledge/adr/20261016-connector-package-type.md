@@ -91,7 +91,10 @@ holds the Solution manifest (`adr-20261010-solution-manifest-is-data-in-composer
   beside Laravel's whose errors the form could not show.
 - A profile holds no secrets: `channels.config` is plain JSON and reaches queued jobs. A `managed` field is written by
   the integration (a bot name from the provider) past the model's events; the form neither shows nor accepts it and
-  saving keeps it. Core stores only what the schema names, so a type without a profile keeps no `config`.
+  saving keeps it. Core stores only what the schema names, so a type without a profile keeps no `config`. Only a
+  built-in integration writes a managed value for now: Foundation offers a connector no way to hand Core a value to
+  store, and a package never writes Core's tables (runtime-settings ADR). That seam is open work before Viber, which
+  needs its account URI from the provider.
 - Media limits are a separate class tagged `media.channel.limits`, like the uploader, so Media still knows no channel.
 - Settings texts are English in the declaration, with an optional translation prefix; `loadTranslationsFrom` is the
   connector's own call, as are its configuration files (`mergeConfigFrom`).

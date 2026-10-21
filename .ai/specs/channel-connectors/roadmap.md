@@ -51,11 +51,15 @@ location requests, media — with no Viber code in Core.
       and the Go gateway, with shared golden fixtures
 - [x] `public-media-links` — Public media links: Core hands a connector a signed, expiring public URL for a media asset, for
       channels that send media by URL; the media uploader becomes optional
+- [ ] `connector-managed-settings` — Managed settings from a connector: a connector hands Core the values it reads
+      from the provider (the managed fields of its settings schema) and Core stores them, so no package writes
+      `channels` (after: Channel settings from the connector's schema — it fills that schema's managed fields)
 - [ ] Viber connector package — `fapost/connector-viber`: ingress and `conversation_started`, webhook
       registration, text, keyboards, contact and location requests, media by URL, settings schema,
       translations, public link; tested on recorded requests and responses (after: Open channel types,
       Channel settings from the connector's schema, Neutral outgoing message — it is built on them;
-      after: Body-HMAC ingress signatures, Public media links — Viber needs both)
+      after: Body-HMAC ingress signatures, Public media links — Viber needs both; after: Managed settings from a
+      connector — its account URI comes from the provider)
 - [ ] Viber end to end — the package installed through the overlay against the owner's pre-2024 bot; the
       gaps found go back into the contract (after: Viber connector package)
 - [ ] fog: session windows — how broadcasting and quotas treat bot-initiated messages outside a 24-hour
@@ -77,9 +81,10 @@ connector contract with Telegram (built in) and Viber (a package) as references.
 1. connector-manifest-discovery; ingress-hmac-body-signature; public-media-links
 2. connector-channel-registrar
 3. open-channel-types; channel-settings-schema; neutral-outgoing-message
-4. telegram-on-registrar; capability-aware-validation; Viber connector package
-5. Viber end to end
-6. Published docs
+4. telegram-on-registrar; capability-aware-validation; connector-managed-settings
+5. Viber connector package
+6. Viber end to end
+7. Published docs
 
 <!--
 Rules (jig-idea §8):

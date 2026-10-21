@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "32f216f6d4b5ab070fa781d04b56a31b",
+  "content-hash": "131160de4360d89d9b36ee7942383e5f",
   "packages": [
     {
       "name": "aws/aws-crt-php",
@@ -966,16 +966,16 @@
     },
     {
       "name": "fapost/foundation",
-      "version": "v0.26.0",
+      "version": "v0.27.0",
       "source": {
         "type": "git",
         "url": "https://github.com/fapost-lab/foundation.git",
-        "reference": "3131dbaa8aa70c2d3137e532f164d4c5cabfcc9b"
+        "reference": "0226023e366dac688b581bc4099fe9723555fa6f"
       },
       "dist": {
         "type": "zip",
-        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/3131dbaa8aa70c2d3137e532f164d4c5cabfcc9b",
-        "reference": "3131dbaa8aa70c2d3137e532f164d4c5cabfcc9b",
+        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/0226023e366dac688b581bc4099fe9723555fa6f",
+        "reference": "0226023e366dac688b581bc4099fe9723555fa6f",
         "shasum": ""
       },
       "require": {
@@ -1014,10 +1014,10 @@
       ],
       "description": "FaPost public contract layer for Solutions, Plugins and external integrations",
       "support": {
-        "source": "https://github.com/fapost-lab/foundation/tree/v0.26.0",
+        "source": "https://github.com/fapost-lab/foundation/tree/v0.27.0",
         "issues": "https://github.com/fapost-lab/foundation/issues"
       },
-      "time": "2026-10-21T10:44:39+00:00"
+      "time": "2026-10-21T11:27:18+00:00"
     },
     {
       "name": "fapost/support",
