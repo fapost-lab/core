@@ -51,7 +51,7 @@ location requests, media — with no Viber code in Core.
       and the Go gateway, with shared golden fixtures
 - [x] `public-media-links` — Public media links: Core hands a connector a signed, expiring public URL for a media asset, for
       channels that send media by URL; the media uploader becomes optional
-- [ ] `connector-managed-settings` — Managed settings from a connector: a connector hands Core the values it reads
+- [x] `connector-managed-settings` — Managed settings from a connector: a connector hands Core the values it reads
       from the provider (the managed fields of its settings schema) and Core stores them, so no package writes
       `channels` (after: Channel settings from the connector's schema — it fills that schema's managed fields)
 - [ ] Viber connector package — `fapost/connector-viber`: ingress and `conversation_started`, webhook

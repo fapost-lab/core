@@ -29,6 +29,7 @@ final class EchoChannelProfile implements ChannelProfileInterface
             new ChannelSettingField('mode', ChannelSettingType::Choice, 'Mode', default: 'safe', required: true, choices: ['fast' => 'Fast', 'safe' => 'Safe']),
             new ChannelSettingField('events', ChannelSettingType::Choices, 'Events', default: ['sent'], required: true, choices: ['sent' => 'Sent', 'read' => 'Read', 'failed' => 'Failed']),
             new ChannelSettingField('account_name', ChannelSettingType::Text, 'Account name', managed: true),
+            new ChannelSettingField('account_id', ChannelSettingType::Integer, 'Account id', managed: true),
         ], usesSecretToken: false);
     }
 

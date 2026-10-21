@@ -6,8 +6,7 @@ namespace App\Http\Requests\Console;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Services\ChannelSettingPresenter;
-use Fapost\Foundation\Channel\Settings\ChannelSettingField;
-use Fapost\Foundation\Channel\Settings\ChannelSettingType;
+use App\Domains\Channels\Services\ChannelSettingRules;
 use Illuminate\Validation\Rule;
 
 /**
@@ -20,8 +19,6 @@ use Illuminate\Validation\Rule;
  */
 final class ChannelFieldRules
 {
-    private const int MAX_TEXT = 65535;
-
     /**
      * @param  string|null  $type      the type of the channel: the one sent when creating (null: not a registered type,
      *                                 so only the type rule can fail), the stored one when changing
@@ -35,17 +32,17 @@ final class ChannelFieldRules
         $schema   = null === $type ? null : $registry->profile($type)->settings();
         $presence = $creating ? ['required'] : ['nullable'];
         if (null === $schema || $schema->usesSecretToken) {
-            $secret = [...$presence, 'string', 'max:' . self::MAX_TEXT];
+            $secret = [...$presence, 'string', 'max:' . ChannelSettingRules::MAX_TEXT];
 
             if (null !== $schema?->secretTokenPattern) {
                 $secret[] = 'regex:' . self::secretTokenRegex($schema->secretTokenPattern);
             }
         } else {
-            $secret = ['nullable', 'string', 'max:' . self::MAX_TEXT];
+            $secret = ['nullable', 'string', 'max:' . ChannelSettingRules::MAX_TEXT];
         }
 
         $rules = [
-            'token'        => [...$presence, 'string', 'max:' . self::MAX_TEXT],
+            'token'        => [...$presence, 'string', 'max:' . ChannelSettingRules::MAX_TEXT],
             'secret_token' => $secret,
             'is_active'    => ['required', 'boolean'],
         ];
@@ -61,7 +58,7 @@ final class ChannelFieldRules
         $rules['config'] = ['present', 'array'];
 
         foreach ($schema->editable() as $field) {
-            $rules = [...$rules, ...self::fieldRules($field)];
+            $rules = [...$rules, ...ChannelSettingRules::for($field)];
         }
 
         return $rules;
@@ -116,40 +113,6 @@ final class ChannelFieldRules
     }
 
     /**
-     * @return array<string, list<mixed>>
-     */
-    private static function fieldRules(ChannelSettingField $field): array
-    {
-        $key      = "config.{$field->key}";
-        $presence = $field->required ? ['required'] : ['nullable'];
-        $accepted = array_map(strval(...), array_keys($field->choices));
-
-        return match ($field->type) {
-            ChannelSettingType::Text => [
-                $key => [...$presence, 'string', 'max:' . ($field->max ?? self::MAX_TEXT)],
-            ],
-            ChannelSettingType::Integer => [
-                $key => [
-                    ...$presence,
-                    'integer',
-                    ...(null === $field->min ? [] : ['min:' . $field->min]),
-                    ...(null === $field->max ? [] : ['max:' . $field->max]),
-                ],
-            ],
-            ChannelSettingType::Boolean => [
-                $key => [...$presence, 'boolean'],
-            ],
-            ChannelSettingType::Choice => [
-                $key => [...$presence, 'string', Rule::in($accepted)],
-            ],
-            ChannelSettingType::Choices => [
-                $key       => ['present', 'array', ...($field->required ? ['min:1'] : [])],
-                "{$key}.*" => ['string', 'distinct', Rule::in($accepted)],
-            ],
-        };
-    }
-
-    /**
      * Only the editable settings of the schema, typed; managed ones are the integration's and never come from a request.
      *
      * @param  array<string, mixed>  $validated
@@ -168,12 +131,7 @@ final class ChannelFieldRules
                 continue;
             }
 
-            $config[$field->key] = match ($field->type) {
-                ChannelSettingType::Integer => (int) $value,
-                ChannelSettingType::Boolean => (bool) $value,
-                ChannelSettingType::Choices => array_values((array) $value),
-                default                     => (string) $value,
-            };
+            $config[$field->key] = ChannelSettingRules::cast($field, $value);
         }
 
         return $config;

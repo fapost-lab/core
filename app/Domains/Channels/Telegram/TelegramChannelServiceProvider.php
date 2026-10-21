@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Domains\Channels\Telegram;
 
 use App\Domains\Channels\ChannelIntegrationDefinition;
-use App\Domains\Channels\Telegram\Contracts\TelegramBotIdentityStoreInterface;
 use App\Domains\Channels\Telegram\Media\TelegramMediaDownloader;
 use App\Domains\Channels\Telegram\Media\TelegramMediaLimits;
 use App\Domains\Channels\Telegram\Media\TelegramMediaUploader;
@@ -28,7 +27,6 @@ final class TelegramChannelServiceProvider extends ServiceProvider
         $this->app->bind(TelegramBotApiClientFactory::class, fn ($app): TelegramBotApiClientFactory => new TelegramBotApiClientFactory(
             (string) $app->make('config')->get('telegram.api_base_url', 'https://api.telegram.org'),
         ));
-        $this->app->bind(TelegramBotIdentityStoreInterface::class, TelegramBotIdentityStore::class);
         $this->app->bind(
             TelegramDeliveryResolver::class,
             fn ($app): TelegramDeliveryResolver => new TelegramDeliveryResolver(
