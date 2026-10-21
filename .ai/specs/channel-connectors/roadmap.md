@@ -33,7 +33,7 @@ reached only through the connector registrar, with its existing tests untouched 
       connector's declared fields instead of `isTelegram` branches; `telegram_bot_username` moves into
       `channels.config`; provider config and media limits come from the connector (after: Connector
       registrar with a channel surface — the schema is registered on it)
-- [ ] `neutral-outgoing-message` — Neutral outgoing message: Flow describes buttons, reply mode and requests for contact or location
+- [x] `neutral-outgoing-message` — Neutral outgoing message: Flow describes buttons, reply mode and requests for contact or location
       without Bot API structures; Telegram's module translates; capabilities declared per connector
       (after: Connector registrar with a channel surface — capabilities are registered on it)
 - [ ] `capability-aware-validation` — Capability-aware validation: validation and the builder warn when a flow uses what its assistant's

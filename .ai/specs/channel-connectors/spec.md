@@ -213,7 +213,9 @@ runtime-plugin draft; what still applies to Composer connectors is kept below.
   task's question.
 - `CallbackDataCodec` and persistent inline buttons: Core's neutral concept or Telegram's implementation
   detail — Viber's 4 KB `tracking_data` and lack of message editing point to Telegram's detail. Decided in
-  the neutral-message item.
+  the neutral-message item. **Answered (neutral-outgoing-message):** `CallbackDataCodec` stays a Core
+  concept with a 64-byte payload limit (the strictest channel sets it), and removing the buttons of a
+  sent message is a `RemoveButtons` channel capability, sent only to a channel that declares it.
 - How broadcasting and quotas account for messages outside a session window (Viber now, WhatsApp next) —
   free replies versus billed bot-initiated sends. Decided once both shapes are in view.
 - The registrar: a connector registrar of its own, or the one `CoreRegistrarInterface` with a channel

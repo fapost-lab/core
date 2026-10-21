@@ -16,7 +16,7 @@ paths:
   - "tests/Unit/Domains/Messaging/**"
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-10-21
 ---
 # Channels glossary
 
@@ -57,3 +57,13 @@ The handle of one typing indicator, refreshed by a heartbeat while a flow runs.
 ## Chat rate limit
 
 `rate:<channel>:<chat>`, 30 messages per minute by default (`config/messaging.php`).
+
+## Button payload
+
+The opaque string a button carries back when pressed, encoded by `CallbackDataCodec` within 64 bytes.
+It is never stored in the transcript; the transcript keeps the button's label and action.
+
+## Channel capability
+
+A declarative flag (`ChannelCapability`, for example `RemoveButtons`) a channel integration states about
+what its provider can do. Flow asks `ChannelRegistry::capabilities()` before using an optional feature.
