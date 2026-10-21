@@ -35,7 +35,8 @@ final class MoveTelegramBotUsernameMigrationTest extends FeatureTestCase
         $migration->up();
 
         $this->assertFalse(Schema::hasColumn('channels', 'telegram_bot_username'));
-        $this->assertSame(['allowed_updates' => ['message'], 'max_connections' => 12, 'bot_username' => 'acme_bot'], $this->config($named));
+        // pgsql's jsonb keeps its own key order; the keys and values are what matter here.
+        $this->assertEquals(['allowed_updates' => ['message'], 'max_connections' => 12, 'bot_username' => 'acme_bot'], $this->config($named));
         $this->assertSame(['max_connections' => 40], $this->config($empty));
         $this->assertSame([], $this->config($none));
         $this->assertSame(['bot_username' => 'list_bot'], $this->config($list));
