@@ -157,6 +157,57 @@ installation that sets none of them behaves as before.
 The upgrade adds two empty settings to every tenant, through the settings migrations
 (see [Two schemas, two migration commands](#two-schemas-two-migration-commands)).
 
+## Message rate is per tenant
+
+Sends are now throttled by each tenant's own rate, set on Tenant settings and stored
+as 30 per minute when a tenant is provisioned. `MESSAGING_RATE_LIMIT_PER_MINUTE` is only
+a fallback for sends outside a tenant, so an installation that set it to anything other
+than 30 runs at 30 per tenant until an admin changes the tenant's rate. See
+[Backpressure](/self-hosting/observability#backpressure).
+
+## Operator-granted Solutions turn on by themselves
+
+Only with an operator package installed: a Solution in the tenant's plan or in a running
+add-on now runs automatically, and the tenant cannot turn it off — including a Solution
+the tenant had turned off before the upgrade. Installations without an operator package
+are not affected.
+
+## Media storage can be S3
+
+Nothing changes unless you set `MEDIA_STORAGE_DRIVER=s3`. An installation that already
+has media must copy it to the bucket before switching; Core does not move stored files.
+See [Media storage](/self-hosting/configuration#media-storage).
+
+## Core images before 0.18.0 lack the console
+
+The `core` images from 0.10.0 to 0.17.0 were built without the compiled console, so on an
+installation from the Compose file every console page (`/admin/login` included) answers
+500 while the `web` image looks healthy. Use 0.18.0 or later.
+
+## Channel settings follow the channel type
+
+A channel's settings form is now drawn from what its channel type declares, and saving a
+channel keeps only the settings that type declares. A channel type that declares none —
+the WhatsApp placeholder, or a connector's channel created before a connector declared
+its settings — loses every stored setting the next time the channel is saved. Re-enter
+them after the connector is updated.
+
+The Telegram bot username moves into the channel's settings. A tenant migration moves
+it, so `platform:update` is all it needs.
+
+## Flow buttons
+
+- A *text with keyboard* block that ends up with no buttons is sent as plain text, where
+  it used to carry an empty inline keyboard.
+- A fixed button whose label comes out empty (a missing translation, an empty variable)
+  now sends the block through its error exit before anything is sent, instead of being
+  refused by the provider.
+
+## Extension packages and Foundation
+
+Core now requires `fapost/foundation` ^0.28. A Solution, connector or operator package
+installed next to it must accept that version, or Composer will not install the upgrade.
+
 ## Host-mode installs: sessions are now checked
 
 An installation already running with `TENANCY_RESOLUTION=host` that has

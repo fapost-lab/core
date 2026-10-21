@@ -59,6 +59,10 @@ Use dynamic buttons whenever the options are not known when the flow is written:
 a list fetched by a [Call](#call), a set of appointment slots, whatever the
 contact's own record holds.
 
+Every fixed button needs a label once it is translated and its variables are filled
+in. If one comes out empty, the message is not sent and the block leaves through its
+error exit. A dynamic entry with an empty label is skipped instead.
+
 #### Waiting for the press
 
 A keyboard makes this block **wait**, the way [Input](#input) does. The flow does

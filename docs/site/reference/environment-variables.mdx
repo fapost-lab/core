@@ -107,6 +107,26 @@ them back.
 
 See [Conversation retention](/self-hosting/observability#conversation-retention).
 
+## Media storage
+
+| Variable | Default | Notes |
+|---|---|---|
+| `MEDIA_STORAGE_DRIVER` | `local` | `local` keeps media under `storage/app`; `s3` uses any S3-compatible storage. Switching an installation that already has files needs them copied first |
+| `MEDIA_S3_BUCKET` | *empty* | Required with `s3`. One bucket for every tenant, each under `tenants/{tenant id}/` |
+| `MEDIA_S3_KEY`, `MEDIA_S3_SECRET` | *empty* | Access key with read, write and delete in the bucket |
+| `MEDIA_S3_REGION` | `us-east-1` | |
+| `MEDIA_S3_ENDPOINT` | *empty* | Empty for AWS; the provider's address otherwise, for example `http://minio:9000` |
+| `MEDIA_S3_USE_PATH_STYLE_ENDPOINT` | `false` | `true` for MinIO and most self-hosted servers |
+| `MEDIA_S3_ROOT` | *empty* | Optional prefix inside the bucket |
+
+See [Media storage](/self-hosting/configuration#media-storage).
+
+## Messaging
+
+| Variable | Default | Notes |
+|---|---|---|
+| `MESSAGING_RATE_LIMIT_PER_MINUTE` | `30` | Fallback only, for sends outside a tenant. A tenant's rate is set on Tenant settings |
+
 ## Localisation
 
 | Variable | Default |
