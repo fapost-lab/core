@@ -8,10 +8,11 @@ use Fapost\Foundation\Connector\ConnectorChannel;
 use LogicException;
 
 /**
- * The channel types connectors registered at boot, with the connector that owns each.
+ * The channel types registered at boot, with the connector that owns each, if any.
  *
- * Filled once per process, before the first request or job, by the connector registrar in Infrastructure; the
- * {@see ChannelRegistry} reads it next to the tagged built-in definitions. It holds class names only, so it depends on
+ * Filled once per process, before the first request or job, by a registrar: the connector registrar in
+ * Infrastructure, or the built-in one ({@see BuiltInChannelRegistrar}) for the channels Core ships, which no
+ * connector owns. The {@see ChannelRegistry} reads every type from here. It holds class names only, so it depends on
  * the image and never on a tenant, and a process may keep it. Core does not check what is added here: the registrar
  * already has.
  */
@@ -29,16 +30,20 @@ final class ConnectorChannels
     private bool $frozen = false;
 
     /**
+     * @param  string|null  $connectorId  the owning connector; null for a built-in channel
      * @param  string|null  $connectorName  the connector's display name from its manifest, shown for the type
      */
-    public function add(ConnectorChannel $channel, string $connectorId, ?string $connectorName = null): void
+    public function add(ConnectorChannel $channel, ?string $connectorId = null, ?string $connectorName = null): void
     {
         if ($this->frozen) {
             throw new LogicException('Connector channels are registered at boot only.');
         }
 
         $this->channels[$channel->type] = $channel;
-        $this->owners[$channel->type]   = $connectorId;
+
+        if (null !== $connectorId) {
+            $this->owners[$channel->type] = $connectorId;
+        }
 
         if (null !== $connectorName && '' !== $connectorName) {
             $this->names[$channel->type] = $connectorName;
@@ -64,7 +69,7 @@ final class ConnectorChannels
     }
 
     /**
-     * Id of the connector that registered the type.
+     * Id of the connector that registered the type; null for a built-in channel or an unknown type.
      */
     public function ownerOf(string $type): ?string
     {

@@ -106,7 +106,7 @@ final class MediaDispatcherTest extends TestCase
 
         $blob    = $this->makeBlob('blob-3');
         $media   = $this->makeMedia($blob);
-        $channel = $this->makeChannel('channel-3', ChannelTypeEnum::WhatsApp);
+        $channel = $this->makeChannel('channel-3', 'viber');
 
         $ref = new MediaChannelRef();
         $ref->forceFill([
@@ -124,7 +124,7 @@ final class MediaDispatcherTest extends TestCase
         );
 
         $uploader = Mockery::mock(ChannelMediaUploaderInterface::class);
-        $uploader->shouldReceive('channelType')->andReturn('whatsapp');
+        $uploader->shouldReceive('channelType')->andReturn('viber');
         $uploader->shouldReceive('upload')->once()->andReturn(new UploadResult('provider-new'));
 
         $registry = new ChannelMediaUploaderRegistry([$uploader]);
@@ -170,7 +170,7 @@ final class MediaDispatcherTest extends TestCase
     {
         $blob    = $this->makeBlob('blob-4');
         $media   = $this->makeMedia($blob);
-        $channel = $this->makeChannel('channel-4', ChannelTypeEnum::WhatsApp);
+        $channel = $this->makeChannel('channel-4', 'viber');
 
         $refs = Mockery::mock(MediaChannelRefRepositoryInterface::class);
         $refs->shouldReceive('find')->andReturnNull();
@@ -207,13 +207,13 @@ final class MediaDispatcherTest extends TestCase
         CarbonImmutable::setTestNow('2026-05-01 12:00:00');
 
         $media   = $this->makeMedia($this->makeBlob('blob-link'));
-        $channel = $this->makeChannel('channel-link', ChannelTypeEnum::WhatsApp);
+        $channel = $this->makeChannel('channel-link', 'viber');
 
         $refs = Mockery::mock(MediaChannelRefRepositoryInterface::class);
         $refs->shouldNotReceive('find');
         $refs->shouldNotReceive('upsert');
 
-        $dispatcher = $this->makeDispatcher($refs, new ChannelMediaUploaderRegistry(), $this->policyRegistry('whatsapp', 7200));
+        $dispatcher = $this->makeDispatcher($refs, new ChannelMediaUploaderRegistry(), $this->policyRegistry('viber', 7200));
 
         $result = $dispatcher->ensureUploadedToChannel($media, $channel);
 
@@ -261,12 +261,12 @@ final class MediaDispatcherTest extends TestCase
         $dispatcher = $this->makeDispatcher(
             Mockery::mock(MediaChannelRefRepositoryInterface::class),
             new ChannelMediaUploaderRegistry(),
-            $this->policyRegistry('whatsapp'),
+            $this->policyRegistry('viber'),
         );
 
         $this->expectException(MediaDeletedException::class);
 
-        $dispatcher->ensureUploadedToChannel($media, $this->makeChannel('channel-link-del', ChannelTypeEnum::WhatsApp));
+        $dispatcher->ensureUploadedToChannel($media, $this->makeChannel('channel-link-del', 'viber'));
     }
 
     private function makeDispatcher(
@@ -333,7 +333,7 @@ final class MediaDispatcherTest extends TestCase
         return $media;
     }
 
-    private function makeChannel(string $id, ChannelTypeEnum $type = ChannelTypeEnum::Telegram): Channel
+    private function makeChannel(string $id, ChannelTypeEnum|string $type = ChannelTypeEnum::Telegram): Channel
     {
         $channel = new Channel();
         $channel->forceFill([

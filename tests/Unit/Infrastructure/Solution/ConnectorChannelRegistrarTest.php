@@ -89,12 +89,11 @@ final class ConnectorChannelRegistrarTest extends TestCase
         $this->registrar(['telegram'])->registerChannel(new ConnectorChannel(type: 'telegram', sender: EchoSender::class, inbound: EchoInboundAdapter::class));
     }
 
-    public function test_whatsapp_is_refused_too(): void
+    public function test_a_type_that_core_no_longer_serves_is_open_to_a_connector(): void
     {
-        $this->expectException(LogicException::class);
-        $this->expectExceptionMessage('registers channel type "whatsapp", which Core serves itself');
-
         $this->registrar(['whatsapp'])->registerChannel(new ConnectorChannel(type: 'whatsapp', sender: EchoSender::class, inbound: EchoInboundAdapter::class));
+
+        $this->assertSame('echo', $this->channels->ownerOf('whatsapp'));
     }
 
     public function test_a_type_registered_twice_is_refused(): void

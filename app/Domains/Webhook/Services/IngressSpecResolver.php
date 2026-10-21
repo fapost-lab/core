@@ -6,17 +6,15 @@ namespace App\Domains\Webhook\Services;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use Fapost\Foundation\Channel\Ingress\IngressSpec;
-use Fapost\Foundation\Channel\Ingress\ProvidesIngressSpecInterface;
 
 /**
  * Single source of truth for which platforms can be verified declaratively.
  *
  * Whether an external gateway can handle a platform is a property of its adapter,
- * not a configuration choice: an adapter either expresses its rules as a spec or
- * it does not. Deriving the answer here rather than listing platforms in the
- * environment removes the only way the two could disagree — a configured list
- * naming a platform that publishes no spec would route live webhooks at a gateway
- * with nothing to verify them against.
+ * not a configuration choice: every registered adapter expresses its rules as a spec.
+ * Deriving the answer here rather than listing platforms in the environment removes
+ * the only way the two could disagree — a configured list naming a platform with no
+ * adapter would route live webhooks at a gateway with nothing to verify them against.
  */
 final readonly class IngressSpecResolver
 {
@@ -26,16 +24,13 @@ final readonly class IngressSpecResolver
     }
 
     /**
-     * Spec declared by the platform's adapter, or null when the adapter either
-     * is not registered or keeps its verification in code.
+     * Spec declared by the platform's adapter, or null when no adapter is registered.
      */
     public function specFor(string $platform): ?IngressSpec
     {
         $adapter = $this->channelRegistry->adapter($platform);
 
-        return $adapter instanceof ProvidesIngressSpecInterface
-            ? $adapter->ingressSpec()
-            : null;
+        return $adapter?->ingressSpec();
     }
 
     /**

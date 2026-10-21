@@ -6,51 +6,27 @@ namespace App\Domains\Channels;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
-use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
 use Fapost\Foundation\Channel\ChannelInboundAdapterInterface;
 use Fapost\Foundation\Channel\Settings\ChannelProfileInterface;
 use Fapost\Foundation\Channel\WebhookRegistrarInterface;
+use Fapost\Foundation\Connector\ConnectorChannel;
 use Fapost\Foundation\Messaging\ChannelCapabilities;
 use Fapost\Foundation\Messaging\ProviderSenderInterface;
 use Illuminate\Contracts\Container\Container;
-use InvalidArgumentException;
 
 /**
  * Container-backed registry for published channel integrations.
  *
- * Built-in integrations come from the container tag and keep the {@see ChannelTypeEnum} filter. A connector's channel
- * comes from {@see ConnectorChannels}, which is read on every lookup, not copied at construction: connectors register
- * at boot, and this singleton may be built before. Its type was checked against the connector's manifest and against
- * the built-in types when it was registered, so the enum filter does not apply to it.
+ * Every channel comes from {@see ConnectorChannels}, which is read on every lookup, not copied at construction: the
+ * built-in modules and the connectors register at boot, and this singleton may be built before. A built-in channel
+ * has no owning connector, so its definition carries a null `connectorId`.
  */
 final class ChannelRegistry implements ChannelRegistryInterface
 {
-    /**
-     * @var array<string, ChannelIntegrationDefinition>
-     */
-    private array $definitionsByType = [];
-
-    /**
-     * @param  iterable<ChannelIntegrationDefinition>  $definitions
-     */
     public function __construct(
-        iterable $definitions,
         private readonly Container $container,
-        private readonly ?ConnectorChannels $connectorChannels = null,
+        private readonly ConnectorChannels $channels,
     ) {
-        foreach ($definitions as $definition) {
-            if (null === ChannelTypeEnum::tryFrom($definition->channelType)) {
-                continue;
-            }
-
-            if (isset($this->definitionsByType[$definition->channelType])) {
-                throw new InvalidArgumentException(
-                    "Duplicate channel integration definition [{$definition->channelType}]."
-                );
-            }
-
-            $this->definitionsByType[$definition->channelType] = $definition;
-        }
     }
 
     /**
@@ -58,13 +34,7 @@ final class ChannelRegistry implements ChannelRegistryInterface
      */
     public function types(): array
     {
-        $types = array_keys($this->definitionsByType);
-
-        foreach ($this->connectorChannels?->all() ?? [] as $channel) {
-            $types[] = $channel->type;
-        }
-
-        return array_values(array_unique($types));
+        return array_map(static fn (ConnectorChannel $channel): string => $channel->type, $this->channels->all());
     }
 
     /**
@@ -86,7 +56,7 @@ final class ChannelRegistry implements ChannelRegistryInterface
             return __($builtIn->labelKey());
         }
 
-        return $this->connectorChannels?->nameOf($channelType) ?? $channelType;
+        return $this->channels->nameOf($channelType) ?? $channelType;
     }
 
     /**
@@ -94,9 +64,22 @@ final class ChannelRegistry implements ChannelRegistryInterface
      */
     public function definition(ChannelTypeEnum|string $channelType): ?ChannelIntegrationDefinition
     {
-        $type = $this->normalizeType($channelType);
+        $type    = $this->normalizeType($channelType);
+        $channel = $this->channels->find($type);
 
-        return $this->definitionsByType[$type] ?? $this->connectorDefinition($type);
+        if (null === $channel) {
+            return null;
+        }
+
+        return new ChannelIntegrationDefinition(
+            channelType: $channel->type,
+            senderClass: $channel->sender,
+            webhookRegistrarClass: $channel->webhookRegistrar,
+            adapterClass: $channel->inbound,
+            connectorId: $this->channels->ownerOf($type),
+            capabilities: $channel->capabilities,
+            profileClass: $channel->profile,
+        );
     }
 
     /**
@@ -146,7 +129,7 @@ final class ChannelRegistry implements ChannelRegistryInterface
      *
      * @throws \Illuminate\Contracts\Container\BindingResolutionException
      */
-    public function adapter(ChannelTypeEnum|string $channelType): ChannelAdapterInterface|ChannelInboundAdapterInterface|null
+    public function adapter(ChannelTypeEnum|string $channelType): ?ChannelInboundAdapterInterface
     {
         $class = $this->definition($channelType)?->adapterClass;
 
@@ -154,7 +137,7 @@ final class ChannelRegistry implements ChannelRegistryInterface
             return null;
         }
 
-        /** @var ChannelAdapterInterface|ChannelInboundAdapterInterface */
+        /** @var ChannelInboundAdapterInterface */
         return $this->container->make($class);
     }
 
@@ -173,25 +156,6 @@ final class ChannelRegistry implements ChannelRegistryInterface
 
         /** @var ChannelProfileInterface */
         return $this->container->make($class);
-    }
-
-    private function connectorDefinition(string $type): ?ChannelIntegrationDefinition
-    {
-        $channel = $this->connectorChannels?->find($type);
-
-        if (null === $channel) {
-            return null;
-        }
-
-        return new ChannelIntegrationDefinition(
-            channelType: $channel->type,
-            senderClass: $channel->sender,
-            webhookRegistrarClass: $channel->webhookRegistrar,
-            adapterClass: $channel->inbound,
-            connectorId: $this->connectorChannels->ownerOf($type),
-            capabilities: $channel->capabilities,
-            profileClass: $channel->profile,
-        );
     }
 
     /**

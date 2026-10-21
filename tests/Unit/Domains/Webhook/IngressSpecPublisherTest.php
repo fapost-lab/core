@@ -50,26 +50,6 @@ final class IngressSpecPublisherTest extends TestCase
         );
     }
 
-    /**
-     * A published spec that no longer reflects its adapter is worse than none:
-     * the gateway would keep applying rules the adapter has abandoned.
-     */
-    public function test_drops_stale_spec_for_a_platform_without_one(): void
-    {
-        Redis::shouldReceive('set')->andReturn(true);
-
-        Redis::shouldReceive('del')
-            ->once()
-            ->with('ingress:spec:whatsapp')
-            ->andReturn(1);
-
-        $this->allowRedisIndex();
-
-        $published = $this->publisher()->publishAll();
-
-        $this->assertArrayNotHasKey('whatsapp', $published);
-    }
-
     public function test_a_connector_channel_spec_is_published_and_indexed(): void
     {
         $this->registerEcho();
@@ -119,20 +99,16 @@ final class IngressSpecPublisherTest extends TestCase
     }
 
     /**
-     * Gateway eligibility is derived, never configured: an adapter that publishes
-     * a spec is verifiable anywhere, one that does not stays on the PHP path.
-     * Nothing in the environment can override either direction.
+     * Gateway eligibility is derived, never configured: every registered adapter publishes a spec and so is
+     * verifiable anywhere. Nothing in the environment can override it.
      */
     public function test_declarative_platforms_are_derived_from_the_adapters(): void
     {
         $platforms = app(IngressSpecResolver::class)->declarativePlatforms();
 
         $this->assertContains('telegram', $platforms);
-        $this->assertNotContains(
-            'whatsapp',
-            $platforms,
-            'An adapter without an ingress spec must not be advertised as gateway-verifiable.',
-        );
+        $this->assertNotContains('unknown', $platforms);
+        $this->assertSame(app(ChannelRegistryInterface::class)->types(), $platforms);
     }
 
     /**

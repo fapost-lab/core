@@ -67,8 +67,8 @@ final class WebhookUrlGeneratorTest extends TestCase
     }
 
     /**
-     * Eligibility comes from the adapters, not from configuration: WhatsApp's
-     * adapter publishes no ingress spec, so no environment setting can send its
+     * Eligibility comes from the adapters, not from configuration: a platform
+     * with no adapter has no ingress spec, so no environment setting can send its
      * webhooks to a gateway that would have nothing to verify them with.
      */
     public function test_platform_without_an_ingress_spec_stays_on_the_laravel_route(): void
@@ -76,8 +76,8 @@ final class WebhookUrlGeneratorTest extends TestCase
         $this->useGateway();
 
         $this->assertSame(
-            'https://app.example.com/webhook/whatsapp/hash-123',
-            app(WebhookUrlGenerator::class)->forChannel('whatsapp', 'hash-123'),
+            'https://app.example.com/webhook/unknown/hash-123',
+            app(WebhookUrlGenerator::class)->forChannel('unknown', 'hash-123'),
         );
     }
 
@@ -112,7 +112,7 @@ final class WebhookUrlGeneratorTest extends TestCase
         $generator = app(WebhookUrlGenerator::class);
 
         $this->assertTrue($generator->usesGateway('telegram'));
-        $this->assertFalse($generator->usesGateway('whatsapp'));
+        $this->assertFalse($generator->usesGateway('unknown'));
     }
 
     private function useGateway(

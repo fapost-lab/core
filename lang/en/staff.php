@@ -214,7 +214,6 @@ return [
 
         'types' => [
             'telegram' => 'Telegram',
-            'whatsapp' => 'WhatsApp',
         ],
 
         'actions' => [

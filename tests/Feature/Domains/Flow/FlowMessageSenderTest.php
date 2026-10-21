@@ -314,7 +314,7 @@ final class FlowMessageSenderTest extends FeatureTestCase
         $channel = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
             'assistant_id' => $assistant->getKey(),
             'tenant_id'    => $tenantId,
-            'type'         => ChannelTypeEnum::WhatsApp,
+            'type'         => 'viber',
             'token'        => 'token-link',
             'is_active'    => true,
         ]));

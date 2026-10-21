@@ -42,9 +42,9 @@ final readonly class IngressSpecPublisher
      * Write a spec for every adapter that publishes one, and drop stale entries
      * for adapters that no longer do.
      *
-     * Removal matters as much as writing: an adapter whose verification outgrew
-     * the declarative form must stop being verifiable by the gateway, otherwise
-     * the gateway would keep applying rules the adapter has abandoned.
+     * Removal matters as much as writing: a type that no longer has an adapter
+     * (a connector removed from the image) must stop being verifiable by the
+     * gateway, otherwise the gateway would keep applying rules nobody serves.
      *
      * @return array<string, IngressSpec> Published specs, keyed by platform.
      *

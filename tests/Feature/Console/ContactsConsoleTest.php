@@ -100,7 +100,6 @@ final class ContactsConsoleTest extends FeatureTestCase
                 ->has('table.rows.0.createdAt')
                 ->where('platforms', [
                     ['value' => 'telegram', 'label' => 'Telegram'],
-                    ['value' => 'whatsapp', 'label' => 'WhatsApp'],
                     ['value' => 'email', 'label' => 'Email'],
                 ])
                 ->where('urls', ['index' => "/assistant/{$this->assistant->getKey()}/contacts"])
@@ -178,15 +177,15 @@ final class ContactsConsoleTest extends FeatureTestCase
     public function test_the_list_filters_by_platform_and_language_and_ignores_unusable_values(): void
     {
         $this->contact(['external_id' => 'tg-ru', 'platform' => 'telegram', 'language' => 'ru']);
-        $this->contact(['external_id' => 'wa-en', 'platform' => 'whatsapp', 'language' => 'en']);
+        $this->contact(['external_id' => 'em-en', 'platform' => 'email', 'language' => 'en']);
 
         $this->actingAs($this->admin());
 
-        $this->get($this->listUrl('?filter[platform]=whatsapp'))
+        $this->get($this->listUrl('?filter[platform]=email'))
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->where('table.meta.total', 1)
-                ->where('table.rows.0.externalId', 'wa-en')
-                ->where('table.state.filters', ['platform' => 'whatsapp'])
+                ->where('table.rows.0.externalId', 'em-en')
+                ->where('table.state.filters', ['platform' => 'email'])
                 ->etc());
 
         $this->get($this->listUrl('?filter[language]=ru'))

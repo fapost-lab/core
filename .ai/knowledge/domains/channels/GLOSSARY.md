@@ -26,13 +26,13 @@ An assistant's transport endpoint on one messenger. Informal synonyms: bot, inte
 
 ## Channel type
 
-`ChannelTypeEnum` (`telegram`, `whatsapp`): the kind of channel. Not the same enum as Contact's
+`ChannelTypeEnum` (`telegram`): the built-in kinds of channel. Not the same enum as Contact's
 `PlatformEnum` (`telegram`, `whatsapp`, `email`), although the values overlap.
 
 ## Channel integration definition
 
-The set of class names — sender, registrar, adapter — that serve one channel type, registered
-with the tag `channels.integration`.
+The set of class names — sender, registrar, adapter — that serve one channel type. A read model
+`ChannelRegistry` builds from the `ConnectorChannel` a built-in module or a connector registered.
 
 ## Provider sender
 

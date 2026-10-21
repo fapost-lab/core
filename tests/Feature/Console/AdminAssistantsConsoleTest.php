@@ -403,7 +403,7 @@ final class AdminAssistantsConsoleTest extends FeatureTestCase
                 ->etc());
 
         $this->put($this->panelUrl($base), [
-            'type'         => 'whatsapp',
+            'type'         => 'viber',
             'token'        => '',
             'secret_token' => '',
             'is_active'    => true,

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domains\Webhook\Http;
 
-use App\Domains\Webhook\Contracts\ChannelAdapterInterface;
 use App\Domains\Webhook\Contracts\WebhookRegistryResolverInterface;
 use App\Domains\Webhook\Exceptions\AdapterNotFoundException;
 use App\Domains\Webhook\Exceptions\InvalidSignatureException;
@@ -13,7 +12,6 @@ use App\Domains\Webhook\Jobs\IncomingMessageJob;
 use App\Domains\Webhook\Services\ChannelAdapterResolver;
 use Fapost\Foundation\Channel\ChannelInboundAdapterInterface;
 use Fapost\Foundation\Channel\Ingress\IngressSpecExecutor;
-use Fapost\Foundation\Channel\Ingress\ProvidesIngressSpecInterface;
 use Fapost\Foundation\Channel\Ingress\SignedRequest;
 use Fapost\Foundation\DTO\InboundWebhookPayload;
 use Illuminate\Http\JsonResponse;
@@ -31,11 +29,9 @@ use Illuminate\Support\Facades\Redis;
  * No Eloquent, no TenantContext, no payload normalization here.
  * All domain work (normalize, contact resolve, flow execution) happens in the worker.
  *
- * Verification runs through the adapter's declarative IngressSpec whenever the
- * adapter publishes one, so this controller and any external ingress gateway
- * execute byte-identical rules. Adapters without a spec keep using their own
- * verification code. A connector's adapter always has one: it ships no
- * verification code.
+ * Verification runs through the adapter's declarative IngressSpec, so this
+ * controller and any external ingress gateway execute byte-identical rules.
+ * An adapter ships no verification code.
  */
 final class WebhookController extends Controller
 {
@@ -92,19 +88,12 @@ final class WebhookController extends Controller
     }
 
     /**
-     * Verify through the declarative spec when the adapter publishes one,
-     * falling back to the adapter's own implementation otherwise.
+     * Verify through the adapter's declarative spec.
      *
-     * The adapter's own code never sees an empty secret: it may compare one
-     * against an absent header and pass. The spec executor refuses it itself,
-     * for every scheme but `none`.
+     * The spec executor refuses an empty secret itself, for every scheme but `none`.
      */
-    private function verify(ChannelAdapterInterface|ChannelInboundAdapterInterface $adapter, Request $request, string $secret): bool
+    private function verify(ChannelInboundAdapterInterface $adapter, Request $request, string $secret): bool
     {
-        if (! $adapter instanceof ProvidesIngressSpecInterface) {
-            return '' !== $secret && $adapter->verifySignature($request, $secret);
-        }
-
         return $this->specExecutor->verify(
             $adapter->ingressSpec(),
             $this->signedRequest($request),
@@ -112,12 +101,8 @@ final class WebhookController extends Controller
         );
     }
 
-    private function idempotencyKey(ChannelAdapterInterface|ChannelInboundAdapterInterface $adapter, Request $request, string $channelId): string
+    private function idempotencyKey(ChannelInboundAdapterInterface $adapter, Request $request, string $channelId): string
     {
-        if (! $adapter instanceof ProvidesIngressSpecInterface) {
-            return $adapter->extractIdempotencyKey($request, $channelId);
-        }
-
         return $this->specExecutor->idempotencyKey(
             $adapter->ingressSpec(),
             $this->signedRequest($request),
