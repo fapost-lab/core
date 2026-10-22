@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Tenancy\Services;
 
+use App\Domains\Tenancy\Contracts\WebhookRegistryHealthCheckerInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Domains\Tenancy\ValueObjects\WebhookRegistryHealthReport;
@@ -20,7 +21,7 @@ use Illuminate\Support\Facades\Redis;
  * and stale entries through {@see WebhookRegistryWriterInterface} and deletes
  * orphaned Redis keys.
  */
-final readonly class WebhookRegistryHealthChecker
+final readonly class WebhookRegistryHealthChecker implements WebhookRegistryHealthCheckerInterface
 {
     private const string KEY_PREFIX = 'webhook:';
 

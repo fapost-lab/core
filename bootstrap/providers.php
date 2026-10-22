@@ -6,6 +6,7 @@ use App\Domains\Channels\Providers\ChannelsServiceProvider;
 use App\Domains\Contact\Providers\ContactServiceProvider;
 use App\Domains\Conversation\Providers\ConversationServiceProvider;
 use App\Domains\Flow\Providers\FlowServiceProvider;
+use App\Domains\Health\Providers\HealthServiceProvider;
 use App\Domains\Media\Providers\MediaServiceProvider;
 use App\Domains\Messaging\Providers\MessageSenderServiceProvider;
 use App\Domains\Solution\Providers\SolutionServiceProvider;
@@ -24,6 +25,7 @@ return [
     ContactServiceProvider::class,
     ConversationServiceProvider::class,
     FlowServiceProvider::class,
+    HealthServiceProvider::class,
     MediaServiceProvider::class,
     MessageSenderServiceProvider::class,
     WebhookServiceProvider::class,
