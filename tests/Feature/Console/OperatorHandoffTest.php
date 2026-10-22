@@ -137,10 +137,11 @@ final class OperatorHandoffTest extends FeatureTestCase
 
     public function test_the_assistant_addresses_send_the_operator_to_the_inbox(): void
     {
-        $inbox = route('console.conversations.index', ['assistant' => (string) $this->assigned->getKey()]);
+        // The expected URL is built after each request, on the host that request used, as the sibling console tests do.
+        $inbox = fn (): string => route('console.conversations.index', ['assistant' => (string) $this->assigned->getKey()]);
 
-        $this->actingAs($this->operator)->get($this->panelUrl('/assistant'))->assertRedirect($inbox);
-        $this->actingAs($this->operator)->get($this->panelUrl("/assistant/{$this->assigned->getKey()}"))->assertRedirect($inbox);
+        $this->actingAs($this->operator)->get($this->panelUrl('/assistant'))->assertRedirect($inbox());
+        $this->actingAs($this->operator)->get($this->panelUrl("/assistant/{$this->assigned->getKey()}"))->assertRedirect($inbox());
         $this->actingAs($this->operator)->get($this->panelUrl("/assistant/{$this->other->getKey()}"))->assertNotFound();
     }
 
