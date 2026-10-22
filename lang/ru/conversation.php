@@ -83,7 +83,12 @@ return [
     ],
 
     'notifications' => [
-        'status_changed'          => 'Статус диалога: :status.',
+        'already_handled_by'      => 'Уже ведёт :name.',
+        'not_holder'              => 'Этот диалог больше не за вами.',
+        'reply_held_by_another'   => 'Этот диалог ведёт другой оператор.',
+        'transferred'             => 'Диалог передан: :name.',
+        'transfer_ineligible'     => 'Этот пользователь не может взять диалог.',
+        'seized'                  => 'Вы забрали диалог себе.',
         'reply_requires_takeover' => 'Сначала перехватите диалог, потом отвечайте.',
         'reply_sent'              => 'Ответ отправлен.',
         'reply_failed'            => 'Не удалось отправить ответ. Попробуйте ещё раз.',

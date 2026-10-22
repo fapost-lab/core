@@ -8,11 +8,11 @@ Every exchange between a contact and this assistant, newest activity first.
 ## The list
 
 Each row summarises one conversation: which **contact**, over which **channel**,
-the **last message**, how many are **unread**, the total **messages**, the
-**status**, and when it was **last active**.
+the **last message**, how many are **unread**, the total **messages**, **who is
+handling** it, and when it was **last active**.
 
-The search finds a conversation by the contact's channel user ID, and the **Status** filter
-narrows the list. Opening a row shows the full transcript. The list and an open conversation stay
+The search finds a conversation by the contact's channel user ID, and the **Handling** filter
+narrows the list: **Waiting for operator**, **Mine**, **With operators** or **Assistant**. Opening a row shows the full transcript. The list and an open conversation stay
 current on their own: live when the install has a websocket broadcaster, otherwise
 by refreshing every few seconds.
 
@@ -23,15 +23,17 @@ by refreshing every few seconds.
   a point where a name was asked for.
 </Note>
 
-## Unread and status
+## Unread and who is handling it
 
 **Unread** counts inbound messages nobody has looked at. It is the queue for a
 human, and it does not go down on its own.
 
-**Status** is the conversation's state — open, or closed. Open means the exchange
-is considered ongoing, whether or not a flow is currently running inside it.
-**Close** and **Reopen** set it; closing a conversation someone already closed
-changes nothing.
+A conversation is always handled by someone:
+
+- **Assistant** — the flows answer the contact.
+- **Waiting for an operator** — an operator was requested and nobody has accepted
+  yet. The flows stand down; the contact's messages wait in the transcript.
+- **Handled by** a named operator — that person answers, and only they can reply.
 
 Opening a conversation marks it read. New messages that arrive while it is open
 are counted until it is opened again.
@@ -49,10 +51,21 @@ Where a person replies from — the operator inbox — the message goes out **un
 the assistant's identity**. The contact sees the assistant, not the individual
 typing.
 
-Replying starts with **Take over**: while you hold the conversation the flows
-stand down and incoming messages wait for you. You can take over only a
-conversation the assistant is answering — if another operator already holds it,
-it stays theirs. **Return to assistant** hands it back to the flows.
+Replying starts with **Take over** (on a conversation waiting for an operator the
+button reads **Accept**): while you hold the conversation the flows stand down and
+incoming messages wait for you. The first operator to take it wins — if another
+operator already holds it, it stays theirs, and only the operator holding a
+conversation can reply in it.
+
+The operator holding a conversation can:
+
+- **Finish** — hand it back to the assistant; the flows answer again.
+- **Transfer** — hand it straight to another operator who works with this
+  assistant and may read and reply to conversations.
+
+An administrator can **take over from** another operator, for an escalation. To
+reply, finish or transfer, an administrator takes the conversation first like
+anyone else.
 
 Each press of **Send** is one message. Pressing it twice, retrying, or
 submitting the same draft again does not send it again; the inbox says the

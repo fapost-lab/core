@@ -61,9 +61,13 @@ and media are not touched. The dedup index
 
 ## Takeover
 
-`ConversationOwnershipInterface` (`ConversationOwnership`) holds who answers a thread: `assign()`
-switches between bot and a staff user, `isHandledByStaff()` is read by Flow's `MessageRouter` on every
-inbound message. Operators reply through `ConversationReplyService`.
+`ConversationOwnershipInterface` (`ConversationOwnership`) holds who handles a thread — `bot`, `queued`
+or `staff` (see the glossary). `takeOver()`, `finish()`, `transfer()` and `seize()` are each one
+conditional UPDATE on the expected current state or holder, so the database decides a race.
+`isHandledByStaff()` (true for `queued` and `staff`) is read by Flow's `MessageRouter` on every inbound
+message. Operators reply through `ConversationReplyService`; `ConversationInbox` checks the holder and the
+transfer target. Nothing sets `queued` yet: the flow node that requests an operator is a later task
+(`operator-handoff-node`).
 
 ## Boundaries
 
@@ -82,7 +86,7 @@ inbound message. Operators reply through `ConversationReplyService`.
   `UpdateConversationDeliveryStatusJob`.
 - Console UI: `app/Http/Controllers/Console/ConversationController.php` over
   `Services/ConversationInbox.php` (list and unread count shared with the shell badge, transcript,
-  take over / return / status, a reply sent once per `request_id`); live updates through
+  take over / finish / transfer / seize, a reply sent once per `request_id`); live updates through
   `Live/ConversationActivityNotifier` on the private channel
   `tenant.{tenant}.assistant.{assistant}.conversations`, announced from `PersistConversationMessageJob`
   and inbox writes.

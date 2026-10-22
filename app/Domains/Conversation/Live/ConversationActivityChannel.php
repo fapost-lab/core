@@ -55,7 +55,7 @@ final readonly class ConversationActivityChannel
 
         $gate = $this->gate->forUser($user);
 
-        if (! $gate->allows('view', $model) || ! $gate->allows('viewAny', Conversation::class)) {
+        if (! $gate->allows('operate', $model) || ! $gate->allows('viewAny', Conversation::class)) {
             return false;
         }
 

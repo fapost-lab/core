@@ -8,7 +8,6 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Services\StaffAssistantService;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\AccessibleAssistants;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 
 /**
@@ -69,8 +68,10 @@ final class ApplicationRegistry
         $applications = [];
         $assistant    = $current ?? $this->consoleAssistant($user, $wishedAssistantIds);
 
-        if (null !== $assistant) {
-            $applications[] = $this->application(self::CONSOLE, 'message-square', self::CONSOLE_ROUTE, ['assistant' => $assistant->getKey()], $assistant);
+        $entry = null === $assistant ? null : $this->navigation->entryRoute($user, $assistant);
+
+        if (null !== $assistant && null !== $entry) {
+            $applications[] = $this->application(self::CONSOLE, 'message-square', $entry, ['assistant' => $assistant->getKey()], $assistant);
         }
 
         $applications[] = $this->application(self::ADMIN, 'shield', self::ADMIN_ROUTE, []);
@@ -93,8 +94,7 @@ final class ApplicationRegistry
     }
 
     /**
-     * The same rule as {@see AccessibleAssistants} (the `view` ability: the permission to manage assistants, and an
-     * assignment unless the user is an administrator), as one ability check and bounded queries.
+     * The same rule as {@see AccessibleAssistants} (the `operate` ability: an assignment unless the user is an administrator), as one ability check and bounded queries.
      *
      * @param  list<string|null>  $wishedIds
      */
@@ -109,14 +109,12 @@ final class ApplicationRegistry
 
         $assistant = null;
 
-        if (Gate::forUser($user)->allows('viewAny', Assistant::class)) {
-            if ([] !== $ids) {
-                $wished    = $this->assistants->query($user)->whereKey($ids)->get()->keyBy(static fn (Assistant $candidate): string => (string) $candidate->getKey());
-                $assistant = collect($ids)->map(static fn (string $id): ?Assistant => $wished->get($id))->first(static fn (?Assistant $candidate): bool => null !== $candidate);
-            }
-
-            $assistant ??= $this->assistants->query($user)->orderBy('name')->first();
+        if ([] !== $ids) {
+            $wished    = $this->assistants->query($user)->whereKey($ids)->get()->keyBy(static fn (Assistant $candidate): string => (string) $candidate->getKey());
+            $assistant = collect($ids)->map(static fn (string $id): ?Assistant => $wished->get($id))->first(static fn (?Assistant $candidate): bool => null !== $candidate);
         }
+
+        $assistant ??= $this->assistants->query($user)->orderBy('name')->first();
 
         return $this->found[$key] = $assistant;
     }

@@ -83,7 +83,12 @@ return [
     ],
 
     'notifications' => [
-        'status_changed'          => 'Conversation is now :status.',
+        'already_handled_by'      => 'Already handled by :name.',
+        'not_holder'              => 'You no longer hold this conversation.',
+        'reply_held_by_another'   => 'Another operator is handling this conversation.',
+        'transferred'             => 'Conversation transferred to :name.',
+        'transfer_ineligible'     => 'This user cannot take the conversation.',
+        'seized'                  => 'You took the conversation over.',
         'reply_requires_takeover' => 'Take the conversation over before replying.',
         'reply_sent'              => 'Reply sent.',
         'reply_failed'            => 'Could not send the reply. Please try again.',

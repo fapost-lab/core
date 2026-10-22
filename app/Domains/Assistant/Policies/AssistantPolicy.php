@@ -36,6 +36,16 @@ final class AssistantPolicy
     }
 
     /**
+     * Whether the user can enter an assistant's console: an administrator, or staff assigned to it. It carries no
+     * permission of its own: each screen authorizes the permission it needs, so an operator with only conversation
+     * permissions reaches the inbox and nothing else. {@see view()} stays the check of managing the assistant.
+     */
+    public function operate(AuthUser $authUser, Assistant $assistant): bool
+    {
+        return $this->isAssignedOrAdmin($authUser, $assistant);
+    }
+
+    /**
      * Whether the user can create assistants.
      */
     public function create(AuthUser $authUser): bool

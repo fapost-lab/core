@@ -11,12 +11,12 @@ use App\Domains\Conversation\Contracts\ConversationOwnershipInterface;
 use App\Domains\Conversation\DTO\ConversationRef;
 use App\Domains\Conversation\Enums\ConversationOwner;
 use App\Domains\Conversation\Models\Conversation;
+use Illuminate\Support\Carbon;
 use Tests\Feature\FeatureTestCase;
 
 /**
  * Covers {@see \App\Domains\Conversation\Services\ConversationOwnership} — the
- * takeover / return-to-bot toggle used by the inbox "Take over" / "Return to
- * bot" header actions, and the unread-counter reset used on thread open.
+ * conditional takeover / finish / transfer / seize writes behind the inbox header actions, and the unread-counter reset used on thread open.
  */
 final class ConversationOwnershipTest extends FeatureTestCase
 {
@@ -24,32 +24,80 @@ final class ConversationOwnershipTest extends FeatureTestCase
 
     private const string STAFF_ID = '00000000-0000-0000-0000-0000000000aa';
 
-    public function test_assign_staff_sets_owner_type_and_staff_user_id(): void
+    private const string OTHER_STAFF_ID = '00000000-0000-0000-0000-0000000000ab';
+
+    private const string ADMIN_ID = '00000000-0000-0000-0000-0000000000ac';
+
+    public function test_take_over_accepts_a_bot_or_queued_thread_and_clears_the_queue_mark(): void
     {
-        $conversation = $this->createConversation();
-        $ownership    = app(ConversationOwnershipInterface::class);
+        $ownership = app(ConversationOwnershipInterface::class);
 
-        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Staff, self::STAFF_ID);
+        $fresh = $this->createConversation();
+        $bot   = $this->createConversation(['owner_type' => ConversationOwner::Bot]);
+        $queue = $this->createConversation(['owner_type' => ConversationOwner::Queued, 'queued_at' => Carbon::now()]);
 
-        $fresh = $conversation->fresh();
-        $this->assertSame(ConversationOwner::Staff, $fresh->owner_type);
-        $this->assertSame(self::STAFF_ID, $fresh->owner_staff_user_id);
+        foreach ([$fresh, $bot, $queue] as $conversation) {
+            $this->assertTrue($ownership->takeOver((string) $conversation->getKey(), self::STAFF_ID));
+
+            $reloaded = $conversation->fresh();
+            $this->assertSame(ConversationOwner::Staff, $reloaded->owner_type);
+            $this->assertSame(self::STAFF_ID, $reloaded->owner_staff_user_id);
+            $this->assertNull($reloaded->queued_at);
+        }
     }
 
-    public function test_assign_bot_clears_owner_staff_user_id(): void
+    public function test_only_one_of_two_operators_wins_the_take_over(): void
     {
-        $conversation = $this->createConversation();
+        $conversation = $this->createConversation(['owner_type' => ConversationOwner::Queued, 'queued_at' => Carbon::now()]);
         $ownership    = app(ConversationOwnershipInterface::class);
 
-        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Staff, self::STAFF_ID);
-        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Bot);
+        $this->assertTrue($ownership->takeOver((string) $conversation->getKey(), self::STAFF_ID));
+        $this->assertFalse($ownership->takeOver((string) $conversation->getKey(), self::OTHER_STAFF_ID));
+
+        $this->assertSame(self::STAFF_ID, $conversation->fresh()->owner_staff_user_id);
+    }
+
+    public function test_finish_returns_the_thread_to_the_bot_only_for_its_holder(): void
+    {
+        $conversation = $this->createConversation(['owner_type' => ConversationOwner::Staff, 'owner_staff_user_id' => self::STAFF_ID]);
+        $ownership    = app(ConversationOwnershipInterface::class);
+
+        $this->assertFalse($ownership->finish((string) $conversation->getKey(), self::OTHER_STAFF_ID));
+        $this->assertSame(ConversationOwner::Staff, $conversation->fresh()->owner_type);
+
+        $this->assertTrue($ownership->finish((string) $conversation->getKey(), self::STAFF_ID));
 
         $fresh = $conversation->fresh();
         $this->assertSame(ConversationOwner::Bot, $fresh->owner_type);
         $this->assertNull($fresh->owner_staff_user_id);
+
+        $queued = $this->createConversation(['owner_type' => ConversationOwner::Queued, 'queued_at' => Carbon::now()]);
+        $this->assertFalse($ownership->finish((string) $queued->getKey(), self::STAFF_ID));
     }
 
-    public function test_is_handled_by_staff_reflects_current_owner(): void
+    public function test_transfer_and_seize_move_the_thread_only_from_the_expected_holder(): void
+    {
+        $conversation = $this->createConversation(['owner_type' => ConversationOwner::Staff, 'owner_staff_user_id' => self::STAFF_ID]);
+        $id           = (string) $conversation->getKey();
+        $ownership    = app(ConversationOwnershipInterface::class);
+
+        $this->assertFalse($ownership->transfer($id, self::OTHER_STAFF_ID, self::ADMIN_ID));
+        $this->assertFalse($ownership->seize($id, self::OTHER_STAFF_ID, self::ADMIN_ID));
+        $this->assertSame(self::STAFF_ID, $conversation->fresh()->owner_staff_user_id);
+
+        $this->assertTrue($ownership->transfer($id, self::STAFF_ID, self::OTHER_STAFF_ID));
+        $this->assertSame(self::OTHER_STAFF_ID, $conversation->fresh()->owner_staff_user_id);
+
+        $this->assertTrue($ownership->seize($id, self::OTHER_STAFF_ID, self::ADMIN_ID));
+        $this->assertSame(self::ADMIN_ID, $conversation->fresh()->owner_staff_user_id);
+        $this->assertSame(ConversationOwner::Staff, $conversation->fresh()->owner_type);
+
+        $bot = $this->createConversation();
+        $this->assertFalse($ownership->transfer((string) $bot->getKey(), self::STAFF_ID, self::OTHER_STAFF_ID));
+        $this->assertFalse($ownership->seize((string) $bot->getKey(), self::STAFF_ID, self::ADMIN_ID));
+    }
+
+    public function test_is_handled_by_staff_is_true_for_a_held_or_a_queued_thread_and_false_for_the_bot(): void
     {
         $conversation = $this->createConversation();
         $ownership    = app(ConversationOwnershipInterface::class);
@@ -64,9 +112,14 @@ final class ConversationOwnershipTest extends FeatureTestCase
 
         $this->assertFalse($ownership->isHandledByStaff($ref));
 
-        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Staff, self::STAFF_ID);
-
+        $conversation->forceFill(['owner_type' => ConversationOwner::Queued, 'queued_at' => Carbon::now()])->save();
         $this->assertTrue($ownership->isHandledByStaff($ref));
+
+        $conversation->forceFill(['owner_type' => ConversationOwner::Staff, 'owner_staff_user_id' => self::STAFF_ID])->save();
+        $this->assertTrue($ownership->isHandledByStaff($ref));
+
+        $conversation->forceFill(['owner_type' => ConversationOwner::Bot, 'owner_staff_user_id' => null])->save();
+        $this->assertFalse($ownership->isHandledByStaff($ref));
     }
 
     /**
@@ -100,7 +153,7 @@ final class ConversationOwnershipTest extends FeatureTestCase
         $conversation = $this->createConversation();
         $ownership    = app(ConversationOwnershipInterface::class);
 
-        $ownership->assign((string) $conversation->getKey(), ConversationOwner::Staff, self::STAFF_ID);
+        $conversation->forceFill(['owner_type' => ConversationOwner::Staff, 'owner_staff_user_id' => self::STAFF_ID])->save();
 
         $otherChannelRef = new ConversationRef(
             tenantId: (string) $conversation->tenant_id,

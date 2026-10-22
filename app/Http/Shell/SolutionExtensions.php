@@ -98,7 +98,7 @@ final readonly class SolutionExtensions
 
             $assistant = $application->perAssistant ? $consoleAssistant : null;
 
-            if ($application->perAssistant && null === $assistant) {
+            if ($application->perAssistant && (null === $assistant || ! Gate::forUser($user)->allows('view', $assistant))) {
                 continue;
             }
 
@@ -195,9 +195,11 @@ final readonly class SolutionExtensions
         }
 
         $assistant = $this->currentAssistant->isResolved() ? $this->currentAssistant->get() : null;
+        // A per-assistant element talks to the Solution's assistant routes, which still require `view`.
+        $viewable = null !== $assistant && Gate::forUser($user)->allows('view', $assistant);
 
         foreach ($this->visible($user, ShellElement::class) as $element) {
-            if (! $element->declaration->perAssistant || null !== $assistant) {
+            if (! $element->declaration->perAssistant || $viewable) {
                 $props['shell'][$element->declaration->slot->value][] = [
                     ...$this->base($element),
                     'component' => $element->declaration->component,
@@ -206,7 +208,7 @@ final readonly class SolutionExtensions
         }
 
         foreach ($this->visible($user, ContextAction::class) as $action) {
-            $item = $this->action($action, $assistant, $request);
+            $item = $this->action($user, $action, $assistant, $request);
 
             if (null !== $item) {
                 $props['actions'][$action->declaration->target->value][] = $item;
@@ -276,13 +278,13 @@ final readonly class SolutionExtensions
     /**
      * A context action for the client. A link carries `href` on the screen of the record it is chosen on, otherwise
      * `hrefTemplate` with {@see self::RECORD_PLACEHOLDER} for the client to fill. A link whose route is missing, or needs
-     * an assistant where none is open, is left out.
+     * an assistant where none is open or the user may not view, is left out.
      *
      * @param  SolutionDeclaration<ContextAction>  $action
      *
      * @return array<string, mixed>|null
      */
-    private function action(SolutionDeclaration $action, ?Assistant $assistant, Request $request): ?array
+    private function action(User $user, SolutionDeclaration $action, ?Assistant $assistant, Request $request): ?array
     {
         $declared = $action->declaration;
         $item     = [
@@ -307,7 +309,7 @@ final readonly class SolutionExtensions
         $parameters = ['record' => self::RECORD_PLACEHOLDER];
 
         if (in_array('assistant', $route->parameterNames(), true)) {
-            if (null === $assistant) {
+            if (null === $assistant || ! Gate::forUser($user)->allows('view', $assistant)) {
                 return null;
             }
 
