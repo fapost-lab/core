@@ -5,6 +5,9 @@
  * what the renderer and validator both consume.
  */
 
+import {useTranslations} from '@builder/composables/useTranslations'
+import {branchRuleLabel} from '@builder/utils/branchLabel'
+
 export interface NodeHandle {
   handle: string
   label: string
@@ -109,17 +112,15 @@ function inputHandles(node: FlowNodeLike): NodeHandle[] {
 function conditionHandles(node: FlowNodeLike): NodeHandle[] {
   const config = (node.config ?? {}) as Record<string, unknown>
   const rules = Array.isArray(config.rules) ? (config.rules as Array<Record<string, unknown>>) : []
+  const {t} = useTranslations()
   if (rules.length === 0) {
     return [{handle: 'true', label: 'true'}, {handle: 'false', label: 'false'}]
   }
   const named = rules.map((rule, idx) => {
     const handle = String(rule.handle ?? `branch_${idx}`)
-    const label  = (rule.label && String(rule.label).trim() !== '')
-      ? String(rule.label)
-      : handle
-    return {handle, label}
+    return {handle, label: branchRuleLabel(rule, idx, t)}
   })
-  return [...named, {handle: 'default', label: 'Otherwise'}]
+  return [...named, {handle: 'default', label: t('nodes.branch.otherwise')}]
 }
 
 function buttonLabel(button: Record<string, unknown>): string {

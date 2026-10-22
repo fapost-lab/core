@@ -32,5 +32,10 @@ interface ContactServiceInterface
 
     public function updateLanguage(string $contactId, string $language): Contact;
 
+    /**
+     * Remember a phone the contact shared about themselves; a no-op when it is already stored.
+     */
+    public function rememberPhone(Contact $contact, string $phone): Contact;
+
     public function findById(string $contactId): Contact;
 }

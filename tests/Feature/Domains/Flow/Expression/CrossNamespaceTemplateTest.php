@@ -93,6 +93,55 @@ final class CrossNamespaceTemplateTest extends FeatureTestCase
         $this->assertSame('Hi, Alice (es)', $session->state['flow']['rendered'] ?? null);
     }
 
+    public function test_builtin_profile_placeholders_resolve_from_contact_meta(): void
+    {
+        $tenantId = (string) Str::uuid();
+        $this->app->make(TenantContextInterface::class)->set(
+            new RuntimeTenant(id: $tenantId, schemaName: 'main'),
+        );
+
+        $assistant = Assistant::factory()->create([
+            'tenant_id'        => $tenantId,
+            'default_language' => 'en',
+        ]);
+        $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+        $contact = Contact::factory()->forTenant($tenantId)->create([
+            'attributes' => [],
+            'meta'       => ['first_name' => 'Ivan', 'last_name' => 'Petrov', 'username' => 'ivan_p'],
+        ]);
+
+        $this->app->make(NodeHandlerRegistry::class)
+            ->register(TemplateRendererProbeHandler::class);
+
+        $definition = FlowDefinition::query()->create([
+            'tenant_id' => $tenantId,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'meta profile template test',
+            'nodes'     => [
+                [
+                    'id'      => 'p-1',
+                    'type'    => 'template_probe',
+                    'version' => 1,
+                    'config'  => ['template' => 'Hi, {{contact.name}}! {{contact.username}}'],
+                ],
+            ],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+
+        $this->app->make(FlowEngineInterface::class)->start($definition, $contact);
+
+        /** @var FlowSession $session */
+        $session = FlowSession::query()
+            ->where('contact_id', $contact->getKey())
+            ->latest('created_at')
+            ->first();
+
+        $this->assertSame('Hi, Ivan Petrov! ivan_p', $session->state['flow']['rendered'] ?? null);
+    }
+
     public function test_module_namespace_placeholders_resolve_through_registered_data_accessor(): void
     {
         $tenantId = (string) Str::uuid();

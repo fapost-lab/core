@@ -258,7 +258,7 @@ function save(): void {
               :error="form.errors.broadcast_backpressure"
               v-slot="{ invalid, describedBy }"
             >
-              <Switch id="broadcast_backpressure" v-model="form.broadcast_backpressure" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
+              <Switch id="broadcast_backpressure" v-model="form.broadcast_backpressure" :aria-invalid="invalid" :aria-describedby="describedBy" />
             </FormField>
           </FormSection>
         </TabsContent>
@@ -272,7 +272,7 @@ function save(): void {
               :error="form.errors.conversation_logging"
               v-slot="{ invalid, describedBy }"
             >
-              <Switch id="conversation_logging" v-model="form.conversation_logging" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
+              <Switch id="conversation_logging" v-model="form.conversation_logging" :aria-invalid="invalid" :aria-describedby="describedBy" />
             </FormField>
 
             <FormField
@@ -282,7 +282,7 @@ function save(): void {
               :error="form.errors.conversation_media_fetch"
               v-slot="{ invalid, describedBy }"
             >
-              <Switch id="conversation_media_fetch" v-model="form.conversation_media_fetch" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
+              <Switch id="conversation_media_fetch" v-model="form.conversation_media_fetch" :aria-invalid="invalid" :aria-describedby="describedBy" />
             </FormField>
           </FormSection>
         </TabsContent>

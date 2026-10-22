@@ -165,7 +165,7 @@ function submit(): void {
 
     <FormSection :title="t.sections.behaviour.title" :description="t.sections.behaviour.description">
       <FormField id="is_active" :label="t.fields.is_active" :error="form.errors.is_active" v-slot="{ invalid, describedBy }">
-        <Switch id="is_active" v-model="form.is_active" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
+        <Switch id="is_active" v-model="form.is_active" :aria-invalid="invalid" :aria-describedby="describedBy" />
       </FormField>
     </FormSection>
 

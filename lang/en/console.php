@@ -1003,6 +1003,12 @@ return [
         ],
         'back'       => 'Back to conversations',
         'open_named' => 'Open conversation with :name',
+        'threads'    => [
+            'title'    => 'Conversations',
+            'search'   => 'Search conversations',
+            'empty'    => 'No other conversations yet.',
+            'no_match' => 'Nothing found.',
+        ],
     ],
 
     // Staff users and roles in the admin panel.

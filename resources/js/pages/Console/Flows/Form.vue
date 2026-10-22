@@ -87,11 +87,11 @@ function submit(): void {
 
       <FormSection :title="t.sections.behaviour.title" :description="t.sections.behaviour.description">
         <FormField id="is_public" :label="t.fields.is_public" :hint="t.fields.is_public_hint" :error="form.errors.is_public" v-slot="{ invalid, describedBy }">
-          <Switch id="is_public" v-model="form.is_public" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
+          <Switch id="is_public" v-model="form.is_public" :aria-invalid="invalid" :aria-describedby="describedBy" />
         </FormField>
 
         <FormField id="logging_enabled" :label="t.fields.logging_enabled" :hint="t.fields.logging_enabled_hint" :error="form.errors.logging_enabled" v-slot="{ invalid, describedBy }">
-          <Switch id="logging_enabled" v-model="form.logging_enabled" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
+          <Switch id="logging_enabled" v-model="form.logging_enabled" :aria-invalid="invalid" :aria-describedby="describedBy" />
         </FormField>
       </FormSection>
 
