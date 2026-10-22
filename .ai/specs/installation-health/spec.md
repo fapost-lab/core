@@ -86,6 +86,23 @@ installation. The owner's words:
   installation's figures leave Core through a Foundation contract, read by the monitoring package
   and by the SaaS operator panel, each in its own look — rejected: a platform page in Core with a
   sign-in of its own, which is a separate large project.
+- Decided 2026-10-22 (owner): the package is `fapost/monitoring` (namespace `Fapost\Monitoring`,
+  repository `fapost-lab/monitoring`) — rejected: `observability` (longer, heavy in configs and
+  commands), `ops` (clashes with Core's `ops:` command prefix and says nothing about what is
+  inside), `maintenance` (reads as Laravel's maintenance mode). It is Apache-2.0 and open, like
+  Core, Foundation and Support, so that self-hosted installations can install it — rejected:
+  closed like the SaaS package, which would make "full control" a paid choice. The software it
+  wires (Pulse, Horizon, a log viewer) is MIT, which Apache-2.0 does not conflict with. It depends
+  on Foundation and Support only, never on Core's `App\*` classes, as every package here does.
+- Decided 2026-10-22 (owner): sign-in is not the package's job. A Foundation contract answers "may
+  this request look at the operator screens", and the package only asks it — rejected: a sign-in
+  of its own for the package (a second authentication system beside the SaaS operator's, with
+  passwords, two-factor and invites to secure) and an e-mail list in `.env` (cannot be kept in step
+  with roles, and means nothing without a sign-in). Core's default answer: on a `single`
+  installation the signed-in owner and admins of the tenant; on a `host` installation closed,
+  until an operator layer binds its own answer (the SaaS package for its Owner and Admin
+  operators, replacing the bridge it made for Horizon in fapost-lab/saas#84). The same contract
+  opens Horizon on a `single` installation, where today its gate is closed for everyone.
 - Assumed (reversible): one read-only service builds the figures and every consumer — the console
   page, the contract, and `gateway:doctor` where it overlaps — reads from it, so a check is written
   once.
@@ -99,14 +116,11 @@ installation. The owner's words:
 
 ## Open questions
 
-- The monitoring package: its name, whether it is open source (Apache-2.0, like Foundation and
-  Support, so that self-hosters can install it) or closed, and its own repository and spec; this
-  spec holds only Core's side of it — the contract and the probes it reads.
-- Who a "super admin" is outside the SaaS panel, where Core has no platform sign-in: on a
-  single-tenant installation the tenant's owner and admins (Horizon and Pulse would be gated on
-  them), on a multi-tenant one the operator layer's own sign-in, as saas#84 did for Horizon.
+- The contract's name and shape (a request in, a yes or no out, or a user and a surface) — the
+  first task in Foundation settles it with the callers in view: the package, the SaaS panel and
+  Core's own Horizon gate.
 - Whether the SaaS panel's Maintenance group becomes a client of the monitoring package or stays
-  as it is.
+  as it is — decided in the package's own spec, once it exists.
 - Where the page sits in the console's menu and its name ("Health", "System", under Settings) — a
   design detail for the first task, with the console-screens convention in hand.
 - Whether a short history (a sparkline of the last hour of connections) is wanted, which needs a

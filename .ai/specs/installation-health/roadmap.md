@@ -29,6 +29,10 @@ renders the installation-wide figures it receives through a contract.
 
 - [ ] Queue card — wait time and throughput of the named queues from Horizon's metrics, and the
       failed-job count, on the page (after: Health service and probes — a new probe in the service)
+- [ ] Operator access contract — a Foundation contract that answers whether a request may look at
+      the operator screens (Horizon today, Pulse and the log viewer in the monitoring package), with
+      Core's default answer: the owner and admins of the tenant on a `single` installation, closed on
+      a `host` one; Core's Horizon gate asks it, which opens Horizon on `single` installations
 - [ ] Health contract — a Foundation contract that returns the installation-wide health to a
       package that renders it (the monitoring package, the SaaS operator panel), with Core's default
       answer for an installation without one (after: Health service and probes — the contract
@@ -36,16 +40,17 @@ renders the installation-wide figures it receives through a contract.
 
 ## Phase 3 — Later
 
-- [ ] fog: monitoring package — a separate repository and spec for Pulse, Horizon's access, a log
-      viewer and later tools, gated for the installation's super admins; Core's part is the Health
-      contract above, the rest waits for the package's name, licence and sign-in answers
+- [ ] Monitoring package — `fapost/monitoring`, Apache-2.0, in its own repository and with its own
+      spec: Pulse (with Reverb's cards), Horizon's screens, a log viewer and later tools, behind the
+      Operator access contract, reading the Health contract (after: Operator access contract and
+      Health contract — the package asks one and reads the other)
 - [ ] fog: history — a short window of samples behind a sparkline; needs a place to keep them
 
 ## Waves
 
-1. Health service and probes
+1. Health service and probes; Operator access contract
 2. Health page; Queue card; Health contract
-3. Tenant slice in host mode
+3. Tenant slice in host mode; Monitoring package
 
 <!--
 Rules (jig-idea §8):
