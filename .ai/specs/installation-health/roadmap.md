@@ -29,20 +29,22 @@ renders the installation-wide figures it receives through a contract.
 
 - [ ] Queue card — wait time and throughput of the named queues from Horizon's metrics, and the
       failed-job count, on the page (after: Health service and probes — a new probe in the service)
-- [ ] Operator contract — a Foundation contract that returns the installation-wide health to a
-      package that renders it, with Core's default answer for an installation without one (after:
-      Health service and probes — the contract exposes the same service)
+- [ ] Health contract — a Foundation contract that returns the installation-wide health to a
+      package that renders it (the monitoring package, the SaaS operator panel), with Core's default
+      answer for an installation without one (after: Health service and probes — the contract
+      exposes the same service)
 
 ## Phase 3 — Later
 
-- [ ] fog: Pulse — server load, slow requests and jobs, exceptions; whether it earns its dependency
-      next to the page, and for whom it is opened
+- [ ] fog: monitoring package — a separate repository and spec for Pulse, Horizon's access, a log
+      viewer and later tools, gated for the installation's super admins; Core's part is the Health
+      contract above, the rest waits for the package's name, licence and sign-in answers
 - [ ] fog: history — a short window of samples behind a sparkline; needs a place to keep them
 
 ## Waves
 
 1. Health service and probes
-2. Health page; Queue card; Operator contract
+2. Health page; Queue card; Health contract
 3. Tenant slice in host mode
 
 <!--

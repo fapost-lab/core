@@ -68,18 +68,24 @@ installation. The owner's words:
 
 ## Decisions
 
-- Decided 2026-10-22 (owner): the screen is a page of our own in the console, built on the console
-  kit, in the Warm Minimal direction — rejected for now: Pulse alone (a new dependency, Laravel's
-  interface instead of the console's, its `pulse:check` daemon sees the container and not the host,
-  and it needs an operator audience Core does not have) and the hybrid with Pulse as the data
-  source (the largest piece of work). Pulse stays open as a later, separate decision for server
-  load and slow requests, which a page of ours would not show.
-- Decided 2026-10-22 (owner): the audience follows the tenancy mode. `single`: the tenant's admins
-  see everything, they are the operators. `host`: a tenant's admin sees only the slice that is
-  theirs (live updates for their assistants, their channels' ingress), and the whole installation's
-  figures are handed to the operator through a Foundation contract that the SaaS operator panel
-  renders in its own look — rejected: a platform page in Core with a sign-in of its own, which is a
-  separate large project.
+- Decided 2026-10-22 (owner), then revised the same day: Core gets a page of our own in the console,
+  built on the console kit in the Warm Minimal direction, for everyone who runs an installation.
+  Pulse, Horizon's access, a log viewer and whatever operator tool comes next do **not** go into
+  Core: they go into a separate package (working names `monitoring` or `maintenance`) that
+  whoever wants full control installs. Rejected: Pulse inside Core, because Pulse requires
+  `livewire/livewire` and Core has just left Livewire together with Filament (its `composer.json`
+  no longer holds either), so it would bring a second front-end stack back into the ground floor;
+  rejected: Pulse inside the SaaS package alone, because it would leave every self-hosted
+  installation without it; rejected: a page of ours instead of Pulse, because it would never show
+  server load, slow requests and exceptions as well as Pulse does. The package keeps the SaaS
+  panel's "Maintenance" links and log viewer (fapost-lab/saas#88, #90) as the first things it
+  could take over.
+- Decided 2026-10-22 (owner): the audience of Core's page follows the tenancy mode. `single`: the
+  tenant's admins see everything, they are the operators. `host`: a tenant's admin sees only the
+  slice that is theirs (live updates for their assistants, their channels' ingress). The whole
+  installation's figures leave Core through a Foundation contract, read by the monitoring package
+  and by the SaaS operator panel, each in its own look — rejected: a platform page in Core with a
+  sign-in of its own, which is a separate large project.
 - Assumed (reversible): one read-only service builds the figures and every consumer — the console
   page, the contract, and `gateway:doctor` where it overlaps — reads from it, so a check is written
   once.
@@ -93,6 +99,14 @@ installation. The owner's words:
 
 ## Open questions
 
+- The monitoring package: its name, whether it is open source (Apache-2.0, like Foundation and
+  Support, so that self-hosters can install it) or closed, and its own repository and spec; this
+  spec holds only Core's side of it — the contract and the probes it reads.
+- Who a "super admin" is outside the SaaS panel, where Core has no platform sign-in: on a
+  single-tenant installation the tenant's owner and admins (Horizon and Pulse would be gated on
+  them), on a multi-tenant one the operator layer's own sign-in, as saas#84 did for Horizon.
+- Whether the SaaS panel's Maintenance group becomes a client of the monitoring package or stays
+  as it is.
 - Where the page sits in the console's menu and its name ("Health", "System", under Settings) — a
   design detail for the first task, with the console-screens convention in hand.
 - Whether a short history (a sparkline of the last hour of connections) is wanted, which needs a
