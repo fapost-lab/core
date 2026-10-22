@@ -98,12 +98,18 @@ final class ConversationResourceAuthorizationTest extends FeatureTestCase
 
         $withReply = User::factory()->create();
         $withReply->givePermissionTo(Permission::ReplyConversations->value);
+        $withReply->assistants()->attach($assistant);
+
+        $unassigned = User::factory()->create();
+        $unassigned->givePermissionTo([Permission::ViewConversations->value, Permission::ReplyConversations->value]);
 
         $withoutReply = User::factory()->create();
         $withoutReply->givePermissionTo(Permission::ViewConversations->value);
 
         $this->assertTrue(Gate::forUser($withReply)->allows('reply', $conversation));
         $this->assertFalse(Gate::forUser($withoutReply)->allows('reply', $conversation));
+        $this->assertFalse(Gate::forUser($unassigned)->allows('reply', $conversation));
+        $this->assertFalse(Gate::forUser($unassigned)->allows('view', $conversation));
     }
 
     /**

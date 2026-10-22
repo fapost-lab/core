@@ -242,13 +242,14 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::delete('assistant/{assistant}/broadcasts/{record}', [BroadcastController::class, 'destroy'])->name('console.broadcasts.destroy');
 
         // Conversations: the inbox reaches real people. `reply` carries the id of the operator's submission and sends it at
-        // most once; the status is sent, not toggled; a takeover only takes a thread the bot answers.
+        // most once; a thread is handled by one operator, so takeover, finish, transfer and seize are conditional writes.
         Route::get('assistant/{assistant}/conversations', [ConversationController::class, 'index'])->name('console.conversations.index');
         Route::get('assistant/{assistant}/conversations/{record}', [ConversationController::class, 'show'])->name('console.conversations.show');
         Route::post('assistant/{assistant}/conversations/{record}/reply', [ConversationController::class, 'reply'])->middleware('throttle:30,1')->name('console.conversations.reply');
         Route::post('assistant/{assistant}/conversations/{record}/takeover', [ConversationController::class, 'takeOver'])->name('console.conversations.takeover');
-        Route::post('assistant/{assistant}/conversations/{record}/return-to-bot', [ConversationController::class, 'returnToBot'])->name('console.conversations.return-to-bot');
-        Route::put('assistant/{assistant}/conversations/{record}/status', [ConversationController::class, 'updateStatus'])->name('console.conversations.status');
+        Route::post('assistant/{assistant}/conversations/{record}/finish', [ConversationController::class, 'finish'])->name('console.conversations.finish');
+        Route::post('assistant/{assistant}/conversations/{record}/transfer', [ConversationController::class, 'transfer'])->name('console.conversations.transfer');
+        Route::post('assistant/{assistant}/conversations/{record}/seize', [ConversationController::class, 'seize'])->name('console.conversations.seize');
 
         // Flow sessions and the flow log: read-only, kept current live or by polling. Every log read is bounded in time.
         Route::get('assistant/{assistant}/flow-sessions', [FlowSessionController::class, 'index'])->name('console.flow-sessions.index');

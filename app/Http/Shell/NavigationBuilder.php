@@ -58,7 +58,7 @@ final readonly class NavigationBuilder
         $settings   = __('assistant.navigation.groups.settings');
 
         $entries = [
-            $this->entry($overview, 'console.dashboard', __('console.navigation.dashboard'), 'layout-grid', -100, true),
+            $this->entry($overview, 'console.dashboard', __('console.navigation.dashboard'), 'layout-grid', -100, Gate::forUser($user)->allows('view', $assistant)),
             $this->entry($channels, 'console.channels.index', __('staff.channels.plural_label'), 'signal', 10, $this->canViewAny($user, Channel::class)),
             $this->entry($flow, 'console.flows.index', __('assistant.flows.plural_label'), 'arrow-left-right', 40, $this->canViewAny($user, FlowDraft::class)),
             $this->entry($flow, 'console.flow-groups.index', __('assistant.flow_groups.plural_label'), 'folder-open', 50, $this->canViewAny($user, FlowGroup::class)),
@@ -82,6 +82,22 @@ final readonly class NavigationBuilder
         ];
 
         return $this->groups($entries, ['assistant' => $assistant->getKey()]);
+    }
+
+    /**
+     * The route name of the first screen of an assistant's console this user may open, in menu order (the dashboard
+     * for who may manage the assistant), or null when none is theirs. The console is entered by assignment and every
+     * screen asks its own permission, so the menu, not one fixed page, decides where a user lands.
+     */
+    public function entryRoute(User $user, Assistant $assistant): ?string
+    {
+        foreach ($this->console($user, $assistant, false) as $group) {
+            foreach ($group['items'] as $item) {
+                return $item['key'];
+            }
+        }
+
+        return null;
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Models\Channel;
@@ -15,10 +16,12 @@ use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Models\Tenant;
+use App\Http\Shell\SolutionExtensions;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
 use Database\Seeders\TenantAclSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -238,6 +241,27 @@ final class SolutionExtensionsConsoleTest extends FeatureTestCase
         $menu = $this->props($this->get($this->panelUrl('/apps/showcase/board')))['navigation']['groups'];
 
         $this->assertSame(['solutions.showcase.board'], array_column(array_merge(...array_column($menu, 'items')), 'key'));
+    }
+
+    public function test_a_link_to_an_assistant_route_is_offered_only_to_who_may_view_the_assistant(): void
+    {
+        $this->activateShowcase();
+        // A request first, so the Solution's routes are registered.
+        $this->actingAs($this->admin())->get($this->panelUrl('/admin/_probe'))->assertOk();
+        $this->app->make(CurrentAssistantInterface::class)->set($this->assistant);
+
+        $operator = User::factory()->create();
+        $operator->givePermissionTo(Permission::ViewConversations->value);
+        $operator->assistants()->attach($this->assistant);
+
+        $manager = User::factory()->create();
+        $manager->givePermissionTo(Permission::ManageAssistants->value);
+        $manager->assistants()->attach($this->assistant);
+
+        $request = Request::create('/');
+
+        $this->assertSame([], app(SolutionExtensions::class)->props($operator, $request)['actions']['contact.view']);
+        $this->assertSame(['showcase.open'], array_column(app(SolutionExtensions::class)->props($manager, $request)['actions']['contact.view'], 'id'));
     }
 
     public function test_a_route_the_menu_hides_also_refuses_the_user(): void

@@ -29,8 +29,18 @@ broken.
 - **The logger never throws to its caller.** Why: a transcript failure must not break message
   delivery or flow execution. Enforced: `ConversationLogger`.
 - **A staff-owned thread stops inbound routing before flow execution** (`MessageRouter`).
-- **An operator reply requires staff ownership, checked on the server;** returning a thread to
-  the bot clears the operator (`ConversationOwnership`).
+- **Only the holder of a thread replies, finishes or transfers it, checked as a query in the service, not a
+  policy** (`ConversationInbox`, `ConversationOwnership`): `Gate::before` would let an admin through any
+  policy, so an admin seizes the thread first. The reply re-checks the holder with a fresh query after its
+  reservation, before anything is uploaded or sent. Finishing clears the operator and `queued_at`.
+  Enforced: `ConversationsConsoleTest`, `ConversationOwnershipTest`.
+- **Every ownership change is one conditional UPDATE** on the expected state or holder (take over from
+  `bot`/`queued`, finish/transfer by the holder, seize from the holder the admin saw): two operators at once
+  never both win. Enforced: `ConversationOwnershipTest`.
+- **A `queued` thread stops inbound routing exactly as a `staff` one** (`isHandledByStaff`, `MessageRouter`).
+- **Reading and answering a thread needs access to its assistant** (`ConversationPolicy::view` / `reply`:
+  admin or assigned), on top of `ViewConversations` / `ReplyConversations`; a transfer target needs both
+  permissions and that access. Enforced: `ConversationResourceAuthorizationTest`, `OperatorHandoffTest`.
 
 ## Rules
 

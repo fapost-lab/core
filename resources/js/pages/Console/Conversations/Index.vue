@@ -8,7 +8,7 @@ export default { layout: AppShell }
 import { computed } from 'vue'
 import { Head, Link, usePage } from '@inertiajs/vue3'
 import { Eye, SearchX, UserRound } from '@lucide/vue'
-import { Badge, StatusDot } from '@fapost/ui/components/badge'
+import { Badge } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { DataTable, ValueCell, type DataTableColumn, type TableDefaults, type TableMeta, type TableState } from '@fapost/ui/components/data-table'
 import { EmptyState } from '@fapost/ui/components/empty-state'
@@ -19,11 +19,11 @@ import { useLiveUpdates } from '@console/lib/useLiveUpdates'
 import { interpolate } from '@console/shell'
 import { rowValue, useSolutionColumns } from '../../../console/solutions'
 import LiveHint from './LiveHint.vue'
-import { STATUS_TONES, type ConversationRow, type ConversationStatus, type ConversationsPageProps } from './types'
+import type { ConversationRow, Handling, ConversationsPageProps } from './types'
 
 const props = defineProps<{
   table: { rows: ConversationRow[]; meta: TableMeta; state: TableState; defaults: TableDefaults & { perPageOptions: number[] } }
-  statuses: ConversationStatus[]
+  handlings: Handling[]
   live: LiveChannel | null
   urls: { index: string }
 }>()
@@ -45,7 +45,7 @@ const coreColumns = computed<DataTableColumn[]>(() => [
   { key: 'preview', label: t.value.columns.last_message, class: 'hidden md:table-cell' },
   { key: 'unread', label: t.value.columns.unread },
   { key: 'messages', label: t.value.columns.messages, class: 'hidden lg:table-cell text-right' },
-  { key: 'status', label: t.value.columns.status },
+  { key: 'handling', label: t.value.columns.status },
   { key: 'lastMessageAt', sortKey: 'last_message_at', label: t.value.columns.last_activity, sortable: true, class: 'hidden sm:table-cell' },
 ])
 
@@ -82,13 +82,13 @@ function capitalise(value: string): string {
       :search-label="t.search_label"
     >
       <template #toolbar="{ filters, setFilter }">
-        <Select :model-value="filters.status ?? ANY" @update:model-value="(value) => setFilter('status', value === ANY ? '' : String(value))">
-          <SelectTrigger size="sm" class="w-48" :aria-label="t.filters.status">
+        <Select :model-value="filters.handling ?? ANY" @update:model-value="(value) => setFilter('handling', value === ANY ? '' : String(value))">
+          <SelectTrigger size="sm" class="w-48" :aria-label="t.filters.handling">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem :value="ANY">{{ t.filters.status_all }}</SelectItem>
-            <SelectItem v-for="status in statuses" :key="status" :value="status">{{ t.statuses[status] }}</SelectItem>
+            <SelectItem :value="ANY">{{ t.filters.handling_all }}</SelectItem>
+            <SelectItem v-for="handling in handlings" :key="handling" :value="handling">{{ t.handlings[handling] }}</SelectItem>
           </SelectContent>
         </Select>
       </template>
@@ -96,7 +96,6 @@ function capitalise(value: string): string {
       <template #cell-contact="{ row }">
         <span class="flex flex-wrap items-center gap-2">
           <Link :href="row.viewUrl" :class="['block max-w-48 truncate hover:underline', row.unread > 0 ? 'font-semibold' : 'font-medium']" :title="row.contact">{{ row.contact }}</Link>
-          <Badge v-if="row.owner === 'staff'" variant="info"><UserRound aria-hidden="true" />{{ t.owner.staff }}</Badge>
         </span>
       </template>
 
@@ -117,8 +116,9 @@ function capitalise(value: string): string {
         <span class="block text-right tabular-nums">{{ row.messages }}</span>
       </template>
 
-      <template #cell-status="{ row }">
-        <StatusDot :tone="STATUS_TONES[row.status]">{{ t.statuses[row.status] }}</StatusDot>
+      <template #cell-handling="{ row }">
+        <Badge v-if="row.owner === 'queued'" variant="warning">{{ t.owner.waiting }}</Badge>
+        <Badge v-else-if="row.owner === 'staff'" variant="info"><UserRound aria-hidden="true" />{{ row.mine ? t.owner.you : (row.ownerName ?? t.owner.staff) }}</Badge>
       </template>
 
       <template #cell-lastMessageAt="{ row }">

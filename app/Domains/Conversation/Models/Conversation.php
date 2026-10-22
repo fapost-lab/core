@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
  * @property ConversationStatus      $status
  * @property ConversationOwner|null  $owner_type
  * @property string|null             $owner_staff_user_id
+ * @property Carbon|null             $queued_at
  * @property Carbon|null             $last_message_at
  * @property Carbon|null             $last_inbound_at
  * @property Carbon|null             $last_outbound_at
@@ -56,6 +57,7 @@ final class Conversation extends BaseModel
         'status',
         'owner_type',
         'owner_staff_user_id',
+        'queued_at',
         'last_message_at',
         'last_inbound_at',
         'last_outbound_at',
@@ -86,6 +88,7 @@ final class Conversation extends BaseModel
         return [
             'status'           => ConversationStatus::class,
             'owner_type'       => ConversationOwner::class,
+            'queued_at'        => 'datetime',
             'last_message_at'  => 'datetime',
             'last_inbound_at'  => 'datetime',
             'last_outbound_at' => 'datetime',
