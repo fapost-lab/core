@@ -103,6 +103,11 @@ installation. The owner's words:
   until an operator layer binds its own answer (the SaaS package for its Owner and Admin
   operators, replacing the bridge it made for Horizon in fapost-lab/saas#84). The same contract
   opens Horizon on a `single` installation, where today its gate is closed for everyone.
+- Decided 2026-10-22 (owner): Telescope moves into the monitoring package as well, next to Pulse,
+  Horizon's screens and the log viewer. Today it is only a `require-dev` dependency of Core
+  (`dont-discover`, wired by `App\Providers\TelescopeServiceProvider`, with the `TELESCOPE_ENABLED`
+  setting and its guard against a missing class in production images). What follows from it is
+  listed under "Open questions" so that the move loses nothing Core knows.
 - Assumed (reversible): one read-only service builds the figures and every consumer — the console
   page, the contract, and `gateway:doctor` where it overlaps — reads from it, so a check is written
   once.
@@ -121,6 +126,18 @@ installation. The owner's words:
   Core's own Horizon gate.
 - Whether the SaaS panel's Maintenance group becomes a client of the monitoring package or stays
   as it is — decided in the package's own spec, once it exists.
+- Telescope's masking rules are Core's knowledge: `hideRequestParameters(['_token', 'token'])` and the
+  ignored path `/support/enter` (the single-use secret of the support access entry), plus the header
+  masking outside `local`. The package must not depend on Core, so they have to travel some other
+  way — Core keeps setting the inert `telescope.*` configuration keys, or a Foundation contract
+  lists what no recording may keep — and the move must not leave a window where Telescope records
+  that secret. Decided in the move's own task, with a test that the secret is never stored.
+- Core's developers would take Telescope from the package: a development checkout links
+  `fapost/monitoring` (`composer dev:link`) instead of requiring Telescope, and the test suite must
+  not start depending on the package; whether that is acceptable, or Core keeps a dev-only copy of
+  the provider, is settled in that task as well.
+- Telescope in production records request contents and is heavy: off by default in the package,
+  behind the operator-access contract when switched on.
 - Where the page sits in the console's menu and its name ("Health", "System", under Settings) — a
   design detail for the first task, with the console-screens convention in hand.
 - Whether a short history (a sparkline of the last hour of connections) is wanted, which needs a

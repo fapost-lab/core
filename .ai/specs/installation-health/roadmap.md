@@ -41,7 +41,7 @@ renders the installation-wide figures it receives through a contract.
 ## Phase 3 — Later
 
 - [ ] Monitoring package — `fapost/monitoring`, Apache-2.0, in its own repository and with its own
-      spec: Pulse (with Reverb's cards), Horizon's screens, a log viewer and later tools, behind the
+      spec: Pulse (with Reverb's cards), Horizon's screens, Telescope, a log viewer and later tools, behind the
       Operator access contract, reading the Health contract (after: Operator access contract and
       Health contract — the package asks one and reads the other)
 - [ ] fog: history — a short window of samples behind a sparkline; needs a place to keep them
