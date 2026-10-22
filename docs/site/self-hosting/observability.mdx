@@ -101,6 +101,34 @@ reachable, whether the key prefix matches, whether published specs agree with th
 adapters, and how many channels still point at a previous address. Run it first
 whenever webhooks are not arriving.
 
+## Health page
+
+On an installation that serves a single organisation, the admin panel has a
+**System → Health** page. It shows whether live updates and webhook intake work
+right now, and is open to anyone with the "View system" permission (administrators
+have it). It does not exist on a multi-tenant installation.
+
+The page asks again every 15 seconds over plain HTTP, never over Reverb, so it
+keeps working when the websocket is what has failed. Each of its two cards,
+**Live updates** (Reverb) and **Webhook gateway**, is in exactly one state:
+
+| State | What it means |
+|---|---|
+| **Up** | The service answered and reported itself healthy. This is the only green state. |
+| **Down** | The service answered, and what it said is that it is not healthy. |
+| **Unknown** | The check could not be completed: the service is unreachable from the application, rejected the request, or the settings needed to ask it are missing. The card says which. This is not the same as down, and the page never shows it as healthy. |
+| **Switched off** | The service is off on purpose: `BROADCAST_CONNECTION` is not `reverb`, or the webhook ingress driver is `laravel`. Nothing is wrong. |
+
+While the first answer is on its way, the cards show a loading state. If a
+refresh fails, the page keeps the last answer on screen, marks it as out of
+date, and keeps trying.
+
+The Reverb card also shows the connections and channels Reverb holds. The
+gateway card shows the address the application asks, whether the published
+specifications agree with the adapters, and how many channels still deliver to the
+address they were registered with. A channel on an old address keeps working,
+more slowly, so it is a figure to read and not a reason to call the gateway down.
+
 ## Per-assistant health
 
 Each [assistant console](/using/console-overview) shows two counters that should

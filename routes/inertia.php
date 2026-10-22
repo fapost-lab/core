@@ -6,6 +6,7 @@ use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\HealthController as AdminHealthController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
 use App\Http\Controllers\Admin\PlatformSettingsController as AdminPlatformSettingsController;
@@ -148,6 +149,9 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::put('admin/platform-settings', [AdminPlatformSettingsController::class, 'update'])->name('console.admin.platform-settings.update');
         // Support access log: read only, and never a Filament screen, so the name is the console's own.
         Route::get('admin/support-access', [AdminSupportAccessController::class, 'index'])->name('console.admin.support-access.index');
+
+        // Health: Reverb and the gateway as the health service reports them; `single` mode only, and the page polls `report`.
+        Route::get('admin/health', [AdminHealthController::class, 'index'])->name('console.admin.health.index');
 
         // Usage and limits: what the tenant uses against each limit, read only; a new screen, so its own URI.
         Route::get('admin/usage', [AdminUsageController::class, 'index'])->name('console.admin.usage.index');
