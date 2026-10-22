@@ -125,7 +125,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // The support entry is a form post from the operator's own site, so no CSRF token can accompany it:
         // the single-use token in its body is the proof (see SupportAccessController).
-        $middleware->validateCsrfTokens(except: ['support/enter']);
+        $middleware->preventRequestForgery(except: ['support/enter']);
 
         // Which addresses may vouch for X-Forwarded-* is `trustedproxy.proxies` (TRUSTED_PROXIES), read per request.
         // The client address and scheme are believed from such a proxy; the host, the port and the path prefix are

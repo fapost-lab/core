@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PHP_VERSION: "8.4"
+  PHP_VERSION: "8.5"
   NODE_VERSION: "26"
 
 jobs:

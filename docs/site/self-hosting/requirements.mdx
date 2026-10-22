@@ -23,7 +23,12 @@ not against what a typical Laravel application usually needs.
 PHP 8.4 is the requirement most likely to bite. Debian 12 ships 8.2 and Ubuntu
 24.04 ships 8.3, so a bare-metal install needs a third-party repository
 ([sury.org](https://deb.sury.org/) on Debian/Ubuntu, [Remi](https://rpms.remirepo.net/)
-on RHEL-family). Container deployments avoid the question entirely.
+on RHEL-family). Container deployments avoid the question entirely: the images
+run PHP 8.5.
+
+Run a patched release: 8.4.27 or 8.5.12 and later. Earlier ones are open to
+CVE-2026-109618 and CVE-2026-109619, two unauthenticated remote code execution
+flaws fixed on 21 October 2026.
 
 ## PHP extensions
 
@@ -33,7 +38,7 @@ Required — the application will not boot without these:
 - `redis` — `config/database.php` defaults `REDIS_CLIENT` to `phpredis`. Using
   `predis` instead is possible but untested here; if you switch, set
   `REDIS_CLIENT=predis` and add the Composer package.
-- `mbstring`, `intl`, `bcmath` — Laravel 12 and the application
+- `mbstring`, `intl`, `bcmath` — Laravel 13 and the application
 - `zip` — Composer, to unpack package archives
 - `json`, `openssl`, `tokenizer`, `xml`, `ctype`, `fileinfo`, `curl` — Laravel baseline
 

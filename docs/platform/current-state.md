@@ -4,7 +4,7 @@ This document exists to separate what is already implemented from the target arc
 
 ## What Exists Today
 
-The application is an active Laravel 12 Core implementation, not a starter scaffold. The repository currently contains:
+The application is an active Laravel 13 Core implementation, not a starter scaffold. The repository currently contains:
 
 - domain modules under `app/Domains/*`;
 - landlord and tenant migrations;
@@ -23,7 +23,7 @@ The application is an active Laravel 12 Core implementation, not a starter scaff
 
 - Default database: PostgreSQL
 - Laravel version: 12
-- PHP version: 8.4
+- PHP version: 8.4+ (the published images run 8.5)
 - Tenant model: landlord connection plus tenant connection/schema
 - Redis is part of the runtime design for queues, locks, cache, and webhook registry
 - Horizon, Inertia, Vue, Vite, and Tailwind are present in the application stack

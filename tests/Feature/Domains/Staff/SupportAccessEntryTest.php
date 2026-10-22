@@ -13,7 +13,7 @@ use App\Domains\Staff\Support\SupportAccessSession;
 use App\Domains\Tenancy\Services\SupportAccessTokenStore;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Tenancy\DTO\SupportAccessRequest;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -181,7 +181,7 @@ final class SupportAccessEntryTest extends FeatureTestCase
 
     public function test_the_enter_route_is_exempt_from_csrf_and_throttled(): void
     {
-        $this->assertContains('support/enter', $this->app->make(VerifyCsrfToken::class)->getExcludedPaths());
+        $this->assertContains('support/enter', $this->app->make(PreventRequestForgery::class)->getExcludedPaths());
 
         $route = Route::getRoutes()->getByName('support.enter');
         $this->assertContains('throttle:20,1', $route->gatherMiddleware());
