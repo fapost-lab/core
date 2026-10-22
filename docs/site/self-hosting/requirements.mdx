@@ -13,22 +13,21 @@ not against what a typical Laravel application usually needs.
 
 | Component  | Version | Why this floor                                                        |
 |------------|---------|-----------------------------------------------------------------------|
-| PHP        | 8.4+    | `composer.json` requires `^8.4`; the code uses typed class constants and property hooks |
+| PHP        | 8.5.12+ | `composer.json` requires `^8.5`; releases before 8.5.12 are open to two remote code execution flaws |
 | PostgreSQL | 15+     | Tenant isolation is schema-per-tenant, and the installer creates schemas at runtime |
 | Redis      | 6+      | Queues, cache, locks and the webhook routing registry                 |
 | Node.js    | 20+     | Build-time only — compiles the console, the flow builder and the mini app through Vite |
 | Composer   | 2.x     | Build-time only                                                       |
 | Go         | 1.27+   | Optional, and build-time only — needed solely for the webhook gateway |
 
-PHP 8.4 is the requirement most likely to bite. Debian 12 ships 8.2 and Ubuntu
+PHP 8.5 is the requirement most likely to bite. Debian 12 ships 8.2 and Ubuntu
 24.04 ships 8.3, so a bare-metal install needs a third-party repository
 ([sury.org](https://deb.sury.org/) on Debian/Ubuntu, [Remi](https://rpms.remirepo.net/)
-on RHEL-family). Container deployments avoid the question entirely: the images
-run PHP 8.5.
+on RHEL-family). Container deployments avoid the question entirely.
 
-Run a patched release: 8.4.27 or 8.5.12 and later. Earlier ones are open to
-CVE-2026-109618 and CVE-2026-109619, two unauthenticated remote code execution
-flaws fixed on 21 October 2026.
+The floor is 8.5.12, not 8.5.0: earlier releases are open to CVE-2026-109618 and
+CVE-2026-109619, two unauthenticated remote code execution flaws fixed on
+21 October 2026.
 
 ## PHP extensions
 

@@ -43,9 +43,9 @@ environment.
 If neither applies, the container path is less work and has fewer ways to go
 subtly wrong.
 
-## The hard part: PHP 8.4
+## The hard part: PHP 8.5
 
-`composer.json` requires `^8.4`, and no mainstream distribution ships it yet —
+`composer.json` requires `^8.5`, and no mainstream distribution ships it yet —
 Debian 12 has 8.2, Ubuntu 24.04 has 8.3. You will be adding a third-party
 repository:
 
@@ -56,8 +56,9 @@ This is a real decision, not a formality: it changes where your system gets PHP
 packages from, for the lifetime of the host. If that is unacceptable in your
 environment, use containers.
 
-Take a patched release: 8.4.27 or 8.5.12 and later. Earlier ones are open to two
-unauthenticated remote code execution flaws (CVE-2026-109618, CVE-2026-109619).
+Take 8.5.12 or later. Earlier releases are open to two unauthenticated remote
+code execution flaws (CVE-2026-109618, CVE-2026-109619), and the installer
+refuses them.
 
 ## 1. Install the runtime
 
@@ -71,7 +72,7 @@ Beyond PHP itself you need the extensions listed in
 Verify before going further:
 
 ```bash
-php -v    # must be 8.4.27+ or 8.5.12+
+php -v    # must be 8.5.12+
 for ext in pdo_pgsql redis intl bcmath gd zip pcntl posix; do
     php -m | grep -qx "$ext" && echo "ok   $ext" || echo "MISSING $ext"
 done
@@ -220,7 +221,7 @@ php artisan platform:update        # checks Solutions, migrates landlord and ten
 php artisan view:clear             # compiled views of the previous release may call code this one dropped
 
 php artisan horizon:terminate      # workers pick up the new code on restart
-sudo systemctl reload php8.4-fpm
+sudo systemctl reload php8.5-fpm
 ```
 
 See [Upgrading and rollback](/self-hosting/upgrading) for the ordering constraints and rollback.

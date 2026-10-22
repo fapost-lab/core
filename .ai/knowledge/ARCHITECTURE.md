@@ -15,7 +15,7 @@ sessions. The platform is extended from outside through public contracts, not by
 
 | Container | Technology | Role |
 |---|---|---|
-| Laravel application | PHP 8.4+ (images run 8.5), Laravel 13, PHP-FPM | Webhook ingress, the console (admin and assistant screens), builder and mini-app endpoints |
+| Laravel application | PHP 8.5, Laravel 13, PHP-FPM | Webhook ingress, the console (admin and assistant screens), builder and mini-app endpoints |
 | Queue workers | Laravel Horizon | Flow execution, message delivery, transcript logging, trigger fan-out |
 | Ingress gateway | Go, optional | Verifies, rate-limits, deduplicates and enqueues webhook deliveries in front of the application |
 | Landlord schema | PostgreSQL | Tenants, the webhook registry and Core's platform-wide settings |

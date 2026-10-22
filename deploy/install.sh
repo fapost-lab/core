@@ -22,7 +22,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly ROOT
-readonly MIN_PHP="8.4"
+# 8.5.12 rather than 8.5: earlier releases are open to CVE-2026-109618 and
+# CVE-2026-109619, two unauthenticated remote code execution flaws.
+readonly MIN_PHP="8.5.12"
 readonly MIN_NODE="20"
 
 # Extensions the application cannot boot or process work without. pcntl and posix
@@ -76,13 +78,13 @@ check_php() {
     fi
 
     local version
-    version="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
+    version="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION.".".PHP_RELEASE_VERSION;')"
 
     if version_at_least "$version" "$MIN_PHP"; then
         ok "PHP $version"
     else
         fail "PHP $version is too old (need ${MIN_PHP}+)"
-        hint "No mainstream distribution ships ${MIN_PHP} yet; a third-party repository is required."
+        hint "No mainstream distribution ships PHP 8.5 yet; a third-party repository is required."
     fi
 }
 

@@ -1,7 +1,7 @@
 # FaPost Core
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](./LICENSE)
-[![PHP 8.4](https://img.shields.io/badge/php-8.4-777bb4.svg)](https://www.php.net/releases/8.4/en.php)
+[![PHP 8.5](https://img.shields.io/badge/php-8.5-777bb4.svg)](https://www.php.net/releases/8.5/en.php)
 [![Laravel 13](https://img.shields.io/badge/laravel-13-ff2d20.svg)](https://laravel.com)
 [![Docs](https://img.shields.io/badge/docs-docs.fapost.in-5a6e58.svg)](https://docs.fapost.in)
 [![Status: active development](https://img.shields.io/badge/status-active%20development-b07c2c.svg)](https://docs.fapost.in)
@@ -74,7 +74,7 @@ published separately under [fapost-lab](https://github.com/fapost-lab).
 
 ## Stack
 
-- PHP 8.4
+- PHP 8.5
 - Laravel 13
 - PostgreSQL with landlord/tenant connections
 - Redis for cache, queues, locks and the webhook registry
