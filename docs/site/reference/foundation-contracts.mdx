@@ -201,6 +201,15 @@ Core; a package only calls it.
 - Ids are lowercase RFC 4122 ULIDs. Any other form names no tenant: `find` returns `null`, and
   `findMany` and the id filters ignore it.
 
+`Operator\Contracts\OperatorAccessInterface` answers one question for every operator screen: may this
+request look at it. `canView(Request $request, OperatorSurface $surface): bool`, where `OperatorSurface` is
+`Horizon`, `Pulse`, `Telescope`, `Logs` or `Health` (new surfaces may be added in a minor release; an
+implementation answers no for one it does not know). Core's own Horizon gate and packages that bring operator
+screens only ask it and have no sign-in of their own. Core binds a default: on a `single` installation, a
+signed-in, active staff member who holds the `view_operator_screens` permission, the tenant's platform support
+user excluded; in `host` mode, nobody. An operator layer rebinds the contract with its own answer, reading the
+sign-in it owns from the request. If your package registers a Gate ability for a screen, ask the contract from it and note that Core's administrator bypass skips only `viewHorizon`, `viewPulse` and `viewTelescope`. Answer no when you cannot tell, and do not throw to say no.
+
 `Tenancy\Contracts\TenantAccessModeInterface` lets an operator package stop a tenant without removing it.
 Core asks it, and a package implements it; Core's default answers "active" for every tenant.
 

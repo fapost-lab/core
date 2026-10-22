@@ -17,9 +17,14 @@ inbound processing and conversation replies share dedicated processes, while
 broadcasts, logging and background synchronisation are worked elsewhere. See
 [Queues](/reference/queues).
 
+On a `single` installation the dashboard is at `/horizon` for signed-in staff who hold the
+**View operator screens** permission; administrators hold every permission. The platform
+support user does not open it, whatever its role. Grant the permission to a custom role
+in the console's role form when someone who is not an administrator should see the queues.
+
 In `host` tenancy mode the dashboard is served on the base domain and on declared
-platform subdomains only, never on a tenant's host, and it stays closed until a user
-passes the `viewHorizon` gate; see
+platform subdomains only, never on a tenant's host, and Core keeps it closed for everyone,
+tenant administrators included, until an operator package answers for it; see
 [Several tenants](/self-hosting/docker-compose#several-tenants-host-mode).
 
 What to watch:

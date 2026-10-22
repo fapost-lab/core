@@ -208,9 +208,19 @@ it, so `platform:update` is all it needs.
   now sends the block through its error exit before anything is sent, instead of being
   refused by the provider.
 
+## Horizon opens to staff on single installations
+
+On a `single` installation, Horizon (`/horizon`) used to be closed to everyone. It now opens
+for signed-in staff who hold the new **View operator screens** permission (`view_operator_screens`).
+Administrators pass automatically, so after the upgrade every administrator can open the queue
+dashboard, which shows job payloads. Custom roles do not hold the permission until you grant it; run
+`php artisan ops:tenants-seed-acl` so the permission exists, then add it to the role. The tenant's
+platform support user never opens it. `host` installations are unchanged: Horizon stays closed until
+an operator package answers for it.
+
 ## Extension packages and Foundation
 
-Core now requires `fapost/foundation` ^0.28. A Solution, connector or operator package
+Core now requires `fapost/foundation` ^0.29. A Solution, connector or operator package
 installed next to it must accept that version, or Composer will not install the upgrade.
 
 ## Host-mode installs: sessions are now checked
