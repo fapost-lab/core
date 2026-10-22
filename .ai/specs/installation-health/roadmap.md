@@ -11,10 +11,10 @@ installation the page shows Reverb (up, down or unknown, connections, channels) 
 (health, the published specs, channels still on the old URL), and opening it with Reverb stopped
 shows "down" with the reason, not an error.
 
-- [ ] Health service and probes — a read-only service that asks Reverb's HTTP API, the gateway's
+- [ ] `health-service` — Health service and probes — a read-only service that asks Reverb's HTTP API, the gateway's
       health endpoint and the webhook registry, with a short cache and timeout, and answers up, down
       or unknown for each; `gateway:doctor` reads its checks from the same place
-- [ ] Health page — the console page on the kit with the Reverb and gateway cards, polled, empty and
+- [ ] `health-page` — Health page — the console page on the kit with the Reverb and gateway cards, polled, empty and
       unknown states included, for the tenant's admins on a single-tenant installation (after:
       Health service and probes — the page draws what the service reports)
 - [ ] Tenant slice in host mode — the same page in `host` mode shows only what is the tenant's: its
@@ -29,7 +29,7 @@ renders the installation-wide figures it receives through a contract.
 
 - [ ] Queue card — wait time and throughput of the named queues from Horizon's metrics, and the
       failed-job count, on the page (after: Health service and probes — a new probe in the service)
-- [ ] Operator access contract — a Foundation contract that answers whether a request may look at
+- [ ] `operator-access-contract` — Operator access contract — a Foundation contract that answers whether a request may look at
       the operator screens (Horizon today, Pulse and the log viewer in the monitoring package), with
       Core's default answer: the owner and admins of the tenant on a `single` installation, closed on
       a `host` one; Core's Horizon gate asks it, which opens Horizon on `single` installations
