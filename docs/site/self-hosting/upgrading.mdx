@@ -11,7 +11,7 @@ Four things happen, and the order is not interchangeable:
 
 1. New code arrives (new image, or new checkout plus `composer install`)
 2. The installed Solutions are checked, ideally with `platform:update --validate-only` before the running containers are replaced: a manifest that is wrong stops the upgrade here, before anything is changed
-3. **Landlord** migrations run — platform-wide tables, including any that the SaaS operator package adds — and then **tenant** migrations, once per tenant schema
+3. **Landlord** migrations run — platform-wide tables, including any that an operator package (SaaS, monitoring) adds — and then **tenant** migrations, once per tenant schema
 4. Queue workers restart, so they stop running the previous release from memory
 
 `php artisan platform:update` repeats the check and does step 3 in one command, then publishes the Solutions'

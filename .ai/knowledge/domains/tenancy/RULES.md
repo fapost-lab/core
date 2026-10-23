@@ -314,9 +314,11 @@ broken.
   so every registered migration path runs; `database/settings` is not one of them — the settings
   migrations are tenant-scoped, so `config/settings.php` leaves `migrations_paths` empty and they
   run only through `MigrationScope::settings()`), and `AppServiceProvider` loads
-  `database/migrations/landlord`. Only the SaaS operator package may open `landlord`, and only for tables of its
-  own prefix; it never writes `tenants` or `webhook_registry`. Plugin and Solution packages have no landlord access
-  (`adr-20261005-extension-packages-own-landlord-tables`, amended 2026-10-08).
+  `database/migrations/landlord`. Only installation operator packages (SaaS, monitoring) may open `landlord`, and only for
+  their own tables (`saas_*`; the three `pulse_*` tables for monitoring); they never write `tenants` or `webhook_registry`,
+  and tenant data deletion never touches their tables. Plugin and Solution packages have no landlord access
+  (`adr-20261005-extension-packages-own-landlord-tables`, amended 2026-10-08;
+  `adr-20261023-operator-packages-own-landlord-tables`).
 - **In workers, change tenant only through `TenantSwitcher::runForTenant()`**; never set
   `search_path` or the context directly. Review only.
 - **Core is not the control plane.** No SaaS logic, billing or onboarding belongs in Core, and
