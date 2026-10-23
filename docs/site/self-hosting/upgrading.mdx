@@ -218,6 +218,28 @@ dashboard, which shows job payloads. Custom roles do not hold the permission unt
 platform support user never opens it. `host` installations are unchanged: Horizon stays closed until
 an operator package answers for it.
 
+## PHP 8.5 and Laravel 13
+
+Core now runs on Laravel 13 and requires PHP 8.5.12 or later. Releases of PHP before 8.5.12
+are open to CVE-2026-109618 and CVE-2026-109619, two unauthenticated remote code execution
+flaws fixed on 21 October 2026.
+
+- **Docker Compose:** nothing to do beyond the usual upgrade. The images run PHP 8.5.
+- **Bare metal:** install PHP 8.5.12 or later with the same extensions before upgrading
+  (see [Requirements](/self-hosting/requirements)), point the web server and the
+  PHP-FPM pool at it, and restart PHP-FPM, Horizon and the scheduler. On PHP 8.4,
+  `composer install` refuses the release and the application refuses to boot.
+  `deploy/install.sh` checks the patch release too.
+- **Extension packages** must accept Laravel 13: an `illuminate/*` or `laravel/framework`
+  constraint of `^12.0` stops Composer, so widen it, for example to `^12.0 || ^13.0`.
+  `fapost/foundation` 0.29 and `fapost/support` 0.2.4 already do. Two framework changes
+  can reach a package's code:
+  - CSRF protection is now `Illuminate\Foundation\Http\Middleware\PreventRequestForgery`.
+    `withoutMiddleware(ValidateCsrfToken::class)` no longer removes it, so routes that
+    excluded it that way start answering 419; exclude `PreventRequestForgery` instead.
+  - `Illuminate\Contracts\Mail\Mailer` gained `cc()`. A test double that implements the
+    contract must add it.
+
 ## Extension packages and Foundation
 
 Core now requires `fapost/foundation` ^0.29. A Solution, connector or operator package
