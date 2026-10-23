@@ -20,6 +20,7 @@ Commands FaPost Core registers, beyond Laravel's own.
 | `migrate:smart` | Show pending landlord and default local tenant migrations **without running them** |
 | `ops:tenants-migrate` | Run `database/migrations/tenant` for all active tenants |
 | `ops:tenants-seed-acl` | Run `TenantAclSeeder` — domain permissions and default roles — for selected active tenants |
+| `tenants:onboarding:restart {tenant} [--force]` | Put an active tenant (slug or id) back into the first-run setup wizard. Steps its data satisfies stay done, the language confirmation is asked again. Holds the tenant's console until the required steps are done, so it asks first; `--force` skips the question. See [Tenancy operations](/self-hosting/tenancy#the-first-run-setup-wizard) |
 
 ## Platform update
 

@@ -9,6 +9,7 @@ const page = usePage<ShellPageProps>()
 
 const t = computed(() => page.props.translations.console)
 const support = computed(() => page.props.supportAccess)
+const onboardingPending = computed(() => page.props.onboarding?.pending === true)
 const notice = computed(() => page.props.accessState.notice)
 const stopped = computed(() => page.props.accessState.mode === 'stopped')
 </script>
@@ -23,6 +24,10 @@ const stopped = computed(() => page.props.accessState.mode === 'stopped')
         {{ t.support.leave }}
       </button>
     </form>
+  </div>
+
+  <div v-if="onboardingPending" role="status" class="bg-info text-info-foreground flex flex-wrap items-center justify-center gap-3 px-4 py-2 text-sm">
+    <span>{{ t.onboarding.support_banner }}</span>
   </div>
 
   <div

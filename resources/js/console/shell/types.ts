@@ -171,6 +171,7 @@ export interface ConsoleTranslations {
     close: string
     table: TableTranslations
     form: FormTranslations
+    onboarding: OnboardingTranslations
 }
 
 export interface ShellPageProps {
@@ -188,5 +189,63 @@ export interface ShellPageProps {
     applications: ShellApplications | null
     /** `null` for a guest. */
     notifications: ShellNotifications | null
+    /** Set for a platform-support session while the tenant is in its setup wizard; the wizard's pages send their steps instead. */
+    onboarding?: { pending?: true; steps?: OnboardingStep[] } | null
     [key: string]: unknown
 }
+
+/** One step of the setup wizard, as `OnboardingWizard::stepProps()` gives it. */
+export interface OnboardingStep {
+  key: string
+  required: boolean
+  complete: boolean
+  current: boolean
+}
+
+interface StepText {
+  title: string
+  description: string
+}
+
+export interface OnboardingTranslations {
+  done: string
+  layout: { progress: string; step_of: string; completed: string; current: string; optional: string }
+  steps: Record<string, StepText>
+  languages: {
+    title: string
+    description: string
+    notice_title: string
+    notice: string
+    base_language: string
+    base_language_help: string
+    base_language_locked: string
+    available_languages: string
+    available_help: string
+    fallback_language: string
+    fallback_help: string
+    placeholder: string
+    multi_placeholder: string
+    selected: string
+    search: string
+    nothing_found: string
+    remove: string
+    continue: string
+    continuing: string
+  }
+  assistant: {
+    title: string
+    description: string
+    notice_title: string
+    notice: string
+    name: string
+    name_help: string
+    language: string
+    language_help: string
+    placeholder: string
+    create: string
+    creating: string
+  }
+  waiting: { title: string; description: string; hint: string }
+  support_banner: string
+}
+

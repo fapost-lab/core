@@ -6,6 +6,7 @@ use App\Http\Controllers\Media\FilesController;
 use App\Http\Controllers\Media\FoldersController;
 use App\Http\Controllers\Media\PickerController;
 use App\Http\Controllers\Media\ReferencesController;
+use App\Http\Middleware\EnsureTenantOnboarded;
 use App\Http\Middleware\RefuseWritesWhenTenantStopped;
 use Illuminate\Support\Facades\Route;
 
@@ -19,7 +20,7 @@ use Illuminate\Support\Facades\Route;
 | by MediaFilePolicy / MediaFolderPolicy.
 */
 
-Route::middleware(['auth', 'tenant', 'verified', RefuseWritesWhenTenantStopped::class])->prefix('media')->name('media.')->group(function (): void {
+Route::middleware(['auth', 'tenant', 'verified', EnsureTenantOnboarded::class, RefuseWritesWhenTenantStopped::class])->prefix('media')->name('media.')->group(function (): void {
     Route::get('folders', [FoldersController::class, 'index'])->name('folders.index');
     Route::get('folders/{folder}', [FoldersController::class, 'show'])->name('folders.show');
     Route::post('folders', [FoldersController::class, 'store'])->name('folders.store');

@@ -7,9 +7,18 @@ Four steps, in this order. Each depends on the one before, which is why an
 assistant that seems finished but stays silent is almost always missing one of
 them.
 
+A new tenant does the first two steps in a short setup wizard: the first time
+an administrator signs in, the console opens the wizard instead of the
+dashboard. It asks you to confirm the content languages (**Content languages**)
+and create the **First assistant**, then takes you straight into that
+assistant. Staff without the settings permission see a waiting page ("Your
+administrator is finishing the setup") until an administrator finishes it.
+The steps below describe the same actions if you need to do them by hand.
+
 <Steps>
   <Step title="Set the languages">
-    Admin panel → **Settings** → *Languages*.
+    Admin panel → **Settings** → *Languages*. In the wizard this is the
+    *Content languages* step.
 
     Choose the language flows will be written in, and any others you will
     translate into.
@@ -17,6 +26,7 @@ them.
     <Warning>
       The source language cannot be changed once a flow has been published. This
       is the only step here that is hard to undo, which is why it comes first.
+      An assistant's own language locks the same way, with its first flow.
     </Warning>
 
     See [Settings](/using/tenant-settings).
@@ -25,7 +35,9 @@ them.
   <Step title="Create an assistant">
     Admin panel → **Assistants** → **New assistant**.
 
-    A name, a default language, active. Then **Manage** to open its console —
+    A name, a default language, active. In the wizard this is the
+    *First assistant* step, and it opens the new assistant's console when done.
+    Otherwise use **Manage** to open its console —
     everything after this happens there.
 
     See [Assistants](/using/assistants).

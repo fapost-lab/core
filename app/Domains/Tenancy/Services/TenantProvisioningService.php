@@ -7,6 +7,7 @@ namespace App\Domains\Tenancy\Services;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Staff\Exceptions\FirstAdminConflictException;
 use App\Domains\Staff\Services\AclBootstrapService;
+use App\Domains\Tenancy\Contracts\NewTenantInitializerInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
@@ -37,6 +38,9 @@ use Throwable;
  * the schema name and creates nothing else. {@see provisionReserved()} completes that row by id and
  * resumes a run that failed or was killed.
  *
+ * The domains that keep state for a new tenant (the setup wizard) are initialized after the first admin through
+ * {@see NewTenantInitializerInterface}, when one is bound.
+ *
  * Resuming is possible because of three things kept in the landlord row, since a transaction cannot
  * span the landlord and tenant connections: a lease (one run at a time), a schema-claim marker set
  * before CREATE SCHEMA (a schema is adopted only when this row claimed it) and steps that tolerate
@@ -57,6 +61,7 @@ final readonly class TenantProvisioningService
         private TenantSlugPolicy $slugPolicy,
         private LoggerInterface $logger,
         private int $leaseSeconds = 900,
+        private ?NewTenantInitializerInterface $initializer = null,
     ) {
     }
 
@@ -220,6 +225,9 @@ final readonly class TenantProvisioningService
                 $step = 'first_admin';
                 $this->aclBootstrapService->createFirstAdmin($firstAdminEmail, $firstAdminPassword, $firstAdminName);
                 $this->renewLease($tenant, $lease);
+
+                $step = 'initialize';
+                $this->initializer?->initialize();
 
                 $step = 'webhooks';
                 $this->channelWebhookRegistry->warmup($tenant);

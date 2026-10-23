@@ -38,6 +38,10 @@ services:
 		tags:
 			- phpat.test
 	-
+		class: Tests\Architecture\OnboardingBoundariesTest
+		tags:
+			- phpat.test
+	-
 		class: Tests\Architecture\MigrationTest
 		tags:
 			- phpat.test

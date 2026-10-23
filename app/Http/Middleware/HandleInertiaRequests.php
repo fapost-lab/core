@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Onboarding\Services\OnboardingState;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\StaffNotificationInbox;
 use App\Domains\Staff\Support\SupportAccessSession;
@@ -99,6 +100,7 @@ final class HandleInertiaRequests extends Middleware
         // What the Solutions served to the tenant add to Core's screens (extension-contract).
         $shared['extensions']    = fn (): ?array => $request->user() instanceof User ? app(SolutionExtensions::class)->props($request->user(), $request) : null;
         $shared['notifications'] = fn (): ?array => $this->notifications($request);
+        $shared['onboarding']    = fn (): ?array => $this->onboarding($request);
 
         return $shared;
     }
@@ -371,6 +373,24 @@ final class HandleInertiaRequests extends Middleware
             'operatorEmail' => $current['operator_email'],
             'expiresAt'     => $current['expires_at'],
         ];
+    }
+
+    /**
+     * Whether the tenant is still in the setup wizard, for the support banner. Only a platform support session gets it:
+     * the staff of a pending tenant are held in the wizard and need no banner. The wizard's own pages send an
+     * `onboarding` prop of their own (the steps), which replaces this one for the page.
+     *
+     * @return array{pending: true}|null
+     */
+    private function onboarding(Request $request): ?array
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User || ! $user->isPlatformSupport()) {
+            return null;
+        }
+
+        return app(OnboardingState::class)->isPending() ? ['pending' => true] : null;
     }
 
     /**

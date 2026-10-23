@@ -86,6 +86,30 @@ php artisan ops:ingress-migrate
 Reports — or migrates — channels whose webhook still points at a previous ingress
 host. See [Webhook gateway](/self-hosting/gateway).
 
+## The first-run setup wizard
+
+A new tenant's console opens in a setup wizard: the staff confirm the content
+languages and create the first assistant before anything else is reachable. To put
+an existing, active tenant back there:
+
+```bash
+php artisan tenants:onboarding:restart {tenant} [--force]
+```
+
+`{tenant}` is the slug or the id. The command asks for confirmation; `--force`
+skips the question for scripts. Steps the tenant's data already satisfies (an
+assistant exists) stay done. The language confirmation is asked again, and a base
+language locked by a published flow is shown read-only.
+
+<Warning>
+  The tenant's staff are held in the wizard until the required steps are done
+  again. Do not run it on a working tenant without telling its administrators.
+</Warning>
+
+Tenants that existed before the wizard was introduced are never held: the settings
+migration marks them complete. Operator packages call the same restart through
+[`TenantOnboardingInterface`](/reference/foundation-contracts#tenancy).
+
 ## Scheduled tenant work
 
 Some maintenance is per-tenant and runs on the scheduler rather than by hand, such

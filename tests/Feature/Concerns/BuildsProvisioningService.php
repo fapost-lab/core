@@ -6,6 +6,7 @@ namespace Tests\Feature\Concerns;
 
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Staff\Services\AclBootstrapService;
+use App\Domains\Tenancy\Contracts\NewTenantInitializerInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Repositories\TenantRepository;
@@ -32,6 +33,7 @@ trait BuildsProvisioningService
         ?ChannelWebhookRegistryInterface $webhooks = null,
         int $leaseSeconds = 900,
         ?LoggerInterface $logger = null,
+        ?NewTenantInitializerInterface $initializer = null,
     ): TenantProvisioningService {
         $this->schemas ??= new FakeTenantSchemas();
 
@@ -57,6 +59,7 @@ trait BuildsProvisioningService
             new TenantSlugPolicy(['webhook', 'www', 'api']),
             $logger ?? new NullLogger(),
             $leaseSeconds,
+            $initializer,
         );
     }
 }
