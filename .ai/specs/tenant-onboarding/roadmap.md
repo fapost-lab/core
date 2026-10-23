@@ -13,12 +13,12 @@ Goal: the language trap is closed for every new tenant. Done when: on a freshly 
 the first administrator is held in the wizard until the languages are confirmed and a first
 assistant exists, then lands on that assistant; an existing tenant is never held.
 
-- [ ] The wizard holds a new tenant until the content languages are confirmed — the step registry in
+- [x] `onboarding-wizard` — The wizard holds a new tenant until the content languages are confirmed — the step registry in
       Core, the tenant's onboarding state and the one-time decision (D7), the gate with its
       allow-list built from step routes, support sessions passing it (D10), a contributor's failing
       check treated as complete and logged, the wizard shell with progress, and the languages step
       as the first registered step, its copy saying what locks and when
-- [ ] The first-assistant step, and the redirect to that assistant when the wizard ends (after: the
+- [x] `onboarding-wizard` — The first-assistant step, and the redirect to that assistant when the wizard ends (after: the
       wizard — the step registers through the registry and runs inside the shell it builds)
 
 ## Phase 2 — What is left is always visible
@@ -27,11 +27,11 @@ Goal: after the gate, nothing is forgotten. Done when: optional steps can be ski
 to where they live, the checklist shows done and left from anywhere in the console, and a required
 step that arrives later reaches a working tenant without locking it.
 
-- [ ] Optional steps in the wizard — skip with "set this up later in <menu section>", and Core's two:
+- [ ] `onboarding-optional-steps` — Optional steps in the wizard — skip with "set this up later in <menu section>", and Core's two:
       connect a channel and invite the team (after: the wizard — optional steps run in its shell)
-- [ ] The checklist: a dashboard widget and a shell indicator, both read from the registry, hidden
+- [ ] `onboarding-checklist` — The checklist: a dashboard widget and a shell indicator, both read from the registry, hidden
       when done or by hand (after: the wizard — the checklist lists the registry's steps)
-- [ ] A required step that appears after onboarding reaches the tenant as a banner with a link and a
+- [ ] `onboarding-checklist` — A required step that appears after onboarding reaches the tenant as a banner with a link and a
       bell notification (after: the wizard — "after onboarding" is the state it records)
 
 ## Phase 3 — Others contribute steps

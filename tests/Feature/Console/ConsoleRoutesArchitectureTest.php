@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Http\Middleware\EnsureCanAccessPanel;
+use App\Http\Middleware\EnsureTenantOnboarded;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\RefuseWritesWhenTenantStopped;
 use App\Http\Middleware\ResolveCurrentAssistant;
@@ -79,7 +80,8 @@ final class ConsoleRoutesArchitectureTest extends FeatureTestCase
         $this->assertBefore($stack, StartSession::class, ForgetInvalidAuthenticatedSession::class);
         $this->assertBefore($stack, ForgetInvalidAuthenticatedSession::class, Authenticate::class);
         $this->assertBefore($stack, Authenticate::class, EnsureCanAccessPanel::class);
-        $this->assertBefore($stack, EnsureCanAccessPanel::class, RefuseWritesWhenTenantStopped::class);
+        $this->assertBefore($stack, EnsureCanAccessPanel::class, EnsureTenantOnboarded::class);
+        $this->assertBefore($stack, EnsureTenantOnboarded::class, RefuseWritesWhenTenantStopped::class);
     }
 
     public function test_the_console_stack_resolves_the_assistant_after_authentication(): void

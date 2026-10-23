@@ -1760,4 +1760,67 @@ return [
     'extensions' => [
         'row_actions' => 'More actions: :name',
     ],
+
+    // The first-run setup wizard (admin/onboarding). The pages' own strings are added with the pages.
+    'onboarding' => [
+        'done' => 'Setup is complete. Welcome!',
+
+        'layout' => [
+            'progress'  => 'Setup progress',
+            'step_of'   => 'Step :current of :total',
+            'completed' => 'completed',
+            'current'   => 'current step',
+            'optional'  => 'optional',
+        ],
+        'steps' => [
+            'languages' => [
+                'title'       => 'Content languages',
+                'description' => 'The language your flows are written in and the languages they can be translated into.',
+            ],
+            'first_assistant' => [
+                'title'       => 'First assistant',
+                'description' => 'Create the assistant that will talk to your contacts.',
+            ],
+        ],
+        'languages' => [
+            'title'                => 'Choose your content languages',
+            'description'          => 'Set these once, before you build anything. You can add more languages later in the tenant settings.',
+            'notice_title'         => 'The base language cannot be changed later',
+            'notice'               => 'Once the first flow is published, its texts are written in the base language and it stays fixed. Pick it carefully.',
+            'base_language'        => 'Base language',
+            'base_language_help'   => 'The language your flows are written in.',
+            'base_language_locked' => 'Locked: a flow has already been published, and its texts are written in this language. It stays as it is.',
+            'available_languages'  => 'Available languages',
+            'available_help'       => 'Languages your content can be translated into.',
+            'fallback_language'    => 'Fallback language',
+            'fallback_help'        => 'Used when neither the session nor the contact has a language. One of the available languages.',
+            'placeholder'          => 'Choose a language',
+            'multi_placeholder'    => 'Choose languages',
+            'selected'             => ':count selected',
+            'search'               => 'Search…',
+            'nothing_found'        => 'Nothing found',
+            'remove'               => 'Remove',
+            'continue'             => 'Continue',
+            'continuing'           => 'Saving…',
+        ],
+        'assistant' => [
+            'title'         => 'Create your first assistant',
+            'description'   => 'An assistant is the bot your contacts talk to. You can change its name later and add more assistants.',
+            'notice_title'  => 'The assistant\'s language locks with its first flow',
+            'notice'        => 'Once the assistant has a flow, its language cannot be changed. Choose the language its flows will be written in.',
+            'name'          => 'Assistant name',
+            'name_help'     => 'Shown to you and your team in the console.',
+            'language'      => 'Assistant language',
+            'language_help' => 'One of the languages you made available in the previous step.',
+            'placeholder'   => 'Choose a language',
+            'create'        => 'Create assistant',
+            'creating'      => 'Creating…',
+        ],
+        'waiting' => [
+            'title'       => 'Your administrator is finishing the setup',
+            'description' => 'This workspace is not ready yet. Once the administrator completes the first-run setup, you will be able to sign in and start working.',
+            'hint'        => 'You can close this page and come back later.',
+        ],
+        'support_banner' => 'This tenant has not finished its first-run setup yet.',
+    ],
 ];

@@ -79,6 +79,23 @@ final readonly class TenantSettingsEditor
     }
 
     /**
+     * Writes the language matrix alone, as the setup wizard does. A locked base language is kept as stored whatever is
+     * passed, so confirming the languages of a tenant that already has flows changes nothing there.
+     *
+     * @param  list<string>  $available
+     */
+    public function saveLanguages(string $base, array $available, string $fallback): void
+    {
+        if (! $this->baseLanguageLocked()) {
+            $this->settings->content_base_language = $base;
+        }
+
+        $this->settings->available_languages = self::languageList($available);
+        $this->settings->fallback_language   = $fallback;
+        $this->settings->save();
+    }
+
+    /**
      * Writes the validated form. A locked base language is kept as stored whatever is passed; the request refuses a
      * change to it before this is reached.
      *
