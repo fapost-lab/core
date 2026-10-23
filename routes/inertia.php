@@ -6,6 +6,7 @@ use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\HealthController as AdminHealthController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
 use App\Http\Controllers\Admin\PlatformSettingsController as AdminPlatformSettingsController;
@@ -149,6 +150,9 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         // Support access log: read only, and never a Filament screen, so the name is the console's own.
         Route::get('admin/support-access', [AdminSupportAccessController::class, 'index'])->name('console.admin.support-access.index');
 
+        // Health: Reverb and the gateway as the health service reports them; `single` mode only, and the page polls `report`.
+        Route::get('admin/health', [AdminHealthController::class, 'index'])->name('console.admin.health.index');
+
         // Usage and limits: what the tenant uses against each limit, read only; a new screen, so its own URI.
         Route::get('admin/usage', [AdminUsageController::class, 'index'])->name('console.admin.usage.index');
 
@@ -238,13 +242,14 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::delete('assistant/{assistant}/broadcasts/{record}', [BroadcastController::class, 'destroy'])->name('console.broadcasts.destroy');
 
         // Conversations: the inbox reaches real people. `reply` carries the id of the operator's submission and sends it at
-        // most once; the status is sent, not toggled; a takeover only takes a thread the bot answers.
+        // most once; a thread is handled by one operator, so takeover, finish, transfer and seize are conditional writes.
         Route::get('assistant/{assistant}/conversations', [ConversationController::class, 'index'])->name('console.conversations.index');
         Route::get('assistant/{assistant}/conversations/{record}', [ConversationController::class, 'show'])->name('console.conversations.show');
         Route::post('assistant/{assistant}/conversations/{record}/reply', [ConversationController::class, 'reply'])->middleware('throttle:30,1')->name('console.conversations.reply');
         Route::post('assistant/{assistant}/conversations/{record}/takeover', [ConversationController::class, 'takeOver'])->name('console.conversations.takeover');
-        Route::post('assistant/{assistant}/conversations/{record}/return-to-bot', [ConversationController::class, 'returnToBot'])->name('console.conversations.return-to-bot');
-        Route::put('assistant/{assistant}/conversations/{record}/status', [ConversationController::class, 'updateStatus'])->name('console.conversations.status');
+        Route::post('assistant/{assistant}/conversations/{record}/finish', [ConversationController::class, 'finish'])->name('console.conversations.finish');
+        Route::post('assistant/{assistant}/conversations/{record}/transfer', [ConversationController::class, 'transfer'])->name('console.conversations.transfer');
+        Route::post('assistant/{assistant}/conversations/{record}/seize', [ConversationController::class, 'seize'])->name('console.conversations.seize');
 
         // Flow sessions and the flow log: read-only, kept current live or by polling. Every log read is bounded in time.
         Route::get('assistant/{assistant}/flow-sessions', [FlowSessionController::class, 'index'])->name('console.flow-sessions.index');

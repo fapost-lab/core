@@ -8,11 +8,14 @@ export default { layout: AppShell }
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
 import { ArrowLeft, FileText, MessageSquareOff, Paperclip, Search, Send, UserRound, X } from '@lucide/vue'
-import { Badge, StatusDot } from '@fapost/ui/components/badge'
+import { Badge } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { Input } from '@fapost/ui/components/input'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { EmptyState } from '@fapost/ui/components/empty-state'
+import { ConfirmDialog } from '@fapost/ui/components/confirm-dialog'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@fapost/ui/components/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
 import { Textarea } from '@fapost/ui/components/textarea'
 import type { LiveChannel } from '@console/lib/live-updates'
 import { useLiveUpdates } from '@console/lib/useLiveUpdates'
@@ -21,7 +24,7 @@ import { exceedsSize, formatSize, newRequestId } from './draft'
 import { SolutionActions } from '../../../console/solutions'
 import LiveHint from './LiveHint.vue'
 import { deliveryGlyph, groupByDay, isToday, timeLabel } from './transcript'
-import { STATUS_TONES, type Abilities, type ConversationDetails, type ConversationRow, type ConversationsPageProps, type Message, type Paging } from './types'
+import type { Abilities, ConversationDetails, ConversationRow, ConversationsPageProps, ConversationUrls, Message, Paging, TransferTarget } from './types'
 
 const props = defineProps<{
   conversation: ConversationDetails
@@ -32,7 +35,8 @@ const props = defineProps<{
   attachment: { maxKb: number; accept: string }
   textMax: number
   live: LiveChannel | null
-  urls: { index: string; self: string; reply: string; takeOver: string; returnToBot: string; status: string }
+  transferTargets: TransferTarget[]
+  urls: ConversationUrls
 }>()
 
 const POLL_MS = 10_000
@@ -58,11 +62,46 @@ const visibleThreads = computed(() => {
 const groups = computed(() => groupByDay(props.messages))
 
 const ownerLine = computed(() => {
+  if (props.conversation.owner === 'queued') {
+    return t.value.owner.queued
+  }
+
   if (props.conversation.owner !== 'staff') {
     return t.value.owner.bot
   }
 
   return props.conversation.ownerName ? interpolate(t.value.owner.staff_named, { name: props.conversation.ownerName }) : t.value.owner.staff
+})
+
+// The badge says who handles the thread; "by you" is when the composer is open for this operator.
+const handlingLabel = computed(() => {
+  const { owner, ownerName, queuedAt } = props.conversation
+
+  if (owner === 'queued') {
+    const time = queuedAt ? new Intl.DateTimeFormat(locale.value, { timeStyle: 'short' }).format(new Date(queuedAt)) : ''
+
+    return interpolate(t.value.handling_status.queued_since, { time })
+  }
+
+  if (owner === 'staff') {
+    if (props.can.compose) {
+      return t.value.handling_status.staff_you
+    }
+
+    return ownerName ? interpolate(t.value.handling_status.staff_named, { name: ownerName }) : t.value.handling_status.staff
+  }
+
+  return t.value.handling_status.bot
+})
+
+const handlingVariant = computed(() => (props.conversation.owner === 'queued' ? 'warning' : props.conversation.owner === 'staff' ? 'info' : 'neutral'))
+
+const lockedHint = computed(() => {
+  if (props.conversation.owner === 'queued') {
+    return t.value.composer.locked_queued
+  }
+
+  return props.conversation.owner === 'staff' ? t.value.composer.locked_staff : t.value.composer.locked
 })
 
 function dayLabel(iso: string): string {
@@ -199,12 +238,33 @@ function takeOver(): void {
   router.post(props.urls.takeOver, {}, requestCallbacks)
 }
 
-function returnToBot(): void {
-  router.post(props.urls.returnToBot, {}, requestCallbacks)
+function finish(): void {
+  router.post(props.urls.finish, {}, requestCallbacks)
 }
 
-function toggleStatus(): void {
-  router.put(props.urls.status, { status: props.conversation.status === 'open' ? 'closed' : 'open' }, requestCallbacks)
+const transferOpen = ref(false)
+const transferTo = ref<string>('')
+const seizeOpen = ref(false)
+const finishOpen = ref(false)
+
+function openTransfer(): void {
+  transferTo.value = ''
+  transferOpen.value = true
+}
+
+function transfer(): void {
+  if (transferTo.value === '') {
+    return
+  }
+
+  router.post(props.urls.transfer, { user_id: transferTo.value }, {
+    ...requestCallbacks,
+    onSuccess: () => (transferOpen.value = false),
+  })
+}
+
+function seize(): void {
+  router.post(props.urls.seize, { expected_owner: props.conversation.ownerId }, requestCallbacks)
 }
 </script>
 
@@ -264,12 +324,15 @@ function toggleStatus(): void {
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-3">
-            <StatusDot :tone="STATUS_TONES[conversation.status]">{{ t.statuses[conversation.status] }}</StatusDot>
+          <Badge :variant="handlingVariant">{{ handlingLabel }}</Badge>
             <LiveHint :transport="transport" :poll-ms="POLL_MS" :labels="t.live" />
-            <Button v-if="can.takeOver" size="sm" :disabled="busy" @click="takeOver">{{ t.actions.take_over }}</Button>
-            <Button v-if="can.returnToBot" variant="outline" size="sm" :disabled="busy" @click="returnToBot">{{ t.actions.return_to_bot }}</Button>
-            <Button v-if="can.setStatus" variant="outline" size="sm" :disabled="busy" @click="toggleStatus">
-              {{ conversation.status === 'open' ? t.actions.close : t.actions.reopen }}
+          <Button v-if="can.takeOver" size="sm" :disabled="busy" @click="takeOver">
+            {{ conversation.owner === 'queued' ? t.actions.accept : t.actions.take_over }}
+          </Button>
+          <Button v-if="can.finish" variant="outline" size="sm" :disabled="busy" @click="finishOpen = true">{{ t.actions.finish }}</Button>
+          <Button v-if="can.transfer" variant="outline" size="sm" :disabled="busy" @click="openTransfer">{{ t.actions.transfer }}</Button>
+          <Button v-if="can.seize" variant="outline" size="sm" :disabled="busy" @click="seizeOpen = true">
+            {{ interpolate(t.actions.seize, { name: conversation.ownerName ?? t.owner.staff }) }}
             </Button>
             <SolutionActions target="conversation.view" :record-id="conversation.id" />
           </div>
@@ -364,8 +427,49 @@ function toggleStatus(): void {
           </div>
         </form>
 
-        <p v-else-if="can.reply" class="text-muted-foreground border-t p-3 text-sm">{{ t.composer.locked }}</p>
+      <p v-else-if="can.reply" class="text-muted-foreground border-t p-3 text-sm">{{ lockedHint }}</p>
       </div>
+
+    <Dialog v-model:open="transferOpen">
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{{ t.transfer.title }}</DialogTitle>
+          <DialogDescription>{{ t.transfer.description }}</DialogDescription>
+        </DialogHeader>
+        <p v-if="transferTargets.length === 0" class="text-muted-foreground text-sm">{{ t.transfer.none }}</p>
+        <Select v-else v-model="transferTo">
+          <SelectTrigger :aria-label="t.transfer.label">
+            <SelectValue :placeholder="t.transfer.placeholder" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem v-for="target in transferTargets" :key="target.id" :value="target.id">{{ target.name }}</SelectItem>
+          </SelectContent>
+        </Select>
+        <DialogFooter>
+          <Button variant="outline" @click="transferOpen = false">{{ t.actions.cancel }}</Button>
+          <Button :disabled="busy || transferTo === ''" @click="transfer">{{ t.transfer.confirm }}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+
+    <ConfirmDialog
+      v-model:open="finishOpen"
+      :destructive="false"
+      :title="t.finish.title"
+      :description="t.finish.description"
+      :confirm-label="t.finish.confirm"
+      :cancel-label="t.actions.cancel"
+      @confirm="finish"
+    />
+
+    <ConfirmDialog
+      v-model:open="seizeOpen"
+      :title="interpolate(t.seize.title, { name: conversation.ownerName ?? t.owner.staff })"
+      :description="t.seize.description"
+      :confirm-label="t.seize.confirm"
+      :cancel-label="t.actions.cancel"
+      @confirm="seize"
+    />
     </div>
   </div>
 </template>

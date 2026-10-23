@@ -199,7 +199,10 @@ final class ContactServiceTest extends FeatureTestCase
 
             $service->rememberPhone($contact, '+380501112233');
 
-            $this->assertSame(['first_name' => 'Ivan', 'phone' => '+380501112233'], $contact->fresh()?->meta);
+            // jsonb on PostgreSQL does not keep key order.
+            $meta = (array) $contact->fresh()?->meta;
+            ksort($meta);
+            $this->assertSame(['first_name' => 'Ivan', 'phone' => '+380501112233'], $meta);
         });
     }
 

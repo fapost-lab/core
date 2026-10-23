@@ -152,9 +152,13 @@ final class ConsoleRoutesArchitectureTest extends FeatureTestCase
      */
     private function stack(RoutingRoute $route): array
     {
-        return array_values(array_filter(
-            $this->app['router']->resolveMiddleware($route->gatherMiddleware(), $route->excludedMiddleware()),
-            'is_string',
+        // A middleware's parameters (`Class:assistant,operate`) are not part of its identity here.
+        return array_values(array_map(
+            static fn (string $middleware): string => explode(':', $middleware, 2)[0],
+            array_filter(
+                $this->app['router']->resolveMiddleware($route->gatherMiddleware(), $route->excludedMiddleware()),
+                'is_string',
+            ),
         ));
     }
 

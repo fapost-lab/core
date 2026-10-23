@@ -17,7 +17,10 @@ use Illuminate\Foundation\Auth\User as AuthUser;
  * contact ever sent, plus their media. Reading requires
  * {@see Permission::ViewConversations}; replying additionally requires
  * {@see Permission::ReplyConversations}, because sending puts words in the
- * assistant's mouth to a real person.
+ * assistant's mouth to a real person. Both also require access to the thread's
+ * assistant (assignment, see {@see User::hasAssistantAccess()}), so a permission
+ * alone never reaches another assistant's transcripts; {@see self::viewAny()}
+ * stays permission-only because the inbox is already scoped to the current assistant.
  *
  * Threads are never created or deleted by hand: they are an append-only log
  * owned by the capture pipeline, and contact deletion cascades them away. So
@@ -41,7 +44,7 @@ final class ConversationPolicy
 
     public function view(AuthUser $authUser, Conversation $conversation): bool
     {
-        return $this->canView($authUser);
+        return $this->canView($authUser) && $this->assignedTo($authUser, $conversation);
     }
 
     /**
@@ -50,7 +53,8 @@ final class ConversationPolicy
     public function reply(AuthUser $authUser, Conversation $conversation): bool
     {
         return $authUser instanceof User
-               && $authUser->can(Permission::ReplyConversations->value);
+               && $authUser->can(Permission::ReplyConversations->value)
+               && $this->assignedTo($authUser, $conversation);
     }
 
     public function create(AuthUser $authUser): bool
@@ -66,6 +70,12 @@ final class ConversationPolicy
     public function delete(AuthUser $authUser, Conversation $conversation): bool
     {
         return false;
+    }
+
+    private function assignedTo(AuthUser $authUser, Conversation $conversation): bool
+    {
+        return $authUser instanceof User
+               && ($authUser->isAdmin() || $authUser->assistants()->whereKey($conversation->assistant_id)->exists());
     }
 
     private function canView(AuthUser $authUser): bool

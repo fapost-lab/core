@@ -8,10 +8,11 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Conversation\Contracts\ConversationOwnershipInterface;
 use App\Domains\Conversation\Contracts\ConversationReplyServiceInterface;
 use App\Domains\Conversation\Enums\ConversationOwner;
-use App\Domains\Conversation\Enums\ConversationStatus;
 use App\Domains\Conversation\Enums\ReplyOutcome;
+use App\Domains\Conversation\Exceptions\ConversationHeldByAnotherOperatorException;
 use App\Domains\Conversation\Exceptions\ConversationNotHeldByStaffException;
 use App\Domains\Conversation\Exceptions\ConversationReplyUndeliverableException;
+use App\Domains\Conversation\Exceptions\ConversationTransferTargetIneligibleException;
 use App\Domains\Conversation\Live\ConversationActivityNotifier;
 use App\Domains\Conversation\Models\Conversation;
 use App\Domains\Conversation\Models\ConversationMessage;
@@ -23,21 +24,29 @@ use App\Domains\Media\Exceptions\MediaNotFoundException;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Messaging\Exceptions\RateLimitExceededException;
 use App\Domains\Messaging\Exceptions\UnsupportedChannelException;
+use App\Domains\Staff\Enums\Permission;
+use App\Domains\Staff\Enums\RoleEnum;
+use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\User;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Throwable;
 
 /**
  * The staff inbox of one assistant: which threads it lists, how many are unread, one thread's transcript, and what an
- * operator does with a thread (take it over, hand it back, close or reopen it, reply).
+ * operator does with a thread (take it over, reply, finish it, transfer it, seize it).
+ *
+ * A thread's state is who handles it (see {@see ConversationOwner}). Who may act is decided here, not in a policy: a
+ * policy only says an operator may reply in general, and an administrator passes every policy, so "this operator holds
+ * this thread" is a query on the thread itself. Reply, finish and transfer need the thread held by the acting
+ * operator; an administrator takes another operator's thread by seizing it first.
  *
  * Every query filters the tenant and the assistant itself (no global scope does it implicitly), and the shell's
  * unread badge counts through {@see self::unreadCount()} over the same {@see self::query()} the list uses, so the two
@@ -86,6 +95,41 @@ final readonly class ConversationInbox
         return Conversation::query()
             ->where('conversations.tenant_id', (string) $assistant->tenant_id)
             ->where('conversations.assistant_id', (string) $assistant->getKey());
+    }
+
+    /**
+     * Narrows `$query` to one handling bucket of the list: `queued` (waiting for an operator), `mine` (held by
+     * `$staffUserId`), `staff` (held by any operator) or `bot` (the assistant answers).
+     *
+     * @param  Builder<Conversation>  $query
+     *
+     * @return bool whether `$handling` named a bucket
+     */
+    public function filterHandling(Builder $query, string $handling, string $staffUserId): bool
+    {
+        switch ($handling) {
+            case 'queued':
+                $query->where('conversations.owner_type', ConversationOwner::Queued->value);
+
+                return true;
+            case 'mine':
+                $query->where('conversations.owner_type', ConversationOwner::Staff->value)
+                    ->where('conversations.owner_staff_user_id', $staffUserId);
+
+                return true;
+            case 'staff':
+                $query->where('conversations.owner_type', ConversationOwner::Staff->value);
+
+                return true;
+            case 'bot':
+                $query->where(static fn (Builder $bucket) => $bucket
+                    ->whereNull('conversations.owner_type')
+                    ->orWhere('conversations.owner_type', ConversationOwner::Bot->value));
+
+                return true;
+            default:
+                return false;
+        }
     }
 
     /**
@@ -196,44 +240,76 @@ final readonly class ConversationInbox
     }
 
     /**
+     * Accepts a thread nobody holds (the bot answers it, or it waits in the queue).
+     *
      * @return bool whether this call took the thread over (false: an operator already holds it)
      */
     public function takeOver(Conversation $conversation, string $staffUserId): bool
     {
-        $taken = $this->ownership->takeOver((string) $conversation->getKey(), $staffUserId);
-
-        if ($taken) {
-            $this->announce($conversation);
-        }
-
-        return $taken;
-    }
-
-    public function returnToBot(Conversation $conversation): void
-    {
-        $this->ownership->assign((string) $conversation->getKey(), ConversationOwner::Bot);
-        $this->announce($conversation);
+        return $this->announced($conversation, $this->ownership->takeOver((string) $conversation->getKey(), $staffUserId));
     }
 
     /**
-     * Sets the status the operator chose (not a toggle: a stale tab that asks to close a closed thread changes nothing).
+     * The holder gives the thread back to the assistant.
      *
-     * @return bool whether the status changed
+     * @return bool whether the thread went back (false: this operator does not hold it, any more or at all)
      */
-    public function setStatus(Conversation $conversation, ConversationStatus $status): bool
+    public function finish(Conversation $conversation, string $staffUserId): bool
     {
-        $changed = Conversation::query()
-            ->where('tenant_id', (string) $conversation->tenant_id)
-            ->where('assistant_id', (string) $conversation->assistant_id)
-            ->whereKey($conversation->getKey())
-            ->where('status', '<>', $status->value)
-            ->update(['status' => $status->value, 'updated_at' => Carbon::now()]) > 0;
+        return $this->announced($conversation, $this->ownership->finish((string) $conversation->getKey(), $staffUserId));
+    }
 
-        if ($changed) {
-            $this->announce($conversation);
+    /**
+     * The holder hands the thread to another operator, who does not confirm it.
+     *
+     * @return bool whether the thread moved (false: `$fromUserId` does not hold it, any more or at all)
+     *
+     * @throws ConversationTransferTargetIneligibleException `$toUserId` cannot take this thread
+     */
+    public function transfer(Assistant $assistant, Conversation $conversation, string $fromUserId, string $toUserId): bool
+    {
+        if ($fromUserId === $toUserId || null === $this->eligibleTarget($assistant, $toUserId)) {
+            throw new ConversationTransferTargetIneligibleException("User [{$toUserId}] cannot take conversation [{$conversation->getKey()}].");
         }
 
-        return $changed;
+        return $this->announced($conversation, $this->ownership->transfer((string) $conversation->getKey(), $fromUserId, $toUserId));
+    }
+
+    /**
+     * An administrator takes a thread another operator holds. `$expectedOwnerId` is the holder the administrator saw,
+     * so a thread that moved since is left alone.
+     *
+     * @return bool whether the thread was seized
+     *
+     * @throws AuthorizationException `$admin` is not an administrator
+     */
+    public function seize(Conversation $conversation, string $expectedOwnerId, User $admin): bool
+    {
+        if (! $admin->isAdmin()) {
+            throw new AuthorizationException('Only an administrator can seize a conversation.');
+        }
+
+        if ((string) $admin->getKey() === $expectedOwnerId) {
+            return false;
+        }
+
+        return $this->announced($conversation, $this->ownership->seize((string) $conversation->getKey(), $expectedOwnerId, (string) $admin->getKey()));
+    }
+
+    /**
+     * The operators `$me` may hand a thread of the assistant to, by name.
+     *
+     * @return list<array{id: string, name: string}>
+     */
+    public function transferTargets(Assistant $assistant, User $me): array
+    {
+        return $this->eligibleStaff($assistant)
+            ->reject(static fn (User $user): bool => (string) $user->getKey() === (string) $me->getKey())
+            ->filter(fn (User $user): bool => $this->canTakeThreads($assistant, $user))
+            ->sortBy(static fn (User $user): string => mb_strtolower((string) $user->name))
+            ->map(static fn (User $user): array => ['id' => (string) $user->getKey(), 'name' => (string) $user->name])
+            ->values()
+            ->all();
     }
 
     /**
@@ -253,7 +329,8 @@ final readonly class ConversationInbox
      * click, a retry or a replayed submit of the same draft never sends twice; after an unconfirmed attempt, a retry once the pending
      * mark has expired can send a second copy if the first did arrive.
      *
-     * @throws ConversationNotHeldByStaffException     the bot answers the thread
+     * @throws ConversationNotHeldByStaffException        nobody holds the thread (the bot answers it, or it is queued)
+     * @throws ConversationHeldByAnotherOperatorException another operator holds the thread
      * @throws ConversationReplyUndeliverableException no active channel or chat to send to
      * @throws VolumeLimitReachedException             the tenant's outbound volume is used up
      * @throws Throwable                               a definite failure before anything was sent
@@ -266,13 +343,30 @@ final readonly class ConversationInbox
         ?UploadedFile $attachment = null,
     ): ReplyOutcome {
         if (ConversationOwner::Staff !== $conversation->owner_type) {
-            throw new ConversationNotHeldByStaffException("Conversation [{$conversation->getKey()}] is answered by the bot.");
+            throw new ConversationNotHeldByStaffException("Conversation [{$conversation->getKey()}] is not held by an operator.");
+        }
+
+        if ($staffUserId !== (string) $conversation->owner_staff_user_id) {
+            throw new ConversationHeldByAnotherOperatorException("Conversation [{$conversation->getKey()}] is held by another operator.");
         }
 
         $reservation = "conversation-reply:{$conversation->tenant_id}:{$conversation->getKey()}:{$requestId}";
 
         if (! $this->cache->add($reservation, self::PENDING, self::PENDING_SECONDS)) {
             return self::SENT === $this->cache->get($reservation) ? ReplyOutcome::Duplicate : ReplyOutcome::Unconfirmed;
+        }
+
+        // The holder may have changed between loading the thread and taking the reservation.
+        $stillHeld = Conversation::query()
+            ->whereKey($conversation->getKey())
+            ->where('owner_type', ConversationOwner::Staff->value)
+            ->where('owner_staff_user_id', $staffUserId)
+            ->exists();
+
+        if (! $stillHeld) {
+            $this->release($reservation, null);
+
+            throw new ConversationHeldByAnotherOperatorException("Conversation [{$conversation->getKey()}] is held by another operator.");
         }
 
         $stored  = null;
@@ -340,6 +434,45 @@ final readonly class ConversationInbox
         if (null !== $stored) {
             $this->media->softDelete($stored);
         }
+    }
+
+    /**
+     * Active, panel-eligible staff who work with the assistant (assigned to it, or administrators).
+     *
+     * @return Collection<int, User>
+     */
+    private function eligibleStaff(Assistant $assistant): Collection
+    {
+        return User::query()
+            ->withoutPlatformSupport()
+            ->where('is_active', true)
+            ->where('status', UserStatus::Active->value)
+            ->where(static fn (Builder $query) => $query
+                ->whereHas('assistants', static fn (Builder $sub): Builder => $sub->whereKey($assistant->getKey()))
+                ->orWhereHas('roles', static fn (Builder $sub): Builder => $sub->where('name', RoleEnum::Admin->value)))
+            ->get();
+    }
+
+    private function eligibleTarget(Assistant $assistant, string $userId): ?User
+    {
+        return $this->eligibleStaff($assistant)
+            ->first(fn (User $user): bool => (string) $user->getKey() === $userId && $this->canTakeThreads($assistant, $user));
+    }
+
+    private function canTakeThreads(Assistant $assistant, User $user): bool
+    {
+        return $user->can(Permission::ViewConversations->value)
+            && $user->can(Permission::ReplyConversations->value)
+            && $user->hasAssistantAccess($assistant);
+    }
+
+    private function announced(Conversation $conversation, bool $changed): bool
+    {
+        if ($changed) {
+            $this->announce($conversation);
+        }
+
+        return $changed;
     }
 
     private function announce(Conversation $conversation): void

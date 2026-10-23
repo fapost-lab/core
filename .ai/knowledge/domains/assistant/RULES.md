@@ -25,8 +25,17 @@ broken.
 
 ## Invariants
 
-- **Panel access requires the `ManageAssistants` permission and either the admin role or an
-  assignment;** a user without access gets 404. Enforced: `AssistantPolicy`, `AssistantPanelTest`.
+- **Entering an assistant's console requires access to that assistant, not a permission;**
+  `AssistantPolicy::operate` (admin, or assigned through `user_assistants`) is the ability the
+  `console` route group passes to `ResolveCurrentAssistant`, and a user without it gets 404. Every
+  screen inside then authorizes its own permission. Managing the assistant and its dashboard stays
+  `view` (`ManageAssistants` and access), and so do the Solution routes (`solution.assistant`), which
+  may carry no ability of their own. Why: an operator holds conversation permissions only; with entry
+  tied to `ManageAssistants` the permissions a role grants for one assistant's screens were dead. The
+  console lands the user on the first menu screen they can open (`NavigationBuilder::entryRoute()`); a Solution
+  application is offered only where the user can `view` the assistant. Owner's decision, 2026-10-23
+  (`adr-20261023-console-entry-by-assignment`). Enforced: `AssistantPolicy`, `OperatorHandoffTest`,
+  `ResolveCurrentAssistantTest`, `AssistantPanelTest`.
 - **Deactivating an assistant deactivates its channels in one transaction;** deleting an
   assistant deletes its channels. Enforced: `AssistantService`, `AssistantServiceTest`.
 - **Anything that belongs to one assistant is authorized by a permission and access to that
@@ -43,7 +52,7 @@ broken.
   and PHPat `NoFilamentTest` where Filament is installed (a local Core checkout with the SaaS
   package overlaid; no CI runs it there).
 - **The current assistant is only ever set explicitly:** by the console route middleware
-  (`ResolveCurrentAssistant`, 404 when the assistant is missing or not viewable) or by a job from
+  (`ResolveCurrentAssistant`, 404 when the assistant is missing or the route group's ability — `operate` in the console, `view` for Solution routes — denies it) or by a job from
   its payload. `CurrentAssistant` itself reads nothing ambient.
   Enforced: `CurrentAssistantTest`, `ResolveCurrentAssistantTest`, `AssistantPanelTest`.
 - **Change `is_active` through `AssistantService`,** never by updating the model. Why: only the

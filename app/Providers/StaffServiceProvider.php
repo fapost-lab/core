@@ -19,12 +19,14 @@ use App\Domains\Staff\Policies\RolePolicy;
 use App\Domains\Staff\Policies\SupportAccessEntryPolicy;
 use App\Domains\Staff\Policies\UserPolicy;
 use App\Domains\Staff\Services\AclBootstrapService;
+use App\Domains\Staff\Services\CoreOperatorAccess;
 use App\Domains\Staff\Services\RoleFormDataMapper;
 use App\Domains\Staff\Services\RoleWriterService;
 use App\Domains\Staff\Services\UserService;
 use App\Domains\Tenancy\Events\LimitApproaching;
 use App\Domains\Tenancy\Events\LimitReached;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
+use Fapost\Foundation\Operator\Contracts\OperatorAccessInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
@@ -54,6 +56,9 @@ final class StaffServiceProvider extends ServiceProvider
         $this->app->bind(UserService::class);
         $this->app->singleton(StaffRecipientResolver::class);
 
+        // Who may open the operator screens. bindIf: an operator layer that already bound its own answer keeps it.
+        $this->app->bindIf(OperatorAccessInterface::class, CoreOperatorAccess::class);
+
         // Staff notification transports — registered into a single in-memory
         // registry. Adding a new channel (e.g. a messenger bot) is a one-line
         // register() call here; the notify_staff node picks it up automatically.
@@ -80,6 +85,11 @@ final class StaffServiceProvider extends ServiceProvider
         Gate::before(static function (mixed $user, string $ability, array $arguments): ?bool {
             if (PlatformSupportProtection::forbids($ability, $arguments)) {
                 return false;
+            }
+
+            // Operator screens are decided by the operator access contract alone, administrators included.
+            if (in_array($ability, CoreOperatorAccess::GATE_ABILITIES, true)) {
+                return null;
             }
 
             return $user instanceof User && $user->isAdmin() ? true : null;
