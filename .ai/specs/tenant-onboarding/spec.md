@@ -209,6 +209,11 @@ So the wizard must be built to extend safely."
   a plan — rejected: a "blocked" state on steps, because the case it covers does not reach the wizard.
 - D7 alternative rejected: grandfathering by any sign of activity (users, active Solutions, changed
   settings) — a heuristic that grows with every new feature; the creation time is one fact.
+- D17. Phases 1 and 2 are built on an epic and released once, at the end, as a minor version — no
+  phase alone gives a tenant a whole first run. Phase 3 is not part of the epic: it waits for a first
+  external step (D8) with no date, so at the epic's finish it moves to its own spec or task —
+  rejected: releasing after all three phases, because the release would wait on another project's
+  schedule.
 - D12. A tenant created already populated (the first-contact path's first-run seed, an import) has an
   assistant when the gate first sees it, so D7 records it as onboarded; the two specs need no
   coordination beyond that.
