@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Console;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Conversation\Enums\ConversationOwner;
+use App\Domains\Conversation\Enums\MessageContentType;
 use App\Domains\Conversation\Enums\MessageDirection;
 use App\Domains\Conversation\Enums\MessageSenderType;
 use App\Domains\Conversation\Enums\ReplyOutcome;
@@ -55,6 +56,9 @@ final class ConversationController extends Controller
     /** Messages a thread page shows at first, and how many more each "load older" adds. */
     public const int MESSAGES_PAGE = 50;
 
+    /** Threads the open thread's side list shows: the assistant's most recently active ones. */
+    public const int THREADS_LIST = 50;
+
     /** The most a thread page shows: older history is the transcript's, not the screen's. */
     public const int MESSAGES_MAX = 1000;
 
@@ -92,24 +96,9 @@ final class ConversationController extends Controller
             'table' => $table->extend(TableTarget::Conversations)->respond(
                 $request,
                 $this->inbox->query($assistant)->with('contact'),
+                // A closure, not an arrow function: the operator names it resolves are kept for the next rows.
                 function (Conversation $conversation) use ($assistant, $request, &$names): array {
-                    $owner   = $this->owner($conversation);
-                    $ownerId = ConversationOwner::Staff === $owner ? $conversation->owner_staff_user_id : null;
-
-                    return [
-                        'id'            => (string) $conversation->getKey(),
-                        'contact'       => $this->inbox->contactLabel($conversation),
-                        'platform'      => (string) $conversation->platform,
-                        'preview'       => $conversation->last_message_preview,
-                        'unread'        => (int) $conversation->unread_count,
-                        'messages'      => (int) $conversation->message_count,
-                        'owner'         => $owner->value,
-                        'ownerName'     => null !== $ownerId ? $this->ownerName($ownerId, $names) : null,
-                        'queuedAt'      => ConversationOwner::Queued === $owner ? $conversation->queued_at?->toIso8601String() : null,
-                        'mine'          => null !== $ownerId && $ownerId === $this->userId($request),
-                        'lastMessageAt' => $conversation->last_message_at?->toIso8601String(),
-                        'viewUrl'       => $this->url('show', $assistant, ['record' => $conversation->getKey()]),
-                    ];
+                    return $this->row($conversation, $assistant, $request, $names);
                 },
             ),
             'handlings' => ['queued', 'mine', 'staff', 'bot'],
@@ -157,7 +146,17 @@ final class ConversationController extends Controller
                 'messageCount' => (int) $conversation->message_count,
             ],
             'messages' => $this->messages($conversation, $messages),
-            'paging'   => [
+            // The side list for switching threads; it is part of the page's live reloads, so it stays current beside the transcript.
+            'threads' => $this->inbox->query($assistant)
+                ->with('contact')
+                ->orderByRaw('conversations.last_message_at DESC NULLS LAST')
+                ->limit(self::THREADS_LIST)
+                ->get()
+                ->map(function (Conversation $thread) use ($assistant, $request, &$names): array {
+                    return $this->row($thread, $assistant, $request, $names);
+                })
+                ->all(),
+            'paging' => [
                 'limit'   => $limit,
                 'hasMore' => $conversation->message_count > $messages->count() && $limit < self::MESSAGES_MAX,
                 'older'   => min($limit + self::MESSAGES_PAGE, self::MESSAGES_MAX),
@@ -374,7 +373,7 @@ final class ConversationController extends Controller
                     MessageSenderType::Staff     => $staffNames[(string) $message->sender_staff_user_id] ?? trans('conversation.authors.staff'),
                 },
                 'contentType' => $message->content_type->value,
-                'text'        => $message->text,
+                'text'        => $this->text($message),
                 'media'       => $media,
                 'buttons'     => $this->buttons($message),
                 'delivery'    => MessageDirection::Outbound === $message->direction ? $message->status->value : null,
@@ -383,6 +382,19 @@ final class ConversationController extends Controller
         }
 
         return $rows;
+    }
+
+    /**
+     * The text of a bubble. A button press stored before its title was captured has the raw callback data as its
+     * text, and only newer rows mark the data apart in the payload, so such a row shows no text rather than the data.
+     */
+    private function text(ConversationMessage $message): ?string
+    {
+        if (MessageContentType::Callback === $message->content_type && ! isset($message->payload['callback_data']) && null !== $message->text && 1 === preg_match('/^[0-9a-f]{64}$/', $message->text)) {
+            return null;
+        }
+
+        return $message->text;
     }
 
     /**
@@ -426,6 +438,32 @@ final class ConversationController extends Controller
         }
 
         return $labels;
+    }
+
+    /**
+     * One thread as a list row, for the inbox table and the open thread's side list alike.
+     *
+     * @return array<string, mixed>
+     */
+    private function row(Conversation $conversation, Assistant $assistant, Request $request, array &$names): array
+    {
+        $owner   = $this->owner($conversation);
+        $ownerId = ConversationOwner::Staff === $owner ? $conversation->owner_staff_user_id : null;
+
+        return [
+            'id'            => (string) $conversation->getKey(),
+            'contact'       => $this->inbox->contactLabel($conversation),
+            'platform'      => (string) $conversation->platform,
+            'preview'       => $conversation->last_message_preview,
+            'unread'        => (int) $conversation->unread_count,
+            'messages'      => (int) $conversation->message_count,
+            'owner'         => $owner->value,
+            'ownerName'     => null !== $ownerId ? $this->ownerName($ownerId, $names) : null,
+            'queuedAt'      => ConversationOwner::Queued === $owner ? $conversation->queued_at?->toIso8601String() : null,
+            'mine'          => null !== $ownerId && $ownerId === $this->userId($request),
+            'lastMessageAt' => $conversation->last_message_at?->toIso8601String(),
+            'viewUrl'       => $this->url('show', $assistant, ['record' => $conversation->getKey()]),
+        ];
     }
 
     private function owner(Conversation $conversation): ConversationOwner

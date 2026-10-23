@@ -17,7 +17,9 @@ use Fapost\Foundation\Flow\Contracts\ScopedStateReaderInterface;
  *
  * Routing:
  *  - contact.<key>            → Contact column (id/tenant_id/external_id/platform/language)
- *                               or attributes[<key>] JSONB leaf
+ *                               or attributes[<key>] JSONB leaf, falling back to the
+ *                               channel profile in `meta` for name/username/phone
+ *                               and to the `platform` column for channel
  *  - contact.<group>.<key>    → attributes[<group>][<key>] JSONB nested
  *  - module.<name>.<...>      → DataAccessor registered under `module.<name>`, get(<...>)
  *  - flow|system|rag|call.*   → flow_sessions.state.<namespace>.<...>
@@ -73,7 +75,7 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
         $attributes = is_array($this->contact->attributes) ? $this->contact->attributes : [];
 
         if (null === $tail) {
-            return $attributes[$head] ?? null;
+            return $attributes[$head] ?? $this->readProfileFallback($head);
         }
 
         $group = $attributes[$head] ?? null;
@@ -83,6 +85,42 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
         }
 
         return data_get($group, $tail);
+    }
+
+    /**
+     * Built-in profile fields the builder offers as `contact.<field>`. A value the flow saved in
+     * attributes always wins (the caller checks it first); this only fills the gap from the channel
+     * profile in `meta` (filled from the inbound payload) or the `platform` column.
+     */
+    private function readProfileFallback(string $field): mixed
+    {
+        $meta = is_array($this->contact->meta) ? $this->contact->meta : [];
+
+        $value = match ($field) {
+            'name'     => $this->fullName($meta),
+            'username' => $meta['username'] ?? null,
+            'phone'    => $meta['phone'] ?? $meta['phone_number'] ?? null,
+            'channel'  => $this->contact->platform,
+            default    => null,
+        };
+
+        return '' === $value ? null : $value;
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private function fullName(array $meta): ?string
+    {
+        $name = mb_trim((string) ($meta['name'] ?? ''));
+
+        if ('' !== $name) {
+            return $name;
+        }
+
+        $full = mb_trim((string) ($meta['first_name'] ?? '') . ' ' . (string) ($meta['last_name'] ?? ''));
+
+        return '' === $full ? null : $full;
     }
 
     private function readModule(string $rest): mixed

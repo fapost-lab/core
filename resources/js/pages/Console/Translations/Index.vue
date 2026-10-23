@@ -42,7 +42,8 @@ const columns = computed<DataTableColumn[]>(() => [
   { key: 'group', label: t.value.columns.group, sortable: true, class: 'hidden md:table-cell' },
   { key: 'key', label: t.value.columns.key, sortable: true },
   { key: 'description', label: t.value.columns.description, class: 'hidden lg:table-cell' },
-  ...props.languages.map((language) => ({ key: `language_${language}`, label: language.toUpperCase() })),
+  // Wrapped, not cut to one line: translations are read side by side, so each cell shows up to three lines.
+  ...props.languages.map((language) => ({ key: `language_${language}`, label: language.toUpperCase(), class: 'whitespace-normal align-top' })),
 ])
 
 // The targets stay set while a dialog closes, so its text does not change under the closing animation.
@@ -119,8 +120,8 @@ function reset(): void {
 
       <template v-for="language in languages" #[`cell-language_${language}`]="{ row }">
         <template v-if="cellOf(row, language)">
-          <span class="flex max-w-56 flex-col items-start gap-1">
-            <span class="text-sm" :title="cellOf(row, language)!.value">{{ truncate(cellOf(row, language)!.value) || '—' }}</span>
+          <span class="flex max-w-64 min-w-40 flex-col items-start gap-1">
+            <span class="line-clamp-3 text-sm break-words" :title="cellOf(row, language)!.value">{{ cellOf(row, language)!.value || '—' }}</span>
             <Badge v-if="statusVariant(cellOf(row, language)!.status)" :variant="statusVariant(cellOf(row, language)!.status)!">
               {{ t.status[cellOf(row, language)!.status] }}
             </Badge>

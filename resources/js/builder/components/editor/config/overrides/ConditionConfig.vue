@@ -2,10 +2,11 @@
 /**
  * Branch (Condition) node config — card-based branch builder.
  *
- * Each branch is a card (handle name + condition) rendered like keyboard
- * buttons in send_message. Two default branches (true / false) are seeded
- * when the node has no rules yet. The node is terminal — no "Otherwise"
- * fallback handle is shown; all paths must be explicitly connected.
+ * Each branch is a card (optional name + condition) rendered like keyboard
+ * buttons in send_message. A branch without a name is called after its
+ * condition (see branchRuleLabel). An "Otherwise" fallback card is always
+ * shown last: it is taken when no branch condition matches and cannot be
+ * deleted.
  */
 import {computed} from 'vue'
 import AccordionSection from '../AccordionSection.vue'
@@ -13,6 +14,8 @@ import ConditionOperandPicker from './ConditionOperandPicker.vue'
 import type {BranchOperandUiState, CompiledLeft} from '@builder/utils/branchOperandCompiler'
 import {compileLeft, decompileLeft} from '@builder/utils/branchOperandCompiler'
 import {useFlowVariables} from '@builder/composables/useFlowVariables'
+import {useTranslations} from '@builder/composables/useTranslations'
+import {BRANCH_OPERATORS, UNARY_OPERATORS, branchAutoName} from '@builder/utils/branchLabel'
 
 interface RuleConfig {
     left?:     CompiledLeft | string | null
@@ -31,20 +34,7 @@ const emit = defineEmits<{
     (e: 'update:config', patch: Record<string, unknown>): void
 }>()
 
-const OPERATORS = [
-    { value: 'eq',        label: '= equals' },
-    { value: 'neq',       label: '≠ not equals' },
-    { value: 'gt',        label: '> greater than' },
-    { value: 'gte',       label: '≥ greater or equal' },
-    { value: 'lt',        label: '< less than' },
-    { value: 'lte',       label: '≤ less or equal' },
-    { value: 'contains',  label: 'contains' },
-    { value: 'in',        label: 'in list' },
-    { value: 'empty',     label: 'is empty' },
-    { value: 'not_empty', label: 'is not empty' },
-]
-
-const UNARY_OPS = new Set(['empty', 'not_empty'])
+const { t } = useTranslations()
 
 const { userVars } = useFlowVariables()
 
@@ -93,6 +83,12 @@ function removeRule(index: number) {
     emitRules(rules.value.filter((_, i) => i !== index))
 }
 
+/** Hint inside the name input: what the branch is called when left unnamed. */
+function namePlaceholder(rule: RuleConfig): string {
+    const auto = branchAutoName(rule)
+    return auto !== '' ? auto : t('nodes.branch.name_placeholder')
+}
+
 function ruleValueAsString(rule: RuleConfig): string {
     if (rule.value === undefined || rule.value === null) return ''
     return typeof rule.value === 'string' ? rule.value : String(rule.value)
@@ -102,7 +98,7 @@ function ruleValueAsString(rule: RuleConfig): string {
 
 <template>
     <div class="accordion">
-        <AccordionSection title="Branches" default-open>
+        <AccordionSection :title="t('nodes.branch.branches')" default-open>
             <div
                 v-for="(rule, i) in rules"
                 :key="i"
@@ -114,17 +110,18 @@ function ruleValueAsString(rule: RuleConfig): string {
                     <input
                         class="handle-input"
                         :value="rule.label ?? ''"
-                        placeholder="Branch name…"
+                        :placeholder="namePlaceholder(rule)"
+                        :title="t('nodes.branch.name_title')"
                         spellcheck="false"
                         @input="updateRule(i, { label: ($event.target as HTMLInputElement).value })"
                     />
-                    <button type="button" class="del-btn" title="Remove branch" @click="removeRule(i)">×</button>
+                    <button type="button" class="del-btn" :title="t('nodes.branch.remove')" @click="removeRule(i)">×</button>
                 </div>
 
                 <!-- Condition body -->
                 <div class="branch-body">
                     <div class="cond-row">
-                        <span class="cond-label">IF</span>
+                        <span class="cond-label">{{ t('nodes.branch.if') }}</span>
                         <ConditionOperandPicker
                             class="cond-operand"
                             :model-value="operandStateFor(rule)"
@@ -139,16 +136,16 @@ function ruleValueAsString(rule: RuleConfig): string {
                             :value="rule.operator ?? 'eq'"
                             @change="updateRule(i, { operator: ($event.target as HTMLSelectElement).value })"
                         >
-                            <option v-for="op in OPERATORS" :key="op.value" :value="op.value">
-                                {{ op.label }}
+                            <option v-for="op in BRANCH_OPERATORS" :key="op.value" :value="op.value">
+                                {{ t(`operators.${op.value}`) }}
                             </option>
                         </select>
 
                         <input
-                            v-if="!UNARY_OPS.has(rule.operator ?? 'eq')"
+                            v-if="!UNARY_OPERATORS.has(rule.operator ?? 'eq')"
                             type="text"
                             class="field-input val-input"
-                            placeholder="value"
+                            :placeholder="t('nodes.branch.value')"
                             :value="ruleValueAsString(rule)"
                             @input="updateRule(i, { value: ($event.target as HTMLInputElement).value })"
                         />
@@ -156,24 +153,24 @@ function ruleValueAsString(rule: RuleConfig): string {
                 </div>
             </div>
 
-            <button type="button" class="add-btn" @click="addRule">+ Add branch</button>
+            <button type="button" class="add-btn" @click="addRule">{{ t('nodes.branch.add') }}</button>
 
             <!-- Fallback: always present, cannot be deleted -->
             <div class="branch-card branch-card--fallback">
                 <div class="branch-header">
                     <span class="branch-arrow" style="color:var(--text-3)">→</span>
-                    <span class="fallback-label">Otherwise</span>
-                    <span class="fallback-badge">fallback</span>
+                    <span class="fallback-label">{{ t('nodes.branch.otherwise') }}</span>
+                    <span class="fallback-badge">{{ t('nodes.branch.fallback') }}</span>
                 </div>
                 <p class="fallback-hint">
-                    Taken when no branch condition matches.
+                    {{ t('nodes.branch.fallback_hint') }}
                 </p>
             </div>
         </AccordionSection>
 
-        <AccordionSection title="Meta">
+        <AccordionSection :title="t('nodes.branch.meta')">
             <div class="config-field">
-                <div class="field-label">Node ID</div>
+                <div class="field-label">{{ t('nodes.branch.node_id') }}</div>
                 <input
                     class="field-input"
                     style="font-family:var(--font-mono);font-size:11.5px"

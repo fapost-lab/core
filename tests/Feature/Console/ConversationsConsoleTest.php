@@ -36,6 +36,7 @@ use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderI
 use Fapost\Foundation\Messaging\OutboundMessage;
 use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
+use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -211,6 +212,70 @@ final class ConversationsConsoleTest extends FeatureTestCase
                 ->etc());
     }
 
+    public function test_a_button_press_shows_its_title_and_never_the_raw_callback_data(): void
+    {
+        $hex    = str_repeat('ab', 32);
+        $thread = $this->thread(['message_count' => 3]);
+        $start  = Carbon::parse('2026-10-01 10:00:00');
+
+        $this->message($thread, ['content_type' => 'callback', 'text' => 'Yes', 'payload' => json_encode(['callback_data' => $hex]), 'created_at' => $start]);
+        $this->message($thread, ['content_type' => 'callback', 'text' => null, 'payload' => json_encode(['callback_data' => $hex]), 'created_at' => $start->copy()->addMinute()]);
+        $this->message($thread, ['content_type' => 'callback', 'text' => $hex, 'created_at' => $start->copy()->addMinutes(2)]);
+
+        $this->actingAs($this->admin())
+            ->get($this->viewUrl($thread))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('messages.0.text', 'Yes')
+                ->where('messages.1.text', null)
+                ->where('messages.2.text', null)
+                ->etc());
+    }
+
+    public function test_a_thread_lists_the_assistants_recent_threads_beside_it_and_no_other_assistants(): void
+    {
+        $thread  = $this->thread(['last_message_at' => Carbon::parse('2026-10-01 10:00:00'), 'last_message_preview' => 'older', 'unread_count' => 2], externalId: 'chat-a');
+        $newer   = $this->thread(['last_message_at' => Carbon::parse('2026-10-02 10:00:00'), 'last_message_preview' => 'newer', 'unread_count' => 5], externalId: 'chat-b');
+        $foreign = $this->thread([], assistant: Assistant::factory()->create(), externalId: 'chat-other');
+
+        $this->actingAs($this->admin())
+            ->get($this->viewUrl($thread))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('threads', 2)
+                ->where('threads.0.id', (string) $newer->getKey())
+                ->where('threads.0.preview', 'newer')
+                ->where('threads.0.unread', 5)
+                ->where('threads.1.id', (string) $thread->getKey())
+                ->where('threads.1.unread', 0)
+                ->where('threads.1.viewUrl', '/assistant/' . $this->assistant->getKey() . '/conversations/' . $thread->getKey())
+                ->where('threads.1.platform', 'telegram')
+                ->where('threads.1.owner', 'bot')
+                ->has('threads.1.contact')
+                ->has('threads.1.lastMessageAt')
+                ->etc());
+
+        $this->assertNotContains((string) $foreign->getKey(), array_column(
+            $this->actingAs($this->admin())->get($this->viewUrl($thread))->viewData('page')['props']['threads'],
+            'id',
+        ));
+    }
+
+    public function test_a_partial_reload_of_the_side_list_does_not_mark_the_thread_read(): void
+    {
+        $thread = $this->thread(['unread_count' => 4]);
+        $admin  = $this->admin();
+
+        // The version the app reports, so the reload reaches the controller instead of being refused as stale. A full visit marks the thread read.
+        $version = $this->actingAs($admin)->get($this->viewUrl($thread))->viewData('page')['version'];
+        Conversation::query()->whereKey($thread->getKey())->update(['unread_count' => 4]);
+
+        $this->actingAs($admin)
+            ->get($this->viewUrl($thread), ['X-Inertia' => 'true', 'X-Inertia-Version' => $version, 'X-Inertia-Partial-Component' => 'Console/Conversations/Show', 'X-Inertia-Partial-Data' => 'threads'])
+            ->assertOk()
+            ->assertJsonPath('props.threads.0.unread', 4);
+
+        $this->assertSame(4, $thread->fresh()?->unread_count);
+    }
+
     public function test_opening_a_thread_marks_it_read_only_after_authorization_and_only_on_a_full_visit(): void
     {
         $thread  = $this->thread(['unread_count' => 3]);
@@ -224,9 +289,11 @@ final class ConversationsConsoleTest extends FeatureTestCase
         $this->actingAs($this->admin())->get($this->viewUrl($sibling))->assertNotFound();
         $this->assertSame(2, $sibling->fresh()?->unread_count);
 
-        // A live reload of the open page does not mark what arrived meanwhile as read.
+        // A live reload of the open page does not mark what arrived meanwhile as read. It carries the app's asset
+        // version, as the browser does, so it is not refused as stale when a local build exists.
+        $version = (string) $this->app->make(HandleInertiaRequests::class)->version(request());
         $this->actingAs($this->admin())
-            ->get($this->viewUrl($thread), ['X-Inertia' => 'true', 'X-Inertia-Partial-Component' => 'Console/Conversations/Show', 'X-Inertia-Partial-Data' => 'messages'])
+            ->get($this->viewUrl($thread), ['X-Inertia' => 'true', 'X-Inertia-Version' => $version, 'X-Inertia-Partial-Component' => 'Console/Conversations/Show', 'X-Inertia-Partial-Data' => 'messages'])
             ->assertOk();
         $this->assertSame(3, $thread->fresh()?->unread_count);
 

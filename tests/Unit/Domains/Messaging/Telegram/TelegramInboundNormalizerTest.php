@@ -33,6 +33,17 @@ final class TelegramInboundNormalizerTest extends TestCase
         $this->assertSame('9001', $message->payload['message_id']);
     }
 
+    public function test_a_phone_the_sender_shares_about_themselves_is_exposed_as_the_contact_phone(): void
+    {
+        $own = (new TelegramInboundNormalizer())->normalize($this->sharedContact(senderId: 202, contactUserId: 202));
+        $foreign = (new TelegramInboundNormalizer())->normalize($this->sharedContact(senderId: 202, contactUserId: 303));
+
+        $this->assertSame(IncomingMessageType::Contact, $own->type);
+        $this->assertSame('+380501112233', $own->payload['phone']);
+        $this->assertArrayNotHasKey('phone', $foreign->payload);
+        $this->assertSame('+380501112233', $foreign->payload['contact']['phone_number']);
+    }
+
     public function test_callback_query_update_is_normalized_correctly(): void
     {
         $normalizer = new TelegramInboundNormalizer();
@@ -64,5 +75,21 @@ final class TelegramInboundNormalizerTest extends TestCase
         $this->expectException(UnsupportedUpdateTypeException::class);
 
         $normalizer->normalize(['update_id' => 9999]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function sharedContact(int $senderId, int $contactUserId): array
+    {
+        return [
+            'update_id' => 5002,
+            'message'   => [
+                'message_id' => 9002,
+                'chat'       => ['id' => 101],
+                'from'       => ['id' => $senderId],
+                'contact'    => ['phone_number' => '+380501112233', 'first_name' => 'Ivan', 'user_id' => $contactUserId],
+            ],
+        ];
     }
 }

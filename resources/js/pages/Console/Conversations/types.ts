@@ -35,6 +35,7 @@ export interface ConversationsTranslations {
   live: LiveTranslations
   back: string
   open_named: string
+  threads: { title: string; search: string; empty: string; no_match: string }
 }
 
 export type ConversationsPageProps = ShellPageProps & {

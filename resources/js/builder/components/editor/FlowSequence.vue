@@ -12,6 +12,7 @@ import FlowSubflowCard from './FlowSubflowCard.vue'
 import FlowCallCard from './FlowCallCard.vue'
 import FlowLoopCard from './FlowLoopCard.vue'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
+import {nodeHandles} from '@builder/utils/nodeHandles'
 
 interface TreeNode {
     node: { id: string; type: string; label?: string; config?: Record<string, unknown> }
@@ -253,16 +254,8 @@ const breadcrumbs = computed(() => {
                 handleLabel = 'Loop body'
             }
             if (node?.type === 'branch' || node?.type === 'condition') {
-                if (handle === 'default') {
-                    handleLabel = 'Otherwise'
-                } else {
-                    const rules = Array.isArray(node?.config?.rules)
-                        ? (node.config!.rules as Array<Record<string, unknown>>)
-                        : []
-                    const rule = rules.find((r) => r.handle === handle)
-                    const lbl = typeof rule?.label === 'string' ? rule.label.trim() : ''
-                    handleLabel = lbl !== '' ? lbl : handle
-                }
+                // The same text as the card and the structure tree: the branch name or its condition, never the handle id.
+                handleLabel = nodeHandles(node).find((h) => h.handle === handle)?.label ?? handleLabel
             }
             if (node?.type === 'send_message' && Array.isArray(node?.config?.buttons)) {
                 const buttons = node.config.buttons as Array<Record<string, unknown>>
