@@ -41,23 +41,50 @@ final class TelegramInboundNormalizer
         $from = $callback['from'] ?? [];
         /** @var array<string, mixed> $message */
         $message = $callback['message'] ?? [];
+        $data    = is_string($callback['data'] ?? null) ? $callback['data'] : null;
 
         return new IncomingMessage(
             updateId: (string)($update['update_id'] ?? ''),
             externalUserId: (string)($from['id'] ?? ''),
             externalChatId: (string)($message['chat']['id'] ?? ''),
-            text: is_string($callback['data'] ?? null) ? $callback['data'] : null,
+            text: $data,
             type: IncomingMessageType::CallbackQuery,
             platform: 'telegram',
             payload: array_filter([
-                'chat_id'    => (string)($message['chat']['id'] ?? ''),
-                'message_id' => (string)($message['message_id'] ?? ''),
-                'update_id'  => (string)($update['update_id'] ?? ''),
-                'first_name' => ($from['first_name'] ?? null) !== null ? (string)$from['first_name'] : null,
-                'last_name'  => ($from['last_name'] ?? null) !== null ? (string)$from['last_name'] : null,
-                'username'   => ($from['username'] ?? null) !== null ? (string)$from['username'] : null,
+                'chat_id'      => (string)($message['chat']['id'] ?? ''),
+                'message_id'   => (string)($message['message_id'] ?? ''),
+                'update_id'    => (string)($update['update_id'] ?? ''),
+                'first_name'   => ($from['first_name'] ?? null) !== null ? (string)$from['first_name'] : null,
+                'last_name'    => ($from['last_name'] ?? null) !== null ? (string)$from['last_name'] : null,
+                'username'     => ($from['username'] ?? null) !== null ? (string)$from['username'] : null,
+                'button_label' => $this->pressedButtonLabel($message, $data),
             ], static fn (mixed $v): bool => null !== $v),
         );
+    }
+
+    /**
+     * The title of the inline button whose callback data was pressed, read from the keyboard of the message the
+     * button sits on. Null when Telegram did not echo the keyboard or no button carries that data.
+     *
+     * @param  array<string, mixed>  $message
+     */
+    private function pressedButtonLabel(array $message, ?string $data): ?string
+    {
+        $rows = $message['reply_markup']['inline_keyboard'] ?? null;
+
+        if (null === $data || ! is_array($rows)) {
+            return null;
+        }
+
+        foreach ($rows as $row) {
+            foreach (is_array($row) ? $row : [] as $button) {
+                if (is_array($button) && ($button['callback_data'] ?? null) === $data && is_string($button['text'] ?? null) && '' !== $button['text']) {
+                    return $button['text'];
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -84,6 +111,15 @@ final class TelegramInboundNormalizer
             $structuredPayload = [];
         }
 
+        // A phone the sender shared about themselves (the request-contact button) belongs to the contact's profile;
+        // a forwarded card of somebody else does not.
+        $sharedContact = $structuredPayload['contact'] ?? null;
+        $ownPhone      = is_array($sharedContact)
+            && isset($sharedContact['phone_number'], $sharedContact['user_id'], $from['id'])
+            && $sharedContact['user_id'] === (string)$from['id']
+                ? (string)$sharedContact['phone_number']
+                : null;
+
         return new IncomingMessage(
             updateId: (string)($update['update_id'] ?? ''),
             externalUserId: (string)($from['id'] ?? ''),
@@ -99,6 +135,7 @@ final class TelegramInboundNormalizer
                 'last_name'      => ($from['last_name'] ?? null) !== null ? (string)$from['last_name'] : null,
                 'username'       => ($from['username'] ?? null) !== null ? (string)$from['username'] : null,
                 'media_group_id' => isset($message['media_group_id']) ? (string)$message['media_group_id'] : null,
+                'phone'          => $ownPhone,
                 ...$structuredPayload,
             ], static fn (mixed $v): bool => null !== $v),
             media: $media,

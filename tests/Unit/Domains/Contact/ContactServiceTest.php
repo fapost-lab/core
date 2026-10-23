@@ -189,6 +189,23 @@ final class ContactServiceTest extends FeatureTestCase
         });
     }
 
+    public function test_remember_phone_adds_the_phone_to_meta_and_keeps_the_rest(): void
+    {
+        $tenant = $this->tenant();
+
+        $this->runInTenant($tenant, function () use ($tenant): void {
+            $service = app(ContactServiceInterface::class);
+            $contact = $service->findOrCreate($tenant->getId(), PlatformEnum::Telegram->value, 'phone-user', ['first_name' => 'Ivan']);
+
+            $service->rememberPhone($contact, '+380501112233');
+
+            // jsonb on PostgreSQL does not keep key order.
+            $meta = (array) $contact->fresh()?->meta;
+            ksort($meta);
+            $this->assertSame(['first_name' => 'Ivan', 'phone' => '+380501112233'], $meta);
+        });
+    }
+
     private function tenant(): Tenant
     {
         return Tenant::query()->firstOrFail();

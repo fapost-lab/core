@@ -17,7 +17,8 @@ use Symfony\Component\HttpFoundation\Response;
  * the parameter of every console route), a ULID or an already bound model, in the current tenant schema and makes it
  * the current assistant.
  *
- * A missing assistant and one the user may not view are both answered 404, never 403: the
+ * A missing assistant and one the user may not pass the ability for (second argument, default `view`; the `console`
+ * group uses `operate`) are both answered 404, never 403: the
  * response must not reveal that an assistant exists. This matches the assistant panel.
  * Run it after the `auth` and `tenant` middleware.
  */
@@ -28,11 +29,11 @@ final readonly class ResolveCurrentAssistant
     ) {
     }
 
-    public function handle(Request $request, Closure $next, string $parameter = 'assistant'): Response
+    public function handle(Request $request, Closure $next, string $parameter = 'assistant', string $ability = 'view'): Response
     {
         $assistant = $this->find($request->route($parameter));
 
-        if (null === $assistant || Gate::forUser($request->user())->denies('view', $assistant)) {
+        if (null === $assistant || Gate::forUser($request->user())->denies($ability, $assistant)) {
             abort(404);
         }
 

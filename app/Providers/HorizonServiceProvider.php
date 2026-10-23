@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use Fapost\Foundation\Operator\Contracts\OperatorAccessInterface;
+use Fapost\Foundation\Operator\Enums\OperatorSurface;
 use Illuminate\Support\Facades\Gate;
 use Laravel\Horizon\HorizonApplicationServiceProvider;
 
@@ -29,16 +31,15 @@ final class HorizonServiceProvider extends HorizonApplicationServiceProvider
     /**
      * Register the Horizon gate.
      *
-     * This gate determines who can access Horizon in non-local environments. The list is empty, so
-     * it is closed. In `host` tenancy mode Horizon is served on the base domain and platform
-     * subdomains only (see config/horizon.php), where no tenant is entered and so no tenant user
-     * is signed in: opening it there is the job of an operator package that brings its own
-     * sign-in and redefines this gate. Without one, run `horizon:status` and read the logs.
+     * Horizon asks the operator access contract about its own surface and ignores the gate's user: the
+     * contract reads the request's sign-in itself. Core's answer opens Horizon on a `single` installation to
+     * staff holding the operator-screens permission and keeps `host` mode closed; in `host` mode Horizon is also
+     * served on platform hosts only (see config/horizon.php), where an operator layer binds its own answer.
+     * Without one, run `horizon:status` and read the logs.
      */
     protected function gate(): void
     {
-        Gate::define('viewHorizon', fn ($user = null) => in_array(optional($user)->email, [
-
-        ]));
+        Gate::define('viewHorizon', static fn (mixed $user = null): bool => app(OperatorAccessInterface::class)
+            ->canView(request(), OperatorSurface::Horizon));
     }
 }

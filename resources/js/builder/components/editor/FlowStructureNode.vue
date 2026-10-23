@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import {computed, ref} from 'vue'
 import {useSelectionStore} from '@builder/store/selectionStore'
+import {useBuilderStore} from '@builder/store/builderStore'
 import {nodeColors} from '@builder/utils/nodeColors'
 import NodeIcon from '@builder/components/NodeIcon.vue'
+import {useTranslations} from '@builder/composables/useTranslations'
+import {branchRuleLabel} from '@builder/utils/branchLabel'
 
 interface FlowNodeMeta {
     id: string
@@ -23,13 +26,31 @@ const props = defineProps({
 })
 
 const selectionStore = useSelectionStore()
+const builderStore = useBuilderStore()
+const {t} = useTranslations()
 const expanded = ref(true)
 
 const handles = computed((): string[] => Object.keys(props.treeNode.childrenByHandle ?? {}))
 
-/** Only condition/switch have meaningful branches — default is just linear continuation */
-const branchHandles = computed((): string[] => handles.value.filter((h: string) => h !== 'default'))
-const defaultChildren = computed((): TreeNode[] => props.treeNode.childrenByHandle?.default ?? [])
+const isBranching = computed((): boolean => ['branch', 'condition'].includes(props.treeNode.node.type))
+
+/**
+ * Handles shown as nested branches. A condition lists every rule (wired or not) and always ends with "Otherwise",
+ * whose blocks nest under it. For other types `default` is just linear continuation and is rendered flat.
+ */
+const branchHandles = computed((): string[] => {
+    const wired = handles.value.filter((h: string) => h !== 'default')
+    if (!isBranching.value) {
+        return wired
+    }
+    const raw = props.treeNode.node.config?.rules
+    const ruleHandles = Array.isArray(raw)
+        ? (raw as Array<Record<string, unknown>>).map((r) => String(r.handle ?? '')).filter((h) => h !== '')
+        : []
+    const extra = wired.filter((h: string) => !ruleHandles.includes(h))
+    return [...ruleHandles, ...extra, 'default']
+})
+const defaultChildren = computed((): TreeNode[] => isBranching.value ? [] : (props.treeNode.childrenByHandle?.default ?? []))
 const colors = computed(() => nodeColors(props.treeNode.node.type))
 
 const nodeLabel = computed((): string => {
@@ -56,20 +77,36 @@ function scrollToCard(nodeId: string) {
     })
 }
 
-function selectNode() {
-    scrollToCard(props.treeNode.node.id)
-    const meaningfulBranch: string[] = []
-
+/**
+ * `parentBranch` accumulates `(nodeId, 'default')` pairs while the tree walks linear-continuation children — noise for
+ * the breadcrumb and the canvas branch context, which only care about meaningful branching points (button.id, rule
+ * handles). The exception is a condition's `default`: that is its "Otherwise" branch, a real choice, so it is kept.
+ * `resolveBranchRoots` uses a recursive lookup, so skipping the other default pairs doesn't break deep navigation.
+ */
+function meaningfulPath(): string[] {
+    const meaningful: string[] = []
     for (let i = 0; i < props.parentBranch.length; i += 2) {
         const nodeId = props.parentBranch[i]
-        const handle = props.parentBranch[i + 1]
-
-        if (!nodeId || !handle || handle === 'default') {
+        const segmentHandle = props.parentBranch[i + 1]
+        if (!nodeId || !segmentHandle) {
             continue
         }
-
-        meaningfulBranch.push(nodeId, handle)
+        if (segmentHandle === 'default' && !isBranchingNodeId(nodeId)) {
+            continue
+        }
+        meaningful.push(nodeId, segmentHandle)
     }
+    return meaningful
+}
+
+function isBranchingNodeId(nodeId: string): boolean {
+    const type = builderStore.definition.nodes.find((n) => n.id === nodeId)?.type
+    return type === 'branch' || type === 'condition'
+}
+
+function selectNode() {
+    scrollToCard(props.treeNode.node.id)
+    const meaningfulBranch = meaningfulPath()
 
     if (meaningfulBranch.length > 0) {
         selectionStore.setActiveBranch(meaningfulBranch)
@@ -80,24 +117,7 @@ function selectNode() {
 }
 
 function focusBranch(handle: string) {
-    // `parentBranch` accumulates `(nodeId, 'default')` pairs while the
-    // tree walks linear-continuation children — those are noise for the
-    // breadcrumb and for the canvas branch context, which only cares
-    // about meaningful branching points (button.id, rule handles).
-    // `resolveBranchRoots` uses a recursive lookup, so skipping default
-    // pairs here doesn't break navigation into deeply nested branches.
-    const meaningful: string[] = []
-    for (let i = 0; i < props.parentBranch.length; i += 2) {
-        const nodeId = props.parentBranch[i]
-        const segmentHandle = props.parentBranch[i + 1]
-        if (!nodeId || !segmentHandle || segmentHandle === 'default') {
-            continue
-        }
-        meaningful.push(nodeId, segmentHandle)
-    }
-    meaningful.push(props.treeNode.node.id, handle)
-
-    selectionStore.setActiveBranch(meaningful)
+    selectionStore.setActiveBranch([...meaningfulPath(), props.treeNode.node.id, handle])
 }
 
 function resolveHandleLabel(handle: string): string {
@@ -118,13 +138,12 @@ function resolveHandleLabel(handle: string): string {
     }
     // Branch/condition rule handles are generated ids — show the rule's label.
     if (props.treeNode.node.type === 'branch' || props.treeNode.node.type === 'condition') {
-        if (handle === 'default') return 'Otherwise'
+        if (handle === 'default') return t('nodes.branch.otherwise')
         const rules = Array.isArray(props.treeNode.node.config?.rules)
             ? (props.treeNode.node.config!.rules as Array<Record<string, unknown>>)
             : []
-        const rule = rules.find((r) => r.handle === handle)
-        const label = typeof rule?.label === 'string' ? rule.label.trim() : ''
-        return label !== '' ? label : handle
+        const index = rules.findIndex((r) => r.handle === handle)
+        return index === -1 ? t('nodes.branch.branch_n').replace(':n', '?') : branchRuleLabel(rules[index], index, t)
     }
     return handle
 }

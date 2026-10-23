@@ -45,12 +45,23 @@ Why an outbound message was sent: `flow`, `broadcast`, `notify`, `command`, `sys
 
 ## Owner
 
-Who answers a thread: `bot` or `staff`.
+Who handles a thread (`ConversationOwner`, column `owner_type`): `bot` (null reads as bot), `queued`
+(an operator was requested and nobody accepted yet, since `queued_at`) or `staff` (the operator in
+`owner_staff_user_id`). This is the thread's only state: the old `status` (`open` / `closed` / `snoozed`)
+is retired, kept as a column nobody reads. Informal synonym: handling.
+
+## Holder
+
+The operator a `staff` thread belongs to. Only the holder replies, finishes or transfers.
 
 ## Operator takeover
 
-Switching a thread's owner to staff. While staff owns it, inbound messages do not reach flows.
+Switching a thread to staff: **take over** from `bot`, **accept** from `queued` (the same operation),
+**seize** (an admin takes a thread from its holder), **transfer** (the holder hands it to another
+operator). **Finish** returns it to the bot. While a thread is `queued` or `staff`, inbound messages do
+not reach flows.
 
 ## Inbox
 
-The staff view of threads, with `unread_count` and a status of `open`, `closed` or `snoozed`.
+The staff view of one assistant's threads, with `unread_count` and the handling filters `queued`,
+`mine`, `staff` and `bot`.

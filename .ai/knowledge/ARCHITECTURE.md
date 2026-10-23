@@ -39,6 +39,7 @@ sessions. The platform is extended from outside through public contracts, not by
 | `assistant` | `app/Domains/Assistant` | The assistant aggregate and the current-assistant context | — |
 | `staff` | `app/Domains/Staff` | Staff users, roles, staff notifications | — |
 | `solution` | `app/Domains/Solution` | Installed extension packages — Solutions and, experimental, connectors (`adr-20261016-connector-package-type`): manifest discovery and validation, the catalog and its cache, `platform:update`, per-tenant activation (`ActiveSolutions`, `SolutionActivator`), the console extension registry (`Console/ConsoleExtensionRegistry`) and the check and publication of a Solution's prebuilt console UI (`SolutionUiBundleReader`, `SolutionUiPublisher`, `PublishedSolutionUi`) | Depend on a domain other than the Tenancy contracts, or on the database outside `Infrastructure` |
+| `health` | `app/Domains/Health` | The read-only answer to "is it working" for Reverb, the gateway and the webhook registry: probes, a cached `HealthService`, `up`/`down`/`unknown`/`disabled` with a reason (`features/installation-health-service`) | Write anything, or fold "could not find out" into up or down; filter by tenant (the consumer does) |
 
 `app/Infrastructure/<X>` also holds the seams that compose two domains so neither knows the other:
 `app/Infrastructure/Solution` writes a Solution's actions into the Flow registry and answers Flow's

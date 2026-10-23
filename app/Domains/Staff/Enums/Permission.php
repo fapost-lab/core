@@ -54,6 +54,12 @@ enum Permission: string
     case ManageSettings = 'manage_settings';
 
     /**
+     * Opens the operator screens (queue dashboard, and what the monitoring package adds) of a `single`
+     * installation. Not {@see self::ViewSystem}, which gates the Usage and Support access screens.
+     */
+    case ViewOperatorScreens = 'view_operator_screens';
+
+    /**
      * Enum cases grouped by their logical UI group.
      *
      * @return array<string, list<self>>
@@ -126,8 +132,10 @@ enum Permission: string
             // platform stores — everything a contact ever sent the assistant.
             self::ViewConversations,
             // Replying puts words in the assistant's mouth, to a real person.
-            self::ReplyConversations => true,
-            default                  => false,
+            self::ReplyConversations,
+            // Queue payloads and logs of the whole installation.
+            self::ViewOperatorScreens => true,
+            default                   => false,
         };
     }
 
@@ -165,6 +173,7 @@ enum Permission: string
             self::ViewAnalytics => 'analytics',
 
             self::ViewSystem,
+            self::ViewOperatorScreens,
             self::ManageSettings => 'system',
         };
     }

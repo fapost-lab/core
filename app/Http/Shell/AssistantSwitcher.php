@@ -16,6 +16,7 @@ final readonly class AssistantSwitcher
 {
     public function __construct(
         private AccessibleAssistants $assistants,
+        private NavigationBuilder $navigation,
     ) {
     }
 
@@ -27,17 +28,20 @@ final readonly class AssistantSwitcher
      */
     public function for(User $user, Assistant $current): array
     {
-        $dashboard = 'console.dashboard';
-
         return [
             'current' => ['id' => (string) $current->getKey(), 'name' => (string) $current->name],
             'items'   => $this->assistants->for($user)
-                ->map(fn (Assistant $assistant): array => [
-                    'id'       => (string) $assistant->getKey(),
-                    'name'     => (string) $assistant->name,
-                    'href'     => route($dashboard, ['assistant' => $assistant->getKey()], false),
-                    'external' => false,
-                ])
+                ->map(function (Assistant $assistant) use ($user): ?array {
+                    $entry = $this->navigation->entryRoute($user, $assistant);
+
+                    return null === $entry ? null : [
+                        'id'       => (string) $assistant->getKey(),
+                        'name'     => (string) $assistant->name,
+                        'href'     => route($entry, ['assistant' => $assistant->getKey()], false),
+                        'external' => false,
+                    ];
+                })
+                ->filter()
                 ->values()
                 ->all(),
         ];

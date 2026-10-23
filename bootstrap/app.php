@@ -105,7 +105,7 @@ return Application::configure(basePath: dirname(__DIR__))
             EnsureUserIsActive::class,
             EnsureCanAccessPanel::class,
         ]);
-        $middleware->group('console', [...$admin, ResolveCurrentAssistant::class]);
+        $middleware->group('console', [...$admin, ResolveCurrentAssistant::class . ':assistant,operate']);
 
         // Routes of Solutions (App\Http\Shell\SolutionRoutes): the console's stacks, then 404 unless the Solution is
         // served to the tenant, and a check that the route renders only the Solution's own pages.

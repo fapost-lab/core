@@ -84,8 +84,8 @@ return [
     */
 
     // OnlyOnPlatformHosts first: in `host` tenancy mode Horizon answers on the base domain and platform
-    // subdomains only, never on a tenant's host. It stays closed to everyone until `viewHorizon` allows a user
-    // (see HorizonServiceProvider).
+    // subdomains only, never on a tenant's host. It opens through `viewHorizon`, which asks the operator
+    // access contract (Core's answer: `single` mode only; see HorizonServiceProvider).
     'middleware' => [App\Http\Middleware\OnlyOnPlatformHosts::class, 'web'],
 
     /*

@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "009b6b246b9ae9a335b2611b4c402e56",
+  "content-hash": "27a9587a1fc6129ec8b85a9a6c08033f",
   "packages": [
     {
       "name": "aws/aws-crt-php",
@@ -62,16 +62,16 @@
     },
     {
       "name": "aws/aws-sdk-php",
-      "version": "3.401.5",
+      "version": "3.402.0",
       "source": {
         "type": "git",
         "url": "https://github.com/aws/aws-sdk-php.git",
-        "reference": "4d304660ba59e185e86a17946c6be6ab07bf8546"
+        "reference": "661f6a54f2a63ac5137390c291535c74cfe6019e"
       },
       "dist": {
         "type": "zip",
-        "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/4d304660ba59e185e86a17946c6be6ab07bf8546",
-        "reference": "4d304660ba59e185e86a17946c6be6ab07bf8546",
+        "url": "https://api.github.com/repos/aws/aws-sdk-php/zipball/661f6a54f2a63ac5137390c291535c74cfe6019e",
+        "reference": "661f6a54f2a63ac5137390c291535c74cfe6019e",
         "shasum": ""
       },
       "require": {
@@ -83,7 +83,7 @@
         "guzzlehttp/promises": "^2.0.3 || ^3.0",
         "guzzlehttp/psr7": "^2.6.3 || ^3.0",
         "mtdowling/jmespath.php": "^2.9.1",
-        "php": ">=8.1",
+        "php": ">=8.2",
         "psr/http-message": "^1.0 || ^2.0",
         "symfony/filesystem": "^v5.4.45 || ^v6.4.3 || ^v7.1.0 || ^v8.0.0"
       },
@@ -153,9 +153,9 @@
       "support": {
         "forum": "https://github.com/aws/aws-sdk-php/discussions",
         "issues": "https://github.com/aws/aws-sdk-php/issues",
-        "source": "https://github.com/aws/aws-sdk-php/tree/3.401.5"
+        "source": "https://github.com/aws/aws-sdk-php/tree/3.402.0"
       },
-      "time": "2026-10-21T18:10:10+00:00"
+      "time": "2026-10-22T18:09:05+00:00"
     },
     {
       "name": "brick/math",
@@ -966,19 +966,20 @@
     },
     {
       "name": "fapost/foundation",
-      "version": "v0.28.1",
+      "version": "v0.29.0",
       "source": {
         "type": "git",
         "url": "https://github.com/fapost-lab/foundation.git",
-        "reference": "5472c11af6f17f4a7815f06b21613dc7528deff5"
+        "reference": "b710dae1b981719b57ff11652223aad27c1da035"
       },
       "dist": {
         "type": "zip",
-        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/5472c11af6f17f4a7815f06b21613dc7528deff5",
-        "reference": "5472c11af6f17f4a7815f06b21613dc7528deff5",
+        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/b710dae1b981719b57ff11652223aad27c1da035",
+        "reference": "b710dae1b981719b57ff11652223aad27c1da035",
         "shasum": ""
       },
       "require": {
+        "illuminate/http": "^11.0 || ^12.0 || ^13.0",
         "illuminate/support": "^11.0 || ^12.0 || ^13.0",
         "php": "^8.4",
         "psr/http-message": "^1.1 || ^2.0",
@@ -1014,10 +1015,10 @@
       ],
       "description": "FaPost public contract layer for Solutions, Plugins and external integrations",
       "support": {
-        "source": "https://github.com/fapost-lab/foundation/tree/v0.28.1",
+        "source": "https://github.com/fapost-lab/foundation/tree/v0.29.0",
         "issues": "https://github.com/fapost-lab/foundation/issues"
       },
-      "time": "2026-10-22T15:03:18+00:00"
+      "time": "2026-10-22T15:13:03+00:00"
     },
     {
       "name": "fapost/support",
@@ -1218,16 +1219,16 @@
     },
     {
       "name": "giggsey/locale",
-      "version": "2.9.0",
+      "version": "2.10.0",
       "source": {
         "type": "git",
         "url": "https://github.com/giggsey/Locale.git",
-        "reference": "fe741e99ae6ccbe8132f3d63d8ec89924e689778"
+        "reference": "c13d22635eac0e51d1dcd7f09b99fd7475209a51"
       },
       "dist": {
         "type": "zip",
-        "url": "https://api.github.com/repos/giggsey/Locale/zipball/fe741e99ae6ccbe8132f3d63d8ec89924e689778",
-        "reference": "fe741e99ae6ccbe8132f3d63d8ec89924e689778",
+        "url": "https://api.github.com/repos/giggsey/Locale/zipball/c13d22635eac0e51d1dcd7f09b99fd7475209a51",
+        "reference": "c13d22635eac0e51d1dcd7f09b99fd7475209a51",
         "shasum": ""
       },
       "require": {
@@ -1270,9 +1271,9 @@
       "description": "Locale functions required by libphonenumber-for-php",
       "support": {
         "issues": "https://github.com/giggsey/Locale/issues",
-        "source": "https://github.com/giggsey/Locale/tree/2.9.0"
+        "source": "https://github.com/giggsey/Locale/tree/2.10.0"
       },
-      "time": "2026-02-24T15:32:13+00:00"
+      "time": "2026-10-22T19:31:33+00:00"
     },
     {
       "name": "graham-campbell/result-type",

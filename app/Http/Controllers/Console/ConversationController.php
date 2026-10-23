@@ -7,12 +7,14 @@ namespace App\Http\Controllers\Console;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Conversation\Enums\ConversationOwner;
-use App\Domains\Conversation\Enums\ConversationStatus;
+use App\Domains\Conversation\Enums\MessageContentType;
 use App\Domains\Conversation\Enums\MessageDirection;
 use App\Domains\Conversation\Enums\MessageSenderType;
 use App\Domains\Conversation\Enums\ReplyOutcome;
+use App\Domains\Conversation\Exceptions\ConversationHeldByAnotherOperatorException;
 use App\Domains\Conversation\Exceptions\ConversationNotHeldByStaffException;
 use App\Domains\Conversation\Exceptions\ConversationReplyUndeliverableException;
+use App\Domains\Conversation\Exceptions\ConversationTransferTargetIneligibleException;
 use App\Domains\Conversation\Live\ConversationActivityChannel;
 use App\Domains\Conversation\Live\ConversationActivityWatchers;
 use App\Domains\Conversation\Models\Conversation;
@@ -20,10 +22,12 @@ use App\Domains\Conversation\Models\ConversationMessage;
 use App\Domains\Conversation\Services\ConversationInbox;
 use App\Domains\Media\Exceptions\StorageLimitReachedException;
 use App\Domains\Media\Services\StorageLimitMessage;
+use App\Domains\Staff\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use App\Http\Requests\Console\ReplyConversationRequest;
-use App\Http\Requests\Console\UpdateConversationStatusRequest;
+use App\Http\Requests\Console\SeizeConversationRequest;
+use App\Http\Requests\Console\TransferConversationRequest;
 use Fapost\Foundation\Console\Enums\TableTarget;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Illuminate\Database\Eloquent\Builder;
@@ -37,9 +41,11 @@ use Throwable;
 
 /**
  * The conversation inbox on the Inertia console: the assistant's threads, and one thread's transcript with the
- * operator's controls (take over, hand back, close or reopen, reply), replacing the Filament conversation resource.
+ * operator's controls (take over, reply, finish, transfer, seize), replacing the Filament conversation resource.
  *
- * Reading needs `view` on conversations; every write needs `reply`. Opening a thread clears its unread counter only
+ * Reading needs `view` on conversations; every write needs `reply`, and the service then decides whether this operator
+ * holds the thread (an administrator seizes another operator's thread first, the one write that also needs the
+ * administrator role). Opening a thread clears its unread counter only
  * after `view` is authorized and only on a full visit, as the Filament page did on mount: a background reload of the
  * open page does not mark what arrived meanwhile as read. A reply reaches a real person, so it goes through
  * {@see ConversationInbox::reply()}, which sends one message per submission. Both pages stay current through the
@@ -49,6 +55,9 @@ final class ConversationController extends Controller
 {
     /** Messages a thread page shows at first, and how many more each "load older" adds. */
     public const int MESSAGES_PAGE = 50;
+
+    /** Threads the open thread's side list shows: the assistant's most recently active ones. */
+    public const int THREADS_LIST = 50;
 
     /** The most a thread page shows: older history is the transcript's, not the screen's. */
     public const int MESSAGES_MAX = 1000;
@@ -65,22 +74,13 @@ final class ConversationController extends Controller
         Gate::authorize('viewAny', Conversation::class);
 
         $assistant = $this->assistant->get();
+        $names     = [];
         $table     = new DataTable(
             sortable: ['last_message_at'],
             searchable: [],
             defaultSort: '-last_message_at',
             filters: [
-                'status' => static function (Builder $query, string $value): bool {
-                    $status = ConversationStatus::tryFrom($value);
-
-                    if (null === $status) {
-                        return false;
-                    }
-
-                    $query->where('conversations.status', $status->value);
-
-                    return true;
-                },
+                'handling' => fn (Builder $query, string $value): bool => $this->inbox->filterHandling($query, $value, $this->userId($request)),
             ],
             // Case-insensitive on both engines, escaped as DataTable::applySearch escapes its columns.
             searchAlso: static fn (Builder $query, string $search) => $query->orWhereHas(
@@ -96,22 +96,14 @@ final class ConversationController extends Controller
             'table' => $table->extend(TableTarget::Conversations)->respond(
                 $request,
                 $this->inbox->query($assistant)->with('contact'),
-                fn (Conversation $conversation): array => [
-                    'id'            => (string) $conversation->getKey(),
-                    'contact'       => $this->inbox->contactLabel($conversation),
-                    'platform'      => (string) $conversation->platform,
-                    'preview'       => $conversation->last_message_preview,
-                    'unread'        => (int) $conversation->unread_count,
-                    'messages'      => (int) $conversation->message_count,
-                    'status'        => $conversation->status->value,
-                    'owner'         => $this->owner($conversation)->value,
-                    'lastMessageAt' => $conversation->last_message_at?->toIso8601String(),
-                    'viewUrl'       => $this->url('show', $assistant, ['record' => $conversation->getKey()]),
-                ],
+                // A closure, not an arrow function: the operator names it resolves are kept for the next rows.
+                function (Conversation $conversation) use ($assistant, $request, &$names): array {
+                    return $this->row($conversation, $assistant, $request, $names);
+                },
             ),
-            'statuses' => array_map(static fn (ConversationStatus $status): string => $status->value, ConversationStatus::cases()),
-            'live'     => $this->live($assistant),
-            'urls'     => ['index' => $this->url('index', $assistant)],
+            'handlings' => ['queued', 'mine', 'staff', 'bot'],
+            'live'      => $this->live($assistant),
+            'urls'      => ['index' => $this->url('index', $assistant)],
         ]);
     }
 
@@ -134,47 +126,64 @@ final class ConversationController extends Controller
         $limit    = $this->messageLimit($request);
         $messages = $this->inbox->transcript($conversation, $limit);
         $owner    = $this->owner($conversation);
+        $ownerId  = ConversationOwner::Staff === $owner && null !== $conversation->owner_staff_user_id ? (string) $conversation->owner_staff_user_id : null;
+        $me       = $this->userId($request);
         $canReply = Gate::allows('reply', $conversation);
+        $holding  = $canReply && null !== $ownerId && $ownerId === $me;
         $key      = (string) $conversation->getKey();
+        $names    = [];
+        $user     = $request->user();
 
         return Inertia::render('Console/Conversations/Show', [
             'conversation' => [
-                'id'        => $key,
-                'contact'   => $this->inbox->contactLabel($conversation),
-                'platform'  => (string) $conversation->platform,
-                'status'    => $conversation->status->value,
-                'owner'     => $owner->value,
-                'ownerName' => ConversationOwner::Staff === $owner && null !== $conversation->owner_staff_user_id
-                    ? ($this->inbox->staffNames([(string) $conversation->owner_staff_user_id])[(string) $conversation->owner_staff_user_id] ?? null)
-                    : null,
+                'id'           => $key,
+                'contact'      => $this->inbox->contactLabel($conversation),
+                'platform'     => (string) $conversation->platform,
+                'owner'        => $owner->value,
+                'ownerId'      => $ownerId,
+                'ownerName'    => null !== $ownerId ? $this->ownerName($ownerId, $names) : null,
+                'queuedAt'     => ConversationOwner::Queued === $owner ? $conversation->queued_at?->toIso8601String() : null,
                 'messageCount' => (int) $conversation->message_count,
             ],
             'messages' => $this->messages($conversation, $messages),
-            'paging'   => [
+            // The side list for switching threads; it is part of the page's live reloads, so it stays current beside the transcript.
+            'threads' => $this->inbox->query($assistant)
+                ->with('contact')
+                ->orderByRaw('conversations.last_message_at DESC NULLS LAST')
+                ->limit(self::THREADS_LIST)
+                ->get()
+                ->map(function (Conversation $thread) use ($assistant, $request, &$names): array {
+                    return $this->row($thread, $assistant, $request, $names);
+                })
+                ->all(),
+            'paging' => [
                 'limit'   => $limit,
                 'hasMore' => $conversation->message_count > $messages->count() && $limit < self::MESSAGES_MAX,
                 'older'   => min($limit + self::MESSAGES_PAGE, self::MESSAGES_MAX),
             ],
             'can' => [
-                'reply'       => $canReply,
-                'compose'     => $canReply && ConversationOwner::Staff === $owner,
-                'takeOver'    => $canReply && ConversationOwner::Staff !== $owner,
-                'returnToBot' => $canReply && ConversationOwner::Staff === $owner,
-                'setStatus'   => $canReply,
+                'reply'    => $canReply,
+                'compose'  => $holding,
+                'takeOver' => $canReply && ConversationOwner::Staff !== $owner,
+                'finish'   => $holding,
+                'transfer' => $holding,
+                'seize'    => $user instanceof User && $user->isAdmin() && null !== $ownerId && $ownerId !== $me,
             ],
-            'attachment' => [
+            'transferTargets' => $holding && $user instanceof User ? $this->inbox->transferTargets($assistant, $user) : [],
+            'attachment'      => [
                 'maxKb'  => ReplyConversationRequest::attachmentMaxKb(),
                 'accept' => implode(',', ReplyConversationRequest::allowedMimeTypes()),
             ],
             'textMax' => ReplyConversationRequest::TEXT_MAX,
             'live'    => $this->live($assistant),
             'urls'    => [
-                'index'       => $this->url('index', $assistant),
-                'self'        => $this->url('show', $assistant, ['record' => $key]),
-                'reply'       => $this->url('reply', $assistant, ['record' => $key]),
-                'takeOver'    => $this->url('takeover', $assistant, ['record' => $key]),
-                'returnToBot' => $this->url('return-to-bot', $assistant, ['record' => $key]),
-                'status'      => $this->url('status', $assistant, ['record' => $key]),
+                'index'    => $this->url('index', $assistant),
+                'self'     => $this->url('show', $assistant, ['record' => $key]),
+                'reply'    => $this->url('reply', $assistant, ['record' => $key]),
+                'takeOver' => $this->url('takeover', $assistant, ['record' => $key]),
+                'finish'   => $this->url('finish', $assistant, ['record' => $key]),
+                'transfer' => $this->url('transfer', $assistant, ['record' => $key]),
+                'seize'    => $this->url('seize', $assistant, ['record' => $key]),
             ],
         ]);
     }
@@ -187,13 +196,15 @@ final class ConversationController extends Controller
         try {
             $outcome = $this->inbox->reply(
                 $conversation,
-                (string) $request->user()?->getAuthIdentifier(),
+                $this->userId($request),
                 $request->requestId(),
                 $request->text(),
                 $request->attachment(),
             );
         } catch (ConversationNotHeldByStaffException) {
             return $this->back(trans('conversation.notifications.reply_requires_takeover'), 'error');
+        } catch (ConversationHeldByAnotherOperatorException) {
+            return $this->back(trans('conversation.notifications.reply_held_by_another'), 'error');
         } catch (ConversationReplyUndeliverableException) {
             return $this->back(trans('conversation.notifications.reply_undeliverable'), 'error');
         } catch (VolumeLimitReachedException $exception) {
@@ -222,34 +233,87 @@ final class ConversationController extends Controller
 
         Gate::authorize('reply', $conversation);
 
-        if (! $this->inbox->takeOver($conversation, (string) $request->user()?->getAuthIdentifier())) {
-            return $this->back(trans('conversation.notifications.already_taken_over'), 'error');
+        if (! $this->inbox->takeOver($conversation, $this->userId($request))) {
+            return $this->back($this->alreadyHandled($conversation), 'error');
         }
 
         return $this->back(trans('conversation.notifications.taken_over'));
     }
 
-    public function returnToBot(string $assistantKey, string $record): RedirectResponse
+    public function finish(Request $request, string $assistantKey, string $record): RedirectResponse
     {
         $conversation = $this->inbox->find($this->assistant->get(), $record);
 
         Gate::authorize('reply', $conversation);
 
-        $this->inbox->returnToBot($conversation);
+        if (! $this->inbox->finish($conversation, $this->userId($request))) {
+            return $this->back(trans('conversation.notifications.not_holder'), 'error');
+        }
 
         return $this->back(trans('conversation.notifications.returned_to_bot'));
     }
 
-    public function updateStatus(UpdateConversationStatusRequest $request, string $assistantKey, string $record): RedirectResponse
+    public function transfer(TransferConversationRequest $request, string $assistantKey, string $record): RedirectResponse
+    {
+        $assistant    = $this->assistant->get();
+        $conversation = $this->inbox->find($assistant, $record);
+
+        try {
+            $moved = $this->inbox->transfer($assistant, $conversation, $this->userId($request), $request->targetId());
+        } catch (ConversationTransferTargetIneligibleException) {
+            return $this->back(trans('conversation.notifications.transfer_ineligible'), 'error');
+        }
+
+        if (! $moved) {
+            return $this->back(trans('conversation.notifications.not_holder'), 'error');
+        }
+
+        $names = $this->inbox->staffNames([$request->targetId()]);
+
+        return $this->back(trans('conversation.notifications.transferred', ['name' => $names[$request->targetId()] ?? '']));
+    }
+
+    public function seize(SeizeConversationRequest $request, string $assistantKey, string $record): RedirectResponse
     {
         $conversation = $this->inbox->find($this->assistant->get(), $record);
-        $status       = $request->status();
+        $user         = $request->user();
 
-        $this->inbox->setStatus($conversation, $status);
+        if (! $user instanceof User || ! $this->inbox->seize($conversation, $request->expectedOwner(), $user)) {
+            return $this->back($this->alreadyHandled($conversation), 'error');
+        }
 
-        return $this->back(trans('conversation.notifications.status_changed', [
-            'status' => trans('conversation.statuses.' . $status->value),
-        ]));
+        return $this->back(trans('conversation.notifications.seized'));
+    }
+
+    /**
+     * The toast for a take over or seizure that lost: who holds the thread now, read fresh.
+     */
+    private function alreadyHandled(Conversation $conversation): string
+    {
+        $holder = $conversation->fresh();
+        $id     = ConversationOwner::Staff === $holder?->owner_type && null !== $holder->owner_staff_user_id ? (string) $holder->owner_staff_user_id : null;
+        $name   = null !== $id ? ($this->inbox->staffNames([$id])[$id] ?? null) : null;
+
+        return null !== $name
+            ? trans('conversation.notifications.already_handled_by', ['name' => $name])
+            : trans('conversation.notifications.already_taken_over');
+    }
+
+    private function userId(Request $request): string
+    {
+        return (string) $request->user()?->getAuthIdentifier();
+    }
+
+    /**
+     * @param  array<string, string|null>  $names  Names resolved so far, by operator id.
+     */
+    private function ownerName(string $id, array &$names): ?string
+    {
+        if (! array_key_exists($id, $names)) {
+            $names[$id] = $this->inbox->staffNames([$id])[$id] ?? null;
+        }
+
+        return $names[$id];
     }
 
     /**
@@ -309,7 +373,7 @@ final class ConversationController extends Controller
                     MessageSenderType::Staff     => $staffNames[(string) $message->sender_staff_user_id] ?? trans('conversation.authors.staff'),
                 },
                 'contentType' => $message->content_type->value,
-                'text'        => $message->text,
+                'text'        => $this->text($message),
                 'media'       => $media,
                 'buttons'     => $this->buttons($message),
                 'delivery'    => MessageDirection::Outbound === $message->direction ? $message->status->value : null,
@@ -318,6 +382,19 @@ final class ConversationController extends Controller
         }
 
         return $rows;
+    }
+
+    /**
+     * The text of a bubble. A button press stored before its title was captured has the raw callback data as its
+     * text, and only newer rows mark the data apart in the payload, so such a row shows no text rather than the data.
+     */
+    private function text(ConversationMessage $message): ?string
+    {
+        if (MessageContentType::Callback === $message->content_type && ! isset($message->payload['callback_data']) && null !== $message->text && 1 === preg_match('/^[0-9a-f]{64}$/', $message->text)) {
+            return null;
+        }
+
+        return $message->text;
     }
 
     /**
@@ -361,6 +438,32 @@ final class ConversationController extends Controller
         }
 
         return $labels;
+    }
+
+    /**
+     * One thread as a list row, for the inbox table and the open thread's side list alike.
+     *
+     * @return array<string, mixed>
+     */
+    private function row(Conversation $conversation, Assistant $assistant, Request $request, array &$names): array
+    {
+        $owner   = $this->owner($conversation);
+        $ownerId = ConversationOwner::Staff === $owner ? $conversation->owner_staff_user_id : null;
+
+        return [
+            'id'            => (string) $conversation->getKey(),
+            'contact'       => $this->inbox->contactLabel($conversation),
+            'platform'      => (string) $conversation->platform,
+            'preview'       => $conversation->last_message_preview,
+            'unread'        => (int) $conversation->unread_count,
+            'messages'      => (int) $conversation->message_count,
+            'owner'         => $owner->value,
+            'ownerName'     => null !== $ownerId ? $this->ownerName($ownerId, $names) : null,
+            'queuedAt'      => ConversationOwner::Queued === $owner ? $conversation->queued_at?->toIso8601String() : null,
+            'mine'          => null !== $ownerId && $ownerId === $this->userId($request),
+            'lastMessageAt' => $conversation->last_message_at?->toIso8601String(),
+            'viewUrl'       => $this->url('show', $assistant, ['record' => $conversation->getKey()]),
+        ];
     }
 
     private function owner(Conversation $conversation): ConversationOwner

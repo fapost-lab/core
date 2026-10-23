@@ -150,10 +150,11 @@ final class ConsoleRouteInterceptionTest extends FeatureTestCase
             'broadcast cancel'         => ['console.broadcasts.cancel', BroadcastController::class, 'cancel', 'POST', 'assistant/{assistant}/broadcasts/{record}/cancel'],
             'broadcast destroy'        => ['console.broadcasts.destroy', BroadcastController::class, 'destroy', 'DELETE', 'assistant/{assistant}/broadcasts/{record}'],
             // Conversations.
-            'conversation reply'         => ['console.conversations.reply', ConversationController::class, 'reply', 'POST', 'assistant/{assistant}/conversations/{record}/reply'],
-            'conversation takeover'      => ['console.conversations.takeover', ConversationController::class, 'takeOver', 'POST', 'assistant/{assistant}/conversations/{record}/takeover'],
-            'conversation return to bot' => ['console.conversations.return-to-bot', ConversationController::class, 'returnToBot', 'POST', 'assistant/{assistant}/conversations/{record}/return-to-bot'],
-            'conversation status'        => ['console.conversations.status', ConversationController::class, 'updateStatus', 'PUT', 'assistant/{assistant}/conversations/{record}/status'],
+            'conversation reply'    => ['console.conversations.reply', ConversationController::class, 'reply', 'POST', 'assistant/{assistant}/conversations/{record}/reply'],
+            'conversation takeover' => ['console.conversations.takeover', ConversationController::class, 'takeOver', 'POST', 'assistant/{assistant}/conversations/{record}/takeover'],
+            'conversation finish'   => ['console.conversations.finish', ConversationController::class, 'finish', 'POST', 'assistant/{assistant}/conversations/{record}/finish'],
+            'conversation transfer' => ['console.conversations.transfer', ConversationController::class, 'transfer', 'POST', 'assistant/{assistant}/conversations/{record}/transfer'],
+            'conversation seize'    => ['console.conversations.seize', ConversationController::class, 'seize', 'POST', 'assistant/{assistant}/conversations/{record}/seize'],
             // Assistant settings.
             'settings update'     => ['console.settings.update', AssistantSettingsController::class, 'update', 'PUT', 'assistant/{assistant}/settings'],
             'settings store flow' => ['console.settings.store-flow', AssistantSettingsController::class, 'storeFlow', 'POST', 'assistant/{assistant}/settings/flows'],

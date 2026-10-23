@@ -54,7 +54,6 @@ function errorOf(field: SettingField): string | undefined {
     <Switch
       v-if="field.type === 'boolean'"
       :id="`setting-${field.key}`"
-      class="w-fit"
       :model-value="model[field.key] === true"
       :aria-invalid="invalid"
       :aria-describedby="describedBy"

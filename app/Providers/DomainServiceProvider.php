@@ -11,6 +11,7 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Contracts\TenantResolverInterface;
+use App\Domains\Tenancy\Contracts\WebhookRegistryHealthCheckerInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryReaderInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryWriterInterface;
 use App\Domains\Tenancy\Database\TenantDatabaseManager;
@@ -51,6 +52,7 @@ use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
 use App\Domains\Tenancy\Services\UnlimitedTenantLimits;
 use App\Domains\Tenancy\Services\UnlimitedUsageMeter;
+use App\Domains\Tenancy\Services\WebhookRegistryHealthChecker;
 use App\Domains\Tenancy\Services\WebhookRegistryWriter;
 use App\Domains\Tenancy\Settings\BuiltTenantSettings;
 use App\Domains\Tenancy\Settings\TenantSettings;
@@ -168,6 +170,7 @@ final class DomainServiceProvider extends ServiceProvider
         $this->registerAccessMode();
 
         $this->app->singleton(WebhookRegistryWriterInterface::class, WebhookRegistryWriter::class);
+        $this->app->bind(WebhookRegistryHealthCheckerInterface::class, WebhookRegistryHealthChecker::class);
         $this->app->singleton(WebhookRegistryReaderInterface::class, EloquentWebhookRegistryReader::class);
 
         // CoreBootstrap memoizes the booted tenant id; once TenantSwitcher restores

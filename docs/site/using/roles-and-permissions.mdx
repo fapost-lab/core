@@ -96,8 +96,15 @@ A permission says what someone may do; their assignment says to which assistants
 Anything that belongs to one assistant needs both, and admins reach every
 assistant without being assigned.
 
+Being assigned to an assistant opens its console; each screen inside it then asks
+for its own permission. Someone answering customers needs no permission to manage
+the assistant: an assignment plus **View conversations** and **Reply to
+conversations** is enough to work its inbox. An assignment with no permission for
+any of the assistant's screens shows nothing.
+
 | Area | What it takes |
 |---|---|
+| **Conversations** | **View conversations**, plus an assignment to the conversation's assistant. **Reply to conversations** on top of that to take over, accept, reply, finish and transfer — and only the operator holding a conversation replies in it. A conversation is transferred only to someone with both permissions and an assignment to its assistant |
 | **Broadcasts** | **Manage broadcasts**, plus an assignment to the broadcast's assistant. Sending and cancelling follow the same rule |
 | **Segments** | **View contacts**, **Manage contacts** or **Manage broadcasts** to see them; **Manage contacts** or **Manage broadcasts** to create, edit and delete them. Segments are the audiences of broadcasts, so a broadcast manager can build them without access to the contact base |
 | **Flow builder** | **Create / edit flow drafts**, plus an assignment to the flow's assistant. **Publish flow to live** is needed on top of that to publish |

@@ -36,7 +36,7 @@ const t = computed(() => page.props.translations.console.channels)
 
     <ChannelsTable :table="table" :can="can" :url="urls.index">
       <template #toolbar>
-        <Button v-if="can.create" as-child class="ml-auto">
+        <Button v-if="can.create" as-child>
           <Link :href="urls.create">
             <Plus aria-hidden="true" />
             {{ t.new }}

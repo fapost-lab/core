@@ -5,16 +5,17 @@ declare(strict_types=1);
 namespace App\Console\Commands\Ops;
 
 use App\Domains\Channels\Services\IngressMigrator;
+use App\Domains\Health\Enums\HealthState;
+use App\Domains\Health\Probes\GatewayProbe;
 use App\Domains\Webhook\Enums\IngressDriver;
+use App\Domains\Webhook\Enums\SpecStatus;
+use App\Domains\Webhook\Services\IngressSpecPublisher;
 use App\Domains\Webhook\Services\IngressSpecResolver;
 use App\Domains\Webhook\Services\WebhookUrlGenerator;
-use Fapost\Foundation\Channel\Ingress\IngressSpec;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Config\Repository;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Redis;
 use Throwable;
-use ValueError;
 
 /**
  * Checks that the application and the gateway can actually see each other.
@@ -41,6 +42,8 @@ final class GatewayDoctorCommand extends Command
         private readonly IngressSpecResolver $specs,
         private readonly WebhookUrlGenerator $urls,
         private readonly IngressMigrator $migrator,
+        private readonly IngressSpecPublisher $publisher,
+        private readonly GatewayProbe $gateway,
     ) {
         parent::__construct();
     }
@@ -134,10 +137,15 @@ final class GatewayDoctorCommand extends Command
             return;
         }
 
-        foreach ($declarative as $platform) {
-            $published = $this->publishedSpec($platform);
+        try {
+            $inspected = $this->publisher->inspect();
+        } catch (Throwable) {
+            // Redis cannot be read, so nothing can be shown as published.
+            $inspected = array_fill_keys($declarative, ['status' => SpecStatus::Missing, 'scheme' => null]);
+        }
 
-            if (null === $published) {
+        foreach ($inspected as $platform => $spec) {
+            if (SpecStatus::Missing === $spec['status']) {
                 $this->reportProblem(
                     "No spec published for {$platform}. Run php artisan ops:ingress-specs-publish."
                 );
@@ -145,9 +153,7 @@ final class GatewayDoctorCommand extends Command
                 continue;
             }
 
-            $expected = $this->specs->specFor($platform);
-
-            if (null !== $expected && $expected->jsonSerialize() !== $published->jsonSerialize()) {
+            if (SpecStatus::Differs === $spec['status']) {
                 $this->reportProblem(
                     "The published spec for {$platform} differs from the adapter's. "
                     . 'Republish with php artisan ops:ingress-specs-publish.'
@@ -158,23 +164,8 @@ final class GatewayDoctorCommand extends Command
 
             $this->components->twoColumnDetail(
                 "Spec: {$platform}",
-                $published->scheme->value . ' (published, matches adapter)',
+                $spec['scheme'] . ' (published, matches adapter)',
             );
-        }
-    }
-
-    private function publishedSpec(string $platform): ?IngressSpec
-    {
-        try {
-            $raw = Redis::get('ingress:spec:' . $platform);
-
-            if (! is_string($raw) || '' === $raw) {
-                return null;
-            }
-
-            return IngressSpec::fromArray(json_decode($raw, true, flags: JSON_THROW_ON_ERROR));
-        } catch (Throwable|ValueError) {
-            return null;
         }
     }
 
@@ -191,21 +182,20 @@ final class GatewayDoctorCommand extends Command
             return;
         }
 
-        $url = mb_rtrim($base, '/') . '/healthz';
+        $health = $this->gateway->probeEndpoint($base);
+        $url    = (string) $health->details['url'];
 
-        try {
-            $response = Http::timeout(5)->get($url);
-        } catch (Throwable $throwable) {
+        if (HealthState::Unknown === $health->state) {
             $this->components->warn(
-                "Could not reach {$url}: {$throwable->getMessage()}. "
+                "Could not reach {$url}: {$health->details['error']}. "
                 . 'If the gateway is not deployed yet, this is expected.'
             );
 
             return;
         }
 
-        if (! $response->successful()) {
-            $this->reportProblem("The gateway answered {$response->status()} at {$url}.");
+        if (HealthState::Down === $health->state) {
+            $this->reportProblem($health->reason);
 
             return;
         }

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
-use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
@@ -225,8 +224,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
             );
         }
 
-        $templateContext = $this->buildTemplateContext($state, $context->contactId);
-        $payload         = $this->resolveMultilingualPayload($normalized, $context, $templateContext);
+        $payload = $this->resolveMultilingualPayload($normalized, $context, $state);
 
         try {
             $externalMessageId = $this->sender->send(
@@ -629,34 +627,6 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
         } catch (Throwable) {
             // Best-effort — never block the flow on a hint message failure.
         }
-    }
-
-    /**
-     * Builds the template variable context by merging flow state with contact data.
-     *
-     * @param  array<string, mixed>  $state
-     *
-     * @return array<string, mixed>
-     */
-    private function buildTemplateContext(array $state, string $contactId): array
-    {
-        try {
-            $contact = Contact::query()->select(['id', 'language', 'meta', 'platform'])->find($contactId);
-        } catch (Throwable) {
-            $contact = null;
-        }
-
-        $meta = ($contact instanceof Contact && is_array($contact->meta)) ? $contact->meta : [];
-
-        return array_merge($state, [
-            'contact' => [
-                'id'       => $contact instanceof Contact ? (string)$contact->getKey() : '',
-                'language' => $contact instanceof Contact ? ($contact->language ?? '') : '',
-                'name'     => $meta['name'] ?? $meta['first_name'] ?? '',
-                'username' => $meta['username'] ?? '',
-                'channel'  => $contact instanceof Contact ? $contact->platform : '',
-            ],
-        ]);
     }
 
     /**

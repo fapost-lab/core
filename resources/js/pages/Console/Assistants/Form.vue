@@ -52,7 +52,7 @@ function submit(): void {
       </FormField>
 
       <FormField id="is_active" :label="t.fields.is_active" :hint="t.fields.is_active_help" :error="form.errors.is_active" v-slot="{ invalid, describedBy }">
-        <Switch id="is_active" v-model="form.is_active" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
+        <Switch id="is_active" v-model="form.is_active" :aria-invalid="invalid" :aria-describedby="describedBy" />
       </FormField>
     </FormSection>
 
