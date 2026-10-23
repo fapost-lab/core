@@ -4,6 +4,9 @@ Destination: a new tenant's first administrator cannot miss the irreversible dec
 working assistant, always sees what is left to set up, and Core, Solutions and the SaaS shell add
 their own steps without touching each other's code.
 
+Epic: epic/tenant-onboarding
+Release: minor
+
 ## Phase 1 — A new tenant cannot miss the language
 
 Goal: the language trap is closed for every new tenant. Done when: on a freshly provisioned tenant
