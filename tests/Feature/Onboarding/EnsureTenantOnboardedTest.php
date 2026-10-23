@@ -46,7 +46,8 @@ final class EnsureTenantOnboardedTest extends FeatureTestCase
         $admin     = $this->admin();
         $assistant = Assistant::factory()->create();
         $draft     = FlowDraft::factory()->create(['tenant_id' => $assistant->tenant_id, 'assistant_id' => $assistant->getKey()]);
-        $wizard    = route('console.admin.onboarding.show');
+        // The path, not the absolute URL: the builder and media URLs carry no panel host, and CI's APP_URL has a port.
+        $wizard = (string)parse_url(route('console.admin.onboarding.show'), PHP_URL_PATH);
 
         foreach ([
             $this->panelUrl('/admin'),
@@ -55,7 +56,7 @@ final class EnsureTenantOnboardedTest extends FeatureTestCase
             "/builder/flows/{$draft->flow_id}",
             '/media/folders',
         ] as $url) {
-            $this->actingAs($admin)->get($url)->assertRedirect($wizard);
+            $this->actingAs($admin)->get($url)->assertRedirectContains($wizard);
         }
     }
 
