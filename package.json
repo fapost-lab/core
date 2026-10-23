@@ -25,7 +25,7 @@
         "vue-tsc": "^3.2.7"
     },
     "dependencies": {
-        "@fapost/ui": "^0.1.0",
+        "@fapost/ui": "^0.1.1",
         "@inertiajs/vue3": "^3.7.1",
         "@lucide/vue": "^1.53.0",
         "@vitejs/plugin-vue": "^6.0.6",
