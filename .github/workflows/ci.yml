@@ -167,7 +167,7 @@ jobs:
       # change (for example to use the Solution testing kit); the commit only
       # has to be reachable on some branch of that repository, merged or not.
       SOLUTION_REPOSITORY: fapost-lab/solution-hello-world
-      SOLUTION_REF: 0a6a67b808428763c67268f92d053b7823e3e054
+      SOLUTION_REF: c806df9d0564cc901a0462ec71198d50921daa9a
       SOLUTION_PACKAGE: fapost/solution-hello-world
       SOLUTION_PATH: packages/solution-hello-world
 
