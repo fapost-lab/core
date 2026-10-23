@@ -104,9 +104,10 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   overview. Absent: the other registrar methods, and the author's half of Solution UI (the Vite preset, the kit-range check, the derived-image
   recipe — `first-solution` phase 0).
 - **Landlord data is reached only through Tenancy.** Other domains depend on
-  `Tenancy/Contracts`; the `landlord` connection is opened only inside Tenancy infrastructure. Only the SaaS operator
-  package may open it, for its own prefixed tables and never for Core's; Plugin and Solution packages may not
-  (`adr-20261005-extension-packages-own-landlord-tables`, amended 2026-10-08).
+  `Tenancy/Contracts`; the `landlord` connection is opened only inside Tenancy infrastructure. Only installation operator
+  packages (SaaS, monitoring) may open it, for their own tables and never for Core's; Plugin and Solution packages may not
+  (`adr-20261005-extension-packages-own-landlord-tables`, amended 2026-10-08;
+  `adr-20261023-operator-packages-own-landlord-tables`).
 - **Cross-domain asynchronous work goes through named queues** separated by purpose:
   `flow.execution`, `messaging.broadcast`, `messaging.system`, `messaging.logging`,
   `scheduled.triggers`; `messaging.transactional` and `sync.external` are reserved and have no
