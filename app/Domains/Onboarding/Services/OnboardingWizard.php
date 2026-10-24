@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Onboarding\Services;
 
+use App\Domains\Onboarding\Contracts\OnboardingStepInterface;
 use App\Domains\Onboarding\DTO\WizardDecision;
 use App\Domains\Onboarding\DTO\WizardMove;
 
@@ -42,14 +43,52 @@ final readonly class OnboardingWizard
     }
 
     /**
-     * The steps in order, as the pages list them. `current` marks the first required step still open.
+     * Whether a step with this key is registered.
+     */
+    public function hasStep(string $key): bool
+    {
+        foreach ($this->progress->steps() as $step) {
+            if ($step->key() === $key) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * The next optional step that is still open, in the wizard's order: after the step with the key `$after`, or from
+     * the start when it is null. Nothing is written: a step that was skipped is open again the next time it is asked.
+     */
+    public function nextOptional(?string $after = null): ?OnboardingStepInterface
+    {
+        $passed = null === $after;
+
+        foreach ($this->progress->report()->steps as $progress) {
+            if (! $passed) {
+                $passed = $progress->step->key() === $after;
+
+                continue;
+            }
+
+            if (! $progress->step->required() && ! $progress->complete) {
+                return $progress->step;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * The steps in order, as the pages list them. `current` marks the step whose page is open (`$currentKey`, for an
+     * optional step), else the first required step still open.
      *
      * @return list<array{key: string, required: bool, complete: bool, current: bool}>
      */
-    public function stepProps(): array
+    public function stepProps(?string $currentKey = null): array
     {
         $report  = $this->progress->report();
-        $current = $report->firstIncompleteRequired()?->step->key();
+        $current = $currentKey ?? $report->firstIncompleteRequired()?->step->key();
         $props   = [];
 
         foreach ($report->steps as $progress) {

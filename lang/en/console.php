@@ -1763,7 +1763,10 @@ return [
 
     // The first-run setup wizard (admin/onboarding). The pages' own strings are added with the pages.
     'onboarding' => [
-        'done' => 'Setup is complete. Welcome!',
+        'done'          => 'Setup is complete. Welcome!',
+        'required_done' => 'The required setup is done. The remaining steps are optional, so you can skip them.',
+        'skip'          => 'Skip for now',
+        'continue'      => 'Continue',
 
         'layout' => [
             'progress'  => 'Setup progress',
@@ -1780,6 +1783,14 @@ return [
             'first_assistant' => [
                 'title'       => 'First assistant',
                 'description' => 'Create the assistant that will talk to your contacts.',
+            ],
+            'channel' => [
+                'title'       => 'Channel',
+                'description' => 'Connect a bot so your contacts can reach the assistant.',
+            ],
+            'team' => [
+                'title'       => 'Team',
+                'description' => 'Invite the people who will work in the console with you.',
             ],
         ],
         'languages' => [
@@ -1815,6 +1826,16 @@ return [
             'placeholder'   => 'Choose a language',
             'create'        => 'Create assistant',
             'creating'      => 'Creating…',
+        ],
+        'channel' => [
+            'title'       => 'Connect a channel',
+            'description' => 'Add a bot token so messages sent to that bot reach the assistant. It starts answering once a flow is published.',
+            'later'       => 'Not now? Skip this step. You can connect a channel at any time under :path.',
+        ],
+        'team' => [
+            'title'       => 'Invite your team',
+            'description' => 'Each person gets an email with a link to set a password. You can invite more people at any time.',
+            'later'       => 'Not now? Skip this step. You can invite people at any time under :path.',
         ],
         'waiting' => [
             'title'       => 'Your administrator is finishing the setup',

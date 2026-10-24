@@ -56,7 +56,7 @@ final class OnboardingRegistryTest extends TestCase
 
     public function test_the_core_steps_are_in_the_order_of_the_wizard(): void
     {
-        $this->assertSame(['languages', 'first_assistant'], array_map(static fn (CoreOnboardingStep $step): string => $step->value, CoreOnboardingStep::cases()));
+        $this->assertSame(['languages', 'first_assistant', 'channel', 'team'], array_map(static fn (CoreOnboardingStep $step): string => $step->value, CoreOnboardingStep::cases()));
     }
 
     public function test_a_failing_check_is_counted_complete_and_flagged_uncertain(): void

@@ -15,7 +15,7 @@ paths:
   - "app/Http/Controllers/Admin/Onboarding*.php"
   - app/Console/Commands/Ops/TenantsOnboardingRestartCommand.php
   - "tests/Feature/Onboarding/**"
-reviewed_at: 2026-10-23
+reviewed_at: 2026-10-24
 ---
 # Onboarding rules
 
@@ -61,6 +61,18 @@ Each entry names what enforces it. "Review only" means nothing fails automatical
   operator, payment or external account. A step that cannot be done holds the console forever. Review only.
 - **A step's completion comes from data where it can.** A step that cannot be derived records a confirmation in
   `confirmed_steps`; a restart forgets confirmations and keeps what the data shows. Review only.
+- **Optional steps come after the wizard closes and write no state.** The gate holds required steps only (spec D9):
+  when the last required step is done the wizard writes `complete` and only then offers the optional steps that are
+  still open (Core: `channel`, `team`), landing in the console after the last. Their pages work for any tenant that
+  is not pending and send a pending one back to the wizard's entry. Skipping is `console.admin.onboarding.continue`,
+  which records nothing: a skipped step stays open, by its data, for the checklist (D6a). Why: a recorded skip would
+  be a second state with a second writer, and an optional step must never hold the console. A step that cannot be
+  done for this user (no assistant, a limit reached) is passed over, not shown. Enforced:
+  `OnboardingOptionalStepsTest::test_skipping_walks_on_to_the_console_and_writes_nothing`,
+  `test_the_optional_pages_send_the_person_back_while_a_required_step_is_open`.
+- **The team is the tenant's own people.** A derived check counts what the tenant did: the platform support user is
+  never "the team" (`TeamStep`, `User::withoutPlatformSupport()`). Enforced:
+  `OnboardingOptionalStepsTest::test_the_platform_support_user_is_not_the_team_but_an_invitation_is`.
 - **Each step's page authorizes its own permission** (`adr-20261023-console-entry-by-assignment`); staff without
   `ManageSettings` see the waiting page, never a 403. Enforced:
   `OnboardingWizardTest::test_staff_who_may_not_manage_settings_see_the_waiting_page`.

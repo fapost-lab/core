@@ -87,6 +87,8 @@ final class OnboardingWizardTest extends FeatureTestCase
                 ->where('onboarding.steps', [
                     ['key' => 'languages', 'required' => true, 'complete' => false, 'current' => true],
                     ['key' => 'first_assistant', 'required' => true, 'complete' => false, 'current' => false],
+                    ['key' => 'channel', 'required' => false, 'complete' => false, 'current' => false],
+                    ['key' => 'team', 'required' => false, 'complete' => false, 'current' => false],
                 ])
                 ->where('languages', ['base' => 'en', 'available' => ['en'], 'fallback' => 'en'])
                 ->where('options', fn ($options): bool => collect($options)->contains(['value' => 'uk', 'label' => 'Ukrainian — Українська']))
@@ -168,7 +170,7 @@ final class OnboardingWizardTest extends FeatureTestCase
         $this->assertSame(0, Assistant::query()->count());
     }
 
-    public function test_the_last_step_closes_the_wizard_and_opens_the_new_assistant(): void
+    public function test_the_last_required_step_closes_the_wizard_and_offers_the_optional_ones(): void
     {
         $admin = $this->admin();
 
@@ -177,7 +179,8 @@ final class OnboardingWizardTest extends FeatureTestCase
         $response = $this->actingAs($admin)->post($this->panelUrl('/admin/onboarding/assistant'), ['name' => 'Sales bot', 'default_language' => 'en']);
 
         $assistant = Assistant::query()->sole();
-        $response->assertRedirect(route('console.home', ['assistant' => (string) $assistant->getKey()]));
+        $response->assertRedirect(route('console.admin.onboarding.channel.create'))
+            ->assertInertiaFlash('success', trans('console.onboarding.required_done'));
         $this->assertSame('Sales bot', $assistant->name);
         $this->assertSame('en', $assistant->default_language);
 
@@ -195,7 +198,7 @@ final class OnboardingWizardTest extends FeatureTestCase
         $this->actingAs($admin)->get($this->panelUrl('/admin/onboarding/assistant'))->assertRedirect(route('console.admin.onboarding.show'));
 
         $this->actingAs($admin)->put($this->panelUrl('/admin/onboarding/languages'), $this->languages())
-            ->assertRedirect(route('console.entry'));
+            ->assertRedirect(route('console.admin.onboarding.channel.create'));
 
         $this->assertFalse($this->app->make(OnboardingState::class)->isPending());
         $this->assertNotNull($assistant);
@@ -225,7 +228,7 @@ final class OnboardingWizardTest extends FeatureTestCase
         $admin = $this->admin();
 
         $this->actingAs($admin)->get($this->panelUrl('/admin'))->assertRedirect(route('console.admin.onboarding.show'));
-        $this->actingAs($admin)->get($this->panelUrl('/admin/onboarding'))->assertRedirect(route('console.entry'));
+        $this->actingAs($admin)->get($this->panelUrl('/admin/onboarding'))->assertRedirect(route('console.admin.onboarding.channel.create'));
 
         $this->assertFalse($this->app->make(OnboardingState::class)->isPending());
         $this->assertNotNull((new OnboardingSettings())->completed_at);
