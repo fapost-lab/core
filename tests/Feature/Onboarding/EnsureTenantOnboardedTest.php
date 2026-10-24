@@ -136,8 +136,8 @@ final class EnsureTenantOnboardedTest extends FeatureTestCase
         $this->actingAs($admin)->get($this->panelUrl('/admin'))->assertOk();
         $this->actingAs($admin)->get($this->panelUrl('/admin/usage'))->assertOk();
 
+        // The shell builds the steps to read their keys (the late-step banner); nothing asks one whether it is done.
         $this->assertSame(0, $step->checks);
-        $this->assertSame(0, $step->built);
     }
 
     public function test_a_tenant_whose_state_cannot_be_read_is_not_held(): void

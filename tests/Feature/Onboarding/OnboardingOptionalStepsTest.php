@@ -10,6 +10,7 @@ use App\Domains\Channels\Enums\ChannelWebhookStatus;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Onboarding\Services\OnboardingProgress;
 use App\Domains\Onboarding\Services\OnboardingState;
+use App\Domains\Onboarding\Services\OnboardingWizard;
 use App\Domains\Onboarding\Settings\OnboardingSettings;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Jobs\SendActivationEmailJob;
@@ -74,7 +75,7 @@ final class OnboardingOptionalStepsTest extends FeatureTestCase
         Bus::fake([SyncChannelWebhookJob::class, SendActivationEmailJob::class]);
 
         $this->assistant = Assistant::factory()->create();
-        $this->app->make(OnboardingState::class)->complete();
+        $this->app->make(OnboardingWizard::class)->close();
     }
 
     public function test_the_channel_page_carries_the_props_of_its_contract_and_no_secret(): void

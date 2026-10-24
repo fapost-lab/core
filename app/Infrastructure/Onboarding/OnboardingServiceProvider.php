@@ -8,6 +8,9 @@ use App\Domains\Onboarding\Contracts\OnboardingStepInterface;
 use App\Domains\Onboarding\Enums\CoreOnboardingStep;
 use App\Domains\Onboarding\Enums\OnboardingOrigin;
 use App\Domains\Onboarding\OnboardingBlock;
+use App\Domains\Onboarding\Services\OnboardingAnnouncements;
+use App\Domains\Onboarding\Services\OnboardingChecklist;
+use App\Domains\Onboarding\Services\OnboardingLateSteps;
 use App\Domains\Onboarding\Services\OnboardingProgress;
 use App\Domains\Onboarding\Services\OnboardingRegistry;
 use App\Domains\Onboarding\Services\OnboardingState;
@@ -37,6 +40,10 @@ final class OnboardingServiceProvider extends ServiceProvider
             $app->make(LoggerInterface::class),
         ));
         $this->app->scoped(OnboardingWizard::class);
+        $this->app->scoped(OnboardingAnnouncements::class);
+        $this->app->scoped(OnboardingChecklist::class);
+        $this->app->scoped(OnboardingLateSteps::class);
+        $this->app->scoped(LateStepAnnouncer::class);
 
         // Plain bind: Core is the only implementation; an operator package calls the contract and never replaces it.
         $this->app->bind(TenantOnboardingInterface::class, CoreTenantOnboarding::class);

@@ -30,6 +30,9 @@ use Inertia\Response;
  *   baseLanguageLocked: bool   the tenant already has a flow; the base is shown read-only and cannot change
  *   updateUrl:          string
  *
+ * After the wizard the checklist still links here, so a finished wizard sends the person to the tenant settings, where
+ * the languages live.
+ *
  * Submitting writes the three fields (the base only while unlocked), confirms the step and lets the wizard move on.
  */
 final class OnboardingLanguagesController extends Controller
@@ -49,7 +52,7 @@ final class OnboardingLanguagesController extends Controller
         Gate::authorize(Permission::ManageSettings->value);
 
         if (! $this->state->isPending()) {
-            return redirect()->route('console.admin.dashboard');
+            return redirect()->route('console.admin.tenant-settings.edit');
         }
 
         $options = [];

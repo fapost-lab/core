@@ -12,7 +12,7 @@ import type { Component } from 'vue'
 import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@fapost/ui/components/card'
 import { EmptyState } from '@fapost/ui/components/empty-state'
-import { interpolate } from '@console/shell'
+import { OnboardingChecklistList, interpolate } from '@console/shell'
 import { SolutionWidgets } from '../../../console/solutions'
 import ActivityChart from './ActivityChart.vue'
 import UsageWidget from './UsageWidget.vue'
@@ -31,6 +31,10 @@ const props = defineProps<{
 
 const page = usePage<AdminDashboardPageProps>()
 const t = computed(() => page.props.translations.console.admin_dashboard)
+
+const checklist = computed(() => page.props.onboardingChecklist ?? null)
+const checklistText = computed(() => page.props.translations.console.onboarding.checklist)
+const checklistDone = computed(() => (checklist.value ? checklist.value.items.length - checklist.value.remaining : 0))
 
 const tiles = computed(() => {
   const s = props.stats
@@ -104,6 +108,16 @@ onBeforeUnmount(() => {
       <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
       <p class="text-muted-foreground text-sm">{{ t.description }}</p>
     </div>
+
+    <Card v-if="checklist" data-test="onboarding-checklist-widget">
+      <CardHeader>
+        <CardTitle class="font-display">{{ checklistText.title }}</CardTitle>
+        <CardDescription>{{ interpolate(checklistText.progress, { done: checklistDone, total: checklist.items.length }) }}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <OnboardingChecklistList :checklist="checklist" />
+      </CardContent>
+    </Card>
 
     <div v-if="stopped" class="bg-surface-muted flex flex-wrap items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm" role="status" data-test="poll-stopped">
       <span class="text-muted-foreground">{{ t.stale }}</span>

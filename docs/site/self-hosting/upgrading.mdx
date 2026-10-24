@@ -170,6 +170,12 @@ the upgrade are not affected: the settings migration marks them complete. To sen
 one back through the wizard, see
 [the first-run setup wizard](/self-hosting/tenancy#the-first-run-setup-wizard).
 
+The setup checklist on the dashboard is shown only to tenants that went through
+the wizard (created after the release, or sent back through it); existing
+tenants never see it. When a later upgrade or an activated Solution adds a
+required setup step, a finished tenant is not held again: its staff see a banner
+linking to the step, and its administrators get one bell notification.
+
 ## Message rate is per tenant
 
 Sends are now throttled by each tenant's own rate, set on Tenant settings and stored
