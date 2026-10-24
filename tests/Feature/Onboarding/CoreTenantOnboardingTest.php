@@ -33,7 +33,7 @@ final class CoreTenantOnboardingTest extends FeatureTestCase
         $state = $this->app->make(OnboardingState::class);
         $state->start();
         $state->confirm('languages');
-        $state->complete();
+        $state->complete([]);
         $contract = $this->app->make(TenantOnboardingInterface::class);
 
         $this->assertFalse($contract->isPending(self::TENANT_ID));

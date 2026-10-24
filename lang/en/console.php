@@ -1843,5 +1843,21 @@ return [
             'hint'        => 'You can close this page and come back later.',
         ],
         'support_banner' => 'This tenant has not finished its first-run setup yet.',
+        'checklist'      => [
+            'title'     => 'Finish setting up',
+            'progress'  => ':done of :total done',
+            'remaining' => ':count left',
+            'open'      => 'Setup checklist',
+            'optional'  => 'optional',
+            'done'      => 'Done',
+            'hide'      => 'Hide',
+        ],
+        'late' => [
+            'banner'             => 'Setup needs another step: :step',
+            'waiting'            => 'Your administrator needs to finish a setup step.',
+            'action'             => 'Open',
+            'notification_title' => 'Setup needs another step',
+            'notification_body'  => 'A new required setup step appeared: :step. Finish it to keep everything working.',
+        ],
     ],
 ];

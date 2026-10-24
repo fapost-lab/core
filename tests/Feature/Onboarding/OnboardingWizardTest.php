@@ -13,6 +13,7 @@ use App\Domains\Onboarding\Enums\OnboardingStatus;
 use App\Domains\Onboarding\OnboardingBlock;
 use App\Domains\Onboarding\Services\OnboardingRegistry;
 use App\Domains\Onboarding\Services\OnboardingState;
+use App\Domains\Onboarding\Services\OnboardingWizard;
 use App\Domains\Onboarding\Settings\OnboardingSettings;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Database\Seeders\TenantAclSeeder;
@@ -54,12 +55,12 @@ final class OnboardingWizardTest extends FeatureTestCase
 
     public function test_the_entry_of_a_finished_wizard_is_the_dashboard(): void
     {
-        $this->app->make(OnboardingState::class)->complete();
+        $this->app->make(OnboardingWizard::class)->close();
 
         $this->actingAs($this->admin())
             ->get($this->panelUrl('/admin/onboarding'))
             ->assertRedirect(route('console.admin.dashboard'));
-        $this->actingAs($this->admin())->get($this->panelUrl('/admin/onboarding/languages'))->assertRedirect(route('console.admin.dashboard'));
+        $this->actingAs($this->admin())->get($this->panelUrl('/admin/onboarding/languages'))->assertRedirect(route('console.admin.tenant-settings.edit'));
     }
 
     public function test_staff_who_may_not_manage_settings_see_the_waiting_page(): void

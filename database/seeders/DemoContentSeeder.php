@@ -6,7 +6,7 @@ namespace Database\Seeders;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
-use App\Domains\Onboarding\Services\OnboardingState;
+use App\Domains\Onboarding\Services\OnboardingWizard;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use Illuminate\Database\Seeder;
@@ -38,7 +38,7 @@ final class DemoContentSeeder extends Seeder
             $assistant = Assistant::query()->firstOrFail();
 
             // A tenant with content is not a new one: it is not held in the setup wizard.
-            app(OnboardingState::class)->complete();
+            app(OnboardingWizard::class)->close();
 
             $this->command?->info("Tenant {$tenant->slug} · assistant {$assistant->name}");
 
