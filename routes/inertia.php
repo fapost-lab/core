@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
 use App\Http\Controllers\Admin\OnboardingAssistantController as AdminOnboardingAssistantController;
 use App\Http\Controllers\Admin\OnboardingChannelController as AdminOnboardingChannelController;
+use App\Http\Controllers\Admin\OnboardingChecklistController as AdminOnboardingChecklistController;
 use App\Http\Controllers\Admin\OnboardingController as AdminOnboardingController;
 use App\Http\Controllers\Admin\OnboardingLanguagesController as AdminOnboardingLanguagesController;
 use App\Http\Controllers\Admin\OnboardingTeamController as AdminOnboardingTeamController;
@@ -180,6 +181,7 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('admin/onboarding/channel', [AdminOnboardingChannelController::class, 'store'])->name('console.admin.onboarding.channel.store');
         Route::get('admin/onboarding/team', [AdminOnboardingTeamController::class, 'create'])->name('console.admin.onboarding.team.create');
         Route::post('admin/onboarding/team', [AdminOnboardingTeamController::class, 'store'])->name('console.admin.onboarding.team.store');
+        Route::post('admin/onboarding/checklist/hide', [AdminOnboardingChecklistController::class, 'hide'])->name('console.admin.onboarding.checklist.hide');
 
         // `assistant` is no screen but may be bookmarked: it sends on to an assistant the user may open.
         Route::get('assistant', [AssistantHomeController::class, 'index'])->name('console.entry');

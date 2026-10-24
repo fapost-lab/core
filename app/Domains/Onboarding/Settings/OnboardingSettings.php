@@ -26,6 +26,14 @@ final class OnboardingSettings extends Settings
      */
     public array $confirmed_steps = [];
 
+    /**
+     * Keys of the steps that were registered when the wizard closed. A required step outside this list appeared after
+     * the tenant finished onboarding: that is a late step.
+     *
+     * @var list<string>
+     */
+    public array $known_steps = [];
+
     /** ISO 8601 moment the wizard was (re)started. */
     public ?string $started_at = null;
 

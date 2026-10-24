@@ -12,7 +12,7 @@ use App\Domains\Assistant\Contracts\AssistantServiceInterface;
 use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Domains\Flow\Services\PublishFlowService;
-use App\Domains\Onboarding\Services\OnboardingState;
+use App\Domains\Onboarding\Services\OnboardingWizard;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Services\TenantProvisioningService;
 use App\Domains\Tenancy\Services\TenantSwitcher;
@@ -198,7 +198,7 @@ final class LoadTestSeedCommand extends Command
         $assistant = $this->assistants->create($tenant, ['name' => "Load Test {$slug}"]);
 
         // A seeded tenant is populated, not new: it is not held in the setup wizard.
-        app(OnboardingState::class)->complete();
+        app(OnboardingWizard::class)->close();
 
         $flowId = $this->flows->execute([
             'assistant_id' => (string)$assistant->getKey(),

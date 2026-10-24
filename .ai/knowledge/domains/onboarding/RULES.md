@@ -15,6 +15,7 @@ paths:
   - "app/Http/Controllers/Admin/Onboarding*.php"
   - app/Console/Commands/Ops/TenantsOnboardingRestartCommand.php
   - "tests/Feature/Onboarding/**"
+  - "resources/js/console/shell/OnboardingChecklist*.vue"
 reviewed_at: 2026-10-24
 ---
 # Onboarding rules
@@ -46,7 +47,17 @@ Each entry names what enforces it. "Review only" means nothing fails automatical
   `EnsureCanAccessPanel` and in the builder and media stacks. Enforced: `EnsureTenantOnboardedTest`,
   `ConsoleRoutesArchitectureTest`.
 - **A complete tenant costs the gate one settings read.** Progress — every step's check — runs only for a pending
-  tenant. Enforced: `EnsureTenantOnboardedTest::test_an_onboarded_tenant_does_not_ask_the_steps_anything`.
+  tenant. The gate alone keeps this; the shell's checklist and late-step props cost more (see Known limits).
+  Enforced: `EnsureTenantOnboardedTest::test_an_onboarded_tenant_does_not_ask_the_steps_anything` (asserts no check
+  runs; the steps are built, for their keys).
+- **The wizard's state has one writer; announcements have their own.** `OnboardingSettings` (state, confirmations,
+  `known_steps`) is written only through the wizard: `OnboardingWizard::close()` — also the entry for a seeder or
+  import that creates a populated tenant — and `OnboardingState::start()`. Which late steps reached the bell lives in
+  a separate group, `OnboardingAnnouncementSettings` (`onboarding_announcements`), written only through
+  `OnboardingAnnouncements` and cleared by `start()`. Why: spatie saves every property of a class, so a page load
+  writing into `OnboardingSettings` could save a stale `state` over an operator's restart. Enforced:
+  `OnboardingLateStepTest::test_announcing_never_writes_the_wizards_state`,
+  `test_starting_the_wizard_again_forgets_the_known_and_announced_steps`.
 
 ## Rules
 
@@ -78,3 +89,30 @@ Each entry names what enforces it. "Review only" means nothing fails automatical
   `OnboardingWizardTest::test_staff_who_may_not_manage_settings_see_the_waiting_page`.
 - **Restarting is an operator's action**: it holds a working tenant's console until the required steps are done,
   so the command and every caller of `TenantOnboardingInterface` ask first. Enforced: `CoreTenantOnboardingTest`.
+- **The checklist is only for a tenant that went through the wizard.** It shows when `started_at` is set
+  (provisioning or a restart), the wizard is closed, a step is still open, and the user holds `ManageSettings`; never
+  to the platform support user. A tenant that existed before the wizard never gets one — its `confirmed_steps` is
+  empty, so "Content languages" would stay open forever. Its items are every registered step, optional ones included,
+  linking to the step's wizard page; those pages, once the wizard is closed, send the person to where the thing lives
+  (assistants list, tenant settings) rather than to the dashboard. Enforced: `OnboardingChecklistTest`.
+- **Hiding the checklist is per user and remembers the registry.** Hiding stores the step keys registered at that
+  moment on the user (`users.onboarding_checklist_hidden`); it hides the shell indicator and the dashboard widget, and
+  the checklist returns by itself when a step outside that list is registered. Enforced:
+  `OnboardingChecklistTest::test_hiding_is_per_user_and_a_new_step_brings_the_checklist_back`.
+- **A late step is a required step not in `known_steps`.** Closing the wizard records every registered key; the
+  settings migration gives existing tenants Core's keys. A late step that is open shows a banner to the whole tenant
+  (platform support included) with a link to its page, and is announced once in the bell of the tenant's active staff
+  holding `ManageSettings` — never the platform support user — by the first full page load after it appeared, under a
+  per-tenant cache lock. Admins who arrive later see the banner, not a notification. A known step that reopened from
+  the data (the last assistant deleted), or a late optional step, shows only in the checklist. A late check that
+  throws counts as done and is logged. Enforced: `OnboardingLateStepTest`.
+
+## Known limits
+
+- **The shell's per-page cost.** Every full console page of a complete tenant builds every registered step (for the
+  late-step keys) and reads `OnboardingSettings` several times — the gate, the late-step and checklist props each
+  read it fresh — and, for a tenant that went through the wizard with the checklist not hidden, runs every step's
+  check. The props are closures, so partial reloads (the bell's polling) pay none of it. Reading the state once per
+  request was left open (review finding F3 of `onboarding-checklist`); revisit if step checks stop being cheap.
+- **Announcements are written after delivery.** A notification that throws mid-loop leaves the step unannounced, so
+  the next load may notify earlier recipients again (at-least-once, not at-most-once).

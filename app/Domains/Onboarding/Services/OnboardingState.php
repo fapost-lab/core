@@ -51,6 +51,23 @@ final readonly class OnboardingState
         return array_values($this->settings()->confirmed_steps);
     }
 
+    /**
+     * @return list<string>
+     */
+    public function knownSteps(): array
+    {
+        return array_values($this->settings()->known_steps);
+    }
+
+    /**
+     * Whether the tenant went through the wizard (provisioning or a restart). A tenant that existed before the wizard
+     * did never has a start moment.
+     */
+    public function hasStarted(): bool
+    {
+        return null !== $this->settings()->started_at;
+    }
+
     public function isConfirmed(string $key): bool
     {
         return in_array($key, $this->confirmedSteps(), true);
@@ -77,25 +94,33 @@ final readonly class OnboardingState
         $settings                  = $this->settings();
         $settings->state           = OnboardingStatus::Pending;
         $settings->confirmed_steps = [];
+        $settings->known_steps     = [];
         $settings->started_at      = CarbonImmutable::now()->toIso8601String();
         $settings->completed_at    = null;
         $settings->save();
+
+        // Announcements live in a group of their own; the restart forgets them without writing anything else.
+        (new OnboardingAnnouncements())->forget();
     }
 
     /**
      * Closes the wizard. Called by the wizard when its required steps are done, and by whatever creates a tenant that
      * is already populated.
+     *
+     * @param  list<string>  $knownSteps  keys of every step registered now; the tenant has seen them all, so none of
+     *                                    them is a late step later
      */
-    public function complete(): void
+    public function complete(array $knownSteps): void
     {
         $settings = $this->settings();
 
-        if (OnboardingStatus::Complete === $settings->state) {
-            return;
+        $settings->known_steps = array_values(array_unique([...array_values($settings->known_steps), ...$knownSteps]));
+
+        if (OnboardingStatus::Complete !== $settings->state) {
+            $settings->state        = OnboardingStatus::Complete;
+            $settings->completed_at = CarbonImmutable::now()->toIso8601String();
         }
 
-        $settings->state        = OnboardingStatus::Complete;
-        $settings->completed_at = CarbonImmutable::now()->toIso8601String();
         $settings->save();
     }
 

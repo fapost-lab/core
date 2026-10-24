@@ -37,7 +37,7 @@ final readonly class OnboardingWizard
             return new WizardDecision(WizardMove::Held, null);
         }
 
-        $this->state->complete();
+        $this->close();
 
         return new WizardDecision(WizardMove::Completed, null);
     }
@@ -77,6 +77,19 @@ final readonly class OnboardingWizard
         }
 
         return null;
+    }
+
+    /**
+     * Closes the wizard, recording every registered step as known: the tenant has been through (or is populated
+     * past) all of them, so only a step registered later counts as a late one. Also the entry for whatever creates
+     * a tenant that is already populated.
+     */
+    public function close(): void
+    {
+        $this->state->complete(array_map(
+            static fn (OnboardingStepInterface $step): string => $step->key(),
+            $this->progress->steps(),
+        ));
     }
 
     /**

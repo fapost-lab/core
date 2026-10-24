@@ -31,6 +31,7 @@ use Inertia\Response;
  *   storeUrl:        string
  *
  * A tenant that already has an assistant does not see the page: the step is done by the data, and the wizard moves on.
+ * After the wizard the checklist still links here, so a finished wizard sends the person to the assistants list.
  * Creating the assistant closes the wizard when it was the last open required step; the person then goes on to the
  * optional steps that are still open, and from the last of them to the assistant's console.
  */
@@ -51,7 +52,7 @@ final class OnboardingAssistantController extends Controller
         Gate::authorize('create', Assistant::class);
 
         if (! $this->state->isPending()) {
-            return redirect()->route('console.admin.dashboard');
+            return redirect()->route('console.admin.assistants.index');
         }
 
         if (Assistant::query()->exists()) {

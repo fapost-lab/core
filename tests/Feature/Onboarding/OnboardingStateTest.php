@@ -81,9 +81,9 @@ final class OnboardingStateTest extends FeatureTestCase
         $state = $this->app->make(OnboardingState::class);
         $state->start();
 
-        $state->complete();
+        $state->complete([]);
         $first = new OnboardingSettings()->completed_at;
-        $state->complete();
+        $state->complete([]);
 
         $this->assertNotNull($first);
         $this->assertSame($first, new OnboardingSettings()->completed_at);
