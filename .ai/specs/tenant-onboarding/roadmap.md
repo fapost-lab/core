@@ -50,11 +50,15 @@ Solution's pages.
 
 ## Waves
 
-1. The wizard with the languages step
-2. The first-assistant step
-3. Optional steps, the checklist, the late-step banner
-4. The Foundation contract
-5. Package blocks on first opening
+1. The wizard holds a new tenant until the content languages are confirmed; The first-assistant step, and the
+   redirect to that assistant when the wizard ends
+2. onboarding-optional-steps; The checklist: a dashboard widget and a shell indicator, both read from the
+   registry, hidden when done or by hand; A required step that appears after onboarding reaches the tenant as a
+   banner with a link and a bell notification
+3. `onboardingStep()` on Foundation's `ConsoleExtensionsInterface`, blocks per contributor in the fixed order
+   (D13), a way in for the SaaS shell, which is not a Solution and cannot use the Solution-bound registry, the
+   Extending docs page for it
+4. A package's block on the first opening of its page, holding only its own pages (D14)
 
 <!--
 Rules (jig-idea §8):
