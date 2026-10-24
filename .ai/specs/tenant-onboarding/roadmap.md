@@ -29,9 +29,9 @@ step that arrives later reaches a working tenant without locking it.
 
 - [x] `onboarding-optional-steps` — Optional steps in the wizard — skip with "set this up later in <menu section>", and Core's two:
       connect a channel and invite the team (after: the wizard — optional steps run in its shell)
-- [ ] `onboarding-checklist` — The checklist: a dashboard widget and a shell indicator, both read from the registry, hidden
+- [x] `onboarding-checklist` — The checklist: a dashboard widget and a shell indicator, both read from the registry, hidden
       when done or by hand (after: the wizard — the checklist lists the registry's steps)
-- [ ] `onboarding-checklist` — A required step that appears after onboarding reaches the tenant as a banner with a link and a
+- [x] `onboarding-checklist` — A required step that appears after onboarding reaches the tenant as a banner with a link and a
       bell notification (after: the wizard — "after onboarding" is the state it records)
 
 ## Phase 3 — Others contribute steps
