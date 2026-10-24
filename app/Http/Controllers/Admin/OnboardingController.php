@@ -12,6 +12,7 @@ use App\Http\Controllers\Concerns\RedirectsWizard;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -24,6 +25,10 @@ use Inertia\Response;
  * - Otherwise the first open required step; when none is open the wizard closes and the person lands in the
  *   assistant's console. When a check could not be made the wizard stays pending and the administrator goes to the dashboard,
  *   which the gate lets through in that case (no loop).
+ *
+ * `continue/{step}` is "go on after this step": the next optional step that is still open, else the console. It writes
+ * nothing, so a step that was skipped stays open in the checklist and is offered again by a restart. While the wizard
+ * is pending it sends the person to the entry instead, since a required step comes first.
  *
  * Props of the page rendered here (`Console/Onboarding/Waiting`):
  *   onboarding: { steps: list<{key: string, required: bool, complete: bool, current: bool}> }
@@ -58,6 +63,19 @@ final class OnboardingController extends Controller
         }
 
         return $this->redirectFor($decision);
+    }
+
+    public function continue(string $step): RedirectResponse
+    {
+        Gate::authorize(Permission::ManageSettings->value);
+
+        abort_unless($this->wizard->hasStep($step), 404);
+
+        if ($this->state->isPending()) {
+            return redirect()->route('console.admin.onboarding.show');
+        }
+
+        return $this->redirectOnward($step);
     }
 
     private function waiting(): Response

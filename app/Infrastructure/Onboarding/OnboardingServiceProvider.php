@@ -51,6 +51,8 @@ final class OnboardingServiceProvider extends ServiceProvider
             static fn (CoreOnboardingStep $step): string => match ($step) {
                 CoreOnboardingStep::Languages      => LanguagesStep::class,
                 CoreOnboardingStep::FirstAssistant => FirstAssistantStep::class,
+                CoreOnboardingStep::Channel        => ChannelStep::class,
+                CoreOnboardingStep::Team           => TeamStep::class,
             },
             CoreOnboardingStep::cases(),
         )));

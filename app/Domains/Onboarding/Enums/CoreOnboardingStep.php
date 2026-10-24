@@ -11,4 +11,6 @@ enum CoreOnboardingStep: string
 {
     case Languages      = 'languages';
     case FirstAssistant = 'first_assistant';
+    case Channel        = 'channel';
+    case Team           = 'team';
 }

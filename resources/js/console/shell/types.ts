@@ -209,6 +209,9 @@ interface StepText {
 
 export interface OnboardingTranslations {
   done: string
+  required_done: string
+  skip: string
+  continue: string
   layout: { progress: string; step_of: string; completed: string; current: string; optional: string }
   steps: Record<string, StepText>
   languages: {
@@ -245,6 +248,8 @@ export interface OnboardingTranslations {
     create: string
     creating: string
   }
+  channel: { title: string; description: string; later: string }
+  team: { title: string; description: string; later: string }
   waiting: { title: string; description: string; hint: string }
   support_banner: string
 }

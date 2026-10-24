@@ -44,7 +44,7 @@ final class CoreTenantOnboardingTest extends FeatureTestCase
         $this->assertSame([], $state->confirmedSteps());
         $steps = collect($this->app->make(OnboardingProgress::class)->report()->steps)
             ->mapWithKeys(static fn ($progress): array => [$progress->step->key() => $progress->complete]);
-        $this->assertSame(['languages' => false, 'first_assistant' => true], $steps->all());
+        $this->assertSame(['languages' => false, 'first_assistant' => true, 'channel' => false, 'team' => false], $steps->all());
     }
 
     public function test_restart_from_outside_every_tenant_leaves_the_callers_context_as_it_was(): void

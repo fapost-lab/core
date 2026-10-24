@@ -7,7 +7,6 @@ namespace App\Http\Controllers\Admin;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Services\StaffAssistantService;
 use App\Domains\Assistant\Support\ContentLanguages;
-use App\Domains\Onboarding\DTO\WizardMove;
 use App\Domains\Onboarding\Services\OnboardingState;
 use App\Domains\Onboarding\Services\OnboardingWizard;
 use App\Domains\Staff\Models\User;
@@ -32,7 +31,8 @@ use Inertia\Response;
  *   storeUrl:        string
  *
  * A tenant that already has an assistant does not see the page: the step is done by the data, and the wizard moves on.
- * Creating the assistant closes the wizard when it was the last open step, and the person lands in the assistant's console.
+ * Creating the assistant closes the wizard when it was the last open required step; the person then goes on to the
+ * optional steps that are still open, and from the last of them to the assistant's console.
  */
 final class OnboardingAssistantController extends Controller
 {
@@ -83,21 +83,13 @@ final class OnboardingAssistantController extends Controller
         $user = $request->user();
 
         try {
-            $assistant = $this->assistants->create($user, $request->fields());
+            $this->assistants->create($user, $request->fields());
         } catch (RecordLimitReachedException $exception) {
             Inertia::flash('error', trans('console.assistants.limit_reached') . '. ' . $exception->getMessage());
 
             return redirect()->route('console.admin.onboarding.show');
         }
 
-        $decision = $this->wizard->advance();
-
-        if (WizardMove::Completed === $decision->move) {
-            Inertia::flash('success', trans('console.onboarding.done'));
-
-            return redirect()->route('console.home', ['assistant' => (string) $assistant->getKey()]);
-        }
-
-        return $this->redirectFor($decision);
+        return $this->redirectFor($this->wizard->advance());
     }
 }

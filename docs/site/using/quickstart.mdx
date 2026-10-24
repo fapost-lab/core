@@ -10,10 +10,13 @@ them.
 A new tenant does the first two steps in a short setup wizard: the first time
 an administrator signs in, the console opens the wizard instead of the
 dashboard. It asks you to confirm the content languages (**Content languages**)
-and create the **First assistant**, then takes you straight into that
-assistant. Staff without the settings permission see a waiting page ("Your
-administrator is finishing the setup") until an administrator finishes it.
-The steps below describe the same actions if you need to do them by hand.
+and create the **First assistant**. Staff without the settings permission see a
+waiting page ("Your administrator is finishing the setup") until an
+administrator finishes it. After those two, the wizard offers two optional
+steps, **Channel** (connect a bot) and **Team** (invite colleagues). Each can be
+skipped with **Skip for now** and done later from its menu section, and then the
+wizard takes you into the assistant. The steps below describe the same actions
+if you need to do them by hand.
 
 <Steps>
   <Step title="Set the languages">
@@ -44,7 +47,8 @@ The steps below describe the same actions if you need to do them by hand.
   </Step>
 
   <Step title="Connect a channel">
-    Console → **Channels** → **New channel**.
+    Console → **Channels** → **New channel**. The setup wizard offers this as an
+    optional step too.
 
     Have the bot token ready: saving contacts the provider and registers the
     webhook. A token that does not belong to a real bot is still saved, but the
