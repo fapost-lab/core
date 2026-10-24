@@ -27,7 +27,7 @@ Goal: after the gate, nothing is forgotten. Done when: optional steps can be ski
 to where they live, the checklist shows done and left from anywhere in the console, and a required
 step that arrives later reaches a working tenant without locking it.
 
-- [ ] `onboarding-optional-steps` — Optional steps in the wizard — skip with "set this up later in <menu section>", and Core's two:
+- [x] `onboarding-optional-steps` — Optional steps in the wizard — skip with "set this up later in <menu section>", and Core's two:
       connect a channel and invite the team (after: the wizard — optional steps run in its shell)
 - [ ] `onboarding-checklist` — The checklist: a dashboard widget and a shell indicator, both read from the registry, hidden
       when done or by hand (after: the wizard — the checklist lists the registry's steps)
