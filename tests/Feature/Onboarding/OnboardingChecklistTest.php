@@ -6,8 +6,11 @@ namespace Tests\Feature\Onboarding;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Onboarding\Enums\OnboardingOrigin;
+use App\Domains\Onboarding\Enums\OnboardingStatus;
 use App\Domains\Onboarding\Services\OnboardingChecklist;
 use App\Domains\Onboarding\Services\OnboardingState;
+use App\Domains\Onboarding\Services\OnboardingWizard;
+use App\Domains\Onboarding\Settings\OnboardingSettings;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Services\PlatformSupportUserService;
 use App\Domains\Staff\Support\SupportAccessSession;
@@ -42,6 +45,23 @@ final class OnboardingChecklistTest extends FeatureTestCase
     {
         $this->registerStep(OnboardingOrigin::Package, 'extra', false, static fn (): bool => false);
 
+        $this->actingAs($this->admin())->get($this->panelUrl('/admin'))->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('onboardingChecklist', null)->etc());
+    }
+
+    public function test_a_populated_tenant_that_provisioning_had_started_gets_no_checklist(): void
+    {
+        $this->holdTenantInWizard();
+        Assistant::factory()->create();
+
+        $this->app->make(OnboardingWizard::class)->close(populated: true);
+
+        $settings = new OnboardingSettings();
+        $this->assertSame(OnboardingStatus::Complete, $settings->state);
+        $this->assertNull($settings->started_at);
+        $this->assertSame($this->app->make(OnboardingChecklist::class)->registeredKeys(), $settings->known_steps);
+
+        // The languages step is still open, yet nothing is offered.
         $this->actingAs($this->admin())->get($this->panelUrl('/admin'))->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page->where('onboardingChecklist', null)->etc());
     }

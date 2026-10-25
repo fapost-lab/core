@@ -8,6 +8,7 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelWebhookStatus;
 use App\Domains\Channels\Models\Channel;
+use App\Domains\Onboarding\Enums\OnboardingStatus;
 use App\Domains\Onboarding\Services\OnboardingProgress;
 use App\Domains\Onboarding\Services\OnboardingState;
 use App\Domains\Onboarding\Services\OnboardingWizard;
@@ -210,6 +211,21 @@ final class OnboardingOptionalStepsTest extends FeatureTestCase
         $this->assertFalse($this->stepIsComplete('channel'), 'A skipped step stays open in the checklist.');
         $this->assertFalse($this->stepIsComplete('team'));
         $this->assertNotEmpty($steps());
+    }
+
+    public function test_the_wizard_closes_straight_to_the_console_when_every_optional_step_is_already_done(): void
+    {
+        Channel::withoutEvents(fn (): Channel => Channel::factory()->create(['assistant_id' => $this->assistant->getKey()]));
+        $this->staff();
+        $this->app->make(OnboardingState::class)->start();
+
+        $this->actingAs($this->admin())
+            ->put($this->panelUrl('/admin/onboarding/languages'), ['content_base_language' => 'en', 'available_languages' => ['en'], 'fallback_language' => 'en'])
+            ->assertRedirect(route('console.entry'))
+            ->assertInertiaFlash('success', trans('console.onboarding.done'));
+
+        $this->assertFalse($this->app->make(OnboardingState::class)->isPending());
+        $this->assertSame(OnboardingStatus::Complete, (new OnboardingSettings())->state);
     }
 
     public function test_skipping_the_channel_goes_past_a_team_that_is_already_there(): void

@@ -15,13 +15,18 @@ use Throwable;
  * Checks the wizard's steps for the tenant of the current scope.
  *
  * Bound `scoped`: the steps are built here, through the resolver, from the classes the worker-lifetime registry holds,
- * so none of them outlives the request or job. Nothing is memoized; the wizard asks again after every write.
+ * so none of them outlives the request or job. The step instances are built once per scope; their answers are never
+ * memoized (steps hold no tenant data, their checks read the connection of the moment), so the wizard asks again
+ * after every write.
  *
  * A step whose check throws is logged, counted complete and flagged uncertain: the tenant is not locked out by a
  * broken check, and the wizard does not close on an answer it never got.
  */
-final readonly class OnboardingProgress
+final class OnboardingProgress
 {
+    /** @var list<OnboardingStepInterface> */
+    private array $steps;
+
     /**
      * @param  Closure(class-string<OnboardingStepInterface>): OnboardingStepInterface  $resolve
      */
@@ -39,6 +44,10 @@ final readonly class OnboardingProgress
      */
     public function steps(): array
     {
+        if (isset($this->steps)) {
+            return $this->steps;
+        }
+
         $steps = [];
 
         foreach ($this->registry->blocks() as $block) {
@@ -47,7 +56,7 @@ final readonly class OnboardingProgress
             }
         }
 
-        return $steps;
+        return $this->steps = $steps;
     }
 
     public function report(): ProgressReport

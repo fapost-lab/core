@@ -34,16 +34,16 @@ final readonly class OnboardingLateSteps
     public function open(): array
     {
         try {
-            if ($this->state->isPending()) {
-                return [];
-            }
-
-            $known = $this->state->knownSteps();
+            $known = $this->state->knownStepsWhenClosed();
         } catch (MissingSettings|QueryException $exception) {
             $this->logger->warning('The onboarding state could not be read; no late step is reported.', [
                 'exception_class' => $exception::class,
             ]);
 
+            return [];
+        }
+
+        if (null === $known) {
             return [];
         }
 

@@ -83,13 +83,16 @@ final readonly class OnboardingWizard
      * Closes the wizard, recording every registered step as known: the tenant has been through (or is populated
      * past) all of them, so only a step registered later counts as a late one. Also the entry for whatever creates
      * a tenant that is already populated.
+     *
+     * @param  bool  $populated  the tenant is populated rather than walked through the wizard (a seeder): it forgets
+     *                           its start moment like a tenant that existed before the wizard, so it gets no checklist
      */
-    public function close(): void
+    public function close(bool $populated = false): void
     {
         $this->state->complete(array_map(
             static fn (OnboardingStepInterface $step): string => $step->key(),
             $this->progress->steps(),
-        ));
+        ), $populated);
     }
 
     /**

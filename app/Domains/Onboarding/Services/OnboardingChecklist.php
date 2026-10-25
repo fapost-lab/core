@@ -78,7 +78,7 @@ final readonly class OnboardingChecklist
     private function isOnboarded(): bool
     {
         try {
-            return ! $this->state->isPending() && $this->state->hasStarted();
+            return $this->state->hasFinishedWizard();
         } catch (MissingSettings|QueryException $exception) {
             $this->logger->warning('The onboarding state could not be read; the checklist is not shown.', [
                 'exception_class' => $exception::class,

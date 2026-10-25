@@ -60,12 +60,32 @@ final readonly class OnboardingState
     }
 
     /**
-     * Whether the tenant went through the wizard (provisioning or a restart). A tenant that existed before the wizard
-     * did never has a start moment.
+     * Whether the wizard is over for a tenant that went through it (provisioning or a restart): one read. A tenant that
+     * existed before the wizard did, or one populated by a seeder, has no start moment. Unreadable settings propagate;
+     * the caller decides.
      */
-    public function hasStarted(): bool
+    public function hasFinishedWizard(): bool
     {
-        return null !== $this->settings()->started_at;
+        $settings = $this->settings();
+
+        return OnboardingStatus::Pending !== $settings->state && null !== $settings->started_at;
+    }
+
+    /**
+     * The steps a closed tenant has seen, or null while the wizard is still open: one read. Unreadable settings
+     * propagate; the caller decides.
+     *
+     * @return list<string>|null
+     */
+    public function knownStepsWhenClosed(): ?array
+    {
+        $settings = $this->settings();
+
+        if (OnboardingStatus::Pending === $settings->state) {
+            return null;
+        }
+
+        return array_values($settings->known_steps);
     }
 
     public function isConfirmed(string $key): bool
@@ -109,8 +129,10 @@ final readonly class OnboardingState
      *
      * @param  list<string>  $knownSteps  keys of every step registered now; the tenant has seen them all, so none of
      *                                    them is a late step later
+     * @param  bool  $forgetStart  forget the start moment in the same write: a populated tenant is treated like one
+     *                             that existed before the wizard and gets no checklist
      */
-    public function complete(array $knownSteps): void
+    public function complete(array $knownSteps, bool $forgetStart = false): void
     {
         $settings = $this->settings();
 
@@ -119,6 +141,10 @@ final readonly class OnboardingState
         if (OnboardingStatus::Complete !== $settings->state) {
             $settings->state        = OnboardingStatus::Complete;
             $settings->completed_at = CarbonImmutable::now()->toIso8601String();
+        }
+
+        if ($forgetStart) {
+            $settings->started_at = null;
         }
 
         $settings->save();

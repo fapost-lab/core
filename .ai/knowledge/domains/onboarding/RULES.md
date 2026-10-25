@@ -16,7 +16,7 @@ paths:
   - app/Console/Commands/Ops/TenantsOnboardingRestartCommand.php
   - "tests/Feature/Onboarding/**"
   - "resources/js/console/shell/OnboardingChecklist*.vue"
-reviewed_at: 2026-10-24
+reviewed_at: 2026-10-25
 ---
 # Onboarding rules
 
@@ -46,13 +46,18 @@ Each entry names what enforces it. "Review only" means nothing fails automatical
   registered step lists in `routes()`; an Inertia visit gets `Inertia::location`. It sits in `admin` after
   `EnsureCanAccessPanel` and in the builder and media stacks. Enforced: `EnsureTenantOnboardedTest`,
   `ConsoleRoutesArchitectureTest`.
-- **A complete tenant costs the gate one settings read.** Progress — every step's check — runs only for a pending
-  tenant. The gate alone keeps this; the shell's checklist and late-step props cost more (see Known limits).
-  Enforced: `EnsureTenantOnboardedTest::test_an_onboarded_tenant_does_not_ask_the_steps_anything` (asserts no check
-  runs; the steps are built, for their keys).
+- **A complete tenant costs the gate one settings read, and a page builds the steps once.** Progress — every step's
+  check — runs only for a pending tenant; the gate of a complete tenant builds no step. `OnboardingProgress` (scoped)
+  builds the step instances once per request or job and never memoizes their answers; the state is still read fresh by
+  each consumer (one read each: the gate, the late-step and the checklist props), never cached, as the ADR asks. A full
+  page of a complete tenant builds the steps once for the late-step keys; a tenant that went through the wizard with the
+  checklist not hidden also runs every check. The props are closures, so partial reloads (the bell's polling) pay none
+  of it. Enforced: `EnsureTenantOnboardedTest::test_an_onboarded_tenant_does_not_ask_the_steps_anything` (no check,
+  one build per request), `test_the_gate_alone_builds_no_step_for_an_onboarded_tenant`,
+  `test_the_steps_are_built_once_per_scope`.
 - **The wizard's state has one writer; announcements have their own.** `OnboardingSettings` (state, confirmations,
   `known_steps`) is written only through the wizard: `OnboardingWizard::close()` — also the entry for a seeder or
-  import that creates a populated tenant — and `OnboardingState::start()`. Which late steps reached the bell lives in
+  import that creates a populated tenant (`close(populated: true)`) — and `OnboardingState::start()`. Which late steps reached the bell lives in
   a separate group, `OnboardingAnnouncementSettings` (`onboarding_announcements`), written only through
   `OnboardingAnnouncements` and cleared by `start()`. Why: spatie saves every property of a class, so a page load
   writing into `OnboardingSettings` could save a stale `state` over an operator's restart. Enforced:
@@ -94,7 +99,11 @@ Each entry names what enforces it. "Review only" means nothing fails automatical
   to the platform support user. A tenant that existed before the wizard never gets one — its `confirmed_steps` is
   empty, so "Content languages" would stay open forever. Its items are every registered step, optional ones included,
   linking to the step's wizard page; those pages, once the wizard is closed, send the person to where the thing lives
-  (assistants list, tenant settings) rather than to the dashboard. Enforced: `OnboardingChecklistTest`.
+  (assistants list, tenant settings) rather than to the dashboard. A tenant a seeder or import populates is closed with
+  `OnboardingWizard::close(populated: true)`, which forgets the `started_at` provisioning wrote, in the same write: it was
+  never walked through, so it is treated like a tenant from before the wizard and gets no checklist. Confirming the
+  languages for it instead was rejected: it would know only Core's confirmation step and mark as seen what nobody saw.
+  Enforced: `OnboardingChecklistTest`, `test_a_populated_tenant_that_provisioning_had_started_gets_no_checklist`.
 - **Hiding the checklist is per user and remembers the registry.** Hiding stores the step keys registered at that
   moment on the user (`users.onboarding_checklist_hidden`); it hides the shell indicator and the dashboard widget, and
   the checklist returns by itself when a step outside that list is registered. Enforced:
@@ -109,10 +118,5 @@ Each entry names what enforces it. "Review only" means nothing fails automatical
 
 ## Known limits
 
-- **The shell's per-page cost.** Every full console page of a complete tenant builds every registered step (for the
-  late-step keys) and reads `OnboardingSettings` several times — the gate, the late-step and checklist props each
-  read it fresh — and, for a tenant that went through the wizard with the checklist not hidden, runs every step's
-  check. The props are closures, so partial reloads (the bell's polling) pay none of it. Reading the state once per
-  request was left open (review finding F3 of `onboarding-checklist`); revisit if step checks stop being cheap.
 - **Announcements are written after delivery.** A notification that throws mid-loop leaves the step unannounced, so
   the next load may notify earlier recipients again (at-least-once, not at-most-once).
