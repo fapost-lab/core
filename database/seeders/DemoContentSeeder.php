@@ -38,7 +38,7 @@ final class DemoContentSeeder extends Seeder
             $assistant = Assistant::query()->firstOrFail();
 
             // A tenant with content is not a new one: it is not held in the setup wizard.
-            app(OnboardingWizard::class)->close();
+            app(OnboardingWizard::class)->close(populated: true);
 
             $this->command?->info("Tenant {$tenant->slug} · assistant {$assistant->name}");
 

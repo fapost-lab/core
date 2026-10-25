@@ -86,5 +86,8 @@ trait InteractsWithOnboardingSteps
 
         $this->app->bind($step::class, static fn (): OnboardingStepInterface => $step);
         $this->app->make(OnboardingRegistry::class)->register(new OnboardingBlock($origin, [$step::class]));
+        // Production registers at boot, before any step is built; a step added mid-test must not meet a scope that has
+        // already built the earlier ones.
+        $this->app->forgetScopedInstances();
     }
 }

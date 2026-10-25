@@ -9,6 +9,7 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Onboarding\Contracts\OnboardingStepInterface;
 use App\Domains\Onboarding\Enums\OnboardingOrigin;
 use App\Domains\Onboarding\OnboardingBlock;
+use App\Domains\Onboarding\Services\OnboardingProgress;
 use App\Domains\Onboarding\Services\OnboardingRegistry;
 use App\Domains\Staff\Services\PlatformSupportUserService;
 use App\Domains\Staff\Support\SupportAccessSession;
@@ -134,10 +135,44 @@ final class EnsureTenantOnboardedTest extends FeatureTestCase
         $admin = $this->admin();
 
         $this->actingAs($admin)->get($this->panelUrl('/admin'))->assertOk();
+        // Production starts each request with a fresh scope.
+        $this->app->forgetScopedInstances();
         $this->actingAs($admin)->get($this->panelUrl('/admin/usage'))->assertOk();
 
-        // The shell builds the steps to read their keys (the late-step banner); nothing asks one whether it is done.
+        // The shell builds the steps to read their keys (the late-step banner), once per request; nothing asks one
+        // whether it is done, and the gate builds nothing.
         $this->assertSame(0, $step->checks);
+        $this->assertSame(2, $step->built);
+    }
+
+    public function test_the_gate_alone_builds_no_step_for_an_onboarded_tenant(): void
+    {
+        $admin     = $this->admin();
+        $component = (string)$this->actingAs($admin)->get($this->panelUrl('/admin'))->viewData('page')['component'];
+        $this->app->forgetScopedInstances();
+        $step = $this->registerExtraStep(routes: []);
+
+        $this->actingAs($admin)
+            ->get($this->panelUrl('/admin'), [
+                'X-Inertia'                   => 'true',
+                'X-Requested-With'            => 'XMLHttpRequest',
+                'X-Inertia-Version'           => (string)app(HandleInertiaRequests::class)->version(Request::create('/')),
+                'X-Inertia-Partial-Component' => $component,
+                'X-Inertia-Partial-Data'      => 'auth',
+            ])
+            ->assertOk();
+
+        $this->assertSame(0, $step->built);
+        $this->assertSame(0, $step->checks);
+    }
+
+    public function test_the_steps_are_built_once_per_scope(): void
+    {
+        $this->registerExtraStep(routes: []);
+        $progress = $this->app->make(OnboardingProgress::class);
+
+        $this->assertSame($progress->steps(), $progress->steps());
+        $this->assertSame($progress, $this->app->make(OnboardingProgress::class));
     }
 
     public function test_a_tenant_whose_state_cannot_be_read_is_not_held(): void
