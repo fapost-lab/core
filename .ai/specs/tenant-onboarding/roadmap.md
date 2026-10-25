@@ -34,7 +34,7 @@ step that arrives later reaches a working tenant without locking it.
 - [x] `onboarding-checklist` — A required step that appears after onboarding reaches the tenant as a banner with a link and a
       bell notification (after: the wizard — "after onboarding" is the state it records)
 
-- [ ] `onboarding-polish` — Polish before the epic finishes — the shell builds the steps once per request (F3 of
+- [x] `onboarding-polish` — Polish before the epic finishes — the shell builds the steps once per request (F3 of
       onboarding-checklist), seeded demo and load-test tenants do not show "Content languages" open
       forever (F7), `OnboardingAnnouncementSettings` registered in `config/settings.php` (F6), and a test
       for the wizard closing when every optional step is already done (F2 of onboarding-optional-steps)
