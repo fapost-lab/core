@@ -198,7 +198,7 @@ final class LoadTestSeedCommand extends Command
         $assistant = $this->assistants->create($tenant, ['name' => "Load Test {$slug}"]);
 
         // A seeded tenant is populated, not new: it is not held in the setup wizard.
-        app(OnboardingWizard::class)->close();
+        app(OnboardingWizard::class)->close(populated: true);
 
         $flowId = $this->flows->execute([
             'assistant_id' => (string)$assistant->getKey(),

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Domains\Onboarding\Settings\OnboardingAnnouncementSettings;
 use App\Domains\Onboarding\Settings\OnboardingSettings;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Spatie\LaravelData\Data;
@@ -15,11 +16,13 @@ return [
     'settings' => [
         TenantSettings::class,
         OnboardingSettings::class,
+        OnboardingAnnouncementSettings::class,
     ],
 
     'tenant_settings' => [
         TenantSettings::class,
         OnboardingSettings::class,
+        OnboardingAnnouncementSettings::class,
     ],
 
     'setting_class_path' => app_path('Settings'),
