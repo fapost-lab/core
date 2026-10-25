@@ -34,6 +34,12 @@ step that arrives later reaches a working tenant without locking it.
 - [x] `onboarding-checklist` — A required step that appears after onboarding reaches the tenant as a banner with a link and a
       bell notification (after: the wizard — "after onboarding" is the state it records)
 
+- [ ] `onboarding-polish` — Polish before the epic finishes — the shell builds the steps once per request (F3 of
+      onboarding-checklist), seeded demo and load-test tenants do not show "Content languages" open
+      forever (F7), `OnboardingAnnouncementSettings` registered in `config/settings.php` (F6), and a test
+      for the wizard closing when every optional step is already done (F2 of onboarding-optional-steps)
+      (after: both phase 2 tasks — it fixes what their reviews left open)
+
 ## Phase 3 — Others contribute steps
 
 Goal: the step list is open beyond Core. Done when: the SaaS shell adds its block before Core's in
@@ -55,10 +61,11 @@ Solution's pages.
 2. onboarding-optional-steps; The checklist: a dashboard widget and a shell indicator, both read from the
    registry, hidden when done or by hand; A required step that appears after onboarding reaches the tenant as a
    banner with a link and a bell notification
-3. `onboardingStep()` on Foundation's `ConsoleExtensionsInterface`, blocks per contributor in the fixed order
+3. Polish before the epic finishes
+4. `onboardingStep()` on Foundation's `ConsoleExtensionsInterface`, blocks per contributor in the fixed order
    (D13), a way in for the SaaS shell, which is not a Solution and cannot use the Solution-bound registry, the
    Extending docs page for it
-4. A package's block on the first opening of its page, holding only its own pages (D14)
+5. A package's block on the first opening of its page, holding only its own pages (D14)
 
 <!--
 Rules (jig-idea §8):
