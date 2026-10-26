@@ -14,7 +14,7 @@ import { FormSection } from '@fapost/ui/components/form-section'
 import { OptionsPicker } from '@fapost/ui/components/options-picker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
 import { interpolate } from '@console/shell'
-import { fallbackOptions, firstError, keptFallback } from '../TenantSettings/form'
+import { fallbackOptions, firstError, keptFallback, withBase } from '../TenantSettings/form'
 import type { SelectOption } from '../TenantSettings/types'
 import type { OnboardingPageProps } from '../../../console/onboarding/types'
 import Notice from './Notice.vue'
@@ -27,21 +27,33 @@ const props = defineProps<{
   languages: { base: string; available: string[]; fallback: string }
   options: SelectOption[]
   baseLanguageLocked: boolean
+  /** The tenant is already populated: the stored languages can be confirmed unchanged ("skip"). */
+  canKeep: boolean
   updateUrl: string
 }>()
 
 const page = usePage<OnboardingPageProps>()
 const t = computed(() => page.props.translations.console.onboarding.languages)
 const step = computed(() => page.props.translations.console.onboarding.steps.languages)
+const skip = computed(() => page.props.translations.console.onboarding.skip)
 
 const form = useForm({
   content_base_language: props.languages.base,
-  available_languages: [...props.languages.available],
+  available_languages: withBase(props.languages.base, [...props.languages.available]),
   fallback_language: props.languages.fallback,
 })
 
 const errors = computed(() => form.errors as Record<string, string | undefined>)
 const fallbackChoices = computed(() => fallbackOptions(props.options, form.available_languages))
+
+// The base language stays among the available ones, as the server stores it: choosing a base adds it there.
+watch([() => form.content_base_language, () => form.available_languages], ([base, available]) => {
+  const kept = withBase(base, available)
+
+  if (kept !== available) {
+    form.available_languages = kept
+  }
+})
 
 watch(
   () => form.available_languages,
@@ -53,6 +65,17 @@ watch(
 function submit(): void {
   form.put(props.updateUrl)
 }
+
+/** Confirms the stored languages as they are, whatever was changed on the page. */
+function keep(): void {
+  form
+    .transform(() => ({
+      content_base_language: props.languages.base,
+      available_languages: [...props.languages.available],
+      fallback_language: props.languages.fallback,
+    }))
+    .put(props.updateUrl, { onFinish: () => form.transform((data) => data) })
+}
 </script>
 
 <template>
@@ -60,7 +83,10 @@ function submit(): void {
 
   <div class="flex flex-col gap-5">
     <div>
-      <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+      <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+        <Button v-if="canKeep" type="button" variant="outline" :disabled="form.processing" @click="keep">{{ skip }}</Button>
+      </div>
       <p class="text-muted-foreground mt-1 text-sm">{{ t.description }}</p>
     </div>
 
@@ -123,6 +149,7 @@ function submit(): void {
 
       <div class="flex items-center gap-2">
         <Button type="submit" :disabled="form.processing">{{ form.processing ? t.continuing : t.continue }}</Button>
+        <Button v-if="canKeep" type="button" variant="ghost" :disabled="form.processing" @click="keep">{{ skip }}</Button>
       </div>
     </form>
   </div>

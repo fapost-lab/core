@@ -60,6 +60,16 @@ trait RedirectsWizard
         return $this->redirectToConsole($announce);
     }
 
+    /**
+     * The address of the step before `$currentKey` whose page can be reopened, or null for the first of its kind.
+     */
+    private function backUrl(string $currentKey): ?string
+    {
+        $previous = app(OnboardingWizard::class)->previous($currentKey);
+
+        return null === $previous ? null : route($previous->route(), [], false);
+    }
+
     private function redirectToConsole(bool $announce = true): RedirectResponse
     {
         if ($announce) {

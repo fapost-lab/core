@@ -32,6 +32,7 @@ use Inertia\Response;
  *   types, settings: what the channel form offers (see {@see PresentsChannels::channelFormOptions()})
  *   later:      string   where to do this later, worded with the labels of the menu
  *   urls:       { submit: string, skip: string }
+ *   backUrl:    string|null   the previous optional step, null for the first
  *
  * The step runs after the required ones, also for a tenant that is no longer in the wizard; while a required step is
  * open the person is sent back to the wizard. Without an assistant to connect it to, without the right to create a
@@ -81,6 +82,7 @@ final class OnboardingChannelController extends Controller
                 'submit' => route('console.admin.onboarding.channel.store', [], false),
                 'skip'   => route('console.admin.onboarding.continue', ['step' => self::STEP], false),
             ],
+            'backUrl' => $this->backUrl(CoreOnboardingStep::Channel->value),
         ]);
     }
 

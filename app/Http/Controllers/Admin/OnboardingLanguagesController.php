@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Support\ContentLanguages;
 use App\Domains\Flow\Services\TenantSettingsEditor;
 use App\Domains\Onboarding\Enums\CoreOnboardingStep;
@@ -28,6 +29,8 @@ use Inertia\Response;
  *   languages:          { base: string, available: list<string>, fallback: string }
  *   options:            list<{value: string, label: string}>   the content-language catalogue
  *   baseLanguageLocked: bool   the tenant already has a flow; the base is shown read-only and cannot change
+ *   canKeep:            bool   the tenant is already populated (it has an assistant, as after a restart): the stored
+ *                              languages can be confirmed as they are, which the page offers as "skip"
  *   updateUrl:          string
  *
  * After the wizard the checklist still links here, so a finished wizard sends the person to the tenant settings, where
@@ -70,6 +73,7 @@ final class OnboardingLanguagesController extends Controller
             ],
             'options'            => $options,
             'baseLanguageLocked' => $this->editor->baseLanguageLocked(),
+            'canKeep'            => Assistant::query()->exists(),
             'updateUrl'          => route('console.admin.onboarding.languages.update', [], false),
         ]);
     }

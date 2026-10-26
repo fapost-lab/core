@@ -85,13 +85,13 @@ final class Role extends SpatieRole
     }
 
     /**
-     * Human-readable title: display_name when set, falls back to name.
-     * Used as the role's title in the console's search results.
+     * Human-readable title: display_name when set, else the translated label of a system role, else name.
+     * Used as the role's title in the console's search results and in role selects.
      */
     protected function title(): Attribute
     {
         return Attribute::make(
-            get: fn (): string => $this->display_name ?? $this->name,
+            get: fn (): string => $this->display_name ?? RoleEnum::tryFrom($this->name)?->label() ?? $this->name,
         );
     }
 

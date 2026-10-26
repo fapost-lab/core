@@ -263,6 +263,12 @@ return [
         'label'        => 'Role',
         'plural_label' => 'Roles',
 
+        'system' => [
+            'admin'           => 'Administrator',
+            'content_manager' => 'Content manager',
+            'analyst'         => 'Analyst',
+        ],
+
         'fields' => [
             'name'         => 'Name',
             'display_name' => 'Display name',

@@ -263,6 +263,12 @@ return [
         'label'        => 'Роль',
         'plural_label' => 'Ролі',
 
+        'system' => [
+            'admin'           => 'Адміністратор',
+            'content_manager' => 'Контент-менеджер',
+            'analyst'         => 'Аналітик',
+        ],
+
         'fields' => [
             'name'         => 'Системна назва',
             'display_name' => 'Відображувана назва',

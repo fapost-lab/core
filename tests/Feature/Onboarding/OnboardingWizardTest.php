@@ -94,6 +94,7 @@ final class OnboardingWizardTest extends FeatureTestCase
                 ->where('languages', ['base' => 'en', 'available' => ['en'], 'fallback' => 'en'])
                 ->where('options', fn ($options): bool => collect($options)->contains(['value' => 'uk', 'label' => 'Ukrainian — Українська']))
                 ->where('baseLanguageLocked', false)
+                ->where('canKeep', false)
                 ->where('updateUrl', '/admin/onboarding/languages')
                 ->etc());
     }
@@ -112,6 +113,34 @@ final class OnboardingWizardTest extends FeatureTestCase
         $this->assertTrue($this->app->make(OnboardingState::class)->isPending());
     }
 
+    public function test_the_base_language_is_stored_among_the_available_ones_when_left_out(): void
+    {
+        $this->actingAs($this->admin())
+            ->put($this->panelUrl('/admin/onboarding/languages'), $this->languages(['content_base_language' => 'ru', 'available_languages' => ['en'], 'fallback_language' => 'en']))
+            ->assertRedirect(route('console.admin.onboarding.assistant.create'));
+
+        $this->assertSame(['ru', 'en'], $this->freshTenantSettings()->available_languages);
+    }
+
+    public function test_the_assistant_page_offers_the_base_language_that_stored_settings_left_out(): void
+    {
+        $settings                        = $this->app->make(TenantSettings::class);
+        $settings->content_base_language = 'ru';
+        $settings->available_languages   = ['en'];
+        $settings->save();
+
+        $this->actingAs($this->admin())
+            ->get($this->panelUrl('/admin/onboarding/assistant'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('languageOptions', [['value' => 'ru', 'label' => 'Russian — Русский'], ['value' => 'en', 'label' => 'English']])
+                ->where('defaultLanguage', 'ru')
+                ->etc());
+
+        $this->actingAs($this->admin())
+            ->post($this->panelUrl('/admin/onboarding/assistant'), ['name' => 'Helper', 'default_language' => 'ru'])
+            ->assertSessionHasNoErrors();
+    }
+
     public function test_a_fallback_outside_the_available_languages_is_refused_and_nothing_is_confirmed(): void
     {
         $this->actingAs($this->admin())
@@ -128,7 +157,7 @@ final class OnboardingWizardTest extends FeatureTestCase
         $admin = $this->admin();
 
         $this->actingAs($admin)->get($this->panelUrl('/admin/onboarding/languages'))
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('baseLanguageLocked', true)->etc());
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('baseLanguageLocked', true)->where('canKeep', true)->etc());
 
         $this->actingAs($admin)
             ->put($this->panelUrl('/admin/onboarding/languages'), $this->languages(['content_base_language' => 'ru', 'available_languages' => ['ru'], 'fallback_language' => 'ru']))
@@ -158,6 +187,7 @@ final class OnboardingWizardTest extends FeatureTestCase
                 ->where('languageOptions', [['value' => 'en', 'label' => 'English'], ['value' => 'de', 'label' => 'German — Deutsch']])
                 ->where('defaultLanguage', 'en')
                 ->where('storeUrl', '/admin/onboarding/assistant')
+                ->where('backUrl', '/admin/onboarding/languages')
                 ->where('onboarding.steps.1.key', 'first_assistant')
                 ->etc());
     }

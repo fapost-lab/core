@@ -6,7 +6,8 @@ export default { layout: OnboardingLayout }
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Head, useForm, usePage } from '@inertiajs/vue3'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
+import { ArrowLeft } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import { FormField } from '@fapost/ui/components/form-field'
 import { FormSection } from '@fapost/ui/components/form-section'
@@ -21,11 +22,14 @@ const props = defineProps<{
   languageOptions: SelectOption[]
   defaultLanguage: string
   storeUrl: string
+  /** The previous required step, null when there is none. */
+  backUrl: string | null
 }>()
 
 const page = usePage<OnboardingPageProps>()
 const t = computed(() => page.props.translations.console.onboarding.assistant)
 const step = computed(() => page.props.translations.console.onboarding.steps.first_assistant)
+const back = computed(() => page.props.translations.console.onboarding.back)
 
 const form = useForm({ name: '', default_language: props.defaultLanguage })
 
@@ -64,6 +68,9 @@ function submit(): void {
       </FormSection>
 
       <div class="flex items-center gap-2">
+        <Button v-if="backUrl" as-child variant="ghost">
+          <Link :href="backUrl"><ArrowLeft aria-hidden="true" />{{ back }}</Link>
+        </Button>
         <Button type="submit" :disabled="form.processing">{{ form.processing ? t.creating : t.create }}</Button>
       </div>
     </form>

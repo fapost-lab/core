@@ -18,6 +18,18 @@ enum RoleEnum: string
     case Analyst        = 'analyst';
 
     /**
+     * The translated name shown to people; system roles are seeded without a display name.
+     */
+    public function label(): string
+    {
+        return match ($this) {
+            self::Admin          => trans('staff.roles.system.admin'),
+            self::ContentManager => trans('staff.roles.system.content_manager'),
+            self::Analyst        => trans('staff.roles.system.analyst'),
+        };
+    }
+
+    /**
      * Numeric priority. Higher number = more access.
      * Custom roles created through UI must have priority strictly below the creator's.
      */
