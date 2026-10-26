@@ -17,6 +17,11 @@ extend functionality will be zip packages."
 
 And, to make sure the contract is right: "let's build a Viber connector straight away."
 
+Changed by the owner on 2026-10-26, with Phase 2 done: "I'm not sure I want a Viber connector until there
+is a request for it. Viber's pricing is very expensive now." Then: "Slack to check the contract, Teams as a
+separate spec." Slack replaces Viber as the contract's first outsider; Viber waits for a customer; Teams is
+the spec `teams-connector`.
+
 Changed by the owner at the gate of `connector-channel-registrar`, the same day: "if Core needs at least
 one connector, there is no point in moving Telegram into a separate package, all the more since we want
 it on by default. I propose to keep it in Core, but on the new contracts; for now we just prepare the
@@ -31,10 +36,43 @@ contracts for building new connectors."
 - What is true when the work is done: a messenger is added to an installation by adding a Composer
   package to its image; Core's code contains nothing provider-specific and no closed list of channel
   types outside the built-in ones; Telegram stays built into Core, reached through the same contracts an
-  outside connector uses, and works exactly as it does today; Viber is the first outside connector,
+  outside connector uses, and works exactly as it does today; Slack is the first outside connector,
   optional, built against the contract.
 
-## What Viber tests that Telegram does not (paper check, 2026-10-16)
+## What Slack tests that Telegram does not (paper check, 2026-10-26)
+
+Slack's Events API and Web API, mapped onto the contract; to be confirmed against Slack's documentation in
+the connector's task. Slack is free to build and test on (a free workspace, no review), which is why it
+replaced Viber as the proof.
+
+- Inbound signature: `X-Slack-Signature` is `v0=` + HMAC-SHA256, keyed by the app's signing secret, over
+  `v0:{X-Slack-Request-Timestamp}:{raw body}` — not the raw body alone — and a request older than five
+  minutes must be refused. The body-HMAC scheme in `IngressSpec` will likely need a signed-string template
+  and a timestamp window, in PHP and the Go gateway alike.
+- `url_verification`: when the Request URL is set, Slack posts a challenge and expects it echoed in the
+  response body. Ingress answers a plain 200 today — the first provider whose handshake is not a plain 200,
+  the case the stress test below names for WhatsApp.
+- Interactivity (button presses) arrives at its own Request URL as `application/x-www-form-urlencoded`
+  with one `payload` field holding JSON, and must be acknowledged within three seconds. Retries carry
+  `X-Slack-Retry-Num`; the idempotency key is the event's `event_id`.
+- Webhook registration is not an API call: the Request URLs live in the Slack app's settings (or its app
+  manifest). The registrar's job becomes showing the URLs to paste, or the manifest to create the app from.
+- One Slack app receives events for every workspace it is installed in, told apart by `team_id`. Core
+  routes one webhook per channel. For the proof, each channel is its own single-workspace app (own bot
+  token, own signing secret, own Request URL) — the Telegram shape. A distributed app with OAuth install
+  across workspaces is an open question.
+- Buttons are Block Kit elements in an actions block (a limit on elements per block, on label length, on
+  `value` length) — a second set of button limits next to Telegram's. No request for contact or location.
+- Messages can be edited (`chat.update`), so removing buttons after a press is possible.
+- Media: an image block takes a public `image_url`; files go through an upload API. Public media links are
+  exercised; the uploader stays optional.
+- No typing indicator for an ordinary bot message: the typing capability really is optional.
+- No session window and no per-message price: the session-window question waits for Meta's channels.
+- Public link: an `app_redirect` URL from the app id and team id.
+
+## What Viber tests that Telegram does not (paper check, 2026-10-16; parked 2026-10-26)
+
+Kept for the day a customer asks for Viber; nothing below is being built now.
 
 Viber's REST Bot API, mapped onto the contract; algorithm and limits to be confirmed against Viber's
 documentation in the connector's task.
@@ -149,15 +187,19 @@ runtime-plugin draft; what still applies to Composer connectors is kept below.
   - Core's channel screens drawn from the connector's schema instead of Telegram branches.
   - Telegram moved onto the seams inside Core: its module reaches Core through the same contracts an
     outside connector uses.
-  - A Viber connector, `fapost/connector-viber`, optional, installed through the overlay, built before
-    Telegram is moved onto the seams; and what it needs from Core: a body-HMAC ingress scheme, public media links.
+  - A Slack connector, `fapost/connector-slack`, optional, installed through the overlay; and what it
+    needs from Core: a body-HMAC ingress scheme (with Slack's signed-string form), a handshake ingress can
+    answer, public media links. (Until 2026-10-26 this was a Viber connector.)
 - Not doing:
+  - A Viber connector until a customer asks for one: its bot-initiated messages are billed per delivery.
+  - Microsoft Teams: the spec `teams-connector` — a different ingress authentication (Bot Framework JWT)
+    and an OAuth-token sender, too big to be the contract's proof.
   - Runtime zip plugins: they stay with `plugin-runtime-contract-idea` and `ecosystem-distribution`.
   - Integrations that are not messaging channels (CRM, payments): they already have action handlers and
     data accessors.
   - Third-party trust, a store, licences.
-  - New messengers beyond Telegram and Viber: WhatsApp is the next consumer, a task of its own once the
-    contract has survived two channels.
+  - New messengers beyond Telegram and Slack: WhatsApp (and Messenger and Instagram, on the same Meta
+    platform) are the next consumers, each a task of its own once the contract has survived two channels.
   - Where the Telegram Mini App lives: the task `telegram-mini-app-strategy-idea`.
 
 ## Decisions
@@ -197,6 +239,14 @@ runtime-plugin draft; what still applies to Composer connectors is kept below.
 - The connector is built and tested on recorded requests and responses; the end-to-end check runs on the
   owner's Viber bot created before February 2024 (the old commercial model), as its own item before the
   package is called done.
+- **Superseding the three Viber decisions above (owner, 2026-10-26):** the contract's outside proof is a
+  Slack connector, `fapost/connector-slack`, optional, installed through the overlay, built and tested on
+  recorded requests and responses, with an end-to-end check in a free Slack workspace as its own item.
+  Viber is parked until a customer asks for it, because bot-initiated messages are billed per delivery.
+  Rejected: Viber now (cost with no customer); Messenger and Instagram (free and close to WhatsApp, but
+  Meta's app review and business verification stand before any public use); Teams as the proof (a new
+  ingress authentication scheme and an OAuth-token sender — its own spec, `teams-connector`); an own web
+  chat widget (a useful product, but its protocol is ours, so it proves nothing about an outside API).
 - A connector that is no longer installed leaves its channels marked unavailable in the console; their
   inbound deliveries are logged and dropped; their data is not touched; the rest of the platform keeps
   working; `platform:update` names the tenants and channels left without a connector. Rejected:
@@ -216,17 +266,22 @@ runtime-plugin draft; what still applies to Composer connectors is kept below.
   the neutral-message item. **Answered (neutral-outgoing-message):** `CallbackDataCodec` stays a Core
   concept with a 64-byte payload limit (the strictest channel sets it), and removing the buttons of a
   sent message is a `RemoveButtons` channel capability, sent only to a channel that declares it.
-- How broadcasting and quotas account for messages outside a session window (Viber now, WhatsApp next) —
-  free replies versus billed bot-initiated sends. Decided once both shapes are in view.
+- How broadcasting and quotas account for messages outside a session window (WhatsApp, Messenger and
+  Instagram; Viber if it returns) — free replies versus billed or tagged bot-initiated sends. Slack has no
+  window, so this waits for Meta's channels.
+- A Slack app distributed across workspaces (one app, one Request URL, OAuth install, routing by
+  `team_id`) against Core's one-webhook-per-channel routing — the proof uses one app per channel; the
+  distributed shape is decided when a customer needs it, and it is the same question Teams raises.
 - The registrar: a connector registrar of its own, or the one `CoreRegistrarInterface` with a channel
   surface that each package kind is allowed a subset of. Decided in the package-type item.
 
 ## Assumptions left untested
 
-- That Viber's signature is an HMAC-SHA256 of the raw body keyed by the bot token, and the keyboard and
-  media limits recalled above — taken from memory; Viber's documentation and the owner's bot test them.
-- That the owner's pre-2024 bot keeps working under the old commercial model for the length of this work
-  ("until further notice by Viber") — a notice from Viber would test it.
+- That Slack's signature, handshake, interactivity format and Block Kit limits are as recalled above —
+  taken from memory; Slack's documentation and a free workspace test them.
+- (Parked with Viber.) That Viber's signature is an HMAC-SHA256 of the raw body keyed by the bot token, and
+  the keyboard and media limits recalled above; that the owner's pre-2024 bot keeps working under the old
+  commercial model.
 
 - That `IngressSpec` stretches to the next provider, or that the Laravel fallback is acceptable for those
   it does not — taken at normal depth; writing WhatsApp's spec on paper tests it.

@@ -2,8 +2,8 @@
 
 Destination: a messenger is added to an installation by adding a `fapost-connector` Composer package to
 its image; Core has no closed list of channel types and reaches every channel through the same contracts;
-Telegram stays built into Core on those contracts and behaves exactly as it does today; Viber is the first
-outside connector, optional, and proves the contract.
+Telegram stays built into Core on those contracts and behaves exactly as it does today; Slack is the first
+outside connector, optional, and proves the contract (Viber until 2026-10-26; now on a customer's request).
 
 Epic: epic/channel-connectors
 Release: minor
@@ -39,7 +39,7 @@ reached only through the connector registrar, with its existing tests untouched 
 - [x] `neutral-outgoing-message` — Neutral outgoing message: Flow describes buttons, reply mode and requests for contact or location
       without Bot API structures; Telegram's module translates; capabilities declared per connector
       (after: Connector registrar with a channel surface — capabilities are registered on it)
-- [ ] `capability-aware-validation` — Capability-aware validation: validation and the builder warn when a flow uses what its assistant's
+- [x] `capability-aware-validation` — Capability-aware validation: validation and the builder warn when a flow uses what its assistant's
       channels cannot do (after: Neutral outgoing message — it checks against the declared capabilities)
 - [x] `outbound-message-without-token` — Outbound message without the token: the `OutboundMessage` envelope a
       connector's sender receives no longer carries the channel token into queued payloads; the sender gets it
@@ -47,11 +47,11 @@ reached only through the connector registrar, with its existing tests untouched 
 - [ ] fog: connector config upgrades between versions — depends on the open question (a connector
       migration or a `config_version`), best answered once a second version of a schema exists
 
-## Phase 3 — Viber, the contract's first outsider
+## Phase 3 — Slack, the contract's first outsider
 
 Goal: a channel Core never knew works through the contract alone. Done when: an installation that adds
-`fapost/connector-viber` through the overlay talks to a real Viber bot — text, buttons, contact and
-location requests, media — with no Viber code in Core.
+`fapost/connector-slack` through the overlay talks to a real Slack app in a workspace — text, buttons,
+media — with no Slack code in Core. (Viber until 2026-10-26: parked until a customer asks, see the spec.)
 
 - [x] `ingress-hmac-body-signature` — Body-HMAC ingress signatures: a signature scheme over the raw body in `IngressSpec`, executed by PHP
       and the Go gateway, with shared golden fixtures
@@ -60,28 +60,33 @@ location requests, media — with no Viber code in Core.
 - [x] `connector-managed-settings` — Managed settings from a connector: a connector hands Core the values it reads
       from the provider (the managed fields of its settings schema) and Core stores them, so no package writes
       `channels` (after: Channel settings from the connector's schema — it fills that schema's managed fields)
-- [ ] Viber connector package — `fapost/connector-viber`: ingress and `conversation_started`, webhook
-      registration, text, keyboards, contact and location requests, media by URL, settings schema,
-      translations, public link; tested on recorded requests and responses (after: Open channel types,
-      Channel settings from the connector's schema, Neutral outgoing message — it is built on them;
-      after: Body-HMAC ingress signatures, Public media links — Viber needs both; after: Managed settings from a
-      connector — its account URI comes from the provider)
+- [ ] Slack connector package — `fapost/connector-slack`: Events API ingress with Slack's `v0` signature
+      and timestamp window, the `url_verification` handshake, interactivity payloads, Block Kit buttons
+      with editing, media by URL, a settings schema (bot token, signing secret) with the Request URLs or an
+      app manifest to paste, translations, public link; one Slack app per channel; tested on recorded
+      requests and responses; the gaps it finds in `IngressSpec` go into Foundation, PHP and the gateway
+      (after: Open channel types, Channel settings from the connector's schema, Neutral outgoing message —
+      it is built on them; after: Body-HMAC ingress signatures, Public media links — Slack needs both;
+      after: Managed settings from a connector — its team and app ids come from the provider)
 - [ ] Button limits — connectors declare their button limits (buttons per message and per row, label
       length) beside the capability flags, and flow validation warns when a flow exceeds them (after:
-      Capability-aware validation — it adds limits to the same check; built with the Viber connector package,
+      Capability-aware validation — it adds limits to the same check; built with the Slack connector package,
       so the contract is shaped by two channels' limits, not Telegram's alone)
-- [ ] Viber end to end — the package installed through the overlay against the owner's pre-2024 bot; the
-      gaps found go back into the contract (after: Viber connector package)
+- [ ] Slack end to end — the package installed through the overlay against a Slack app in a free
+      workspace; the gaps found go back into the contract (after: Slack connector package)
 - [ ] fog: session windows — how broadcasting and quotas treat bot-initiated messages outside a 24-hour
-      window; to be shaped with WhatsApp in view
+      window; to be shaped with WhatsApp, Messenger and Instagram in view (Slack has none)
+- [ ] fog: Viber connector — on a customer's request; the 2026-10-16 paper check in the spec is its start
+- [ ] fog: a Slack app distributed across workspaces (OAuth install, routing by `team_id`) — on a
+      customer's request; the same routing question as `teams-connector`
 
 ## Phase 4 — The contract written down
 
 Goal: someone outside the project can write a connector. Done when: the published docs describe the
-connector contract with Telegram (built in) and Viber (a package) as references.
+connector contract with Telegram (built in) and Slack (a package) as references.
 
 - [ ] Published docs — `docs/site/extending/channel-drivers.mdx` rewritten from "a new provider is a Core
-      change" to the connector contract, with Telegram and Viber as references (after: Viber end to end —
+      change" to the connector contract, with Telegram and Slack as references (after: Slack end to end —
       the docs describe the contract the outsider proved)
 - [ ] fog: the Telegram Mini App's host — waits on `telegram-mini-app-strategy-idea`; Telegram stays in
       Core, so its host stays there unless that task decides otherwise
@@ -92,8 +97,8 @@ connector contract with Telegram (built in) and Viber (a package) as references.
 2. connector-channel-registrar
 3. open-channel-types; channel-settings-schema; neutral-outgoing-message
 4. telegram-on-registrar; capability-aware-validation; connector-managed-settings; outbound-message-without-token
-5. Viber connector package; Button limits
-6. Viber end to end
+5. Slack connector package; Button limits
+6. Slack end to end
 7. Published docs
 
 <!--
