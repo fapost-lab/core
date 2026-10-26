@@ -6,6 +6,7 @@ namespace Tests\Feature\Jobs\Messaging;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Models\Channel;
+use App\Domains\Messaging\Exceptions\ChannelNotFoundException;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
@@ -40,18 +41,20 @@ final class BroadcastSendJobTest extends FeatureTestCase
         $this->addToAssertionCount(1);
     }
 
-    public function test_the_queued_job_carries_no_token_and_the_sender_gets_it_from_the_channel(): void
+    public function test_the_queued_job_carries_no_token(): void
     {
-        $channel = $this->channel();
-        $job     = new BroadcastSendJob($this->message($channel));
+        $job = new BroadcastSendJob($this->message($this->channel()));
 
-        $this->assertNull($job->message->transportToken);
         $this->assertStringNotContainsString('bot-token', serialize($job));
+    }
+
+    public function test_the_envelope_is_handed_to_the_sender_as_queued(): void
+    {
+        $job = new BroadcastSendJob($this->message($this->channel()));
 
         $sender = $this->mock(MessageSenderInterface::class, function (MockInterface $mock): void {
             $mock->shouldReceive('send')->once()->withArgs(
-                fn (OutboundMessage $message): bool => 'bot-token' === $message->transportToken
-                    && 'idem-1' === $message->idempotencyKey
+                fn (OutboundMessage $message): bool => 'idem-1' === $message->idempotencyKey
                     && 'chat-1' === $message->chatId
                     && 'Hello' === $message->payload->text,
             )->andReturn(new DeliveryResult(sent: true));
@@ -60,15 +63,12 @@ final class BroadcastSendJobTest extends FeatureTestCase
         $job->handle($sender, $this->tenantRepository(), $this->tenantSwitcher());
     }
 
-    public function test_nothing_is_sent_when_the_channel_is_gone(): void
+    public function test_nothing_is_sent_and_nothing_is_retried_when_the_channel_is_gone(): void
     {
-        $channel = $this->channel();
-        $job     = new BroadcastSendJob($this->message($channel));
-
-        Channel::withoutEvents(static fn (): ?bool => $channel->forceDelete());
+        $job = new BroadcastSendJob($this->message($this->channel()));
 
         $sender = $this->mock(MessageSenderInterface::class, function (MockInterface $mock): void {
-            $mock->shouldReceive('send')->never();
+            $mock->shouldReceive('send')->once()->andThrow(new ChannelNotFoundException('Channel not found.'));
         });
 
         $job->handle($sender, $this->tenantRepository(), $this->tenantSwitcher());
@@ -158,7 +158,6 @@ final class BroadcastSendJobTest extends FeatureTestCase
             tenantId: 'tenant-1',
             channelId: (string) $channel->getKey(),
             channelType: 'telegram',
-            transportToken: 'bot-token',
             chatId: 'chat-1',
             payload: new MessagePayload(type: 'text', text: 'Hello'),
         );

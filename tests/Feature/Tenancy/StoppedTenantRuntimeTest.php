@@ -76,7 +76,6 @@ final class StoppedTenantRuntimeTest extends FeatureTestCase
                 tenantId: $tenant,
                 channelId: 'channel-1',
                 channelType: 'telegram',
-                transportToken: 'bot-token',
                 chatId: 'chat-1',
                 payload: new MessagePayload(type: 'text', text: 'Hello'),
             ))],

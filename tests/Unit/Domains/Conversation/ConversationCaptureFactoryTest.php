@@ -125,7 +125,6 @@ final class ConversationCaptureFactoryTest extends TestCase
             tenantId: 't-1',
             channelId: 'ch-1',
             channelType: 'telegram',
-            transportToken: 'token',
             chatId: 'chat-1',
             payload: new MessagePayload(type: 'text', text: 'Hello from support'),
             metadata: [
@@ -163,7 +162,6 @@ final class ConversationCaptureFactoryTest extends TestCase
             tenantId: 't-1',
             channelId: 'ch-1',
             channelType: 'telegram',
-            transportToken: 'token',
             chatId: 'chat-1',
             payload: new MessagePayload(type: 'text', text: 'no metadata'),
         );
@@ -189,7 +187,6 @@ final class ConversationCaptureFactoryTest extends TestCase
             tenantId: 't-1',
             channelId: 'ch-1',
             channelType: 'telegram',
-            transportToken: 'token',
             chatId: 'chat-1',
             payload: new MessagePayload(type: 'text', text: 'Hello again'),
             metadata: [
@@ -224,7 +221,6 @@ final class ConversationCaptureFactoryTest extends TestCase
             tenantId: 't-1',
             channelId: 'ch-1',
             channelType: 'telegram',
-            transportToken: 'token',
             chatId: 'chat-1',
             payload: new MessagePayload(type: 'text', text: 'Automated reply'),
             metadata: [
@@ -295,7 +291,6 @@ final class ConversationCaptureFactoryTest extends TestCase
                 tenantId: 't-1',
                 channelId: 'ch-1',
                 channelType: 'telegram',
-                transportToken: 'token',
                 chatId: 'chat-1',
                 payload: $payload,
                 metadata: ['contact_id' => 'ct-1', 'assistant_id' => 'a-1'],

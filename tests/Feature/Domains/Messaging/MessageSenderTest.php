@@ -2,15 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Tests\Unit\Domains\Messaging;
+namespace Tests\Feature\Domains\Messaging;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\ChannelRegistry;
 use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Conversation\Capture\ConversationCaptureFactory;
 use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Conversation\DTO\MessageLogEntry;
 use App\Domains\Conversation\Enums\DeliveryStatus;
+use App\Domains\Messaging\Exceptions\ChannelNotFoundException;
 use App\Domains\Messaging\Exceptions\RateLimitExceededException;
 use App\Domains\Messaging\Exceptions\UnsupportedChannelException;
 use App\Domains\Messaging\MessageSender;
@@ -18,6 +21,7 @@ use App\Domains\Messaging\TenantMessagingRateLimit;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Carbon\CarbonImmutable;
 use Closure;
+use Fapost\Foundation\Channel\ChannelInterface;
 use Fapost\Foundation\Connector\ConnectorChannel;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessagePayload;
@@ -29,13 +33,13 @@ use Illuminate\Contracts\Redis\Factory as RedisFactory;
 use Illuminate\Redis\Connections\Connection;
 use Mockery;
 use Mockery\MockInterface;
+use Tests\Feature\FeatureTestCase;
 use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
 use Tests\Fixtures\Connectors\Echo\EchoSender;
 use Tests\Support\FakeUsageMeter;
 use Tests\Support\UsageGates;
-use Tests\TestCase;
 
-final class MessageSenderTest extends TestCase
+final class MessageSenderTest extends FeatureTestCase
 {
     public function test_idempotency_hit_returns_duplicate_and_provider_is_not_called(): void
     {
@@ -130,9 +134,8 @@ final class MessageSenderTest extends TestCase
         $result = $sender->send(new OutboundMessage(
             idempotencyKey: 'idem-echo',
             tenantId: 'tenant-1',
-            channelId: 'channel-1',
+            channelId: (string) $this->channel()->getKey(),
             channelType: 'echo',
-            transportToken: 'token',
             chatId: 'chat-1',
             payload: new MessagePayload(type: 'text', text: 'Hello'),
         ));
@@ -143,7 +146,8 @@ final class MessageSenderTest extends TestCase
 
     public function test_pipeline_sends_incr_and_expire_for_rate_key(): void
     {
-        $key = 'rate:channel-1:chat-1';
+        $channelId = (string) $this->channel()->getKey();
+        $key       = "rate:{$channelId}:chat-1";
 
         $connection = $this->mock(Connection::class, function (MockInterface $mock) use ($key): void {
             $mock->shouldReceive('set')->once()->with('msg:sent:idem-5', 'processing', 'EX', 86400, 'NX')->andReturn(true);
@@ -162,7 +166,7 @@ final class MessageSenderTest extends TestCase
         $provider = new InMemoryProviderSender();
         $sender   = new MessageSender($this->registry($provider), $redis, $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
 
-        $sender->send($this->message(idempotencyKey: 'idem-5'));
+        $sender->send($this->message(idempotencyKey: 'idem-5', channelId: $channelId));
     }
 
     public function test_successful_delivery_with_capture_context_logs_outbound_transcript(): void
@@ -181,9 +185,8 @@ final class MessageSenderTest extends TestCase
         $message = new OutboundMessage(
             idempotencyKey: 'idem-6',
             tenantId: 'tenant-1',
-            channelId: 'channel-1',
+            channelId: (string) $this->channel()->getKey(),
             channelType: 'telegram',
-            transportToken: 'bot-token',
             chatId: 'chat-1',
             payload: new MessagePayload(type: 'text', text: 'Reply'),
             metadata: [
@@ -319,7 +322,6 @@ final class MessageSenderTest extends TestCase
                 tenantId: 'tenant-1',
                 channelId: 'channel-1',
                 channelType: 'telegram',
-                transportToken: null,
                 chatId: 'chat-1',
                 payload: $payload,
                 metadata: 0 === $index ? [] : ['edit_message_id' => '77'],
@@ -354,7 +356,6 @@ final class MessageSenderTest extends TestCase
             tenantId: 'tenant-1',
             channelId: 'channel-1',
             channelType: 'telegram',
-            transportToken: null,
             chatId: 'chat-1',
             payload: new MessagePayload(type: 'text', text: 'Hello'),
             metadata: ['volume_occurred_at' => '2026-09-30T23:59:00+00:00'],
@@ -379,6 +380,45 @@ final class MessageSenderTest extends TestCase
 
         $this->assertTrue($sender->send($this->message(idempotencyKey: 'idem-10'))->sent);
         $this->assertSame(1, $provider->calls);
+    }
+
+    public function test_the_provider_receives_the_channel_loaded_by_the_envelope_channel_id(): void
+    {
+        $connection = $this->mock(Connection::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('set')->once()->with('msg:sent:idem-11', 'processing', 'EX', 86400, 'NX')->andReturn(true);
+            $mock->shouldReceive('pipeline')->once()->andReturn([1, true]);
+            $mock->shouldReceive('set')->once()->with('msg:sent:idem-11', '1', 'EX', 86400);
+        });
+        $channel  = $this->channel();
+        $provider = new InMemoryProviderSender();
+        $sender   = new MessageSender($this->registry($provider), $this->redisFactory($connection), $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate());
+
+        $sender->send($this->message(idempotencyKey: 'idem-11', channelId: (string) $channel->getKey()));
+
+        $this->assertInstanceOf(Channel::class, $provider->channel);
+        $this->assertSame($channel->getKey(), $provider->channel->getKey());
+        $this->assertSame('bot-token', $provider->channel->getConfig()['token']);
+    }
+
+    public function test_a_missing_channel_releases_the_key_spends_no_volume_and_never_calls_the_provider(): void
+    {
+        $connection = $this->mock(Connection::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('set')->once()->with('msg:sent:idem-12', 'processing', 'EX', 86400, 'NX')->andReturn(true);
+            $mock->shouldReceive('pipeline')->once()->andReturn([1, true]);
+            $mock->shouldReceive('del')->once()->with('msg:sent:idem-12');
+        });
+        $provider = new InMemoryProviderSender();
+        $meter    = FakeUsageMeter::allowing();
+        $sender   = new MessageSender($this->registry($provider), $this->redisFactory($connection), $this->rateLimit(), $this->nullConversationLogger(), new ConversationCaptureFactory(), UsageGates::gate($meter));
+
+        try {
+            $sender->send($this->message(idempotencyKey: 'idem-12', channelId: '00000000-0000-0000-0000-00000000dead'));
+            $this->fail('Expected ChannelNotFoundException.');
+        } catch (ChannelNotFoundException) {
+        }
+
+        $this->assertSame(0, $provider->calls);
+        $this->assertSame([], $meter->units);
     }
 
     private function rateLimit(int $perMinute = 30): TenantMessagingRateLimit
@@ -409,14 +449,23 @@ final class MessageSenderTest extends TestCase
         });
     }
 
-    private function message(string $idempotencyKey): OutboundMessage
+    private function channel(): Channel
+    {
+        $assistant = Assistant::factory()->create(['tenant_id' => '00000000-0000-0000-0000-000000000001']);
+
+        return Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $assistant->id,
+            'token'        => 'bot-token',
+        ]));
+    }
+
+    private function message(string $idempotencyKey, ?string $channelId = null): OutboundMessage
     {
         return new OutboundMessage(
             idempotencyKey: $idempotencyKey,
             tenantId: 'tenant-1',
-            channelId: 'channel-1',
+            channelId: $channelId ?? (string) $this->channel()->getKey(),
             channelType: 'telegram',
-            transportToken: 'bot-token',
             chatId: 'chat-1',
             payload: new MessagePayload(type: 'text', text: 'Hello'),
         );
@@ -442,9 +491,12 @@ final class InMemoryProviderSender implements ProviderSenderInterface
 {
     public int $calls = 0;
 
-    public function deliver(OutboundMessage $message): DeliveryResult
+    public ?ChannelInterface $channel = null;
+
+    public function deliver(OutboundMessage $message, ChannelInterface $channel): DeliveryResult
     {
         $this->calls++;
+        $this->channel = $channel;
 
         return new DeliveryResult(sent: true, providerMessageId: 'provider-message-1');
     }
