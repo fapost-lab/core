@@ -19,7 +19,7 @@ import { Textarea } from '@fapost/ui/components/textarea'
 import { interpolate } from '@console/shell'
 import { SolutionMount, tabFromQuery, useExtensions } from '../../../console/solutions'
 import { OptionsPicker } from '@fapost/ui/components/options-picker'
-import { fallbackOptions, firstError, isTab, keptFallback, tabsWithErrors } from './form'
+import { fallbackOptions, firstError, isTab, keptFallback, tabsWithErrors, withBase } from './form'
 import type { SelectOption, TenantSettingsPageProps, TenantSettingsState, TenantSettingsTab } from './types'
 
 /**
@@ -38,12 +38,24 @@ const page = usePage<TenantSettingsPageProps>()
 const t = computed(() => page.props.translations.console.tenant_settings)
 const common = computed(() => page.props.translations.console.form)
 
-const form = useForm<TenantSettingsState>({ ...props.settings, available_languages: [...props.settings.available_languages] })
+const form = useForm<TenantSettingsState>({
+  ...props.settings,
+  available_languages: withBase(props.settings.content_base_language, [...props.settings.available_languages]),
+})
 
 const errors = computed(() => form.errors as Record<string, string | undefined>)
 const errorTabs = computed(() => tabsWithErrors(errors.value))
 const fallbackChoices = computed(() => fallbackOptions(props.options.languages, form.available_languages))
 const tabs: TenantSettingsTab[] = ['languages', 'runtime', 'broadcasts', 'conversations']
+
+// The base language stays among the available ones, as the server stores it: choosing a base adds it there.
+watch([() => form.content_base_language, () => form.available_languages], ([base, available]) => {
+  const kept = withBase(base, available)
+
+  if (kept !== available) {
+    form.available_languages = kept
+  }
+})
 
 watch(
   () => form.available_languages,

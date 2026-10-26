@@ -237,6 +237,7 @@ export interface OnboardingTranslations {
   required_done: string
   skip: string
   continue: string
+  back: string
   layout: { progress: string; step_of: string; completed: string; current: string; optional: string }
   steps: Record<string, StepText>
   languages: {

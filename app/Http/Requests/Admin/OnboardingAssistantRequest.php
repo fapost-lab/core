@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Admin;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Flow\Services\TenantSettingsEditor;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Illuminate\Foundation\Http\FormRequest;
@@ -30,7 +31,7 @@ final class OnboardingAssistantRequest extends FormRequest
     {
         return [
             'name'             => ['required', 'string', 'max:255'],
-            'default_language' => ['required', 'string', Rule::in($settings->available_languages)],
+            'default_language' => ['required', 'string', Rule::in(TenantSettingsEditor::withBase($settings->content_base_language, $settings->available_languages))],
         ];
     }
 

@@ -31,6 +31,7 @@ use Inertia\Response;
  *   complete:   bool     someone besides the person setting up has been invited, so the way on reads "Continue"
  *   later:      string   where to do this later, worded with the labels of the menu
  *   urls:       { submit: string, skip: string }
+ *   backUrl:    string|null   the previous optional step, null for the first
  *
  * An invitation keeps the person on the page, so another can follow. Like the channel step it runs after the required
  * ones, and without the right to invite or at the staff limit it is not shown (the store answers 403 without the right). Skipping is {@see OnboardingController::continue()} and writes nothing.
@@ -77,6 +78,7 @@ final class OnboardingTeamController extends Controller
                 'submit' => route('console.admin.onboarding.team.store', [], false),
                 'skip'   => route('console.admin.onboarding.continue', ['step' => self::STEP], false),
             ],
+            'backUrl' => $this->backUrl(CoreOnboardingStep::Team->value),
         ]);
     }
 

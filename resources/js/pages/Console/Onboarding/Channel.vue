@@ -6,7 +6,8 @@ export default { layout: OnboardingLayout }
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Head, usePage } from '@inertiajs/vue3'
+import { Head, Link, usePage } from '@inertiajs/vue3'
+import { Button } from '@fapost/ui/components/button'
 import type { OnboardingPageProps } from '../../../console/onboarding/types'
 import ChannelForm from '../Channels/ChannelForm.vue'
 import type { ChannelTypeOption, SettingsByType } from '../Channels/types'
@@ -21,6 +22,8 @@ defineProps<{
   /** Where the channel can be connected later, worded by the server with the labels of the menu. */
   later: string
   urls: { submit: string; skip: string }
+  /** The previous optional step; null for the first one, which has nowhere to go back to. */
+  backUrl?: string | null
 }>()
 
 const page = usePage<OnboardingPageProps>()
@@ -34,7 +37,12 @@ const skip = computed(() => page.props.translations.console.onboarding.skip)
 
   <div class="flex flex-col gap-5">
     <div>
-      <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+      <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+        <Button as-child variant="outline">
+          <Link :href="urls.skip">{{ skip }}</Link>
+        </Button>
+      </div>
       <p class="text-muted-foreground mt-1 text-sm">{{ t.description }}</p>
       <p class="text-muted-foreground mt-1 text-sm">{{ later }}</p>
     </div>

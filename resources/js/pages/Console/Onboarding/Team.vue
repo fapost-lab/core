@@ -7,6 +7,7 @@ export default { layout: OnboardingLayout }
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Head, Link, usePage } from '@inertiajs/vue3'
+import { ArrowLeft } from '@lucide/vue'
 import { Button } from '@fapost/ui/components/button'
 import type { OnboardingPageProps } from '../../../console/onboarding/types'
 import InviteForm from '../Users/InviteForm.vue'
@@ -23,6 +24,8 @@ defineProps<{
   /** Where people can be invited later, worded by the server with the labels of the menu. */
   later: string
   urls: { submit: string; skip: string }
+  /** The previous optional step, null when there is none. */
+  backUrl: string | null
 }>()
 
 const page = usePage<OnboardingPageProps>()
@@ -36,13 +39,21 @@ const text = computed(() => page.props.translations.console.onboarding)
 
   <div class="flex flex-col gap-5">
     <div>
-      <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+      <div class="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <h1 class="font-display text-[28px] leading-tight font-semibold">{{ t.title }}</h1>
+        <Button as-child variant="outline">
+          <Link :href="urls.skip">{{ complete ? text.continue : text.skip }}</Link>
+        </Button>
+      </div>
       <p class="text-muted-foreground mt-1 text-sm">{{ t.description }}</p>
       <p class="text-muted-foreground mt-1 text-sm">{{ later }}</p>
     </div>
 
     <InviteForm :roles="roles" :submit-url="urls.submit">
       <template #actions>
+        <Button v-if="backUrl" as-child variant="ghost">
+          <Link :href="backUrl"><ArrowLeft aria-hidden="true" />{{ text.back }}</Link>
+        </Button>
         <Button as-child :variant="complete ? 'default' : 'ghost'">
           <Link :href="urls.skip">{{ complete ? text.continue : text.skip }}</Link>
         </Button>

@@ -1767,6 +1767,7 @@ return [
         'required_done' => 'The required setup is done. The remaining steps are optional, so you can skip them.',
         'skip'          => 'Skip for now',
         'continue'      => 'Continue',
+        'back'          => 'Back',
 
         'layout' => [
             'progress'  => 'Setup progress',

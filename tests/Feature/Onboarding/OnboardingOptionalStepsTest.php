@@ -96,6 +96,7 @@ final class OnboardingOptionalStepsTest extends FeatureTestCase
                 ->has('settings.telegram')
                 ->where('later', trans('console.onboarding.channel.later', ['path' => 'Channels › Channels']))
                 ->where('urls', ['submit' => '/admin/onboarding/channel', 'skip' => '/admin/onboarding/continue/channel'])
+                ->where('backUrl', null)
                 ->etc());
 
         $this->assertStringNotContainsString('token', mb_strtolower(json_encode($response->viewData('page')['props']['urls'], JSON_THROW_ON_ERROR)));
@@ -276,6 +277,7 @@ final class OnboardingOptionalStepsTest extends FeatureTestCase
                 ->where('complete', false)
                 ->where('later', trans('console.onboarding.team.later', ['path' => 'Staff › Users']))
                 ->where('urls', ['submit' => '/admin/onboarding/team', 'skip' => '/admin/onboarding/continue/team'])
+                ->where('backUrl', '/admin/onboarding/channel')
                 ->has('roles')
                 ->etc());
 

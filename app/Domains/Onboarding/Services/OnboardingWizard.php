@@ -80,6 +80,32 @@ final readonly class OnboardingWizard
     }
 
     /**
+     * The step to go back to from the step with the key `$currentKey`: the nearest earlier step of the same kind. A
+     * required step goes back to a required one (its page can be reopened while the wizard is pending), an optional
+     * step to an optional one; the first of its kind has nowhere to go back to.
+     */
+    public function previous(string $currentKey): ?OnboardingStepInterface
+    {
+        $steps = $this->progress->steps();
+
+        foreach ($steps as $index => $step) {
+            if ($step->key() !== $currentKey) {
+                continue;
+            }
+
+            for ($before = $index - 1; $before >= 0; $before--) {
+                if ($steps[$before]->required() === $step->required()) {
+                    return $steps[$before];
+                }
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
      * Closes the wizard, recording every registered step as known: the tenant has been through (or is populated
      * past) all of them, so only a step registered later counts as a late one. Also the entry for whatever creates
      * a tenant that is already populated.

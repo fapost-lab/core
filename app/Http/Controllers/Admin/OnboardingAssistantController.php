@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Admin;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Services\StaffAssistantService;
 use App\Domains\Assistant\Support\ContentLanguages;
+use App\Domains\Flow\Services\TenantSettingsEditor;
+use App\Domains\Onboarding\Enums\CoreOnboardingStep;
 use App\Domains\Onboarding\Services\OnboardingState;
 use App\Domains\Onboarding\Services\OnboardingWizard;
 use App\Domains\Staff\Models\User;
@@ -26,9 +28,10 @@ use Inertia\Response;
  *
  * Props of `Console/Onboarding/Assistant`:
  *   onboarding:      { steps: list<{key: string, required: bool, complete: bool, current: bool}> }
- *   languageOptions: list<{value: string, label: string}>   limited to the tenant's available languages
+ *   languageOptions: list<{value: string, label: string}>   the tenant's available languages, the base language always among them
  *   defaultLanguage: string                                  the tenant's content base language
  *   storeUrl:        string
+ *   backUrl:         string|null                             the previous required step, the languages
  *
  * A tenant that already has an assistant does not see the page: the step is done by the data, and the wizard moves on.
  * After the wizard the checklist still links here, so a finished wizard sends the person to the assistants list.
@@ -62,7 +65,8 @@ final class OnboardingAssistantController extends Controller
         $catalogue = ContentLanguages::options();
         $options   = [];
 
-        foreach ($this->settings->available_languages as $code) {
+        // The base language is offered even when stored settings left it out of the available ones.
+        foreach (TenantSettingsEditor::withBase($this->settings->content_base_language, $this->settings->available_languages) as $code) {
             $options[] = ['value' => $code, 'label' => $catalogue[$code] ?? $code];
         }
 
@@ -71,6 +75,7 @@ final class OnboardingAssistantController extends Controller
             'languageOptions' => $options,
             'defaultLanguage' => $this->settings->content_base_language,
             'storeUrl'        => route('console.admin.onboarding.assistant.store', [], false),
+            'backUrl'         => $this->backUrl(CoreOnboardingStep::FirstAssistant->value),
         ]);
     }
 
