@@ -162,6 +162,20 @@ installation that sets none of them behaves as before.
 The upgrade adds two empty settings to every tenant, through the settings migrations
 (see [Two schemas, two migration commands](#two-schemas-two-migration-commands)).
 
+## New tenants go through a setup wizard
+
+A tenant created after this release opens its console in a short first-run wizard
+(content languages, first assistant) before anything else. Tenants that exist at
+the upgrade are not affected: the settings migration marks them complete. To send
+one back through the wizard, see
+[the first-run setup wizard](/self-hosting/tenancy#the-first-run-setup-wizard).
+
+The setup checklist on the dashboard is shown only to tenants that went through
+the wizard (created after the release, or sent back through it); existing
+tenants never see it. When a later upgrade or an activated Solution adds a
+required setup step, a finished tenant is not held again: its staff see a banner
+linking to the step, and its administrators get one bell notification.
+
 ## Message rate is per tenant
 
 Sends are now throttled by each tenant's own rate, set on Tenant settings and stored

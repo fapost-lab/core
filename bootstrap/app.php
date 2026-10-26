@@ -14,6 +14,7 @@ use App\Domains\Tenancy\Support\TenantHost;
 use App\Http\Middleware\EnsureCanAccessPanel;
 use App\Http\Middleware\EnsureSolutionActive;
 use App\Http\Middleware\EnsureSolutionPage;
+use App\Http\Middleware\EnsureTenantOnboarded;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RedirectTenantRootToAdmin;
@@ -79,7 +80,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToPriorityList(before: AuthenticatesRequests::class, prepend: ForgetInvalidAuthenticatedSession::class);
 
         // Stacks of the console (routes/inertia.php): the tenant first (sessions live in the tenant schema), then the
-        // session, authentication and the account checks repeated on every request. `console` adds the assistant of
+        // session, authentication and the account checks repeated on every request, then the hold of a tenant that is
+        // still in the setup wizard (the builder and media routes carry it themselves). `console` adds the assistant of
         // the URL, the route parameter `{assistant}`.
         $admin = [
             'web',
@@ -89,6 +91,7 @@ return Application::configure(basePath: dirname(__DIR__))
             AuthenticateSession::class,
             EnsureUserIsActive::class,
             EnsureCanAccessPanel::class,
+            EnsureTenantOnboarded::class,
             RefuseWritesWhenTenantStopped::class,
             SetConsoleRootView::class,
         ];

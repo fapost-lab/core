@@ -9,6 +9,12 @@ use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\HealthController as AdminHealthController;
 use App\Http\Controllers\Admin\MediaController as AdminMediaController;
 use App\Http\Controllers\Admin\MediaFolderController as AdminMediaFolderController;
+use App\Http\Controllers\Admin\OnboardingAssistantController as AdminOnboardingAssistantController;
+use App\Http\Controllers\Admin\OnboardingChannelController as AdminOnboardingChannelController;
+use App\Http\Controllers\Admin\OnboardingChecklistController as AdminOnboardingChecklistController;
+use App\Http\Controllers\Admin\OnboardingController as AdminOnboardingController;
+use App\Http\Controllers\Admin\OnboardingLanguagesController as AdminOnboardingLanguagesController;
+use App\Http\Controllers\Admin\OnboardingTeamController as AdminOnboardingTeamController;
 use App\Http\Controllers\Admin\PlatformSettingsController as AdminPlatformSettingsController;
 use App\Http\Controllers\Admin\RoleController as AdminRoleController;
 use App\Http\Controllers\Admin\SearchController as AdminSearchController;
@@ -161,6 +167,21 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::post('admin/solutions/{solution}/activate', [AdminSolutionController::class, 'activate'])->where('solution', '[a-z][a-z0-9_]{1,31}')->name('console.admin.solutions.activate');
         Route::post('admin/solutions/{solution}/deactivate', [AdminSolutionController::class, 'deactivate'])->where('solution', '[a-z][a-z0-9_]{1,31}')->name('console.admin.solutions.deactivate');
         Route::post('admin/solutions/{solution}/connect', [AdminSolutionController::class, 'connect'])->where('solution', '[a-z][a-z0-9_]{1,31}')->name('console.admin.solutions.connect');
+
+        // The first-run setup wizard. A tenant that is still in it is held here by EnsureTenantOnboarded; the step pages
+        // are the wizard's own, so the gate lets them through. `show` sends the person to the step that is open.
+        Route::get('admin/onboarding', [AdminOnboardingController::class, 'show'])->name('console.admin.onboarding.show');
+        Route::get('admin/onboarding/languages', [AdminOnboardingLanguagesController::class, 'edit'])->name('console.admin.onboarding.languages.edit');
+        Route::put('admin/onboarding/languages', [AdminOnboardingLanguagesController::class, 'update'])->name('console.admin.onboarding.languages.update');
+        Route::get('admin/onboarding/assistant', [AdminOnboardingAssistantController::class, 'create'])->name('console.admin.onboarding.assistant.create');
+        Route::post('admin/onboarding/assistant', [AdminOnboardingAssistantController::class, 'store'])->name('console.admin.onboarding.assistant.store');
+        // The optional steps run after the wizard closes (and work for a tenant that never was in it); `continue` skips on to the next.
+        Route::get('admin/onboarding/continue/{step}', [AdminOnboardingController::class, 'continue'])->where('step', '[a-z][a-z0-9_]{1,63}')->name('console.admin.onboarding.continue');
+        Route::get('admin/onboarding/channel', [AdminOnboardingChannelController::class, 'create'])->name('console.admin.onboarding.channel.create');
+        Route::post('admin/onboarding/channel', [AdminOnboardingChannelController::class, 'store'])->name('console.admin.onboarding.channel.store');
+        Route::get('admin/onboarding/team', [AdminOnboardingTeamController::class, 'create'])->name('console.admin.onboarding.team.create');
+        Route::post('admin/onboarding/team', [AdminOnboardingTeamController::class, 'store'])->name('console.admin.onboarding.team.store');
+        Route::post('admin/onboarding/checklist/hide', [AdminOnboardingChecklistController::class, 'hide'])->name('console.admin.onboarding.checklist.hide');
 
         // `assistant` is no screen but may be bookmarked: it sends on to an assistant the user may open.
         Route::get('assistant', [AssistantHomeController::class, 'index'])->name('console.entry');

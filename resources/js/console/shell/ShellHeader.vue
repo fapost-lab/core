@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from 
 import AppRail from './AppRail.vue'
 import LanguageMenu from './LanguageMenu.vue'
 import NotificationBell from './NotificationBell.vue'
+import OnboardingChecklistIndicator from './OnboardingChecklistIndicator.vue'
 import ShellSearch from './ShellSearch.vue'
 import ShellSidebar from './ShellSidebar.vue'
 import ThemeToggle from './ThemeToggle.vue'
@@ -67,6 +68,7 @@ const crumbs = computed(() => {
         :labels="t.language"
       />
       <ThemeToggle :labels="t.theme" />
+      <OnboardingChecklistIndicator v-if="page.props.onboardingChecklist" :checklist="page.props.onboardingChecklist" />
       <NotificationBell
         v-if="page.props.notifications"
         :notifications="page.props.notifications"
