@@ -24,7 +24,6 @@ paths:
   - app/Http/Middleware/OnlyOnPlatformHosts.php
   - config/trustedproxy.php
   - config/horizon.php
-  - config/telescope.php
   - app/Providers/HorizonServiceProvider.php
   - docker/compose.yaml
   - "tests/Feature/Http/**"
@@ -34,7 +33,7 @@ paths:
   - tests/Feature/Staff/CoreOperatorAccessTest.php
   - tests/Feature/Staff/HorizonOperatorAccessTest.php
   - tests/Architecture/OperatorAccessBoundaryTest.php
-reviewed_at: 2026-10-22
+reviewed_at: 2026-10-26
 ---
 # Tenancy rules
 
@@ -80,9 +79,10 @@ broken.
   boot anyway so `config:clear` still works. An ingress host (`WEBHOOK_BASE_URL`, gateway URL) outside the base
   domain only warns (`php artisan about`): TrustHosts would answer it 400. Enforced: `HostModeDeploymentCheckTest`,
   `HostModeBootTest`.
-- **Horizon and Telescope are never served on a tenant host.** `OnlyOnPlatformHosts` is first in their route
-  middleware (`config/horizon.php`, `config/telescope.php`) and answers 404 on a tenant host in `host` mode. Platform
-  hosts carry no tenant sign-in. Who may open Horizon (and the monitoring package's screens) is decided by `Fapost\Foundation\Operator\Contracts\OperatorAccessInterface`
+- **Horizon is never served on a tenant host.** `OnlyOnPlatformHosts` is first in its route middleware
+  (`config/horizon.php`) and answers 404 on a tenant host in `host` mode. Platform hosts carry no tenant sign-in.
+  Telescope is not Core's: it comes with `fapost/monitoring`, whose routes take the host guard from the operator layer
+  (`monitoring.middleware`) and are closed by the contract below regardless. Who may open Horizon (and the monitoring package's screens) is decided by `Fapost\Foundation\Operator\Contracts\OperatorAccessInterface`
   (`viewHorizon` asks it for `OperatorSurface::Horizon`). Core's default (`CoreOperatorAccess`): `single` mode, a signed-in
   active user holding `Permission::ViewOperatorScreens`, never the platform support user; `host` mode, nobody, tenant
   admins included, until an operator layer rebinds the contract (SaaS today redefines the `viewHorizon` gate itself; its bridge moves to the contract in a later task). The administrators' `Gate::before` bypass skips
@@ -315,7 +315,7 @@ broken.
   migrations are tenant-scoped, so `config/settings.php` leaves `migrations_paths` empty and they
   run only through `MigrationScope::settings()`), and `AppServiceProvider` loads
   `database/migrations/landlord`. Only installation operator packages (SaaS, monitoring) may open `landlord`, and only for
-  their own tables (`saas_*`; the three `pulse_*` tables for monitoring); they never write `tenants` or `webhook_registry`,
+  their own tables (`saas_*`; the `pulse_*` and `telescope_*` tables for monitoring); they never write `tenants` or `webhook_registry`,
   and tenant data deletion never touches their tables. Plugin and Solution packages have no landlord access
   (`adr-20261005-extension-packages-own-landlord-tables`, amended 2026-10-08;
   `adr-20261023-operator-packages-own-landlord-tables`).

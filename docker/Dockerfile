@@ -166,7 +166,7 @@ CMD ["php-fpm"]
 # a bug that only appears after deployment. Sharing the base leaves exactly the
 # differences that are meant to be there:
 #
-#   - dev Composer dependencies (Telescope, Pail, ide-helper)
+#   - dev Composer dependencies (Pail, ide-helper)
 #   - source bind-mounted rather than copied, so edits are live
 #   - opcache revalidating, or nothing you type would take effect
 #   - Xdebug, optional and off by default because it is not free

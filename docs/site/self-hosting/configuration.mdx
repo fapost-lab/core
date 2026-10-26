@@ -127,14 +127,13 @@ reachable from the application, not from the internet.
 
 ## What must change for production
 
-The shipped `.env.example` is a development file. Four values are unsafe as they
+The shipped `.env.example` is a development file. Three values are unsafe as they
 stand:
 
 | | |
 |---|---|
 | `APP_DEBUG` | `true` exposes stack traces with configuration in them. Set `false`. |
 | `APP_KEY` | Empty. Generate one, and never reuse it across installations. |
-| `TELESCOPE_ENABLED` | `true` records every request, including their contents. |
 | `HCAPTCHA_*` | Ships with hCaptcha's public test keys, which always pass. |
 
 Set a `REDIS_PASSWORD` on anything but a local machine.

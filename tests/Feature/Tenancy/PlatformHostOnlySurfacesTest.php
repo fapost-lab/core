@@ -9,8 +9,8 @@ use Illuminate\Support\Facades\Route;
 use Tests\Feature\FeatureTestCase;
 
 /**
- * Horizon and Telescope are the installation's, not a tenant's: in `host` mode they answer on the
- * base domain and platform subdomains, and 404 on a tenant host.
+ * Horizon is the installation's, not a tenant's: in `host` mode it answers on the base domain and
+ * platform subdomains, and 404s on a tenant host.
  */
 final class PlatformHostOnlySurfacesTest extends FeatureTestCase
 {
@@ -47,7 +47,6 @@ final class PlatformHostOnlySurfacesTest extends FeatureTestCase
     public function test_horizon_is_guarded_by_it_and_closed_on_a_platform_host(): void
     {
         $this->assertContains(OnlyOnPlatformHosts::class, config('horizon.middleware'));
-        $this->assertContains(OnlyOnPlatformHosts::class, config('telescope.middleware'));
 
         // Not served on a tenant host at all; on the base domain the gate (empty allow-list) refuses.
         $this->get("http://main.{$this->base}/horizon")->assertNotFound();
