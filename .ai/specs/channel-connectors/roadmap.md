@@ -41,7 +41,7 @@ reached only through the connector registrar, with its existing tests untouched 
       (after: Connector registrar with a channel surface — capabilities are registered on it)
 - [ ] `capability-aware-validation` — Capability-aware validation: validation and the builder warn when a flow uses what its assistant's
       channels cannot do (after: Neutral outgoing message — it checks against the declared capabilities)
-- [ ] `outbound-message-without-token` — Outbound message without the token: the `OutboundMessage` envelope a
+- [x] `outbound-message-without-token` — Outbound message without the token: the `OutboundMessage` envelope a
       connector's sender receives no longer carries the channel token into queued payloads; the sender gets it
       when the job runs (after: Telegram on the registrar — the sender contract is settled there)
 - [ ] fog: connector config upgrades between versions — depends on the open question (a connector
@@ -66,6 +66,10 @@ location requests, media — with no Viber code in Core.
       Channel settings from the connector's schema, Neutral outgoing message — it is built on them;
       after: Body-HMAC ingress signatures, Public media links — Viber needs both; after: Managed settings from a
       connector — its account URI comes from the provider)
+- [ ] Button limits — connectors declare their button limits (buttons per message and per row, label
+      length) beside the capability flags, and flow validation warns when a flow exceeds them (after:
+      Capability-aware validation — it adds limits to the same check; built with the Viber connector package,
+      so the contract is shaped by two channels' limits, not Telegram's alone)
 - [ ] Viber end to end — the package installed through the overlay against the owner's pre-2024 bot; the
       gaps found go back into the contract (after: Viber connector package)
 - [ ] fog: session windows — how broadcasting and quotas treat bot-initiated messages outside a 24-hour
@@ -88,7 +92,7 @@ connector contract with Telegram (built in) and Viber (a package) as references.
 2. connector-channel-registrar
 3. open-channel-types; channel-settings-schema; neutral-outgoing-message
 4. telegram-on-registrar; capability-aware-validation; connector-managed-settings; outbound-message-without-token
-5. Viber connector package
+5. Viber connector package; Button limits
 6. Viber end to end
 7. Published docs
 
