@@ -27,7 +27,6 @@ final class OutboundMessageButtonsSerializationTest extends TestCase
             tenantId: 'tenant-1',
             channelId: 'channel-1',
             channelType: 'telegram',
-            transportToken: null,
             chatId: 'chat-1',
             payload: new MessagePayload(type: 'keyboard', text: 'Choose', buttons: $buttons),
         );

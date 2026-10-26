@@ -200,7 +200,6 @@ final readonly class ConversationReplyService implements ConversationReplyServic
             tenantId: (string) $conversation->tenant_id,
             channelId: (string) $channel->getKey(),
             channelType: $channel->type,
-            transportToken: $channel->token,
             chatId: $chatId,
             payload: $payload,
             // No parse_mode, unlike every other outbound path here. Those

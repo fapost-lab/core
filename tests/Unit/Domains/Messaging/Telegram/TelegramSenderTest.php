@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Messaging\Telegram;
 
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Telegram\TelegramBotApiClientFactory;
 use App\Domains\Channels\Telegram\TelegramDeliveryResolver;
 use App\Domains\Channels\Telegram\TelegramDocumentDeliveryAction;
@@ -14,6 +15,7 @@ use App\Domains\Channels\Telegram\TelegramVideoDeliveryAction;
 use App\Domains\Channels\Telegram\TelegramVoiceDeliveryAction;
 use Fapost\Foundation\Messaging\MessagePayload;
 use Fapost\Foundation\Messaging\OutboundMessage;
+use Fapost\Foundation\Messaging\ProcessingIndicatorHandle;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -36,10 +38,9 @@ final class TelegramSenderTest extends TestCase
             tenantId: 'tenant-1',
             channelId: 'channel-1',
             channelType: 'telegram',
-            transportToken: 'bot-token',
             chatId: 'chat-1',
             payload: new MessagePayload(type: 'text', text: 'Hello world'),
-        ));
+        ), $this->channel('bot-token'));
 
         $this->assertTrue($result->sent);
         $this->assertSame('77', $result->providerMessageId);
@@ -64,10 +65,9 @@ final class TelegramSenderTest extends TestCase
             tenantId: 'tenant-1',
             channelId: 'channel-1',
             channelType: 'telegram',
-            transportToken: 'bot-token',
             chatId: 'chat-1',
             payload: new MessagePayload(type: 'text', text: 'hello'),
-        ));
+        ), $this->channel('bot-token'));
 
         $this->assertFalse($result->sent);
         $this->assertSame('telegram down', $result->error);
@@ -89,14 +89,13 @@ final class TelegramSenderTest extends TestCase
             tenantId: 'tenant-1',
             channelId: 'channel-1',
             channelType: 'telegram',
-            transportToken: 'bot-token',
             chatId: 'chat-1',
             payload: new MessagePayload(
                 type: 'keyboard',
                 text: 'Choose',
                 keyboard: ['keyboard' => [[['text' => 'Yes']]], 'one_time_keyboard' => true, 'resize_keyboard' => true],
             ),
-        ));
+        ), $this->channel('bot-token'));
 
         $this->assertTrue($result->sent);
         Http::assertSent(static fn (Request $request): bool => 'https://api.telegram.org/botbot-token/sendMessage' === (string) $request->url()
@@ -119,14 +118,13 @@ final class TelegramSenderTest extends TestCase
             tenantId: 'tenant-1',
             channelId: 'channel-1',
             channelType: 'telegram',
-            transportToken: 'bot-token',
             chatId: 'chat-1',
             payload: new MessagePayload(
                 type: 'photo',
                 text: 'A caption',
                 media: ['photo' => 'https://example.com/img.jpg'],
             ),
-        ));
+        ), $this->channel('bot-token'));
 
         $this->assertTrue($result->sent);
         $this->assertSame('100', $result->providerMessageId);
@@ -150,14 +148,13 @@ final class TelegramSenderTest extends TestCase
             tenantId: 'tenant-1',
             channelId: 'channel-1',
             channelType: 'telegram',
-            transportToken: 'bot-token',
             chatId: 'chat-1',
             payload: new MessagePayload(
                 type: 'document',
                 text: '',
                 media: ['document' => 'https://example.com/file.pdf'],
             ),
-        ));
+        ), $this->channel('bot-token'));
 
         $this->assertTrue($result->sent);
         Http::assertSent(static fn (Request $request): bool => str_contains((string) $request->url(), 'sendDocument')
@@ -178,14 +175,13 @@ final class TelegramSenderTest extends TestCase
             tenantId: 'tenant-1',
             channelId: 'channel-1',
             channelType: 'telegram',
-            transportToken: 'bot-token',
             chatId: 'chat-1',
             payload: new MessagePayload(
                 type: 'video',
                 text: 'Watch this',
                 media: ['video' => 'https://example.com/clip.mp4'],
             ),
-        ));
+        ), $this->channel('bot-token'));
 
         $this->assertTrue($result->sent);
         Http::assertSent(static fn (Request $request): bool => str_contains((string) $request->url(), 'sendVideo')
@@ -207,18 +203,54 @@ final class TelegramSenderTest extends TestCase
             tenantId: 'tenant-1',
             channelId: 'channel-1',
             channelType: 'telegram',
-            transportToken: 'bot-token',
             chatId: 'chat-1',
             payload: new MessagePayload(
                 type: 'voice',
                 text: '',
                 media: ['voice' => 'https://example.com/audio.ogg'],
             ),
-        ));
+        ), $this->channel('bot-token'));
 
         $this->assertTrue($result->sent);
         Http::assertSent(static fn (Request $request): bool => str_contains((string) $request->url(), 'sendVoice')
             && 'https://example.com/audio.ogg' === $request['voice']);
+    }
+
+    public function test_a_channel_without_a_token_is_not_sent_through(): void
+    {
+        Http::fake();
+
+        $result = $this->sender()->deliver(new OutboundMessage(
+            idempotencyKey: 'idem-no-token',
+            tenantId: 'tenant-1',
+            channelId: 'channel-1',
+            channelType: 'telegram',
+            chatId: 'chat-1',
+            payload: new MessagePayload(type: 'text', text: 'Hello'),
+        ), $this->channel(''));
+
+        $this->assertFalse($result->sent);
+        $this->assertSame('Telegram transport token is missing.', $result->error);
+        Http::assertNothingSent();
+    }
+
+    public function test_typing_indicator_uses_the_token_of_the_channel(): void
+    {
+        Http::fake(['https://api.telegram.org/*' => Http::response(['ok' => true, 'result' => true], 200)]);
+
+        $channel = $this->channel('bot-token');
+        $handle  = $this->sender()->indicateProcessing('chat-1', $channel);
+        $this->sender()->refreshProcessing(new ProcessingIndicatorHandle('telegram', 'chat-1'), $channel);
+
+        $this->assertSame('chat-1', $handle->chatId);
+        Http::assertSentCount(2);
+        Http::assertSent(static fn (Request $request): bool => 'https://api.telegram.org/botbot-token/sendChatAction' === (string) $request->url()
+            && 'chat-1' === $request['chat_id']);
+    }
+
+    private function channel(string $token): Channel
+    {
+        return (new Channel())->forceFill(['type' => 'telegram', 'token' => $token]);
     }
 
     private function sender(): TelegramSender

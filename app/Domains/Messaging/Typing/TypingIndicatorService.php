@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Messaging\Typing;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use Fapost\Foundation\Channel\ChannelInterface;
 use Fapost\Foundation\Messaging\TypingCapableProviderInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -12,7 +13,7 @@ use Throwable;
 
 /**
  * Discovers typing-capable channel providers via the {@see ChannelRegistry}
- * and starts a {@see TypingSession} bound to the resolved transport token.
+ * and starts a {@see TypingSession} bound to the channel it runs for.
  * Channels whose provider does not implement
  * {@see TypingCapableProviderInterface} silently get a {@code null} session;
  * callers treat null as a no-op (no provider, no indicator).
@@ -35,18 +36,18 @@ final readonly class TypingIndicatorService
      *   • starting the indicator threw and was swallowed.
      */
     public function start(
-        string $channelType,
+        ChannelInterface $channel,
         string $chatId,
-        string $transportToken,
     ): ?TypingSession {
-        $sender = $this->channelRegistry->sender($channelType);
+        $channelType = $channel->getType();
+        $sender      = $this->channelRegistry->sender($channelType);
 
         if (! $sender instanceof TypingCapableProviderInterface) {
             return null;
         }
 
         try {
-            $handle = $sender->indicateProcessing($chatId, $transportToken);
+            $handle = $sender->indicateProcessing($chatId, $channel);
         } catch (Throwable $exception) {
             $this->logger->debug('typing.start_failed', [
                 'channel' => $channelType,
@@ -60,7 +61,7 @@ final readonly class TypingIndicatorService
         return new TypingSession(
             provider: $sender,
             handle: $handle,
-            transportToken: $transportToken,
+            channel: $channel,
             logger: $this->logger,
         );
     }

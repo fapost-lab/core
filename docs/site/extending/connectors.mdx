@@ -103,6 +103,11 @@ it, so constructors must be cheap and must not touch tenant data.
 | `profile` | no | `Fapost\Foundation\Channel\Settings\ChannelProfileInterface` |
 | `mediaLimits` | no | `Fapost\Foundation\Media\ChannelMediaLimitsInterface` |
 
+A sender gets the channel with each call: `deliver(OutboundMessage $message, ChannelInterface $channel)`.
+Read the token and the channel's settings from `$channel->getConfig()` (`token`, and the
+values your profile declares under `options`, such as `sender_name` for Viber) while you
+call the provider, and keep none of them.
+
 Boot fails, naming your connector, when you register a type your manifest does not
 declare, a type Core serves itself (such as `telegram`), a type twice, a class that does
 not implement its interface, a media class or a profile whose `channelType()` is another

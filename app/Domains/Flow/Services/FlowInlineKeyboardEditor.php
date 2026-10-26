@@ -74,7 +74,6 @@ final readonly class FlowInlineKeyboardEditor implements InlineKeyboardEditorInt
                     tenantId: $tenantId,
                     channelId: (string)$channel->getKey(),
                     channelType: $channel->type,
-                    transportToken: $channel->token,
                     chatId: (string)$channelContact->contact->external_id,
                     payload: new MessagePayload(type: 'remove_keyboard', text: ''),
                     metadata: ['edit_message_id' => $externalMessageId],

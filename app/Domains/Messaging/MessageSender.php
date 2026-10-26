@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Messaging;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Conversation\Capture\ConversationCaptureFactory;
 use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
+use App\Domains\Messaging\Exceptions\ChannelNotFoundException;
 use App\Domains\Messaging\Exceptions\RateLimitExceededException;
 use App\Domains\Messaging\Exceptions\UnsupportedChannelException;
 use Fapost\Foundation\Messaging\DeliveryResult;
@@ -21,6 +23,9 @@ use Throwable;
  * Applies idempotency and rate limiting before delegating delivery to the
  * channel-specific sender resolved from the shared channel registry. The tenant's
  * outbound volume is spent just before delivery ({@see OutboundVolumeGate}).
+ *
+ * The envelope carries no secret: the channel is loaded here, in the current tenant context, and handed
+ * to the sender, which reads the credentials from it for the duration of the call.
  */
 final readonly class MessageSender implements MessageSenderInterface
 {
@@ -38,6 +43,7 @@ final readonly class MessageSender implements MessageSenderInterface
     }
 
     /**
+     * @throws ChannelNotFoundException When the channel no longer exists; nothing is spent or delivered.
      * @throws Throwable
      */
     public function send(OutboundMessage $message): DeliveryResult
@@ -58,6 +64,13 @@ final readonly class MessageSender implements MessageSenderInterface
             throw new UnsupportedChannelException("Unsupported channel type [{$message->channelType}].");
         }
 
+        $channel = Channel::query()->find($message->channelId);
+
+        if (null === $channel) {
+            $this->releaseIdempotency($message->idempotencyKey);
+            throw new ChannelNotFoundException("Channel [{$message->channelId}] not found.");
+        }
+
         // Last check before the side effect: a duplicate or a failed precondition above never spends a unit.
         try {
             $this->volumeGate->admit($message);
@@ -67,7 +80,7 @@ final readonly class MessageSender implements MessageSenderInterface
         }
 
         try {
-            $result = $provider->deliver($message);
+            $result = $provider->deliver($message, $channel);
         } catch (Throwable $exception) {
             $this->releaseIdempotency($message->idempotencyKey);
             throw $exception;

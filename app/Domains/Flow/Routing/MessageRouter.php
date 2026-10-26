@@ -97,9 +97,8 @@ final readonly class MessageRouter
         // {@see TypingHeartbeatRegistry} so the engine can refresh it before
         // each handler.execute() and the indicator survives multi-node runs.
         $typingSession = $this->typing->start(
-            channelType: $channel->type,
+            channel: $channel,
             chatId: $message->externalChatId,
-            transportToken: (string)$channel->token,
         );
 
         if (null !== $typingSession) {

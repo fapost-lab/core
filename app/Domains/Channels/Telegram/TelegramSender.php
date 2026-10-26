@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Channels\Telegram;
 
 use App\Domains\Channels\Telegram\Exceptions\TelegramApiException;
+use Fapost\Foundation\Channel\ChannelInterface;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\OutboundMessage;
 use Fapost\Foundation\Messaging\ProcessingIndicatorHandle;
@@ -33,11 +34,11 @@ final readonly class TelegramSender implements ProviderSenderInterface, TypingCa
     }
 
     /**
-     * Deliver one outbound message using the resolved Telegram transport token.
+     * Deliver one outbound message using the bot token of the channel it is sent through.
      */
-    public function deliver(OutboundMessage $message): DeliveryResult
+    public function deliver(OutboundMessage $message, ChannelInterface $channel): DeliveryResult
     {
-        $token = (string)($message->transportToken ?? '');
+        $token = $this->tokenOf($channel);
 
         if ('' === $token) {
             return new DeliveryResult(sent: false, error: 'Telegram transport token is missing.');
@@ -59,9 +60,9 @@ final readonly class TelegramSender implements ProviderSenderInterface, TypingCa
         );
     }
 
-    public function indicateProcessing(string $chatId, string $transportToken): ProcessingIndicatorHandle
+    public function indicateProcessing(string $chatId, ChannelInterface $channel): ProcessingIndicatorHandle
     {
-        $this->safeChatAction($chatId, $transportToken);
+        $this->safeChatAction($chatId, $channel);
 
         return new ProcessingIndicatorHandle(
             providerId: self::PROVIDER_ID,
@@ -69,24 +70,33 @@ final readonly class TelegramSender implements ProviderSenderInterface, TypingCa
         );
     }
 
-    public function refreshProcessing(ProcessingIndicatorHandle $handle, string $transportToken): void
+    public function refreshProcessing(ProcessingIndicatorHandle $handle, ChannelInterface $channel): void
     {
-        $this->safeChatAction($handle->chatId, $transportToken);
+        $this->safeChatAction($handle->chatId, $channel);
     }
 
-    public function stopProcessing(ProcessingIndicatorHandle $handle, string $transportToken): void
+    public function stopProcessing(ProcessingIndicatorHandle $handle, ChannelInterface $channel): void
     {
         // No-op for Telegram: indicator auto-clears after ~5s or on next sent message.
     }
 
-    private function safeChatAction(string $chatId, string $transportToken): void
+    private function tokenOf(ChannelInterface $channel): string
     {
-        if ('' === $transportToken) {
+        $token = $channel->getConfig()['token'] ?? null;
+
+        return is_string($token) ? $token : '';
+    }
+
+    private function safeChatAction(string $chatId, ChannelInterface $channel): void
+    {
+        $token = $this->tokenOf($channel);
+
+        if ('' === $token) {
             return;
         }
 
         try {
-            $this->clientFactory->make($transportToken)->sendChatAction($chatId, 'typing');
+            $this->clientFactory->make($token)->sendChatAction($chatId, 'typing');
         } catch (Throwable $exception) {
             $this->logger->debug('telegram.chat_action_failed', [
                 'chat_id' => $chatId,

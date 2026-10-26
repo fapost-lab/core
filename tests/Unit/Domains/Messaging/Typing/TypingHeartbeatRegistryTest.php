@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Messaging\Typing;
 
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingSession;
 use Fapost\Foundation\Messaging\ProcessingIndicatorHandle;
@@ -45,7 +46,7 @@ final class TypingHeartbeatRegistryTest extends TestCase
         $registry->set(new TypingSession(
             provider: $provider,
             handle: new ProcessingIndicatorHandle('test', 'chat-1'),
-            transportToken: 'token',
+            channel: (new Channel())->forceFill(['type' => 'telegram', 'token' => 'token']),
         ));
 
         // The engine treats the registry as opaque — it just tells the
@@ -63,7 +64,7 @@ final class TypingHeartbeatRegistryTest extends TestCase
         return new TypingSession(
             provider: $provider,
             handle: new ProcessingIndicatorHandle('test', 'chat'),
-            transportToken: 'token',
+            channel: (new Channel())->forceFill(['type' => 'telegram', 'token' => 'token']),
         );
     }
 }

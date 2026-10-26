@@ -17,7 +17,8 @@ paths:
   - "tests/Unit/Domains/Messaging/**"
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
-reviewed_at: 2026-10-21
+  - "tests/Feature/Domains/Messaging/**"
+reviewed_at: 2026-10-26
 ---
 # Channels rules
 
@@ -99,10 +100,17 @@ broken.
 - **A channel secret never leaves the request or job that uses it.** A provider client throws
   exceptions whose text went through `SecretRedactor` and does not chain the original (a connection
   error's message carries the URL, and Telegram's URL carries the bot token); a queued job names the
-  channel and loads its credentials when it runs. Only a synchronous deregister carries a snapshot,
+  channel and loads its credentials when it runs. Foundation's `OutboundMessage` has no credential field
+  (since 0.31): `MessageSender` loads the channel by `channelId` in the tenant context when it sends and
+  hands it to `ProviderSenderInterface::deliver($message, $channel)`; the typing provider gets the channel the
+  same way, and a connector's media services already did. A missing channel is
+  `ChannelNotFoundException`, thrown before any volume is spent. Rejected: hiding the field from
+  serialization (implicit, one forgotten override leaks again), a Foundation credentials-lookup contract the
+  sender calls itself (every sender must remember it, and it runs tenant lookups inside a connector), and a
+  separate credentials DTO (a second way beside `ChannelInterface`). Only a synchronous deregister carries a snapshot,
   because a deleted row cannot be loaded. Why: exception text and job payloads end up in logs,
   `jobs` and `failed_jobs`. Enforced: `TelegramBotApiClientRedactionTest`,
-  `SyncChannelWebhookJobCredentialsTest`, `BroadcastSendJobTest`.
+  `SyncChannelWebhookJobCredentialsTest`, `BroadcastSendJobTest`, `MessageSenderTest`.
 - **Pick the queue by purpose:** replies in an active dialogue `messaging.transactional`,
   broadcasts `messaging.broadcast`, service and lifecycle work `messaging.system`. Source:
   `conventions/queues.md`.

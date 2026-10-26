@@ -140,7 +140,6 @@ final class SendContactNotificationJob implements ShouldQueue, TenantAccessGated
                     tenantId: $this->tenantId,
                     channelId: (string) $channel->getKey(),
                     channelType: $channel->type,
-                    transportToken: $channel->token,
                     chatId: (string) $contact->external_id,
                     payload: new MessagePayload(type: 'text', text: $text),
                     metadata: [
