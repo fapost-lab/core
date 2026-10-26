@@ -11,13 +11,13 @@ installation the page shows Reverb (up, down or unknown, connections, channels) 
 (health, the published specs, channels still on the old URL), and opening it with Reverb stopped
 shows "down" with the reason, not an error.
 
-- [ ] `health-service` — Health service and probes — a read-only service that asks Reverb's HTTP API, the gateway's
+- [x] `health-service` — Health service and probes — a read-only service that asks Reverb's HTTP API, the gateway's
       health endpoint and the webhook registry, with a short cache and timeout, and answers up, down
       or unknown for each; `gateway:doctor` reads its checks from the same place
-- [ ] `health-page` — Health page — the console page on the kit with the Reverb and gateway cards, polled, empty and
+- [x] `health-page` — Health page — the console page on the kit with the Reverb and gateway cards, polled, empty and
       unknown states included, for the tenant's admins on a single-tenant installation (after:
       Health service and probes — the page draws what the service reports)
-- [ ] Tenant slice in host mode — the same page in `host` mode shows only what is the tenant's: its
+- [ ] `health-tenant-slice` — Tenant slice in host mode — the same page in `host` mode shows only what is the tenant's: its
       live updates and its channels' ingress, never another tenant's or installation-wide figures
       (after: Health page — it narrows the page that exists)
 
@@ -27,13 +27,13 @@ Goal: the queue is on the page, and the operator of a multi-tenant installation 
 Done when: the page shows queue wait and throughput per named queue, and the SaaS operator panel
 renders the installation-wide figures it receives through a contract.
 
-- [ ] Queue card — wait time and throughput of the named queues from Horizon's metrics, and the
+- [ ] `health-queue-card` — Queue card — wait time and throughput of the named queues from Horizon's metrics, and the
       failed-job count, on the page (after: Health service and probes — a new probe in the service)
-- [ ] `operator-access-contract` — Operator access contract — a Foundation contract that answers whether a request may look at
+- [x] `operator-access-contract` — Operator access contract — a Foundation contract that answers whether a request may look at
       the operator screens (Horizon today, Pulse and the log viewer in the monitoring package), with
       Core's default answer: the owner and admins of the tenant on a `single` installation, closed on
       a `host` one; Core's Horizon gate asks it, which opens Horizon on `single` installations
-- [ ] Health contract — a Foundation contract that returns the installation-wide health to a
+- [ ] `health-contract` — Health contract — a Foundation contract that returns the installation-wide health to a
       package that renders it (the monitoring package, the SaaS operator panel), with Core's default
       answer for an installation without one (after: Health service and probes — the contract
       exposes the same service)
