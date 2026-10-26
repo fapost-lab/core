@@ -60,7 +60,7 @@ media — with no Slack code in Core. (Viber until 2026-10-26: parked until a cu
 - [x] `connector-managed-settings` — Managed settings from a connector: a connector hands Core the values it reads
       from the provider (the managed fields of its settings schema) and Core stores them, so no package writes
       `channels` (after: Channel settings from the connector's schema — it fills that schema's managed fields)
-- [ ] `slack-connector-package` — Slack connector package: `fapost/connector-slack`: Events API ingress with Slack's `v0` signature
+- [x] `slack-connector-package` — Slack connector package: `fapost/connector-slack`: Events API ingress with Slack's `v0` signature
       and timestamp window, the `url_verification` handshake, interactivity payloads, Block Kit buttons
       with editing, media by URL, a settings schema (bot token, signing secret) with the Request URLs or an
       app manifest to paste, translations, public link; one Slack app per channel; tested on recorded
