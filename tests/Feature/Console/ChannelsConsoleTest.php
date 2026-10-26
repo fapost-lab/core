@@ -395,6 +395,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
                     'handle'             => '@help_bot',
                     'url'                => 'https://t.me/help_bot',
                     'settings'           => ['allowed_updates' => ['message'], 'max_connections' => 12],
+                    'setup'              => [],
                 ])
                 ->where('urls.submit', "/assistant/{$this->assistant->getKey()}/channels/{$channel->getKey()}")
                 ->etc());
@@ -837,6 +838,47 @@ final class ChannelsConsoleTest extends FeatureTestCase
                 ->where('table.rows.0.typeLabel', 'Echo')
                 ->where('table.rows.0.available', true)
                 ->etc());
+    }
+
+    public function test_the_form_offers_the_setup_guide_of_a_type_before_its_channel_exists(): void
+    {
+        $this->registerEcho(profile: true);
+        // A connector adds its lines with `loadTranslationsFrom`; one step has a translation, the other falls back to English.
+        $this->app->make('translator')->addLines(['echo.setup.url.title' => 'Send events to this address'], 'en');
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl('/create'))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('setup.telegram', [])
+                ->where('setup.echo', [
+                    ['title' => 'Send events to this address', 'text' => 'The URL appears once the channel is created.', 'copy' => null, 'copyKind' => 'url'],
+                    ['title' => 'Add the subscription', 'text' => 'Create it with this body.', 'copy' => '{"region":"eu","events":["sent"]}', 'copyKind' => 'code'],
+                ])
+                ->etc());
+    }
+
+    public function test_the_edit_screen_gives_the_setup_guide_the_channels_webhook_url_and_config(): void
+    {
+        $this->registerEcho(profile: true);
+        $channel = $this->channel(['type' => 'echo', 'config' => ['region' => 'us']]);
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl("/{$channel->getKey()}/edit"))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('channel.setup.0.copyKind', 'url')
+                ->where('channel.setup.0.copy', fn ($url): bool => str_ends_with((string) $url, "/webhook/echo/{$channel->webhook_public_hash}"))
+                ->where('channel.setup.0.text', 'Paste it into the Echo dashboard.')
+                ->where('channel.setup.1.copy', '{"region":"us","events":["sent"]}')
+                ->etc());
+    }
+
+    public function test_a_channel_of_a_type_without_a_guide_has_an_empty_one(): void
+    {
+        $channel = $this->channel();
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl("/{$channel->getKey()}/edit"))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('channel.setup', [])->etc());
     }
 
     public function test_a_connector_profile_offers_its_settings_and_no_secret_token(): void

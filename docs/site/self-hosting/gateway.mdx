@@ -44,12 +44,24 @@ and deduplicated:
 }
 ```
 
+A spec may also declare a signed string built from headers and the body, a freshness
+window for a signed timestamp, a form field that holds the JSON document and a handshake
+that answers a provider's challenge in plain text. A spec that uses any of them is
+published as `"v": 2` (the other keys are `signed`, `timestamp`, `form` and
+`handshake`); all other specs stay `"v": 1`, unchanged.
+
+A gateway that predates version 2 rejects a version 2 spec and forwards its requests to
+the application, which runs the same rules in PHP. Nothing is lost or accepted wrongly
+while the gateway is old; those channels simply do not get its speed until you upgrade
+it. A handshake is answered the same way by both runtimes, and only for a request with a
+valid signature.
+
 Adding a channel therefore stays a pure PHP change and needs no gateway release.
-A platform whose verification is too complex to express declaratively simply does
-not publish a spec, and its webhooks stay on the PHP path.
+A provider whose verification the spec cannot express yet is handled by extending the
+spec in a new version, never by verification code in a connector.
 
 Both implementations are held to
-[`contracts/ingress/golden.json`](https://github.com/fapost-lab/core/blob/main/contracts/ingress/golden.json) — 40 cases
+[`contracts/ingress/golden.json`](https://github.com/fapost-lab/core/blob/main/contracts/ingress/golden.json) — over a hundred cases
 executed by both the PHP and the Go test suites, so the two cannot drift apart.
 
 ## Installing

@@ -10,21 +10,22 @@ use App\Domains\Webhook\Exceptions\InvalidSignatureException;
 use App\Domains\Webhook\Exceptions\WebhookRegistryException;
 use App\Domains\Webhook\Jobs\IncomingMessageJob;
 use App\Domains\Webhook\Services\ChannelAdapterResolver;
-use Fapost\Foundation\Channel\ChannelInboundAdapterInterface;
 use Fapost\Foundation\Channel\Ingress\IngressSpecExecutor;
 use Fapost\Foundation\Channel\Ingress\SignedRequest;
 use Fapost\Foundation\DTO\InboundWebhookPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Redis;
 
 /**
  * Stateless webhook ingress endpoint. Responsible ONLY for:
- *   1. Signature verification (secret from Redis registry, no DB).
- *   2. Idempotency deduplication (Redis SET NX).
- *   3. Routing envelope lookup (Redis registry, no DB).
- *   4. Dispatching IncomingMessageJob with raw payload.
+ *   1. Signature verification, with the freshness window of the spec (secret from Redis registry, no DB).
+ *   2. The provider's handshake, answered in plain text after a verified signature, without a job.
+ *   3. Idempotency deduplication (Redis SET NX).
+ *   4. Routing envelope lookup (Redis registry, no DB).
+ *   5. Dispatching IncomingMessageJob with the request document (the JSON body, or the JSON a form field holds).
  *
  * No Eloquent, no TenantContext, no payload normalization here.
  * All domain work (normalize, contact resolve, flow execution) happens in the worker.
@@ -42,7 +43,7 @@ final class WebhookController extends Controller
     ) {
     }
 
-    public function __invoke(Request $request, string $channel, string $hash): JsonResponse
+    public function __invoke(Request $request, string $channel, string $hash): JsonResponse|Response
     {
         try {
             return $this->handle($request, $hash);
@@ -53,16 +54,25 @@ final class WebhookController extends Controller
         }
     }
 
-    private function handle(Request $request, string $hash): JsonResponse
+    private function handle(Request $request, string $hash): JsonResponse|Response
     {
-        $entry   = $this->registryResolver->resolve($hash);
-        $adapter = $this->adapterResolver->resolve($entry->platform);
+        $entry         = $this->registryResolver->resolve($hash);
+        $spec          = $this->adapterResolver->resolve($entry->platform)->ingressSpec();
+        $signedRequest = $this->signedRequest($request);
 
-        if (! $this->verify($adapter, $request, $entry->secretToken)) {
+        if (! $this->specExecutor->verify($spec, $signedRequest, $entry->secretToken)) {
             throw new InvalidSignatureException('Invalid channel signature.');
         }
 
-        $idempotencyKey = $this->idempotencyKey($adapter, $request, $entry->channelId);
+        // Only a verified request is answered with a value derived from its body: the provider's challenge is
+        // echoed for whoever holds the signing secret, and for no one else.
+        $handshake = $this->specExecutor->handshakeResponse($spec, $signedRequest);
+
+        if (null !== $handshake) {
+            return response($handshake, 200, ['Content-Type' => 'text/plain; charset=utf-8']);
+        }
+
+        $idempotencyKey = $this->specExecutor->idempotencyKey($spec, $signedRequest, $entry->channelId);
 
         if (! $this->markProcessed($idempotencyKey)) {
             return response()->json(['ok' => true]);
@@ -76,7 +86,7 @@ final class WebhookController extends Controller
                     assistantId: $entry->assistantId,
                     channelId: $entry->channelId,
                     platform: $entry->platform,
-                    rawPayload: $request->json()->all(),
+                    rawPayload: $this->specExecutor->document($spec, $signedRequest),
                     idempotencyKey: $idempotencyKey,
                     receivedAt: time(),
                 )
@@ -85,29 +95,6 @@ final class WebhookController extends Controller
             ->onQueue('flow.execution');
 
         return response()->json(['ok' => true]);
-    }
-
-    /**
-     * Verify through the adapter's declarative spec.
-     *
-     * The spec executor refuses an empty secret itself, for every scheme but `none`.
-     */
-    private function verify(ChannelInboundAdapterInterface $adapter, Request $request, string $secret): bool
-    {
-        return $this->specExecutor->verify(
-            $adapter->ingressSpec(),
-            $this->signedRequest($request),
-            $secret,
-        );
-    }
-
-    private function idempotencyKey(ChannelInboundAdapterInterface $adapter, Request $request, string $channelId): string
-    {
-        return $this->specExecutor->idempotencyKey(
-            $adapter->ingressSpec(),
-            $this->signedRequest($request),
-            $channelId,
-        );
     }
 
     /**

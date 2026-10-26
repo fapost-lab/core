@@ -63,11 +63,33 @@ final class IngressSpecGoldenTest extends TestCase
         $executor = new IngressSpecExecutor();
         $context  = $case['note'] ?? $case['name'];
 
+        if (null !== $spec->timestamp) {
+            $this->assertArrayHasKey('now', $case, "A case whose spec has a timestamp must set now: {$context}");
+        }
+
+        $verified = $executor->verify($spec, $request, (string) $case['secret'], $case['now'] ?? null);
+
         $this->assertSame(
             $case['expect']['verified'],
-            $executor->verify($spec, $request, (string) $case['secret']),
+            $verified,
             "Signature verdict mismatch: {$context}",
         );
+
+        if (array_key_exists('document', $case['expect'])) {
+            $this->assertEquals(
+                $case['expect']['document'],
+                $executor->document($spec, $request),
+                "Document mismatch: {$context}",
+            );
+        }
+
+        if (array_key_exists('handshake', $case['expect'])) {
+            $this->assertSame(
+                $case['expect']['handshake'],
+                $verified ? $executor->handshakeResponse($spec, $request) : null,
+                "Handshake mismatch: {$context}",
+            );
+        }
 
         if (! array_key_exists('idempotencyKey', $case['expect'])) {
             return;
