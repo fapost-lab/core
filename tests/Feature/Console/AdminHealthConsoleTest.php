@@ -134,6 +134,55 @@ final class AdminHealthConsoleTest extends FeatureTestCase
         $this->assertSame('unknown', $report['gateway']['state']);
     }
 
+    public function test_the_queue_card_carries_the_figures_the_probe_measured(): void
+    {
+        $this->answers([
+            $this->probe('queues', ProbeResult::up('queues', 'Horizon is running (1 instance).', [
+                'masters'               => 1,
+                'failed'                => 5,
+                'failed_window_minutes' => 10080,
+                'window_started_at'     => '2026-10-26T10:00:00+00:00',
+                'queues'                => [
+                    ['name' => 'flow.execution', 'connection' => 'redis', 'wait_seconds' => 70, 'wait_threshold' => 60, 'throughput' => 10, 'jobs_per_minute' => 2.5],
+                    ['name' => 'default', 'connection' => 'redis', 'wait_seconds' => null, 'wait_threshold' => 60, 'throughput' => 0, 'jobs_per_minute' => null],
+                    ['name' => 'low', 'connection' => 'redis', 'wait_seconds' => 3, 'wait_threshold' => 60, 'throughput' => 3, 'jobs_per_minute' => 3.0],
+                ],
+            ])),
+        ]);
+
+        $queues = $this->report()['queues'];
+
+        $this->assertSame('up', $queues['state']);
+        $this->assertSame(5, $queues['failed']);
+        $this->assertSame(168, $queues['failedWindowHours']);
+        $this->assertSame(1, $queues['supervisors']);
+        $this->assertSame('2026-10-26T10:00:00+00:00', $queues['windowStartedAt']);
+        $this->assertSame(['name' => 'flow.execution', 'waitSeconds' => 70, 'waitThreshold' => 60, 'slow' => true, 'jobsPerMinute' => 2.5], $queues['queues'][0]);
+        $this->assertSame(['name' => 'default', 'waitSeconds' => null, 'waitThreshold' => 60, 'slow' => false, 'jobsPerMinute' => null], $queues['queues'][1]);
+        $this->assertFalse($queues['queues'][2]['slow']);
+        $this->assertEquals(3.0, $queues['queues'][2]['jobsPerMinute']);
+    }
+
+    public function test_a_queue_card_without_figures_and_a_missing_one_read_as_unknown_not_empty(): void
+    {
+        $this->answers([$this->probe('queues', ProbeResult::disabled('queues', 'Queues run on the "database" connection.', ['connection' => 'database']))]);
+
+        $queues = $this->report()['queues'];
+
+        $this->assertSame('disabled', $queues['state']);
+        $this->assertNull($queues['queues']);
+        $this->assertNull($queues['failed']);
+        $this->assertNull($queues['supervisors']);
+
+        $this->answers([]);
+
+        $queues = $this->report()['queues'];
+
+        $this->assertSame('unknown', $queues['state']);
+        $this->assertNull($queues['checkedAt']);
+        $this->assertNull($queues['queues']);
+    }
+
     public function test_the_admin_menu_links_to_the_page_in_the_system_group(): void
     {
         $this->actingAs($this->admin())

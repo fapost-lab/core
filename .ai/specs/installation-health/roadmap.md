@@ -27,7 +27,7 @@ Goal: the queue is on the page, and the operator of a multi-tenant installation 
 Done when: the page shows queue wait and throughput per named queue, and the SaaS operator panel
 renders the installation-wide figures it receives through a contract.
 
-- [ ] `health-queue-card` — Queue card — wait time and throughput of the named queues from Horizon's metrics, and the
+- [x] `health-queue-card` — Queue card — wait time and throughput of the named queues from Horizon's metrics, and the
       failed-job count, on the page (after: Health service and probes — a new probe in the service)
 - [x] `operator-access-contract` — Operator access contract — a Foundation contract that answers whether a request may look at
       the operator screens (Horizon today, Pulse and the log viewer in the monitoring package), with

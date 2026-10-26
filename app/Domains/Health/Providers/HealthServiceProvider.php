@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Health\Providers;
 
 use App\Domains\Health\Probes\GatewayProbe;
+use App\Domains\Health\Probes\QueueProbe;
 use App\Domains\Health\Probes\ReverbProbe;
 use App\Domains\Health\Probes\WebhookRegistryProbe;
 use App\Domains\Health\Services\HealthService;
@@ -24,6 +25,7 @@ final class HealthServiceProvider extends ServiceProvider
                     $app->make(ReverbProbe::class),
                     $app->make(GatewayProbe::class),
                     $app->make(WebhookRegistryProbe::class),
+                    $app->make(QueueProbe::class),
                 ],
                 cache: $app->make(Repository::class),
             ),

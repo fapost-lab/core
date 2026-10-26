@@ -37,3 +37,23 @@ export function newestCheck(times: (string | null)[]): string | null {
 
   return valid.length === 0 ? null : valid.reduce((a, b) => (new Date(a) >= new Date(b) ? a : b))
 }
+
+/**
+ * When a measuring window began, with the date when it is not today: a window opened days ago (the scheduler stopped
+ * taking Horizon's snapshots) must not read as this morning, because the per-minute figure is averaged over all of it.
+ */
+export function formatSince(iso: string | null, locale: string, now: Date = new Date()): string | null {
+  if (iso === null) {
+    return null
+  }
+
+  const date = new Date(iso)
+
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return date.toDateString() === now.toDateString()
+    ? date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleString(locale, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}

@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import Index from './Index.vue'
-import type { GatewayCard, HealthReportData, ReverbCard } from './types'
+import type { GatewayCard, HealthReportData, QueuesCard, ReverbCard } from './types'
 
 const { page, reload, cancelAll } = vi.hoisted(() => ({
   page: { props: {} as Record<string, unknown>, url: '/admin/health' },
@@ -42,6 +42,22 @@ const translations = {
         drift_some: 'Still on the old address.',
         spec_status: { matches: 'In sync', missing: 'Not published', differs: 'Out of date' },
       },
+      queues: {
+        title: 'Queues',
+        subtitle: 'Horizon',
+        description: 'Background workers.',
+        disabled: 'Queues do not run through Horizon.',
+        failed: 'Failed jobs in the last :hours hours',
+        failed_any: 'Recently failed jobs',
+        supervisors: 'Horizon instances',
+        queue: 'Queue',
+        wait: 'Wait',
+        per_minute: 'Jobs per minute',
+        seconds: ':seconds s',
+        slow: 'Long wait',
+        queues_none: 'The queues could not be read',
+        window: 'Jobs per minute since :time',
+      },
       reason: 'What the check says',
       not_reported: 'Not reported.',
       no_figure: 'Not available',
@@ -75,8 +91,27 @@ function gateway(over: Partial<GatewayCard> = {}): GatewayCard {
   }
 }
 
+function queues(over: Partial<QueuesCard> = {}): QueuesCard {
+  return {
+    key: 'queues',
+    state: 'up',
+    reason: 'Horizon is running (2 instances).',
+    checkedAt: CHECKED,
+    failed: 3,
+    failedWindowHours: 168,
+    supervisors: 2,
+    windowStartedAt: '2026-10-22T09:55:00Z',
+    queues: [
+      { name: 'flow.execution', waitSeconds: 12, waitThreshold: 60, slow: false, jobsPerMinute: 4.5 },
+      { name: 'default', waitSeconds: 90, waitThreshold: 60, slow: true, jobsPerMinute: 0 },
+      { name: 'messaging.system', waitSeconds: null, waitThreshold: 60, slow: false, jobsPerMinute: null },
+    ],
+    ...over,
+  }
+}
+
 function report(over: Partial<HealthReportData> = {}): HealthReportData {
-  return { reverb: reverb(), gateway: gateway(), ...over }
+  return { reverb: reverb(), gateway: gateway(), queues: queues(), ...over }
 }
 
 function render(props: Record<string, unknown> = {}) {
@@ -98,7 +133,7 @@ describe('loading', () => {
   it('shows neither green nor red before the first answer', () => {
     const wrapper = render()
 
-    for (const key of ['reverb', 'gateway']) {
+    for (const key of ['reverb', 'gateway', 'queues']) {
       const card = wrapper.find(`[data-test="card-${key}"]`)
 
       expect(card.attributes('data-state')).toBe('loading')
@@ -170,6 +205,63 @@ describe('states', () => {
 
     expect(unread.find('[data-test="specs"] [data-test="missing"]').text()).toBe('Could not be read')
     expect(unread.find('[data-test="drift"] [data-test="missing"]').text()).toBe('Could not be counted')
+  })
+})
+
+describe('the queue card', () => {
+  it('lists each queue with its wait and jobs per minute, and the failed jobs over the window', () => {
+    const card = render({ report: report() }).find('[data-test="card-queues"]')
+
+    expect(card.find('[data-test="state"]').text()).toBe('Up')
+    expect(card.find('[data-test="failed"]').text()).toContain('Failed jobs in the last 168 hours')
+    expect(card.find('[data-test="failed"]').text()).toContain('3')
+    expect(card.find('[data-test="queue-flow.execution"]').text()).toContain('12 s')
+    expect(card.find('[data-test="queue-flow.execution"]').text()).toContain('4.5')
+    expect(card.find('[data-test="window"]').text()).toMatch(/^Jobs per minute since /)
+  })
+
+  it('marks a wait at or over the threshold with a word, not colour alone', () => {
+    const card = render({ report: report() }).find('[data-test="card-queues"]')
+
+    expect(card.find('[data-test="queue-default"] [data-test="queue-slow"]').text()).toContain('Long wait')
+    expect(card.find('[data-test="queue-flow.execution"] [data-test="queue-slow"]').exists()).toBe(false)
+    expect(card.findAll('[data-test="queue-slow"]')).toHaveLength(1)
+  })
+
+  it('shows a missing wait or rate as not available, never as zero', () => {
+    const row = render({ report: report() }).find('[data-test="queue-messaging.system"]')
+
+    expect(row.text()).toBe('messaging.system' + 'Not available' + 'Not available')
+    expect(row.findAll('[data-test="missing"]')).toHaveLength(1)
+  })
+
+  it('says down plainly and still lists the queues it could read', () => {
+    const card = render({ report: report({ queues: queues({ state: 'down', reason: 'Horizon is not running.' }) }) }).find('[data-test="card-queues"]')
+
+    expect(card.find('[data-test="state"]').text()).toBe('Down')
+    expect(card.find('[data-test="reason"]').text()).toContain('Horizon is not running.')
+    expect(card.find('[data-test="queue-table"]').exists()).toBe(true)
+  })
+
+  it('says the queues could not be read instead of drawing an empty table', () => {
+    const card = render({ report: report({ queues: queues({ state: 'unknown', queues: null, failed: null, supervisors: null }) }) }).find('[data-test="card-queues"]')
+
+    expect(card.find('[data-test="queues-none"]').text()).toBe('The queues could not be read')
+    expect(card.find('[data-test="queue-table"]').exists()).toBe(false)
+    expect(card.find('[data-test="failed"] [data-test="missing"]').exists()).toBe(true)
+  })
+
+  it('shows a card switched off with its sentence and no figures', () => {
+    const card = render({ report: report({ queues: queues({ state: 'disabled', queues: null, failed: null, supervisors: null }) }) }).find('[data-test="card-queues"]')
+
+    expect(card.find('[data-test="state"]').text()).toBe('Switched off')
+    expect(card.find('[data-test="disabled-text"]').text()).toBe('Queues do not run through Horizon.')
+    expect(card.find('[data-test="queue-table"]').exists()).toBe(false)
+    expect(card.find('[data-test="failed"]').exists()).toBe(false)
+  })
+
+  it('spans both columns', () => {
+    expect(render({ report: report() }).find('[data-test="card-queues"]').classes()).toContain('lg:col-span-2')
   })
 })
 

@@ -45,7 +45,7 @@ What to watch:
 
 ## The scheduler
 
-Four scheduled tasks matter, and all fail silently if the scheduler is not
+Five scheduled tasks matter, and all fail silently if the scheduler is not
 running:
 
 | Task | When | If it does not run |
@@ -54,6 +54,7 @@ running:
 | `logs:create-partition` | Monthly, on the 1st | Next month's flow-log partition is missing |
 | `logs:prune-flow` | Daily, 03:00 | Old log partitions accumulate |
 | `conversations:prune` | Daily, 03:15 | Nothing is pruned; the transcript keeps growing (a no-op while retention is `0`) |
+| `horizon:snapshot` | Every five minutes | Horizon's metrics and the health page's jobs-per-minute figures stop moving |
 
 The monthly one is the trap: it fails at a month boundary, weeks after the
 scheduler stopped, and presents as flow logging breaking for no apparent reason.
@@ -109,20 +110,20 @@ whenever webhooks are not arriving.
 ## Health page
 
 On an installation that serves a single organisation, the admin panel has a
-**System → Health** page. It shows whether live updates and webhook intake work
-right now, and is open to anyone with the "View system" permission (administrators
+**System → Health** page. It shows whether live updates, webhook intake and the
+background queues work right now, and is open to anyone with the "View system" permission (administrators
 have it). It does not exist on a multi-tenant installation.
 
 The page asks again every 15 seconds over plain HTTP, never over Reverb, so it
-keeps working when the websocket is what has failed. Each of its two cards,
-**Live updates** (Reverb) and **Webhook gateway**, is in exactly one state:
+keeps working when the websocket is what has failed. Each of its three cards,
+**Live updates** (Reverb), **Webhook gateway** and **Queues** (Horizon), is in exactly one state:
 
 | State | What it means |
 |---|---|
 | **Up** | The service answered and reported itself healthy. This is the only green state. |
 | **Down** | The service answered, and what it said is that it is not healthy. |
 | **Unknown** | The check could not be completed: the service is unreachable from the application, rejected the request, or the settings needed to ask it are missing. The card says which. This is not the same as down, and the page never shows it as healthy. |
-| **Switched off** | The service is off on purpose: `BROADCAST_CONNECTION` is not `reverb`, or the webhook ingress driver is `laravel`. Nothing is wrong. |
+| **Switched off** | The service is off on purpose: `BROADCAST_CONNECTION` is not `reverb`, the webhook ingress driver is `laravel`, or `QUEUE_CONNECTION` is not `redis`. Nothing is wrong. |
 
 While the first answer is on its way, the cards show a loading state. If a
 refresh fails, the page keeps the last answer on screen, marks it as out of
@@ -133,6 +134,19 @@ gateway card shows the address the application asks, whether the published
 specifications agree with the adapters, and how many channels still deliver to the
 address they were registered with. A channel on an old address keeps working,
 more slowly, so it is a figure to read and not a reason to call the gateway down.
+
+The Queues card reads Horizon's own metrics. It is **up** while Horizon is running
+and **down** when no Horizon instance has reported in or all of them are paused, since
+queued jobs are then not being processed. It is **unknown** when Redis cannot be
+read, and **switched off** when `QUEUE_CONNECTION` is not `redis`. For each named
+queue it shows how long the queue would take to clear, highlighted with the words
+"Long wait" once it reaches Horizon's long-wait threshold (`horizon.waits`, 60
+seconds unless set), and the jobs per minute processed since the last Horizon
+snapshot. A queue that no running supervisor serves shows no wait rather than a
+zero. The card also counts failed jobs over Horizon's recent-failed window
+(`horizon.trim.recent_failed`, 7 days by default). The per-minute figures depend on
+the `horizon:snapshot` task above: the card says when the current window began, with
+the date when it is not today, so a window that has stayed open for days shows it.
 
 ## Per-assistant health
 
