@@ -50,10 +50,14 @@ export interface QueuesCard extends CardBase {
   queues: QueueRow[] | null
 }
 
+/** `installation` is the whole installation (single mode); `tenant` is one tenant's slice (host mode). */
+export type HealthScope = 'installation' | 'tenant'
+
+/** The tenant's slice carries no `queues`, and its Reverb and gateway cards leave the installation's figures null. */
 export interface HealthReportData {
   reverb: ReverbCard
   gateway: GatewayCard
-  queues: QueuesCard
+  queues?: QueuesCard
 }
 
 export interface HealthTranslations {
@@ -68,6 +72,8 @@ export interface HealthTranslations {
     spec_status: Record<'matches' | 'missing' | 'differs', string>
   }
   queues: Record<'title' | 'subtitle' | 'description' | 'disabled' | 'failed' | 'failed_any' | 'supervisors' | 'queue' | 'wait' | 'per_minute' | 'seconds' | 'slow' | 'queues_none' | 'window', string>
+  /** The wording of the tenant's slice (host mode). */
+  tenant: Record<'title' | 'description' | 'channels' | 'drift' | 'reason_withheld', string>
   reason: string
   not_reported: string
   no_figure: string

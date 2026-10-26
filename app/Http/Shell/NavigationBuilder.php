@@ -133,7 +133,7 @@ final readonly class NavigationBuilder
                 __('console.health.navigation'),
                 'heart-pulse',
                 80,
-                TenancyResolutionMode::Single === TenancyResolutionMode::fromConfig() && $user->can(Permission::ViewSystem->value),
+                $user->can(Permission::ViewSystem->value),
             ),
             $this->entry($system, 'console.admin.usage.index', __('console.usage.navigation'), 'gauge', 90, $user->can(Permission::ManageSettings->value)),
             $this->entry($system, 'console.admin.solutions.index', __('console.solutions.navigation'), 'puzzle', 95, $user->can(Permission::ManageSettings->value)),

@@ -33,11 +33,12 @@ final readonly class IngressMigrator
     }
 
     /**
-     * Channels per platform whose recorded ingress host differs from the configured one.
+     * Channels per platform whose recorded ingress host differs from the configured one: the whole installation's, or
+     * one tenant's when a tenant id is given.
      *
      * @return array<string, int>
      */
-    public function drift(): array
+    public function drift(?string $tenantId = null): array
     {
         $drift = [];
 
@@ -45,6 +46,7 @@ final readonly class IngressMigrator
             $count = $this->reader->countIngressDrift(
                 $type,
                 $this->urlGenerator->baseFor($type),
+                $tenantId,
             );
 
             if ($count > 0) {

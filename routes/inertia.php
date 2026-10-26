@@ -156,7 +156,7 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         // Support access log: read only, and never a Filament screen, so the name is the console's own.
         Route::get('admin/support-access', [AdminSupportAccessController::class, 'index'])->name('console.admin.support-access.index');
 
-        // Health: Reverb and the gateway as the health service reports them; `single` mode only, and the page polls `report`.
+        // Health: Reverb and the gateway as the health service reports them (the whole installation in `single` mode, the tenant's own slice in `host`); the page polls `report`.
         Route::get('admin/health', [AdminHealthController::class, 'index'])->name('console.admin.health.index');
 
         // Usage and limits: what the tenant uses against each limit, read only; a new screen, so its own URI.

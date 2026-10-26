@@ -112,6 +112,24 @@ final class WebhookRegistryWriterDatabaseTest extends FeatureTestCase
         $this->assertNotContains($onGateway, $drifted);
     }
 
+    public function test_reader_counts_only_the_given_tenants_drift(): void
+    {
+        $reader = $this->app->make(WebhookRegistryReaderInterface::class);
+        $main   = Tenant::query()->firstOrFail();
+        $second = $this->secondTenant();
+
+        $this->seedEntry($main);
+        $this->seedEntry($main);
+        $this->seedEntry($second);
+
+        $mine = (string) $main->getKey();
+
+        $this->assertSame(3, $reader->countIngressDrift('telegram', 'https://webhook.example.com'));
+        $this->assertSame(2, $reader->countIngressDrift('telegram', 'https://webhook.example.com', $mine));
+        $this->assertSame(1, $reader->countIngressDrift('telegram', 'https://webhook.example.com', (string) $second->getKey()));
+        $this->assertSame(0, $reader->countIngressDrift('telegram', 'https://webhook.example.com', '00000000-0000-0000-0000-0000000000ff'));
+    }
+
     public function test_reader_bounds_the_drift_batch(): void
     {
         $this->seedEntry();
@@ -124,7 +142,20 @@ final class WebhookRegistryWriterDatabaseTest extends FeatureTestCase
         $this->assertCount(2, $batch);
     }
 
-    private function seedEntry(): string
+    private function secondTenant(): Tenant
+    {
+        DB::connection('landlord')->table('tenants')->insert([
+            'id'          => '00000000-0000-0000-0000-000000000002',
+            'slug'        => 'second',
+            'schema_name' => 'second_schema',
+            'status'      => 'active',
+            'config'      => '{}',
+        ]);
+
+        return Tenant::query()->findOrFail('00000000-0000-0000-0000-000000000002');
+    }
+
+    private function seedEntry(?Tenant $tenant = null): string
     {
         Redis::shouldReceive('set')->andReturnTrue();
 
@@ -132,7 +163,7 @@ final class WebhookRegistryWriterDatabaseTest extends FeatureTestCase
 
         $this->app->make(WebhookRegistryWriter::class)->write(
             $hash,
-            Tenant::query()->firstOrFail(),
+            $tenant ?? Tenant::query()->firstOrFail(),
             (string) Str::uuid(),
             (string) Str::uuid(),
             'telegram',
