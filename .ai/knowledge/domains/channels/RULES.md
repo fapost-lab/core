@@ -78,6 +78,10 @@ broken.
   never has to know the limit; removing the buttons of a sent message is sent only to a channel that
   declares `RemoveButtons` (the editor, `FlowInlineKeyboardEditor`, decides, not the driver); the
   transcript stores `buttons` (label and action, no payload) and still reads legacy `keyboard` rows.
+  Keyboard sizes are declared beside the flags as `ButtonLimits` (buttons per message, per row, label
+  characters; `null` = undeclared) and only ever produce a validation warning, never a refusal or a send-time
+  truncation: a limit a provider does not document (Telegram's 100 per keyboard and 8 per row are observed, not
+  in the Bot API) must not break a flow. There is no payload-length limit: the codec's 64 bytes fit every channel.
   Why: a second messenger must not require Flow to learn its markup. Enforced: `TelegramReplyMarkup`
   characterization tests; the rest review only.
 - **A new messenger is a new integration, not a branch.** A messenger Core ships is a built-in module: a
