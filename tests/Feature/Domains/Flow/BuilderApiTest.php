@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Flow;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Models\TenantEvent;
@@ -245,6 +246,37 @@ final class BuilderApiTest extends FeatureTestCase
             ->assertOk()
             ->assertJsonPath('valid', false)
             ->assertJsonPath('errors.0.path', 'trigger.config');
+    }
+
+    public function test_validate_returns_capability_warnings_without_invalidating_the_flow(): void
+    {
+        $draft = $this->draft();
+        $user  = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => $draft->assistant_id,
+            'tenant_id'    => $draft->tenant_id,
+            'type'         => 'viber',
+        ]));
+
+        $this->actingAs($user)
+            ->postJson("/builder/flows/{$draft->flow_id}/validate", [
+                'definition' => [
+                    'nodes' => [
+                        'in_1' => [
+                            'id'      => 'in_1',
+                            'type'    => 'input',
+                            'version' => 1,
+                            'config'  => ['expected_type' => 'contact', 'variable' => 'phone'],
+                        ],
+                    ],
+                    'edges' => [],
+                ],
+            ])
+            ->assertOk()
+            ->assertJsonPath('warnings.0.code', 'channel_lacks_capability')
+            ->assertJsonPath('warnings.0.path', 'nodes.in_1');
     }
 
     public function test_validate_returns_valid_for_empty_flow_without_trigger(): void
