@@ -20,7 +20,7 @@
         "ext-pdo": "*",
         "ext-pdo_pgsql": "*",
         "composer/semver": "^3.4",
-        "fapost/foundation": "^0.31",
+        "fapost/foundation": "^0.32",
         "fapost/support": "^0.2",
         "giggsey/libphonenumber-for-php": "^9.0",
         "inertiajs/inertia-laravel": "^3.0",
