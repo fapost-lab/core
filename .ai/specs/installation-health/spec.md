@@ -103,11 +103,17 @@ installation. The owner's words:
   until an operator layer binds its own answer (the SaaS package for its Owner and Admin
   operators, replacing the bridge it made for Horizon in fapost-lab/saas#84). The same contract
   opens Horizon on a `single` installation, where today its gate is closed for everyone.
-- Decided 2026-10-22 (owner): Telescope moves into the monitoring package as well, next to Pulse,
-  Horizon's screens and the log viewer. Today it is only a `require-dev` dependency of Core
+- Decided 2026-10-22 (owner): Telescope moves into the monitoring package as well, next to Pulse
+  and the log viewer. Today it is only a `require-dev` dependency of Core
   (`dont-discover`, wired by `App\Providers\TelescopeServiceProvider`, with the `TELESCOPE_ENABLED`
   setting and its guard against a missing class in production images). What follows from it is
   listed under "Open questions" so that the move loses nothing Core knows.
+- Decided 2026-10-26 (owner): Horizon and its dashboard stay in Core. The dashboard ships inside
+  `laravel/horizon` together with the supervisors, which Core runs, and its routes come from
+  Horizon's own provider, so there is no clean way to move only the screens. Its access already
+  goes through the Operator access contract (`OperatorSurface::Horizon`, #274). Rejected: the
+  package adding its own steps to `horizon.middleware` — it would edit configuration Core owns and
+  make `/horizon` behave differently depending on whether the package is installed.
 - Assumed (reversible): one read-only service builds the figures and every consumer — the console
   page, the contract, and `gateway:doctor` where it overlaps — reads from it, so a check is written
   once.
