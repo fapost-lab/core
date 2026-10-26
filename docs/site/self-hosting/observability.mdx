@@ -146,9 +146,24 @@ which.
 
 ## Application logs
 
-Laravel's log carries application errors. Telescope is available in development
-and records every request with its contents — which is why it must be off in
-production.
+Laravel's log carries application errors.
+
+Telescope is no longer part of Core. It comes with the optional
+[`fapost/monitoring`](https://github.com/fapost-lab/monitoring) package, from the
+release after v0.1.3, where it is off by default. Switch it on with
+`MONITORING_TELESCOPE_ENABLED=true` for as long as it takes to look at a problem:
+it records requests with their contents. Only whoever the operator access contract
+lets in can open it, and it masks secrets such as the support access token.
+
+<Warning>
+  On a multi-tenant production installation (`host` mode, a hosted service), keep
+  Telescope off. It stores the payloads of exceptions and failed jobs — tenants'
+  customer data — in the landlord database, and it writes on the hot path. Watch
+  errors in Sentry or the logs, load in Pulse, and queues in Horizon and the queue
+  card of the health page. Switch Telescope on only while you investigate an
+  incident, and off again afterwards. On a self-hosted `single` installation it is
+  the owner's call.
+</Warning>
 
 ## Backpressure
 

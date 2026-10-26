@@ -42,7 +42,6 @@
         "laravel/boost": "^2.0",
         "laravel/pail": "^1.2.5",
         "laravel/pint": "^1.27",
-        "laravel/telescope": "^5.0",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.6",
         "phpat/phpat": "^0.12.4",
@@ -136,13 +135,6 @@
             "Illuminate\\Foundation\\ComposerScripts::prePackageUninstall"
         ],
         "docs:build": "php tools/doctum/doctum.phar update tools/doctum/config.php --ignore-parse-errors"
-    },
-    "extra": {
-        "laravel": {
-            "dont-discover": [
-                "laravel/telescope"
-            ]
-        }
     },
     "config": {
         "optimize-autoloader": true,
