@@ -10,8 +10,8 @@ paths:
 
 ## What
 
-`HealthService` (`app/Domains/Health`) asks three probes — Reverb's HTTP API, the gateway's `/healthz` and the
-webhook registry against Redis — and answers each with a `ProbeResult`: a `HealthState`, a reason and the figures
+`HealthService` (`app/Domains/Health`) asks four probes — Reverb's HTTP API, the gateway's `/healthz`, the
+webhook registry against Redis and Horizon's queue metrics — and answers each with a `ProbeResult`: a `HealthState`, a reason and the figures
 measured. Each answer is cached for the few seconds its probe declares. It is read-only and returns installation-wide,
 unfiltered data. `gateway:doctor` reads its gateway check from `GatewayProbe::probeEndpoint()` and its spec check from
 `IngressSpecPublisher::inspect()`.
@@ -28,7 +28,16 @@ doctor command.
   Unreachable, timed out, rejected signature, missing settings and a probe that threw are `unknown` with a reason;
   nothing defaults to `up`. A stopped Reverb therefore reads `unknown` ("could not be reached"), not `down`: from the
   application the same refusal is a wrong `REVERB_HOST`.
-- **Switched off on purpose is `disabled`**, not an error: `BROADCAST_CONNECTION` not `reverb`, ingress driver `laravel`.
+- **Switched off on purpose is `disabled`**, not an error: `BROADCAST_CONNECTION` not `reverb`, ingress driver `laravel`,
+  the default queue connection not on the `redis` driver.
+- **`QueueProbe` reads Horizon and never writes to it.** Horizon not running (no master supervisor, or all paused) is `down`:
+  Redis answered and nothing is processing jobs. An unreadable Redis is `unknown`. It goes through `HorizonQueueMetrics`,
+  which reads `last_snapshot_at` as a plain key: `MetricsRepository::jobsProcessedPerMinute()` and
+  `minutesSinceLastSnapshot()` stamp it and would move the window `horizon:snapshot` closes. A queue no running
+  supervisor serves has a wait of `null`, never `0`; `horizon:snapshot` is scheduled every five minutes in
+  `routes/console.php`, without which the per-minute figures never settle. Wait thresholds come from `horizon.waits`
+  (read as a whole array, its keys contain dots), default 60 s.
+  Its figures are the whole installation's: a tenant's slice in `host` mode must leave the queue card out, not narrow it.
 - **The Reverb secret never leaves `ReverbApiClient`:** requests are signed by hand, and no exception message, reason
   or detail repeats the URL (it carries the signature) or the secret. Short timeouts (3 s, 2 s to connect).
 - **No tenant filtering here.** `details` can hold channel names with a tenant id; the consumer narrows them.

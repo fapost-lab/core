@@ -7,13 +7,13 @@ export default { layout: AppShell }
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue'
 import { Head, router, usePage } from '@inertiajs/vue3'
-import { Radio, RefreshCw, TriangleAlert, Webhook } from '@lucide/vue'
+import { Layers, Radio, RefreshCw, TriangleAlert, Webhook } from '@lucide/vue'
 import { Badge } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { interpolate } from '@console/shell'
 import Figure from './Figure.vue'
 import HealthCard from './HealthCard.vue'
-import { formatChecked, newestCheck } from './health'
+import { formatChecked, formatSince, newestCheck } from './health'
 import type { HealthPageProps, HealthReportData } from './types'
 
 const props = defineProps<{
@@ -131,15 +131,25 @@ onBeforeUnmount(() => {
 
 const reverb = computed(() => snapshot.value?.reverb ?? null)
 const gateway = computed(() => snapshot.value?.gateway ?? null)
+const queues = computed(() => snapshot.value?.queues ?? null)
+const windowStart = computed(() => formatSince(queues.value?.windowStartedAt ?? null, locale.value, new Date(now.value)))
 const noData = computed(() => snapshot.value === null && failed.value)
 /** Old data is never shown as current: a failed request, no answer yet for a restored report, or no answer for two intervals. */
 const stale = computed(
   () => snapshot.value !== null && (failed.value || lastSuccessAt.value === null || now.value - lastSuccessAt.value > props.pollSeconds * 2000),
 )
-const lastKnown = computed(() => formatChecked(newestCheck([reverb.value?.checkedAt ?? null, gateway.value?.checkedAt ?? null]), locale.value))
+const lastKnown = computed(() => formatChecked(newestCheck([reverb.value?.checkedAt ?? null, gateway.value?.checkedAt ?? null, queues.value?.checkedAt ?? null]), locale.value))
 
 function checkedLabel(iso: string | null | undefined): string | null {
   return formatChecked(iso ?? null, locale.value)
+}
+
+function waitText(seconds: number | null): string {
+  return seconds === null ? t.value.no_figure : interpolate(t.value.queues.seconds, { seconds })
+}
+
+function perMinuteText(value: number | null): string {
+  return value === null ? t.value.no_figure : value.toLocaleString(locale.value, { maximumFractionDigits: 1 })
 }
 
 function specVariant(status: string): 'success' | 'warning' | 'danger' | 'neutral' {
@@ -250,6 +260,65 @@ function specText(status: string): string {
             </dd>
           </div>
         </dl>
+      </HealthCard>
+
+      <HealthCard
+        class="lg:col-span-2"
+        service-key="queues"
+        :title="t.queues.title"
+        :subtitle="t.queues.subtitle"
+        :description="t.queues.description"
+        :icon="Layers"
+        :state="queues?.state ?? 'loading'"
+        :reason="queues?.reason ?? null"
+        :disabled-text="t.queues.disabled"
+        :checked="checkedLabel(queues?.checkedAt)"
+        :t="t"
+      >
+        <div v-if="queues && queues.state !== 'disabled'" class="flex flex-col gap-3">
+          <dl class="grid grid-cols-2 gap-3">
+            <Figure
+              :label="queues.failedWindowHours !== null ? interpolate(t.queues.failed, { hours: queues.failedWindowHours }) : t.queues.failed_any"
+              :value="queues.failed"
+              :missing="t.no_figure"
+              data-test="failed"
+            />
+            <Figure :label="t.queues.supervisors" :value="queues.supervisors" :missing="t.no_figure" />
+          </dl>
+
+          <p v-if="queues.queues === null" class="text-muted-foreground bg-muted/50 rounded-lg px-4 py-3 text-sm" data-test="queues-none">{{ t.queues.queues_none }}</p>
+          <div v-else class="bg-muted/50 overflow-x-auto rounded-lg px-4 py-3" data-test="queue-table">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-muted-foreground text-left text-[13px]">
+                  <th class="py-1 pr-3 font-normal">{{ t.queues.queue }}</th>
+                  <th class="py-1 pr-3 font-normal">{{ t.queues.wait }}</th>
+                  <th class="py-1 text-right font-normal">{{ t.queues.per_minute }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="queue in queues.queues" :key="queue.name" :data-test="`queue-${queue.name}`">
+                  <td class="py-1 pr-3 font-mono break-all">{{ queue.name }}</td>
+                  <td class="py-1 pr-3 tabular-nums">
+                    <span v-if="queue.waitSeconds === null" class="text-muted-foreground" data-test="missing">{{ waitText(null) }}</span>
+                    <span
+                      v-else-if="queue.slow"
+                      class="bg-warning text-warning-foreground inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-medium"
+                      data-test="queue-slow"
+                    >
+                      {{ waitText(queue.waitSeconds) }} · {{ t.queues.slow }}
+                    </span>
+                    <span v-else>{{ waitText(queue.waitSeconds) }}</span>
+                  </td>
+                  <td class="py-1 text-right tabular-nums" :class="queue.jobsPerMinute === null ? 'text-muted-foreground' : ''">{{ perMinuteText(queue.jobsPerMinute) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <p v-if="windowStart" class="text-muted-foreground mt-2 text-[13px]" data-test="window">
+              {{ interpolate(t.queues.window, { time: windowStart }) }}
+            </p>
+          </div>
+        </div>
       </HealthCard>
     </div>
   </div>

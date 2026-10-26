@@ -6,6 +6,7 @@ namespace App\Http\Shell;
 
 use App\Domains\Health\Enums\HealthState;
 use App\Domains\Health\Probes\GatewayProbe;
+use App\Domains\Health\Probes\QueueProbe;
 use App\Domains\Health\Probes\ReverbProbe;
 use App\Domains\Health\ValueObjects\HealthReport;
 use App\Domains\Health\ValueObjects\ProbeResult;
@@ -21,13 +22,14 @@ use App\Domains\Health\ValueObjects\ProbeResult;
 final class HealthPresenter
 {
     /**
-     * @return array{reverb: array<string, mixed>, gateway: array<string, mixed>}
+     * @return array{reverb: array<string, mixed>, gateway: array<string, mixed>, queues: array<string, mixed>}
      */
     public function page(HealthReport $report): array
     {
         return [
             'reverb'  => $this->reverb($report->get(ReverbProbe::KEY)),
             'gateway' => $this->gateway($report->get(GatewayProbe::KEY)),
+            'queues'  => $this->queues($report->get(QueueProbe::KEY)),
         ];
     }
 
@@ -71,6 +73,39 @@ final class HealthPresenter
                         $drift,
                     )),
                 ]
+                : null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function queues(?ProbeResult $result): array
+    {
+        $queues = $result?->details['queues'] ?? null;
+        $window = $this->count($result, 'failed_window_minutes');
+
+        return [
+            ...$this->base(QueueProbe::KEY, $result),
+            'failed'            => $this->count($result, 'failed'),
+            'failedWindowHours' => null === $window ? null : max((int) round($window / 60), 1),
+            'supervisors'       => $this->count($result, 'masters'),
+            'windowStartedAt'   => $this->text($result, 'window_started_at'),
+            'queues'            => is_array($queues)
+                ? array_values(array_map(static function (mixed $queue): array {
+                    $queue     = (array) $queue;
+                    $wait      = $queue['wait_seconds'] ?? null;
+                    $threshold = (int) ($queue['wait_threshold'] ?? 0);
+                    $perMinute = $queue['jobs_per_minute'] ?? null;
+
+                    return [
+                        'name'          => (string) ($queue['name'] ?? ''),
+                        'waitSeconds'   => is_int($wait) ? $wait : null,
+                        'waitThreshold' => $threshold,
+                        'slow'          => is_int($wait) && $threshold > 0 && $wait >= $threshold,
+                        'jobsPerMinute' => is_int($perMinute) || is_float($perMinute) ? (float) $perMinute : null,
+                    ];
+                }, $queues))
                 : null,
         ];
     }

@@ -7,6 +7,7 @@ namespace Tests\Unit\Domains\Health;
 use App\Domains\Health\Contracts\HealthProbe;
 use App\Domains\Health\Enums\HealthState;
 use App\Domains\Health\Probes\GatewayProbe;
+use App\Domains\Health\Probes\QueueProbe;
 use App\Domains\Health\Probes\ReverbProbe;
 use App\Domains\Health\Probes\WebhookRegistryProbe;
 use App\Domains\Health\Services\HealthService;
@@ -21,12 +22,12 @@ use Tests\TestCase;
 
 final class HealthServiceTest extends TestCase
 {
-    public function test_the_container_service_covers_reverb_gateway_and_the_registry(): void
+    public function test_the_container_service_covers_reverb_gateway_the_registry_and_the_queues(): void
     {
         $report = $this->app->make(HealthService::class)->report();
 
         $this->assertSame(
-            [ReverbProbe::KEY, GatewayProbe::KEY, WebhookRegistryProbe::KEY],
+            [ReverbProbe::KEY, GatewayProbe::KEY, WebhookRegistryProbe::KEY, QueueProbe::KEY],
             array_keys($report->results),
         );
     }

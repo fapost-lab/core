@@ -4,7 +4,7 @@ export type HealthState = 'up' | 'down' | 'unknown' | 'disabled'
 
 /** What every card carries, as `HealthPresenter` builds it; `checkedAt` is null for a service the report did not mention. */
 interface CardBase {
-  key: 'reverb' | 'gateway'
+  key: 'reverb' | 'gateway' | 'queues'
   state: HealthState
   /** Null for a service the report did not mention. */
   reason: string | null
@@ -27,9 +27,33 @@ export interface GatewayCard extends CardBase {
   drift: { total: number; platforms: { platform: string; count: number }[] } | null
 }
 
+export interface QueueRow {
+  name: string
+  /** Seconds to clear the queue; null when no running supervisor serves it, which is not the same as an empty queue. */
+  waitSeconds: number | null
+  waitThreshold: number
+  /** The wait has reached Horizon's long-wait threshold. */
+  slow: boolean
+  /** Null until Horizon has taken a snapshot to measure against. */
+  jobsPerMinute: number | null
+}
+
+export interface QueuesCard extends CardBase {
+  key: 'queues'
+  /** Failed jobs inside Horizon's recent-failed window; null when they could not be counted. */
+  failed: number | null
+  failedWindowHours: number | null
+  supervisors: number | null
+  /** When the per-minute figures start, as an ISO time; null without a snapshot. */
+  windowStartedAt: string | null
+  /** Null when the queues could not be read. */
+  queues: QueueRow[] | null
+}
+
 export interface HealthReportData {
   reverb: ReverbCard
   gateway: GatewayCard
+  queues: QueuesCard
 }
 
 export interface HealthTranslations {
@@ -43,6 +67,7 @@ export interface HealthTranslations {
   gateway: Record<'title' | 'subtitle' | 'description' | 'disabled' | 'address' | 'specs' | 'specs_none' | 'drift' | 'drift_none' | 'drift_zero' | 'drift_some', string> & {
     spec_status: Record<'matches' | 'missing' | 'differs', string>
   }
+  queues: Record<'title' | 'subtitle' | 'description' | 'disabled' | 'failed' | 'failed_any' | 'supervisors' | 'queue' | 'wait' | 'per_minute' | 'seconds' | 'slow' | 'queues_none' | 'window', string>
   reason: string
   not_reported: string
   no_figure: string
