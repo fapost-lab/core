@@ -8,6 +8,7 @@ use App\Domains\Health\Enums\HealthState;
 use App\Domains\Health\Probes\GatewayProbe;
 use App\Domains\Health\Probes\QueueProbe;
 use App\Domains\Health\Probes\ReverbProbe;
+use App\Domains\Health\Support\UrlScrubber;
 use App\Domains\Health\ValueObjects\HealthReport;
 use App\Domains\Health\ValueObjects\ProbeResult;
 
@@ -138,25 +139,7 @@ final class HealthPresenter
      */
     private function scrubbed(?string $text): ?string
     {
-        if (null === $text) {
-            return null;
-        }
-
-        return preg_replace_callback(
-            '~https?://[^\s"\'<>]+~i',
-            static function (array $match): string {
-                $parts = parse_url(mb_rtrim($match[0], '.,;:)'));
-
-                if (false === $parts || ! isset($parts['scheme'], $parts['host'])) {
-                    return $match[0];
-                }
-
-                $trailing = mb_substr($match[0], mb_strlen(mb_rtrim($match[0], '.,;:)')));
-
-                return $parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : '') . ($parts['path'] ?? '') . $trailing;
-            },
-            $text,
-        );
+        return UrlScrubber::scrub($text);
     }
 
     private function count(?ProbeResult $result, string $detail): ?int
