@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {nextTick} from 'vue';
+import {computed, nextTick} from 'vue';
 import {useBuilderStore} from '@builder/store/builderStore';
 import {useRegistryStore} from '@builder/store/registryStore';
 import {useSelectionStore} from '@builder/store/selectionStore';
@@ -10,6 +10,8 @@ const store = useBuilderStore();
 const registryStore = useRegistryStore();
 const selectionStore = useSelectionStore();
 const { validate } = useValidation();
+
+const warningCount = computed(() => store.validationResult?.warnings?.length ?? 0);
 
 /**
  * Find the branch path (sequence of node+handle pairs, default chains omitted)
@@ -89,6 +91,9 @@ function humanPath(path: string | undefined): string {
                     >
                         {{ store.validationResult.valid ? 'Valid' : `${store.validationResult.errors?.length ?? 0} errors` }}
                     </span>
+                    <span v-if="warningCount > 0" class="val-badge val-badge--warn">
+                        {{ warningCount }} {{ warningCount === 1 ? 'warning' : 'warnings' }}
+                    </span>
                 </div>
                 <div class="val-header-right">
                     <button class="btn btn-ghost" style="font-size:11.5px;padding:3px 8px" @click="() => validate()">Revalidate</button>
@@ -97,9 +102,11 @@ function humanPath(path: string | undefined): string {
             </div>
 
             <div class="val-body">
-                <div v-if="store.validationResult?.valid" class="val-ok">No errors found. Ready to publish.</div>
+                <div v-if="store.validationResult?.valid" class="val-ok">
+                    {{ warningCount > 0 ? 'No errors found. Ready to publish; see the warnings below.' : 'No errors found. Ready to publish.' }}
+                </div>
 
-                <template v-else-if="store.validationResult?.errors?.length">
+                <template v-if="!store.validationResult?.valid && store.validationResult?.errors?.length">
                     <button
                         v-for="error in store.validationResult.errors"
                         :key="`${error.path}:${error.message}`"
@@ -114,7 +121,20 @@ function humanPath(path: string | undefined): string {
                     </button>
                 </template>
 
-                <div v-else class="val-empty">Run validation to check your flow.</div>
+                <button
+                    v-for="warning in store.validationResult?.warnings ?? []"
+                    :key="`warn:${warning.path}:${warning.message}`"
+                    class="val-error-row val-warning-row"
+                    @click="jumpToNode(warning)"
+                >
+                    <span class="val-dot val-dot--warn">●</span>
+                    <div>
+                        <code class="val-path">{{ humanPath(warning.path) }}</code>
+                        <div class="val-msg">{{ warning.message }}</div>
+                    </div>
+                </button>
+
+                <div v-if="!store.validationResult" class="val-empty">Run validation to check your flow.</div>
             </div>
         </div>
     </Transition>
@@ -143,6 +163,7 @@ function humanPath(path: string | undefined): string {
 }
 .val-badge--ok  { background: var(--sage-bg);  color: var(--sage); }
 .val-badge--err { background: var(--rose-bg);  color: var(--rose); }
+.val-badge--warn { background: var(--amber-bg); color: var(--amber); }
 .val-close {
     background: none; border: none; cursor: pointer;
     font-size: 13px; color: var(--text-3); padding: 2px 6px;
@@ -162,6 +183,8 @@ function humanPath(path: string | undefined): string {
 }
 .val-error-row:hover { background: var(--rose-bg); }
 .val-dot { color: var(--rose); font-size: 10px; margin-top: 3px; flex-shrink: 0; }
+.val-warning-row:hover { background: var(--amber-bg); }
+.val-dot--warn { color: var(--amber); }
 .val-path { font-family: var(--font-mono); font-size: 11px; color: var(--text-3); }
 .val-msg  { font-size: 12.5px; color: var(--text-2); margin-top: 1px; }
 

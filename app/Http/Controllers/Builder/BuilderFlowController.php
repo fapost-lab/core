@@ -97,6 +97,7 @@ final class BuilderFlowController extends Controller
         ValidateFlowRequest $request,
         string $flow,
         ValidateFlowService $service,
+        FlowDraftRepositoryInterface $drafts,
     ): JsonResponse {
         $definition      = $request->validated('definition');
         $definitionNodes = $this->extractDefinitionNodes($definition);
@@ -108,6 +109,7 @@ final class BuilderFlowController extends Controller
             trigger: $triggerPayload,
             flowId: $flow,
             edges: $definitionEdges,
+            assistantId: $drafts->findByFlowId($flow)->assistant_id,
         );
 
         return response()->json($result);
