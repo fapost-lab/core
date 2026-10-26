@@ -152,6 +152,13 @@ final class IncomingMessageJob implements ShouldQueue, TenantAccessGatedJob
                     defaultLanguage: $assistant->default_language,
                 );
 
+                // Meta is written only when the contact is created, so a phone shared later is stored here.
+                $sharedPhone = $inboundMessage->payload['phone'] ?? null;
+
+                if (is_string($sharedPhone) && '' !== $sharedPhone) {
+                    $contactService->rememberPhone($contact, $sharedPhone);
+                }
+
                 $contactService->findOrCreateChannelContact(
                     contact: $contact,
                     channelId: $this->payload->channelId,

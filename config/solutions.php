@@ -30,9 +30,9 @@ return [
     */
 
     'console_runtime' => [
-        'kit'     => '0.1.0',
-        'vue'     => '3.5.43',
-        'inertia' => '3.7.1',
+        'kit'     => '0.1.1',
+        'vue'     => '3.5.44',
+        'inertia' => '3.9.1',
     ],
 
     /*
@@ -41,7 +41,7 @@ return [
     |--------------------------------------------------------------------------
     |
     | Only the default of the platform setting `solutions.marketplace_url`: the address the Solutions page of the admin
-    | panel links to, on a platform that does not sell Solutions itself. A value stored in Platform settings wins. Empty
+    | panel links to, on a self-hosted installation (single resolution mode) that does not sell Solutions itself. A value stored in Platform settings wins. Empty
     | hides the link.
     |
     */

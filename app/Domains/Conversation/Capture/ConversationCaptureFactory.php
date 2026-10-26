@@ -43,6 +43,23 @@ final class ConversationCaptureFactory
         string $idempotencyKey,
         ?DateTimeImmutable $occurredAt = null,
     ): MessageLogEntry {
+        $contentType = MessageContentType::fromInbound($message->type);
+        $text        = $message->text;
+        $payload     = $message->payload;
+
+        // A button press carries the callback data as its text, which is routing data rather than something the
+        // contact said. The transcript shows the button's title instead and keeps the data in the payload.
+        if (MessageContentType::Callback === $contentType) {
+            $label = $payload['button_label'] ?? null;
+
+            if (null !== $text) {
+                $payload['callback_data'] = $text;
+            }
+
+            $text = is_string($label) && '' !== $label ? $label : null;
+            unset($payload['button_label']);
+        }
+
         return new MessageLogEntry(
             tenantId: $tenantId,
             assistantId: $assistantId,
@@ -51,9 +68,9 @@ final class ConversationCaptureFactory
             platform: $message->platform,
             direction: MessageDirection::Inbound,
             senderType: MessageSenderType::Contact,
-            contentType: MessageContentType::fromInbound($message->type),
-            text: $message->text,
-            payload: $message->payload,
+            contentType: $contentType,
+            text: $text,
+            payload: $payload,
             media: $this->mapInboundMedia($message->media),
             providerMessageId: null,
             replyToProviderMessageId: null,
@@ -124,7 +141,8 @@ final class ConversationCaptureFactory
      */
     private function outboundPayload(OutboundMessage $message): array
     {
-        $buttons = $message->payload->buttons;
+        // `?? null`: a payload serialized before foundation 0.26 leaves `buttons` uninitialized after unserialize.
+        $buttons = $message->payload->buttons ?? null;
 
         if (null !== $buttons) {
             return ['buttons' => array_map(

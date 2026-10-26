@@ -16,7 +16,7 @@
         "@vue/test-utils": "^2.5.1",
         "axios": "^1.20.0",
         "concurrently": "^10.0.5",
-        "happy-dom": "^20.14.6",
+        "happy-dom": "^21.0.4",
         "laravel-vite-plugin": "^3.0.1",
         "tailwindcss": "^4.0.0",
         "typescript": "^6.0.3",
@@ -25,7 +25,7 @@
         "vue-tsc": "^3.2.7"
     },
     "dependencies": {
-        "@fapost/ui": "^0.1.0",
+        "@fapost/ui": "^0.1.1",
         "@inertiajs/vue3": "^3.7.1",
         "@lucide/vue": "^1.53.0",
         "@vitejs/plugin-vue": "^6.0.6",

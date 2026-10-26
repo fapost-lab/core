@@ -69,6 +69,8 @@ use Spatie\Permission\Traits\HasRoles;
  *                   $locale
  * @property list<string>|null
  *                   $pinned_applications
+ * @property list<string>|null
+ *                   $onboarding_checklist_hidden
  * @property bool
  *                   $is_active
  * @property bool
@@ -238,6 +240,8 @@ final class User extends Authenticatable implements HasLocalePreference
             'is_platform_support' => 'boolean',
             // The shell's rail: application keys in the user's order; `null` until the user changes it.
             'pinned_applications' => 'array',
+            // The setup checklist the user hid: the step keys registered at that moment; `null` until they hide it.
+            'onboarding_checklist_hidden' => 'array',
         ];
     }
 }

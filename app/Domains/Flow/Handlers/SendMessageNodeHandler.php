@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
-use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\InlineKeyboardEditorInterface;
 use App\Domains\Flow\Contracts\MessageSenderInterface;
@@ -37,6 +36,7 @@ use Fapost\Support\Builder\Schema\Fields\TextField;
 use Fapost\Support\Builder\Schema\Fields\ToggleField;
 use Fapost\Support\Builder\Schema\Schema;
 use Fapost\Support\Builder\Schema\Section;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Throwable;
 
@@ -55,6 +55,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
         private readonly PersistentButtonRegistryInterface $persistentButtonRegistry,
         private readonly VariableResolverInterface $variableResolver,
         private readonly SendMessageTimeoutSchedulerInterface $timeoutScheduler,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -223,8 +224,7 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
             );
         }
 
-        $templateContext = $this->buildTemplateContext($state, $context->contactId);
-        $payload         = $this->resolveMultilingualPayload($normalized, $context, $templateContext);
+        $payload = $this->resolveMultilingualPayload($normalized, $context, $state);
 
         try {
             $externalMessageId = $this->sender->send(
@@ -241,9 +241,18 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
                 errorMessage: 'limit_reached: ' . $exception->getMessage(),
             );
         } catch (Throwable $exception) {
-            return NodeExecutionResult::executed(
+            $this->logger->warning('flow.send_message_failed', [
+                'tenant_id'  => $context->tenantId,
+                'session_id' => $context->sessionId,
+                'node_id'    => $nodeId,
+                'exception'  => $exception,
+            ]);
+
+            return new NodeExecutionResult(
+                status: NodeExecutionStatus::Executed,
                 sourceHandle: 'error',
                 metadata: ['error' => $exception->getMessage(), 'error_type' => 'send_failure'],
+                errorMessage: 'send_failure: ' . $exception->getMessage(),
             );
         }
 
@@ -618,34 +627,6 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
         } catch (Throwable) {
             // Best-effort — never block the flow on a hint message failure.
         }
-    }
-
-    /**
-     * Builds the template variable context by merging flow state with contact data.
-     *
-     * @param  array<string, mixed>  $state
-     *
-     * @return array<string, mixed>
-     */
-    private function buildTemplateContext(array $state, string $contactId): array
-    {
-        try {
-            $contact = Contact::query()->select(['id', 'language', 'meta', 'platform'])->find($contactId);
-        } catch (Throwable) {
-            $contact = null;
-        }
-
-        $meta = ($contact instanceof Contact && is_array($contact->meta)) ? $contact->meta : [];
-
-        return array_merge($state, [
-            'contact' => [
-                'id'       => $contact instanceof Contact ? (string)$contact->getKey() : '',
-                'language' => $contact instanceof Contact ? ($contact->language ?? '') : '',
-                'name'     => $meta['name'] ?? $meta['first_name'] ?? '',
-                'username' => $meta['username'] ?? '',
-                'channel'  => $contact instanceof Contact ? $contact->platform : '',
-            ],
-        ]);
     }
 
     /**

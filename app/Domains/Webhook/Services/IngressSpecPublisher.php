@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace App\Domains\Webhook\Services;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Webhook\Enums\SpecStatus;
 use Fapost\Foundation\Channel\Ingress\IngressSpec;
 use Illuminate\Support\Facades\Redis;
 use JsonException;
+use Throwable;
+use ValueError;
 
 /**
  * Publishes declarative ingress specs to Redis for consumption by ingress
@@ -75,6 +78,58 @@ final readonly class IngressSpecPublisher
         }
 
         return $published;
+    }
+
+    /**
+     * The spec published for a platform, or null when none is there or what is there cannot be parsed.
+     *
+     * A Redis that cannot be read is not "nothing published": the exception is left to the caller, who can tell the
+     * two apart.
+     */
+    public function published(string $platform): ?IngressSpec
+    {
+        $raw = Redis::get($this->key($platform));
+
+        if (! is_string($raw) || '' === $raw) {
+            return null;
+        }
+
+        try {
+            return IngressSpec::fromArray(json_decode($raw, true, flags: JSON_THROW_ON_ERROR));
+        } catch (Throwable|ValueError) {
+            return null;
+        }
+    }
+
+    /**
+     * Compare what is published with what each adapter declares, without writing anything.
+     *
+     * @return array<string, array{status: SpecStatus, scheme: string|null}> Keyed by platform; the scheme is the published one.
+     */
+    public function inspect(): array
+    {
+        $result = [];
+
+        foreach ($this->resolver->declarativePlatforms() as $platform) {
+            $published = $this->published($platform);
+
+            if (null === $published) {
+                $result[$platform] = ['status' => SpecStatus::Missing, 'scheme' => null];
+
+                continue;
+            }
+
+            $expected = $this->resolver->specFor($platform);
+
+            $result[$platform] = [
+                'status' => null !== $expected && $expected->jsonSerialize() !== $published->jsonSerialize()
+                    ? SpecStatus::Differs
+                    : SpecStatus::Matches,
+                'scheme' => $published->scheme->value,
+            ];
+        }
+
+        return $result;
     }
 
     public function forget(string $platform): void

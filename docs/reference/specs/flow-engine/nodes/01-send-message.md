@@ -46,7 +46,7 @@ keyboards and dynamic keyboards built from state data.
 
 ## Output handles
 
-- `error` — `MessageSenderInterface::send()` threw; metadata carries `error` and `error_type: 'send_failure'`.
+- `error` — `MessageSenderInterface::send()` threw; metadata carries `error` and `error_type: 'send_failure'`, the flow log entry carries `send_failure: <message>`, and the failure is logged as a warning (`flow.send_message_failed`).
 - `no_response` — an inline-keyboard prompt timed out without a button press.
 - The pressed button's handle when `content_type = text_with_keyboard` and `keyboard_mode = inline`:
   - static keyboard — the button's own UUID `id` string;

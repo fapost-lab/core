@@ -128,8 +128,8 @@ final readonly class MessageRouter
             $this->lockRegistry->set($handle);
 
             try {
-                // Step 4a: an operator holding this thread outranks the flow
-                // engine. Checked before session state because the session may
+                // Step 4a: an operator holding this thread, or one requested and
+                // not yet accepted (queued), outranks the flow engine. Checked before session state because the session may
                 // still be sitting in waiting_input from before the takeover —
                 // classifying first would resume a flow the operator replaced.
                 // The message is already in the transcript (IncomingMessageJob

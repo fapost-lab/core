@@ -11,7 +11,7 @@ Four things happen, and the order is not interchangeable:
 
 1. New code arrives (new image, or new checkout plus `composer install`)
 2. The installed Solutions are checked, ideally with `platform:update --validate-only` before the running containers are replaced: a manifest that is wrong stops the upgrade here, before anything is changed
-3. **Landlord** migrations run — platform-wide tables, including any that the SaaS operator package adds — and then **tenant** migrations, once per tenant schema
+3. **Landlord** migrations run — platform-wide tables, including any that an operator package (SaaS, monitoring) adds — and then **tenant** migrations, once per tenant schema
 4. Queue workers restart, so they stop running the previous release from memory
 
 `php artisan platform:update` repeats the check and does step 3 in one command, then publishes the Solutions'
@@ -44,6 +44,11 @@ rather than an event:
 ```dotenv
 APP_VERSION=1.4.2
 ```
+
+The console footer shows the release the running image was built from, next to
+"Powered by FaPost", so after an upgrade you can see it took. An image you build
+yourself with `docker/compose.build.yaml` shows the `APP_VERSION` it was built
+with, or `dev` without one.
 
 ## Solutions are checked first
 
@@ -156,6 +161,103 @@ installation that sets none of them behaves as before.
 
 The upgrade adds two empty settings to every tenant, through the settings migrations
 (see [Two schemas, two migration commands](#two-schemas-two-migration-commands)).
+
+## New tenants go through a setup wizard
+
+A tenant created after this release opens its console in a short first-run wizard
+(content languages, first assistant) before anything else. Tenants that exist at
+the upgrade are not affected: the settings migration marks them complete. To send
+one back through the wizard, see
+[the first-run setup wizard](/self-hosting/tenancy#the-first-run-setup-wizard).
+
+The setup checklist on the dashboard is shown only to tenants that went through
+the wizard (created after the release, or sent back through it); existing
+tenants never see it. When a later upgrade or an activated Solution adds a
+required setup step, a finished tenant is not held again: its staff see a banner
+linking to the step, and its administrators get one bell notification.
+
+## Message rate is per tenant
+
+Sends are now throttled by each tenant's own rate, set on Tenant settings and stored
+as 30 per minute when a tenant is provisioned. `MESSAGING_RATE_LIMIT_PER_MINUTE` is only
+a fallback for sends outside a tenant, so an installation that set it to anything other
+than 30 runs at 30 per tenant until an admin changes the tenant's rate. See
+[Backpressure](/self-hosting/observability#backpressure).
+
+## Operator-granted Solutions turn on by themselves
+
+Only with an operator package installed: a Solution in the tenant's plan or in a running
+add-on now runs automatically, and the tenant cannot turn it off — including a Solution
+the tenant had turned off before the upgrade. Installations without an operator package
+are not affected.
+
+## Media storage can be S3
+
+Nothing changes unless you set `MEDIA_STORAGE_DRIVER=s3`. An installation that already
+has media must copy it to the bucket before switching; Core does not move stored files.
+See [Media storage](/self-hosting/configuration#media-storage).
+
+## Core images before 0.18.0 lack the console
+
+The `core` images from 0.10.0 to 0.17.0 were built without the compiled console, so on an
+installation from the Compose file every console page (`/admin/login` included) answers
+500 while the `web` image looks healthy. Use 0.18.0 or later.
+
+## Channel settings follow the channel type
+
+A channel's settings form is now drawn from what its channel type declares, and saving a
+channel keeps only the settings that type declares. A channel type that declares none —
+the WhatsApp placeholder, or a connector's channel created before a connector declared
+its settings — loses every stored setting the next time the channel is saved. Re-enter
+them after the connector is updated.
+
+The Telegram bot username moves into the channel's settings. A tenant migration moves
+it, so `platform:update` is all it needs.
+
+## Flow buttons
+
+- A *text with keyboard* block that ends up with no buttons is sent as plain text, where
+  it used to carry an empty inline keyboard.
+- A fixed button whose label comes out empty (a missing translation, an empty variable)
+  now sends the block through its error exit before anything is sent, instead of being
+  refused by the provider.
+
+## Horizon opens to staff on single installations
+
+On a `single` installation, Horizon (`/horizon`) used to be closed to everyone. It now opens
+for signed-in staff who hold the new **View operator screens** permission (`view_operator_screens`).
+Administrators pass automatically, so after the upgrade every administrator can open the queue
+dashboard, which shows job payloads. Custom roles do not hold the permission until you grant it; run
+`php artisan ops:tenants-seed-acl` so the permission exists, then add it to the role. The tenant's
+platform support user never opens it. `host` installations are unchanged: Horizon stays closed until
+an operator package answers for it.
+
+## PHP 8.5 and Laravel 13
+
+Core now runs on Laravel 13 and requires PHP 8.5.12 or later. Releases of PHP before 8.5.12
+are open to CVE-2026-109618 and CVE-2026-109619, two unauthenticated remote code execution
+flaws fixed on 21 October 2026.
+
+- **Docker Compose:** nothing to do beyond the usual upgrade. The images run PHP 8.5.
+- **Bare metal:** install PHP 8.5.12 or later with the same extensions before upgrading
+  (see [Requirements](/self-hosting/requirements)), point the web server and the
+  PHP-FPM pool at it, and restart PHP-FPM, Horizon and the scheduler. On PHP 8.4,
+  `composer install` refuses the release and the application refuses to boot.
+  `deploy/install.sh` checks the patch release too.
+- **Extension packages** must accept Laravel 13: an `illuminate/*` or `laravel/framework`
+  constraint of `^12.0` stops Composer, so widen it, for example to `^12.0 || ^13.0`.
+  `fapost/foundation` 0.29 and `fapost/support` 0.2.4 already do. Two framework changes
+  can reach a package's code:
+  - CSRF protection is now `Illuminate\Foundation\Http\Middleware\PreventRequestForgery`.
+    `withoutMiddleware(ValidateCsrfToken::class)` no longer removes it, so routes that
+    excluded it that way start answering 419; exclude `PreventRequestForgery` instead.
+  - `Illuminate\Contracts\Mail\Mailer` gained `cc()`. A test double that implements the
+    contract must add it.
+
+## Extension packages and Foundation
+
+Core now requires `fapost/foundation` ^0.29. A Solution, connector or operator package
+installed next to it must accept that version, or Composer will not install the upgrade.
 
 ## Host-mode installs: sessions are now checked
 

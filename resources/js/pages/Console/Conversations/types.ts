@@ -1,9 +1,8 @@
 import type { LiveChannel } from '@console/lib/live-updates'
 import type { ShellPageProps } from '@console/shell'
 
-export type ConversationStatus = 'open' | 'closed' | 'snoozed'
-export type ConversationOwner = 'bot' | 'staff'
-export type Tone = 'success' | 'info' | 'warning' | 'danger' | 'neutral'
+export type ConversationOwner = 'bot' | 'queued' | 'staff'
+export type Handling = 'queued' | 'mine' | 'staff' | 'bot'
 
 export interface LiveTranslations {
   live: string
@@ -15,9 +14,10 @@ export interface ConversationsTranslations {
   description: string
   search_label: string
   columns: { contact: string; platform: string; last_message: string; unread: string; messages: string; status: string; last_activity: string }
-  filters: { status: string; status_all: string }
-  statuses: Record<ConversationStatus, string>
-  owner: { bot: string; staff: string; staff_named: string }
+  filters: { handling: string; handling_all: string }
+  handlings: Record<Handling, string>
+  owner: { bot: string; queued: string; staff: string; staff_named: string; waiting: string; you: string }
+  handling_status: { bot: string; queued_since: string; staff_named: string; staff_you: string; staff: string }
   content_types: Record<string, string>
   delivery: Record<string, string>
   media: { pending: string; failed: string }
@@ -27,11 +27,15 @@ export interface ConversationsTranslations {
   empty_thread: string
   load_older: string
   message_count: string
-  actions: { take_over: string; return_to_bot: string; close: string; reopen: string; send: string }
-  composer: { label: string; placeholder: string; hint: string; attach: string; remove: string; too_large: string; locked: string; sending: string }
+  actions: { take_over: string; accept: string; finish: string; transfer: string; seize: string; send: string; cancel: string }
+  transfer: { title: string; description: string; label: string; placeholder: string; confirm: string; none: string }
+  seize: { title: string; description: string; confirm: string }
+  finish: { title: string; description: string; confirm: string }
+  composer: { label: string; placeholder: string; hint: string; attach: string; remove: string; too_large: string; locked: string; locked_queued: string; locked_staff: string; sending: string }
   live: LiveTranslations
   back: string
   open_named: string
+  threads: { title: string; search: string; empty: string; no_match: string }
 }
 
 export type ConversationsPageProps = ShellPageProps & {
@@ -48,8 +52,10 @@ export interface ConversationRow extends Record<string, unknown> {
   preview: string | null
   unread: number
   messages: number
-  status: ConversationStatus
   owner: ConversationOwner
+  ownerName: string | null
+  queuedAt: string | null
+  mine: boolean
   lastMessageAt: string | null
   viewUrl: string
 }
@@ -58,9 +64,10 @@ export interface ConversationDetails {
   id: string
   contact: string
   platform: string
-  status: ConversationStatus
   owner: ConversationOwner
+  ownerId: string | null
   ownerName: string | null
+  queuedAt: string | null
   messageCount: number
 }
 
@@ -94,15 +101,25 @@ export interface Abilities {
   reply: boolean
   compose: boolean
   takeOver: boolean
-  returnToBot: boolean
-  setStatus: boolean
+  finish: boolean
+  transfer: boolean
+  seize: boolean
+}
+
+export interface TransferTarget {
+  id: string
+  name: string
+}
+
+export interface ConversationUrls {
+  index: string
+  self: string
+  reply: string
+  takeOver: string
+  finish: string
+  transfer: string
+  seize: string
 }
 
 export type { LiveChannel }
 
-/** How a conversation status reads at a glance. */
-export const STATUS_TONES: Record<ConversationStatus, Tone> = {
-  open: 'success',
-  snoozed: 'warning',
-  closed: 'neutral',
-}

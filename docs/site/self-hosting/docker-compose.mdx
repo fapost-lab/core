@@ -4,7 +4,7 @@ description: "The container installation path, start to finish."
 ---
 
 Runs the whole stack in containers. The host needs Docker and nothing else — no
-PHP 8.4, no Composer, no Node.
+PHP, no Composer, no Node.
 
 An installation is one compose file and one `.env` beside it. The troubleshooting
 section lists failures actually encountered rather than ones imagined.
@@ -381,11 +381,13 @@ internal probe by container name, gets 400. `php artisan about` lists a setting 
 breaks this. The gateway forwards the host the provider called when it falls back to
 the application, so that path is covered.
 
-Horizon (and Telescope in development) answer on the base domain and on declared
-platform subdomains only, never on a tenant's host. Both are closed until a user
-passes the `viewHorizon` gate, and platform pages carry no tenant sign-in, so for
-now watch the queues with `horizon:status` and the logs; an operator package that
-brings its own sign-in opens the dashboard.
+Horizon (and Telescope in development, where both are open) answer on the base domain and on declared
+platform subdomains only, never on a tenant's host. Both are closed to everyone,
+tenant administrators included, because platform pages carry no tenant sign-in and a
+tenant's staff must not see the whole installation. Core asks the operator access contract
+(`Fapost\Foundation\Operator\Contracts\OperatorAccessInterface`), and only an operator
+package that binds its own answer opens them. Without one, watch the queues with
+`horizon:status` and the logs.
 
 `php artisan install` asks for the mode when `.env` does not state one, and sets
 `SESSION_DRIVER=redis` for you if you choose `host`. Moving an existing install to

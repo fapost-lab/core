@@ -29,7 +29,12 @@ paths:
   - docker/compose.yaml
   - "tests/Feature/Http/**"
   - tests/Unit/Domains/Tenancy/TenantSettingsCacheIsolationTest.php
-reviewed_at: 2026-10-16
+  - app/Domains/Staff/Services/CoreOperatorAccess.php
+  - app/Providers/StaffServiceProvider.php
+  - tests/Feature/Staff/CoreOperatorAccessTest.php
+  - tests/Feature/Staff/HorizonOperatorAccessTest.php
+  - tests/Architecture/OperatorAccessBoundaryTest.php
+reviewed_at: 2026-10-22
 ---
 # Tenancy rules
 
@@ -77,8 +82,14 @@ broken.
   `HostModeBootTest`.
 - **Horizon and Telescope are never served on a tenant host.** `OnlyOnPlatformHosts` is first in their route
   middleware (`config/horizon.php`, `config/telescope.php`) and answers 404 on a tenant host in `host` mode. Platform
-  hosts carry no tenant sign-in, so `viewHorizon` stays an empty allow-list until an operator package brings its own
-  sign-in and redefines the gate. Enforced: `PlatformHostOnlySurfacesTest`.
+  hosts carry no tenant sign-in. Who may open Horizon (and the monitoring package's screens) is decided by `Fapost\Foundation\Operator\Contracts\OperatorAccessInterface`
+  (`viewHorizon` asks it for `OperatorSurface::Horizon`). Core's default (`CoreOperatorAccess`): `single` mode, a signed-in
+  active user holding `Permission::ViewOperatorScreens`, never the platform support user; `host` mode, nobody, tenant
+  admins included, until an operator layer rebinds the contract (SaaS today redefines the `viewHorizon` gate itself; its bridge moves to the contract in a later task). The administrators' `Gate::before` bypass skips
+  `CoreOperatorAccess::GATE_ABILITIES`, so the contract alone decides. Enforced: `PlatformHostOnlySurfacesTest`,
+  `HorizonOperatorAccessTest`, `CoreOperatorAccessTest`, `OperatorAccessBoundaryTest`.
+  Deferred on purpose: an "owner" role and a split of installer-time from runtime settings. When they come, only the
+  Core default changes (who holds the permission); the contract stays.
 - **Forwarded headers are believed only from `trustedproxy.proxies` (`TRUSTED_PROXIES`), and never the host.**
   `bootstrap/app.php` trusts `X-Forwarded-For` and `-Proto`; the host and port are not (the host
   selects the tenant, TrustHosts runs before TrustProxies, and no proxy of ours sets a port). Empty trusts nobody; the bundled Compose defaults to its pinned Caddy address, not
@@ -303,9 +314,11 @@ broken.
   so every registered migration path runs; `database/settings` is not one of them — the settings
   migrations are tenant-scoped, so `config/settings.php` leaves `migrations_paths` empty and they
   run only through `MigrationScope::settings()`), and `AppServiceProvider` loads
-  `database/migrations/landlord`. Only the SaaS operator package may open `landlord`, and only for tables of its
-  own prefix; it never writes `tenants` or `webhook_registry`. Plugin and Solution packages have no landlord access
-  (`adr-20261005-extension-packages-own-landlord-tables`, amended 2026-10-08).
+  `database/migrations/landlord`. Only installation operator packages (SaaS, monitoring) may open `landlord`, and only for
+  their own tables (`saas_*`; the three `pulse_*` tables for monitoring); they never write `tenants` or `webhook_registry`,
+  and tenant data deletion never touches their tables. Plugin and Solution packages have no landlord access
+  (`adr-20261005-extension-packages-own-landlord-tables`, amended 2026-10-08;
+  `adr-20261023-operator-packages-own-landlord-tables`).
 - **In workers, change tenant only through `TenantSwitcher::runForTenant()`**; never set
   `search_path` or the context directly. Review only.
 - **Core is not the control plane.** No SaaS logic, billing or onboarding belongs in Core, and

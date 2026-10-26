@@ -99,6 +99,7 @@ DTOs: `UploadContext`, `UploadResult`, `DownloadResult`. Enum: `MediaKind`.
 | `Tenancy\Contracts\TenantProvisionerInterface` | Creating a tenant with its first administrator. Implemented by Core; a package only calls it |
 | `Tenancy\Contracts\TenantReservationInterface` | Holding a slug for a tenant that does not exist yet, then completing it by id. Implemented by Core; a package only calls it |
 | `Tenancy\Contracts\TenantRenamerInterface` | Changing a tenant's slug, and so its host. Implemented by Core; a package only calls it |
+| `Tenancy\Contracts\TenantOnboardingInterface` | Experimental. Putting a tenant back into the first-run setup wizard, and asking whether it is pending. Implemented by Core; a package only calls it |
 
 `provision(ProvisionTenant): ProvisionedTenant` creates the tenant record, its database schema,
 runs the migrations and creates the first admin.
@@ -182,6 +183,16 @@ webhooks and tokens stay as they are.
   change are the caller's job. Read `url` and `loginUrl` again from the directory instead of keeping
   old copies, and address the tenant by id, never by slug.
 
+`Tenancy\Contracts\TenantOnboardingInterface` (experimental) controls a tenant's first-run setup wizard.
+A tenant whose onboarding is pending has its console held in the wizard until the required steps are done.
+
+- `restart(string $tenantId): void` puts the tenant back into the wizard; restarting one already pending
+  succeeds and starts over. Steps the tenant's data satisfies stay done, the language confirmation is asked
+  again. It closes the console of a working tenant's staff, so ask the operator to confirm first. It is one
+  write in the tenant's schema, fast enough for an HTTP request.
+- `isPending(string $tenantId): bool` tells whether the wizard is pending.
+- Both throw `Exceptions\TenantOnboardingException` when the tenant does not exist or is not `Active`.
+
 `Enums\TenantStatus` gains `Pending`. New statuses and reasons may appear in a minor release, so
 branch on them with a default arm.
 
@@ -200,6 +211,15 @@ Core; a package only calls it.
   addresses a tenant only when the platform resolves tenants by host.
 - Ids are lowercase RFC 4122 ULIDs. Any other form names no tenant: `find` returns `null`, and
   `findMany` and the id filters ignore it.
+
+`Operator\Contracts\OperatorAccessInterface` answers one question for every operator screen: may this
+request look at it. `canView(Request $request, OperatorSurface $surface): bool`, where `OperatorSurface` is
+`Horizon`, `Pulse`, `Telescope`, `Logs` or `Health` (new surfaces may be added in a minor release; an
+implementation answers no for one it does not know). Core's own Horizon gate and packages that bring operator
+screens only ask it and have no sign-in of their own. Core binds a default: on a `single` installation, a
+signed-in, active staff member who holds the `view_operator_screens` permission, the tenant's platform support
+user excluded; in `host` mode, nobody. An operator layer rebinds the contract with its own answer, reading the
+sign-in it owns from the request. If your package registers a Gate ability for a screen, ask the contract from it and note that Core's administrator bypass skips only `viewHorizon`, `viewPulse` and `viewTelescope`. Answer no when you cannot tell, and do not throw to say no.
 
 `Tenancy\Contracts\TenantAccessModeInterface` lets an operator package stop a tenant without removing it.
 Core asks it, and a package implements it; Core's default answers "active" for every tenant.

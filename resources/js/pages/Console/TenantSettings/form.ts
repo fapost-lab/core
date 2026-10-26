@@ -37,6 +37,11 @@ export function fallbackOptions(options: SelectOption[], available: string[]): S
   return available.length === 0 ? options : options.filter((option) => available.includes(option.value))
 }
 
+/** The available languages with the base language among them, added first when missing: flows are written in it. */
+export function withBase(base: string, available: string[]): string[] {
+  return base === '' || available.includes(base) ? available : [base, ...available]
+}
+
 /** The fallback once the available languages change: kept while still available, otherwise cleared for a new choice. */
 export function keptFallback(fallback: string, available: string[]): string {
   return available.length === 0 || available.includes(fallback) ? fallback : ''

@@ -9,7 +9,7 @@ paths:
   - app/Providers/AppServiceProvider.php
   - "app/Console/Commands/Platform/Install*.php"
   - app/Console/Commands/MigrateSmartCommand.php
-summary: Only the SaaS operator package may own prefixed landlord tables (amended 2026-10-08; Plugin and Solution may not); migrations load via loadMigrationsFrom, applied by migrate --database=landlord without --path
+summary: Superseded in part by adr-20261023-operator-packages-own-landlord-tables (monitoring may too). Only the SaaS operator package may own prefixed landlord tables (amended 2026-10-08; Plugin and Solution may not); migrations load via loadMigrationsFrom, applied by migrate --database=landlord without --path
 ---
 # Extension packages may own landlord tables of their own, applied by Core's landlord migrate command without a path
 

@@ -55,7 +55,7 @@ final readonly class FlowActivityChannel
 
         $gate = $this->gate->forUser($user);
 
-        if (! $gate->allows('view', $model) || ! $gate->allows('viewAny', FlowSession::class)) {
+        if (! $gate->allows('operate', $model) || ! $gate->allows('viewAny', FlowSession::class)) {
             return false;
         }
 

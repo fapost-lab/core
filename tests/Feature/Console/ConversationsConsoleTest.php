@@ -10,7 +10,7 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Conversation\Enums\ConversationOwner;
-use App\Domains\Conversation\Enums\ConversationStatus;
+use App\Domains\Conversation\Exceptions\ConversationHeldByAnotherOperatorException;
 use App\Domains\Conversation\Live\ConversationActivityWatchers;
 use App\Domains\Conversation\Models\Conversation;
 use App\Domains\Conversation\Services\ConversationInbox;
@@ -36,6 +36,7 @@ use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderI
 use Fapost\Foundation\Messaging\OutboundMessage;
 use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
+use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -64,6 +65,8 @@ final class ConversationsConsoleTest extends FeatureTestCase
 
     private Assistant $assistant;
 
+    private ?User $admin = null;
+
     /** @var list<OutboundMessage> */
     private array $sent = [];
 
@@ -80,7 +83,8 @@ final class ConversationsConsoleTest extends FeatureTestCase
     public function test_the_list_shows_the_assistants_threads_and_the_menu_counts_the_same_unread(): void
     {
         $unread = $this->thread(['unread_count' => 2, 'message_count' => 5, 'last_message_preview' => 'Hi there', 'last_message_at' => Carbon::now()], meta: ['first_name' => 'Ann', 'last_name' => 'Lee']);
-        $this->thread(['last_message_at' => Carbon::now()->subDay(), 'owner_type' => ConversationOwner::Staff]);
+        $holder = $this->operator();
+        $this->thread(['last_message_at' => Carbon::now()->subDay(), 'owner_type' => ConversationOwner::Staff, 'owner_staff_user_id' => (string) $holder->getKey()]);
 
         $sibling = Assistant::factory()->create();
         $this->thread(['unread_count' => 4], assistant: $sibling);
@@ -101,11 +105,16 @@ final class ConversationsConsoleTest extends FeatureTestCase
                 ->where('table.rows.0.preview', 'Hi there')
                 ->where('table.rows.0.unread', 2)
                 ->where('table.rows.0.messages', 5)
-                ->where('table.rows.0.status', 'open')
                 ->where('table.rows.0.owner', 'bot')
+                ->where('table.rows.0.ownerName', null)
+                ->where('table.rows.0.queuedAt', null)
+                ->where('table.rows.0.mine', false)
                 ->where('table.rows.0.viewUrl', "/assistant/{$this->assistant->getKey()}/conversations/{$unread->getKey()}")
                 ->where('table.rows.1.owner', 'staff')
-                ->where('statuses', ['open', 'closed', 'snoozed'])
+                ->where('table.rows.1.ownerName', $holder->name)
+                ->where('table.rows.1.mine', false)
+                ->missing('table.rows.0.status')
+                ->where('handlings', ['queued', 'mine', 'staff', 'bot'])
                 ->where('live', [
                     'channel' => 'tenant.' . self::TENANT_ID . ".assistant.{$this->assistant->getKey()}.conversations",
                     'event'   => 'conversation.activity',
@@ -114,11 +123,10 @@ final class ConversationsConsoleTest extends FeatureTestCase
                 ->etc());
     }
 
-    public function test_the_list_searches_the_contact_id_and_filters_by_status(): void
+    public function test_the_list_searches_the_contact_id(): void
     {
         $wanted = $this->thread(externalId: 'alice-42');
         $this->thread(externalId: 'bob-7');
-        $closed = $this->thread(['status' => ConversationStatus::Closed]);
 
         $this->actingAs($this->admin())
             ->get($this->listUrl('?search=ALICE'))
@@ -126,14 +134,47 @@ final class ConversationsConsoleTest extends FeatureTestCase
                 ->where('table.meta.total', 1)
                 ->where('table.rows.0.id', (string) $wanted->getKey())
                 ->etc());
+    }
 
-        $this->actingAs($this->admin())
-            ->get($this->listUrl('?filter[status]=closed'))
+    public function test_the_list_filters_by_who_handles_the_thread(): void
+    {
+        $me       = $this->operator();
+        $other    = $this->operator();
+        $bot      = $this->thread();
+        $explicit = $this->thread(['owner_type' => ConversationOwner::Bot]);
+        $queued   = $this->thread(['owner_type' => ConversationOwner::Queued, 'queued_at' => Carbon::parse('2026-10-22 09:00:00')]);
+        $mine     = $this->heldThread(holder: $me);
+        $theirs   = $this->heldThread(holder: $other);
+
+        $ids = function (string $handling) use ($me): array {
+            $rows = [];
+            $this->actingAs($me)->get($this->listUrl("?filter[handling]={$handling}"))
+                ->assertInertia(function (AssertableInertia $page) use (&$rows): void {
+                    $rows = array_column($page->toArray()['props']['table']['rows'], 'id');
+                });
+            sort($rows);
+
+            return $rows;
+        };
+        $sorted = static function (Conversation ...$threads): array {
+            $keys = array_map(static fn (Conversation $thread): string => (string) $thread->getKey(), $threads);
+            sort($keys);
+
+            return $keys;
+        };
+
+        $this->assertSame($sorted($queued), $ids('queued'));
+        $this->assertSame($sorted($mine), $ids('mine'));
+        $this->assertSame($sorted($mine, $theirs), $ids('staff'));
+        $this->assertSame($sorted($bot, $explicit), $ids('bot'));
+        $this->assertCount(5, $ids('unknown'));
+
+        $this->actingAs($me)->get($this->listUrl('?filter[handling]=queued'))
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('table.meta.total', 1)
-                ->where('table.rows.0.id', (string) $closed->getKey())
-                ->where('table.state.filters', ['status' => 'closed'])
+                ->where('table.rows.0.queuedAt', Carbon::parse('2026-10-22 09:00:00')->toIso8601String())
                 ->etc());
+        $this->actingAs($me)->get($this->listUrl('?filter[handling]=mine'))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('table.rows.0.mine', true)->etc());
     }
 
     public function test_a_thread_shows_its_latest_messages_in_order_and_pages_back(): void
@@ -157,7 +198,9 @@ final class ConversationsConsoleTest extends FeatureTestCase
                 ->where('messages.49.text', 'm59')
                 ->where('messages.0.author', 'alice-42')
                 ->where('paging', ['limit' => 50, 'hasMore' => true, 'older' => 100])
-                ->where('can', ['reply' => true, 'compose' => false, 'takeOver' => true, 'returnToBot' => false, 'setStatus' => true])
+                ->where('conversation.ownerId', null)
+                ->where('can', ['reply' => true, 'compose' => false, 'takeOver' => true, 'finish' => false, 'transfer' => false, 'seize' => false])
+                ->where('transferTargets', [])
                 ->etc());
 
         $this->actingAs($this->admin())
@@ -167,6 +210,70 @@ final class ConversationsConsoleTest extends FeatureTestCase
                 ->where('messages.0.text', 'm0')
                 ->where('paging.hasMore', false)
                 ->etc());
+    }
+
+    public function test_a_button_press_shows_its_title_and_never_the_raw_callback_data(): void
+    {
+        $hex    = str_repeat('ab', 32);
+        $thread = $this->thread(['message_count' => 3]);
+        $start  = Carbon::parse('2026-10-01 10:00:00');
+
+        $this->message($thread, ['content_type' => 'callback', 'text' => 'Yes', 'payload' => json_encode(['callback_data' => $hex]), 'created_at' => $start]);
+        $this->message($thread, ['content_type' => 'callback', 'text' => null, 'payload' => json_encode(['callback_data' => $hex]), 'created_at' => $start->copy()->addMinute()]);
+        $this->message($thread, ['content_type' => 'callback', 'text' => $hex, 'created_at' => $start->copy()->addMinutes(2)]);
+
+        $this->actingAs($this->admin())
+            ->get($this->viewUrl($thread))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('messages.0.text', 'Yes')
+                ->where('messages.1.text', null)
+                ->where('messages.2.text', null)
+                ->etc());
+    }
+
+    public function test_a_thread_lists_the_assistants_recent_threads_beside_it_and_no_other_assistants(): void
+    {
+        $thread  = $this->thread(['last_message_at' => Carbon::parse('2026-10-01 10:00:00'), 'last_message_preview' => 'older', 'unread_count' => 2], externalId: 'chat-a');
+        $newer   = $this->thread(['last_message_at' => Carbon::parse('2026-10-02 10:00:00'), 'last_message_preview' => 'newer', 'unread_count' => 5], externalId: 'chat-b');
+        $foreign = $this->thread([], assistant: Assistant::factory()->create(), externalId: 'chat-other');
+
+        $this->actingAs($this->admin())
+            ->get($this->viewUrl($thread))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->has('threads', 2)
+                ->where('threads.0.id', (string) $newer->getKey())
+                ->where('threads.0.preview', 'newer')
+                ->where('threads.0.unread', 5)
+                ->where('threads.1.id', (string) $thread->getKey())
+                ->where('threads.1.unread', 0)
+                ->where('threads.1.viewUrl', '/assistant/' . $this->assistant->getKey() . '/conversations/' . $thread->getKey())
+                ->where('threads.1.platform', 'telegram')
+                ->where('threads.1.owner', 'bot')
+                ->has('threads.1.contact')
+                ->has('threads.1.lastMessageAt')
+                ->etc());
+
+        $this->assertNotContains((string) $foreign->getKey(), array_column(
+            $this->actingAs($this->admin())->get($this->viewUrl($thread))->viewData('page')['props']['threads'],
+            'id',
+        ));
+    }
+
+    public function test_a_partial_reload_of_the_side_list_does_not_mark_the_thread_read(): void
+    {
+        $thread = $this->thread(['unread_count' => 4]);
+        $admin  = $this->admin();
+
+        // The version the app reports, so the reload reaches the controller instead of being refused as stale. A full visit marks the thread read.
+        $version = $this->actingAs($admin)->get($this->viewUrl($thread))->viewData('page')['version'];
+        Conversation::query()->whereKey($thread->getKey())->update(['unread_count' => 4]);
+
+        $this->actingAs($admin)
+            ->get($this->viewUrl($thread), ['X-Inertia' => 'true', 'X-Inertia-Version' => $version, 'X-Inertia-Partial-Component' => 'Console/Conversations/Show', 'X-Inertia-Partial-Data' => 'threads'])
+            ->assertOk()
+            ->assertJsonPath('props.threads.0.unread', 4);
+
+        $this->assertSame(4, $thread->fresh()?->unread_count);
     }
 
     public function test_opening_a_thread_marks_it_read_only_after_authorization_and_only_on_a_full_visit(): void
@@ -182,9 +289,11 @@ final class ConversationsConsoleTest extends FeatureTestCase
         $this->actingAs($this->admin())->get($this->viewUrl($sibling))->assertNotFound();
         $this->assertSame(2, $sibling->fresh()?->unread_count);
 
-        // A live reload of the open page does not mark what arrived meanwhile as read.
+        // A live reload of the open page does not mark what arrived meanwhile as read. It carries the app's asset
+        // version, as the browser does, so it is not refused as stale when a local build exists.
+        $version = (string) $this->app->make(HandleInertiaRequests::class)->version(request());
         $this->actingAs($this->admin())
-            ->get($this->viewUrl($thread), ['X-Inertia' => 'true', 'X-Inertia-Partial-Component' => 'Console/Conversations/Show', 'X-Inertia-Partial-Data' => 'messages'])
+            ->get($this->viewUrl($thread), ['X-Inertia' => 'true', 'X-Inertia-Version' => $version, 'X-Inertia-Partial-Component' => 'Console/Conversations/Show', 'X-Inertia-Partial-Data' => 'messages'])
             ->assertOk();
         $this->assertSame(3, $thread->fresh()?->unread_count);
 
@@ -234,44 +343,235 @@ final class ConversationsConsoleTest extends FeatureTestCase
         $this->actingAs($viewer)
             ->get($this->viewUrl($thread))
             ->assertInertia(fn (AssertableInertia $page) => $page
-                ->where('can', ['reply' => false, 'compose' => false, 'takeOver' => false, 'returnToBot' => false, 'setStatus' => false])
+                ->where('can', ['reply' => false, 'compose' => false, 'takeOver' => false, 'finish' => false, 'transfer' => false, 'seize' => false])
                 ->etc());
 
-        foreach ([['post', 'reply'], ['post', 'takeover'], ['post', 'return-to-bot'], ['put', 'status']] as [$verb, $action]) {
-            $this->actingAs($viewer)->{$verb}($this->writeUrl($thread, $action), ['request_id' => (string) Str::uuid(), 'text' => 'x', 'status' => 'closed'])->assertForbidden();
+        $target = $this->operator();
+
+        foreach (['reply', 'takeover', 'finish', 'transfer', 'seize'] as $action) {
+            $this->actingAs($viewer)->post($this->writeUrl($thread, $action), ['request_id' => (string) Str::uuid(), 'text' => 'x', 'user_id' => (string) $target->getKey(), 'expected_owner' => (string) $target->getKey()])->assertForbidden();
         }
 
         $this->assertSame([], $this->sent);
-        $this->assertSame(ConversationStatus::Open, $thread->fresh()?->status);
         $this->assertNull($thread->fresh()?->owner_type);
     }
 
-    public function test_take_over_hand_back_and_status_are_conditional_writes(): void
+    public function test_take_over_and_finish_are_conditional_writes(): void
     {
         $thread   = $this->thread();
-        $operator = $this->userWith([Permission::ViewConversations, Permission::ReplyConversations]);
-        $other    = $this->userWith([Permission::ViewConversations, Permission::ReplyConversations]);
+        $operator = $this->operator();
+        $other    = $this->operator();
 
         $this->actingAs($operator)->post($this->writeUrl($thread, 'takeover'))->assertRedirect()
             ->assertInertiaFlash('success', __('conversation.notifications.taken_over'));
         $this->assertSame(ConversationOwner::Staff, $thread->fresh()?->owner_type);
         $this->assertSame((string) $operator->getKey(), $thread->fresh()?->owner_staff_user_id);
 
-        // A second operator (or a stale tab) does not take the thread away silently.
+        // A second operator (or a stale tab) does not take the thread away silently, and learns who has it.
         $this->actingAs($other)->post($this->writeUrl($thread, 'takeover'))
-            ->assertInertiaFlash('error', __('conversation.notifications.already_taken_over'));
+            ->assertInertiaFlash('error', __('conversation.notifications.already_handled_by', ['name' => $operator->name]));
         $this->assertSame((string) $operator->getKey(), $thread->fresh()?->owner_staff_user_id);
 
-        // The status is set, not toggled: closing twice leaves it closed.
-        $this->actingAs($operator)->put($this->writeUrl($thread, 'status'), ['status' => 'closed'])->assertRedirect();
-        $this->actingAs($operator)->put($this->writeUrl($thread, 'status'), ['status' => 'closed'])->assertRedirect();
-        $this->assertSame(ConversationStatus::Closed, $thread->fresh()?->status);
-        $this->actingAs($operator)->put($this->writeUrl($thread, 'status'), ['status' => 'snoozed'])->assertSessionHasErrors('status');
+        // Only the holder gives it back.
+        $this->actingAs($other)->post($this->writeUrl($thread, 'finish'))
+            ->assertInertiaFlash('error', __('conversation.notifications.not_holder'));
+        $this->assertSame(ConversationOwner::Staff, $thread->fresh()?->owner_type);
 
-        $this->actingAs($operator)->post($this->writeUrl($thread, 'return-to-bot'))
+        $this->actingAs($operator)->post($this->writeUrl($thread, 'finish'))
             ->assertInertiaFlash('success', __('conversation.notifications.returned_to_bot'));
         $this->assertSame(ConversationOwner::Bot, $thread->fresh()?->owner_type);
         $this->assertNull($thread->fresh()?->owner_staff_user_id);
+    }
+
+    public function test_an_operator_accepts_a_queued_thread_and_the_queue_mark_clears(): void
+    {
+        $thread   = $this->thread(['owner_type' => ConversationOwner::Queued, 'queued_at' => Carbon::now()]);
+        $operator = $this->operator();
+
+        $this->actingAs($operator)->get($this->viewUrl($thread))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('conversation.owner', 'queued')
+                ->where('conversation.queuedAt', fn (?string $at): bool => null !== $at)
+                ->where('can.takeOver', true)
+                ->where('can.compose', false)
+                ->etc());
+
+        $this->actingAs($operator)->post($this->writeUrl($thread, 'takeover'))
+            ->assertInertiaFlash('success', __('conversation.notifications.taken_over'));
+
+        $fresh = $thread->fresh();
+        $this->assertSame(ConversationOwner::Staff, $fresh?->owner_type);
+        $this->assertSame((string) $operator->getKey(), $fresh?->owner_staff_user_id);
+        $this->assertNull($fresh?->queued_at);
+    }
+
+    public function test_a_thread_shows_its_holder_the_controls_that_are_theirs(): void
+    {
+        $holder  = $this->operator();
+        $thread  = $this->heldThread(holder: $holder);
+        $mate    = $this->operator();
+        $thread2 = $this->heldThread(holder: $mate);
+
+        $this->actingAs($holder)->get($this->viewUrl($thread))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('conversation.ownerId', (string) $holder->getKey())
+                ->where('conversation.ownerName', $holder->name)
+                ->where('can', ['reply' => true, 'compose' => true, 'takeOver' => false, 'finish' => true, 'transfer' => true, 'seize' => false])
+                ->where('transferTargets', fn ($targets): bool => in_array((string) $mate->getKey(), collect($targets)->pluck('id')->all(), true)
+                    && ! in_array((string) $holder->getKey(), collect($targets)->pluck('id')->all(), true))
+                ->where('urls.finish', "/assistant/{$this->assistant->getKey()}/conversations/{$thread->getKey()}/finish")
+                ->etc());
+
+        // Another operator sees someone else's thread: nothing to do with it; an administrator can seize it.
+        $this->actingAs($holder)->get($this->viewUrl($thread2))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('can', ['reply' => true, 'compose' => false, 'takeOver' => false, 'finish' => false, 'transfer' => false, 'seize' => false])
+                ->where('transferTargets', [])
+                ->etc());
+        $this->actingAs($this->admin())->get($this->viewUrl($thread2))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('can', ['reply' => true, 'compose' => false, 'takeOver' => false, 'finish' => false, 'transfer' => false, 'seize' => true])
+                ->etc());
+    }
+
+    public function test_only_the_holder_replies_finishes_or_transfers_an_admin_included(): void
+    {
+        $this->fakeSender();
+        $holder = $this->operator();
+        $target = $this->operator();
+        $thread = $this->heldThread(holder: $holder);
+        $admin  = $this->admin();
+
+        foreach ([$target, $admin] as $intruder) {
+            $this->actingAs($intruder)
+                ->post($this->writeUrl($thread, 'reply'), ['request_id' => (string) Str::uuid(), 'text' => 'Hi'])
+                ->assertInertiaFlash('error', __('conversation.notifications.reply_held_by_another'));
+            $this->actingAs($intruder)->post($this->writeUrl($thread, 'finish'))
+                ->assertInertiaFlash('error', __('conversation.notifications.not_holder'));
+            $this->actingAs($intruder)->post($this->writeUrl($thread, 'transfer'), ['user_id' => (string) $intruder->getKey() === (string) $admin->getKey() ? (string) $target->getKey() : (string) $admin->getKey()])
+                ->assertInertiaFlash('error', __('conversation.notifications.not_holder'));
+        }
+
+        $this->assertSame([], $this->sent);
+        $this->assertSame((string) $holder->getKey(), $thread->fresh()?->owner_staff_user_id);
+        $this->assertSame(ConversationOwner::Staff, $thread->fresh()?->owner_type);
+    }
+
+    public function test_the_holder_transfers_a_thread_to_an_eligible_operator_who_then_holds_it(): void
+    {
+        $holder = $this->operator();
+        $target = $this->operator();
+        $thread = $this->heldThread(holder: $holder);
+
+        $this->actingAs($holder)->post($this->writeUrl($thread, 'transfer'), ['user_id' => (string) $target->getKey()])
+            ->assertInertiaFlash('success', __('conversation.notifications.transferred', ['name' => $target->name]));
+        $this->assertSame((string) $target->getKey(), $thread->fresh()?->owner_staff_user_id);
+
+        // The former holder is now a bystander.
+        $this->actingAs($holder)->post($this->writeUrl($thread, 'finish'))
+            ->assertInertiaFlash('error', __('conversation.notifications.not_holder'));
+        $this->actingAs($target)->post($this->writeUrl($thread, 'finish'))
+            ->assertInertiaFlash('success', __('conversation.notifications.returned_to_bot'));
+    }
+
+    public function test_a_transfer_to_someone_who_cannot_take_the_thread_is_refused(): void
+    {
+        $holder     = $this->operator();
+        $thread     = $this->heldThread(holder: $holder);
+        $noReply    = $this->userWith([Permission::ViewConversations]);
+        $unassigned = $this->userWith([Permission::ViewConversations, Permission::ReplyConversations]);
+        $unassigned->assistants()->detach();
+        $inactive = $this->operator();
+        $inactive->forceFill(['is_active' => false])->save();
+        $unknown = (string) Str::uuid();
+
+        foreach ([$noReply, $unassigned, $inactive, $holder] as $user) {
+            $this->actingAs($holder)->post($this->writeUrl($thread, 'transfer'), ['user_id' => (string) $user->getKey()])
+                ->assertInertiaFlash('error', __('conversation.notifications.transfer_ineligible'));
+        }
+
+        $this->actingAs($holder)->post($this->writeUrl($thread, 'transfer'), ['user_id' => $unknown])
+            ->assertInertiaFlash('error', __('conversation.notifications.transfer_ineligible'));
+        $this->actingAs($holder)->post($this->writeUrl($thread, 'transfer'), ['user_id' => 'nope'])->assertSessionHasErrors('user_id');
+
+        $this->assertSame((string) $holder->getKey(), $thread->fresh()?->owner_staff_user_id);
+
+        // An administrator needs no assignment: they reach every assistant.
+        $admin = $this->admin();
+        $this->actingAs($holder)->post($this->writeUrl($thread, 'transfer'), ['user_id' => (string) $admin->getKey()])
+            ->assertInertiaFlash('success', __('conversation.notifications.transferred', ['name' => $admin->name]));
+    }
+
+    public function test_a_target_with_reply_but_no_view_is_refused_and_not_listed(): void
+    {
+        $holder    = $this->operator();
+        $thread    = $this->heldThread(holder: $holder);
+        $replyOnly = $this->userWith([Permission::ReplyConversations]);
+
+        $this->actingAs($holder)->post($this->writeUrl($thread, 'transfer'), ['user_id' => (string) $replyOnly->getKey()])
+            ->assertInertiaFlash('error', __('conversation.notifications.transfer_ineligible'));
+
+        $this->assertSame((string) $holder->getKey(), $thread->fresh()?->owner_staff_user_id);
+        $this->assertNotContains(
+            (string) $replyOnly->getKey(),
+            array_column(app(ConversationInbox::class)->transferTargets($this->assistant, $holder), 'id'),
+        );
+    }
+
+    public function test_a_reply_is_refused_when_the_thread_was_seized_after_it_was_loaded(): void
+    {
+        $this->fakeSender();
+        $holder = $this->operator();
+        $thread = $this->heldThread(holder: $holder);
+        $stale  = Conversation::query()->findOrFail($thread->getKey());
+        $other  = $this->operator();
+
+        Conversation::query()->whereKey($thread->getKey())->update(['owner_staff_user_id' => (string) $other->getKey()]);
+
+        $requestId = (string) Str::uuid();
+
+        try {
+            app(ConversationInbox::class)->reply($stale, (string) $holder->getKey(), $requestId, 'Hello');
+            $this->fail('The reply must be refused.');
+        } catch (ConversationHeldByAnotherOperatorException) {
+            // expected
+        }
+
+        $this->assertSame([], $this->sent);
+        $this->assertNull(Cache::get($this->reservation($thread, $requestId)), 'the reservation is released');
+    }
+
+    public function test_an_administrator_seizes_a_thread_only_from_the_holder_they_saw(): void
+    {
+        $holder = $this->operator();
+        $thread = $this->heldThread(holder: $holder);
+        $admin  = $this->admin();
+
+        // The thread moved on to someone else after the administrator opened it.
+        $now = $this->operator();
+        $thread->forceFill(['owner_staff_user_id' => (string) $now->getKey()])->save();
+        $this->actingAs($admin)->post($this->writeUrl($thread, 'seize'), ['expected_owner' => (string) $holder->getKey()])
+            ->assertInertiaFlash('error', __('conversation.notifications.already_handled_by', ['name' => $now->name]));
+        $this->assertSame((string) $now->getKey(), $thread->fresh()?->owner_staff_user_id);
+
+        $this->actingAs($admin)->post($this->writeUrl($thread, 'seize'), ['expected_owner' => (string) $now->getKey()])
+            ->assertInertiaFlash('success', __('conversation.notifications.seized'));
+        $this->assertSame((string) $admin->getKey(), $thread->fresh()?->owner_staff_user_id);
+        $this->assertSame(ConversationOwner::Staff, $thread->fresh()?->owner_type);
+
+        // The seized operator can no longer act on it.
+        $this->actingAs($now)->post($this->writeUrl($thread, 'finish'))
+            ->assertInertiaFlash('error', __('conversation.notifications.not_holder'));
+    }
+
+    public function test_seizing_needs_the_administrator_role(): void
+    {
+        $holder = $this->operator();
+        $thread = $this->heldThread(holder: $holder);
+        $other  = $this->operator();
+
+        $this->actingAs($other)->post($this->writeUrl($thread, 'seize'), ['expected_owner' => (string) $holder->getKey()])->assertForbidden();
+        $this->assertSame((string) $holder->getKey(), $thread->fresh()?->owner_staff_user_id);
     }
 
     public function test_a_reply_is_sent_once_on_the_threads_own_channel_however_often_it_is_submitted(): void
@@ -534,12 +834,16 @@ final class ConversationsConsoleTest extends FeatureTestCase
     {
         $this->fakeSender();
         $botThread = $this->thread();
+        $queued    = $this->thread(['owner_type' => ConversationOwner::Queued]);
         $sibling   = $this->heldThread(Assistant::factory()->create());
         $foreignAs = Assistant::factory()->create(['tenant_id' => self::OTHER_TENANT_ID]);
         $foreign   = $this->thread(['tenant_id' => self::OTHER_TENANT_ID, 'owner_type' => ConversationOwner::Staff], assistant: $foreignAs);
 
         $this->actingAs($this->admin())
             ->post($this->writeUrl($botThread, 'reply'), ['request_id' => (string) Str::uuid(), 'text' => 'Hi'])
+            ->assertInertiaFlash('error', __('conversation.notifications.reply_requires_takeover'));
+        $this->actingAs($this->admin())
+            ->post($this->writeUrl($queued, 'reply'), ['request_id' => (string) Str::uuid(), 'text' => 'Hi'])
             ->assertInertiaFlash('error', __('conversation.notifications.reply_requires_takeover'));
 
         foreach ([$sibling, $foreign] as $thread) {
@@ -595,11 +899,17 @@ final class ConversationsConsoleTest extends FeatureTestCase
     }
 
     /**
-     * A thread an operator holds, on an active Telegram channel the contact is linked to.
+     * A thread an operator holds (the test's administrator unless `$holder` says otherwise), on an active Telegram
+     * channel the contact is linked to.
      */
-    private function heldThread(?Assistant $assistant = null): Conversation
+    private function heldThread(?Assistant $assistant = null, ?User $holder = null): Conversation
     {
-        return $this->thread(['owner_type' => ConversationOwner::Staff, 'owner_staff_user_id' => (string) User::factory()->create()->getKey()], assistant: $assistant);
+        return $this->thread(['owner_type' => ConversationOwner::Staff, 'owner_staff_user_id' => (string) ($holder ?? $this->admin())->getKey()], assistant: $assistant);
+    }
+
+    private function operator(): User
+    {
+        return $this->userWith([Permission::ViewConversations, Permission::ReplyConversations]);
     }
 
     /**
@@ -632,7 +942,6 @@ final class ConversationsConsoleTest extends FeatureTestCase
             'contact_id'   => $contact->getKey(),
             'channel_id'   => $channel->getKey(),
             'platform'     => 'telegram',
-            'status'       => ConversationStatus::Open,
             ...$attributes,
         ]);
     }
@@ -709,12 +1018,17 @@ final class ConversationsConsoleTest extends FeatureTestCase
         return is_array($flash) && is_string($flash[$kind] ?? null) ? $flash[$kind] : '';
     }
 
+    /**
+     * The test's one administrator: every call returns the same person, so a thread they hold stays theirs.
+     */
     private function admin(): User
     {
-        $user = User::factory()->create();
-        $user->assignRole(RoleEnum::Admin->value);
+        if (null === $this->admin) {
+            $this->admin = User::factory()->create();
+            $this->admin->assignRole(RoleEnum::Admin->value);
+        }
 
-        return $user;
+        return $this->admin;
     }
 
     /**

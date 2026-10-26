@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Onboarding\Services\OnboardingChecklist;
+use App\Domains\Onboarding\Services\OnboardingLateSteps;
+use App\Domains\Onboarding\Services\OnboardingState;
+use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\StaffNotificationInbox;
 use App\Domains\Staff\Support\SupportAccessSession;
@@ -17,6 +21,7 @@ use App\Http\Shell\ShellApplication;
 use App\Http\Shell\SolutionExtensions;
 use App\Http\Shell\SolutionUiMapInterface;
 use App\Infrastructure\Broadcasting\BroadcasterStatus;
+use App\Infrastructure\Onboarding\LateStepAnnouncer;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
 use Inertia\Middleware;
@@ -99,6 +104,10 @@ final class HandleInertiaRequests extends Middleware
         // What the Solutions served to the tenant add to Core's screens (extension-contract).
         $shared['extensions']    = fn (): ?array => $request->user() instanceof User ? app(SolutionExtensions::class)->props($request->user(), $request) : null;
         $shared['notifications'] = fn (): ?array => $this->notifications($request);
+        $shared['onboarding']    = fn (): ?array => $this->onboarding($request);
+        // Closures, so a partial reload (`only`) never asks the steps anything.
+        $shared['onboardingChecklist'] = fn (): ?array => $this->onboardingChecklist($request);
+        $shared['onboardingLateSteps'] = fn (): ?array => $this->onboardingLateSteps($request);
 
         return $shared;
     }
@@ -118,9 +127,9 @@ final class HandleInertiaRequests extends Middleware
     }
 
     /**
-     * Fixed endpoints and choices of the shell, and the installation name its footer credits.
+     * Fixed endpoints and choices of the shell, and the installation name and release its footer shows.
      *
-     * @return array{localeUrl: string, logoutUrl: string, supportLeaveUrl: string, locales: list<string>, appName: string}
+     * @return array{localeUrl: string, logoutUrl: string, supportLeaveUrl: string, locales: list<string>, appName: string, version: string}
      */
     private function shell(): array
     {
@@ -131,6 +140,8 @@ final class HandleInertiaRequests extends Middleware
             'locales'         => SetLocale::SUPPORTED_LOCALES,
             // The installation's own name, the holder of the copyright in the footer.
             'appName' => (string) config('app.name', 'FaPost'),
+            // The release this installation runs, from the image (`dev` in a checkout).
+            'version' => (string) config('app.version', 'dev'),
         ];
     }
 
@@ -369,6 +380,83 @@ final class HandleInertiaRequests extends Middleware
             'operatorEmail' => $current['operator_email'],
             'expiresAt'     => $current['expires_at'],
         ];
+    }
+
+    /**
+     * Whether the tenant is still in the setup wizard, for the support banner. Only a platform support session gets it:
+     * the staff of a pending tenant are held in the wizard and need no banner. The wizard's own pages send an
+     * `onboarding` prop of their own (the steps), which replaces this one for the page.
+     *
+     * @return array{pending: true}|null
+     */
+    private function onboarding(Request $request): ?array
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User || ! $user->isPlatformSupport()) {
+            return null;
+        }
+
+        return app(OnboardingState::class)->isPending() ? ['pending' => true] : null;
+    }
+
+    /**
+     * The setup checklist of a tenant that went through the wizard, for a user who may do its steps: every step with
+     * its state and link, how many are open, and where to hide it. `null` when there is nothing to show (see
+     * {@see OnboardingChecklist::for()}); never for the platform support user.
+     *
+     * @return array{items: list<array{key: string, required: bool, complete: bool, url: string}>, remaining: int, hideUrl: string}|null
+     */
+    private function onboardingChecklist(Request $request): ?array
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User || $user->isPlatformSupport()) {
+            return null;
+        }
+
+        $view = app(OnboardingChecklist::class)->for(
+            $user->can(Permission::ManageSettings->value),
+            $user->onboarding_checklist_hidden,
+        );
+
+        if (null === $view) {
+            return null;
+        }
+
+        return [
+            'items'     => $view->items,
+            'remaining' => $view->remaining(),
+            'hideUrl'   => route('console.admin.onboarding.checklist.hide', [], false),
+        ];
+    }
+
+    /**
+     * The required steps that appeared after the tenant finished onboarding and are still open, for the banner. Every
+     * staff user sees it, the platform support user too (the tenant's state, not a personal one); `canAct` tells whether
+     * the user may do the step. A full page load by a person of the tenant also announces a new late step in the bell.
+     *
+     * @return array{steps: list<array{key: string, url: string}>, canAct: bool}|null
+     */
+    private function onboardingLateSteps(Request $request): ?array
+    {
+        $user = $request->user();
+
+        if (! $user instanceof User) {
+            return null;
+        }
+
+        $steps = app(OnboardingLateSteps::class)->open();
+
+        if ([] === $steps) {
+            return null;
+        }
+
+        if (! $user->isPlatformSupport()) {
+            app(LateStepAnnouncer::class)->announce($steps);
+        }
+
+        return ['steps' => $steps, 'canAct' => $user->can(Permission::ManageSettings->value)];
     }
 
     /**

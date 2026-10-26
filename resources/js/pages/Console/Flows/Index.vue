@@ -183,7 +183,7 @@ function toggleActivity(): void {
       <template #actions="{ row }">
         <div class="flex items-center justify-end gap-1">
           <Button as-child variant="outline" size="sm">
-            <a :href="row.builderUrl" target="_blank" rel="noopener" :aria-label="interpolate(t.builder_named, { name: row.name })">
+            <a :href="row.builderUrl" :aria-label="interpolate(t.builder_named, { name: row.name })">
               <SquarePen aria-hidden="true" />
               {{ t.builder }}
             </a>

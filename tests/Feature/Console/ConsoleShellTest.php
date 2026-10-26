@@ -108,7 +108,7 @@ final class ConsoleShellTest extends FeatureTestCase
         $this->assertSame(['console.admin.media.index', 'console.admin.translations.index'], $this->keys($groups[3]));
         $this->assertCount(5, $groups);
         $this->assertSame('System', $groups[4]['label'], 'The System group closes the menu.');
-        $this->assertSame(['console.admin.usage.index', 'console.admin.solutions.index', 'console.admin.tenant-settings.edit', 'console.admin.platform-settings.edit'], $this->keys($groups[4]));
+        $this->assertSame(['console.admin.health.index', 'console.admin.usage.index', 'console.admin.solutions.index', 'console.admin.tenant-settings.edit', 'console.admin.platform-settings.edit'], $this->keys($groups[4]));
     }
 
     public function test_a_user_without_rights_sees_only_the_dashboard_in_the_tenant_wide_menu(): void
@@ -151,6 +151,8 @@ final class ConsoleShellTest extends FeatureTestCase
 
     public function test_the_shell_endpoints_and_translations_are_shared(): void
     {
+        config(['app.version' => 'v1.2.3']);
+
         $this->actingAs($this->admin())
             ->get($this->panelUrl('/admin/_probe?lang=ru'))
             ->assertInertia(fn (AssertableInertia $page) => $page
@@ -160,6 +162,7 @@ final class ConsoleShellTest extends FeatureTestCase
                 ->where('shell.locales', ['en', 'ru', 'uk'])
                 ->where('translations.console.user_menu.sign_out', 'Выйти')
                 ->where('shell.appName', config('app.name'))
+                ->where('shell.version', 'v1.2.3')
                 ->where('translations.console.close', 'Закрыть')
                 ->where('translations.console.footer.powered_by', 'Работает на')
                 ->where('translations.console.table.search', 'Поиск')

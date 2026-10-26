@@ -9,6 +9,9 @@ const page = usePage<ShellPageProps>()
 
 const t = computed(() => page.props.translations.console)
 const support = computed(() => page.props.supportAccess)
+const onboardingPending = computed(() => page.props.onboarding?.pending === true)
+const lateSteps = computed(() => page.props.onboardingLateSteps?.steps ?? [])
+const canAct = computed(() => page.props.onboardingLateSteps?.canAct === true)
 const notice = computed(() => page.props.accessState.notice)
 const stopped = computed(() => page.props.accessState.mode === 'stopped')
 </script>
@@ -23,6 +26,24 @@ const stopped = computed(() => page.props.accessState.mode === 'stopped')
         {{ t.support.leave }}
       </button>
     </form>
+  </div>
+
+  <div v-if="onboardingPending" role="status" class="bg-info text-info-foreground flex flex-wrap items-center justify-center gap-3 px-4 py-2 text-sm">
+    <span>{{ t.onboarding.support_banner }}</span>
+  </div>
+
+  <div
+    v-for="step in lateSteps"
+    :key="step.key"
+    role="status"
+    class="bg-info text-info-foreground flex flex-wrap items-center justify-center gap-3 px-4 py-2 text-sm"
+    data-test="onboarding-late-step"
+  >
+    <template v-if="canAct">
+      <span>{{ interpolate(t.onboarding.late.banner, { step: t.onboarding.steps[step.key]?.title ?? step.key }) }}</span>
+      <a :href="step.url" class="underline underline-offset-4">{{ t.onboarding.late.action }}</a>
+    </template>
+    <span v-else>{{ t.onboarding.late.waiting }}</span>
   </div>
 
   <div

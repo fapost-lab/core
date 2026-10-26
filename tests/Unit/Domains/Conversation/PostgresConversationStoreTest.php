@@ -115,6 +115,16 @@ final class PostgresConversationStoreTest extends TestCase
         $this->assertNull($conversation->last_outbound_at);
     }
 
+    public function test_a_button_press_without_text_previews_as_a_button_press(): void
+    {
+        $conversationId = $this->store->ensureConversation($this->ref());
+        $entry          = $this->inbound('update-cb', 'x');
+
+        $this->store->appendMessage($conversationId, new MessageLogEntry(...[...get_object_vars($entry), 'contentType' => MessageContentType::Callback, 'text' => null]));
+
+        $this->assertSame(trans('conversation.content_types.callback'), DB::table('conversations')->where('id', $conversationId)->value('last_message_preview'));
+    }
+
     public function test_append_message_is_idempotent_by_idempotency_key(): void
     {
         $conversationId = $this->store->ensureConversation($this->ref());

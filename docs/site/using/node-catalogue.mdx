@@ -23,7 +23,8 @@ something rather different from a send.
 
 Message text is written per language on the builder's **Content** tab.
 
-If the send fails, the flow leaves through the block's **error** exit. When the
+If the send fails, the flow leaves through the block's **error** exit, and the flow log
+shows `send_failure: ...` with the reason on the block. When the
 tenant has used up its outbound messages for the period, the message is not sent
 and the flow leaves the same way, with the error type `limit_reached` (the flow
 log shows it as `limit_reached: ...` on the block); a block
@@ -58,6 +59,10 @@ default).
 Use dynamic buttons whenever the options are not known when the flow is written:
 a list fetched by a [Call](#call), a set of appointment slots, whatever the
 contact's own record holds.
+
+Every fixed button needs a label once it is translated and its variables are filled
+in. If one comes out empty, the message is not sent and the block leaves through its
+error exit. A dynamic entry with an empty label is skipped instead.
 
 #### Waiting for the press
 

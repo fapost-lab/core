@@ -83,6 +83,61 @@ final class ScopedStateReaderTest extends TestCase
         $this->assertSame(['input1' => 'A', 'input2' => 'B'], $reader->read('contact.form'));
     }
 
+    public function test_builtin_profile_fields_fall_back_to_contact_meta_and_platform(): void
+    {
+        $contact           = $this->contact();
+        $contact->platform = 'telegram';
+        $contact->meta     = [
+            'first_name' => 'Ivan',
+            'last_name'  => 'Petrov',
+            'username'   => 'ivan_p',
+            'phone'      => '+380501112233',
+        ];
+
+        $reader = new ScopedStateReader([], $contact, $this->emptyRegistry());
+
+        $this->assertSame('Ivan Petrov', $reader->read('contact.name'));
+        $this->assertSame('ivan_p', $reader->read('contact.username'));
+        $this->assertSame('+380501112233', $reader->read('contact.phone'));
+        $this->assertSame('telegram', $reader->read('contact.channel'));
+    }
+
+    public function test_name_falls_back_to_first_name_alone_and_phone_number_key(): void
+    {
+        $contact       = $this->contact();
+        $contact->meta = ['first_name' => 'Ivan', 'phone_number' => '+1'];
+
+        $reader = new ScopedStateReader([], $contact, $this->emptyRegistry());
+
+        $this->assertSame('Ivan', $reader->read('contact.name'));
+        $this->assertSame('+1', $reader->read('contact.phone'));
+    }
+
+    public function test_saved_attributes_win_over_meta_profile(): void
+    {
+        $contact             = $this->contact();
+        $contact->meta       = ['first_name' => 'Ivan', 'username' => 'ivan_p'];
+        $contact->attributes = ['name' => 'Vanya', 'username' => 'custom'];
+
+        $reader = new ScopedStateReader([], $contact, $this->emptyRegistry());
+
+        $this->assertSame('Vanya', $reader->read('contact.name'));
+        $this->assertSame('custom', $reader->read('contact.username'));
+    }
+
+    public function test_profile_fields_are_null_without_meta_and_nested_paths_stay_attribute_only(): void
+    {
+        $contact       = $this->contact();
+        $contact->meta = ['first_name' => 'Ivan'];
+
+        $reader = new ScopedStateReader([], $contact, $this->emptyRegistry());
+
+        $this->assertNull($reader->read('contact.username'));
+        $this->assertNull($reader->read('contact.phone'));
+        $this->assertNull($reader->read('contact.channel'));
+        $this->assertNull($reader->read('contact.name.first'));
+    }
+
     public function test_returns_null_for_unknown_paths(): void
     {
         $reader = new ScopedStateReader(

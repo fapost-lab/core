@@ -1,10 +1,31 @@
 #!/usr/bin/env sh
 
+# Pre-commit: Pint, the Unit and Feature suites and phpstan.
+#
+# - Skipped entirely when the index holds no PHP files.
+# - Pint runs on the host: it needs no extensions, only the vendor directory.
+# - Tests and phpstan run in the devilbox PHP container when it is up, because the
+#   project's runtime (redis extension, database, network) lives there; otherwise on
+#   the host, and the hook says so. Container name: FAPOST_DEVILBOX_CONTAINER
+#   (default server-php-1). The checkout must sit under the same directory that
+#   devilbox mounts as /shared/httpd; the main checkout and its worktrees do.
+# - core.hooksPath (tools/git-hooks/install.php) points at the main checkout, so
+#   worktrees run the main checkout's copy of this hook. That is kept on purpose:
+#   one hook, one place to fix, and existing installs keep working.
+
 set -eu
 
 repository_root="$(git rev-parse --show-toplevel)"
 
 cd "$repository_root"
+
+staged_php_files="$(git diff --cached --name-only --diff-filter=ACMR -- '*.php')"
+
+if [ -z "$staged_php_files" ]; then
+    printf '%s\n' "pre-commit: no PHP files staged, skipping Pint, tests and phpstan."
+
+    exit 0
+fi
 
 checksum_command="cksum"
 
@@ -16,11 +37,48 @@ calculate_php_diff_checksum() {
     git diff --no-ext-diff --binary -- '*.php' | $checksum_command | awk '{print $1}'
 }
 
+container="${FAPOST_DEVILBOX_CONTAINER:-server-php-1}"
+container_path=""
+
+# Path of this checkout inside the container: the directory above the main checkout
+# is what devilbox mounts at /shared/httpd.
+main_checkout="$(cd "$(git rev-parse --git-common-dir)/.." && pwd -P)"
+mount_root="$(dirname "$main_checkout")"
+real_root="$(pwd -P)"
+
+case "$real_root" in
+    "$mount_root"/*) candidate="/shared/httpd/${real_root#"$mount_root"/}" ;;
+    *) candidate="" ;;
+esac
+
+if [ -n "$candidate" ] && command -v docker >/dev/null 2>&1 \
+    && [ "$(docker inspect -f '{{.State.Running}}' "$container" 2>/dev/null || true)" = "true" ] \
+    && docker exec "$container" test -f "$candidate/artisan" >/dev/null 2>&1; then
+    container_path="$candidate"
+fi
+
+if [ -n "$container_path" ]; then
+    printf '%s\n' "pre-commit: running tests and phpstan in container $container ($container_path)."
+else
+    printf '%s\n' "pre-commit: devilbox container not usable, running tests and phpstan on the host PHP."
+fi
+
 run_step() {
     printf '%s\n' ""
     printf '%s\n' "Running: $1"
     shift
     "$@"
+}
+
+run_runtime_step() {
+    label="$1"
+    shift
+
+    if [ -n "$container_path" ]; then
+        run_step "$label" docker exec -i -w "$container_path" "$container" "$@"
+    else
+        run_step "$label" "$@"
+    fi
 }
 
 before_pint_checksum="$(calculate_php_diff_checksum)"
@@ -36,6 +94,6 @@ if [ "$before_pint_checksum" != "$after_pint_checksum" ]; then
     exit 1
 fi
 
-run_step "Unit tests" php artisan test --compact --testsuite=Unit
-run_step "Feature tests" php artisan test --compact --testsuite=Feature
-run_step "Architecture tests" vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=512M --no-interaction
+run_runtime_step "Unit tests" php artisan test --compact --testsuite=Unit
+run_runtime_step "Feature tests" php artisan test --compact --testsuite=Feature
+run_runtime_step "Architecture tests" vendor/bin/phpstan analyse --configuration=phpstan.neon --memory-limit=512M --no-interaction

@@ -25,6 +25,8 @@ const props = defineProps<{
   method: 'post' | 'put'
   submitUrl: string
   cancelUrl: string
+  /** The label of the link beside the save button; the common "cancel" when absent. */
+  cancelLabel?: string
   types: ChannelTypeOption[]
   /** The settings every channel type declared, by type. */
   settings: SettingsByType
@@ -171,14 +173,14 @@ function submit(): void {
 
     <FormSection :title="t.sections.behaviour.title" :description="t.sections.behaviour.description">
       <FormField id="is_active" :label="t.fields.is_active" :error="form.errors.is_active" v-slot="{ invalid, describedBy }">
-        <Switch id="is_active" v-model="form.is_active" class="w-fit" :aria-invalid="invalid" :aria-describedby="describedBy" />
+        <Switch id="is_active" v-model="form.is_active" :aria-invalid="invalid" :aria-describedby="describedBy" />
       </FormField>
     </FormSection>
 
     <div class="flex items-center gap-2">
       <Button type="submit" :disabled="form.processing">{{ form.processing ? common.saving : common.save }}</Button>
       <Button as-child variant="ghost">
-        <Link :href="cancelUrl">{{ common.cancel }}</Link>
+        <Link :href="cancelUrl">{{ cancelLabel ?? common.cancel }}</Link>
       </Button>
     </div>
   </form>

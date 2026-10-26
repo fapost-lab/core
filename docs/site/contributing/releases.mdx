@@ -31,7 +31,8 @@ the tag name at build time (`org.opencontainers.image.version`), and
 
 Pushing a `v*` tag runs the **Publish images** workflow, which builds `core`,
 `web` and `gateway` for amd64 and arm64 and pushes them to GitHub Container
-Registry under every tag an operator might pin to:
+Registry under every tag an operator might pin to, then publishes the GitHub
+release for the tag:
 
 | Image tag  | From `v1.4.2`              | Moves?                       |
 | ---------- | -------------------------- | ---------------------------- |
@@ -61,17 +62,18 @@ git tag -a v0.4.2 -m "v0.4.2"
 git push origin v0.4.2
 ```
 
-4. Publish the GitHub release with notes generated from the merged pull request
-   titles, then edit the notes so that breaking changes and required operator
-   actions (a migration, a new environment variable, a restart order) are at the
-   top and impossible to miss:
+4. Check that the [Publish images](https://github.com/fapost-lab/core/actions/workflows/publish-images.yml)
+   run finished and the three images exist under the new tag. Once they do, the
+   same run publishes the GitHub release with notes generated from the merged
+   pull request titles. A release already published for the tag is left as it is,
+   so notes written by hand beforehand win.
+5. Edit the notes so that breaking changes and required operator actions (a
+   migration, a new environment variable, a restart order) are at the top and
+   impossible to miss:
 
 ```bash
-gh release create v0.4.2 --generate-notes --verify-tag
+gh release edit v0.4.2 --notes-file notes.md
 ```
-
-5. Check that the [Publish images](https://github.com/fapost-lab/core/actions/workflows/publish-images.yml)
-   run finished and the three images exist under the new tag.
 
 A pushed tag is not undone. If a release turns out to be broken, the fix is the
 next patch tag, not a moved or deleted one — an operator may already have pulled
@@ -103,8 +105,4 @@ longer in use. Before 1.0 this case is not expected to arise.
 
 A change that wants operator feedback before it is called a release is tagged
 `v1.5.0-rc.1`. It builds images like any other tag, but `latest` is not moved
-to it and the GitHub release is marked as a pre-release:
-
-```bash
-gh release create v1.5.0-rc.1 --generate-notes --verify-tag --prerelease
-```
+to it, and the release the workflow publishes is marked as a pre-release.

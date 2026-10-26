@@ -67,6 +67,7 @@ const year = new Date().getFullYear()
           <span>
             {{ t.footer.powered_by }}
             <a href="https://fapost.in" target="_blank" rel="noopener" class="text-muted-foreground hover:text-foreground font-medium transition-colors">FaPost</a>
+            <span class="ms-1 tabular-nums">{{ page.props.shell.version }}</span>
           </span>
         </div>
       </footer>

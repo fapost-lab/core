@@ -84,6 +84,15 @@ final class AdminTenantSettingsConsoleTest extends FeatureTestCase
         $this->assertSame(7, $settings->webhook_timeout);
     }
 
+    public function test_the_base_language_is_stored_among_the_available_ones_when_left_out(): void
+    {
+        $this->actingAs($this->admin())
+            ->put($this->url(), $this->payload(['content_base_language' => 'ru', 'available_languages' => ['en'], 'fallback_language' => 'en']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(['ru', 'en'], $this->freshSettings()->available_languages);
+    }
+
     public function test_the_form_shows_the_install_default_for_conversation_settings_nobody_stored(): void
     {
         config(['conversation.enabled' => false, 'conversation.media.fetch' => true]);

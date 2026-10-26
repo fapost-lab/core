@@ -11,7 +11,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 
 /**
- * The assistants of the current platform tenant that a user may open, ordered by name.
+ * The assistants of the current platform tenant that a user may open (the `operate` ability), ordered by name.
  *
  * One list for every surface that switches between assistants, such as the console's switcher.
  */
@@ -31,7 +31,7 @@ final readonly class AccessibleAssistants
             ->where('tenant_id', $this->tenantContext->get()->getId())
             ->orderBy('name')
             ->get()
-            ->filter(fn (Assistant $assistant): bool => Gate::forUser($user)->allows('view', $assistant))
+            ->filter(fn (Assistant $assistant): bool => Gate::forUser($user)->allows('operate', $assistant))
             ->values();
     }
 }

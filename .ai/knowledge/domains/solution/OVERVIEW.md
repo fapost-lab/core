@@ -125,7 +125,8 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
     (`SolutionNotEntitledException`); a granted one is `Unchanged` on activate and refused on deactivate (`SolutionGrantedException`), also while the operator cannot answer when it is in the last grants.
   - Storefront: Foundation's experimental `SolutionStorefrontInterface` (default `Services/NoSolutionStorefront`, `bindIf`) lists the operator's
     offers and connects one (trial or request). Asked only by `SolutionsPresenter` and `Admin\SolutionController::connect`, never in a job.
-  - Directory link: only while the storefront is the default `NoSolutionStorefront` (a self-hosted installation, no operator to sell
+  - Directory link: only in single resolution mode (`TenancyResolutionMode::Single`; never in host mode, i.e. SaaS, whatever the
+    setting says) and only while the storefront is the default `NoSolutionStorefront` (no operator to sell
     anything), the screen shows a "Find more Solutions" link to the platform setting `solutions.marketplace_url` (default: the
     docs page `self-hosting/solutions-directory`; a stored empty value hides it). An operator's storefront replaces the link, it never
     sits beside it. The setting is registered in `App\Providers\DomainServiceProvider`, not in `SolutionServiceProvider`: PHPat

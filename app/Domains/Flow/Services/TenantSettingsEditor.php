@@ -43,6 +43,21 @@ final readonly class TenantSettingsEditor
     }
 
     /**
+     * The available languages with the content base language among them: the base is what every flow is written in,
+     * so it is always available. Kept first when it had to be added; an order already chosen is left alone.
+     *
+     * @param  array<array-key, mixed>  $available
+     *
+     * @return list<string>
+     */
+    public static function withBase(string $base, array $available): array
+    {
+        $languages = self::languageList($available);
+
+        return in_array($base, $languages, true) ? $languages : [$base, ...$languages];
+    }
+
+    /**
      * The values the form starts from. The conversation fields are the effective ones: a tenant that has stored
      * none sees the install default, which a save then stores explicitly.
      *
@@ -79,6 +94,23 @@ final readonly class TenantSettingsEditor
     }
 
     /**
+     * Writes the language matrix alone, as the setup wizard does. A locked base language is kept as stored whatever is
+     * passed, so confirming the languages of a tenant that already has flows changes nothing there.
+     *
+     * @param  list<string>  $available
+     */
+    public function saveLanguages(string $base, array $available, string $fallback): void
+    {
+        if (! $this->baseLanguageLocked()) {
+            $this->settings->content_base_language = $base;
+        }
+
+        $this->settings->available_languages = self::withBase($this->settings->content_base_language, $available);
+        $this->settings->fallback_language   = $fallback;
+        $this->settings->save();
+    }
+
+    /**
      * Writes the validated form. A locked base language is kept as stored whatever is passed; the request refuses a
      * change to it before this is reached.
      *
@@ -90,7 +122,7 @@ final readonly class TenantSettingsEditor
             $this->settings->content_base_language = $fields['content_base_language'];
         }
 
-        $this->settings->available_languages      = self::languageList($fields['available_languages']);
+        $this->settings->available_languages      = self::withBase($this->settings->content_base_language, $fields['available_languages']);
         $this->settings->fallback_language        = $fields['fallback_language'];
         $this->settings->messaging_rate_limit     = $fields['messaging_rate_limit'];
         $this->settings->broadcast_chunk_size     = $fields['broadcast_chunk_size'];

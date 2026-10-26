@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Tma;
 
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
+use Illuminate\Routing\Router;
 use Tests\Feature\FeatureTestCase;
 
 final class TmaRoutesTest extends FeatureTestCase
@@ -42,6 +44,19 @@ final class TmaRoutesTest extends FeatureTestCase
         $response->assertJsonPath('status', 'accepted');
         $response->assertJsonPath('received.answers.f1', 'Jane Doe');
         $response->assertJsonPath('received.answers.f3', true);
+    }
+
+    public function test_tma_api_routes_skip_the_request_forgery_check(): void
+    {
+        // The HTTP kernel hands its middleware groups to the router when it handles a request.
+        $this->postJson('/tma/api/forms/form-123/submit', ['answers' => []])->assertOk();
+
+        $router = $this->app->make(Router::class);
+        $route  = $router->getRoutes()->match(request()->create('/tma/api/forms/form-123/submit', 'POST'));
+
+        $this->assertContains(PreventRequestForgery::class, $router->getMiddlewareGroups()['web']);
+
+        $this->assertNotContains(PreventRequestForgery::class, $router->gatherRouteMiddleware($route));
     }
 
     public function test_tma_api_is_unauthorized_in_production_even_with_header(): void

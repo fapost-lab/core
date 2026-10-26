@@ -32,6 +32,7 @@ final class PermissionEnumTest extends TestCase
                 'reply_conversations',
                 'rotate_channel_token',
                 'view_conversations',
+                'view_operator_screens',
             ],
             $values,
         );

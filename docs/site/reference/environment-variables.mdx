@@ -52,7 +52,7 @@ value stored in the database wins over them, and resetting the stored value brin
 |---|---|---|
 | `FLOW_MAX_ITERATIONS` | `100` | `flow.execution.max_iterations`: how many nodes one flow run may pass through before the session fails |
 | `TENANCY_RENAME_REDIRECT_DAYS` | `30` | `tenancy.rename.redirect_days`, described above |
-| `SOLUTIONS_MARKETPLACE_URL` | `https://docs.fapost.in/self-hosting/solutions-directory` | `solutions.marketplace_url`: where **Find more Solutions** on the admin Solutions page links; empty hides the link. An address that is not http or https is ignored |
+| `SOLUTIONS_MARKETPLACE_URL` | `https://docs.fapost.in/self-hosting/solutions-directory` | `solutions.marketplace_url`: where **Find more Solutions** on the admin Solutions page links; empty hides the link. Shown only in single resolution mode, never in host mode. An address that is not http or https is ignored |
 
 ## Database
 
@@ -106,6 +106,26 @@ them back.
 | `CONVERSATION_RETENTION_DAYS` | *unset* | Default for the platform setting `conversation.retention_days`. Unset or `0` keeps the transcript forever. A whole number of days from 1 to 3650 lets `conversations:prune` drop whole monthly `conversation_messages` partitions older than that, so a message lives between that many days and about 31 days longer. A larger value keeps working as the default but cannot be stored in the admin. **Irreversible**: dropped messages come back only from a database backup. Conversation threads and downloaded media are kept. One value for the whole installation |
 
 See [Conversation retention](/self-hosting/observability#conversation-retention).
+
+## Media storage
+
+| Variable | Default | Notes |
+|---|---|---|
+| `MEDIA_STORAGE_DRIVER` | `local` | `local` keeps media under `storage/app`; `s3` uses any S3-compatible storage. Switching an installation that already has files needs them copied first |
+| `MEDIA_S3_BUCKET` | *empty* | Required with `s3`. One bucket for every tenant, each under `tenants/{tenant id}/` |
+| `MEDIA_S3_KEY`, `MEDIA_S3_SECRET` | *empty* | Access key with read, write and delete in the bucket |
+| `MEDIA_S3_REGION` | `us-east-1` | |
+| `MEDIA_S3_ENDPOINT` | *empty* | Empty for AWS; the provider's address otherwise, for example `http://minio:9000` |
+| `MEDIA_S3_USE_PATH_STYLE_ENDPOINT` | `false` | `true` for MinIO and most self-hosted servers |
+| `MEDIA_S3_ROOT` | *empty* | Optional prefix inside the bucket |
+
+See [Media storage](/self-hosting/configuration#media-storage).
+
+## Messaging
+
+| Variable | Default | Notes |
+|---|---|---|
+| `MESSAGING_RATE_LIMIT_PER_MINUTE` | `30` | Fallback only, for sends outside a tenant. A tenant's rate is set on Tenant settings |
 
 ## Localisation
 

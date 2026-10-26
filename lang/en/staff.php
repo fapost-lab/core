@@ -86,14 +86,16 @@ return [
             'view_analytics'            => 'View analytics',
             'view_system'               => 'View system',
             'manage_settings'           => 'Manage settings',
+            'view_operator_screens'     => 'View operator screens',
         ],
         'descriptions' => [
-            'rotate_channel_token' => 'Reissues the webhook URL hash. Existing webhook configurations become invalid until re-configured on the platform side.',
-            'publish_flow'         => 'Promotes a draft to live. Takes effect immediately for all incoming sessions.',
-            'manage_roles'         => 'Create and edit custom roles with their permission sets.',
-            'manage_flow'          => 'Legacy coarse-grained permission. Covers all flow operations. Use granular permissions for new roles.',
-            'view_conversations'   => 'Opens full message transcripts between contacts and the assistant, including media.',
-            'reply_conversations'  => 'Sends messages to a contact from the operator inbox under the assistant identity.',
+            'rotate_channel_token'  => 'Reissues the webhook URL hash. Existing webhook configurations become invalid until re-configured on the platform side.',
+            'publish_flow'          => 'Promotes a draft to live. Takes effect immediately for all incoming sessions.',
+            'manage_roles'          => 'Create and edit custom roles with their permission sets.',
+            'manage_flow'           => 'Legacy coarse-grained permission. Covers all flow operations. Use granular permissions for new roles.',
+            'view_conversations'    => 'Opens full message transcripts between contacts and the assistant, including media.',
+            'reply_conversations'   => 'Sends messages to a contact from the operator inbox under the assistant identity.',
+            'view_operator_screens' => 'Opens the queue dashboard and the other operator screens of the whole installation: job payloads, logs and load figures.',
         ],
         'sensitive_warning' => 'Sensitive — review carefully before assigning.',
     ],
@@ -260,6 +262,12 @@ return [
     'roles' => [
         'label'        => 'Role',
         'plural_label' => 'Roles',
+
+        'system' => [
+            'admin'           => 'Administrator',
+            'content_manager' => 'Content manager',
+            'analyst'         => 'Analyst',
+        ],
 
         'fields' => [
             'name'         => 'Name',

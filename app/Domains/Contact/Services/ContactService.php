@@ -99,6 +99,19 @@ final readonly class ContactService implements ContactServiceInterface
         return $contact;
     }
 
+    public function rememberPhone(Contact $contact, string $phone): Contact
+    {
+        $meta = is_array($contact->meta) ? $contact->meta : [];
+
+        if (($meta['phone'] ?? null) === $phone) {
+            return $contact;
+        }
+
+        $contact->forceFill(['meta' => [...$meta, 'phone' => $phone]])->save();
+
+        return $contact;
+    }
+
     public function findById(string $contactId): Contact
     {
         return Contact::query()->findOrFail($contactId);

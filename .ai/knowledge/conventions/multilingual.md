@@ -12,7 +12,7 @@ paths:
   - app/Http/Controllers/Console/LocaleController.php
   - app/Http/Middleware/HandleInertiaRequests.php
 summary: "Admin UI language (per person: SetLocale, the locale cookie, users.locale, shared Inertia translations) and content language stay separate; content resolves via LanguageResolverInterface, and a button/select value is never translated"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-10-26
 ---
 # Multilingual layers
 
@@ -31,6 +31,13 @@ translation keys or flow content.
 
 A button/select `value` is language-agnostic and never translated; only the
 label/content is.
+
+A tenant's content base language is always one of its available languages: flows are
+written in it, so a list of languages that leaves it out offers a choice nobody can use.
+`TenantSettingsEditor::withBase()` adds it on every save (the settings screen and the setup
+wizard), and the forms add it when a base is chosen. A screen that offers a choice of the
+tenant's languages reads them through `withBase()` too, since settings stored before
+2026-10-26 may lack it.
 
 The admin UI language is one per person, resolved by `SetLocale` on every web request: a
 `?lang=` override, then the session, then a long-lived cookie, then the browser's

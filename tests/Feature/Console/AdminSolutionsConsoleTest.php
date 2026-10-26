@@ -338,6 +338,17 @@ final class AdminSolutionsConsoleTest extends FeatureTestCase
             ->assertInertia(fn (AssertableInertia $page) => $page->where('marketplaceUrl', 'https://docs.fapost.in/self-hosting/solutions-directory')->etc());
     }
 
+    public function test_a_host_mode_platform_never_shows_the_marketplace_link(): void
+    {
+        $this->app->make(PlatformSettings::class)->update(['solutions.marketplace_url' => 'https://example.com/solutions'], 'cli:test');
+        config(['tenancy.resolution' => 'host']);
+        $this->app->forgetScopedInstances();
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('marketplaceUrl', null)->etc());
+    }
+
     public function test_a_stored_marketplace_address_replaces_the_default(): void
     {
         $this->app->make(PlatformSettings::class)->update(['solutions.marketplace_url' => 'https://example.com/solutions'], 'cli:test');

@@ -15,7 +15,14 @@
 # ---------------------------------------------------------------------------
 # base — PHP with every extension the application and its workers need
 # ---------------------------------------------------------------------------
-FROM php:8.4-fpm-alpine AS base
+# The minor version is pinned, the patch release is not: a rebuild picks up the
+# latest 8.5.x. The check below refuses a base older than 8.5.12, the release
+# that fixed CVE-2026-109618 and CVE-2026-109619, so a stale cached layer cannot
+# ship a vulnerable runtime.
+FROM php:8.5-fpm-alpine AS base
+
+RUN php -r 'exit(version_compare(PHP_VERSION, "8.5.12", "<") ? 1 : 0);' \
+    || { echo "PHP $(php -r 'echo PHP_VERSION;') is older than 8.5.12" >&2; exit 1; }
 
 # The -dev packages are build inputs for the extensions below and are removed
 # again once compilation finishes.
@@ -43,7 +50,6 @@ RUN apk add --no-cache \
         bcmath \
         zip \
         gd \
-        opcache \
         pcntl \
         sockets \
     && pecl install redis \
@@ -54,7 +60,10 @@ RUN apk add --no-cache \
 # pcntl and posix are what Horizon supervises workers with. Missing them is a
 # silent failure: the web tier serves fine while no queued job ever runs, so the
 # check belongs in the build rather than in an incident.
+# OPcache is part of the PHP 8.5 core build, so it is not compiled above; the
+# check keeps it from going missing if the base image ever changes that.
 RUN php -m | grep -qx pcntl \
+    && php -m | grep -qx 'Zend OPcache' \
     && php -m | grep -qx posix \
     && php -m | grep -qx redis \
     && php -m | grep -qx pdo_pgsql
@@ -134,8 +143,12 @@ RUN mkdir -p storage/framework/{cache,sessions,views} storage/logs bootstrap/cac
 # docker/check-image-assets.sh keeps this in step with the `web` image.
 COPY --from=assets --chown=www-data:www-data /build/public/build ./public/build
 
+# The release tag, read by config('app.version') for the console footer. Kept in
+# the image rather than the code; an image built FROM this one (the SaaS image)
+# inherits the file. Last on purpose: it changes on every release.
 ARG VERSION=dev
 LABEL org.opencontainers.image.version=$VERSION
+RUN printf '%s' "$VERSION" > VERSION
 
 USER www-data
 

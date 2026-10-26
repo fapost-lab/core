@@ -91,6 +91,8 @@ export interface ShellConfig {
     locales: string[]
     /** The installation's name (`app.name`), the holder of the copyright in the footer. */
     appName: string
+    /** The release this installation runs (`app.version`): an image tag such as `v0.18.2`, or `dev`. */
+    version: string
 }
 
 /** The notification bell (see `HandleInertiaRequests::notifications()`); the list loads when it opens. */
@@ -169,6 +171,7 @@ export interface ConsoleTranslations {
     close: string
     table: TableTranslations
     form: FormTranslations
+    onboarding: OnboardingTranslations
 }
 
 export interface ShellPageProps {
@@ -186,5 +189,110 @@ export interface ShellPageProps {
     applications: ShellApplications | null
     /** `null` for a guest. */
     notifications: ShellNotifications | null
+    /** Set for a platform-support session while the tenant is in its setup wizard; the wizard's pages send their steps instead. */
+    onboarding?: { pending?: true; steps?: OnboardingStep[] } | null
+    /** The setup checklist for this user; `null` when there is nothing to show (see `OnboardingChecklist::for()`). */
+    onboardingChecklist?: OnboardingChecklistData | null
+    /** The required steps that appeared after the tenant finished onboarding and are still open; `null` when none. */
+    onboardingLateSteps?: OnboardingLateStepsData | null
     [key: string]: unknown
 }
+
+/** One line of the setup checklist, as `OnboardingChecklist::for()` gives it. */
+export interface OnboardingChecklistItem {
+  key: string
+  required: boolean
+  complete: boolean
+  /** A path on this host; the step's page. */
+  url: string
+}
+
+export interface OnboardingChecklistData {
+  items: OnboardingChecklistItem[]
+  remaining: number
+  hideUrl: string
+}
+
+export interface OnboardingLateStepsData {
+  steps: { key: string; url: string }[]
+  /** The user may do the step (holds the settings permission). */
+  canAct: boolean
+}
+
+/** One step of the setup wizard, as `OnboardingWizard::stepProps()` gives it. */
+export interface OnboardingStep {
+  key: string
+  required: boolean
+  complete: boolean
+  current: boolean
+}
+
+interface StepText {
+  title: string
+  description: string
+}
+
+export interface OnboardingTranslations {
+  done: string
+  required_done: string
+  skip: string
+  continue: string
+  back: string
+  layout: { progress: string; step_of: string; completed: string; current: string; optional: string }
+  steps: Record<string, StepText>
+  languages: {
+    title: string
+    description: string
+    notice_title: string
+    notice: string
+    base_language: string
+    base_language_help: string
+    base_language_locked: string
+    available_languages: string
+    available_help: string
+    fallback_language: string
+    fallback_help: string
+    placeholder: string
+    multi_placeholder: string
+    selected: string
+    search: string
+    nothing_found: string
+    remove: string
+    continue: string
+    continuing: string
+  }
+  assistant: {
+    title: string
+    description: string
+    notice_title: string
+    notice: string
+    name: string
+    name_help: string
+    language: string
+    language_help: string
+    placeholder: string
+    create: string
+    creating: string
+  }
+  channel: { title: string; description: string; later: string }
+  team: { title: string; description: string; later: string }
+  waiting: { title: string; description: string; hint: string }
+  support_banner: string
+  checklist: {
+    title: string
+    progress: string
+    remaining: string
+    open: string
+    optional: string
+    done: string
+    hide: string
+  }
+  late: {
+    banner: string
+    waiting: string
+    action: string
+    notification_title: string
+    notification_body: string
+  }
+}
+

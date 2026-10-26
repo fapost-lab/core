@@ -9,6 +9,7 @@ use App\Domains\Conversation\DTO\ConversationRef;
 use App\Domains\Conversation\DTO\MessageLogEntry;
 use App\Domains\Conversation\Enums\ConversationStatus;
 use App\Domains\Conversation\Enums\DeliveryStatus;
+use App\Domains\Conversation\Enums\MessageContentType;
 use App\Domains\Conversation\Enums\MessageDirection;
 use App\Domains\Conversation\Models\Conversation;
 use Carbon\CarbonImmutable;
@@ -150,7 +151,9 @@ final readonly class PostgresConversationStore implements ConversationStoreInter
 
     private function preview(MessageLogEntry $entry): string
     {
-        $text = $entry->text ?? "[{$entry->contentType->value}]";
+        $text = $entry->text ?? (MessageContentType::Callback === $entry->contentType
+            ? trans('conversation.content_types.callback')
+            : "[{$entry->contentType->value}]");
 
         return Str::limit($text, self::PREVIEW_LENGTH, '');
     }

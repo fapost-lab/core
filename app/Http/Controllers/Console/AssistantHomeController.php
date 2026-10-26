@@ -8,6 +8,7 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\AccessibleAssistants;
 use App\Http\Controllers\Controller;
+use App\Http\Shell\NavigationBuilder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -19,10 +20,10 @@ use Illuminate\Support\Facades\Gate;
 final class AssistantHomeController extends Controller
 {
     /**
-     * `assistant`: the dashboard of the first assistant the user may open (by name, as the switcher lists them), or the
+     * `assistant`: the first screen the user may open of the first assistant they may open (in menu order: the dashboard, or for an operator the conversation inbox) (by name, as the switcher lists them), or the
      * admin console when there is none. Filament answered 404 there; the admin console is where such a user works.
      */
-    public function index(Request $request, AccessibleAssistants $assistants): RedirectResponse
+    public function index(Request $request, AccessibleAssistants $assistants, NavigationBuilder $navigation): RedirectResponse
     {
         /** @var User $user */
         $user  = $request->user();
@@ -30,23 +31,29 @@ final class AssistantHomeController extends Controller
 
         // The list is already filtered by the same policy; asked again here as defence in depth, and so the action carries
         // its own check (ConsoleAuthorizationTest).
-        if (null === $first || Gate::denies('view', $first)) {
+        $route = null === $first || Gate::denies('operate', $first) ? null : $navigation->entryRoute($user, $first);
+
+        if (null === $first || null === $route) {
             return redirect()->route('console.admin.dashboard');
         }
 
-        return redirect()->route('console.dashboard', ['assistant' => (string) $first->getKey()]);
+        return redirect()->route($route, ['assistant' => (string) $first->getKey()]);
     }
 
     /**
-     * `assistant/{assistant}`: that assistant's dashboard. The `console` stack has already answered 404 for an assistant
+     * `assistant/{assistant}`: that assistant's first screen the user may open. The `console` stack has already answered 404 for an assistant
      * the user may not open.
      */
-    public function show(CurrentAssistantInterface $currentAssistant): RedirectResponse
+    public function show(Request $request, CurrentAssistantInterface $currentAssistant, NavigationBuilder $navigation): RedirectResponse
     {
+        /** @var User $user */
+        $user      = $request->user();
         $assistant = $currentAssistant->get();
 
-        Gate::authorize('view', $assistant);
+        Gate::authorize('operate', $assistant);
 
-        return redirect()->route('console.dashboard', ['assistant' => (string) $assistant->getKey()]);
+        $route = $navigation->entryRoute($user, $assistant) ?? abort(403);
+
+        return redirect()->route($route, ['assistant' => (string) $assistant->getKey()]);
     }
 }

@@ -230,6 +230,9 @@ function resolveHandleLabel(node: FlowNodeLike, handle: string): string {
             : String(raw ?? '')
         return text.trim() !== '' ? text.trim() : `Button ${idx + 1}`
     }
+    if (node.type === 'branch' || node.type === 'condition') {
+        return nodeHandles(node).find((h) => h.handle === handle)?.label ?? handle
+    }
     return handle
 }
 

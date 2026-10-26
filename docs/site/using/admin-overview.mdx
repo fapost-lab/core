@@ -14,6 +14,40 @@ The admin panel is where you set things up. The console is where you work day to
 day. Most of the user guide is about the console; this group is about everything
 that sits above it.
 
+## First sign-in: the setup wizard
+
+A new tenant starts in a short setup wizard rather than on the dashboard. An
+administrator confirms the content languages — the base language locks once the
+first flow is published, and an assistant's language locks with its first flow —
+and creates the first assistant. Until these required steps are done, the rest of
+the panel is closed. Staff without the settings permission see a waiting page
+("Your administrator is finishing the setup") until an administrator finishes.
+
+Then the wizard offers two optional steps: connecting a channel and inviting the
+team. Each can be skipped with **Skip for now** and done later, a channel in the
+assistant's **Channels** menu and people under **Staff** → **Users**. After the last step the wizard lands in
+the assistant's console. Tenants that existed before the wizard was introduced
+never see it.
+
+### The setup checklist
+
+Once the wizard closes, administrators of a tenant that went through it see a
+**Finish setting up** card on the dashboard and a setup checklist button in
+the header, marked with the number of steps left. Both list every setup step — the optional ones too — with
+what is done and a link to what is left, and disappear when everything is done.
+**Hide** removes both for you only; the checklist comes back by itself when a
+new setup step appears. Staff without the settings permission do not see it.
+
+### A new required step after setup
+
+An upgrade or a newly activated Solution can add a required setup step to a
+tenant that has already finished. The tenant does not go back into the wizard:
+everyone sees a banner above the page, "Setup needs another step", with a link
+to it, until it is done. Administrators — anyone with the settings permission —
+also get one notification in the bell when the step first appears; people who
+join later see the banner only. Staff who cannot do the step see that their
+administrator needs to finish it.
+
 ## The dashboard
 
 Opening the panel lands you on a set of counters:
