@@ -11,13 +11,14 @@ import { Button } from '@fapost/ui/components/button'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { interpolate } from '@console/shell'
 import ChannelForm from './ChannelForm.vue'
-import type { ChannelTypeOption, ChannelsPageProps, EditableChannel, SettingsByType } from './types'
+import type { ChannelTypeOption, ChannelsPageProps, EditableChannel, SettingsByType, SetupByType } from './types'
 import WebhookStatus from './WebhookStatus.vue'
 
 const props = defineProps<{
   channel: EditableChannel
   types: ChannelTypeOption[]
   settings: SettingsByType
+  setup?: SetupByType
   urls: { index: string; submit: string }
 }>()
 
@@ -56,6 +57,7 @@ function registerAgain(): void {
       :cancel-url="urls.index"
       :types="types"
       :settings="settings"
+      :setup="setup"
       :channel="channel"
     />
   </div>

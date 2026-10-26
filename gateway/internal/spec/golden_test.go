@@ -1,16 +1,21 @@
 package spec
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 // goldenPath points at the contract shared with the PHP application. Both suites
 // execute this same file; that is the whole mechanism preventing the two
 // implementations from drifting apart.
 const goldenPath = "../../../contracts/ingress/golden.json"
+
+// goldenFormat is the version of the fixture file itself, independent of the spec wire version.
+const goldenFormat = 1
 
 type goldenDocument struct {
 	Version int          `json:"version"`
@@ -23,6 +28,7 @@ type goldenCase struct {
 	Secret    string          `json:"secret"`
 	ChannelID string          `json:"channelId"`
 	Note      string          `json:"note"`
+	Now       *int64          `json:"now"`
 	Request   struct {
 		RawBody string            `json:"rawBody"`
 		Headers map[string]string `json:"headers"`
@@ -31,6 +37,12 @@ type goldenCase struct {
 	Expect struct {
 		Verified       bool    `json:"verified"`
 		IdempotencyKey *string `json:"idempotencyKey"`
+
+		// Document is compared structurally when present.
+		Document json.RawMessage `json:"document"`
+
+		// Handshake is only present when the case pins it; null means "no challenge".
+		Handshake json.RawMessage `json:"handshake"`
 	} `json:"expect"`
 }
 
@@ -57,8 +69,8 @@ func loadGolden(t *testing.T) goldenDocument {
 func TestGoldenContract(t *testing.T) {
 	document := loadGolden(t)
 
-	if document.Version != Version {
-		t.Fatalf("golden contract version %d, this build speaks %d", document.Version, Version)
+	if document.Version != goldenFormat {
+		t.Fatalf("golden contract version %d, this test understands %d", document.Version, goldenFormat)
 	}
 
 	for _, testCase := range document.Cases {
@@ -74,9 +86,20 @@ func TestGoldenContract(t *testing.T) {
 				testCase.Request.Query,
 			)
 
-			if got := parsed.Verify(request, testCase.Secret); got != testCase.Expect.Verified {
-				t.Errorf("Verify() = %v, want %v%s", got, testCase.Expect.Verified, context(testCase))
+			now := time.Now().Unix()
+			if testCase.Now != nil {
+				now = *testCase.Now
+			} else if parsed.Timestamp != nil {
+				t.Fatal("a case whose spec has a timestamp must set now")
 			}
+
+			verified := parsed.VerifyAt(request, testCase.Secret, now)
+			if verified != testCase.Expect.Verified {
+				t.Errorf("VerifyAt() = %v, want %v%s", verified, testCase.Expect.Verified, context(testCase))
+			}
+
+			assertDocument(t, testCase, parsed, request)
+			assertHandshake(t, testCase, parsed, request, verified)
 
 			if testCase.Expect.IdempotencyKey == nil {
 				return
@@ -86,6 +109,85 @@ func TestGoldenContract(t *testing.T) {
 				t.Errorf("IdempotencyKey() = %q, want %q%s", got, *testCase.Expect.IdempotencyKey, context(testCase))
 			}
 		})
+	}
+}
+
+func assertDocument(t *testing.T, testCase goldenCase, parsed Spec, request *Request) {
+	t.Helper()
+
+	if len(testCase.Expect.Document) == 0 {
+		return
+	}
+
+	want, ok := canonical(testCase.Expect.Document)
+	if !ok {
+		t.Fatalf("expected document is not JSON: %s", testCase.Expect.Document)
+	}
+
+	actual, err := json.Marshal(parsed.Document(request))
+	if err != nil {
+		t.Fatalf("marshal document: %v", err)
+	}
+
+	got, _ := canonical(actual)
+
+	if got != want {
+		t.Errorf("Document() = %s, want %s%s", got, want, context(testCase))
+	}
+}
+
+// canonical renders JSON with sorted keys and with every empty container (and null) as "[]",
+// because PHP cannot tell an empty object from an empty list.
+func canonical(raw []byte) (string, bool) {
+	var value any
+
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+
+	if err := decoder.Decode(&value); err != nil {
+		return "", false
+	}
+
+	out, err := json.Marshal(value)
+	if err != nil {
+		return "", false
+	}
+
+	switch string(out) {
+	case "null", "{}", "[]":
+		return "[]", true
+	default:
+		return string(out), true
+	}
+}
+
+func assertHandshake(t *testing.T, testCase goldenCase, parsed Spec, request *Request, verified bool) {
+	t.Helper()
+
+	if len(testCase.Expect.Handshake) == 0 {
+		return
+	}
+
+	var want *string
+	if err := json.Unmarshal(testCase.Expect.Handshake, &want); err != nil {
+		t.Fatalf("expected handshake must be a string or null: %v", err)
+	}
+
+	var got *string
+
+	if verified {
+		if answer, ok := parsed.HandshakeResponse(request); ok {
+			got = &answer
+		}
+	}
+
+	switch {
+	case got == nil && want != nil:
+		t.Errorf("HandshakeResponse() = none, want %q%s", *want, context(testCase))
+	case got != nil && want == nil:
+		t.Errorf("HandshakeResponse() = %q, want none%s", *got, context(testCase))
+	case got != nil && *got != *want:
+		t.Errorf("HandshakeResponse() = %q, want %q%s", *got, *want, context(testCase))
 	}
 }
 
