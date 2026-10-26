@@ -45,6 +45,23 @@ It auto-discovers packages by reading each `packages/*/composer.json` and linkin
 the linker. It is a no-op when `packages/` is absent, which is why the same hook
 is safe in production and CI.
 
+A checkout is linked only when Core asks for it and accepts it:
+
+- the package is in `require` or `require-dev` of the root manifest — `composer.json`,
+  or the file `COMPOSER` names, which is `composer.local.json` while an
+  [overlay](#packages-core-does-not-require) is installed;
+- its constraint is `@dev` or `dev-*`, or a `path` repository points at the checkout,
+  or the checkout's latest tag (`git describe --tags`) satisfies the constraint.
+
+Anything else is skipped with a line saying why, and `vendor/` keeps the copy
+Composer installed from `composer.lock`. A checkout of `fapost/foundation` at
+`v0.33.0` is not linked into a Core that requires `^0.30`: it would break every
+contract Core implements. When such a package is still linked from an earlier run,
+the linker removes the link and asks for `composer install`, which puts the locked
+copy back. A package only an [overlay](#packages-core-does-not-require) requires keeps
+its link when `dev:link` runs without `COMPOSER`, as long as Composer lists it as
+installed.
+
 ## Set up an existing package for development
 
 Clone the package into `packages/` next to the others, then let Composer link it:
@@ -348,9 +365,7 @@ COMPOSER=composer.local.json composer dump-autoload
 A plain `composer install` or `composer update` goes back to Core alone and
 uninstalls the overlay package from Composer's point of view — a quick way to
 check that Core still runs without your extension. Run `composer overlay` again to
-bring it back. `dev:link` may still leave a symlink under `vendor/` for a
-`packages/*` checkout; it is harmless, because the package is neither autoloaded nor
-discovered.
+bring it back.
 
 <Warning>
   The overlay changes nothing in Core's repository, so your extension must work
@@ -468,7 +483,7 @@ php artisan migrate --database=landlord --force
 | `repositories[]` in the root `composer.json` | One VCS entry per package — the production source. |
 | `require` in the root `composer.json` | Version constraint per package, for example `^0.1`. |
 | `composer.lock` | Pins the exact commit of each tagged version. Always the VCS lane, so it is safe to commit. |
-| `tools/dev-link-packages.php` / `composer dev:link` | Symlinks `vendor/<name>` to the local checkout. Runs on install and update; a no-op without `packages/`. |
+| `tools/dev-link-packages.php` / `composer dev:link` | Symlinks `vendor/<name>` to the local checkout when the root manifest requires the package and the checkout's version satisfies the constraint. Runs on install and update; a no-op without `packages/`. |
 | `tools/dev-link-npm.mjs` / `npm run dev:link` | Symlinks `node_modules/<name>` to the local checkout of an npm package (`@fapost/ui`). Runs as `postinstall`; a no-op without `packages/`. |
 | `composer.overlay.json` | Packages Core does not require: `repositories` and `require` only. Git-ignored. |
 | `tools/composer-overlay.php` / `composer overlay` | Writes `composer.local.json` and `composer.local.lock` and installs the overlay against Core's lock. |
