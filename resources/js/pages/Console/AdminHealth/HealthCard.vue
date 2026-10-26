@@ -23,6 +23,8 @@ const props = defineProps<{
   /** `loading` until the page has an answer. */
   state: HealthState | 'loading'
   reason: string | null
+  /** Shown instead of "not reported" when a down or unknown service has no reason because it is withheld from this reader. */
+  withheldReason?: string
   /** The sentence shown when the service is switched off on purpose. */
   disabledText: string
   /** When the answer is from, already written for the person; null when there is none. */
@@ -50,7 +52,17 @@ const dot = computed(
       neutral: 'bg-neutral-dot',
     })[tone.value],
 )
-const reasonText = computed(() => props.reason ?? (props.state === 'unknown' ? props.t.not_reported : null))
+const reasonText = computed(() => {
+  if (props.reason !== null) {
+    return props.reason
+  }
+
+  if (props.withheldReason !== undefined && (props.state === 'down' || props.state === 'unknown')) {
+    return props.withheldReason
+  }
+
+  return props.state === 'unknown' ? props.t.not_reported : null
+})
 const heading = computed(() => `health-${props.serviceKey}`)
 </script>
 

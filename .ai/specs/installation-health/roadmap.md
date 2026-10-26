@@ -17,7 +17,7 @@ shows "down" with the reason, not an error.
 - [x] `health-page` — Health page — the console page on the kit with the Reverb and gateway cards, polled, empty and
       unknown states included, for the tenant's admins on a single-tenant installation (after:
       Health service and probes — the page draws what the service reports)
-- [ ] `health-tenant-slice` — Tenant slice in host mode — the same page in `host` mode shows only what is the tenant's: its
+- [x] `health-tenant-slice` — Tenant slice in host mode — the same page in `host` mode shows only what is the tenant's: its
       live updates and its channels' ingress, never another tenant's or installation-wide figures
       (after: Health page — it narrows the page that exists)
 

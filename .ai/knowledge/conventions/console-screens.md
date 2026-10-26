@@ -11,7 +11,7 @@ paths:
   - "resources/js/pages/Console/**"
   - "resources/js/console/shell/**"
   - "resources/js/console/lib/**"
-reviewed_at: 2026-10-22
+reviewed_at: 2026-10-26
 ---
 # Console screens
 
@@ -153,7 +153,10 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   asked in one presenter method that the controller repeats before writing.
 
 - **A screen about the installation's own services** (`Admin\HealthController`, `HealthPresenter`, `Console/AdminHealth`) opens
-  in `single` mode only (404 in `host`) behind `ViewSystem`, and its menu item repeats both conditions. The report is an
+  behind `ViewSystem`, and its menu item repeats that condition. In `single` mode it shows the whole installation; in
+  `host` mode the controller passes `scope: tenant` and the report through `TenantHealthSlice` and
+  `HealthPresenter::tenantPage()`: the tenant's own channels and ingress drift only, no reasons, addresses, connections,
+  specifications or queue card (the tenant comes from the explicit tenant context). The report is an
   `Inertia::optional` prop the page fetches itself and polls with a partial reload, never over Reverb (a page about the
   websocket must not need it). Nothing defaults to green: loading, a failed request, a service the report did not mention
   and data older than two intervals each have their own state, and a request that hangs is cancelled after 10 s. What the

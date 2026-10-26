@@ -109,10 +109,15 @@ whenever webhooks are not arriving.
 
 ## Health page
 
-On an installation that serves a single organisation, the admin panel has a
-**System → Health** page. It shows whether live updates, webhook intake and the
-background queues work right now, and is open to anyone with the "View system" permission (administrators
-have it). It does not exist on a multi-tenant installation.
+The admin panel has a **System → Health** page, open to anyone with the "View system" permission
+(administrators have it). On an installation that serves a single organisation it shows whether live updates,
+webhook intake and the background queues work right now.
+
+On a multi-tenant installation (`host` mode) the page is there for a tenant's users with the same permission, but it
+shows only that tenant's slice: the state of live updates (Reverb) and the number of the tenant's open live channels,
+and the state of the webhook gateway and how many of the tenant's channels are still on the old address. There are no
+connection counts, addresses, published specifications, reasons or a Queues card, because those belong to the whole
+installation. The sections below describe the full page of a single-organisation installation.
 
 The page asks again every 15 seconds over plain HTTP, never over Reverb, so it
 keeps working when the websocket is what has failed. Each of its three cards,

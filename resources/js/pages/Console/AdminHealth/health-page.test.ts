@@ -58,6 +58,13 @@ const translations = {
         queues_none: 'The queues could not be read',
         window: 'Jobs per minute since :time',
       },
+      tenant: {
+        title: 'Workspace health',
+        description: 'This workspace only.',
+        channels: 'Open live channels',
+        drift: 'Your channels on the old address',
+        reason_withheld: 'The details are visible to the operator.',
+      },
       reason: 'What the check says',
       not_reported: 'Not reported.',
       no_figure: 'Not available',
@@ -115,7 +122,7 @@ function report(over: Partial<HealthReportData> = {}): HealthReportData {
 }
 
 function render(props: Record<string, unknown> = {}) {
-  return mount(Index, { props: { pollSeconds: 15, ...props } })
+  return mount(Index, { props: { pollSeconds: 15, scope: 'installation', ...props } })
 }
 
 beforeEach(() => {
@@ -389,5 +396,76 @@ describe('old data', () => {
     const wrapper = render({ report: report({ gateway: gateway({ state: 'unknown', reason: null, checkedAt: null, specs: null, drift: null, url: null }) }) })
 
     expect(wrapper.find('[data-test="card-gateway"] [data-test="reason"]').text()).toContain('Not reported.')
+  })
+})
+
+describe('the tenant slice', () => {
+  function slice(over: Partial<HealthReportData> = {}): HealthReportData {
+    return {
+      reverb: reverb({ reason: null, address: null, connections: null, channels: 3 }),
+      gateway: gateway({ reason: null, url: null, specs: null, drift: { total: 2, platforms: [{ platform: 'telegram', count: 2 }] } }),
+      ...over,
+    }
+  }
+
+  it('has no queues card, not even while loading', () => {
+    const loading = render({ scope: 'tenant' })
+
+    expect(loading.find('[data-test="card-queues"]').exists()).toBe(false)
+    expect(loading.find('[data-test="card-reverb"]').exists()).toBe(true)
+
+    const loaded = render({ scope: 'tenant', report: slice() })
+
+    expect(loaded.find('[data-test="card-queues"]').exists()).toBe(false)
+  })
+
+  it('uses its own title and description', () => {
+    const wrapper = render({ scope: 'tenant', report: slice() })
+
+    expect(wrapper.find('h1').text()).toBe('Workspace health')
+    expect(wrapper.text()).toContain('This workspace only.')
+  })
+
+  it('shows the tenant channels and drift but no connections, address or specifications', () => {
+    const wrapper = render({ scope: 'tenant', report: slice() })
+    const card = wrapper.find('[data-test="card-reverb"]')
+
+    expect(card.text()).toContain('Open live channels')
+    expect(card.text()).toContain('3')
+    expect(card.text()).not.toContain('Connections')
+    expect(card.text()).not.toContain('Address')
+    expect(wrapper.find('[data-test="card-gateway"]').text()).not.toContain('Address')
+    expect(wrapper.find('[data-test="specs"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="drift"]').text()).toContain('Your channels on the old address')
+    expect(wrapper.find('[data-test="drift-total"]').text()).toBe('2')
+  })
+
+  it('ignores an address or specifications even if the server sent them', () => {
+    const wrapper = render({ scope: 'tenant', report: slice({ reverb: reverb({ reason: null, channels: 1 }), gateway: gateway({ reason: null }) }) })
+
+    expect(wrapper.text()).not.toContain('reverb:8080')
+    expect(wrapper.text()).not.toContain('gateway:8080')
+    expect(wrapper.find('[data-test="specs"]').exists()).toBe(false)
+  })
+
+  it('says the details are withheld for a service that is down or unknown, and nothing for one that is up', () => {
+    const wrapper = render({
+      scope: 'tenant',
+      report: slice({ reverb: reverb({ state: 'unknown', reason: null, address: null, connections: null, channels: null }), gateway: gateway({ state: 'down', reason: null, url: null, specs: null }) }),
+    })
+
+    expect(wrapper.find('[data-test="card-reverb"] [data-test="reason"]').text()).toContain('The details are visible to the operator.')
+    expect(wrapper.find('[data-test="card-reverb"]').text()).not.toContain('Not reported.')
+    expect(wrapper.find('[data-test="card-gateway"] [data-test="reason"]').text()).toContain('The details are visible to the operator.')
+
+    const up = render({ scope: 'tenant', report: slice() })
+
+    expect(up.find('[data-test="reason"]').exists()).toBe(false)
+  })
+
+  it('draws no queues card even if a queues answer arrives', () => {
+    const wrapper = render({ scope: 'tenant', report: slice({ queues: queues({ checkedAt: '2030-01-01T00:00:00Z' }) }) })
+
+    expect(wrapper.find('[data-test="card-queues"]').exists()).toBe(false)
   })
 })
