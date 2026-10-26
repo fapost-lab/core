@@ -68,7 +68,7 @@ media — with no Slack code in Core. (Viber until 2026-10-26: parked until a cu
       (after: Open channel types, Channel settings from the connector's schema, Neutral outgoing message —
       it is built on them; after: Body-HMAC ingress signatures, Public media links — Slack needs both;
       after: Managed settings from a connector — its team and app ids come from the provider)
-- [ ] `button-limits` — Button limits: connectors declare their button limits (buttons per message and per row, label
+- [x] `button-limits` — Button limits: connectors declare their button limits (buttons per message and per row, label
       length) beside the capability flags, and flow validation warns when a flow exceeds them (after:
       Capability-aware validation — it adds limits to the same check; built with the Slack connector package,
       so the contract is shaped by two channels' limits, not Telegram's alone)
