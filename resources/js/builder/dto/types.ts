@@ -101,4 +101,6 @@ export interface ValidationError {
 export interface ValidationResult {
     valid: boolean
     errors?: ValidationError[]
+    /** Advice only (e.g. a channel of the assistant lacks a capability the flow uses): never blocks publishing. */
+    warnings?: ValidationError[]
 }

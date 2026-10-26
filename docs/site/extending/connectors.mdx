@@ -131,6 +131,12 @@ provider's format in your sender. Core's flow messages carry `buttons` and leave
 `MessagePayload::$keyboard` null; `keyboard` is deprecated, so a sender that reads only
 it shows no buttons.
 
+The flow builder reads these declarations: when a flow uses something one of the
+assistant's channels does not declare (for example a contact request on a channel without
+`ShareContact`), validation shows a warning naming the channel and the capability. A warning
+never blocks publishing, so an undeclared capability only means that part of the flow
+degrades on that channel.
+
 When the user presses a `Callback` button, report it as an `IncomingMessage` of type
 `IncomingMessageType::CallbackQuery` whose `text` is the button's payload, unchanged.
 How the provider delivers the press is the connector's business. The payload is at most
