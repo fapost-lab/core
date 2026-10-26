@@ -209,7 +209,9 @@ abstract class ConnectorTestCase extends BaseTestCase
      * is registered and its channels go through Core's connector registrar, with the same checks.
      *
      * Call it in `setUp()`. A connector checked out next to Core is not in Core's composer.json, so discovery does not
-     * see it; this is the step discovery would have taken.
+     * see it; this is the step discovery would have taken. A connector installed into Core (through the overlay, as in
+     * the package's CI) is already discovered and booted when the test starts: the manifest is still read and the
+     * provider still checked, but nothing is registered a second time, so the same test runs in both places.
      *
      * @param  class-string<AbstractConnectorServiceProvider>  $provider
      * @param  string|null  $composerPath  the package's composer.json; null to look for it above the provider's file
@@ -225,6 +227,10 @@ abstract class ConnectorTestCase extends BaseTestCase
         $connector = InstalledConnector::fromManifest(ConnectorManifest::fromComposer($composer), null, $composerPath);
 
         $this->assertSame($provider, $connector->provider, "The manifest in {$composerPath} names another provider.");
+
+        if ($this->app->getProvider($provider) instanceof AbstractConnectorServiceProvider) {
+            return;
+        }
 
         $instance = $this->app->register($provider);
 

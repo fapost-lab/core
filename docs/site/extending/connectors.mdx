@@ -373,7 +373,7 @@ before 1.0.
 
 | Method | What it does |
 |---|---|
-| `bootConnector($providerClass, $composerPath)` | Call it in `setUp()`. Reads and validates your manifest (by default the `composer.json` above the provider's file), registers the provider and its channels through Core's connector registrar, as discovery does for an installed connector. A package checked out next to Core is not in Core's `composer.json`, so this is the step discovery would take. |
+| `bootConnector($providerClass, $composerPath)` | Call it in `setUp()`. Reads and validates your manifest (by default the `composer.json` above the provider's file), registers the provider and its channels through Core's connector registrar, as discovery does for an installed connector. A package checked out next to Core is not in Core's `composer.json`, so this is the step discovery would take. When the package is installed into Core (as in your CI, through the overlay), discovery has already booted it: the manifest is still validated, but nothing is registered twice, so the same `setUp()` works in both places. |
 | `createChannel($type, $token, $secretToken, $config)` | An active channel of your type in the default tenant, routed so the real webhook route finds it. |
 | `postWebhook($channel, $rawBody, $headers)` | POSTs the exact bytes to the real webhook route; `Content-Type` defaults to JSON. |
 | `dispatchedInbound()` | The `InboundWebhookPayload` of every inbound job ingress queued so far. |
