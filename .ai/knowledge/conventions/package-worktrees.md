@@ -3,12 +3,13 @@ id: convention-package-worktrees
 type: convention
 status: active
 domains: []
-paths: []
+paths:
+  - tools/dev-link-packages.php
 stages:
   - implement
   - consolidate
-summary: Package repositories under packages/ get worktrees only in packages/<pkg>.worktrees, and the shipping agent removes them after the package PR merges; tag checkouts are removed in the same session
-reviewed_at: 2026-10-16
+summary: Package repositories under packages/ get worktrees only in packages/<pkg>.worktrees and are removed after their PR merges; composer dev:link links a checkout only when Core requires it at a version its constraint accepts
+reviewed_at: 2026-10-26
 ---
 # Package worktrees
 
@@ -31,6 +32,17 @@ inside a package is invisible to them and is nobody's to remove unless its autho
 - Remove the empty `packages/<package>.worktrees/` directory with its last worktree: an
   empty one makes `git worktree list` run inside it fall through to Core's repository.
 
+### What `composer dev:link` links
+
+`tools/dev-link-packages.php` links a checkout from `packages/` only when the root manifest
+(`composer.json`, or the file `COMPOSER` names — `composer.local.json` under the overlay)
+requires the package and the checkout's latest tag (`git describe --tags --abbrev=0`)
+satisfies the constraint; `@dev`, `dev-*` and path repositories always pass. Anything else
+keeps Composer's locked copy. A link it made earlier for a package whose version is now
+refused is removed, with a request to run `composer install`; a link to a package only the
+overlay requires stays while Composer lists it as installed, so a plain `composer dev:link`
+does not break the overlay.
+
 ## Example
 
 A task changed `fapost-foundation` on `feat/media-link-policy` in
@@ -49,3 +61,8 @@ Without this, finished worktrees piled up: by 2026-10-16 `fapost-foundation` hel
 worktrees of merged branches and five detached checkouts of release tags, none of them known
 to any task or cleanup tool. Each is a full checkout an agent may later mistake for live
 work, and `composer dev:link` only ever links the main checkout, so they serve nothing.
+
+The linker used to link every checkout in `packages/` unconditionally. With PR #296 sharing
+`packages/` into task worktrees, a `fapost/foundation` checkout at v0.33.0 — breaking since
+0.31 — was linked under a `main` that requires `^0.30`, and no Core test could run. A checkout
+is linked only when Core accepts its version.
