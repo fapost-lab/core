@@ -39,7 +39,7 @@ reached only through the connector registrar, with its existing tests untouched 
 - [x] `neutral-outgoing-message` — Neutral outgoing message: Flow describes buttons, reply mode and requests for contact or location
       without Bot API structures; Telegram's module translates; capabilities declared per connector
       (after: Connector registrar with a channel surface — capabilities are registered on it)
-- [ ] `capability-aware-validation` — Capability-aware validation: validation and the builder warn when a flow uses what its assistant's
+- [x] `capability-aware-validation` — Capability-aware validation: validation and the builder warn when a flow uses what its assistant's
       channels cannot do (after: Neutral outgoing message — it checks against the declared capabilities)
 - [x] `outbound-message-without-token` — Outbound message without the token: the `OutboundMessage` envelope a
       connector's sender receives no longer carries the channel token into queued payloads; the sender gets it
