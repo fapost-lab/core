@@ -8,7 +8,9 @@ use App\Domains\Health\Probes\GatewayProbe;
 use App\Domains\Health\Probes\QueueProbe;
 use App\Domains\Health\Probes\ReverbProbe;
 use App\Domains\Health\Probes\WebhookRegistryProbe;
+use App\Domains\Health\Services\CoreInstallationHealth;
 use App\Domains\Health\Services\HealthService;
+use Fapost\Foundation\Health\Contracts\InstallationHealthInterface;
 use Illuminate\Contracts\Cache\Repository;
 use Illuminate\Support\ServiceProvider;
 
@@ -30,5 +32,9 @@ final class HealthServiceProvider extends ServiceProvider
                 cache: $app->make(Repository::class),
             ),
         );
+
+        // The installation's health for a package that renders it. bindIf: an operator layer that bound its own answer
+        // keeps it. Not shared: it holds nothing and resolves the scoped service each time.
+        $this->app->bindIf(InstallationHealthInterface::class, CoreInstallationHealth::class);
     }
 }

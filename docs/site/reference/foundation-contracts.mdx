@@ -221,6 +221,32 @@ signed-in, active staff member who holds the `view_operator_screens` permission,
 user excluded; in `host` mode, nobody. An operator layer rebinds the contract with its own answer, reading the
 sign-in it owns from the request. If your package registers a Gate ability for a screen, ask the contract from it and note that Core's administrator bypass skips only `viewHorizon`, `viewPulse` and `viewTelescope`. Answer no when you cannot tell, and do not throw to say no.
 
+Experimental since 0.34. `Health\Contracts\InstallationHealthInterface` gives a package that renders it (an
+operator panel, a monitoring package) the health of the whole installation. `report(): InstallationHealthReport`
+holds one `ServiceHealth` per service the installation probes (`service()` finds one; null means "not monitored",
+never healthy) and `generatedAt`. Each `ServiceHealth` carries the `MonitoredService` (`reverb`, `gateway`,
+`webhook_registry`, `queues`), a `HealthState`, a one-sentence `reason`, `checkedAt`, an optional `endpoint` and a
+list of `HealthMetric` (`name`, `value`, `unit`, `subject`; `metric()` finds one).
+
+- `up` means the service answered and is healthy; `down` only that it answered and is not; `unknown` that it could
+  not be read (unreachable, timed out, misconfigured, the probe failed); `disabled` that it is switched off on
+  purpose. Show `unknown` as unknown, never as healthy or down. New services, states and units may be added in a
+  minor release, so branch on them with a default arm.
+- The metrics: `reverb` reports `connections` and `channels`; `gateway` reports `spec_status` (`matches`,
+  `missing`, `differs`) and `drifted_channels` per platform; `webhook_registry` reports `missing`, `stale` and
+  `orphaned`; `queues` reports `wait_seconds` and `throughput` (jobs per minute) per queue and `failed_jobs`. A
+  value of null was not measured; it is never a zero in disguise.
+- Nothing in it is a secret or names a tenant: an endpoint and a reason carry no user name, password or query of a
+  URL, and Reverb is reported by counts, not channel names.
+- It does not decide who may see it. Ask `OperatorAccessInterface::canView()` for `OperatorSurface::Health` first.
+  It needs no request and no tenant context.
+- Core binds a default over its own health service; an operator layer may rebind it. A Core older than 0.34 of
+  Foundation leaves it unbound: check `app()->bound()` and say the figures are unavailable. It never throws. Resolve it where you use it
+  rather than keeping it in a singleton of your own.
+- Each probe's answer is cached for 5 to 30 seconds, and a slow source waits for its timeout (a few seconds), so a
+  call with a cold cache can block for several seconds. Call it when a screen renders or polls, not on every
+  request, and poll no more often than every 5 seconds.
+
 `Tenancy\Contracts\TenantAccessModeInterface` lets an operator package stop a tenant without removing it.
 Core asks it, and a package implements it; Core's default answers "active" for every tenant.
 
