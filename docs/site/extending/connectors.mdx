@@ -99,7 +99,7 @@ it, so constructors must be cheap and must not touch tenant data.
 | `mediaUploader` | no | `Fapost\Foundation\Media\ChannelMediaUploaderInterface` |
 | `mediaDownloader` | no | `Fapost\Foundation\Media\ChannelMediaDownloaderInterface` |
 | `mediaLinkPolicy` | no | `Fapost\Foundation\Media\ChannelMediaLinkPolicyInterface` |
-| `capabilities` | no | A `Fapost\Foundation\Messaging\ChannelCapabilities` listing what the channel can do beyond text and media |
+| `capabilities` | no | A `Fapost\Foundation\Messaging\ChannelCapabilities` listing what the channel can do beyond text and media, and the size of the keyboards it shows (`ButtonLimits`) |
 | `profile` | no | `Fapost\Foundation\Channel\Settings\ChannelProfileInterface` |
 | `mediaLimits` | no | `Fapost\Foundation\Media\ChannelMediaLimitsInterface` |
 
@@ -136,6 +136,19 @@ assistant's channels does not declare (for example a contact request on a channe
 `ShareContact`), validation shows a warning naming the channel and the capability. A warning
 never blocks publishing, so an undeclared capability only means that part of the flow
 degrades on that channel.
+
+### Button limits
+
+`ChannelCapabilities` takes a `ButtonLimits` as its second argument: `maxButtons` (in one
+message), `maxButtonsPerRow` and `maxLabelLength` (in UTF-8 characters). `null`, the default,
+means the channel declares no limit and nothing is checked. When a flow's keyboard is larger
+than a declared limit, validation shows a `channel_button_limit_exceeded` warning naming the
+channel, the limit and the actual size. It is a warning only and never blocks publishing, so
+declare what the provider documents or what you have observed it to enforce. You need no limit
+for the payload length: it is at most 64 bytes on every channel.
+
+Telegram, for example, declares 100 buttons and 8 per row and leaves the label length open:
+its Bot API documents no keyboard counts or label length, and clients truncate long labels.
 
 When the user presses a `Callback` button, report it as an `IncomingMessage` of type
 `IncomingMessageType::CallbackQuery` whose `text` is the button's payload, unchanged.

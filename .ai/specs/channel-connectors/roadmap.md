@@ -60,7 +60,7 @@ media — with no Slack code in Core. (Viber until 2026-10-26: parked until a cu
 - [x] `connector-managed-settings` — Managed settings from a connector: a connector hands Core the values it reads
       from the provider (the managed fields of its settings schema) and Core stores them, so no package writes
       `channels` (after: Channel settings from the connector's schema — it fills that schema's managed fields)
-- [ ] Slack connector package — `fapost/connector-slack`: Events API ingress with Slack's `v0` signature
+- [ ] `slack-connector-package` — Slack connector package: `fapost/connector-slack`: Events API ingress with Slack's `v0` signature
       and timestamp window, the `url_verification` handshake, interactivity payloads, Block Kit buttons
       with editing, media by URL, a settings schema (bot token, signing secret) with the Request URLs or an
       app manifest to paste, translations, public link; one Slack app per channel; tested on recorded
@@ -68,7 +68,7 @@ media — with no Slack code in Core. (Viber until 2026-10-26: parked until a cu
       (after: Open channel types, Channel settings from the connector's schema, Neutral outgoing message —
       it is built on them; after: Body-HMAC ingress signatures, Public media links — Slack needs both;
       after: Managed settings from a connector — its team and app ids come from the provider)
-- [ ] Button limits — connectors declare their button limits (buttons per message and per row, label
+- [ ] `button-limits` — Button limits: connectors declare their button limits (buttons per message and per row, label
       length) beside the capability flags, and flow validation warns when a flow exceeds them (after:
       Capability-aware validation — it adds limits to the same check; built with the Slack connector package,
       so the contract is shaped by two channels' limits, not Telegram's alone)
@@ -97,7 +97,7 @@ connector contract with Telegram (built in) and Slack (a package) as references.
 2. connector-channel-registrar
 3. open-channel-types; channel-settings-schema; neutral-outgoing-message
 4. telegram-on-registrar; capability-aware-validation; connector-managed-settings; outbound-message-without-token
-5. Slack connector package; Button limits
+5. slack-connector-package; button-limits
 6. Slack end to end
 7. Published docs
 
