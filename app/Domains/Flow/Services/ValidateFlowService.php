@@ -21,6 +21,7 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Domains\Flow\Subflow\CallGraphValidator;
+use App\Domains\Flow\Validation\ButtonLimitChecker;
 use App\Domains\Flow\Validation\ChannelCapabilityChecker;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
@@ -42,6 +43,7 @@ final readonly class ValidateFlowService
         private ?CallGraphValidator $callGraphValidator = null,
         private ?PlatformSettingsReaderInterface $platformSettings = null,
         private ?ChannelCapabilityChecker $capabilityChecker = null,
+        private ?ButtonLimitChecker $buttonLimitChecker = null,
     ) {
     }
 
@@ -93,12 +95,21 @@ final readonly class ValidateFlowService
         $this->validateButtonValueTypes($nodeMap, $errors);
         $this->validateTrigger($trigger, $errors, $flowId);
 
+        $warnings = [];
+
+        if (null !== $assistantId) {
+            $channelNodes = $this->withoutAnnotations($nodeMap);
+
+            $warnings = [
+                ...($this->capabilityChecker?->check($channelNodes, $assistantId) ?? []),
+                ...($this->buttonLimitChecker?->check($channelNodes, $assistantId) ?? []),
+            ];
+        }
+
         return new FlowValidationResultDto(
             valid: [] === $errors,
             errors: $errors,
-            warnings: null !== $assistantId && null !== $this->capabilityChecker
-                ? $this->capabilityChecker->check($this->withoutAnnotations($nodeMap), $assistantId)
-                : [],
+            warnings: $warnings,
         );
     }
 

@@ -104,6 +104,17 @@ channels gets none. Annotation nodes are skipped.
 | `input` expecting `select` or `confirm` | `CallbackButtons` |
 | `input` expecting `contact` / `location` | `ShareContact` / `ShareLocation` |
 
+`ButtonLimitChecker` emits `channel_button_limit_exceeded` (path `nodes.{id}`) when a keyboard is larger than a
+channel declares in its `ButtonLimits`: one warning per node and per kind of limit (buttons in one message, buttons
+in a row, characters in a label), naming every channel type that is exceeded together with its limit and the
+actual number. A limit a channel leaves `null` is not checked. What is counted mirrors how the keyboard is built:
+
+| Node usage | Counted |
+|---|---|
+| `send_message` `text_with_keyboard` with static `buttons` | total; the longest row (buttons grouped by `row`, default 0); the longest label over every translation. A label containing `{{` is skipped: its length is known only after rendering |
+| same, with `dynamic_buttons` (replace the static buttons at runtime) | only `max_per_row` (default 2) against the row limit; the count is known only at runtime |
+| `input` expecting `select` or `confirm` | the same as static `buttons`; labels are not templated there, so none is skipped |
+
 ## Publish-time checks (`PublishFlowService`)
 
 After `ValidateFlowService` passes, still inside the transaction:
