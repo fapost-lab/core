@@ -21,6 +21,7 @@ use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Domains\Webhook\Exceptions\AdapterNotFoundException;
 use App\Domains\Webhook\Services\ChannelAdapterResolver;
 use Carbon\CarbonImmutable;
+use Fapost\Foundation\Channel\InboundEventIgnoredException;
 use Fapost\Foundation\DTO\InboundWebhookPayload;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -34,7 +35,7 @@ use Illuminate\Support\Facades\Log;
  * Execution order (must be strictly preserved):
  *   1. Switch to tenant schema.
  *   2. Normalize raw payload → IncomingMessage via channel adapter; no adapter for the type ends the job (logged,
- *      not retried).
+ *      not retried). An adapter that throws InboundEventIgnoredException ends the job quietly (debug log only).
  *   3. Resolve the assistant.
  *   4. Ask the active-contact gate; a refused sender is recorded and the job ends
  *      before anything about them is stored.
@@ -111,7 +112,20 @@ final class IncomingMessageJob implements ShouldQueue, TenantAccessGatedJob
                     return;
                 }
 
-                $inboundMessage = $adapter->normalize($this->payload->rawPayload);
+                // A delivery that is no user's message for the flow (the bot's own message, an edit, a system event)
+                // leaves nothing behind: no contact, no transcript, no retry.
+                try {
+                    $inboundMessage = $adapter->normalize($this->payload->rawPayload);
+                } catch (InboundEventIgnoredException $exception) {
+                    Log::debug('Inbound delivery ignored by the channel adapter.', [
+                        'tenant_id'  => $this->payload->tenantId,
+                        'channel_id' => $this->payload->channelId,
+                        'platform'   => $platform,
+                        'reason'     => $exception->getMessage(),
+                    ]);
+
+                    return;
+                }
 
                 $assistant = $assistants->findById($this->payload->assistantId);
                 $currentAssistant->set($assistant);

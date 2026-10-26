@@ -8,11 +8,12 @@ export default { layout: AppShell }
 import { computed } from 'vue'
 import { Head, usePage } from '@inertiajs/vue3'
 import ChannelForm from './ChannelForm.vue'
-import type { ChannelTypeOption, ChannelsPageProps, SettingsByType } from './types'
+import type { ChannelTypeOption, ChannelsPageProps, SettingsByType, SetupByType } from './types'
 
 defineProps<{
   types: ChannelTypeOption[]
   settings: SettingsByType
+  setup?: SetupByType
   urls: { index: string; submit: string }
 }>()
 
@@ -32,6 +33,7 @@ const t = computed(() => usePage<ChannelsPageProps>().props.translations.console
       :cancel-url="urls.index"
       :types="types"
       :settings="settings"
+      :setup="setup"
     />
   </div>
 </template>

@@ -16,7 +16,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -46,6 +45,9 @@ type Options struct {
 	Client       *http.Client
 	MaxBodyBytes int64
 	DedupTTL     time.Duration
+
+	// Now supplies the current time for the signature timestamp check; time.Now when nil.
+	Now func() time.Time
 
 	// UpstreamPreserveHost forwards the caller's Host on the fallback instead of the upstream URL's.
 	UpstreamPreserveHost bool
@@ -80,6 +82,10 @@ type Handler struct {
 
 // New builds the handler.
 func New(options Options) *Handler {
+	if options.Now == nil {
+		options.Now = time.Now
+	}
+
 	if options.Client == nil {
 		options.Client = &http.Client{Timeout: 15 * time.Second}
 	}
@@ -96,6 +102,8 @@ const (
 	outcomeQueued       outcome = "queued"
 	outcomeDuplicate    outcome = "duplicate"
 	outcomeBadSignature outcome = "bad_signature"
+	outcomeStale        outcome = "stale_timestamp"
+	outcomeHandshake    outcome = "handshake"
 	outcomeRateLimited  outcome = "rate_limited"
 	outcomeProxied      outcome = "proxied"
 	outcomeRejected     outcome = "rejected"
@@ -185,14 +193,32 @@ func (h *Handler) dispatch(w http.ResponseWriter, r *http.Request, dc dispatchCo
 
 	signed := spec.NewRequest(dc.body, flatten(r.Header), flattenQuery(r.URL.Query()))
 
-	if !ingressSpec.Verify(signed, entry.SecretToken) {
+	if verdict := ingressSpec.Check(signed, entry.SecretToken, h.options.Now().Unix()); verdict != nil {
 		// Logged at warn: a burst of these is either an attacker probing a known
-		// hash or a secret that drifted between the provider and the registry.
-		dc.logger.Warn("signature rejected",
-			slog.String("outcome", string(outcomeBadSignature)),
+		// hash or a secret that drifted between the provider and the registry. A
+		// stale timestamp is told apart because it points at clock skew or a replay,
+		// not at a wrong secret; the caller sees the same answer either way.
+		result, message := outcomeBadSignature, "signature rejected"
+		if errors.Is(verdict, spec.ErrTimestamp) {
+			result, message = outcomeStale, "stale or malformed request timestamp rejected"
+		}
+
+		dc.logger.Warn(message,
+			slog.String("outcome", string(result)),
 			slog.String("client_ip", h.clientIP(r)),
 			slog.Duration("took", time.Since(dc.started)))
 		writeOK(w)
+
+		return
+	}
+
+	if answer, isChallenge := ingressSpec.HandshakeResponse(signed); isChallenge {
+		// An endpoint-ownership challenge is answered, not delivered: no dedup
+		// claim and nothing on the queue.
+		dc.logger.Info("handshake answered",
+			slog.String("outcome", string(outcomeHandshake)),
+			slog.Duration("took", time.Since(dc.started)))
+		writeText(w, answer)
 
 		return
 	}
@@ -215,7 +241,7 @@ func (h *Handler) dispatch(w http.ResponseWriter, r *http.Request, dc dispatchCo
 		return
 	}
 
-	if err := h.publish(r.Context(), dc, entry, key); err != nil {
+	if err := h.publish(r.Context(), dc, entry, key, ingressSpec.Document(signed)); err != nil {
 		// The claim is released inside publish, so the provider's retry is not
 		// swallowed as a duplicate. Proxying gives this delivery a second chance
 		// right now rather than relying on that retry.
@@ -233,13 +259,13 @@ func (h *Handler) dispatch(w http.ResponseWriter, r *http.Request, dc dispatchCo
 	writeOK(w)
 }
 
-func (h *Handler) publish(ctx context.Context, dc dispatchContext, entry registry.Entry, key string) error {
-	var raw map[string]any
-
-	// The worker expects a decoded object. A body that verified but is not a JSON
-	// object cannot be normalized downstream, so it travels as an empty payload
-	// rather than failing the job on the far side.
-	if err := json.Unmarshal(dc.body, &raw); err != nil {
+func (h *Handler) publish(ctx context.Context, dc dispatchContext, entry registry.Entry, key string, document any) error {
+	// The worker expects a decoded object: the JSON body, or the JSON carried in
+	// the spec's form field. A document that is not an object cannot be normalized
+	// downstream, so it travels as an empty payload rather than failing the job on
+	// the far side.
+	raw, isObject := document.(map[string]any)
+	if !isObject {
 		raw = map[string]any{}
 	}
 
@@ -499,6 +525,13 @@ func writeOK(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"ok":true}`))
+}
+
+// writeText answers a handshake with the plain-text string the provider expects.
+func writeText(w http.ResponseWriter, body string) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(body))
 }
 
 func newRequestID() string {

@@ -1,0 +1,20 @@
+{
+    "name": "acme/fapost-connector-echo-kit",
+    "description": "Fixture connector used by the connector testing kit: the echo channel with its profile and registrar.",
+    "type": "fapost-connector",
+    "require": {
+        "fapost/foundation": "^0.23"
+    },
+    "extra": {
+        "fapost": {
+            "schema": 1,
+            "id": "echo",
+            "name": "Echo",
+            "description": "A channel that answers with what it was told.",
+            "provider": "Tests\\Fixtures\\Connectors\\Echo\\EchoKitConnectorServiceProvider",
+            "channels": [
+                "echo"
+            ]
+        }
+    }
+}

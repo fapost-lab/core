@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Log;
 use Tests\Feature\FeatureTestCase;
 use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
 use Tests\Fixtures\Connectors\Echo\EchoSender;
+use Tests\Fixtures\Connectors\Echo\EchoSignedInboundAdapter;
 use Tests\Support\FakeUsageMeter;
 
 /**
@@ -77,6 +78,29 @@ final class OpenChannelTypesTest extends FeatureTestCase
         $this->assertSame(1, ChannelContact::query()->count());
         $this->assertCount(1, $this->logged);
         $this->assertSame('echo', $this->logged[0]->platform);
+    }
+
+    public function test_a_delivery_the_adapter_ignores_leaves_no_contact_transcript_or_retry(): void
+    {
+        $this->app->make(ConnectorChannels::class)->add(
+            new ConnectorChannel(type: 'echo', sender: EchoSender::class, inbound: EchoSignedInboundAdapter::class),
+            'echo',
+            'Echo',
+        );
+        $channel = $this->channel('echo');
+
+        Log::shouldReceive('debug')
+            ->once()
+            ->withArgs(static fn (string $message, array $context): bool => 'echo' === $context['platform']
+                && self::TENANT_ID === $context['tenant_id']
+                && (string) $channel->getKey() === $context['channel_id']
+                && str_contains($context['reason'], 'own message'));
+
+        $this->deliver($channel, 'echo', ['event_id' => 'e1', 'from' => 'bot', 'bot' => true]);
+
+        $this->assertSame(0, Contact::query()->count());
+        $this->assertSame(0, ChannelContact::query()->count());
+        $this->assertSame([], $this->logged);
     }
 
     public function test_an_inbound_message_for_a_type_nothing_serves_is_dropped_with_a_warning(): void
