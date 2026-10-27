@@ -113,6 +113,10 @@ final class TenantMediaDisk
             'region'     => '' !== (string)($config['region'] ?? '') ? (string)$config['region'] : 'us-east-1',
             'visibility' => 'private',
             'throw'      => true,
+            // Everything is private, so a move need not read the source object's ACL to keep its visibility.
+            // That read (GetObjectAcl) is outside the minimal key policy the media bucket is documented with
+            // and answers 403, which failed every upload at the temp-to-final move.
+            'retain_visibility' => false,
         ];
 
         $endpoint = (string)($config['endpoint'] ?? '');

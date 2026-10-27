@@ -58,6 +58,21 @@ final class TenantMediaDiskTest extends TestCase
         $this->assertSame('http://minio:9000/media/tenants/t1/x.jpg', (string)$disk->getClient()->getObjectUrl('media', 'tenants/t1/x.jpg'));
     }
 
+    public function test_s3_move_does_not_read_the_source_acl(): void
+    {
+        config(['media.storage' => [
+            'driver'   => 's3',
+            'bucket'   => 'media',
+            'key'      => 'k',
+            'secret'   => 's',
+            'endpoint' => 'http://minio:9000',
+        ]]);
+
+        $disk = (new TenantMediaDisk())->resolve(new RuntimeTenant(id: 't1', schemaName: 't1', config: []));
+
+        $this->assertFalse($disk->getConfig()['retain_visibility']);
+    }
+
     public function test_tenant_storage_wins_and_never_borrows_installation_credentials(): void
     {
         config(['media.storage' => [
