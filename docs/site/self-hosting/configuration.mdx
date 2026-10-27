@@ -22,7 +22,7 @@ needs the `CREATE` privilege: schemas are created as tenants are.
 Landlord reads the same `DB_*` values. The `LANDLORD_DB_*` variables (host,
 port, database, username, password) are advanced and not supported for now:
 with a separate landlord database, root tables that the application reads
-through the default connection (cache, jobs, failed jobs, Telescope) end up
+through the default connection (cache, jobs, failed jobs) end up
 where nothing reads them. Leave them unset. Tenant schemas are created on the
 tenant connection (`TENANT_DB_CONNECTION`, `pgsql` by default, configured by the
 `DB_*` values), whatever the landlord variables say.

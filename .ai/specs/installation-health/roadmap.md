@@ -33,7 +33,7 @@ renders the installation-wide figures it receives through a contract.
       the operator screens (Horizon today, Pulse and the log viewer in the monitoring package), with
       Core's default answer: the owner and admins of the tenant on a `single` installation, closed on
       a `host` one; Core's Horizon gate asks it, which opens Horizon on `single` installations
-- [ ] `health-contract` — Health contract — a Foundation contract that returns the installation-wide health to a
+- [x] `health-contract` — Health contract — a Foundation contract that returns the installation-wide health to a
       package that renders it (the monitoring package, the SaaS operator panel), with Core's default
       answer for an installation without one (after: Health service and probes — the contract
       exposes the same service)
