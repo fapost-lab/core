@@ -144,12 +144,12 @@ contact — is resolved separately at runtime; see
 the log rather than sending it. `LOG_CHANNEL=stack` with `LOG_LEVEL=debug` is the
 development default — raise the level in production.
 
-`TELESCOPE_ENABLED` defaults to `true` locally and should be `false` in production.
+Telescope's settings (`MONITORING_TELESCOPE_*`) belong to the optional `fapost/monitoring` package.
 `HCAPTCHA_SITE_KEY` and `HCAPTCHA_SECRET_KEY` ship with hCaptcha's public test
 values, which always pass — replace them before exposing any public form.
 
 <Warning>
-  The shipped `.env.example` values for `APP_DEBUG`, `TELESCOPE_ENABLED`, and the
+  The shipped `.env.example` values for `APP_DEBUG` and the
   hCaptcha keys are development defaults. Each is safe locally and unsafe in
   production.
 </Warning>

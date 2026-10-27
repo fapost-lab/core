@@ -134,8 +134,7 @@ entrypoint does on start).
 
 **`APP_ENV=production` is not cosmetic.** The images are built with `--no-dev`,
 and development tooling registered for the `local` environment is absent from
-them. Running a production image with `APP_ENV=local` used to fail at boot with a
-missing Telescope class; a guard now prevents that, but the setting is still
+them. Running a production image with `APP_ENV=local` boots, but the setting is
 wrong for anything but development.
 
 **Empty passwords fail fast, by design.** `postgres` and `redis` refuse to start
@@ -381,8 +380,8 @@ internal probe by container name, gets 400. `php artisan about` lists a setting 
 breaks this. The gateway forwards the host the provider called when it falls back to
 the application, so that path is covered.
 
-Horizon (and Telescope in development, where both are open) answer on the base domain and on declared
-platform subdomains only, never on a tenant's host. Both are closed to everyone,
+Horizon answers on the base domain and on declared
+platform subdomains only, never on a tenant's host. It is closed to everyone,
 tenant administrators included, because platform pages carry no tenant sign-in and a
 tenant's staff must not see the whole installation. Core asks the operator access contract
 (`Fapost\Foundation\Operator\Contracts\OperatorAccessInterface`), and only an operator

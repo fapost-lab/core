@@ -1513,6 +1513,13 @@ return [
             'nodata' => 'The request failed and nothing has been read yet. The page keeps trying every :seconds seconds.',
             'retry'  => 'Try again',
         ],
+        'tenant' => [
+            'title'           => 'Workspace health',
+            'description'     => 'Whether live updates and webhook intake work for this workspace right now. The installation-wide figures are for the installation\'s operator. The page asks again by itself and does not depend on the websocket it reports on.',
+            'channels'        => 'Open live channels',
+            'drift'           => 'Your channels on the old address',
+            'reason_withheld' => 'The details are visible to the installation\'s operator.',
+        ],
     ],
 
     'usage' => [

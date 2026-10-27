@@ -16,8 +16,8 @@ use App\Domains\Health\ValueObjects\ProbeResult;
  * Turns the installation's {@see HealthReport} into the props of the health page: one card per service, each with the
  * state the probe established, its reason and the few figures worth drawing.
  *
- * It narrows nothing by audience (the page exists in `single` mode only); a consumer that shows a tenant's slice
- * filters the report before it gets here. Channel names are not passed on, only their number: a name can carry a
+ * It narrows nothing by audience: the installation's page takes the report as it is, and a tenant's slice is cut by
+ * {@see TenantHealthSlice} before it gets here ({@see self::tenantPage()}). Channel names are not passed on, only their number: a name can carry a
  * tenant id and the page has no use for it. A service the report does not mention reads as "unknown", never as healthy.
  */
 final class HealthPresenter
@@ -31,6 +31,20 @@ final class HealthPresenter
             'reverb'  => $this->reverb($report->get(ReverbProbe::KEY)),
             'gateway' => $this->gateway($report->get(GatewayProbe::KEY)),
             'queues'  => $this->queues($report->get(QueueProbe::KEY)),
+        ];
+    }
+
+    /**
+     * The tenant's slice of the page: Reverb and the gateway only. The slice carries no reason (it would name the
+     * installation's addresses), so none reaches the page, and the cards show nothing the slice did not keep.
+     *
+     * @return array{reverb: array<string, mixed>, gateway: array<string, mixed>}
+     */
+    public function tenantPage(HealthReport $slice): array
+    {
+        return [
+            'reverb'  => [...$this->reverb($slice->get(ReverbProbe::KEY)), 'reason' => null],
+            'gateway' => [...$this->gateway($slice->get(GatewayProbe::KEY)), 'reason' => null],
         ];
     }
 

@@ -13,7 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * Keeps an operations surface (Horizon, Telescope) off tenant hosts.
+ * Keeps an operations surface (e.g. Horizon) off tenant hosts.
  *
  * In `host` mode every `<slug>.<base_domain>` serves a tenant, and a path registered without a
  * domain would answer there too: a tenant's browser would reach the queue dashboard of the whole

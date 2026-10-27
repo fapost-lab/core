@@ -45,6 +45,18 @@ final class AdminHealthConsoleTest extends FeatureTestCase
                 ->etc());
     }
 
+    public function test_in_single_mode_the_page_is_the_installations_with_the_queue_card(): void
+    {
+        $this->answers([$this->probe('queues', ProbeResult::up('queues', 'Horizon is running.', ['masters' => 1]))]);
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('scope', 'installation')->etc());
+
+        $this->assertSame(['reverb', 'gateway', 'queues'], array_keys($this->report()));
+        $this->assertSame('up', $this->report()['queues']['state']);
+    }
+
     public function test_a_reload_carries_reverb_and_the_gateway_as_the_probes_reported_them(): void
     {
         $this->answers([

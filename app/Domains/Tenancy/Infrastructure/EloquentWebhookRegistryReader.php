@@ -24,9 +24,15 @@ final class EloquentWebhookRegistryReader implements WebhookRegistryReaderInterf
             ->first();
     }
 
-    public function countIngressDrift(string $platform, string $expectedBaseUrl): int
+    public function countIngressDrift(string $platform, string $expectedBaseUrl, ?string $tenantId = null): int
     {
-        return $this->driftQuery($platform, $expectedBaseUrl)->count();
+        $query = $this->driftQuery($platform, $expectedBaseUrl);
+
+        if (null !== $tenantId) {
+            $query->where('tenant_id', $tenantId);
+        }
+
+        return $query->count();
     }
 
     /**

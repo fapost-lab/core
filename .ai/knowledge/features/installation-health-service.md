@@ -5,6 +5,7 @@ status: active
 domains: []
 paths:
   - "app/Domains/Health/**"
+  - app/Http/Shell/TenantHealthSlice.php
 reviewed_at: 2026-10-27
 ---
 # Installation health service
@@ -32,6 +33,9 @@ doctor command.
   application the same refusal is a wrong `REVERB_HOST`.
 - **Switched off on purpose is `disabled`**, not an error: `BROADCAST_CONNECTION` not `reverb`, ingress driver `laravel`,
   the default queue connection not on the `redis` driver.
+- **In `host` mode the console narrows the report through `App\Http\Shell\TenantHealthSlice`**, never in the domain:
+  Reverb channels are counted by the `tenant.{id}.` prefix, gateway drift comes from a tenant-scoped registry count,
+  and there are no reasons, no queue card and no connections, addresses or specs.
 - **`QueueProbe` reads Horizon and never writes to it.** Horizon not running (no master supervisor, or all paused) is `down`:
   Redis answered and nothing is processing jobs. An unreadable Redis is `unknown`. It goes through `HorizonQueueMetrics`,
   which reads `last_snapshot_at` as a plain key: `MetricsRepository::jobsProcessedPerMinute()` and

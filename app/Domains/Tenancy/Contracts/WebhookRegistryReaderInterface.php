@@ -19,8 +19,10 @@ interface WebhookRegistryReaderInterface
      *
      * A NULL recorded host counts as drift: it means no registration has confirmed
      * where the provider is actually delivering, so it cannot be assumed correct.
+     *
+     * With a tenant id the count covers that tenant's channels only; without one it covers the whole installation.
      */
-    public function countIngressDrift(string $platform, string $expectedBaseUrl): int;
+    public function countIngressDrift(string $platform, string $expectedBaseUrl, ?string $tenantId = null): int;
 
     /**
      * Fetch a bounded batch of drifted rows, oldest first.

@@ -35,6 +35,18 @@ final class IngressMigratorTest extends FeatureTestCase
         $this->assertSame(['telegram' => 2], $this->migrator()->drift());
     }
 
+    public function test_drift_can_be_narrowed_to_one_tenant(): void
+    {
+        $this->useGateway();
+
+        $this->seedChannel(recordedIngress: 'https://app.example.com');
+
+        $tenantId = (string) Tenant::query()->firstOrFail()->getKey();
+
+        $this->assertSame(['telegram' => 1], $this->migrator()->drift($tenantId));
+        $this->assertSame([], $this->migrator()->drift('00000000-0000-0000-0000-0000000000ff'));
+    }
+
     public function test_no_drift_is_reported_once_every_channel_is_on_the_configured_host(): void
     {
         $this->useGateway();
