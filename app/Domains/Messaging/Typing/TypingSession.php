@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Messaging\Typing;
 
+use Fapost\Foundation\Channel\ChannelInterface;
 use Fapost\Foundation\Messaging\ProcessingIndicatorHandle;
 use Fapost\Foundation\Messaging\TypingCapableProviderInterface;
 use Psr\Log\LoggerInterface;
@@ -13,7 +14,7 @@ use Throwable;
 /**
  * Live "processing" indicator session held while a flow is executing. Wraps
  * the per-provider {@see ProcessingIndicatorHandle} together with the
- * transport token required to refresh / stop the indicator without leaking
+ * channel required to refresh / stop the indicator without leaking
  * channel internals to callers.
  *
  * All operations are best-effort: provider exceptions are caught and logged,
@@ -24,7 +25,7 @@ final readonly class TypingSession
     public function __construct(
         public TypingCapableProviderInterface $provider,
         public ProcessingIndicatorHandle $handle,
-        public string $transportToken,
+        public ChannelInterface $channel,
         private LoggerInterface $logger = new NullLogger(),
     ) {
     }
@@ -37,7 +38,7 @@ final readonly class TypingSession
     public function refresh(): void
     {
         try {
-            $this->provider->refreshProcessing($this->handle, $this->transportToken);
+            $this->provider->refreshProcessing($this->handle, $this->channel);
         } catch (Throwable $exception) {
             $this->logger->debug('typing.refresh_failed', [
                 'provider' => $this->handle->providerId,
@@ -50,7 +51,7 @@ final readonly class TypingSession
     public function stop(): void
     {
         try {
-            $this->provider->stopProcessing($this->handle, $this->transportToken);
+            $this->provider->stopProcessing($this->handle, $this->channel);
         } catch (Throwable $exception) {
             $this->logger->debug('typing.stop_failed', [
                 'provider' => $this->handle->providerId,

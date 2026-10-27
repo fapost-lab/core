@@ -21,6 +21,8 @@ use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Domains\Flow\Subflow\CallGraphValidator;
+use App\Domains\Flow\Validation\ButtonLimitChecker;
+use App\Domains\Flow\Validation\ChannelCapabilityChecker;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -40,6 +42,8 @@ final readonly class ValidateFlowService
         private TenantContextInterface $tenantContext,
         private ?CallGraphValidator $callGraphValidator = null,
         private ?PlatformSettingsReaderInterface $platformSettings = null,
+        private ?ChannelCapabilityChecker $capabilityChecker = null,
+        private ?ButtonLimitChecker $buttonLimitChecker = null,
     ) {
     }
 
@@ -52,7 +56,8 @@ final readonly class ValidateFlowService
         array $nodes,
         ?array $trigger = null,
         ?string $flowId = null,
-        array $edges = []
+        array $edges = [],
+        ?string $assistantId = null,
     ): FlowValidationResultDto {
         $errors  = [];
         $nodeMap = $this->normalizeNodeMap($nodes, $errors);
@@ -90,9 +95,34 @@ final readonly class ValidateFlowService
         $this->validateButtonValueTypes($nodeMap, $errors);
         $this->validateTrigger($trigger, $errors, $flowId);
 
+        $warnings = [];
+
+        if (null !== $assistantId) {
+            $channelNodes = $this->withoutAnnotations($nodeMap);
+
+            $warnings = [
+                ...($this->capabilityChecker?->check($channelNodes, $assistantId) ?? []),
+                ...($this->buttonLimitChecker?->check($channelNodes, $assistantId) ?? []),
+            ];
+        }
+
         return new FlowValidationResultDto(
             valid: [] === $errors,
             errors: $errors,
+            warnings: $warnings,
+        );
+    }
+
+    /**
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function withoutAnnotations(array $nodeMap): array
+    {
+        return array_filter(
+            $nodeMap,
+            static fn (array $node): bool => ! AnnotationNodeTypes::isAnnotation($node['type'] ?? null),
         );
     }
 

@@ -17,7 +17,7 @@ paths:
   - app/Console/Commands/Ops/MigrateIngressCommand.php
   - app/Console/Commands/Ops/PublishIngressSpecsCommand.php
   - app/Console/Commands/Ops/WebhookRegistryHealthCommand.php
-reviewed_at: 2026-10-16
+reviewed_at: 2026-10-26
 ---
 # Channel ingress
 
@@ -49,6 +49,15 @@ in `gateway/`. Code lives in `app/Domains/Webhook` — the folder name predates 
 
 - The controller answers `{"ok": true}` in every case, including a bad signature, an unknown hash
   or a duplicate (the first two are reported, not returned).
+- The request document: `IngressSpecExecutor::document()` is the JSON body or, for a spec with a form field, the JSON
+  held in that field of a form-encoded body (Slack interactivity); `Content-Type` is never read, so PHP and Go agree.
+  Placeholders `body.*` of the idempotency key and of the handshake read the document, and the queued `rawPayload` is
+  the document.
+- Order of steps (both runtimes): registry lookup, spec, verify (HMAC over the spec's `signed` template, within the
+  `timestamp` window), handshake (a verified challenge is answered `200 text/plain` and stops), idempotency key, dedup,
+  enqueue. A bad signature, a stale timestamp and an unknown hash all answer `{"ok":true}` without a job.
+- The worker may refuse a delivery after it was accepted: `normalize()` throws `InboundEventIgnoredException` for what
+  is no user message, and `IncomingMessageJob` ends quietly (debug log, no contact, transcript or retry).
 - Dedup: `WebhookController::markProcessed` sets `processed:{idempotency_key}` (86400 s, `NX`)
   before the job is dispatched, so a duplicate update never reaches the queue.
 - Verification and the idempotency key go through the adapter's declarative `ingressSpec()`

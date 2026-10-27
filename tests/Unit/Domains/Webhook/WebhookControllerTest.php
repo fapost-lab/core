@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redis;
 use Mockery\MockInterface;
 use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
+use Tests\Fixtures\Connectors\Echo\EchoSignedInboundAdapter;
 use Tests\TestCase;
 
 final class WebhookControllerTest extends TestCase
@@ -204,6 +205,77 @@ final class WebhookControllerTest extends TestCase
         Bus::assertNothingDispatched();
     }
 
+    public function test_a_verified_handshake_is_answered_in_plain_text_without_deduplication_or_a_job(): void
+    {
+        Bus::fake();
+        $this->registryReturns(new EchoSignedInboundAdapter(), $this->makeEntry('channel-5', 'echo-secret'));
+
+        Redis::shouldReceive('set')->never();
+
+        $body     = '{"type":"url_verification","challenge":"abc 123"}';
+        $response = $this->call('POST', '/webhook/telegram/ok-hash', [], [], [], $this->server($this->signatureHeaders($body, 'echo-secret')), $body);
+
+        $response->assertOk();
+        $this->assertSame('abc 123', $response->getContent());
+        $this->assertSame('text/plain; charset=utf-8', $response->headers->get('Content-Type'));
+
+        Bus::assertNothingDispatched();
+    }
+
+    public function test_an_unsigned_handshake_is_not_echoed(): void
+    {
+        Bus::fake();
+        $this->registryReturns(new EchoSignedInboundAdapter(), $this->makeEntry('channel-5', 'echo-secret'));
+
+        Redis::shouldReceive('set')->never();
+
+        $body     = '{"type":"url_verification","challenge":"abc 123"}';
+        $response = $this->call('POST', '/webhook/telegram/ok-hash', [], [], [], $this->server($this->signatureHeaders($body, 'wrong-secret')), $body);
+
+        $response->assertOk()->assertExactJson(['ok' => true]);
+
+        Bus::assertNothingDispatched();
+    }
+
+    public function test_a_form_body_is_queued_as_the_json_document_of_its_field(): void
+    {
+        Bus::fake();
+        $this->registryReturns(new EchoSignedInboundAdapter(), $this->makeEntry('channel-5', 'echo-secret'));
+
+        Redis::shouldReceive('set')
+            ->once()
+            ->with('processed:echo:channel-5:trig-1', '1', 'EX', 86400, 'NX')
+            ->andReturn(true);
+
+        $body = 'token=x&payload=' . rawurlencode('{"trigger_id":"trig-1","from":"u1","text":"a b"}');
+
+        $this->call('POST', '/webhook/telegram/ok-hash', [], [], [], $this->server($this->signatureHeaders($body, 'echo-secret'), 'application/x-www-form-urlencoded'), $body)
+            ->assertOk()
+            ->assertExactJson(['ok' => true]);
+
+        Bus::assertDispatched(
+            IncomingMessageJob::class,
+            static fn (IncomingMessageJob $job): bool => 'echo:channel-5:trig-1' === $job->payload->idempotencyKey
+                && ['trigger_id' => 'trig-1', 'from' => 'u1', 'text' => 'a b'] === $job->payload->rawPayload,
+        );
+    }
+
+    public function test_a_stale_timestamp_is_answered_ok_and_queues_nothing(): void
+    {
+        Bus::fake();
+        $this->registryReturns(new EchoSignedInboundAdapter(), $this->makeEntry('channel-5', 'echo-secret'));
+
+        Redis::shouldReceive('set')->never();
+
+        $body = '{"event_id":"e1","from":"u1"}';
+
+        $this->call('POST', '/webhook/telegram/ok-hash', [], [], [], $this->server($this->signatureHeaders($body, 'echo-secret', time() - 301)), $body)
+            ->assertOk()
+            ->assertExactJson(['ok' => true]);
+
+        Bus::assertNothingDispatched();
+    }
+
     public function test_returns_200_without_db_access(): void
     {
         Bus::fake();
@@ -226,6 +298,35 @@ final class WebhookControllerTest extends TestCase
             ['update_id'                       => 1, 'message' => ['chat' => ['id' => 1], 'from' => ['id' => 1], 'date' => 0, 'text' => 'hi']],
             ['X-Telegram-Bot-Api-Secret-Token' => 'secret'],
         )->assertOk();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function signatureHeaders(string $body, string $secret, ?int $timestamp = null): array
+    {
+        $timestamp ??= time();
+
+        return [
+            'x-echo-timestamp' => (string) $timestamp,
+            'x-echo-signature' => 'v0=' . hash_hmac('sha256', "v0:{$timestamp}:{$body}", $secret),
+        ];
+    }
+
+    /**
+     * @param  array<string, string>  $headers
+     *
+     * @return array<string, string>
+     */
+    private function server(array $headers, string $contentType = 'application/json'): array
+    {
+        $server = ['CONTENT_TYPE' => $contentType];
+
+        foreach ($headers as $name => $value) {
+            $server['HTTP_' . mb_strtoupper(str_replace('-', '_', $name))] = $value;
+        }
+
+        return $server;
     }
 
     private function registryReturns(object $adapter, WebhookRegistryEntry $entry): void

@@ -417,6 +417,10 @@ return [
             'select_all'        => 'Select all',
             'clear_all'         => 'Clear',
         ],
+        'setup' => [
+            'title'       => 'Provider setup',
+            'description' => 'What to do on the provider side to connect this channel.',
+        ],
         'settings' => [
             'telegram' => [
                 'allowed_updates' => [

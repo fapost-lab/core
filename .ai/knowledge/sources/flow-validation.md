@@ -11,8 +11,8 @@ paths:
   - app/Domains/Flow/Services/PublishFlowService.php
 source: docs/reference/specs/flow-engine/06-validation.md
 summary: What validates a flow at save, validate and publish time, and what each layer returns
-source_hash: 94b7cd29a7dd0c2fc003804b3c946a8c0637ea43
-reviewed_at: 2026-10-05
+source_hash: 3e32f1d3efef0ac99277a8cc8f6197c3e800f2b6
+reviewed_at: 2026-10-26
 ---
 # Flow validation
 

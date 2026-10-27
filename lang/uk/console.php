@@ -417,6 +417,10 @@ return [
             'select_all'        => 'Вибрати всі',
             'clear_all'         => 'Очистити',
         ],
+        'setup' => [
+            'title'       => 'Налаштування у провайдера',
+            'description' => 'Що потрібно зробити на боці провайдера, щоб підключити канал.',
+        ],
         'settings' => [
             'telegram' => [
                 'allowed_updates' => [

@@ -17,7 +17,8 @@ paths:
   - "tests/Unit/Domains/Messaging/**"
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
-reviewed_at: 2026-10-21
+  - "tests/Feature/Domains/Messaging/**"
+reviewed_at: 2026-10-26
 ---
 # Channels rules
 
@@ -77,6 +78,10 @@ broken.
   never has to know the limit; removing the buttons of a sent message is sent only to a channel that
   declares `RemoveButtons` (the editor, `FlowInlineKeyboardEditor`, decides, not the driver); the
   transcript stores `buttons` (label and action, no payload) and still reads legacy `keyboard` rows.
+  Keyboard sizes are declared beside the flags as `ButtonLimits` (buttons per message, per row, label
+  characters; `null` = undeclared) and only ever produce a validation warning, never a refusal or a send-time
+  truncation: a limit a provider does not document (Telegram's 100 per keyboard and 8 per row are observed, not
+  in the Bot API) must not break a flow. There is no payload-length limit: the codec's 64 bytes fit every channel.
   Why: a second messenger must not require Flow to learn its markup. Enforced: `TelegramReplyMarkup`
   characterization tests; the rest review only.
 - **A new messenger is a new integration, not a branch.** A messenger Core ships is a built-in module: a
@@ -99,10 +104,17 @@ broken.
 - **A channel secret never leaves the request or job that uses it.** A provider client throws
   exceptions whose text went through `SecretRedactor` and does not chain the original (a connection
   error's message carries the URL, and Telegram's URL carries the bot token); a queued job names the
-  channel and loads its credentials when it runs. Only a synchronous deregister carries a snapshot,
+  channel and loads its credentials when it runs. Foundation's `OutboundMessage` has no credential field
+  (since 0.31): `MessageSender` loads the channel by `channelId` in the tenant context when it sends and
+  hands it to `ProviderSenderInterface::deliver($message, $channel)`; the typing provider gets the channel the
+  same way, and a connector's media services already did. A missing channel is
+  `ChannelNotFoundException`, thrown before any volume is spent. Rejected: hiding the field from
+  serialization (implicit, one forgotten override leaks again), a Foundation credentials-lookup contract the
+  sender calls itself (every sender must remember it, and it runs tenant lookups inside a connector), and a
+  separate credentials DTO (a second way beside `ChannelInterface`). Only a synchronous deregister carries a snapshot,
   because a deleted row cannot be loaded. Why: exception text and job payloads end up in logs,
   `jobs` and `failed_jobs`. Enforced: `TelegramBotApiClientRedactionTest`,
-  `SyncChannelWebhookJobCredentialsTest`, `BroadcastSendJobTest`.
+  `SyncChannelWebhookJobCredentialsTest`, `BroadcastSendJobTest`, `MessageSenderTest`.
 - **Pick the queue by purpose:** replies in an active dialogue `messaging.transactional`,
   broadcasts `messaging.broadcast`, service and lifecycle work `messaging.system`. Source:
   `conventions/queues.md`.

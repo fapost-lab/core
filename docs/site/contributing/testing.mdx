@@ -176,8 +176,8 @@ The Go gateway carries its own suite, run from `gateway/`:
   regression in webhook verification for every channel.
 </Warning>
 
-That golden file is `contracts/ingress/golden.json`, and both suites execute its
-40 cases. A verification change that passes in one language and fails in the
+That golden file is `contracts/ingress/golden.json`, and both suites execute every
+case in it. A verification change that passes in one language and fails in the
 other is precisely what it exists to catch — so extend the golden file rather
 than either language's own tests.
 

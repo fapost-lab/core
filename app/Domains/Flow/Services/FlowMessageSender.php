@@ -141,7 +141,6 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             tenantId: $tenantId,
             channelId: (string)$channel->getKey(),
             channelType: $channel->type,
-            transportToken: $channel->token,
             chatId: $chatId,
             payload: $this->toMessagePayload($payload, $contentType, $publicLink),
             metadata: [

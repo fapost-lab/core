@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Channels\Telegram;
 
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Telegram\TelegramBotApiClientFactory;
 use App\Domains\Channels\Telegram\TelegramDeliveryResolver;
 use App\Domains\Channels\Telegram\TelegramReplyMarkup;
@@ -124,10 +125,9 @@ final class TelegramReplyMarkupTest extends TestCase
             tenantId: 'tenant-1',
             channelId: 'channel-1',
             channelType: 'telegram',
-            transportToken: 'bot-token',
             chatId: 'chat-1',
             payload: $payload,
-        ));
+        ), (new Channel())->forceFill(['type' => 'telegram', 'token' => 'bot-token']));
 
         $this->assertTrue($result->sent);
     }

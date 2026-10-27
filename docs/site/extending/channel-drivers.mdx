@@ -61,9 +61,14 @@ Delivery goes through a transport sender:
 ```php
 interface ProviderSenderInterface
 {
-    public function deliver(OutboundMessage $message): DeliveryResult;
+    public function deliver(OutboundMessage $message, ChannelInterface $channel): DeliveryResult;
 }
 ```
+
+The envelope carries no secret and may sit in a queue. Core loads the channel when it
+sends and passes it in: read the credentials from `$channel->getConfig()` during the
+call (`token`, `secret_token`, and the channel's settings under `options`), and never
+keep or log them. `TypingCapableProviderInterface` receives the channel the same way.
 
 Two optional capabilities sit alongside it. `TypingCapableProviderInterface`
 exposes a typing or processing indicator through a `ProcessingIndicatorHandle`;

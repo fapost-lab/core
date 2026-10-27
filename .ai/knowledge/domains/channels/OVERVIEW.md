@@ -17,7 +17,11 @@ paths:
   - "tests/Feature/Channels/**"
   - tests/Architecture/MessagingBoundariesTest.php
   - "database/migrations/tenant/*channels*"
-reviewed_at: 2026-10-16
+  - testing/ConnectorTestCase.php
+  - testing/Support/InMemoryRedis.php
+  - tests/Feature/Testing/ConnectorTestCaseTest.php
+  - app/Http/Controllers/Concerns/PresentsChannels.php
+reviewed_at: 2026-10-26
 ---
 # Channels
 
@@ -73,6 +77,19 @@ Messaging, and its tests still use the `Tests\Unit\Domains\Messaging\Telegram` n
   presenter, `ChannelService::update` and `Services/ChannelPublicLinks` read it; no Core code outside
   `Telegram/` branches on a channel type. Telegram's is `Telegram/TelegramChannelProfile`; its media limits
   (`media.channel.limits`) and `config/telegram.php` (merged by its provider) live in the module too.
+- `Services/ChannelSetupGuidePresenter.php` turns the steps of a profile that also implements
+  `ChannelSetupGuideInterface` into the console's "Provider setup" block: `PresentsChannels::channelFormOptions()` gives
+  `setup` per type (no webhook URL yet) and `editableChannel()` gives the channel's own `setup` with its webhook URL
+  (`WebhookUrlGenerator`, the gateway's or Laravel's) and stored config. Texts are looked up under the step's
+  `translationKey` (`{prefix}.title`, `{prefix}.text`) with the English text as fallback, like the settings. A
+  profile without the interface has no steps. The URL carries the public hash, so the block is for users who may
+  manage channels and shows the new URL after a rotation.
+- `testing/ConnectorTestCase.php` (`Fapost\Testing`, experimental) is the base class of a connector package's tests
+  inside Core: it creates a channel of the connector's type, posts raw webhooks to the real route, exposes the queued
+  `InboundWebhookPayload`s, normalizes them through the registered adapter, sends through `MessageSenderInterface`
+  and runs the webhook registrar. Redis is replaced by `testing/Support/InMemoryRedis.php` and only
+  `IncomingMessageJob` is faked on the bus, so no test reaches a real Redis or queue. Proven by
+  `tests/Feature/Testing/ConnectorTestCaseTest.php` with the Echo fixture.
 - `Telegram/TelegramChannelServiceProvider.php` — the reference integration; tags
   `channels.telegram_delivery`, `media.channel.uploader`, `media.channel.downloader`.
 - `Services/ChannelService.php`, `Observers/ChannelObserver.php`. `ChannelService::reregisterWebhook` is the

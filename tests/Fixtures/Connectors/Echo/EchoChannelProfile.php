@@ -9,11 +9,15 @@ use Fapost\Foundation\Channel\Settings\ChannelPublicLink;
 use Fapost\Foundation\Channel\Settings\ChannelSettingField;
 use Fapost\Foundation\Channel\Settings\ChannelSettingsSchema;
 use Fapost\Foundation\Channel\Settings\ChannelSettingType;
+use Fapost\Foundation\Channel\Settings\ChannelSetupCopyKind;
+use Fapost\Foundation\Channel\Settings\ChannelSetupGuideInterface;
+use Fapost\Foundation\Channel\Settings\ChannelSetupStep;
 
 /**
- * The fixture channel declares a setting of every type, one the integration writes itself, and no webhook secret.
+ * The fixture channel declares a setting of every type, one the integration writes itself, and no webhook secret. Its setup guide has a step with the webhook URL, once the channel has one, and a step with a block of
+ * code that names the configured region.
  */
-final class EchoChannelProfile implements ChannelProfileInterface
+final class EchoChannelProfile implements ChannelProfileInterface, ChannelSetupGuideInterface
 {
     public function channelType(): string
     {
@@ -38,5 +42,26 @@ final class EchoChannelProfile implements ChannelProfileInterface
         $name = $config['account_name'] ?? null;
 
         return is_string($name) && '' !== $name ? new ChannelPublicLink($name, '@' . $name, 'https://echo.example/' . $name) : null;
+    }
+
+    public function setupGuide(?string $webhookUrl, array $config): array
+    {
+        $region = is_string($config['region'] ?? null) ? $config['region'] : 'eu';
+
+        return [
+            new ChannelSetupStep(
+                title: 'Send events to this URL',
+                text: null === $webhookUrl ? 'The URL appears once the channel is created.' : 'Paste it into the Echo dashboard.',
+                copy: $webhookUrl,
+                copyKind: ChannelSetupCopyKind::Url,
+                translationKey: 'echo.setup.url',
+            ),
+            new ChannelSetupStep(
+                title: 'Add the subscription',
+                text: 'Create it with this body.',
+                copy: json_encode(['region' => $region, 'events' => ['sent']], JSON_THROW_ON_ERROR),
+                copyKind: ChannelSetupCopyKind::Code,
+            ),
+        ];
     }
 }

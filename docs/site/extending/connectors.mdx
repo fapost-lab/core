@@ -99,9 +99,14 @@ it, so constructors must be cheap and must not touch tenant data.
 | `mediaUploader` | no | `Fapost\Foundation\Media\ChannelMediaUploaderInterface` |
 | `mediaDownloader` | no | `Fapost\Foundation\Media\ChannelMediaDownloaderInterface` |
 | `mediaLinkPolicy` | no | `Fapost\Foundation\Media\ChannelMediaLinkPolicyInterface` |
-| `capabilities` | no | A `Fapost\Foundation\Messaging\ChannelCapabilities` listing what the channel can do beyond text and media |
+| `capabilities` | no | A `Fapost\Foundation\Messaging\ChannelCapabilities` listing what the channel can do beyond text and media, and the size of the keyboards it shows (`ButtonLimits`) |
 | `profile` | no | `Fapost\Foundation\Channel\Settings\ChannelProfileInterface` |
 | `mediaLimits` | no | `Fapost\Foundation\Media\ChannelMediaLimitsInterface` |
+
+A sender gets the channel with each call: `deliver(OutboundMessage $message, ChannelInterface $channel)`.
+Read the token and the channel's settings from `$channel->getConfig()` (`token`, and the
+values your profile declares under `options`, such as `sender_name` for Viber) while you
+call the provider, and keep none of them.
 
 Boot fails, naming your connector, when you register a type your manifest does not
 declare, a type Core serves itself (such as `telegram`), a type twice, a class that does
@@ -125,6 +130,25 @@ has a `label` and an action: `Callback` (the press returns a hidden payload),
 provider's format in your sender. Core's flow messages carry `buttons` and leave
 `MessagePayload::$keyboard` null; `keyboard` is deprecated, so a sender that reads only
 it shows no buttons.
+
+The flow builder reads these declarations: when a flow uses something one of the
+assistant's channels does not declare (for example a contact request on a channel without
+`ShareContact`), validation shows a warning naming the channel and the capability. A warning
+never blocks publishing, so an undeclared capability only means that part of the flow
+degrades on that channel.
+
+### Button limits
+
+`ChannelCapabilities` takes a `ButtonLimits` as its second argument: `maxButtons` (in one
+message), `maxButtonsPerRow` and `maxLabelLength` (in UTF-8 characters). `null`, the default,
+means the channel declares no limit and nothing is checked. When a flow's keyboard is larger
+than a declared limit, validation shows a `channel_button_limit_exceeded` warning naming the
+channel, the limit and the actual size. It is a warning only and never blocks publishing, so
+declare what the provider documents or what you have observed it to enforce. You need no limit
+for the payload length: it is at most 64 bytes on every channel.
+
+Telegram, for example, declares 100 buttons and 8 per row and leaves the label length open:
+its Bot API documents no keyboard counts or label length, and clients truncate long labels.
 
 When the user presses a `Callback` button, report it as an `IncomingMessage` of type
 `IncomingMessageType::CallbackQuery` whose `text` is the button's payload, unchanged.
@@ -263,6 +287,102 @@ final class ViberInboundAdapter implements ChannelInboundAdapterInterface
 
 If your provider signs requests in a way no `SignatureScheme` covers, the scheme is
 extended in Foundation and the gateway; a connector cannot ship its own check.
+
+### Signed timestamps, forms and challenges (`IngressSpec` version 2)
+
+Some providers sign more than the body, send the event inside a form field or ask the
+URL to prove it is yours first. These are optional parameters of the `IngressSpec`
+constructor; a spec that sets none of them stays version 1:
+
+| Parameter | What it does |
+|---|---|
+| `signedPayload` | The string the HMAC covers, as a template: `{raw}` is the body byte for byte (exactly once), `{header.x-name}` a request header. Without it the HMAC covers the raw body. HMAC schemes only. |
+| `timestamp` | `new IngressTimestamp('x-request-timestamp', 300)`: a header with unix seconds and a tolerance of 1 to 3600 seconds. A missing, non-numeric or older (or newer) value than the tolerance is refused, which stops a replayed request. HMAC schemes only. |
+| `formField` | The name of a form field whose value is the JSON document, for a body that is `application/x-www-form-urlencoded` instead of JSON. |
+| `handshake` | `new IngressHandshake('{body.type}', 'url_verification', '{body.challenge}')`: when the first template equals the second value, ingress answers `200 text/plain` with the third template and queues nothing. Only a request with a valid signature is answered. |
+
+A template placeholder may list alternatives: `{body.event_id|body.trigger_id}` takes the
+first one that is not empty. `{body.*}` placeholders read the request document: the JSON
+body, or the JSON in the form field. That document is also what your adapter's
+`normalize()` receives. A refused request, as before, is answered `200 {"ok":true}`.
+
+Every delivery your adapter accepts must give the idempotency key a non-empty id. A key
+whose placeholders all resolve empty (`acme:{channel}:`) is one shared slot for 24 hours,
+so every later delivery of that shape is dropped as a duplicate. Add an alternative, or
+treat such a delivery as one to ignore.
+
+```php
+return new IngressSpec(
+    scheme: SignatureScheme::HmacSha256,
+    parameter: 'x-sig',
+    prefix: 'v0=',
+    idempotencyTemplate: 'acme:{channel}:{body.event_id|body.trigger_id}',
+    signedPayload: 'v0:{header.x-ts}:{raw}',
+    timestamp: new IngressTimestamp('x-ts', 300),
+    formField: 'payload',
+    handshake: new IngressHandshake('{body.type}', 'url_verification', '{body.challenge}'),
+);
+```
+
+A gateway built before version 2 does not understand such a spec and forwards the
+request to the application, which verifies it itself, so the connector works before the
+gateway is upgraded; it only loses the gateway's speed.
+
+### Deliveries that are not messages
+
+Providers also send the bot's own messages, edits and system events. When `normalize()`
+meets one, throw `Fapost\Foundation\Channel\InboundEventIgnoredException` with a short
+reason. Core drops the delivery: no contact is created, nothing reaches the transcript
+and the job is not retried. The reason is written to the debug log.
+
+## The setup guide
+
+A person connecting a channel often has work to do at the provider: paste the webhook
+URL, add a manifest. Let your profile also implement `ChannelSetupGuideInterface` and the
+console shows those steps beside the channel form:
+
+```php
+public function setupGuide(?string $webhookUrl, array $config): array
+{
+    return [
+        new ChannelSetupStep(
+            title: 'Paste the request URL',
+            text: 'Open the app settings and set this as the events URL.',
+            copy: $webhookUrl,
+            copyKind: ChannelSetupCopyKind::Url,
+            translationKey: 'acme.setup.url',
+        ),
+    ];
+}
+```
+
+`$webhookUrl` is the channel's public webhook URL, or `null` while the channel is not yet
+created; `$config` is its stored configuration. The method does no I/O. A step has a
+title, an optional text, an optional value to copy (`Text`, `Url` or `Code`, such as a
+manifest) and an optional translation key: Core looks for `{key}.title` and `{key}.text`
+in its translations (add yours with `loadTranslationsFrom`) and falls back to the English
+text of the step. The URL contains the channel's public hash, so only users who can
+manage channels see the guide.
+
+## Testing a connector
+
+`Fapost\Testing\ConnectorTestCase` boots Core with its test database and gives a
+connector's own tests what they need, without importing anything from `App\`. Nothing
+reaches a real Redis or queue. It is experimental and may change in minor versions
+before 1.0.
+
+| Method | What it does |
+|---|---|
+| `bootConnector($providerClass, $composerPath)` | Call it in `setUp()`. Reads and validates your manifest (by default the `composer.json` above the provider's file), registers the provider and its channels through Core's connector registrar, as discovery does for an installed connector. A package checked out next to Core is not in Core's `composer.json`, so this is the step discovery would take. When the package is installed into Core (as in your CI, through the overlay), discovery has already booted it: the manifest is still validated, but nothing is registered twice, so the same `setUp()` works in both places. |
+| `createChannel($type, $token, $secretToken, $config)` | An active channel of your type in the default tenant, routed so the real webhook route finds it. |
+| `postWebhook($channel, $rawBody, $headers)` | POSTs the exact bytes to the real webhook route; `Content-Type` defaults to JSON. |
+| `dispatchedInbound()` | The `InboundWebhookPayload` of every inbound job ingress queued so far. |
+| `normalizeInbound($payload)` | Runs a payload through your registered adapter; `InboundEventIgnoredException` reaches the test. |
+| `send($outboundMessage)` | Sends through Core's `MessageSenderInterface`, as a flow does. |
+| `registerWebhook($channel)` | Runs your webhook registrar synchronously. |
+| `channelConfig($channel)` | The stored `channels.config`, including what the registrar reported. |
+
+Fake the provider's HTTP API with `Http::fake()`.
 
 ## When a connector is removed
 

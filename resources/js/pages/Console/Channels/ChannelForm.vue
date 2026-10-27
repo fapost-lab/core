@@ -10,8 +10,9 @@ import { Input } from '@fapost/ui/components/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@fapost/ui/components/select'
 import { Switch } from '@fapost/ui/components/switch'
 import ChannelSettingsFields from './ChannelSettingsFields.vue'
+import ChannelSetupGuide from './ChannelSetupGuide.vue'
 import SecretInput from './SecretInput.vue'
-import type { ChannelTypeOption, ChannelsPageProps, EditableChannel, SettingField, SettingValue, SettingsByType } from './types'
+import type { ChannelTypeOption, ChannelsPageProps, EditableChannel, SettingField, SettingValue, SettingsByType, SetupByType } from './types'
 
 /**
  * The fields of a channel, shared by the create and the edit screen (and by the tenant-wide admin when it moves).
@@ -29,6 +30,8 @@ const props = defineProps<{
   types: ChannelTypeOption[]
   /** The settings every channel type declared, by type. */
   settings: SettingsByType
+  /** The setup guide of every channel type, by type; a created channel's own guide (with its webhook URL) is in `channel`. */
+  setup?: SetupByType
   /** The channel being edited; absent when creating. */
   channel?: EditableChannel
 }>()
@@ -64,6 +67,7 @@ const form = useForm({
   config: initialConfig(props.channel?.type ?? props.types[0]?.value ?? ''),
 })
 
+const setupSteps = computed(() => (editing.value && props.channel ? props.channel.setup : (props.setup?.[form.type] ?? [])))
 const fields = computed(() => props.settings[form.type] ?? [])
 const usesSecretToken = computed(() => props.types.find((option) => option.value === form.type)?.usesSecretToken ?? true)
 
@@ -160,6 +164,8 @@ function submit(): void {
       </FormField>
 
     </FormSection>
+
+    <ChannelSetupGuide :steps="setupSteps" />
 
     <FormSection v-if="fields.length > 0" :title="t.fields.config">
       <ChannelSettingsFields v-model="form.config" :fields="fields" :errors="form.errors" />

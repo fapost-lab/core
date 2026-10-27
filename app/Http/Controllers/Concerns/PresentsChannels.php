@@ -8,6 +8,7 @@ use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Services\ChannelPublicLinks;
 use App\Domains\Channels\Services\ChannelSettingPresenter;
+use App\Domains\Channels\Services\ChannelSetupGuidePresenter;
 use Closure;
 use Fapost\Foundation\Channel\Settings\ChannelSettingField;
 use Fapost\Foundation\Channel\Settings\ChannelSettingType;
@@ -73,20 +74,24 @@ trait PresentsChannels
             'handle'             => $link?->handle,
             'url'                => $link?->url,
             'settings'           => $this->settingValues($channel),
+            'setup'              => app(ChannelSetupGuidePresenter::class)->forChannel($channel),
         ];
     }
 
     /**
      * What the form offers: the channel types, and for each the settings its integration declared (labelled in the
-     * interface language) and whether it uses a secret token.
+     * interface language), whether it uses a secret token, and the steps of its provider's setup guide (without the
+     * webhook URL: the channel does not exist yet).
      *
-     * @return array{types: list<array{value: string, label: string, usesSecretToken: bool}>, settings: array<string, list<array<string, mixed>>>}
+     * @return array{types: list<array{value: string, label: string, usesSecretToken: bool}>, settings: array<string, list<array<string, mixed>>>, setup: array<string, list<array<string, mixed>>>}
      */
     protected function channelFormOptions(): array
     {
         $registry = app(ChannelRegistryInterface::class);
+        $guides   = app(ChannelSetupGuidePresenter::class);
         $types    = [];
         $settings = [];
+        $setup    = [];
 
         foreach ($registry->types() as $type) {
             $schema  = $registry->profile($type)->settings();
@@ -96,9 +101,10 @@ trait PresentsChannels
                 'usesSecretToken' => $schema->usesSecretToken,
             ];
             $settings[$type] = array_map($this->settingField(...), $schema->editable());
+            $setup[$type]    = $guides->forType($type);
         }
 
-        return ['types' => $types, 'settings' => $settings];
+        return ['types' => $types, 'settings' => $settings, 'setup' => $setup];
     }
 
     /**

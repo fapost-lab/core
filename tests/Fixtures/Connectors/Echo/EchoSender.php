@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Fixtures\Connectors\Echo;
 
+use Fapost\Foundation\Channel\ChannelInterface;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\OutboundMessage;
 use Fapost\Foundation\Messaging\ProviderSenderInterface;
@@ -13,7 +14,7 @@ use Fapost\Foundation\Messaging\ProviderSenderInterface;
  */
 final class EchoSender implements ProviderSenderInterface
 {
-    public function deliver(OutboundMessage $message): DeliveryResult
+    public function deliver(OutboundMessage $message, ChannelInterface $channel): DeliveryResult
     {
         return new DeliveryResult(sent: true, providerMessageId: 'echo-1');
     }

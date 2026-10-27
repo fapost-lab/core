@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Messaging;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
+use App\Domains\Channels\Models\Channel;
 use App\Domains\Conversation\Capture\ConversationCaptureFactory;
 use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Messaging\Exceptions\RateLimitExceededException;
@@ -23,6 +25,7 @@ use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Closure;
+use Fapost\Foundation\Channel\ChannelInterface;
 use Fapost\Foundation\Messaging\DeliveryResult;
 use Fapost\Foundation\Messaging\MessagePayload;
 use Fapost\Foundation\Messaging\OutboundMessage;
@@ -136,18 +139,20 @@ final class TenantMessagingRateLimitTest extends FeatureTestCase
     /**
      * Sends to one chat until the limit refuses, and returns how many messages went out.
      */
-    private function sentBeforeLimit(MessageSender $sender, string $channelId): int
+    private function sentBeforeLimit(MessageSender $sender, string $label): int
     {
-        $sent = 0;
+        // The channel is loaded by the sender, so it has to exist in the tenant the send runs in.
+        $assistant = Assistant::factory()->create(['tenant_id' => '00000000-0000-0000-0000-000000000001']);
+        $channelId = (string) Channel::withoutEvents(fn (): Channel => Channel::factory()->create(['assistant_id' => $assistant->id]))->getKey();
+        $sent      = 0;
 
         for ($index = 0; $index < 20; $index++) {
             try {
                 $sender->send(new OutboundMessage(
-                    idempotencyKey: "{$channelId}-{$index}",
+                    idempotencyKey: "{$label}-{$channelId}-{$index}",
                     tenantId: 'tenant',
                     channelId: $channelId,
                     channelType: 'telegram',
-                    transportToken: 'bot-token',
                     chatId: 'chat-1',
                     payload: new MessagePayload(type: 'text', text: 'Hello'),
                 ));
@@ -169,7 +174,7 @@ final class TenantMessagingRateLimitTest extends FeatureTestCase
     private function sender(array &$counters): MessageSender
     {
         $provider = new class () implements ProviderSenderInterface {
-            public function deliver(OutboundMessage $message): DeliveryResult
+            public function deliver(OutboundMessage $message, ChannelInterface $channel): DeliveryResult
             {
                 return new DeliveryResult(sent: true, providerMessageId: 'provider-message-1');
             }

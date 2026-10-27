@@ -12,6 +12,7 @@ export interface ChannelsTranslations {
   webhook: { failed: string; failed_hint: string; failed_at: string; register_again: string }
   status: { active: string; inactive: string }
   sections: { connection: { title: string; description: string }; behaviour: { title: string; description: string } }
+  setup: { title: string; description: string }
   fields: {
     type: string
     type_locked: string
@@ -95,6 +96,21 @@ export interface SettingField {
 /** The settings of every channel type, by type. */
 export type SettingsByType = Record<string, SettingField[]>
 
+/** What a step's value is, so the form renders it as a line, a link or a block. */
+export type SetupCopyKind = 'text' | 'url' | 'code'
+
+/** One step of a provider's setup guide, texts already in the interface language. */
+export interface SetupStep {
+  title: string
+  text: string | null
+  /** A value to copy: the webhook URL, a manifest. */
+  copy: string | null
+  copyKind: SetupCopyKind
+}
+
+/** The setup guide of every channel type, by type, before the channel exists (its URL is not known yet). */
+export type SetupByType = Record<string, SetupStep[]>
+
 /** A channel as the edit page receives it. The token and the secret token are never sent. */
 export interface EditableChannel {
   id: string
@@ -110,4 +126,6 @@ export interface EditableChannel {
   url: string | null
   /** The stored value of each editable setting, by key. */
   settings: Record<string, SettingValue>
+  /** The setup guide with this channel's webhook URL; empty when the integration has none. */
+  setup: SetupStep[]
 }

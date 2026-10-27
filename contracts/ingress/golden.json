@@ -1095,6 +1095,2235 @@
                 "idempotencyKey": "n:channel-42"
             },
             "note": "The none scheme reads no secret."
+        },
+        {
+            "name": "v2: slack documented example is valid at the signing time",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=a2114d57b48eac39b9ad189dd8316235a7b4a8d21a10bd27519666489c69b503"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "slack:channel-42:",
+                "document": {},
+                "handshake": null
+            },
+            "note": "Secret, timestamp, body and signature are the worked example from Slack's request-verification guide."
+        },
+        {
+            "name": "v2: timestamp exactly at the tolerance is accepted",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=a2114d57b48eac39b9ad189dd8316235a7b4a8d21a10bd27519666489c69b503"
+                },
+                "query": {}
+            },
+            "now": 1531420918,
+            "expect": {
+                "verified": true
+            }
+        },
+        {
+            "name": "v2: timestamp one second past the tolerance is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=a2114d57b48eac39b9ad189dd8316235a7b4a8d21a10bd27519666489c69b503"
+                },
+                "query": {}
+            },
+            "now": 1531420919,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: timestamp too far in the future is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=a2114d57b48eac39b9ad189dd8316235a7b4a8d21a10bd27519666489c69b503"
+                },
+                "query": {}
+            },
+            "now": 1531420317,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: timestamp exactly at the tolerance in the future is accepted",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=a2114d57b48eac39b9ad189dd8316235a7b4a8d21a10bd27519666489c69b503"
+                },
+                "query": {}
+            },
+            "now": 1531420318,
+            "expect": {
+                "verified": true
+            }
+        },
+        {
+            "name": "v2: missing timestamp header is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-signature": "v0=a2114d57b48eac39b9ad189dd8316235a7b4a8d21a10bd27519666489c69b503"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: non-numeric timestamp is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "abc",
+                    "x-slack-signature": "v0=0a1d54dbd4ea9dc7d2d38740a5422c73ecae51cd8ede59115bf561082a571fff"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false
+            },
+            "note": "Signed over the literal header, so only the timestamp check can refuse it."
+        },
+        {
+            "name": "v2: negative timestamp is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "-5",
+                    "x-slack-signature": "v0=7de0965af47cf56fef03ce0f039e0385fc46e1b867afbfecabd83053c2ecc996"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: decimal timestamp is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618.5",
+                    "x-slack-signature": "v0=f26f90c17322c78737a6ac96887f9256121b2dd1a48e1f9213618f24c81d5f14"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: 20 digit timestamp is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "00000000001531420618",
+                    "x-slack-signature": "v0=d8107611e568949b9e78ba2bdf79c00cd92a0b5639a522660bb0edff9e26aac1"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false
+            },
+            "note": "More than 19 characters is refused even when the digits are zeros followed by a fresh value."
+        },
+        {
+            "name": "v2: timestamp beyond int64 is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "9223372036854775808",
+                    "x-slack-signature": "v0=23f8665e178a5658a7ac35b1633c91197696dd46945d3a21d26b8595be300445"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: leading zeros within 19 digits are accepted",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "0001531420618",
+                    "x-slack-signature": "v0=9c59956475240f9b00579d10e95837e08e8773dad861b7a1e9820a2ad52e32d4"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": true
+            },
+            "note": "Leading zeros are stripped before the range check: the value is 1531420618."
+        },
+        {
+            "name": "v2: signature over the raw body alone is refused under the signed template",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=606e2393418875185144945af582414441d3eb39202bb33f6909a6ff0f4a2747"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: uppercase hex digest is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=A2114D57B48EAC39B9AD189DD8316235A7B4A8D21A10BD27519666489C69B503"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: empty secret is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=dcc4cc3a5be21a2d541c36dc659c414c1ee979d73ab14ece8b26c7410ed946ba"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: signature under a different secret is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=3859a9a919d50935596031154fb7bcad3d63d9f2a13a5b213aa6d38c697d9895"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: signature with a different timestamp in the signed string is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=ffbf8ca586db401fa71716579fba59aea718787d68572406a7236da28a871144"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: hmac_sha1 with a signed template and timestamp",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha1",
+                "parameter": "x-sig",
+                "prefix": "sha1=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-sig": "sha1=5430f2988302d841ef0f238167c5e185f2fb8613"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": true
+            }
+        },
+        {
+            "name": "v2: timestamp check applies to a raw body signature",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": null,
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 1
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=606e2393418875185144945af582414441d3eb39202bb33f6909a6ff0f4a2747"
+                },
+                "query": {}
+            },
+            "now": 1531420620,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: a stale timestamp is refused before the signature is compared",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=a2114d57b48eac39b9ad189dd8316235a7b4a8d21a10bd27519666489c69b503"
+                },
+                "query": {}
+            },
+            "now": 1531430618,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: form: JSON in the payload field becomes the document",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22block_actions%22%2C%22n%22%3A5%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {
+                    "type": "block_actions",
+                    "n": 5
+                },
+                "idempotencyKey": "block_actions"
+            }
+        },
+        {
+            "name": "v2: form: plus decodes to a space",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22a+b%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {
+                    "type": "a b"
+                },
+                "idempotencyKey": "a b"
+            }
+        },
+        {
+            "name": "v2: form: percent 20 decodes to a space",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22x%20y%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {
+                    "type": "x y"
+                },
+                "idempotencyKey": "x y"
+            }
+        },
+        {
+            "name": "v2: form: lowercase hex escapes decode",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7b%22type%22%3a%22lo%22%7d",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {
+                    "type": "lo"
+                },
+                "idempotencyKey": "lo"
+            }
+        },
+        {
+            "name": "v2: form: percent 2B decodes to a literal plus",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22a%2Bb%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {
+                    "type": "a+b"
+                },
+                "idempotencyKey": "a+b"
+            }
+        },
+        {
+            "name": "v2: form: the first duplicate field wins",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22first%22%7D&payload=%7B%22type%22%3A%22second%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {
+                    "type": "first"
+                },
+                "idempotencyKey": "first"
+            }
+        },
+        {
+            "name": "v2: form: invalid escape in the matching value yields an empty document and does not fall through",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22x%ZZ%22%7D&payload=%7B%22type%22%3A%22later%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {},
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "v2: form: invalid escape in another segment's name is skipped",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "bad%zz=1&payload=%7B%22type%22%3A%22ok%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {
+                    "type": "ok"
+                },
+                "idempotencyKey": "ok"
+            }
+        },
+        {
+            "name": "v2: form: invalid escape in another segment's value is ignored",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "other=%zz&payload=%7B%22type%22%3A%22ok%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {
+                    "type": "ok"
+                },
+                "idempotencyKey": "ok"
+            }
+        },
+        {
+            "name": "v2: form: truncated escape at the end is invalid",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22x%2",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {},
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "v2: form: semicolon is not a separator",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "a=1;payload=%7B%22type%22%3A%22semi%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {},
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "v2: form: field name matches case sensitively",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "Payload=%7B%22type%22%3A%22x%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {},
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "v2: form: field value with trailing semicolon is not JSON",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22x%22%7D;y=1",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {},
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "v2: form: empty segments are skipped",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "&&payload=%7B%22type%22%3A%22gap%22%7D&",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {
+                    "type": "gap"
+                },
+                "idempotencyKey": "gap"
+            }
+        },
+        {
+            "name": "v2: form: segment without equals sign has an empty value",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload&x=%7B%22type%22%3A%22x%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {},
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "v2: form: encoded field name matches",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "pay%6Coad=%7B%22type%22%3A%22enc%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {
+                    "type": "enc"
+                },
+                "idempotencyKey": "enc"
+            }
+        },
+        {
+            "name": "v2: form: payload that is a JSON scalar yields an empty document",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=123",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {},
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "v2: form: payload that is not JSON yields an empty document",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=hello",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {},
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "v2: form: payload with trailing garbage yields an empty document",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22x%22%7Dgarbage",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {},
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "v2: form: JSON array payload is the document",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%5B%7B%22type%22%3A%22in-list%22%7D%5D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": [
+                    {
+                        "type": "in-list"
+                    }
+                ],
+                "idempotencyKey": ""
+            },
+            "note": "Numeric path segments index arrays; {body.type} on a list is empty."
+        },
+        {
+            "name": "v2: form: JSON body wins over the form field",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"type\":\"json\",\"payload\":\"x\"}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {
+                    "type": "json",
+                    "payload": "x"
+                },
+                "idempotencyKey": "json"
+            }
+        },
+        {
+            "name": "v2: form: empty JSON object is the document and the form is not tried",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {},
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "v2: form: no form field set leaves a form body without a document",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22x%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {},
+                "idempotencyKey": ""
+            }
+        },
+        {
+            "name": "v2: form: non-UTF-8 bytes are decoded byte-wise",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.type}",
+                "signed": null,
+                "timestamp": null,
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22%FF%22%7D",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "document": {},
+                "idempotencyKey": ""
+            },
+            "note": "The value decodes to bytes that are not valid UTF-8, so it is not JSON."
+        },
+        {
+            "name": "v2: handshake: url_verification echoes the challenge",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"token\":\"Jhj5dZrVaK7ZwHHjRyZWjbDl\",\"challenge\":\"3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P\",\"type\":\"url_verification\"}",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=f9bd80929259f3f6d5fe3a3186c453c89cd1ad4862815a15837584f31c993652"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": true,
+                "handshake": "3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P"
+            }
+        },
+        {
+            "name": "v2: handshake: other event type is not a challenge",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"type\":\"event_callback\",\"event_id\":\"Ev1\",\"challenge\":\"nope\"}",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=07d9fb76075a3e4b584ad983a0022d62243dfad9d4d26960f5c6a2e9fb50475a"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": true,
+                "handshake": null
+            }
+        },
+        {
+            "name": "v2: handshake: comparison is case sensitive",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"type\":\"URL_VERIFICATION\",\"challenge\":\"x\"}",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=3bcf3164e46653a1061327722899bfaddeb5ba628031313f647f703ac64e488c"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": true,
+                "handshake": null
+            }
+        },
+        {
+            "name": "v2: handshake: bad signature is not answered",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"token\":\"Jhj5dZrVaK7ZwHHjRyZWjbDl\",\"challenge\":\"3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P\",\"type\":\"url_verification\"}",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=0000000000000000000000000000000000000000000000000000000000000000"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false,
+                "handshake": null
+            }
+        },
+        {
+            "name": "v2: handshake: stale timestamp is not answered",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"token\":\"Jhj5dZrVaK7ZwHHjRyZWjbDl\",\"challenge\":\"3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P\",\"type\":\"url_verification\"}",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=f9bd80929259f3f6d5fe3a3186c453c89cd1ad4862815a15837584f31c993652"
+                },
+                "query": {}
+            },
+            "now": 1531421618,
+            "expect": {
+                "verified": false,
+                "handshake": null
+            }
+        },
+        {
+            "name": "v2: handshake: missing challenge answers with an empty string",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"type\":\"url_verification\"}",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=698720b19d0fb00bbaf1dcaa31ed77b055b3c00865f31632a0a17235e27e0180"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": true,
+                "handshake": ""
+            }
+        },
+        {
+            "name": "v2: handshake: numeric challenge is stringified",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"type\":\"url_verification\",\"challenge\":42}",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=6d1941e2b5c8167b76f5ca08846e3ff365d1b3313806b3596d77c3bbd824d6db"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": true,
+                "handshake": "42"
+            }
+        },
+        {
+            "name": "v2: handshake: when and respond are templates; raw resolves to empty outside the signed template",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "k",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": {
+                    "when": "{header.x-kind}:{body.t}",
+                    "equals": "ping:1",
+                    "respond": "pong {body.t} {raw}"
+                }
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"t\":1}",
+                "headers": {
+                    "X-Kind": "ping"
+                },
+                "query": {}
+            },
+            "now": 0,
+            "expect": {
+                "verified": true,
+                "handshake": "pong 1 "
+            }
+        },
+        {
+            "name": "v2: handshake: when mismatch on a template",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "k",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": {
+                    "when": "{header.x-kind}:{body.t}",
+                    "equals": "ping:1",
+                    "respond": "pong {body.t} {raw}"
+                }
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"t\":2}",
+                "headers": {
+                    "X-Kind": "ping"
+                },
+                "query": {}
+            },
+            "now": 0,
+            "expect": {
+                "verified": true,
+                "handshake": null
+            }
+        },
+        {
+            "name": "v2: handshake: spec without a handshake never answers",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": null
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"token\":\"Jhj5dZrVaK7ZwHHjRyZWjbDl\",\"challenge\":\"3eZbrw1aBm2rZgRNFdxV2595E9CY3gmdALWMmHkvFXO7tYXAYM8P\",\"type\":\"url_verification\"}",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=f9bd80929259f3f6d5fe3a3186c453c89cd1ad4862815a15837584f31c993652"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": true,
+                "handshake": null
+            }
+        },
+        {
+            "name": "v2: idempotency: first alternative wins",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.a|body.b}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"a\":\"A\",\"b\":\"B\"}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "A"
+            }
+        },
+        {
+            "name": "v2: idempotency: second alternative when the first is missing",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.a|body.b}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"b\":\"B\"}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "B"
+            }
+        },
+        {
+            "name": "v2: idempotency: second alternative when the first is an empty string",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.a|body.b}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"a\":\"\",\"b\":\"B\"}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "B"
+            }
+        },
+        {
+            "name": "v2: idempotency: both empty",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "k:{body.a|body.b}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "k:"
+            }
+        },
+        {
+            "name": "v2: idempotency: zero is a non-empty string",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.a|body.b}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"a\":0,\"b\":\"B\"}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "0"
+            }
+        },
+        {
+            "name": "v2: idempotency: non scalar first alternative falls through",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.a|body.b}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"a\":{\"x\":1},\"b\":\"B\"}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "B"
+            }
+        },
+        {
+            "name": "v2: idempotency: mixed namespaces",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.a|header.x-id|channel}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{}",
+                "headers": {
+                    "X-Id": "H"
+                },
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "H"
+            }
+        },
+        {
+            "name": "v2: idempotency: channel as the last alternative",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.a|channel}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "channel-42"
+            }
+        },
+        {
+            "name": "v2: idempotency: alternatives are not trimmed",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.a| body.b}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"b\":\"B\"}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": ""
+            },
+            "note": "A space before the alternative makes it an unknown name."
+        },
+        {
+            "name": "v2: idempotency: pipe outside a placeholder is literal",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "a|b:{body.a}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"a\":\"1\"}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "a|b:1"
+            }
+        },
+        {
+            "name": "v2: idempotency: raw placeholder resolves to empty",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "a{raw}b",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"a\":\"1\"}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "ab"
+            }
+        },
+        {
+            "name": "v2: idempotency: multiple placeholders each take alternatives",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.a|body.b}-{body.c|body.d}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"b\":\"2\",\"d\":\"4\"}",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "2-4"
+            }
+        },
+        {
+            "name": "v2: idempotency: array index must be canonical",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.0|body.1}",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "[\"x\",\"y\"]",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "x"
+            }
+        },
+        {
+            "name": "v2: idempotency: non canonical array index does not resolve",
+            "spec": {
+                "v": 2,
+                "scheme": "none",
+                "parameter": null,
+                "prefix": "",
+                "idempotency": "{body.01}k",
+                "signed": null,
+                "timestamp": null,
+                "form": null,
+                "handshake": null
+            },
+            "secret": "",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "[\"x\",\"y\"]",
+                "headers": {},
+                "query": {}
+            },
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "k"
+            }
+        },
+        {
+            "name": "v2: slack event_callback keys on event_id",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "{\"token\":\"t\",\"team_id\":\"T1\",\"type\":\"event_callback\",\"event_id\":\"Ev0PV52K21\",\"event\":{\"type\":\"message\",\"text\":\"hi\",\"user\":\"U1\"}}",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=56131c50a88d3d514c4f1ff21231680e33be25b9c15fbaa57cf0b02c49141be7"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "slack:channel-42:Ev0PV52K21",
+                "handshake": null,
+                "document": {
+                    "token": "t",
+                    "team_id": "T1",
+                    "type": "event_callback",
+                    "event_id": "Ev0PV52K21",
+                    "event": {
+                        "type": "message",
+                        "text": "hi",
+                        "user": "U1"
+                    }
+                }
+            }
+        },
+        {
+            "name": "v2: slack block_actions form keys on trigger_id",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22block_actions%22%2C%22trigger_id%22%3A%2213345224609.738474920.8088930838d88f008e0%22%2C%22user%22%3A%7B%22id%22%3A%22U1%22%7D%2C%22actions%22%3A%5B%7B%22action_id%22%3A%22a1%22%2C%22value%22%3A%22v%22%7D%5D%7D",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=8bbc463107d7914fb678337ac93016b634589b9da2bef428ae450d814a29252f"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "slack:channel-42:13345224609.738474920.8088930838d88f008e0",
+                "handshake": null,
+                "document": {
+                    "type": "block_actions",
+                    "trigger_id": "13345224609.738474920.8088930838d88f008e0",
+                    "user": {
+                        "id": "U1"
+                    },
+                    "actions": [
+                        {
+                            "action_id": "a1",
+                            "value": "v"
+                        }
+                    ]
+                }
+            }
+        },
+        {
+            "name": "v2: slack block_actions form with a tampered body is refused",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "payload=%7B%22type%22%3A%22block_actions%22%2C%22trigger_id%22%3A%2213345224609.738474920.8088930838d88f008e0%22%2C%22user%22%3A%7B%22id%22%3A%22U1%22%7D%2C%22actions%22%3A%5B%7B%22action_id%22%3A%22a1%22%2C%22value%22%3A%22v%22%7D%5D%7Dx",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=8bbc463107d7914fb678337ac93016b634589b9da2bef428ae450d814a29252f"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": false
+            }
+        },
+        {
+            "name": "v2: slack slash command has no document and an empty key",
+            "spec": {
+                "v": 2,
+                "scheme": "hmac_sha256",
+                "parameter": "x-slack-signature",
+                "prefix": "v0=",
+                "idempotency": "slack:{channel}:{body.event_id|body.trigger_id}",
+                "signed": "v0:{header.x-slack-request-timestamp}:{raw}",
+                "timestamp": {
+                    "header": "x-slack-request-timestamp",
+                    "tolerance": 300
+                },
+                "form": "payload",
+                "handshake": {
+                    "when": "{body.type}",
+                    "equals": "url_verification",
+                    "respond": "{body.challenge}"
+                }
+            },
+            "secret": "8f742231b10e8888abcd99yyyzzz85a5",
+            "channelId": "channel-42",
+            "request": {
+                "rawBody": "token=xyzz0WbapA4vBCDEFasx0q6G&team_id=T1DC2JH3J&team_domain=testteamnow&channel_id=G8PSS9T3V&channel_name=foobar&user_id=U2CERLKJA&user_name=roadrunner&command=%2Fwebhook-collect&text=&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT1DC2JH3J%2F397700885554%2F96rGlfmibIGlgcZRskXaIFfN&trigger_id=398738663015.47445629121.803a0bc887a14d10d2c447fce8b6703c",
+                "headers": {
+                    "x-slack-request-timestamp": "1531420618",
+                    "x-slack-signature": "v0=a2114d57b48eac39b9ad189dd8316235a7b4a8d21a10bd27519666489c69b503"
+                },
+                "query": {}
+            },
+            "now": 1531420618,
+            "expect": {
+                "verified": true,
+                "idempotencyKey": "slack:channel-42:",
+                "document": {},
+                "handshake": null
+            },
+            "note": "Slash commands carry their fields in the form body itself, outside the payload field; the document stays empty."
         }
     ]
 }
