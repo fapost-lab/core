@@ -27,8 +27,21 @@
 -include .make.local
 
 CONTAINER ?=
-WORKDIR   ?= /shared/httpd/fapost-core
-EXEC      := $(if $(CONTAINER),docker exec -w $(WORKDIR) $(CONTAINER),)
+
+# Where this checkout is inside the container: the container's mount whose
+# host folder holds this directory, longest first — so a task worktree next to
+# the main checkout runs in itself, not in the main checkout. Under devilbox
+# /Users/you/Projects/php is /shared/httpd, and fapost-core.worktrees/<task>
+# lands at /shared/httpd/fapost-core.worktrees/<task>. Docker Desktop may
+# report a host folder under /host_mnt. Set WORKDIR to override.
+ifeq ($(origin WORKDIR),undefined)
+WORKDIR := $(if $(CONTAINER),$(shell docker inspect --format '{{range .Mounts}}{{.Source}}|{{.Destination}}{{"\n"}}{{end}}' $(CONTAINER) 2>/dev/null \
+	| awk -F'|' -v dir='$(CURDIR)' '{ sub(/^\/host_mnt/, "", $$1) } \
+		index(dir "/", $$1 "/") == 1 && length($$1) > best { best = length($$1); path = $$2 substr(dir, length($$1) + 1) } \
+		END { print path }'))
+endif
+WORKDIR := $(or $(WORKDIR),$(CURDIR))
+EXEC    := $(if $(CONTAINER),docker exec -w $(WORKDIR) $(CONTAINER),)
 
 # The vhost the local site is served on. Devilbox names it after the directory,
 # and the tunnel scripts append .test when the name carries no dot — so the
@@ -43,7 +56,7 @@ TUNNEL_HOST ?=
 .DEFAULT_GOAL := help
 
 .PHONY: help setup dev test test-filter test-arch stan lint fix \
-        hooks-install dev-link ngrok tunnel docs-build docs-dev artisan shell \
+        hooks-install dev-link worktree-setup ngrok tunnel docs-build docs-dev artisan shell \
         horizon queue-restart fresh \
         loadtest loadtest-stub-start loadtest-stub-stop loadtest-workers-start loadtest-workers-stop
 
@@ -82,6 +95,11 @@ dev-link: ## Symlink packages/* over vendor/ and node_modules/ for local package
 	$(EXEC) php tools/dev-link-packages.php
 	# On the host, like npm itself (node_modules is installed there); needs Node on the host.
 	node tools/dev-link-npm.mjs
+
+# Jig runs this in every new task worktree (worktree.setup in .ai/config.yaml);
+# the script says what it does with and without packages/.
+worktree-setup: ## Install a task worktree's dependencies: from the lock, or linked when packages/ is shared
+	EXEC='$(EXEC)' tools/worktree-setup
 
 # ─── Running ─────────────────────────────────────────────────────────────────
 
