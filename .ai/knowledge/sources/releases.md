@@ -7,8 +7,8 @@ paths:
   - .github/workflows/publish-images.yml
 source: docs/site/contributing/releases.mdx
 summary: Versioning in 0.x, image tags, hotfix and pre-release procedure
-source_hash: 803f0414dc9b3c18363bbf49a7e03320131940ee
-reviewed_at: 2026-10-05
+source_hash: 5779c00dea62050257e56973bf5e84aa70c52c54
+reviewed_at: 2026-10-28
 ---
 # Releases and versioning
 
