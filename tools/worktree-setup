@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+#
+# Finishes a Jig task worktree: `worktree.setup` in .ai/config.yaml runs it
+# through `make worktree-setup`, after Jig has shared and carried what git does
+# not track. It also runs by hand from any checkout.
+#
+# A worktree gets a copy of this checkout's vendor/ and node_modules/, and here
+# those hold links into packages/ (`composer dev:link`, `npm run dev:link`). So
+# the task runs on one of two setups, decided by whether packages/ is there —
+# Jig gives it to the worktree only when the task shares it
+# (`jig task start <id> --worktree --share packages`, also in JIG_SHARED):
+#
+#   - without packages/: the links into it lead nowhere. They are removed and
+#     the dependencies installed from the lock files, so the task runs on the
+#     versions Core pins — what CI runs;
+#   - with packages/: the overlay is brought from the checkout the worktree came
+#     from and installed, and the local checkouts are linked, as in that
+#     checkout.
+#
+# Safe to run again (`jig task bootstrap` does), and in several worktrees at
+# once: Composer and npm keep their caches safe for that.
+#
+# Environment:
+#   EXEC                the prefix that runs a command where PHP is — the
+#                       Makefile's `docker exec -w <dir> <container>`; empty
+#                       runs on this machine.
+#   JIG_OWNER_CHECKOUT  the checkout the worktree was made from (set by Jig).
+#   JIG_DANGLING        carried links that lead nowhere, one per line (set by Jig).
+
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+exec_prefix="${EXEC:-}"
+
+say() {
+    printf '[worktree-setup] %s\n' "$*"
+}
+
+# Prints the links under vendor/ and node_modules/ that point into packages/.
+# JIG_DANGLING names the ones that lead nowhere; this finds them without Jig too.
+package_links() {
+    find vendor node_modules -maxdepth 3 -type l 2>/dev/null | while read -r link; do
+        case "$(readlink "$link")" in
+            *packages/*) printf '%s\n' "$link" ;;
+        esac
+    done
+}
+
+run_php() {
+    # shellcheck disable=SC2086 # the prefix is words, by design
+    $exec_prefix "$@"
+}
+
+if [ -d packages ]; then
+    owner="${JIG_OWNER_CHECKOUT:-}"
+
+    if [ -n "$owner" ] && [ -f "$owner/composer.overlay.json" ] && [ ! -f composer.overlay.json ]; then
+        cp "$owner/composer.overlay.json" composer.overlay.json
+        say "copied composer.overlay.json from $owner"
+    fi
+
+    if [ -f composer.overlay.json ]; then
+        # The overlay installs Core's lock as well, so no `composer install` before it: that
+        # would remove the overlay's packages only for this to put them back. Without
+        # Composer's scripts: post-update-cmd runs boost:update, which needs this machine's
+        # untracked boost.json and rewrites tracked agent guidelines in the task's tree. The
+        # steps the overlay does need are run here instead.
+        run_php php tools/composer-overlay.php --no-interaction --no-scripts
+        run_php env COMPOSER=composer.local.json php tools/dev-link-packages.php
+        run_php php artisan package:discover --ansi
+        run_php php tools/composer-overlay.php --post-install-only
+    else
+        run_php composer install --no-interaction
+    fi
+
+    node tools/dev-link-npm.mjs
+else
+    removed_npm=0
+
+    for link in $(package_links); do
+        rm "$link"
+        say "removed $link"
+
+        case "$link" in
+            node_modules/*) removed_npm=1 ;;
+        esac
+    done
+
+    # The overlay installs packages from packages/, which this worktree has not.
+    rm -f composer.local.json composer.local.lock
+
+    run_php composer install --no-interaction
+
+    if [ "$removed_npm" -eq 1 ]; then
+        npm ci --no-audit --no-fund
+    fi
+fi
+
+run_php php artisan package:discover --ansi
+run_php php artisan view:clear --ansi
+
+say "done"

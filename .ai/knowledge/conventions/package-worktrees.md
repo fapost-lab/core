@@ -5,11 +5,13 @@ status: active
 domains: []
 paths:
   - tools/dev-link-packages.php
+  - tools/worktree-setup
+  - tools/dev-link-npm.mjs
 stages:
   - implement
   - consolidate
 summary: Package repositories under packages/ get worktrees only in packages/<pkg>.worktrees and are removed after their PR merges; composer dev:link links a checkout only when Core requires it at a version its constraint accepts
-reviewed_at: 2026-10-26
+reviewed_at: 2026-10-28
 ---
 # Package worktrees
 
@@ -41,7 +43,25 @@ satisfies the constraint; `@dev`, `dev-*` and path repositories always pass. Any
 keeps Composer's locked copy. A link it made earlier for a package whose version is now
 refused is removed, with a request to run `composer install`; a link to a package only the
 overlay requires stays while Composer lists it as installed, so a plain `composer dev:link`
-does not break the overlay.
+does not break the overlay. `tools/dev-link-npm.mjs` applies the same rule to `node_modules/`:
+the checkout's `package.json` `version` must satisfy the range Core's `package.json` declares.
+
+### What a Core task worktree runs on
+
+`packages/` is not shared with every Core task worktree. `worktree.setup` runs
+`make worktree-setup` (`tools/worktree-setup`) in each new worktree, and it decides by whether
+`packages/` is there:
+
+- without it (the default), the links into `packages/` carried over in `vendor/` and
+  `node_modules/` are removed and the dependencies installed from the lock files, so the task
+  runs on the versions Core pins;
+- a task that edits a package is started with `jig task start <id> --worktree --share packages`
+  (or `jig task bootstrap <id> --share packages` later): the setup copies
+  `composer.overlay.json` from the main checkout, installs the overlay without Composer's
+  scripts, and links the checkouts Core accepts.
+
+The Makefile derives `WORKDIR` from the container's mounts, so `make` in a worktree runs in that
+worktree inside devilbox rather than in the main checkout.
 
 ## Example
 
@@ -66,3 +86,8 @@ The linker used to link every checkout in `packages/` unconditionally. With PR #
 `packages/` into task worktrees, a `fapost/foundation` checkout at v0.33.0 — breaking since
 0.31 — was linked under a `main` that requires `^0.30`, and no Core test could run. A checkout
 is linked only when Core accepts its version.
+
+Sharing `packages/` with every task (2026-10-26, `worktree.share`) still left a task either on
+those checkouts or, without them, on dangling links — never on the lock that CI runs. Jig 0.36
+added `worktree.setup` and `--share` for one task, so the default became the lock and the
+local checkouts became a choice of the task that edits them.

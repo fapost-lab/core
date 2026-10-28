@@ -7,22 +7,25 @@ profiles: [generic, laravel, node, php, shell]
 adapters: [claude, codex]
 
 git.base_branch: main                 # merge target for ancestry checks
-git.branch_per_task: true             # `jig task new` creates and checks out a branch
+git.branch_per_task: true             # `jig task start` creates and checks out a branch
 git.branch_template: task/{id}        # {id} is the task id; validated by git itself
 forge: auto                           # auto | github | gitlab | none
 
-# packages/ holds separate repositories linked over vendor/ (`composer dev:link`) and wired in
-# as path repositories by the overlay: a worktree shares them rather than holding a stale copy.
-worktree.share: [packages]
-# The local overlay (`composer overlay`) and the Makefile's container override are untracked
-# but needed for a worktree to install and run its checks the way this checkout does.
-worktree.carry: [composer.local.json, composer.local.lock, composer.overlay.json, .make.local]
+# A worktree is finished by `make worktree-setup` (tools/worktree-setup): it installs the
+# dependencies from the lock files, or — for a task started with `--share packages`, the
+# separate repositories under edit — installs the overlay and links the local checkouts.
+# packages/ is no longer shared with every task: a task on a package checkout of another
+# version would not run Core's tests at all.
+worktree.setup: make worktree-setup
+# The Makefile's container override is untracked but needed for a worktree to run its
+# checks and its setup in the container, the way this checkout does.
+worktree.carry: [.make.local]
 
 housekeeping.cadence: 1d              # session hook runs housekeeping if last run is older
 housekeeping.fetch: true              # allow `git fetch` during housekeeping
-housekeeping.trash_ttl: 7d            # trash entries older than this are deleted
-housekeeping.abandoned_ttl: 14d       # abandoned workspaces are purged after this
-housekeeping.stale_after: 60d         # older active tasks are reported as STALE_CANDIDATE
+housekeeping.trash_ttl: 7d            # trash entries (closed tasks, removed specs) older than this are deleted
+housekeeping.abandoned_ttl: 14d       # an abandoned task is archived after this (kept, not deleted)
+housekeeping.stale_after: 60d         # an untouched active/ready task is archived after this
 
 knowledge.require_frontmatter: true   # `jig knowledge check` fails on missing frontmatter
 

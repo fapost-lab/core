@@ -177,18 +177,42 @@ The file is git-ignored: it describes your machine, not the project.
 ```makefile
 # .make.local
 CONTAINER = server-php-1            # container name from `docker ps`
-WORKDIR   = /shared/httpd/fapost-core   # where the checkout is mounted inside it
 TUNNEL_HOST = dev.fapost.in         # optional, stable hostname for `make tunnel`
 ```
 
-`WORKDIR` defaults to devilbox's layout, `/shared/httpd/<directory name>`; set
-it when your container mounts the checkout elsewhere. The container name comes
+`WORKDIR`, where the checkout is inside the container, is worked out from the
+container's mounts: the mount whose host folder holds the checkout. Under
+devilbox `~/Projects/php` is `/shared/httpd`, so the checkout runs in
+`/shared/httpd/fapost-core` and a task worktree next to it in
+`/shared/httpd/fapost-core.worktrees/<task>` — in itself, not in the main
+checkout. Set `WORKDIR` only when the container reaches the checkout some other
+way than a mount; set in `.make.local` it applies to every worktree that file
+is carried into. The container name comes
 from Docker Compose: `<project>-<service>-<index>`, so devilbox's PHP service is
 `server-php-1` and its PostgreSQL is `server-pgsql-1`.
 
 Targets that run host tools stay on the host regardless of `CONTAINER`:
 `make dev` (Vite needs the host's Node), `make docs-dev` (Mintlify), the tunnel
 targets. `make` shows which is which.
+
+### Task worktrees
+
+An agent working through Jig may run a task in a worktree of its own
+(`jig task start <id> --worktree`). Jig copies `.make.local` into it and then
+runs `make worktree-setup` (`worktree.setup` in `.ai/config.yaml`), which
+prepares the worktree's dependencies:
+
+- by default the worktree has no `packages/`, so the links `composer dev:link`
+  and `npm run dev:link` made into it are removed and the dependencies are
+  installed from `composer.lock` and `package-lock.json` — the task runs on the
+  versions Core pins, as CI does;
+- a task that edits the packages is started with `--share packages`: the
+  worktree sees your checkouts under `packages/`, and the setup installs your
+  `composer.overlay.json` and links the checkouts Core accepts, as in your main
+  checkout.
+
+The command can be run again by hand, `make worktree-setup`, or through
+`jig task bootstrap <id>`.
 
 ## Adding packages on top of Core
 
