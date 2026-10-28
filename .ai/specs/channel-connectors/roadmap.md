@@ -5,8 +5,8 @@ its image; Core has no closed list of channel types and reaches every channel th
 Telegram stays built into Core on those contracts and behaves exactly as it does today; Slack is the first
 outside connector, optional, and proves the contract (Viber until 2026-10-26; now on a customer's request).
 
-Epic: epic/channel-connectors
-Release: minor
+The epic `epic/channel-connectors` reached `main` in #309 (phases 1–3). What is left here is built as
+ordinary tasks into `main`.
 
 ## Phase 1 — The connector package type
 
