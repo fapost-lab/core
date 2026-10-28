@@ -37,6 +37,14 @@ const progress = ref(0)
 
 const filesError = computed(() => errors.value.files)
 
+const chosenLabel = computed(() => {
+  if (files.value.length === 0) {
+    return t.value.upload_dialog.none_chosen
+  }
+
+  return files.value.length === 1 ? files.value[0].name : interpolate(t.value.upload_dialog.chosen, { count: files.value.length })
+})
+
 watch(open, (isOpen) => {
   if (isOpen) {
     files.value = []
@@ -127,6 +135,7 @@ async function submit(): Promise<void> {
 
       <form class="flex flex-col gap-5" novalidate @submit.prevent="submit">
         <FormField id="media-upload-files" :label="t.upload_dialog.files" :error="filesError" v-slot="{ invalid, describedBy }">
+          <!-- The native control is hidden: its button and "No file chosen" text follow the browser language, not the console's. -->
           <input
             id="media-upload-files"
             ref="input"
@@ -134,12 +143,26 @@ async function submit(): Promise<void> {
             name="files[]"
             multiple
             required
+            tabindex="-1"
             :accept="limits.accept || undefined"
-            class="border-input bg-card file:text-foreground w-full rounded-md border px-3 py-2 text-sm file:mr-3 file:border-0 file:bg-transparent file:font-semibold"
-            :aria-invalid="invalid"
-            :aria-describedby="describedBy"
+            class="sr-only"
+            aria-hidden="true"
             @change="pick"
           />
+          <div class="border-input bg-card flex w-full items-center gap-3 rounded-md border px-3 py-2 text-sm">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              :aria-invalid="invalid"
+              :aria-describedby="describedBy"
+              :disabled="processing"
+              @click="input?.click()"
+            >
+              {{ t.upload_dialog.choose }}
+            </Button>
+            <span class="text-muted-foreground truncate">{{ chosenLabel }}</span>
+          </div>
         </FormField>
 
         <FormField id="media-upload-folder" :label="t.upload_dialog.folder" :error="errors.folder_id" v-slot="{ invalid, describedBy }">
