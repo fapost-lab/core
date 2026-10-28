@@ -55,6 +55,12 @@ return [
         'leave'  => 'Sign out',
     ],
 
+    'workspace_deletion' => [
+        'banner'     => 'Workspace deletion is scheduled for :time, requested by :name.',
+        'cancel'     => 'Cancel deletion',
+        'cancelling' => 'Cancelling…',
+    ],
+
     'dashboard' => [
         'title'    => 'Assistant overview',
         'sections' => [
@@ -1416,6 +1422,27 @@ return [
         ],
         'errors' => [
             'has_errors' => 'has errors',
+        ],
+        'delete' => [
+            'title'                 => 'Delete workspace',
+            'description'           => 'Permanently remove this workspace and everything in it, 24 hours after you confirm.',
+            'warning_title'         => 'This cannot be undone',
+            'warning'               => 'Deleting the workspace erases all of its data for good: assistants, flows, channels, contacts, conversations, users and media files. No copy is kept and nothing can be restored.',
+            'delay_notice'          => 'Deletion starts 24 hours after you confirm. Until then the workspace works as usual, every administrator is told by email, and any administrator can cancel.',
+            'confirm_label'         => 'Type :slug to confirm',
+            'confirm_hint'          => 'Enter the workspace address name exactly as shown.',
+            'slug_mismatch'         => 'The text does not match the workspace name.',
+            'submit'                => 'Schedule deletion',
+            'deleting'              => 'Scheduling…',
+            'scheduled'             => 'Deletion is scheduled. Every administrator was told by email.',
+            'already_scheduled'     => 'Deletion of this workspace is already scheduled.',
+            'scheduled_description' => 'Deletion is scheduled. Cancel it before it starts to keep the workspace.',
+            'scheduled_title'       => 'Workspace deletion starts :time',
+            'scheduled_by'          => ':name asked for it on :time.',
+            'cancel'                => 'Cancel deletion',
+            'cancelling'            => 'Cancelling…',
+            'cancelled'             => 'Deletion cancelled. Every administrator was told by email.',
+            'nothing_to_cancel'     => 'There is no scheduled deletion to cancel.',
         ],
     ],
 

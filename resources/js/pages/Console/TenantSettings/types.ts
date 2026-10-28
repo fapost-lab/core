@@ -45,6 +45,27 @@ export interface TenantSettingsTranslations {
     remove: string
   }
   errors: { has_errors: string }
+  delete: {
+    title: string
+    description: string
+    warning_title: string
+    warning: string
+    delay_notice: string
+    confirm_label: string
+    confirm_hint: string
+    slug_mismatch: string
+    submit: string
+    deleting: string
+    scheduled: string
+    already_scheduled: string
+    scheduled_description: string
+    scheduled_title: string
+    scheduled_by: string
+    cancel: string
+    cancelling: string
+    cancelled: string
+    nothing_to_cancel: string
+  }
 }
 
 export type TenantSettingsPageProps = ShellPageProps & {
@@ -66,4 +87,13 @@ export interface TenantSettingsState {
   flow_session_ttl: number
   max_retry_attempts: number
   flow_fallback_message: string
+}
+
+/** The "Delete workspace" section: the right to ask, and the deletion already scheduled (UTC times, ISO 8601). */
+export interface WorkspaceDeletionSection {
+  slug: string
+  canRequest: boolean
+  requestUrl: string
+  cancelUrl: string
+  scheduled: { startsAt: string; requestedAt: string; requestedBy: string } | null
 }

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { usePage } from '@inertiajs/vue3'
+import { computed, ref } from 'vue'
+import { router, usePage } from '@inertiajs/vue3'
 import { interpolate } from '@fapost/ui/lib/utils'
+import { formatUtc } from './utc'
 import type { ShellPageProps } from './types'
 
 /** The strips above the page: a platform-support session, and the notice the tenant's access mode carries. */
@@ -13,7 +14,17 @@ const onboardingPending = computed(() => page.props.onboarding?.pending === true
 const lateSteps = computed(() => page.props.onboardingLateSteps?.steps ?? [])
 const canAct = computed(() => page.props.onboardingLateSteps?.canAct === true)
 const notice = computed(() => page.props.accessState.notice)
+const deletion = computed(() => page.props.workspaceDeletionBanner ?? null)
+const cancelling = ref(false)
 const stopped = computed(() => page.props.accessState.mode === 'stopped')
+
+function cancelDeletion(): void {
+  if (deletion.value === null || cancelling.value) {
+    return
+  }
+
+  router.post(deletion.value.cancelUrl, {}, { preserveScroll: true, onFinish: () => (cancelling.value = false), onStart: () => (cancelling.value = true) })
+}
 </script>
 
 <template>
@@ -26,6 +37,13 @@ const stopped = computed(() => page.props.accessState.mode === 'stopped')
         {{ t.support.leave }}
       </button>
     </form>
+  </div>
+
+  <div v-if="deletion" role="status" class="bg-danger text-danger-foreground flex flex-wrap items-center justify-center gap-3 px-4 py-2 text-sm" data-test="workspace-deletion-banner">
+    <span>{{ interpolate(t.workspace_deletion.banner, { time: formatUtc(deletion.startsAt, page.props.locale), name: deletion.requestedBy }) }}</span>
+    <button type="button" class="rounded border border-current px-2.5 py-0.5 text-sm hover:opacity-80" :disabled="cancelling" @click="cancelDeletion">
+      {{ cancelling ? t.workspace_deletion.cancelling : t.workspace_deletion.cancel }}
+    </button>
   </div>
 
   <div v-if="onboardingPending" role="status" class="bg-info text-info-foreground flex flex-wrap items-center justify-center gap-3 px-4 py-2 text-sm">

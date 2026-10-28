@@ -67,8 +67,13 @@ with the landlord table.
   (`Support/TenantHost::panelDomain()`).
 - Workers: `TenantSwitcher::runForTenant()`.
 - Lifecycle: `Services/TenantProvisioningService` creates a tenant; `Services/TenantDecommissioner`
-  removes one (webhook registry entries, then schema, then landlord row) — irreversible, used only
-  by the load-test harness for the throwaway tenants it provisioned.
+  removes one, irreversibly. `decommission()` keeps the load-test harness's short path; `decommissionCompletely()`
+  backs Foundation's `TenantDecommissionerInterface` (`Infrastructure/CoreTenantDecommissioner`): stop serving
+  (Inactive), provider webhooks and per-tenant caches, routing and support tokens, installation media, schema,
+  then `TenantDecommissioned` and the `tenant.decommissioned` log line, then the landlord row. It reaches other
+  domains only through ports in `Contracts/` (channel webhooks, media, caches, admins). A tenant's admins may
+  request it from the settings page (`Services/WorkspaceDeletion`, `tenant_deletion_requests`): it starts 24 h
+  later through `tenants:start-deletions` and `Jobs/DecommissionTenantJob` unless an admin cancels.
 - Console: `app/Console/Commands/Ops/Tenants*Command.php`, `WebhookRegistryHealthCommand`,
   `app/Console/Commands/Platform/Install*Command.php`.
 - Schema: `database/migrations/landlord/` is platform-wide; `database/migrations/tenant/` runs

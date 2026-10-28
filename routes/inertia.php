@@ -24,6 +24,7 @@ use App\Http\Controllers\Admin\TenantSettingsController as AdminTenantSettingsCo
 use App\Http\Controllers\Admin\TranslationController as AdminTranslationController;
 use App\Http\Controllers\Admin\UsageController as AdminUsageController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\WorkspaceDeletionController as AdminWorkspaceDeletionController;
 use App\Http\Controllers\Console\ApplicationRailController;
 use App\Http\Controllers\Console\AssistantHomeController;
 use App\Http\Controllers\Console\AssistantSettingsController;
@@ -44,6 +45,7 @@ use App\Http\Controllers\Console\LocaleController;
 use App\Http\Controllers\Console\NotificationController;
 use App\Http\Controllers\Console\TranslationController;
 use App\Http\Middleware\ForgetInvalidAuthenticatedSession;
+use App\Http\Middleware\RefuseWritesWhenTenantStopped;
 use App\Http\Middleware\SetConsoleRootView;
 use App\Http\Shell\SolutionRoutes;
 use Illuminate\Support\Facades\Route;
@@ -150,6 +152,10 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         // Tenant settings: languages with the base-language lock, runtime limits, broadcast pacing; one form saved whole.
         Route::get('admin/tenant-settings', [AdminTenantSettingsController::class, 'edit'])->name('console.admin.tenant-settings.edit');
         Route::put('admin/tenant-settings', [AdminTenantSettingsController::class, 'update'])->name('console.admin.tenant-settings.update');
+        // Delete the workspace: an admin asks, the removal starts 24 hours later, any admin may cancel before. Open to a
+        // stopped tenant too (its admins may delete what it can no longer use): the policy and the administrator role decide.
+        Route::post('admin/tenant-settings/delete', [AdminWorkspaceDeletionController::class, 'store'])->withoutMiddleware(RefuseWritesWhenTenantStopped::class)->name('console.admin.tenant-settings.delete');
+        Route::post('admin/tenant-settings/delete/cancel', [AdminWorkspaceDeletionController::class, 'cancel'])->withoutMiddleware(RefuseWritesWhenTenantStopped::class)->name('console.admin.tenant-settings.delete.cancel');
         // Platform settings: the deployment-wide values of a single-tenant install; the controller answers 404 in host mode.
         Route::get('admin/platform-settings', [AdminPlatformSettingsController::class, 'edit'])->name('console.admin.platform-settings.edit');
         Route::put('admin/platform-settings', [AdminPlatformSettingsController::class, 'update'])->name('console.admin.platform-settings.update');

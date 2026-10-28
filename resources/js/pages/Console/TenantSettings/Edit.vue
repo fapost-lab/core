@@ -19,8 +19,9 @@ import { Textarea } from '@fapost/ui/components/textarea'
 import { interpolate } from '@console/shell'
 import { SolutionMount, tabFromQuery, useExtensions } from '../../../console/solutions'
 import { OptionsPicker } from '@fapost/ui/components/options-picker'
+import DeleteWorkspace from './DeleteWorkspace.vue'
 import { fallbackOptions, firstError, isTab, keptFallback, tabsWithErrors, withBase } from './form'
-import type { SelectOption, TenantSettingsPageProps, TenantSettingsState, TenantSettingsTab } from './types'
+import type { SelectOption, TenantSettingsPageProps, TenantSettingsState, TenantSettingsTab, WorkspaceDeletionSection } from './types'
 
 /**
  * The tenant's settings: one form in four tabs, saved as a whole by one button under them. The open tab is kept in
@@ -32,6 +33,7 @@ const props = defineProps<{
   baseLanguageLocked: boolean
   options: { languages: SelectOption[] }
   urls: { submit: string }
+  workspaceDeletion: WorkspaceDeletionSection | null
 }>()
 
 const page = usePage<TenantSettingsPageProps>()
@@ -308,5 +310,7 @@ function save(): void {
         <SolutionMount :component="extra.component" :assistant-id="assistantId" />
       </TabsContent>
     </Tabs>
+
+    <DeleteWorkspace v-if="workspaceDeletion" :section="workspaceDeletion" />
   </div>
 </template>

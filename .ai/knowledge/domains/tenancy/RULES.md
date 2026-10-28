@@ -167,7 +167,7 @@ broken.
   `schema_name` is set once at provisioning and never derived from the slug again, so a rename is
   one conditional UPDATE of `tenants.slug` plus a `tenant_slug_aliases` row, in one landlord
   transaction. A former slug stays reserved for that tenant permanently (`check()`/`reserve()`
-  answer Taken); only its redirect window ends (platform setting `tenancy.rename.redirect_days`, default `TENANCY_RENAME_REDIRECT_DAYS`, 30). Every
+  answer Taken), until the tenant itself is removed: its aliases go with it and the slugs are free; only its redirect window ends (platform setting `tenancy.rename.redirect_days`, default `TENANCY_RENAME_REDIRECT_DAYS`, 30). Every
   slug claim — rename and `reserveSlug` — takes the same `pg_advisory_xact_lock` on pgsql, and
   `reserve()` re-reads its reservation key after taking it. Rename is refused for Pending tenants
   and outside host mode. Enforced: `CoreTenantRenamerTest`, `HostResolutionTest`,
@@ -273,7 +273,8 @@ broken.
   `TenantRequestRunner` asks `TenantAccessModeInterface` once per request into the `scoped` `CurrentAccessState`;
   the default is `AlwaysActiveAccessMode`, bound with `bindIf`. While stopped: unsafe methods on the builder,
   media, mini-app and console routes answer 423 (`RefuseWritesWhenTenantStopped`; the platform support user passes; a
-  route with no side effects opts out with `withoutMiddleware`), runtime jobs are dropped or postponed by
+  route with no side effects opts out with `withoutMiddleware`; the only destructive exceptions are requesting and
+  cancelling the workspace's deletion, so a stopped tenant's admins can leave), runtime jobs are dropped or postponed by
   `RespectsTenantAccessMode`, and `flow:sweep-subflow-timeouts` skips the tenant. The tenant stays `Active` so
   console commands see it. A postponed job is re-queued as a delayed copy, never `release()`d (a release spends
   an attempt). Fail open: an operator that throws is reported and counts as active (`TenantAccessStates`). A
@@ -331,3 +332,14 @@ broken.
 - **Write `webhook:<hash>` keys only through `WebhookRegistryWriter`.** The class states it is
   the only writer; `Webhook/Services/WebhookRegistryResolver` also writes the key today, and the
   `webhook:` prefix is spelled in three places. *(proposed)*
+- **Removing a tenant is irreversible, announced and cancellable when the tenant asks for it.** Only through
+  `TenantDecommissionerInterface` (Core's `CoreTenantDecommissioner`). The first step makes the tenant unserved
+  (Inactive), so a failed run never leaves it half removed and served; every step can be repeated; a Pending
+  tenant is refused. `TenantDecommissioned` is dispatched after the schema drop and before the row delete, so
+  delivery is at least once and listeners are idempotent. Nothing is backed up. Self-deletion: host mode only,
+  only where the operator's `TenantSelfDeletionPolicyInterface` allows (Core's default: never); there is no owner
+  role, so any tenant Admin except the platform support user may request it; every admin is mailed; it starts
+  24 h later and any admin may cancel until it starts; a request and its notice commit together. One unique job
+  per tenant on `tenancy.decommission` (connection `redis-long`). Enforced: `CoreTenantDecommissionerTest`,
+  `DecommissionTenantJobTest`, `TenantsStartDeletionsCommandTest`, `AdminWorkspaceDeletionConsoleTest`,
+  `TenancyRemovalPortsTest`.

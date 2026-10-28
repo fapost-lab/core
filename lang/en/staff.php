@@ -317,4 +317,22 @@ return [
             ],
         ],
     ],
+
+    'workspace_deletion' => [
+        'greeting'  => 'Hello :name',
+        'scheduled' => [
+            'subject'       => 'Deletion of the workspace :workspace is scheduled',
+            'body'          => 'Deletion of the workspace ":workspace" was requested by :requested_by on :requested_at.',
+            'starts'        => 'Deletion starts on :starts_at.',
+            'irreversible'  => 'Everything in the workspace is deleted irreversibly: conversations, contacts, bots and channels, media files, users and settings. Nothing is kept and nothing can be restored.',
+            'cancel_hint'   => 'Until then the workspace works as usual, and any administrator can cancel the deletion in the workspace settings.',
+            'cancel_button' => 'Open the settings to cancel',
+        ],
+        'cancelled' => [
+            'subject'      => 'Deletion of the workspace :workspace is cancelled',
+            'body'         => 'The deletion of the workspace ":workspace" was cancelled by :cancelled_by.',
+            'requested'    => 'It had been requested by :requested_by on :requested_at.',
+            'nothing_lost' => 'Nothing was deleted and the workspace goes on as before.',
+        ],
+    ],
 ];

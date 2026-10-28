@@ -9,6 +9,7 @@ use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\SupportAccessRedeemerInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
+use App\Domains\Tenancy\Contracts\TenantDeletionRequestRepositoryInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Contracts\TenantResolverInterface;
 use App\Domains\Tenancy\Contracts\WebhookRegistryHealthCheckerInterface;
@@ -19,12 +20,14 @@ use App\Domains\Tenancy\Database\TenantPostgresConnection;
 use App\Domains\Tenancy\Enums\PlatformSettingFormat;
 use App\Domains\Tenancy\Infrastructure\CorePlatformSettings;
 use App\Domains\Tenancy\Infrastructure\CoreSupportAccess;
+use App\Domains\Tenancy\Infrastructure\CoreTenantDecommissioner;
 use App\Domains\Tenancy\Infrastructure\CoreTenantDirectory;
 use App\Domains\Tenancy\Infrastructure\CoreTenantProvisioner;
 use App\Domains\Tenancy\Infrastructure\CoreTenantRenamer;
 use App\Domains\Tenancy\Infrastructure\CoreTenantReservations;
 use App\Domains\Tenancy\Infrastructure\CoreTenantUsage;
 use App\Domains\Tenancy\Infrastructure\EloquentWebhookRegistryReader;
+use App\Domains\Tenancy\Repositories\TenantDeletionRequestRepository;
 use App\Domains\Tenancy\Repositories\TenantRepository;
 use App\Domains\Tenancy\Services\AlwaysActiveAccessMode;
 use App\Domains\Tenancy\Services\ByteQuota;
@@ -36,6 +39,7 @@ use App\Domains\Tenancy\Services\HostModeDeploymentCheck;
 use App\Domains\Tenancy\Services\HostTenantResolver;
 use App\Domains\Tenancy\Services\LimitAnnouncer;
 use App\Domains\Tenancy\Services\LimitRegistry;
+use App\Domains\Tenancy\Services\NeverAllowsSelfDeletion;
 use App\Domains\Tenancy\Services\NoLimitNotice;
 use App\Domains\Tenancy\Services\NoPeriodUsage;
 use App\Domains\Tenancy\Services\PeriodQuota;
@@ -45,7 +49,9 @@ use App\Domains\Tenancy\Services\RecordLimitWatch;
 use App\Domains\Tenancy\Services\RecordQuota;
 use App\Domains\Tenancy\Services\RequestHostClassifier;
 use App\Domains\Tenancy\Services\SupportAccessTokenStore;
+use App\Domains\Tenancy\Services\TenantCaches;
 use App\Domains\Tenancy\Services\TenantContext;
+use App\Domains\Tenancy\Services\TenantOwnCacheForgetter;
 use App\Domains\Tenancy\Services\TenantProvisioningService;
 use App\Domains\Tenancy\Services\TenantSlugPolicy;
 use App\Domains\Tenancy\Services\TenantSwitcher;
@@ -71,10 +77,12 @@ use Fapost\Foundation\Settings\Contracts\PlatformSettingsInterface;
 use Fapost\Foundation\Settings\Enums\PlatformSettingType;
 use Fapost\Foundation\Tenancy\Contracts\SupportAccessInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantAccessModeInterface;
+use Fapost\Foundation\Tenancy\Contracts\TenantDecommissionerInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantDirectoryInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantProvisionerInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantRenamerInterface;
 use Fapost\Foundation\Tenancy\Contracts\TenantReservationInterface;
+use Fapost\Foundation\Tenancy\Contracts\TenantSelfDeletionPolicyInterface;
 use Illuminate\Container\Container;
 use Illuminate\Contracts\Config\Repository as ConfigRepository;
 use Illuminate\Database\Connection;
@@ -136,6 +144,17 @@ final class DomainServiceProvider extends ServiceProvider
         $this->app->bind(TenantDirectoryInterface::class, CoreTenantDirectory::class);
         // Plain bind: Core is the only implementation of renaming a tenant, and nothing in Core calls it.
         $this->app->bind(TenantRenamerInterface::class, CoreTenantRenamer::class);
+        // Plain bind: Core is the only implementation of removing a tenant; an operator package calls it and never replaces it.
+        $this->app->bind(TenantDecommissionerInterface::class, CoreTenantDecommissioner::class);
+        // bindIf: the operator package that lets an owner delete the workspace binds its own answer first. Without
+        // one the answer is no, so a self-hosted installation never offers it.
+        $this->app->bindIf(TenantSelfDeletionPolicyInterface::class, NeverAllowsSelfDeletion::class);
+        $this->app->bind(TenantDeletionRequestRepositoryInterface::class, TenantDeletionRequestRepository::class);
+        // What Tenancy keeps in the cache per tenant, and what the other domains tag, is forgotten with the tenant.
+        $this->app->when(TenantOwnCacheForgetter::class)->needs('$permissionCacheKey')->giveConfig('permission.cache.key', 'spatie.permission.cache');
+        $this->app->when(TenantOwnCacheForgetter::class)->needs('$permissionCacheStore')->giveConfig('permission.cache.store', 'default');
+        $this->app->tag(TenantOwnCacheForgetter::class, 'tenancy.cache_forgetters');
+        $this->app->when(TenantCaches::class)->needs('$forgetters')->giveTagged('tenancy.cache_forgetters');
 
         // Core is the only implementation of support access, so a plain bind: an operator package
         // calls the contract and never replaces it. Without the package the feature stays off

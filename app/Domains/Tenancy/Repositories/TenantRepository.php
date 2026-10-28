@@ -8,6 +8,7 @@ use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Exceptions\TenantNotFoundException;
 use App\Domains\Tenancy\Models\Tenant;
+use App\Domains\Tenancy\Models\TenantDeletionRequest;
 use App\Domains\Tenancy\Models\TenantStatus;
 use App\Domains\Tenancy\ValueObjects\ReleaseRefusal;
 use App\Domains\Tenancy\ValueObjects\TenantProvisioningState;
@@ -112,7 +113,16 @@ final class TenantRepository implements TenantRepositoryInterface
     public function delete(TenantInterface $tenant): void
     {
         $this->aliases()->where('tenant_id', $tenant->getId())->delete();
+        TenantDeletionRequest::on('landlord')->where('tenant_id', $tenant->getId())->delete();
         Tenant::on('landlord')->whereKey($tenant->getId())->delete();
+    }
+
+    public function stopServing(string $id): bool
+    {
+        return Tenant::on('landlord')
+            ->whereKey($id)
+            ->whereIn('status', [TenantStatus::Active, TenantStatus::Inactive, TenantStatus::Suspended])
+            ->update(['status' => TenantStatus::Inactive]) > 0;
     }
 
     public function isSlugOrSchemaTaken(string $slug, string $schemaName): bool

@@ -30,7 +30,47 @@ final class TenantMediaDisk
 
     public function resolve(TenantInterface $tenant): Filesystem
     {
-        $config = $this->tenantConfig($tenant) ?? $this->installationConfig();
+        return $this->build($this->tenantConfig($tenant) ?? $this->installationConfig());
+    }
+
+    /**
+     * The installation's own media disk, whatever the tenant configured. Used to remove what the installation
+     * itself holds for a tenant; a tenant's own storage is never reached through it.
+     */
+    public function installation(): Filesystem
+    {
+        return $this->build($this->installationConfig());
+    }
+
+    /**
+     * Whether the tenant keeps its media in storage of its own (a client bucket) rather than the installation's.
+     */
+    public function hasOwnStorage(TenantInterface $tenant): bool
+    {
+        return null !== $this->tenantConfig($tenant);
+    }
+
+    /**
+     * Disk name as recorded on media_blobs.storage_disk: the installation disk's driver
+     * (`local`, `s3`), so a blob still says where it was written after the installation
+     * switches disks, or {@see self::TENANT_DISK} when the tenant's own storage holds it.
+     */
+    public function diskName(TenantInterface $tenant): string
+    {
+        if (null !== $this->tenantConfig($tenant)) {
+            return self::TENANT_DISK;
+        }
+
+        $driver = $this->installationConfig()['driver'] ?? null;
+
+        return is_string($driver) ? $driver : 'local';
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     */
+    private function build(array $config): Filesystem
+    {
         $driver = is_string($config['driver'] ?? null) ? $config['driver'] : 'local';
 
         // The blob path stored on `media_blobs.storage_path` already carries the full
@@ -49,22 +89,6 @@ final class TenantMediaDisk
                 sprintf('Unsupported tenant media disk driver [%s].', $driver)
             ),
         };
-    }
-
-    /**
-     * Disk name as recorded on media_blobs.storage_disk: the installation disk's driver
-     * (`local`, `s3`), so a blob still says where it was written after the installation
-     * switches disks, or {@see self::TENANT_DISK} when the tenant's own storage holds it.
-     */
-    public function diskName(TenantInterface $tenant): string
-    {
-        if (null !== $this->tenantConfig($tenant)) {
-            return self::TENANT_DISK;
-        }
-
-        $driver = $this->installationConfig()['driver'] ?? null;
-
-        return is_string($driver) ? $driver : 'local';
     }
 
     /**

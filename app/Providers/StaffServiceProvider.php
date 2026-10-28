@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Domains\Staff\Listeners\CloseSupportAccessEntry;
 use App\Domains\Staff\Listeners\NotifyAdminsOfLimit;
+use App\Domains\Staff\Listeners\NotifyAdminsOfWorkspaceDeletion;
 use App\Domains\Staff\Listeners\RememberUserLocale;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\SupportAccessEntry;
@@ -22,9 +23,13 @@ use App\Domains\Staff\Services\AclBootstrapService;
 use App\Domains\Staff\Services\CoreOperatorAccess;
 use App\Domains\Staff\Services\RoleFormDataMapper;
 use App\Domains\Staff\Services\RoleWriterService;
+use App\Domains\Staff\Services\TenantAdminDirectory;
 use App\Domains\Staff\Services\UserService;
+use App\Domains\Tenancy\Contracts\TenantAdminDirectoryInterface;
 use App\Domains\Tenancy\Events\LimitApproaching;
 use App\Domains\Tenancy\Events\LimitReached;
+use App\Domains\Tenancy\Events\WorkspaceDeletionCancelled;
+use App\Domains\Tenancy\Events\WorkspaceDeletionScheduled;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
 use Fapost\Foundation\Operator\Contracts\OperatorAccessInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
@@ -55,6 +60,8 @@ final class StaffServiceProvider extends ServiceProvider
         // Not a singleton: it holds the record quota, which reads the scoped tenant context.
         $this->app->bind(UserService::class);
         $this->app->singleton(StaffRecipientResolver::class);
+        // Not a singleton: it reads the current tenant's schema.
+        $this->app->bind(TenantAdminDirectoryInterface::class, TenantAdminDirectory::class);
 
         // Who may open the operator screens. bindIf: an operator layer that already bound its own answer keeps it.
         $this->app->bindIf(OperatorAccessInterface::class, CoreOperatorAccess::class);
@@ -99,6 +106,8 @@ final class StaffServiceProvider extends ServiceProvider
         Event::listen(Login::class, RememberUserLocale::class);
         Event::listen(LimitReached::class, NotifyAdminsOfLimit::class);
         Event::listen(LimitApproaching::class, NotifyAdminsOfLimit::class);
+        Event::listen(WorkspaceDeletionScheduled::class, NotifyAdminsOfWorkspaceDeletion::class);
+        Event::listen(WorkspaceDeletionCancelled::class, NotifyAdminsOfWorkspaceDeletion::class);
 
         Gate::policy(User::class, UserPolicy::class);
         Gate::policy(Role::class, RolePolicy::class);

@@ -46,6 +46,13 @@ final class FailingTenantRepository implements TenantRepositoryInterface
         return $this->inner->existsAny();
     }
 
+    public function stopServing(string $id): bool
+    {
+        $this->hook(__FUNCTION__);
+
+        return $this->inner->stopServing($id);
+    }
+
     public function findById(string $id): ?TenantInterface
     {
         $this->hook(__FUNCTION__);

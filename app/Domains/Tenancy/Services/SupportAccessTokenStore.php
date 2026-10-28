@@ -76,6 +76,14 @@ final class SupportAccessTokenStore implements SupportAccessRedeemerInterface
     }
 
     /**
+     * Removes every token of a tenant that is being removed completely, redeemed or not. Safe to repeat.
+     */
+    public function deleteForTenant(string $tenantId): int
+    {
+        return SupportAccessToken::query()->where('tenant_id', $tenantId)->delete();
+    }
+
+    /**
      * Removes rows that can no longer be redeemed and are old enough to be of no use.
      */
     public function prune(): int
