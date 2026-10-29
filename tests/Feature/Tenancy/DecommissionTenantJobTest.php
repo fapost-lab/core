@@ -76,7 +76,7 @@ final class DecommissionTenantJobTest extends FeatureTestCase
     public function test_a_cancelled_request_stops_the_job_before_anything_is_removed(): void
     {
         [$request] = $this->request();
-        $this->app->make(TenantDeletionRequestRepositoryInterface::class)->cancel($request->getKey(), new TenantAdmin('u2', 'Other', 'o@example.test'), CarbonImmutable::now());
+        $this->app->make(TenantDeletionRequestRepositoryInterface::class)->cancel($request->getKey(), new TenantAdmin('00000000-0000-0000-0000-0000000000bb', 'Other', 'o@example.test'), CarbonImmutable::now());
 
         $decommissioner = $this->decommissioner();
         $decommissioner->shouldNotReceive('decommission');
@@ -96,7 +96,7 @@ final class DecommissionTenantJobTest extends FeatureTestCase
         $this->handle(new DecommissionTenantJob($request->tenant_id, DecommissionReason::OwnerRequest, $request->getKey()), $decommissioner);
 
         $this->assertNotNull($request->fresh()->started_at);
-        $this->assertFalse($this->app->make(TenantDeletionRequestRepositoryInterface::class)->cancel($request->getKey(), new TenantAdmin('u2', 'Other', 'o@example.test'), CarbonImmutable::now()));
+        $this->assertFalse($this->app->make(TenantDeletionRequestRepositoryInterface::class)->cancel($request->getKey(), new TenantAdmin('00000000-0000-0000-0000-0000000000bb', 'Other', 'o@example.test'), CarbonImmutable::now()));
     }
 
     public function test_a_retry_of_a_started_request_goes_on(): void
