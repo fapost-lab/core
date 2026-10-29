@@ -20,6 +20,7 @@ use App\Http\Shell\NavigationBuilder;
 use App\Http\Shell\ShellApplication;
 use App\Http\Shell\SolutionExtensions;
 use App\Http\Shell\SolutionUiMapInterface;
+use App\Http\Shell\WorkspaceDeletionPresenter;
 use App\Infrastructure\Broadcasting\BroadcasterStatus;
 use App\Infrastructure\Onboarding\LateStepAnnouncer;
 use Illuminate\Http\Request;
@@ -104,7 +105,9 @@ final class HandleInertiaRequests extends Middleware
         // What the Solutions served to the tenant add to Core's screens (extension-contract).
         $shared['extensions']    = fn (): ?array => $request->user() instanceof User ? app(SolutionExtensions::class)->props($request->user(), $request) : null;
         $shared['notifications'] = fn (): ?array => $this->notifications($request);
-        $shared['onboarding']    = fn (): ?array => $this->onboarding($request);
+        // The banner of a scheduled workspace deletion, for the tenant's admins; one indexed landlord query a page.
+        $shared['workspaceDeletionBanner'] = fn (): ?array => $request->user() instanceof User ? app(WorkspaceDeletionPresenter::class)->banner($request->user()) : null;
+        $shared['onboarding']              = fn (): ?array => $this->onboarding($request);
         // Closures, so a partial reload (`only`) never asks the steps anything.
         $shared['onboardingChecklist'] = fn (): ?array => $this->onboardingChecklist($request);
         $shared['onboardingLateSteps'] = fn (): ?array => $this->onboardingLateSteps($request);

@@ -11,7 +11,9 @@ use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Channels\Policies\ChannelPolicy;
 use App\Domains\Channels\Services\ChannelManagedSettings;
+use App\Domains\Channels\Services\ChannelProviderWebhookRemover;
 use App\Domains\Channels\Telegram\TelegramChannelServiceProvider;
+use App\Domains\Tenancy\Contracts\ChannelWebhookRemoverInterface;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
 use Fapost\Foundation\Channel\Settings\ManagedChannelSettingsInterface;
 use Fapost\Foundation\Lifecycle\AbstractConnectorServiceProvider;
@@ -45,6 +47,8 @@ final class ChannelsServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(ChannelWebhookRemoverInterface::class, ChannelProviderWebhookRemover::class);
+
         $modules = [];
 
         foreach (self::BUILT_IN_MODULES as $module) {

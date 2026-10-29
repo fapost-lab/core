@@ -242,6 +242,20 @@ return [
             'timeout'             => 60,
             'nice'                => 5,
         ],
+        // Removing a tenant: slow, rare, one at a time. Its own connection, whose `retry_after` is above the timeout.
+        'removal' => [
+            'connection'   => 'redis-long',
+            'queue'        => ['tenancy.decommission'],
+            'balance'      => 'simple',
+            'minProcesses' => 1,
+            'maxProcesses' => 1,
+            'maxTime'      => 0,
+            'maxJobs'      => 0,
+            'memory'       => 256,
+            'tries'        => 5,
+            'timeout'      => 1500,
+            'nice'         => 5,
+        ],
         'default' => [
             'connection'          => 'redis',
             'queue'               => ['default'],
@@ -277,6 +291,9 @@ return [
                 'balanceMaxShift' => 1,
                 'balanceCooldown' => 3,
             ],
+            'removal' => [
+                'maxProcesses' => 1,
+            ],
             'default' => [
                 'maxProcesses'    => 3,
                 'balanceMaxShift' => 1,
@@ -295,6 +312,9 @@ return [
             ],
             'low' => [
                 'minProcesses' => 1,
+                'maxProcesses' => 1,
+            ],
+            'removal' => [
                 'maxProcesses' => 1,
             ],
             'default' => [

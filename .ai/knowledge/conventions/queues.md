@@ -66,6 +66,9 @@ Queue assignment by purpose, as it exists in the codebase today:
   `FetchConversationMediaJob.php`, `UpdateConversationDeliveryStatusJob.php`.
 - `scheduled.triggers`: `app/Jobs/Flow/StartFlowFromEventJob.php` and `DispatchFlowTriggerEventJob`
   (queued through `app/Domains/Flow/Events/QueuedFlowTriggerEventPublisher.php`).
+- `tenancy.decommission`: `app/Domains/Tenancy/Jobs/DecommissionTenantJob.php`, on the `redis-long` connection
+  (`retry_after` 1800 s above the job's 1500 s timeout) and its own one-process `removal` supervisor: removing a
+  tenant drops a schema and deletes media, and must neither be re-reserved mid-run nor hold up messaging.
 
 Preventive backpressure: `RunBroadcastJob` counts the depth of `messaging.broadcast`
 (`Queue::size()`) before creating any recipient rows and, above

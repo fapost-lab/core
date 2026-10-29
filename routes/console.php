@@ -13,3 +13,4 @@ Schedule::command('flow:sweep-subflow-timeouts')->everyMinute()->withoutOverlapp
 Schedule::command('support-access:prune')->dailyAt('03:45');
 Schedule::command('limit-refusals:prune')->dailyAt('04:00');
 Schedule::command('horizon:snapshot')->everyFiveMinutes();
+Schedule::command('tenants:start-deletions')->everyMinute()->withoutOverlapping();

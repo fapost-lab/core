@@ -13,6 +13,8 @@ use App\Domains\Conversation\Jobs\UpdateConversationDeliveryStatusJob;
 use App\Domains\Staff\Jobs\SendActivationEmailJob;
 use App\Domains\Staff\Jobs\SendLimitNoticeJob;
 use App\Domains\Staff\Jobs\SendStaffNotificationJob;
+use App\Domains\Staff\Jobs\SendWorkspaceDeletionNoticeJob;
+use App\Domains\Tenancy\Jobs\DecommissionTenantJob;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
 use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
 use App\Domains\Webhook\Jobs\IncomingMessageJob;
@@ -38,7 +40,7 @@ use Tests\TestCase;
  * Runtime work is anything the tenant's customers or schedules cause: inbound messages, wake-ups
  * and timeouts, event triggers, broadcasts, notifications sent from a flow. Housekeeping is what
  * the platform does for the tenant regardless (the conversation record, delivery statuses,
- * webhook sync, activation mail, media cleanup).
+ * webhook sync, activation mail, media cleanup, deleting the tenant).
  */
 final class RuntimeJobAccessModeTest extends TestCase
 {
@@ -73,6 +75,10 @@ final class RuntimeJobAccessModeTest extends TestCase
         SendActivationEmailJob::class,
         SendLimitNoticeJob::class,
         CleanupSoftDeletedMediaJob::class,
+        // Deleting a tenant: its owner may delete a stopped tenant, and the operator's retention deletes stopped tenants.
+        DecommissionTenantJob::class,
+        // Tells the admins that the workspace's deletion was scheduled or cancelled: about the tenant's own state.
+        SendWorkspaceDeletionNoticeJob::class,
     ];
 
     public function test_every_queued_job_is_decided(): void

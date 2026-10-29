@@ -38,8 +38,10 @@ use App\Domains\Media\Services\PublicMediaLinkIssuer;
 use App\Domains\Media\Services\PublicMediaLinkResolver;
 use App\Domains\Media\Services\PublicMediaLinkSigner;
 use App\Domains\Media\Services\StoredMediaBytes;
+use App\Domains\Media\Services\TenantMediaPurger;
 use App\Domains\Media\Storage\StoragePathFactory;
 use App\Domains\Media\Storage\TenantMediaDisk;
+use App\Domains\Tenancy\Contracts\TenantMediaPurgerInterface;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
@@ -78,6 +80,7 @@ final class MediaServiceProvider extends ServiceProvider
     {
         $this->app->singleton(StoragePathFactory::class);
         $this->app->singleton(TenantMediaDisk::class);
+        $this->app->bind(TenantMediaPurgerInterface::class, TenantMediaPurger::class);
 
         $this->app->scoped(
             ChannelMediaUploaderRegistry::class,

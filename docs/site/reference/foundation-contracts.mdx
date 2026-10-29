@@ -99,6 +99,8 @@ DTOs: `UploadContext`, `UploadResult`, `DownloadResult`. Enum: `MediaKind`.
 | `Tenancy\Contracts\TenantProvisionerInterface` | Creating a tenant with its first administrator. Implemented by Core; a package only calls it |
 | `Tenancy\Contracts\TenantReservationInterface` | Holding a slug for a tenant that does not exist yet, then completing it by id. Implemented by Core; a package only calls it |
 | `Tenancy\Contracts\TenantRenamerInterface` | Changing a tenant's slug, and so its host. Implemented by Core; a package only calls it |
+| `Tenancy\Contracts\TenantDecommissionerInterface` | Experimental. Removing a tenant completely and for good. Implemented by Core; a package only calls it |
+| `Tenancy\Contracts\TenantSelfDeletionPolicyInterface` | Experimental. Whether a tenant's owner may delete the workspace from its settings. Implemented by an operator package; Core's default answers no |
 | `Tenancy\Contracts\TenantOnboardingInterface` | Experimental. Putting a tenant back into the first-run setup wizard, and asking whether it is pending. Implemented by Core; a package only calls it |
 
 `provision(ProvisionTenant): ProvisionedTenant` creates the tenant record, its database schema,
@@ -182,6 +184,53 @@ webhooks and tokens stay as they are.
   and keeps no history of renames: telling the tenant's staff the new address and recording the
   change are the caller's job. Read `url` and `loginUrl` again from the directory instead of keeping
   old copies, and address the tenant by id, never by slug.
+
+`Tenancy\Contracts\TenantDecommissionerInterface` (experimental) removes a tenant completely and
+irreversibly. No backup or dump is made: ask the owner or the operator to confirm before calling it.
+
+- `decommission(string $tenantId, DecommissionReason $reason): DecommissionedTenant` is slow (provider
+  calls, file deletion, dropping a schema): call it from a queued job, never from an HTTP request.
+  `DecommissionReason` is `OwnerRequest` or `Retention`; it is carried to the event.
+- In order, each step safe to repeat: the tenant stops being served (its status becomes `Inactive`, so a
+  run that fails half way leaves it unserved and retriable); the provider-side channel webhooks are removed
+  while the bot tokens still exist (a provider that refuses is logged and never stops the removal) and the
+  tenant's cache entries are forgotten; the webhook routing and the support access tokens are deleted; the
+  media objects under `tenants/{id}/` on the installation's media disk are deleted; the tenant's schema is
+  dropped; the event is dispatched and the log line written; and last the landlord row is deleted, so the
+  slug is free at once. A tenant that keeps its media in storage of its own (a client bucket) loses nothing
+  there: `mediaKeptInClientStorage` is true.
+- `DecommissionedTenant` carries `tenantId`, `slug`, `alreadyGone` and `mediaKeptInClientStorage`. An
+  unknown tenant is reported as `alreadyGone` (no slug, no event), so a job that crashed after the call can
+  repeat it. `Active`, `Inactive` and `Suspended` tenants can be removed; a `Pending` one is refused.
+- A refusal or failure is a `TenantDecommissionFailedException` with a `reason` (`Enums\DecommissionFailure`):
+  `Pending` (nothing was deleted; do not retry until provisioning is resolved) and `Failed` (the cause is in
+  `previous`). Repeating after `Failed` is safe: the removal picks up what is left.
+- When the schema is gone Core dispatches `Events\TenantDecommissioned` (`tenantId`, `slug`, `reason`)
+  through Laravel's event dispatcher, and only then deletes the landlord row. An operator package listens
+  to erase its own data about the tenant. The tenant's data no longer exists when the event arrives, so a
+  listener works from these values alone. **Delivery is at least once:** if a listener throws, the call
+  fails with `Failed`, the row stays, and the next call finds the tenant again and dispatches the event
+  again, so a listener must be idempotent. Once the row is gone the tenant is `alreadyGone` and nothing is
+  dispatched. Core also writes a `tenant.decommissioned` info line (`tenant_id`, `slug`, `reason`) each
+  time it dispatches the event and the row is about to go.
+- Run it from a job that is unique per tenant. Core's own job (`DecommissionTenantJob`) runs on the
+  `tenancy.decommission` queue, on a connection whose `retry_after` is above the job's timeout (see
+  [Queues](/reference/queues)).
+
+`Tenancy\Contracts\TenantSelfDeletionPolicyInterface` (experimental) is implemented by an operator package.
+
+- `allows(string $tenantId): bool` is asked while the tenant's settings page is rendered and again when an
+  administrator confirms, so answer quickly. It is asked only where the installation resolves tenants by
+  host; in `single` mode nobody can delete the workspace whatever the policy says. When it says yes, an
+  administrator of the tenant (never the platform support user) sees a "Delete workspace" section in the
+  settings and confirms by typing the workspace's slug.
+- Core records the request and **starts the removal 24 hours later** (`tenants:start-deletions`, every
+  minute). Every administrator is told by email at once, the workspace works as usual until then, and any
+  administrator can cancel in the settings (the other administrators are told by email who did). When the
+  time comes Core queues the removal with the reason `OwnerRequest`, after checking that the request was
+  not cancelled. A stopped tenant's administrators can ask and cancel too.
+- Core binds a default that answers false, so an installation without an operator package never offers it.
+  Bind your own before Core's providers register, as for the other defaults.
 
 `Tenancy\Contracts\TenantOnboardingInterface` (experimental) controls a tenant's first-run setup wizard.
 A tenant whose onboarding is pending has its console held in the wizard until the required steps are done.

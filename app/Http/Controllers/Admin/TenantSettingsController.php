@@ -9,7 +9,9 @@ use App\Domains\Flow\Services\TenantSettingsEditor;
 use App\Domains\Staff\Enums\Permission;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\TenantSettingsRequest;
+use App\Http\Shell\WorkspaceDeletionPresenter;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -25,10 +27,11 @@ final class TenantSettingsController extends Controller
 {
     public function __construct(
         private readonly TenantSettingsEditor $editor,
+        private readonly WorkspaceDeletionPresenter $deletion,
     ) {
     }
 
-    public function edit(): Response
+    public function edit(Request $request): Response
     {
         Gate::authorize(Permission::ManageSettings->value);
 
@@ -43,6 +46,8 @@ final class TenantSettingsController extends Controller
             'baseLanguageLocked' => $this->editor->baseLanguageLocked(),
             'options'            => ['languages' => $languages],
             'urls'               => ['submit' => route('console.admin.tenant-settings.update', [], false)],
+            // Only for an admin, and only where the operator allows it or a deletion is already scheduled; the endpoints ask again.
+            'workspaceDeletion' => $this->deletion->section($request->user()),
         ]);
     }
 

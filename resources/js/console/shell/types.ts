@@ -165,6 +165,7 @@ export interface ConsoleTranslations {
     }
     applications: ApplicationsTranslations
     support: { banner: string; leave: string }
+    workspace_deletion: { banner: string; cancel: string; cancelling: string }
     footer: { rights: string; powered_by: string }
     dashboard: Record<string, string | Record<string, string>>
     /** The close button of the kit's dialogs and sheets. */
@@ -181,6 +182,8 @@ export interface ShellPageProps {
     auth: { user: ShellUser | null; permissions: string[] }
     accessState: { mode: string; notice: AccessNotice | null }
     supportAccess: { operatorName: string; operatorEmail: string; expiresAt: string } | null
+    /** While the workspace's deletion is scheduled, for its admins: when it starts (UTC, ISO 8601), who asked, where to cancel. */
+    workspaceDeletionBanner?: { startsAt: string; requestedAt: string; requestedBy: string; cancelUrl: string } | null
     /** Whether broadcasting delivers anywhere (`null` and `log` do not); live screens poll when it does not. */
     broadcaster: { enabled: boolean; name: string }
     shell: ShellConfig

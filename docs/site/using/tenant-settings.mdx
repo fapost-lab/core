@@ -83,3 +83,34 @@ Until someone saves a value here, both follow the installation's defaults
 otherwise), and the form shows the value in effect. How long the log is kept is not
 set here: it is one value for the whole installation, in
 [Platform settings](/self-hosting/platform-settings).
+
+## Delete workspace
+
+<Note>
+  This section appears only when your plan or installation allows deleting a workspace
+  yourself, and only to administrators. On a self-hosted installation with one workspace it
+  is never shown.
+</Note>
+
+At the bottom of the page, **Delete workspace** removes the whole workspace for good:
+assistants, flows, channels, contacts, conversations, users and media files. No copy is
+kept and nothing can be restored.
+
+<Warning>
+  Deletion cannot be undone. The bots stop answering when it starts, and the workspace's
+  address becomes free again.
+</Warning>
+
+1. Type the workspace's name (its address name) in the field and choose **Schedule deletion**.
+   The button stays disabled until the name matches.
+2. Deletion does not start at once. It is scheduled for **24 hours** later. Until then the
+   workspace works as usual and nobody is signed out.
+3. Right away every administrator gets an email: which workspace, who asked and when, when
+   deletion starts (in UTC), what is lost, and a link to cancel.
+4. While deletion is scheduled, every administrator sees a banner on each page with the start
+   time and a **Cancel deletion** button, and the same button appears in this section.
+5. Any administrator can cancel before the start. Everyone is told by email who cancelled,
+   and the workspace goes on as before. Once deletion has started it can no longer be cancelled.
+
+Times are shown in UTC. Only one deletion can be scheduled at a time: asking again while one
+is scheduled tells you it already is.

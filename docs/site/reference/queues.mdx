@@ -12,6 +12,7 @@ description: "Every queue, what belongs on it, and why they stay separate."
 | `scheduled.triggers` | Scheduled and event trigger fan-out |
 | `sync.external` | External synchronisations |
 | `messaging.logging` | Conversation capture, written outside the delivery path |
+| `tenancy.decommission` | Removing a tenant completely (see below); one job at a time, on its own connection |
 | `default` | Anything not explicitly routed |
 
 ## Why they are separate
@@ -51,7 +52,7 @@ rate limit into tens of thousands of failed jobs, each of which will retry.
 
 ## Which worker takes which
 
-Horizon runs four supervisors, and the grouping is the separation made
+Horizon runs five supervisors, and the grouping is the separation made
 operational:
 
 | Supervisor | Queues |
@@ -60,9 +61,18 @@ operational:
 | 2 | `sync.external`, `scheduled.triggers` |
 | 3 | `messaging.broadcast`, `messaging.system`, `messaging.logging` |
 | 4 | `default` |
+| 5 | `tenancy.decommission`, on the `redis-long` connection |
 
 The first pair is the latency-critical path — a message arriving and the reply
 going out — and it has its own processes so nothing else can crowd it.
+
+## Removing a tenant
+
+Deleting a workspace calls the channel providers, deletes files and drops a schema, which can take
+minutes. It runs on `tenancy.decommission`, on the `redis-long` connection: the same Redis as the
+others, but a `retry_after` (`REDIS_LONG_QUEUE_RETRY_AFTER`, 1800 seconds) above the job's timeout
+(1500 seconds), so a long run is never reserved a second time by another worker. Keep that order if
+you change either value. The job is unique per tenant.
 
 ## Running the workers
 

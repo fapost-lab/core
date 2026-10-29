@@ -35,6 +35,13 @@ interface TenantRepositoryInterface
      */
     public function findBySlugPrefix(string $prefix): array;
 
+    /**
+     * One conditional UPDATE to Inactive, the status no resolver serves: only Active, Inactive and Suspended rows
+     * change (a Pending tenant is not removed here). Called first when a tenant is removed, so a removal that fails
+     * half way leaves the tenant unserved. False when it changed no row (the row is gone, or Pending).
+     */
+    public function stopServing(string $id): bool;
+
     public function save(TenantInterface $tenant): void;
 
     /**

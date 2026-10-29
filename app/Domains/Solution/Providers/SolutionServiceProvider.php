@@ -14,6 +14,7 @@ use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\Infrastructure\CacheSolutionGrantSnapshotStore;
 use App\Domains\Solution\Infrastructure\CoreInstalledSolutionCatalog;
 use App\Domains\Solution\Infrastructure\EloquentSolutionActivationStore;
+use App\Domains\Solution\Infrastructure\SolutionGrantCacheForgetter;
 use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Solution\Services\AllSolutionsEntitled;
 use App\Domains\Solution\Services\InstalledConnectors;
@@ -56,6 +57,9 @@ final class SolutionServiceProvider extends ServiceProvider
         // singletonIf lets a test substitute them.
         $this->app->singletonIf(InstalledPackagesReader::class, fn ($app): InstalledPackagesReader => new InstalledPackagesReader($app->basePath('vendor')));
         $this->app->singletonIf(SolutionCache::class, fn ($app): SolutionCache => new SolutionCache($app->bootstrapPath('cache/fapost-solutions.php')));
+        // The grants kept for a tenant go when the tenant is removed completely.
+        $this->app->bind(SolutionGrantCacheForgetter::class);
+        $this->app->tag(SolutionGrantCacheForgetter::class, 'tenancy.cache_forgetters');
         $this->app->singletonIf(InstalledSolutions::class);
         $this->app->singletonIf(InstalledConnectors::class);
         $this->app->singletonIf(ConsoleExtensionRegistry::class);
