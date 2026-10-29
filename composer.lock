@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "f92177cf825b88fb0b4ceec57681f3ba",
+  "content-hash": "f468c56d75e84911ff5d6996c41b4bc8",
   "packages": [
     {
       "name": "aws/aws-crt-php",
@@ -5297,75 +5297,6 @@
         }
       ],
       "time": "2024-06-11T12:45:25+00:00"
-    },
-    {
-      "name": "romanzipp/laravel-queue-monitor",
-      "version": "5.5.0",
-      "source": {
-        "type": "git",
-        "url": "https://github.com/romanzipp/Laravel-Queue-Monitor.git",
-        "reference": "fb5443f74ea92e19e1cb335f737d3b57ab1af0f3"
-      },
-      "dist": {
-        "type": "zip",
-        "url": "https://api.github.com/repos/romanzipp/Laravel-Queue-Monitor/zipball/fb5443f74ea92e19e1cb335f737d3b57ab1af0f3",
-        "reference": "fb5443f74ea92e19e1cb335f737d3b57ab1af0f3",
-        "shasum": ""
-      },
-      "require": {
-        "ext-json": "*",
-        "ext-mbstring": "*",
-        "illuminate/database": "^12.0|^13.0",
-        "illuminate/queue": "^12.0|^13.0",
-        "illuminate/support": "^12.0|^13.0",
-        "nesbot/carbon": "^3.0",
-        "php": "^8.2"
-      },
-      "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.0",
-        "laravel/framework": "^12.0|^13.0",
-        "mockery/mockery": "^1.6",
-        "orchestra/testbench": "^10.0|^11.0",
-        "phpstan/phpstan": "^2.1",
-        "phpunit/phpunit": "^11.5|^12.0|^13.0",
-        "romanzipp/php-cs-fixer-config": "^3.0"
-      },
-      "type": "library",
-      "extra": {
-        "laravel": {
-          "providers": [
-            "romanzipp\\QueueMonitor\\Providers\\QueueMonitorProvider"
-          ]
-        }
-      },
-      "autoload": {
-        "psr-4": {
-          "romanzipp\\QueueMonitor\\": "src"
-        }
-      },
-      "notification-url": "https://packagist.org/downloads/",
-      "license": [
-        "MIT"
-      ],
-      "authors": [
-        {
-          "name": "romanzipp",
-          "email": "ich@ich.wtf",
-          "homepage": "https://ich.wtf"
-        }
-      ],
-      "description": "Queue Monitoring for Laravel Database Job Queue",
-      "support": {
-        "issues": "https://github.com/romanzipp/Laravel-Queue-Monitor/issues",
-        "source": "https://github.com/romanzipp/Laravel-Queue-Monitor/tree/5.5.0"
-      },
-      "funding": [
-        {
-          "url": "https://github.com/romanzipp",
-          "type": "github"
-        }
-      ],
-      "time": "2026-10-11T09:30:44+00:00"
     },
     {
       "name": "spatie/laravel-activitylog",
