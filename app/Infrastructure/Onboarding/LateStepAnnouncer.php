@@ -14,17 +14,25 @@ use Psr\Log\LoggerInterface;
 use Throwable;
 
 /**
- * Puts each late required step into the bell of the people who can finish it, once.
+ * Puts each late required step into the bell of the people who can finish it, once, and a tenant's bell gets at most
+ * one such announcement a day.
  *
  * Called on a full page load of the tenant's staff, from the shared props: whoever loads a page first after the step
  * appeared announces it, under a short lock per tenant so concurrent first loads do not notify twice. The announced keys
- * are kept in their own settings group ({@see OnboardingAnnouncements}), never in the wizard's state, so an administrator who arrives later finds the banner but not a new notification.
+ * are kept in their own settings group ({@see OnboardingAnnouncements}), never in the wizard's state, so an administrator
+ * who arrives later finds the banner but not a new notification.
+ *
+ * The step is recorded as announced before anyone is notified: a record that cannot be written stops the announcement,
+ * so a failure costs a missed notification (the banner still shows) and never a notification on every page load. The
+ * daily cap holds even if the record is lost, for instance when the wizard is restarted.
  *
  * It never throws into the page: a failure is logged and the next load tries again.
  */
 final readonly class LateStepAnnouncer
 {
     private const int LOCK_SECONDS = 10;
+
+    private const int CAP_SECONDS = 86_400;
 
     public function __construct(
         private OnboardingAnnouncements $announcements,
@@ -49,9 +57,12 @@ final readonly class LateStepAnnouncer
             $lock->get(function () use ($openSteps): void {
                 $fresh = $this->unannounced($openSteps);
 
-                if ([] === $fresh) {
+                // The tenant was told today already; what is still unannounced waits for tomorrow.
+                if ([] === $fresh || ! Cache::add('onboarding:announced:' . $this->tenants->get()->getId(), true, self::CAP_SECONDS)) {
                     return;
                 }
+
+                $this->announcements->announce(array_column($fresh, 'key'));
 
                 $recipients = $this->recipients();
 
@@ -60,8 +71,6 @@ final readonly class LateStepAnnouncer
                         $user->notifyNow(new LateOnboardingStepNotification($step['key'], $step['url']));
                     }
                 }
-
-                $this->announcements->announce(array_column($fresh, 'key'));
             });
         } catch (Throwable $exception) {
             $this->logger->warning('A late onboarding step could not be announced.', [

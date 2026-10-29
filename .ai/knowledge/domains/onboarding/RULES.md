@@ -63,6 +63,17 @@ Each entry names what enforces it. "Review only" means nothing fails automatical
   writing into `OnboardingSettings` could save a stale `state` over an operator's restart. Enforced:
   `OnboardingLateStepTest::test_announcing_never_writes_the_wizards_state`,
   `test_starting_the_wizard_again_forgets_the_known_and_announced_steps`.
+- **The onboarding settings classes have no property defaults.** Spatie fills a missing row with the property's
+  default on load and fails only on save, so with defaults a tenant the settings migrations have not reached reads as
+  `complete` with no `known_steps`: every required step looks late, the banner shows over configured data, and the
+  announcement fails to save after notifying. Without defaults that load throws `MissingSettings`, which the gate, the
+  checklist and the late steps already treat as "unreadable, show nothing". Enforced:
+  `OnboardingLateStepTest::test_a_tenant_the_settings_migrations_did_not_reach_gets_no_banner_and_no_notification`.
+- **A late step is recorded as announced before anyone is notified, and a tenant's bell gets at most one late-step
+  announcement a day.** A record that cannot be written stops the announcement (the banner still shows), so a failure
+  never turns into a notification on every page load; the daily `Cache::add` per tenant holds even when the record is
+  lost (a restart). Enforced: `test_a_late_step_whose_announcement_cannot_be_recorded_notifies_nobody`,
+  `test_a_tenant_is_told_about_late_steps_at_most_once_a_day`.
 
 ## Rules
 

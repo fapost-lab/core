@@ -4,22 +4,31 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Onboarding;
 
+use App\Domains\Staff\Contracts\LocalizedDatabaseNotification;
 use App\Domains\Staff\Models\User;
 use Illuminate\Notifications\Notification;
 
 /**
- * Tells one administrator that a required setup step appeared after the tenant finished onboarding, in the
- * administrator's own language, with a link to the step.
+ * Tells one administrator that a required setup step appeared after the tenant finished onboarding, with a link to the
+ * step.
  *
  * Sent with `notifyNow` from {@see LateStepAnnouncer}, never queued. Stored in the shape the bell reads: `title`,
- * `body` and Core's `action` key.
+ * `body` and Core's `action` key, in the administrator's own language; the bell renders it again in the language of the
+ * page from the stored `step` ({@see LocalizedDatabaseNotification}).
  */
-final class LateOnboardingStepNotification extends Notification
+final class LateOnboardingStepNotification extends Notification implements LocalizedDatabaseNotification
 {
     public function __construct(
         private readonly string $stepKey,
         private readonly string $url,
     ) {
+    }
+
+    public static function localize(array $data, string $locale): array
+    {
+        $step = $data['step'] ?? null;
+
+        return is_string($step) && '' !== $step ? self::text($step, $locale) : [];
     }
 
     /**
@@ -35,19 +44,33 @@ final class LateOnboardingStepNotification extends Notification
      */
     public function toArray(User $notifiable): array
     {
-        $locale = $notifiable->preferredLocale();
-        $titles = trans('console.onboarding.steps.' . $this->stepKey . '.title', [], $locale);
-        $step   = is_string($titles) && 'console.onboarding.steps.' . $this->stepKey . '.title' !== $titles ? $titles : $this->stepKey;
+        $text = self::text($this->stepKey, $notifiable->preferredLocale());
 
         return [
-            'title'  => trans('console.onboarding.late.notification_title', [], $locale),
-            'body'   => trans('console.onboarding.late.notification_body', ['step' => $step], $locale),
+            'title'  => $text['title'],
+            'body'   => $text['body'],
             'action' => [
-                'label' => trans('console.onboarding.late.action', [], $locale),
+                'label' => $text['actionLabel'],
                 'url'   => $this->url,
             ],
             'kind' => 'onboarding_late_step',
             'step' => $this->stepKey,
+        ];
+    }
+
+    /**
+     * @return array{title: string, body: string, actionLabel: string}
+     */
+    private static function text(string $stepKey, string $locale): array
+    {
+        $key   = 'console.onboarding.steps.' . $stepKey . '.title';
+        $title = trans($key, [], $locale);
+        $step  = is_string($title) && $key !== $title ? $title : $stepKey;
+
+        return [
+            'title'       => (string) trans('console.onboarding.late.notification_title', [], $locale),
+            'body'        => (string) trans('console.onboarding.late.notification_body', ['step' => $step], $locale),
+            'actionLabel' => (string) trans('console.onboarding.late.action', [], $locale),
         ];
     }
 }
