@@ -75,6 +75,12 @@ broken.
   schema. The inbox returns plain text (markup stripped, never rendered) and keeps a link only when it is a path on
   this host or an `http(s)` address with no whitespace, control character or backslash anywhere.
   Enforced: `NotificationBellConsoleTest`.
+- **A notification that stores what it is about is shown in the language of the page.** The stored prose is written
+  in the recipient's `users.locale`, which is usually empty (the console's language lives in the session and the
+  cookie), so it falls back to `app.locale`. A notification class that implements `LocalizedDatabaseNotification`
+  renders its title, body and action label again from its stored keys, and `StaffNotificationInbox` calls it with the
+  request's locale; the stored prose stays the fallback. Enforced:
+  `OnboardingLateStepTest::test_the_bell_shows_a_late_step_in_the_language_of_the_page`.
 - **Admins hear about a limit once per limit and episode, and a broken path never changes the
   gate.** `NotifyAdminsOfLimit` (synchronous, on the hot path) does one atomic `Cache::add` on the
   `LimitEpisode` key and queues `SendLimitNoticeJob` only for the first refusal of an episode:

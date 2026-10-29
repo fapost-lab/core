@@ -13,13 +13,16 @@ use Spatie\LaravelSettings\Settings;
  * of the wizard's state (a page load announcing a step) could save a stale `state` over a restart. The wizard's state
  * keeps one writer; this class is written only by {@see \App\Domains\Onboarding\Services\OnboardingAnnouncements} and
  * cleared when the wizard starts. Built fresh for every read and write, like the wizard's state.
+ *
+ * No default, for the reason {@see OnboardingSettings} gives: a tenant the settings migrations have not reached must
+ * fail on load, not read as "nothing announced yet".
  */
 final class OnboardingAnnouncementSettings extends Settings
 {
     /**
      * @var list<string>
      */
-    public array $announced_steps = [];
+    public array $announced_steps;
 
     public static function group(): string
     {

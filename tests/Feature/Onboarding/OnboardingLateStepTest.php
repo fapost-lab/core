@@ -19,6 +19,7 @@ use App\Domains\Staff\Support\SupportAccessSession;
 use App\Infrastructure\Onboarding\LateOnboardingStepNotification;
 use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia;
 use Mockery;
 use Psr\Log\LoggerInterface;
@@ -128,6 +129,73 @@ final class OnboardingLateStepTest extends FeatureTestCase
         $this->actingAs($latecomer)->get($this->panelUrl('/admin'))->assertOk()
             ->assertInertia(fn (AssertableInertia $page) => $page->has('onboardingLateSteps.steps', 1)->etc());
         $this->assertSame(0, $latecomer->notifications()->count(), 'A later administrator sees the banner, not a notification.');
+    }
+
+    public function test_a_tenant_the_settings_migrations_did_not_reach_gets_no_banner_and_no_notification(): void
+    {
+        DB::table('settings')->whereIn('group', ['onboarding', 'onboarding_announcements'])->delete();
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->get($this->panelUrl('/admin'))->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('onboardingLateSteps', null)->etc());
+        $this->actingAs($admin)->get($this->panelUrl('/admin'))->assertOk();
+
+        $this->assertSame(0, $admin->notifications()->count());
+    }
+
+    public function test_a_late_step_whose_announcement_cannot_be_recorded_notifies_nobody(): void
+    {
+        $this->onboardTenant();
+        $this->registerStep(OnboardingOrigin::Package, 'late', true, static fn (): bool => false);
+        DB::table('settings')->where('group', 'onboarding_announcements')->delete();
+        $admin = $this->admin();
+
+        $this->actingAs($admin)->get($this->panelUrl('/admin'))->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->has('onboardingLateSteps.steps', 1)->etc());
+        $this->actingAs($admin)->get($this->panelUrl('/admin'))->assertOk();
+
+        $this->assertSame(0, $admin->notifications()->count(), 'A record that cannot be written must not turn into a notification on every load.');
+    }
+
+    public function test_a_tenant_is_told_about_late_steps_at_most_once_a_day(): void
+    {
+        $this->onboardTenant();
+        $this->registerStep(OnboardingOrigin::Package, 'late', true, static fn (): bool => false);
+        $admin         = $this->admin();
+        $announcements = $this->app->make(OnboardingAnnouncements::class);
+
+        $this->actingAs($admin)->get($this->panelUrl('/admin'))->assertOk();
+        $this->assertSame(1, $admin->notifications()->count());
+
+        // The record is lost (a restarted wizard forgets it): the same day still brings no second notification.
+        $announcements->forget();
+        $this->actingAs($admin)->get($this->panelUrl('/admin'))->assertOk();
+        $this->assertSame(1, $admin->notifications()->count());
+        $this->assertSame([], $announcements->announced());
+
+        $this->travel(25)->hours();
+        $this->actingAs($admin)->get($this->panelUrl('/admin'))->assertOk();
+        $this->actingAs($admin)->get($this->panelUrl('/admin'))->assertOk();
+
+        $this->assertSame(2, $admin->notifications()->count());
+        $this->assertSame(['late'], $announcements->announced());
+    }
+
+    public function test_the_bell_shows_a_late_step_in_the_language_of_the_page(): void
+    {
+        $admin = $this->admin();
+        $admin->forceFill(['locale' => null])->save();
+        Notification::sendNow($admin, new LateOnboardingStepNotification('languages', '/admin/onboarding/languages'));
+        $this->assertStringContainsString('Content languages', $admin->notifications()->first()->data['body']);
+
+        $item = $this->actingAs($admin)->getJson($this->panelUrl('/console/notifications?lang=ru'))->assertOk()->json('items.0');
+
+        $this->assertSame(trans('console.onboarding.late.notification_title', [], 'ru'), $item['title']);
+        $this->assertSame(
+            trans('console.onboarding.late.notification_body', ['step' => trans('console.onboarding.steps.languages.title', [], 'ru')], 'ru'),
+            $item['body'],
+        );
+        $this->assertSame(['label' => trans('console.onboarding.late.action', [], 'ru'), 'url' => '/admin/onboarding/languages'], $item['action']);
     }
 
     public function test_the_platform_support_user_sees_the_banner_but_is_not_notified(): void

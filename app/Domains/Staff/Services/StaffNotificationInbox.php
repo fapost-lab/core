@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Services;
 
+use App\Domains\Staff\Contracts\LocalizedDatabaseNotification;
 use App\Domains\Staff\Models\User;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
@@ -20,7 +21,8 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * Rows come from Core's {@see \App\Domains\Staff\Notifications\StaffMessageNotification} and
  * {@see \App\Domains\Staff\Notifications\LimitReachedNotification} and from Filament before it left; all of them keep
  * Filament's keys (`title`, `body`, `status`, `iconColor`, `actions`) or Core's `action`. The text is returned plain:
- * markup in a stored body is removed, never rendered.
+ * markup in a stored body is removed, never rendered. A row whose class implements {@see LocalizedDatabaseNotification}
+ * is rendered again in the language of the request.
  */
 final class StaffNotificationInbox
 {
@@ -78,18 +80,40 @@ final class StaffNotificationInbox
      */
     private function present(DatabaseNotification $notification): array
     {
-        $data = $notification->data;
-        $data = is_array($data) ? $data : [];
+        $data      = $notification->data;
+        $data      = is_array($data) ? $data : [];
+        $localized = $this->localized($notification->type, $data);
+        $action    = $this->action($data);
+
+        if (null !== $action && isset($localized['actionLabel'])) {
+            $action['label'] = $this->text($localized['actionLabel']);
+        }
 
         return [
             'id'        => (string) $notification->getKey(),
-            'title'     => $this->text($data['title'] ?? null) ?? '',
-            'body'      => $this->text($data['body'] ?? null),
+            'title'     => $this->text($localized['title'] ?? $data['title'] ?? null) ?? '',
+            'body'      => $this->text($localized['body'] ?? $data['body'] ?? null),
             'tone'      => $this->tone($data),
-            'action'    => $this->action($data),
+            'action'    => $action,
             'createdAt' => $notification->created_at?->toAtomString(),
             'read'      => null !== $notification->read_at,
         ];
+    }
+
+    /**
+     * The row's text in the language of the request, when its class can render it; the stored type is only trusted
+     * when it names such a class.
+     *
+     * @param  array<array-key, mixed>  $data
+     * @return array{title?: string, body?: string, actionLabel?: string}
+     */
+    private function localized(mixed $type, array $data): array
+    {
+        if (! is_string($type) || ! is_a($type, LocalizedDatabaseNotification::class, true)) {
+            return [];
+        }
+
+        return $type::localize($data, app()->getLocale());
     }
 
     /**
