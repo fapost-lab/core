@@ -180,7 +180,7 @@ final class ConversationsConsoleTest extends FeatureTestCase
     public function test_a_thread_shows_its_latest_messages_in_order_and_pages_back(): void
     {
         $thread = $this->thread(['message_count' => 60, 'unread_count' => 3], externalId: 'alice-42');
-        $start  = Carbon::parse('2026-10-01 10:00:00');
+        $start  = Carbon::now()->startOfMonth()->setTime(10, 0);
 
         for ($i = 0; $i < 60; $i++) {
             $this->message($thread, ['text' => "m{$i}", 'created_at' => $start->copy()->addMinutes($i)]);
@@ -216,7 +216,7 @@ final class ConversationsConsoleTest extends FeatureTestCase
     {
         $hex    = str_repeat('ab', 32);
         $thread = $this->thread(['message_count' => 3]);
-        $start  = Carbon::parse('2026-10-01 10:00:00');
+        $start  = Carbon::now()->startOfMonth()->setTime(10, 0);
 
         $this->message($thread, ['content_type' => 'callback', 'text' => 'Yes', 'payload' => json_encode(['callback_data' => $hex]), 'created_at' => $start]);
         $this->message($thread, ['content_type' => 'callback', 'text' => null, 'payload' => json_encode(['callback_data' => $hex]), 'created_at' => $start->copy()->addMinute()]);
