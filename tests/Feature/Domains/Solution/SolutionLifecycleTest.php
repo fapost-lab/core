@@ -21,6 +21,7 @@ use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Solution\Services\InstalledSolutions;
 use App\Domains\Solution\Services\SolutionActivator;
 use App\Domains\Solution\Services\SolutionCache;
+use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -58,7 +59,8 @@ use Tests\Support\NoUnservedChannels;
  * `platform:update` validating and publishing them, activation for tenant alpha, a real flow whose `call` node reaches
  * the action through the FlowEngine, the builder's test call, the console pages, then tenant beta answering
  * `solution_inactive` throughout, deactivation, reactivation, and a worker serving both tenants job after job. A third
- * test takes the entitlement away and gives it back: computed, with nothing written.
+ * test takes the entitlement away and gives it back: computed, with nothing written. Another moves the kit Core ships
+ * past the console UI's range: the UI is hidden, the Solution keeps running.
  *
  * Each link has unit tests of its own; this is the proof that they hold together. On PostgreSQL the second tenant has
  * a schema of its own and the real activation store is used throughout. SQLite has no schemas, so there the store is
@@ -318,6 +320,38 @@ final class SolutionLifecycleTest extends FeatureTestCase
         $this->assertConsoleOf(visible: false);
         $this->assertSame(0, DB::table('solution_activations')->count());
         $this->assertSame(0, DB::table('solution_activation_events')->count());
+    }
+
+    public function test_a_core_upgrade_past_its_kit_range_hides_the_console_ui_and_keeps_the_solution_running(): void
+    {
+        $this->artisan('platform:update')->assertExitCode(0);
+        $this->activate($this->alpha, 'feedback', 'showcase');
+        $this->assertConsoleOf(visible: true);
+
+        // Core now ships a kit the showcase bundle (`^0.1`) was not built for.
+        config(['solutions.console_runtime.kit' => '0.2.0']);
+        $this->app->forgetInstance(SolutionUiCompatibility::class);
+        $this->forgetSolutionState();
+
+        // The activation, the flows and the builder are untouched.
+        $this->assertSame('success', $this->flowResult($this->alpha)['end_status']);
+        $this->inTenant($this->alpha, fn () => $this->assertSame(['feedback', 'showcase'], $this->app->make(ActiveSolutions::class)->ids()));
+        $this->assertSame('active', DB::table('solution_activations')->where('solution_id', 'showcase')->value('status'));
+
+        // The console UI is not served: its page says it needs an update, its application is marked.
+        $this->assertServedTo($this->alpha, false);
+        $this->actingAs($this->admin());
+        $this->get($this->panelUrl('/apps/showcase/board'))->assertStatus(503);
+        $showcase = collect($this->props($this->get($this->panelUrl('/admin/_probe')))['applications']['items'])->firstWhere('key', 'showcase');
+        $this->assertTrue($showcase['needsUpdate']);
+
+        // A build that fits again (here: the platform back on a kit inside the range) is served at once.
+        config(['solutions.console_runtime.kit' => '0.1.1']);
+        $this->app->forgetInstance(SolutionUiCompatibility::class);
+        $this->forgetSolutionState();
+
+        $this->assertConsoleOf(visible: true);
+        $this->assertServedTo($this->alpha, true);
     }
 
     /**

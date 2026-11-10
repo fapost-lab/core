@@ -10,6 +10,7 @@ use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
@@ -24,6 +25,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\TestResponse;
 use Inertia\Inertia;
@@ -101,6 +103,7 @@ final class SolutionExtensionsConsoleTest extends FeatureTestCase
             'href'         => '/apps/showcase/board',
             'external'     => false,
             'perAssistant' => false,
+            'needsUpdate'  => false,
         ], $applications['items'][2]);
     }
 
@@ -184,6 +187,68 @@ final class SolutionExtensionsConsoleTest extends FeatureTestCase
         // Active again, but its build was never published.
         $this->installShowcase(publish: false);
         $this->activateShowcase();
+        $this->get($this->panelUrl('/apps/showcase/board'))->assertNotFound();
+        $this->assertSame(['console', 'admin'], array_column($this->props($this->get($this->panelUrl('/admin/_probe')))['applications']['items'], 'key'));
+    }
+
+    public function test_an_active_solution_whose_kit_no_longer_fits_is_marked_and_its_pages_say_it_needs_an_update(): void
+    {
+        $this->activateShowcase();
+        $this->actingAs($this->admin());
+        $this->get($this->panelUrl('/apps/showcase/board'))->assertOk();
+
+        $this->upgradeKitTo('0.2.0');
+
+        // Nothing of it is served: no declarations, no page map; the application stays in the switcher, marked.
+        $probe = $this->get($this->panelUrl('/admin/_probe'));
+        $props = $this->props($probe);
+
+        $this->assertSame($this->emptyExtensions(), $props['extensions']);
+        $this->assertStringContainsString('<script type="application/json" id="fapost-solutions">{}</script>', (string) $probe->getContent());
+        $this->assertSame(['console', 'admin', 'showcase'], array_column($props['applications']['items'], 'key'));
+        $this->assertSame([false, false, true], array_column($props['applications']['items'], 'needsUpdate'));
+        $this->assertSame('/apps/showcase/board', $props['applications']['items'][2]['href']);
+
+        // Its pages answer inside the shell that it needs an update, with no menu of pages that are not served.
+        $page = $this->get($this->panelUrl('/apps/showcase/board'))->assertStatus(Response::HTTP_SERVICE_UNAVAILABLE);
+        $page->assertInertia(fn (AssertableInertia $inertia) => $inertia
+            ->component('Errors/SolutionUnavailable')
+            ->where('reason', 'update_required')
+            ->where('applications.current', 'showcase')
+            ->where('navigation.groups', []));
+
+        $this->get($this->panelUrl('/apps/showcase/desk'), ['X-Inertia' => 'true', 'X-Inertia-Version' => $this->version()])
+            ->assertStatus(Response::HTTP_SERVICE_UNAVAILABLE)
+            ->assertHeader('X-Inertia')
+            ->assertJsonPath('component', 'Errors/SolutionUnavailable')
+            ->assertJsonPath('props.reason', 'update_required');
+
+        $this->getJson($this->panelUrl('/apps/showcase/board'))->assertStatus(Response::HTTP_SERVICE_UNAVAILABLE);
+
+        // The search palette finds the application, but none of its pages.
+        $groups = $this->getJson($this->panelUrl('/admin/search?' . http_build_query(['q' => 'desk'])))->assertOk()->json('groups');
+        $this->assertSame([], $groups);
+    }
+
+    public function test_a_user_the_application_does_not_let_in_still_gets_404_when_it_needs_an_update(): void
+    {
+        $this->activateShowcase();
+        $this->upgradeKitTo('0.2.0');
+        Gate::define('showcase.use', static fn (mixed $user): bool => false);
+
+        $user = User::factory()->create();
+        $user->givePermissionTo(Permission::ManageAssistants->value);
+        $this->actingAs($user);
+
+        $this->get($this->panelUrl('/apps/showcase/board'))->assertNotFound();
+        $this->assertNotContains('showcase', array_column($this->props($this->get($this->panelUrl('/admin/_probe')))['applications']['items'], 'key'));
+    }
+
+    public function test_an_inactive_solution_whose_kit_no_longer_fits_still_answers_404(): void
+    {
+        $this->upgradeKitTo('0.2.0');
+        $this->actingAs($this->admin());
+
         $this->get($this->panelUrl('/apps/showcase/board'))->assertNotFound();
         $this->assertSame(['console', 'admin'], array_column($this->props($this->get($this->panelUrl('/admin/_probe')))['applications']['items'], 'key'));
     }
@@ -396,6 +461,17 @@ final class SolutionExtensionsConsoleTest extends FeatureTestCase
     /**
      * The Inertia version a first visit of the console gets.
      */
+    /**
+     * What a Core upgrade to another kit does to the showcase bundle, built for `^0.1`: the platform ships a version
+     * outside that range.
+     */
+    private function upgradeKitTo(string $version): void
+    {
+        config(['solutions.console_runtime.kit' => $version]);
+        $this->app->forgetInstance(SolutionUiCompatibility::class);
+        $this->forgetSolutionState();
+    }
+
     private function version(): string
     {
         return (string) $this->get($this->panelUrl('/admin/_probe'))->assertOk()->viewData('page')['version'];

@@ -159,7 +159,8 @@ function turnOff(): void {
             </StatusDot>
             <Badge v-if="solution.grant" variant="success" data-test="grant-badge">{{ grantBadge(solution) }}</Badge>
             <Badge v-if="solution.entitlement.state === 'not_entitled'" variant="warning" data-test="not-entitled">{{ t.entitlement.badge }}</Badge>
-            <Badge v-if="solution.ui && solution.ui.mismatches.length > 0" variant="warning" data-test="kit-badge">{{ t.kit.badge }}</Badge>
+            <Badge v-if="solution.ui?.needsUpdate" variant="warning" data-test="needs-update-badge">{{ t.kit.needs_update }}</Badge>
+            <Badge v-else-if="solution.ui && solution.ui.mismatches.length > 0" variant="warning" data-test="kit-badge">{{ t.kit.badge }}</Badge>
           </CardTitle>
         </CardHeader>
 

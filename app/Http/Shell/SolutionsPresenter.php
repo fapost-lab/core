@@ -39,7 +39,7 @@ use Throwable;
  * whether the tenant has it on, what it registers (the actions of its manifest and its console declarations, as the
  * registry holds them), whether the operator grants it (plan or add-on: on, with no Turn off), allows it (the tenant's
  * own toggle) or offers it to connect (the operator's storefront) and, when it ships a console UI, whether the bundle is
- * published and fits the kit Core ships.
+ * published and fits the kit Core ships, and whether, being on, it needs an update before its UI is served again.
  * A Solution whose package is gone but whose activation is still stored is listed apart, so it can be put out.
  * On a self-hosted platform with no storefront of its own it also carries the address where more Solutions are found, from the
  * platform setting {@see self::MARKETPLACE_URL_SETTING}.
@@ -73,6 +73,7 @@ final readonly class SolutionsPresenter
         private ConsoleExtensionRegistry $registry,
         private PublishedSolutionUi $published,
         private SolutionUiCompatibility $compatibility,
+        private SolutionUi $ui,
         private SolutionStorefrontInterface $storefront,
         private TenantContextInterface $tenantContext,
         private PlatformSettingsReaderInterface $settings,
@@ -334,9 +335,10 @@ final readonly class SolutionsPresenter
     }
 
     /**
-     * What the Solution adds to the console, or null when it ships none.
+     * What the Solution adds to the console, or null when it ships none. `needsUpdate`: it is on, but its published UI no
+     * longer fits, so the console does not serve it ({@see SolutionUi::needsUpdate()}, the rule the app switcher uses).
      *
-     * @return array{state: string, application: string|null, registrations: list<Registration>, pages: list<string>, mismatches: list<array{component: string, required: string, provided: string, unreadable: bool}>}|null
+     * @return array{state: string, application: string|null, registrations: list<Registration>, pages: list<string>, mismatches: list<array{component: string, required: string, provided: string, unreadable: bool}>, needsUpdate: bool}|null
      */
     private function ui(InstalledSolution $solution): ?array
     {
@@ -363,6 +365,7 @@ final readonly class SolutionsPresenter
                 ],
                 $this->compatibility->mismatches($bundle),
             ),
+            'needsUpdate' => $this->ui->needsUpdate($solution->id),
         ];
     }
 

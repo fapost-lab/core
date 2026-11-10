@@ -51,6 +51,7 @@ final class AppSwitcherConsoleTest extends FeatureTestCase
             'href'         => "/assistant/{$assistant->getKey()}/dashboard",
             'external'     => false,
             'perAssistant' => true,
+            'needsUpdate'  => false,
         ], $applications['items'][0]);
         $this->assertSame('/admin', $applications['items'][1]['href']);
         $this->assertFalse($applications['items'][1]['perAssistant']);

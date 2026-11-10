@@ -119,8 +119,10 @@ const identity = computed(() => {
           </div>
 
           <div v-if="solution.ui && solution.ui.mismatches.length > 0" class="flex flex-col gap-1.5" data-test="kit-mismatch">
-            <Badge variant="warning" class="self-start">{{ t.kit.title }}</Badge>
-            <p class="text-muted-foreground text-sm">{{ t.kit.description }}</p>
+            <Badge variant="warning" class="self-start">{{ solution.ui.needsUpdate ? t.kit.needs_update_title : t.kit.title }}</Badge>
+            <p class="text-muted-foreground text-sm" :data-test="solution.ui.needsUpdate ? 'needs-update-note' : 'kit-note'">
+              {{ solution.ui.needsUpdate ? t.kit.needs_update_note : t.kit.description }}
+            </p>
             <ul class="text-sm">
               <li v-for="mismatch in solution.ui.mismatches" :key="mismatch.component" :data-test="`mismatch-${mismatch.component}`">{{ mismatchText(t, mismatch) }}</li>
             </ul>

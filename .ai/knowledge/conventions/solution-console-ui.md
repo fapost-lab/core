@@ -16,8 +16,9 @@ paths:
   - "tests/Fixtures/Solutions/**"
   - config/solutions.php
   - docs/site/extending/console-ui.mdx
+  - resources/js/pages/Errors/SolutionUnavailable.vue
 summary: "How a Solution adds console UI: the ADR's MAY/MUST/MUST NOT boundary, boot()-only registration and the freeze flag, route groups and route-name ids, the publication allow-list, values() without a timeout"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-11-10
 ---
 # Solution console UI
 
@@ -61,10 +62,17 @@ How Core holds it, and what a change to these files must keep:
   The Solution a request belongs to is read **from the route name** (`EnsureSolutionActive::solutionOf()`,
   also the rail's current application): a route in these groups without a `solutions.<id>.` name is a
   404. Keep the name, not the URL, as the source of the id.
-- **Per request, the server filters.** `SolutionUi::isServed()` (active for the tenant ∧ UI published, when
-  the Solution declares one) and the Gate ability decide what reaches the props, the rail, the import map's
-  page map and the routes; the client never filters for access. A link action's route takes `record`;
-  `contact.row` gets an `hrefTemplate` with `__record__`.
+- **Per request, the server filters.** `SolutionUi::isServed()` (active for the tenant ∧, when the Solution
+  declares a UI, its bundle published ∧ fitting the kit, Vue and Inertia Core ships per `SolutionUiCompatibility`)
+  and the Gate ability decide what reaches the props, the rail, the import map's page map and the routes; the
+  client never filters for access. A link action's route takes `record`; `contact.row` gets an `hrefTemplate`
+  with `__record__`.
+- **Active but no longer fitting is marked, not hidden.** `SolutionUi::needsUpdate()` (active ∧ published ∧ a
+  mismatch) is the one rule: the application stays in the switcher with `needsUpdate` and no menu (pins survive),
+  and `EnsureSolutionActive` answers 503 with Core's `Errors/SolutionUnavailable` (`reason: update_required`) to a
+  user the application's ability lets in — checked there, because the route's `can:` runs later — and 404 to
+  anyone else. That page is Core's own answer, returned before `EnsureSolutionPage`, so it is not a "page outside
+  its namespace" error. Never deactivate on a mismatch: the tenant's flows would stop (the ADR rejects it).
 - **`values()` has no timeout.** `SolutionColumns` calls `ColumnValuesInterface::values()` once per page,
   synchronously; PHP cannot interrupt it. A throw or a non-scalar answer empties the column and logs; a slow
   one slows Core's table, which is why the docs ask for one batched query and no remote calls.

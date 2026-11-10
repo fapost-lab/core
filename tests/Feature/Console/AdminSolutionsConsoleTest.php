@@ -91,6 +91,7 @@ final class AdminSolutionsConsoleTest extends FeatureTestCase
                 ->where('solutions.1.active', true)
                 ->where('solutions.1.ui.state', 'published')
                 ->where('solutions.1.ui.mismatches', [])
+                ->where('solutions.1.ui.needsUpdate', false)
                 ->where('solutions.1.ui.application', fn ($label): bool => is_string($label) && '' !== $label)
                 ->where('solutions.1.ui.registrations', function ($registrations): bool {
                     $points = collect($registrations)->pluck('point')->unique()->sort()->values()->all();
@@ -241,6 +242,7 @@ final class AdminSolutionsConsoleTest extends FeatureTestCase
                     ['component' => 'vue', 'required' => '^4.0', 'provided' => config('solutions.console_runtime.vue'), 'unreadable' => false],
                 ])
                 ->where('solutions.0.canActivate', false)
+                ->where('solutions.0.ui.needsUpdate', false)
                 ->etc());
 
         // The server repeats the check: a request that skips the disabled button is refused too, with the reason.
@@ -274,7 +276,12 @@ final class AdminSolutionsConsoleTest extends FeatureTestCase
 
         $this->actingAs($this->admin())
             ->get($this->url())
-            ->assertInertia(fn (AssertableInertia $page) => $page->where('solutions.0.active', true)->where('solutions.0.canActivate', false)->etc());
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('solutions.0.active', true)
+                ->where('solutions.0.canActivate', false)
+                // On, but its console UI is no longer served until it is updated: the card says so.
+                ->where('solutions.0.ui.needsUpdate', true)
+                ->etc());
 
         $this->actingAs($this->admin())->post($this->url('/showcase/deactivate'))->assertRedirect();
 
