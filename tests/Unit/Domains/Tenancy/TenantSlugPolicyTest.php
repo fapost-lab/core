@@ -276,7 +276,7 @@ final class TenantSlugPolicyTest extends TestCase
 
         $reserved = app(TenantSlugPolicy::class)->reservedSlugs();
 
-        foreach (['www', 'admin', 'mail', 'autodiscover', '_acme-challenge'] as $slug) {
+        foreach (['www', 'admin', 'mail', 'send', 'autodiscover', '_acme-challenge'] as $slug) {
             $this->assertContains($slug, $reserved);
         }
     }
