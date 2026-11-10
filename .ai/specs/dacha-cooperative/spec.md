@@ -81,7 +81,8 @@ reminders.
 
 ## Scope and non-goals
 
-- In scope (phase 1): the plot and owner registry with spreadsheet import; ownership changes;
+- In scope (phases 1–3): the plot and owner registry with documented and measured areas and
+  spreadsheet import; the budget and the membership fee computed from it; ownership changes;
   linking Telegram users to plots; meters with zones; readings from members and the electrician;
   configurable charge items and tariffs; charge runs for all plots; manual payments (cash and
   bank) with allocation; balances and debtors; the member's balance and charge history in the
@@ -115,6 +116,12 @@ The owner's answers, 2026-11-10:
 - People and services: staff employed by the cooperative, contractors (a firm or a sole
   trader — waste collection, security), and seasonal hires; security is both permanent and
   seasonal (owner, 2026-11-10).
+- The membership fee comes from the budget (owner, 2026-11-10). Today it is a fixed fee per
+  plot: land tax plus the cooperative's expenses, divided between all plots. Measurement of the
+  area each plot actually occupies is under way; the fee will become the plot's share by area
+  plus the common costs plus the land tax on common-use land. The general meeting sets the fee
+  for the year (or the month); electricity and water are charged separately by meter. "This is
+  needed right away."
 - Channel: Telegram. Viber was rejected by the owner as too expensive.
 
 ## Decisions
@@ -200,6 +207,21 @@ The owner's answers, 2026-11-10:
   contracts and salaries; actual ones from outgoing bank payments matched to the counterparty or
   the employee, and cash expenses entered by the treasurer. The board sees income and expenses by
   item, planned against actual.
+- The membership fee is computed from a budget (кошторис) approved by the general meeting for a
+  period — a year, or a month, set on the budget. A budget is a list of lines (land tax on the
+  plots, land tax on common-use land, salaries, security, waste collection, …), each with an
+  amount and its own allocation rule: equally per plot, in proportion to area, or directly per
+  plot (an amount per m² of the plot's own area). A plot's fee is the sum of its shares of every
+  line, and the member sees the breakdown by line. Today's scheme is every line shared equally;
+  the coming one is the plot's land tax by area plus the common lines by the rule the meeting
+  picks. Changing the scheme is a new budget, never a release. Rejected: a fixed fee entered by
+  hand, because it hides how the fee was reached and must be recomputed by hand when the measured
+  areas arrive; and one rule for the whole budget, because the coming scheme already mixes two.
+  Electricity and water stay outside the budget, charged by meter.
+- A plot has two areas with dates: the documented area and the measured area it occupies; the
+  budget names which one its by-area lines use — rejected: one area field overwritten by the
+  measurement, because the switch to measured areas is a decision of the meeting with a date, and
+  the earlier fees must stay reproducible.
 - A meter has one or more zones (day/night), each with its own tariff, and a reading carries a
   value per zone — rejected: single-zone only, because both kinds exist on the plots and adding
   zones later rewrites readings and the calculation.
@@ -245,8 +267,10 @@ The owner's answers, 2026-11-10:
   the PRRO obligation for this cooperative's legal form — to be confirmed with its accountant;
   the decision against acquiring rests on it.
 
-- The budget (кошторис): whether the general meeting's approved budget should set the fee rates
-  (budget ÷ area or ÷ plots) — a fog item; decides whether the expense plan drives charges.
+- How the budget meets actual expenses: whether the income and expense report compares actual
+  spending against the budget's lines, and what happens to a surplus or a deficit at the end of
+  the period (carried into the next budget, refunded, charged) — decides the report and the next
+  budget; not needed for the first fee run.
 
 ## Assumptions left untested
 

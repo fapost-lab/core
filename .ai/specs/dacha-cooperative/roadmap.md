@@ -34,8 +34,9 @@ their phone in the bot sees their plots.
 
 - [ ] The Solution package — private repository, manifest, activation for a tenant, its first
       console page (after: Phase 0 — nothing to install into before it)
-- [ ] Plots and owners — the registry: plot number, area, street, owners with phones; owner
-      changes recorded with a date; the board's screens (after: the Solution package)
+- [ ] Plots and owners — the registry: plot number, documented and measured area with dates,
+      street, owners with phones; owner changes recorded with a date; the board's screens
+      (after: the Solution package)
 - [ ] Registry import — a spreadsheet of plots and owners imported with a preview and per-row
       errors (after: plots and owners — the tables it fills)
 - [ ] Linking in Telegram — phone sharing matched against the registry, the "name your plot"
@@ -52,9 +53,9 @@ their phone in the bot sees their plots.
 
 ## Phase 2 — Readings and charges
 
-Goal: the cooperative charges fees and electricity from the system. Done when: a monthly charge
-run produces every plot's charges from tariffs and readings, and a member sees the breakdown in
-the bot.
+Goal: the cooperative charges the membership fee, electricity and water from the system. Done
+when: the membership fee from the approved budget and a monthly run of electricity and water from
+tariffs and readings produce every plot's charges, and a member sees the breakdown in the bot.
 
 - [ ] Meters and readings — electricity and water meters, with zones, per plot and shared (the
       common electricity meter, shared water meters); readings from the members' bot (refused
@@ -69,9 +70,14 @@ the bot.
 - [ ] Charge items and tariffs — the cooperative's bank accounts, and configurable items (fixed
       per plot, per sotka, per metered unit, one-off), each paid to an account, with tariffs valid
       from a date (after: plots and owners)
+- [ ] The budget and the membership fee — a budget for a year or a month with lines, each with
+      an amount and its allocation rule (equally, by area, per m² of the plot), the area it uses,
+      and the membership fee per plot computed from it with a breakdown by line (after: charge
+      items and tariffs — the fee is a charge item; after: plots and owners — the areas it
+      divides by)
 - [ ] Charge runs — a run for all plots or a selection, recorded and reversible as a whole;
       charges from flagged readings held for the board (after: meters and readings; after:
-      recorded water draws; after: charge items and tariffs)
+      recorded water draws; after: the budget and the membership fee)
 - [ ] The cooperative's balance — the intake meters for electricity and water read monthly, and
       per period and resource the intake against the plots' meters and recorded draws, with the
       unaccounted difference shown to the board (after: meters and readings; after: recorded
@@ -120,10 +126,8 @@ payments, and shown against income by item.
       expenses entered by the treasurer, each to an expense item (after: bank statement import —
       outgoing payments come from the same statement; after: salaries as expenses; after:
       contractors and contracts)
-- [ ] The income and expense report — income and expenses by item and period, planned against
-      actual, with export (after: actual expenses)
-- [ ] fog: the budget (кошторис) — whether the general meeting's budget sets the fee rates is
-      not known yet
+- [ ] The income and expense report — income and expenses by item and period, the budget and
+      the plan against actual, with export (after: actual expenses)
 
 ## Phase 5 — The cooperative beyond accounting
 
@@ -152,7 +156,7 @@ the items below are in use at the owner's cooperative.
 3. The Solution package
 4. Plots and owners; Contractors and contracts
 5. Registry import; Linking in Telegram; Charge items and tariffs; Staff and positions
-6. The board's bot; Salaries as expenses
+6. The board's bot; Salaries as expenses; The budget and the membership fee
 7. Meters and readings
 8. Recorded water draws
 9. Charge runs; The cooperative's balance
