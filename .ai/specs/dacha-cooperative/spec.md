@@ -167,6 +167,18 @@ The owner's answers, 2026-11-10:
   (the default account unless set), the QR code carries that account, and a statement is
   imported per account — rejected: a single account per tenant, because the owner's cooperative
   already has two, and the reference product supports several for the same reason.
+- The board works in a second Telegram bot of its own, a second Telegram channel in the same
+  tenant (owner, 2026-11-10): the electrician records readings on a round, the person on duty
+  records water draws, the treasurer enters cash payments, and the board looks up a plot's
+  balance and the debtors and approves link requests and flagged readings. Access is a board role
+  granted in the Solution (chair, treasurer, electrician, water duty, audit commission — read-only)
+  to a person linked by phone and confirmed by the chair; the bot being separate is convenience,
+  the role check is the guard. A person is one Core contact across both bots (contacts are unique
+  per tenant, platform and Telegram id), so an electrician who also owns a plot is a member in
+  one bot and staff in the other. Rejected: one bot whose menu depends on the role, because the
+  members' bot must stay simple for 400 people and a board menu there is one wrong check away
+  from showing it to a member; and the console only, because readings and cash are taken in the
+  field, on a phone.
 - A meter has one or more zones (day/night), each with its own tariff, and a reading carries a
   value per zone — rejected: single-zone only, because both kinds exist on the plots and adding
   zones later rewrites readings and the calculation.

@@ -42,20 +42,26 @@ their phone in the bot sees their plots.
       request and the board's approval queue, several plots per chat (after: plots and owners;
       after: a flow action that knows its contact)
 
+- [ ] The board's bot — a second Telegram channel for the board, board roles granted in the
+      Solution and confirmed by the chair, and link-request approvals from the phone (after:
+      linking in Telegram — the same phone linking, and the requests it approves)
+
 ## Phase 2 — Readings and charges
 
 Goal: the cooperative charges fees and electricity from the system. Done when: a monthly charge
 run produces every plot's charges from tariffs and readings, and a member sees the breakdown in
 the bot.
 
-- [ ] Meters and readings — electricity and water meters, with zones, per plot and shared
-      (the common electricity meter, shared water meters); readings from the bot (refused below
-      the previous, a jump flagged) and from the electrician, each with its source; how each plot
-      is supplied with water (own meter, recorded draws through a shared meter, unmetered) with a
-      date (after: linking in Telegram — members submit as linked owners)
-- [ ] Recorded water draws — a draw through a shared water meter recorded against a plot, by
-      the person on duty or the member in the bot, and charged per unit (after: meters and
-      readings — draws belong to a shared meter)
+- [ ] Meters and readings — electricity and water meters, with zones, per plot and shared (the
+      common electricity meter, shared water meters); readings from the members' bot (refused
+      below the previous, a jump flagged) and from the electrician's round in the board's bot,
+      each with its source; flagged readings reviewed in the board's bot; how each plot is
+      supplied with water (own meter, recorded draws through a shared meter, unmetered) with a
+      date (after: linking in Telegram — members submit as linked owners; after: the board's
+      bot — the electrician's round runs in it)
+- [ ] Recorded water draws — a draw through a shared water meter recorded against a plot, by the
+      person on duty in the board's bot or the member in the members' bot, and charged per unit
+      (after: meters and readings — draws belong to a shared meter)
 - [ ] Charge items and tariffs — the cooperative's bank accounts, and configurable items (fixed
       per plot, per sotka, per metered unit, one-off), each paid to an account, with tariffs valid
       from a date (after: plots and owners)
@@ -82,6 +88,9 @@ match.
 - [ ] Bank statement import — a statement file from each of the cooperative's accounts (Sense
       Business Online's export first) imported and its payments matched to plots by the payment
       purpose, with a queue for the unmatched (after: payments)
+- [ ] Money in the board's bot — the treasurer enters a cash payment for a plot, and the board
+      looks up a plot's balance and the debtors from the phone (after: payments; after: debtors —
+      what it enters and shows; after: the board's bot)
 - [ ] Payment by bank details — the bot gives the member the amount due and the cooperative's
       details as an NBU payment QR code with the plot in the purpose (after: balance in the bot —
       the amount it shows)
@@ -118,14 +127,15 @@ the items below are in use at the owner's cooperative.
 3. The Solution package
 4. Plots and owners
 5. Registry import; Linking in Telegram; Charge items and tariffs
-6. Meters and readings
-7. Recorded water draws
-8. Charge runs; The cooperative's balance
-9. Balance in the bot; Payments
-10. Payment by bank details
-11. Debtors; Bank statement import; Losses; Audit-commission access
-12. Reminders; Announcements; Requests to the board; The statement from the bank's API
-13. The pilot month
+6. The board's bot
+7. Meters and readings
+8. Recorded water draws
+9. Charge runs; The cooperative's balance
+10. Balance in the bot; Payments
+11. Payment by bank details
+12. Debtors; Bank statement import; Losses; Audit-commission access
+13. Reminders; Money in the board's bot; Announcements; Requests to the board; The statement from the bank's API
+14. The pilot month
 
 <!--
 Rules (jig-idea §8):
