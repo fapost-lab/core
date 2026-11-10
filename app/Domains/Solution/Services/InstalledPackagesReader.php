@@ -17,8 +17,13 @@ use JsonException;
  */
 final class InstalledPackagesReader
 {
-    public function __construct(private readonly string $vendorPath)
-    {
+    /**
+     * @param  list<string>  $ignoredPackages  names left out of {@see candidates()} although installed.json lists them
+     */
+    public function __construct(
+        private readonly string $vendorPath,
+        private readonly array $ignoredPackages = [],
+    ) {
     }
 
     public function installedJsonPath(): string
@@ -38,7 +43,7 @@ final class InstalledPackagesReader
         foreach ($this->entries() as $entry) {
             $name = $entry['name'] ?? null;
 
-            if (!is_string($name)) {
+            if (!is_string($name) || in_array($name, $this->ignoredPackages, true)) {
                 continue;
             }
 
