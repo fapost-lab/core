@@ -78,6 +78,11 @@ match.
       named item, reversed rather than deleted (after: charge runs — payments close charges)
 - [ ] Debtors — the list of debtors by plot and item, with a threshold, and its export (after:
       payments)
+- [ ] Bank statement import — a statement imported and its payments matched to plots by the
+      payment purpose, with a queue for the unmatched (after: payments)
+- [ ] Payment by bank details — the bot gives the member the amount due and the cooperative's
+      details as an NBU payment QR code with the plot in the purpose (after: balance in the bot —
+      the amount it shows)
 - [ ] Reminders — a monthly reminder to submit readings and a debt reminder to linked owners,
       sent by the Solution's schedule (after: Solution schedule; after: debtors)
 - [ ] The pilot month — the owner's cooperative runs one month in parallel with its current
@@ -89,8 +94,12 @@ match.
 Goal: the board runs the cooperative's life, not only its money, in the same place. Done when:
 the items below are in use at the owner's cooperative.
 
-- [ ] Bank statement import — a statement imported and its payments matched to plots by the
-      payment purpose, with a queue for the unmatched (after: payments)
+- [ ] Online payment — card payment from the bot through a provider port with the first adapter
+      (provider chosen by the cooperative's bank), the tenant's commission setting (the member by
+      default, grossed up), and the confirmed payment recorded and allocated (after: payments —
+      an online payment becomes one)
+- [ ] A second payment provider — another adapter behind the same port, so a cooperative banking
+      elsewhere can activate it (after: online payment — the port it plugs into)
 - [ ] Losses — the difference from the cooperative's balance, for electricity and water, shared
       by the board's rule per resource and shown in each member's breakdown (after: the
       cooperative's balance — the difference it shares; after: charge runs — it becomes charges)
@@ -102,8 +111,6 @@ the items below are in use at the owner's cooperative.
       payments)
 - [ ] fog: polls and general-meeting votes — quorum, one vote per plot or per owner, and the legal
       weight of an online vote are not known yet
-- [ ] fog: online payment — which provider (monobank, LiqPay, a bank's acquiring) and whether
-      the cooperative's account allows it is not known yet
 
 ## Waves
 
@@ -116,9 +123,10 @@ the items below are in use at the owner's cooperative.
 7. Recorded water draws
 8. Charge runs; The cooperative's balance
 9. Balance in the bot; Payments
-10. Debtors; Bank statement import; Losses; Audit-commission access
-11. Reminders; Announcements; Requests to the board
-12. The pilot month
+10. Payment by bank details
+11. Debtors; Bank statement import; Online payment; Losses; Audit-commission access
+12. Reminders; Announcements; Requests to the board; A second payment provider
+13. The pilot month
 
 <!--
 Rules (jig-idea §8):
