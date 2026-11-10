@@ -109,6 +109,7 @@ The owner's answers, 2026-11-10:
 - The cooperative has its own intake meters for both electricity and water; the supplier bills
   the cooperative by them (owner, 2026-11-10: "the organisation's common meter must be accounted
   for, for both electricity and water").
+- Bank accounts: one at Sense Bank; a second whose bank the owner is confirming (2026-11-10).
 - Channel: Telegram. Viber was rejected by the owner as too expensive.
 
 ## Decisions
@@ -162,6 +163,10 @@ The owner's answers, 2026-11-10:
 - The bot gives the member the amount due and the cooperative's bank details as an NBU payment QR
   code with the plot in the payment purpose; the member pays from their own banking app, and the
   bank statement import matches the payment to the plot. This is the online payment.
+- A cooperative has one or more bank accounts; each charge item names the account it is paid to
+  (the default account unless set), the QR code carries that account, and a statement is
+  imported per account — rejected: a single account per tenant, because the owner's cooperative
+  already has two, and the reference product supports several for the same reason.
 - A meter has one or more zones (day/night), each with its own tariff, and a reading carries a
   value per zone — rejected: single-zone only, because both kinds exist on the plots and adding
   zones later rewrites readings and the calculation.
@@ -196,9 +201,13 @@ The owner's answers, 2026-11-10:
   percentage; and for water, whether unmetered plots carry the difference through their fixed fee
   or share it — the owner's cooperative decides; needed only for the losses item.
 
-- The cooperative's bank, and whether its business API gives the statement (PrivatBank's
-  Autoclient, monobank's business API, another) — decides the item that fetches the statement
-  without a file.
+- The second account's bank, and whether either bank gives the statement through an API. For
+  Sense Bank no public business API for statements was found (2026-11-10 search: Sense Business
+  Online and Sense SuperApp for legal entities, and a mention of joining open banking); to be
+  asked of the bank's business support. Decides the API item; until then the statement is a file
+  exported from Sense Business Online, and which export formats it offers decides the import.
+- Which charge items go to which account — the owner's cooperative decides; needed for the
+  QR code and the statement matching.
 - Whether every income the cooperative takes by transfer (fees, electricity, water) stays outside
   the PRRO obligation for this cooperative's legal form — to be confirmed with its accountant;
   the decision against acquiring rests on it.

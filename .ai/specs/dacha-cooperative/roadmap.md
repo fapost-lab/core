@@ -56,8 +56,9 @@ the bot.
 - [ ] Recorded water draws — a draw through a shared water meter recorded against a plot, by
       the person on duty or the member in the bot, and charged per unit (after: meters and
       readings — draws belong to a shared meter)
-- [ ] Charge items and tariffs — configurable items (fixed per plot, per sotka, per metered unit,
-      one-off) with tariffs valid from a date (after: plots and owners)
+- [ ] Charge items and tariffs — the cooperative's bank accounts, and configurable items (fixed
+      per plot, per sotka, per metered unit, one-off), each paid to an account, with tariffs valid
+      from a date (after: plots and owners)
 - [ ] Charge runs — a run for all plots or a selection, recorded and reversible as a whole;
       charges from flagged readings held for the board (after: meters and readings; after:
       recorded water draws; after: charge items and tariffs)
@@ -78,8 +79,9 @@ match.
       named item, reversed rather than deleted (after: charge runs — payments close charges)
 - [ ] Debtors — the list of debtors by plot and item, with a threshold, and its export (after:
       payments)
-- [ ] Bank statement import — a statement imported and its payments matched to plots by the
-      payment purpose, with a queue for the unmatched (after: payments)
+- [ ] Bank statement import — a statement file from each of the cooperative's accounts (Sense
+      Business Online's export first) imported and its payments matched to plots by the payment
+      purpose, with a queue for the unmatched (after: payments)
 - [ ] Payment by bank details — the bot gives the member the amount due and the cooperative's
       details as an NBU payment QR code with the plot in the purpose (after: balance in the bot —
       the amount it shows)
