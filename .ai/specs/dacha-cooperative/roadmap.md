@@ -94,12 +94,9 @@ match.
 Goal: the board runs the cooperative's life, not only its money, in the same place. Done when:
 the items below are in use at the owner's cooperative.
 
-- [ ] Online payment — card payment from the bot through a provider port with the first adapter
-      (provider chosen by the cooperative's bank), the tenant's commission setting (the member by
-      default, grossed up), and the confirmed payment recorded and allocated (after: payments —
-      an online payment becomes one)
-- [ ] A second payment provider — another adapter behind the same port, so a cooperative banking
-      elsewhere can activate it (after: online payment — the port it plugs into)
+- [ ] The statement from the bank's API — the cooperative's bank's business API delivers the
+      statement every day, so payments are matched without a file (after: bank statement import —
+      the matching it feeds)
 - [ ] Losses — the difference from the cooperative's balance, for electricity and water, shared
       by the board's rule per resource and shown in each member's breakdown (after: the
       cooperative's balance — the difference it shares; after: charge runs — it becomes charges)
@@ -124,8 +121,8 @@ the items below are in use at the owner's cooperative.
 8. Charge runs; The cooperative's balance
 9. Balance in the bot; Payments
 10. Payment by bank details
-11. Debtors; Bank statement import; Online payment; Losses; Audit-commission access
-12. Reminders; Announcements; Requests to the board; A second payment provider
+11. Debtors; Bank statement import; Losses; Audit-commission access
+12. Reminders; Announcements; Requests to the board; The statement from the bank's API
 13. The pilot month
 
 <!--

@@ -88,10 +88,11 @@ reminders.
   bot; reading and debt reminders.
 - Later phases: bank statement import and automatic matching; losses between the common meter
   and the plots; polls and general-meeting votes; announcements to all members or a street;
-  requests to the board; audit-commission reports; online payment by card through an acquiring
-  provider.
+  requests to the board; audit-commission reports; the bank statement fetched from the bank's
+  API.
 - Not doing: penalties (пеня), subsidies and benefits, BAS and 1C exchange, acts and invoices for
-  legal entities, automatic meter reading by modem, a mobile app, an organisation website, Viber.
+  legal entities, card acquiring (it brings the PRRO obligation), automatic meter reading by
+  modem, a mobile app, an organisation website, Viber.
 
 ## Facts about the first cooperative
 
@@ -149,22 +150,18 @@ The owner's answers, 2026-11-10:
   see theft, broken meters and typos before anyone is charged for them.
 - A shared water meter through which plots draw water is distinct from the intake meter: its
   draws are charged to plots, while the intake meter is only balanced against.
-- Online payment is built behind a provider port: the Solution knows a payment intent, its status
-  and the provider's callback, and each provider (monobank acquiring, WayForPay, LiqPay) is an
-  adapter chosen per tenant in the settings — rejected: one hard-wired provider, because the
-  provider follows the bank the cooperative's account is in, and another cooperative will bank
-  elsewhere. A confirmed online payment becomes an ordinary payment, allocated like any other.
-- Who pays the provider's commission is a tenant setting, the member by default (owner,
-  2026-11-10). When the member pays it, the amount is grossed up so the cooperative receives the
-  charge in full (charge / (1 − rate) plus any fixed fee), and the member sees the commission
-  before paying; when the cooperative pays it, the member pays the charge and the commission is
-  recorded as the cooperative's expense.
-- Before any acquiring, the bot gives the member the cooperative's bank details as an NBU payment
-  QR code with the plot in the payment purpose; the member pays from their own banking app, the
-  cooperative pays no acquiring commission, and the bank statement import matches the payment.
-  This is the cheapest and simplest way in, and the acquiring adapter follows it — rejected: going
-  straight to acquiring, because it needs a contract with the provider and costs the cooperative
-  (or the member) 1–2.5 % on every payment, while transfers to the account already happen today.
+- Members pay only by direct transfer to the cooperative's bank account; there is no card
+  acquiring (owner, 2026-11-10, reversing the same day's request for online payment: "a direct
+  payment to the account is needed; it is related to the PRRO"). Card payments taken through an
+  acquiring provider are settlement operations that need a fiscal receipt from a software cash
+  register (ПРРО); a transfer from the member's own account to the cooperative's IBAN does not.
+  Rejected: card acquiring through monobank, WayForPay or LiqPay behind a provider port with a
+  commission setting (planned and dropped the same day), because of the PRRO obligation it brings.
+  The commission setting is dropped with it: a transfer's fee, if any, is set by the member's own
+  bank.
+- The bot gives the member the amount due and the cooperative's bank details as an NBU payment QR
+  code with the plot in the payment purpose; the member pays from their own banking app, and the
+  bank statement import matches the payment to the plot. This is the online payment.
 - A meter has one or more zones (day/night), each with its own tariff, and a reading carries a
   value per zone — rejected: single-zone only, because both kinds exist on the plots and adding
   zones later rewrites readings and the calculation.
@@ -199,15 +196,12 @@ The owner's answers, 2026-11-10:
   percentage; and for water, whether unmetered plots carry the difference through their fixed fee
   or share it — the owner's cooperative decides; needed only for the losses item.
 
-- The first acquiring provider for the owner's cooperative — monobank acquiring (about 1.3 % for
-  Ukrainian cards, needs the cooperative's account at monobank), LiqPay (about 1–1.5 %, a reduced
-  rate reported for housing and utility organisations, natural if the account is at PrivatBank)
-  or WayForPay (about 2–2.2 %, not tied to a bank). Figures from 2026 reviews, not from contracts;
-  depends on where the cooperative's account is and whether the provider serves a non-profit
-  cooperative.
-- Whether charging the commission to the payer is allowed by the chosen provider's contract and
-  card-network rules, and how it is shown (a separate line, or the provider's own "payer pays
-  commission" option) — decides how the commission setting is implemented per adapter.
+- The cooperative's bank, and whether its business API gives the statement (PrivatBank's
+  Autoclient, monobank's business API, another) — decides the item that fetches the statement
+  without a file.
+- Whether every income the cooperative takes by transfer (fees, electricity, water) stays outside
+  the PRRO obligation for this cooperative's legal form — to be confirmed with its accountant;
+  the decision against acquiring rests on it.
 
 ## Assumptions left untested
 
