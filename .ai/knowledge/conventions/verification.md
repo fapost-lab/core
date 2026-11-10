@@ -7,7 +7,7 @@ paths: []
 stages:
   - verify
 summary: Which composer/make commands run the PHPUnit and PHPat suites, and why php artisan test tests/Architecture verifies nothing
-reviewed_at: 2026-10-05
+reviewed_at: 2026-11-10
 ---
 # Verification commands
 
@@ -26,6 +26,15 @@ reviewed_at: 2026-10-05
 - Do not run `php artisan test tests/Architecture` as the PHPat check: those classes
   are not PHPUnit `TestCase`s, and the command reports success while verifying
   nothing.
+- Core's tests run against Core alone, even in a checkout where `composer overlay` installed
+  operator packages or Solutions into `vendor/`. `Tests\TestCase::createApplication()` leaves out
+  every package installed but not listed in Core's `composer.lock` (`Tests\Support\OverlayPackages`):
+  Laravel's package discovery ignores them (`Tests\Support\CorePackageManifest`, built in memory,
+  never written to `bootstrap/cache/packages.php`), Solution discovery is given them as
+  `InstalledPackagesReader`'s ignored packages, and the Solution cache is read from
+  `bootstrap/cache/fapost-solutions.testing.php`, not the developer's `fapost-solutions.php`.
+  The extension testing kit (`testing/`) does not do this: an extension's tests need its own package
+  discovered.
 - `make` lists the wrapped commands (`make test`, `make test-arch`/`make stan`,
   `make test-filter FILTER=...`); `CONTAINER` in `.make.local` routes them into a
   container.
@@ -51,3 +60,11 @@ together stops that false confidence from resurfacing after a migration or a new
 architecture rule is added. Running the PHPUnit suite on both SQLite and PostgreSQL
 in CI catches multi-tenant schema behaviour that SQLite cannot exercise, without
 forcing every local run to pay for a Postgres instance.
+
+Lock membership is what tells an overlay package: `tools/composer-overlay.php` refuses any package
+Core requires or locks and writes its own `composer.local.lock`, so an overlay package and every
+dependency it brought in are exactly what `installed.json` holds beyond `composer.lock`. Filtering by
+`fapost/*` or by `composer.overlay.json` would miss those dependencies (Pulse, Telescope) and their
+providers. In CI nothing is installed beyond the lock, so the filter is empty there. Running Core's
+tests on a second, overlay-free `vendor/` was rejected: a second install to keep in step, and a plain
+`php artisan test` in the developer's checkout would still fail.
