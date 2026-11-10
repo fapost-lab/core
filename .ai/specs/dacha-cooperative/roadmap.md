@@ -87,7 +87,7 @@ tariffs and readings produce every plot's charges, and a member sees the breakdo
 
 ## Phase 3 — Payments and debts
 
-Goal: the treasurer records every payment and the board knows who owes. Done when: a month at
+Goal: the treasurer records every payment, cash and bank, and the board knows who owes. Done when: a month at
 the owner's cooperative runs in the system in parallel with the treasurer's book and the balances
 match.
 
@@ -95,9 +95,6 @@ match.
       named item, reversed rather than deleted (after: charge runs — payments close charges)
 - [ ] Debtors — the list of debtors by plot and item, with a threshold, and its export (after:
       payments)
-- [ ] Bank statement import — a statement file from each of the cooperative's accounts (Sense
-      Business Online's export first) imported and its payments matched to plots by the payment
-      purpose, with a queue for the unmatched (after: payments)
 - [ ] Money in the board's bot — the treasurer enters a cash payment for a plot, and the board
       looks up a plot's balance and the debtors from the phone (after: payments; after: debtors —
       what it enters and shows; after: the board's bot)
@@ -110,33 +107,11 @@ match.
       book, and every difference is explained (after: reminders — the pilot covers the whole
       cycle)
 
-## Phase 4 — The cooperative's expenses
-
-Goal: the board knows what the cooperative spends and on what. Done when: a month's expenses at
-the owner's cooperative — salaries, waste collection, security — are planned, matched to actual
-payments, and shown against income by item.
-
-- [ ] Salaries as expenses — a salary per holding, the monthly planned expense with employer
-      charges (entered, or a percentage), seasonal holdings planned only in their months (after:
-      staff and positions — the holdings it plans for)
-- [ ] Contractors and contracts — counterparties (firm or sole trader), contracts with an amount
-      per month or per invoice, a period and seasonal months, and an expense item (after: the
-      Solution package)
-- [ ] Actual expenses — outgoing bank payments matched to a contractor or an employee, cash
-      expenses entered by the treasurer, each to an expense item (after: bank statement import —
-      outgoing payments come from the same statement; after: salaries as expenses; after:
-      contractors and contracts)
-- [ ] The income and expense report — income and expenses by item and period, the budget and
-      the plan against actual, with export (after: actual expenses)
-
-## Phase 5 — The cooperative beyond accounting
+## Phase 4 — The cooperative beyond accounting
 
 Goal: the board runs the cooperative's life, not only its money, in the same place. Done when:
 the items below are in use at the owner's cooperative.
 
-- [ ] The statement from the bank's API — the cooperative's bank's business API delivers the
-      statement every day, so payments are matched without a file (after: bank statement import —
-      the matching it feeds)
 - [ ] Losses — the difference from the cooperative's balance, for electricity and water, shared
       by the board's rule per resource and shown in each member's breakdown (after: the
       cooperative's balance — the difference it shares; after: charge runs — it becomes charges)
@@ -144,8 +119,14 @@ the items below are in use at the owner's cooperative.
       Telegram)
 - [ ] Requests to the board — a member files a request in the bot and the board answers it
       (after: linking in Telegram)
-- [ ] Audit-commission access — read-only access to the registry, money and expenses, and the
-      income and expense report (after: the income and expense report)
+- [ ] Audit-commission access — read-only access to the registry, charges, payments and debts
+      (after: debtors — the last of what it reads)
+- [ ] fog: bank statements — import, matching to plots, the bank's API, and payments for fees the
+      Solution does not record; who fills in the payment purpose, and how, is not known yet
+- [ ] fog: the cooperative's income and expenses — salaries, contractors, actual expenses, the
+      report; kept by the accountant for now, possibly decided later
+- [ ] fog: entrance and construction-start fees — recording them needs a way to close or write
+      them off, and part is collected outside the accounting
 - [ ] fog: polls and general-meeting votes — quorum, one vote per plot or per owner, and the legal
       weight of an online vote are not known yet
 
@@ -154,17 +135,16 @@ the items below are in use at the owner's cooperative.
 1. Solution migrations in the tenant schema; Solution schedule; A flow action that knows its contact; A private Solution in the SaaS image
 2. Solution routes
 3. The Solution package
-4. Plots and owners; Contractors and contracts
+4. Plots and owners
 5. Registry import; Linking in Telegram; Charge items and tariffs; Staff and positions
-6. The board's bot; Salaries as expenses; The budget and the membership fee
+6. The board's bot; The budget and the membership fee
 7. Meters and readings
 8. Recorded water draws
 9. Charge runs; The cooperative's balance
 10. Balance in the bot; Payments
-11. Payment by bank details; Debtors; Bank statement import
-12. Reminders; Money in the board's bot; Actual expenses; Losses; Announcements; Requests to the board; The statement from the bank's API
-13. The pilot month; The income and expense report
-14. Audit-commission access
+11. Payment by bank details; Debtors; Losses; Announcements; Requests to the board
+12. Reminders; Money in the board's bot; Audit-commission access
+13. The pilot month
 
 <!--
 Rules (jig-idea §8):

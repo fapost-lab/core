@@ -87,12 +87,12 @@ reminders.
   configurable charge items and tariffs; charge runs for all plots; manual payments (cash and
   bank) with allocation; balances and debtors; the member's balance and charge history in the
   bot; reading and debt reminders.
-- Later phases: the cooperative's expenses — salaries as expenses, contractors and contracts,
-  planned against actual, the income and expense report; bank statement import and automatic
-  matching; losses between the common meter
+- Later phases: losses; losses between the common meter
   and the plots; polls and general-meeting votes; announcements to all members or a street;
-  requests to the board; audit-commission reports; the bank statement fetched from the bank's
-  API.
+  requests to the board; audit-commission reports; the bank statement — import, matching and the bank's API — once it is understood.
+- Not doing now: the cooperative's income and expense accounting (salaries, contractors, actual
+  expenses, the income and expense report) — the accountant keeps it, possibly decided later;
+  entrance fees and construction-start fees.
 - Not doing: penalties (пеня), subsidies and benefits, BAS and 1C exchange, acts and invoices for
   legal entities, card acquiring (it brings the PRRO obligation), automatic meter reading by
   modem, a mobile app, an organisation website, Viber.
@@ -122,6 +122,10 @@ The owner's answers, 2026-11-10:
   plus the common costs plus the land tax on common-use land. The general meeting sets the fee
   for the year (or the month); electricity and water are charged separately by meter. "This is
   needed right away."
+- Entrance fees for new members and fees for starting construction exist; part of them is
+  collected in cash outside the accounting (owner, 2026-11-10).
+- Who fills in the payment purpose of a transfer, and how, is unknown, so how a statement would
+  be matched to plots is not understood yet (owner, 2026-11-10).
 - Channel: Telegram. Viber was rejected by the owner as too expensive.
 
 ## Decisions
@@ -174,7 +178,7 @@ The owner's answers, 2026-11-10:
   bank.
 - The bot gives the member the amount due and the cooperative's bank details as an NBU payment QR
   code with the plot in the payment purpose; the member pays from their own banking app, and the
-  bank statement import matches the payment to the plot. This is the online payment.
+  treasurer records the payment until statement matching exists. This is the online payment.
 - A cooperative has one or more bank accounts; each charge item names the account it is paid to
   (the default account unless set), the QR code carries that account, and a statement is
   imported per account — rejected: a single account per tenant, because the owner's cooperative
@@ -192,21 +196,27 @@ The owner's answers, 2026-11-10:
   from showing it to a member; and the console only, because readings and cash are taken in the
   field, on a phone.
 - The cooperative keeps a staff directory: people (members or not) holding positions (chair,
-  treasurer, electrician, guard, …), each holding with a period — permanent or seasonal — and a
-  salary. A position carries the board-bot role its holder gets, so access follows the
+  treasurer, electrician, guard, …), each holding with a period — permanent or seasonal (no
+  salary for now: expenses stay with the accountant). A position carries the board-bot role its holder gets, so access follows the
   appointment and ends with it. Rejected: board roles granted to people directly, with positions
   kept elsewhere, because the same fact (who is the electrician this season) would be kept twice.
-- Salary is accounted as an expense, not calculated as payroll (owner, 2026-11-10): each holding
-  plans a monthly expense of the salary plus employer charges (entered, or a simple percentage),
-  and the actual payment comes from the bank statement or the treasurer's cash book. Taxes,
-  payslips and reports stay with the accountant. Rejected: full payroll (PIT, military levy,
-  social contribution, timesheets, leave), because it is a product of its own whose rules change
-  every year and whose mistakes are fined — the reference product does not do it either.
-- External services are counterparties with contracts: an amount per month or per invoice, a
-  period, seasonal months where it applies, and an expense item. Planned expenses come from
-  contracts and salaries; actual ones from outgoing bank payments matched to the counterparty or
-  the employee, and cash expenses entered by the treasurer. The board sees income and expenses by
-  item, planned against actual.
+- The cooperative's income and expense accounting stays with its accountant for now (owner,
+  2026-11-10: "let the accounting department handle it; perhaps we decide it later"). The Solution
+  keeps what members are charged and what they paid; the staff directory stays because the
+  board's bot needs it. Rejected for now, and kept here so the argument is not reopened without
+  a reason: salaries planned as expenses with employer charges, contractors with permanent and
+  seasonal contracts, actual expenses matched from outgoing payments and cash, and the income and
+  expense report (planned and dropped the same day).
+- Entrance fees and construction-start fees are not recorded for now (owner, 2026-11-10). A fee
+  shown to a member must be closed by a payment or written off; part of these fees is paid in
+  cash outside the accounting, so recording them would leave balances nobody closes. Rejected:
+  recording them as charge items now. The consequence to handle later: such a payment may still
+  arrive by transfer and appear in a statement.
+- Bank statements are not imported for now: who fills in the payment purpose, and how, is
+  unknown, so matching cannot be designed (owner, 2026-11-10: "how to allocate statements is not
+  clear yet; we will think later"). Until then the treasurer enters bank payments by hand, and
+  the QR code fills the purpose in a fixed form, so the statements that arrive meanwhile become
+  the material for designing the matching.
 - The membership fee is computed from a budget (кошторис) approved by the general meeting for a
   period — a year, or a month, set on the budget. A budget is a list of lines (land tax on the
   plots, land tax on common-use land, salaries, security, waste collection, …), each with an
@@ -267,10 +277,6 @@ The owner's answers, 2026-11-10:
   the PRRO obligation for this cooperative's legal form — to be confirmed with its accountant;
   the decision against acquiring rests on it.
 
-- How the budget meets actual expenses: whether the income and expense report compares actual
-  spending against the budget's lines, and what happens to a surplus or a deficit at the end of
-  the period (carried into the next budget, refunded, charged) — decides the report and the next
-  budget; not needed for the first fee run.
 
 ## Assumptions left untested
 
