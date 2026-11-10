@@ -104,6 +104,9 @@ The owner's answers, 2026-11-10:
   and waste collection — and "we must allow for adding more items".
 - Water: some plots have their own water meter; some draw water through a shared meter, where
   each draw is recorded against the plot; some use the common water with no metering at all.
+- The cooperative has its own intake meters for both electricity and water; the supplier bills
+  the cooperative by them (owner, 2026-11-10: "the organisation's common meter must be accounted
+  for, for both electricity and water").
 - Channel: Telegram. Viber was rejected by the owner as too expensive.
 
 ## Decisions
@@ -136,6 +139,15 @@ The owner's answers, 2026-11-10:
   water as a fixed fee only, because plots with their own meters and recorded draws would pay for
   water they did not use; and a water model separate from electricity, because the two differ
   only in the resource.
+- The cooperative's intake meters (electricity and water) are meters of the cooperative, not of a
+  plot, read monthly like any other. Each period the Solution shows the balance per resource: the
+  intake against the sum of plot meters and recorded draws, with the difference — losses, common
+  use and unmetered plots — as one visible figure. Showing the balance comes in phase 2; turning
+  the difference into charges is the later losses item. Rejected: treating the intake meter only
+  as an input to the losses item, because the board needs the balance from the first month to
+  see theft, broken meters and typos before anyone is charged for them.
+- A shared water meter through which plots draw water is distinct from the intake meter: its
+  draws are charged to plots, while the intake meter is only balanced against.
 - A meter has one or more zones (day/night), each with its own tariff, and a reading carries a
   value per zone — rejected: single-zone only, because both kinds exist on the plots and adding
   zones later rewrites readings and the calculation.
@@ -166,8 +178,9 @@ The owner's answers, 2026-11-10:
   is allowed to use is open; decides the reminders item.
 - Whether a flow action can see the calling contact and return structured data for the reply —
   decides whether the bot dialogue is a flow or the Solution's own handler.
-- The losses rule: shared equally, by consumption, or by a fixed percentage — the owner's
-  cooperative decides; needed only for the losses phase.
+- The losses rule, per resource: shared equally, by consumption, by area, or by a fixed
+  percentage; and for water, whether unmetered plots carry the difference through their fixed fee
+  or share it — the owner's cooperative decides; needed only for the losses item.
 
 ## Assumptions left untested
 

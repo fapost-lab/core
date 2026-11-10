@@ -61,6 +61,10 @@ the bot.
 - [ ] Charge runs — a run for all plots or a selection, recorded and reversible as a whole;
       charges from flagged readings held for the board (after: meters and readings; after:
       recorded water draws; after: charge items and tariffs)
+- [ ] The cooperative's balance — the intake meters for electricity and water read monthly, and
+      per period and resource the intake against the plots' meters and recorded draws, with the
+      unaccounted difference shown to the board (after: meters and readings; after: recorded
+      water draws — both are summed against the intake)
 - [ ] Balance in the bot — the member's balance per plot and item, and the charge history
       (after: charge runs)
 
@@ -87,8 +91,9 @@ the items below are in use at the owner's cooperative.
 
 - [ ] Bank statement import — a statement imported and its payments matched to plots by the
       payment purpose, with a queue for the unmatched (after: payments)
-- [ ] Losses — the difference between the common meter and the plots shared by the board's rule
-      and shown in each member's breakdown (after: charge runs)
+- [ ] Losses — the difference from the cooperative's balance, for electricity and water, shared
+      by the board's rule per resource and shown in each member's breakdown (after: the
+      cooperative's balance — the difference it shares; after: charge runs — it becomes charges)
 - [ ] Announcements — a message to all members, a street or the debtors (after: linking in
       Telegram)
 - [ ] Requests to the board — a member files a request in the bot and the board answers it
@@ -109,7 +114,7 @@ the items below are in use at the owner's cooperative.
 5. Registry import; Linking in Telegram; Charge items and tariffs
 6. Meters and readings
 7. Recorded water draws
-8. Charge runs
+8. Charge runs; The cooperative's balance
 9. Balance in the bot; Payments
 10. Debtors; Bank statement import; Losses; Audit-commission access
 11. Reminders; Announcements; Requests to the board
