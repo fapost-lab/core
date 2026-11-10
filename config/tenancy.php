@@ -135,6 +135,9 @@ return [
         // Mail and name service
         'mail', 'email', 'smtp', 'imap', 'pop', 'pop3', 'webmail',
         'ns', 'ns1', 'ns2', 'ns3', 'mx', 'ftp', 'sftp',
+        // Resend publishes explicit MX and TXT records on send.<domain> for return-path and bounces,
+        // so the wildcard A record does not cover it: a tenant there would get a host that never resolves.
+        'send',
 
         // Delegation labels: controlling these allows mail spoofing or certificate issuance
         'autodiscover', 'autoconfig', '_dmarc', '_domainkey', '_acme-challenge',
