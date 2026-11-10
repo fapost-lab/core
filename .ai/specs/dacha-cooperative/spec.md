@@ -86,7 +86,9 @@ reminders.
   configurable charge items and tariffs; charge runs for all plots; manual payments (cash and
   bank) with allocation; balances and debtors; the member's balance and charge history in the
   bot; reading and debt reminders.
-- Later phases: bank statement import and automatic matching; losses between the common meter
+- Later phases: the cooperative's expenses — salaries as expenses, contractors and contracts,
+  planned against actual, the income and expense report; bank statement import and automatic
+  matching; losses between the common meter
   and the plots; polls and general-meeting votes; announcements to all members or a street;
   requests to the board; audit-commission reports; the bank statement fetched from the bank's
   API.
@@ -110,6 +112,9 @@ The owner's answers, 2026-11-10:
   the cooperative by them (owner, 2026-11-10: "the organisation's common meter must be accounted
   for, for both electricity and water").
 - Bank accounts: one at Sense Bank; a second whose bank the owner is confirming (2026-11-10).
+- People and services: staff employed by the cooperative, contractors (a firm or a sole
+  trader — waste collection, security), and seasonal hires; security is both permanent and
+  seasonal (owner, 2026-11-10).
 - Channel: Telegram. Viber was rejected by the owner as too expensive.
 
 ## Decisions
@@ -179,6 +184,22 @@ The owner's answers, 2026-11-10:
   members' bot must stay simple for 400 people and a board menu there is one wrong check away
   from showing it to a member; and the console only, because readings and cash are taken in the
   field, on a phone.
+- The cooperative keeps a staff directory: people (members or not) holding positions (chair,
+  treasurer, electrician, guard, …), each holding with a period — permanent or seasonal — and a
+  salary. A position carries the board-bot role its holder gets, so access follows the
+  appointment and ends with it. Rejected: board roles granted to people directly, with positions
+  kept elsewhere, because the same fact (who is the electrician this season) would be kept twice.
+- Salary is accounted as an expense, not calculated as payroll (owner, 2026-11-10): each holding
+  plans a monthly expense of the salary plus employer charges (entered, or a simple percentage),
+  and the actual payment comes from the bank statement or the treasurer's cash book. Taxes,
+  payslips and reports stay with the accountant. Rejected: full payroll (PIT, military levy,
+  social contribution, timesheets, leave), because it is a product of its own whose rules change
+  every year and whose mistakes are fined — the reference product does not do it either.
+- External services are counterparties with contracts: an amount per month or per invoice, a
+  period, seasonal months where it applies, and an expense item. Planned expenses come from
+  contracts and salaries; actual ones from outgoing bank payments matched to the counterparty or
+  the employee, and cash expenses entered by the treasurer. The board sees income and expenses by
+  item, planned against actual.
 - A meter has one or more zones (day/night), each with its own tariff, and a reading carries a
   value per zone — rejected: single-zone only, because both kinds exist on the plots and adding
   zones later rewrites readings and the calculation.
@@ -223,6 +244,9 @@ The owner's answers, 2026-11-10:
 - Whether every income the cooperative takes by transfer (fees, electricity, water) stays outside
   the PRRO obligation for this cooperative's legal form — to be confirmed with its accountant;
   the decision against acquiring rests on it.
+
+- The budget (кошторис): whether the general meeting's approved budget should set the fee rates
+  (budget ÷ area or ÷ plots) — a fog item; decides whether the expense plan drives charges.
 
 ## Assumptions left untested
 

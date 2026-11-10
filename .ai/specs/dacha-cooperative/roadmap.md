@@ -42,9 +42,13 @@ their phone in the bot sees their plots.
       request and the board's approval queue, several plots per chat (after: plots and owners;
       after: a flow action that knows its contact)
 
-- [ ] The board's bot — a second Telegram channel for the board, board roles granted in the
-      Solution and confirmed by the chair, and link-request approvals from the phone (after:
-      linking in Telegram — the same phone linking, and the requests it approves)
+- [ ] Staff and positions — the directory of people and positions, permanent and seasonal
+      holdings with dates, and the board-bot role each position carries (after: plots and
+      owners — staff who own plots are the same people)
+- [ ] The board's bot — a second Telegram channel for the board, access from the holder's
+      position confirmed by the chair, and link-request approvals from the phone (after: linking
+      in Telegram — the same phone linking, and the requests it approves; after: staff and
+      positions — the roles it checks)
 
 ## Phase 2 — Readings and charges
 
@@ -100,7 +104,28 @@ match.
       book, and every difference is explained (after: reminders — the pilot covers the whole
       cycle)
 
-## Phase 4 — The cooperative beyond accounting
+## Phase 4 — The cooperative's expenses
+
+Goal: the board knows what the cooperative spends and on what. Done when: a month's expenses at
+the owner's cooperative — salaries, waste collection, security — are planned, matched to actual
+payments, and shown against income by item.
+
+- [ ] Salaries as expenses — a salary per holding, the monthly planned expense with employer
+      charges (entered, or a percentage), seasonal holdings planned only in their months (after:
+      staff and positions — the holdings it plans for)
+- [ ] Contractors and contracts — counterparties (firm or sole trader), contracts with an amount
+      per month or per invoice, a period and seasonal months, and an expense item (after: the
+      Solution package)
+- [ ] Actual expenses — outgoing bank payments matched to a contractor or an employee, cash
+      expenses entered by the treasurer, each to an expense item (after: bank statement import —
+      outgoing payments come from the same statement; after: salaries as expenses; after:
+      contractors and contracts)
+- [ ] The income and expense report — income and expenses by item and period, planned against
+      actual, with export (after: actual expenses)
+- [ ] fog: the budget (кошторис) — whether the general meeting's budget sets the fee rates is
+      not known yet
+
+## Phase 5 — The cooperative beyond accounting
 
 Goal: the board runs the cooperative's life, not only its money, in the same place. Done when:
 the items below are in use at the owner's cooperative.
@@ -115,8 +140,8 @@ the items below are in use at the owner's cooperative.
       Telegram)
 - [ ] Requests to the board — a member files a request in the bot and the board answers it
       (after: linking in Telegram)
-- [ ] Audit-commission access — read-only access and the income and expense report (after:
-      payments)
+- [ ] Audit-commission access — read-only access to the registry, money and expenses, and the
+      income and expense report (after: the income and expense report)
 - [ ] fog: polls and general-meeting votes — quorum, one vote per plot or per owner, and the legal
       weight of an online vote are not known yet
 
@@ -125,17 +150,17 @@ the items below are in use at the owner's cooperative.
 1. Solution migrations in the tenant schema; Solution schedule; A flow action that knows its contact; A private Solution in the SaaS image
 2. Solution routes
 3. The Solution package
-4. Plots and owners
-5. Registry import; Linking in Telegram; Charge items and tariffs
-6. The board's bot
+4. Plots and owners; Contractors and contracts
+5. Registry import; Linking in Telegram; Charge items and tariffs; Staff and positions
+6. The board's bot; Salaries as expenses
 7. Meters and readings
 8. Recorded water draws
 9. Charge runs; The cooperative's balance
 10. Balance in the bot; Payments
-11. Payment by bank details
-12. Debtors; Bank statement import; Losses; Audit-commission access
-13. Reminders; Money in the board's bot; Announcements; Requests to the board; The statement from the bank's API
-14. The pilot month
+11. Payment by bank details; Debtors; Bank statement import
+12. Reminders; Money in the board's bot; Actual expenses; Losses; Announcements; Requests to the board; The statement from the bank's API
+13. The pilot month; The income and expense report
+14. Audit-commission access
 
 <!--
 Rules (jig-idea §8):
