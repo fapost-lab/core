@@ -11,7 +11,7 @@ paths:
   - "resources/js/pages/Console/**"
   - "resources/js/console/shell/**"
   - "resources/js/console/lib/**"
-reviewed_at: 2026-10-26
+reviewed_at: 2026-11-10
 ---
 # Console screens
 
@@ -57,10 +57,19 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   assistant switcher shows only for an application that works per assistant. Example: `ApplicationRail`,
   `AppRail.vue`, `AllApplicationsDialog.vue`, `AppSwitcherConsoleTest`.
 - **The notification bell** lives in the shell's header in both panels. The shared `notifications` prop carries
-  only the unread count (one indexed count, no cache) and the bell's URLs; the list loads as JSON when the menu
-  opens, the count is polled every 60 s while the tab is visible, and every bell route is throttled. A link the
-  bell opens is a full page load, after the "read" write settles or a second passes. Example:
-  `NotificationController`, `StaffNotificationInbox`, `resources/js/console/shell/NotificationBell.vue`.
+  only the unread count (one indexed count, no cache), the bell's URLs and `live` — the user's own channel
+  `tenant.{tenant}.user.{user}.notifications` while a broadcaster delivers, else null; the list loads as JSON when the
+  menu opens, and every bell route is throttled. The bell reads JSON, not Inertia props, so it does not call
+  `useLiveUpdates` but `useBellUpdates` over the same `live-updates` parts: on the channel when the socket is
+  connected (an empty announcement makes it read the count, or the list while open), otherwise polling the count
+  every 60 s while the tab is visible. The server announces from one place — a `NotificationSent` listener for the
+  `database` channel, plus marking read — not at each sender, and without throttling (one user's notifications are
+  rare). A link the bell opens is a full page load, after the "read" write settles or a second passes. Example:
+  `NotificationController`, `StaffNotificationInbox`, `StaffNotificationsAnnouncer`,
+  `resources/js/console/shell/NotificationBell.vue`, `useBellUpdates.ts`.
+- **A menu item may carry a second count**, `attention` (`{count, label}`, the label is what a screen reader says),
+  beside its `badge`, drawn in the warning colour: the conversations item shows the threads waiting for an operator
+  next to the unread ones, both counted over the inbox's own list query. Example: `NavigationBuilder`, `NavLink.vue`.
 - **After a write**, toast through `Inertia::flash()` (never the session `with()`: a shared prop
   is kept in history and replays on Back). Deletes go `back()` so the list keeps its state; forms
   go to the index.

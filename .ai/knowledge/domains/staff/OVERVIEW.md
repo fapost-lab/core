@@ -22,7 +22,7 @@ paths:
   - app/Http/Controllers/Admin/UserController.php
   - app/Http/Controllers/Admin/RoleController.php
   - "app/Http/Requests/Admin/**"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-11-10
 ---
 # Staff
 
@@ -49,7 +49,9 @@ email) raised by Flow's staff-notify node.
 - Activation: `/activate` routes (`routes/web.php`), `Services/ActivationTokenService.php`,
   `Jobs/SendActivationEmailJob.php`.
 - Notifications: `Jobs/SendStaffNotificationJob.php` (queue `messaging.system`), the staff
-  notifier registry.
+  notifier registry (`StaffNotifierInterface::send(User, StaffMessage)` — text and an optional link), the bell's
+  `Services/StaffNotificationInbox.php`, and its live channel in `Live/` (announced by
+  `Listeners/AnnounceStaffNotification` on every in-app notification).
 - `Http/Middleware/EnsureUserIsActive.php` (the console stacks), `database/seeders/RoleSeeder.php`.
 - Admin UI: `app/Http/Controllers/Admin/{UserController,RoleController}.php`
   over `Services/StaffUserService.php` and `Services/StaffRoleService.php` (roles are written by

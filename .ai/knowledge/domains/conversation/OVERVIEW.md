@@ -12,7 +12,7 @@ paths:
   - config/conversation.php
   - "database/migrations/tenant/*conversation*"
   - "tests/*/Domains/Conversation/**"
-reviewed_at: 2026-10-17
+reviewed_at: 2026-11-10
 ---
 # Conversation
 
@@ -68,6 +68,14 @@ conditional UPDATE on the expected current state or holder, so the database deci
 message. Operators reply through `ConversationReplyService`; `ConversationInbox` checks the holder and the
 transfer target. Nothing sets `queued` yet: the flow node that requests an operator is a later task
 (`operator-handoff-node`).
+
+`Notifications/ConversationOperatorNotifier` puts an operator's threads in their bell, in-app only: a contact's message
+in a thread they hold (from `PersistConversationMessageJob`, inbound and newly recorded only), a thread transferred to
+them, a thread an administrator seized from them, each linking to the thread by path and rendered again in the page's
+language. A message adds nothing while any notification about that thread is still unread for the holder (checked and
+written under a per-thread cache lock; a worker that loses the lock skips). It never throws: a failure is reported and
+neither the transcript job nor the transfer or seizure fails. The side menu counts `queued` threads beside the unread
+ones (`ConversationInbox::queuedCount`).
 
 ## Boundaries
 

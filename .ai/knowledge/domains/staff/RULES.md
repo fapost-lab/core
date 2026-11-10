@@ -16,7 +16,7 @@ paths:
   - app/Http/Controllers/Admin/UserController.php
   - app/Http/Controllers/Admin/RoleController.php
   - "app/Http/Requests/Admin/**"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-11-10
 ---
 # Staff rules
 
@@ -66,7 +66,8 @@ broken.
 - **In-app staff notifications are stored in the shape Filament's database notifications wrote**
   (`notifications.data`: `title`, `body`, `status`, `icon`, `iconColor`, `duration`, `format: filament`
   and the rest, key for key), by Core's own `StaffMessageNotification`, so rows written before and after
-  Filament left read the same way when an inbox shows them. They are sent with `notifyNow` inside the
+  Filament left read the same way when an inbox shows them. A message without a link keeps `actions: []`; one with a
+  link (`StaffMessage::$url`) stores it as the single entry `{name: open, label, url}` of `actions`. They are sent with `notifyNow` inside the
   notify job's `runForTenant`, never queued, for the reason limit notices are: a queued notification
   restores the `User` outside the tenant. Enforced: `StaffNotificationTest`.
 - **A user reads and marks only their own notifications, admins included.** Ownership is the query, not a
@@ -75,6 +76,15 @@ broken.
   schema. The inbox returns plain text (markup stripped, never rendered) and keeps a link only when it is a path on
   this host or an `http(s)` address with no whitespace, control character or backslash anywhere.
   Enforced: `NotificationBellConsoleTest`.
+- **Only the user it names listens on a staff user's notification channel** (`tenant.{tenant}.user.{user}.notifications`,
+  `StaffNotificationsChannel`): the tenant of the request and the user's id are compared, never a policy, because
+  `Gate::before` would let an admin onto anyone's channel. The announcement on it (`StaffNotificationsChanged`) carries
+  no data, waits for the commit, is sent only while a broadcaster delivers, and a failure is reported, never thrown
+  into whatever sent or read the notification. Enforced: `StaffNotificationsLiveTest`.
+- **A link a staff notifier delivers is a path on the tenant's host or an `http(s)` address** (`StaffMessage`). In-app
+  keeps the path as it is (the bell opens it on whichever host the user is on); email makes it absolute on the current
+  tenant's host through a closure the provider supplies, read at the time of sending, because `StaffNotifierRegistry`
+  is a singleton and must not capture a tenant. Review only.
 - **A notification that stores what it is about is shown in the language of the page.** The stored prose is written
   in the recipient's `users.locale`, which is usually empty (the console's language lives in the session and the
   cookie), so it falls back to `app.locale`. A notification class that implements `LocalizedDatabaseNotification`

@@ -16,6 +16,8 @@ use App\Domains\Conversation\Exceptions\ConversationTransferTargetIneligibleExce
 use App\Domains\Conversation\Live\ConversationActivityNotifier;
 use App\Domains\Conversation\Models\Conversation;
 use App\Domains\Conversation\Models\ConversationMessage;
+use App\Domains\Conversation\Notifications\ConversationOperatorNotifier;
+use App\Domains\Conversation\Support\ContactLabel;
 use App\Domains\Media\Contracts\MediaServiceInterface;
 use App\Domains\Media\Contracts\MediaUploaderInterface;
 use App\Domains\Media\Enums\MediaSource;
@@ -80,6 +82,7 @@ final readonly class ConversationInbox
         private MediaUploaderInterface $uploader,
         private MediaServiceInterface $media,
         private ConversationActivityNotifier $activity,
+        private ConversationOperatorNotifier $operators,
         private Cache $cache,
         private ExceptionHandler $exceptions,
     ) {
@@ -141,6 +144,17 @@ final readonly class ConversationInbox
     }
 
     /**
+     * Threads waiting for an operator, for the navigation badge beside the unread one.
+     */
+    public function queuedCount(Assistant $assistant): int
+    {
+        $query = $this->query($assistant);
+        $this->filterHandling($query, 'queued', '');
+
+        return $query->count();
+    }
+
+    /**
      * A thread of the assistant; another assistant's, another tenant's or a malformed id is not found.
      *
      * @throws ModelNotFoundException<Conversation>
@@ -179,20 +193,7 @@ final readonly class ConversationInbox
      */
     public function contactLabel(Conversation $conversation): string
     {
-        $contact = $conversation->contact;
-        $meta    = is_array($contact?->meta) ? $contact->meta : [];
-
-        $full = mb_trim((string) ($meta['first_name'] ?? '') . ' ' . (string) ($meta['last_name'] ?? ''));
-
-        if ('' !== $full) {
-            return $full;
-        }
-
-        if ('' !== (string) ($meta['username'] ?? '')) {
-            return '@' . $meta['username'];
-        }
-
-        return null !== $contact ? (string) $contact->external_id : (string) $conversation->getKey();
+        return ContactLabel::of($conversation);
     }
 
     /**
@@ -260,7 +261,7 @@ final readonly class ConversationInbox
     }
 
     /**
-     * The holder hands the thread to another operator, who does not confirm it.
+     * The holder hands the thread to another operator, who does not confirm it and is told in the bell.
      *
      * @return bool whether the thread moved (false: `$fromUserId` does not hold it, any more or at all)
      *
@@ -272,12 +273,18 @@ final readonly class ConversationInbox
             throw new ConversationTransferTargetIneligibleException("User [{$toUserId}] cannot take conversation [{$conversation->getKey()}].");
         }
 
-        return $this->announced($conversation, $this->ownership->transfer((string) $conversation->getKey(), $fromUserId, $toUserId));
+        $moved = $this->announced($conversation, $this->ownership->transfer((string) $conversation->getKey(), $fromUserId, $toUserId));
+
+        if ($moved) {
+            $this->operators->transferred($conversation, $toUserId, $fromUserId);
+        }
+
+        return $moved;
     }
 
     /**
      * An administrator takes a thread another operator holds. `$expectedOwnerId` is the holder the administrator saw,
-     * so a thread that moved since is left alone.
+     * so a thread that moved since is left alone; that operator is told in the bell.
      *
      * @return bool whether the thread was seized
      *
@@ -293,7 +300,13 @@ final readonly class ConversationInbox
             return false;
         }
 
-        return $this->announced($conversation, $this->ownership->seize((string) $conversation->getKey(), $expectedOwnerId, (string) $admin->getKey()));
+        $seized = $this->announced($conversation, $this->ownership->seize((string) $conversation->getKey(), $expectedOwnerId, (string) $admin->getKey()));
+
+        if ($seized) {
+            $this->operators->seized($conversation, $expectedOwnerId, $admin);
+        }
+
+        return $seized;
     }
 
     /**

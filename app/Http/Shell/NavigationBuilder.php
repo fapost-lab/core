@@ -33,7 +33,10 @@ use Illuminate\Support\Facades\Route;
  * Each item names its full `console.*` route; an item whose route does not exist is left out. `external` (a plain link, a full page load) is false for
  * every Core item; it stays for an item that leads off the console.
  *
- * @phpstan-type Item array{key: string, label: string, href: string, icon: string, external: bool, badge: string|null}
+ * An item may carry a second count beside its badge, `attention`, with the words a screen reader says for it: the
+ * conversations item shows how many threads wait for an operator next to how many are unread.
+ *
+ * @phpstan-type Item array{key: string, label: string, href: string, icon: string, external: bool, badge: string|null, attention?: array{count: string, label: string}|null}
  * @phpstan-type Group array{label: string|null, items: list<Item>}
  */
 final readonly class NavigationBuilder
@@ -74,6 +77,7 @@ final readonly class NavigationBuilder
                 75,
                 $this->canViewAny($user, Conversation::class),
                 $badges ? fn (): ?string => $this->unreadConversations($assistant) : null,
+                $badges ? fn (): ?array => $this->waitingConversations($assistant) : null,
             ),
             $this->entry($operations, 'console.contact-segments.index', __('segment.plural_label'), 'funnel', 78, $this->canViewAny($user, ContactSegment::class)),
             $this->entry($operations, 'console.broadcasts.index', __('broadcast.plural_label'), 'megaphone', 80, $this->canViewAny($user, Broadcast::class)),
@@ -151,20 +155,21 @@ final readonly class NavigationBuilder
     }
 
     /**
-     * @param  (Closure(): (string|null))|null  $badge
+     * @param  (Closure(): (string|null))|null                                    $badge
+     * @param  (Closure(): (array{count: string, label: string}|null))|null       $attention
      *
-     * @return array{group: string|null, route: string, label: string, icon: string, sort: int, visible: bool, badge: (Closure(): (string|null))|null}
+     * @return array{group: string|null, route: string, label: string, icon: string, sort: int, visible: bool, badge: (Closure(): (string|null))|null, attention: (Closure(): (array{count: string, label: string}|null))|null}
      */
-    private function entry(?string $group, string $route, string $label, string $icon, int $sort, bool $visible, ?Closure $badge = null): array
+    private function entry(?string $group, string $route, string $label, string $icon, int $sort, bool $visible, ?Closure $badge = null, ?Closure $attention = null): array
     {
-        return ['group' => $group, 'route' => $route, 'label' => $label, 'icon' => $icon, 'sort' => $sort, 'visible' => $visible, 'badge' => $badge];
+        return ['group' => $group, 'route' => $route, 'label' => $label, 'icon' => $icon, 'sort' => $sort, 'visible' => $visible, 'badge' => $badge, 'attention' => $attention];
     }
 
     /**
      * Keeps what the user may see, orders items by their sort within a group (declaration order breaks ties) and
      * keeps groups in the order they are first declared, the group-less one first as Filament showed it.
      *
-     * @param  list<array{group: string|null, route: string, label: string, icon: string, sort: int, visible: bool, badge: (Closure(): (string|null))|null}>  $entries
+     * @param  list<array{group: string|null, route: string, label: string, icon: string, sort: int, visible: bool, badge: (Closure(): (string|null))|null, attention: (Closure(): (array{count: string, label: string}|null))|null}>  $entries
      * @param  array<string, mixed>  $parameters
      *
      * @return list<Group>
@@ -188,12 +193,13 @@ final readonly class NavigationBuilder
             $sorted[$key][] = [
                 'sort' => $entry['sort'],
                 'item' => [
-                    'key'      => $name,
-                    'label'    => $entry['label'],
-                    'href'     => route($name, $parameters, false),
-                    'icon'     => $entry['icon'],
-                    'external' => false,
-                    'badge'    => null === $entry['badge'] ? null : ($entry['badge'])(),
+                    'key'       => $name,
+                    'label'     => $entry['label'],
+                    'href'      => route($name, $parameters, false),
+                    'icon'      => $entry['icon'],
+                    'external'  => false,
+                    'badge'     => null === $entry['badge'] ? null : ($entry['badge'])(),
+                    'attention' => null === $entry['attention'] ? null : ($entry['attention'])(),
                 ],
             ];
         }
@@ -227,5 +233,19 @@ final readonly class NavigationBuilder
         $count = $this->inbox->unreadCount($assistant);
 
         return $count > 0 ? (string) $count : null;
+    }
+
+    /**
+     * Threads waiting for an operator, counted by the inbox over the query its list uses.
+     *
+     * @return array{count: string, label: string}|null
+     */
+    private function waitingConversations(Assistant $assistant): ?array
+    {
+        $count = $this->inbox->queuedCount($assistant);
+
+        return $count > 0
+            ? ['count' => (string) $count, 'label' => trans_choice('conversation.navigation.waiting', $count, ['count' => $count])]
+            : null;
     }
 }

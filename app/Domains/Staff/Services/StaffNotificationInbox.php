@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Staff\Services;
 
 use App\Domains\Staff\Contracts\LocalizedDatabaseNotification;
+use App\Domains\Staff\Live\StaffNotificationsAnnouncer;
 use App\Domains\Staff\Models\User;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
@@ -22,9 +23,10 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  * {@see \App\Domains\Staff\Notifications\LimitReachedNotification} and from Filament before it left; all of them keep
  * Filament's keys (`title`, `body`, `status`, `iconColor`, `actions`) or Core's `action`. The text is returned plain:
  * markup in a stored body is removed, never rendered. A row whose class implements {@see LocalizedDatabaseNotification}
- * is rendered again in the language of the request.
+ * is rendered again in the language of the request. Reading changes the count, so it is announced to the user's other
+ * consoles ({@see StaffNotificationsAnnouncer}).
  */
-final class StaffNotificationInbox
+final readonly class StaffNotificationInbox
 {
     /**
      * How many notifications the bell lists.
@@ -32,6 +34,11 @@ final class StaffNotificationInbox
     public const int LATEST = 20;
 
     private const array TONES = ['success', 'info', 'warning', 'danger'];
+
+    public function __construct(
+        private StaffNotificationsAnnouncer $announcer,
+    ) {
+    }
 
     public function unreadCount(User $user): int
     {
@@ -64,7 +71,11 @@ final class StaffNotificationInbox
             throw new NotFoundHttpException();
         }
 
-        $notification->markAsRead();
+        if (null === $notification->read_at) {
+            $notification->markAsRead();
+            // The user's other tabs read their count again.
+            $this->announcer->changed($user);
+        }
     }
 
     /**
@@ -72,7 +83,9 @@ final class StaffNotificationInbox
      */
     public function markAllRead(User $user): void
     {
-        $user->unreadNotifications()->update(['read_at' => now()]);
+        if ($user->unreadNotifications()->update(['read_at' => now()]) > 0) {
+            $this->announcer->changed($user);
+        }
     }
 
     /**

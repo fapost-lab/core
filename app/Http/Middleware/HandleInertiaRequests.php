@@ -9,9 +9,11 @@ use App\Domains\Onboarding\Services\OnboardingChecklist;
 use App\Domains\Onboarding\Services\OnboardingLateSteps;
 use App\Domains\Onboarding\Services\OnboardingState;
 use App\Domains\Staff\Enums\Permission;
+use App\Domains\Staff\Live\StaffNotificationsChannel;
 use App\Domains\Staff\Models\User;
 use App\Domains\Staff\Services\StaffNotificationInbox;
 use App\Domains\Staff\Support\SupportAccessSession;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Services\CurrentAccessState;
 use App\Http\Shell\ApplicationRail;
 use App\Http\Shell\ApplicationRegistry;
@@ -151,8 +153,9 @@ final class HandleInertiaRequests extends Middleware
     /**
      * The notification bell: one count of the user's unread notifications (an indexed query on the notifiable), and
      * where the bell reads the list, polls the count and marks everything read. The list itself loads when it opens.
+     * `live` is the user's own channel while a broadcaster delivers and a tenant is in context; without it the bell polls.
      *
-     * @return array{unread: int, indexUrl: string, countUrl: string, readAllUrl: string}|null
+     * @return array{unread: int, indexUrl: string, countUrl: string, readAllUrl: string, live: array{channel: string, event: string}|null}|null
      */
     private function notifications(Request $request): ?array
     {
@@ -167,6 +170,24 @@ final class HandleInertiaRequests extends Middleware
             'indexUrl'   => route('console.notifications.index', [], false),
             'countUrl'   => route('console.notifications.count', [], false),
             'readAllUrl' => route('console.notifications.read-all', [], false),
+            'live'       => $this->notificationsChannel($user),
+        ];
+    }
+
+    /**
+     * @return array{channel: string, event: string}|null
+     */
+    private function notificationsChannel(User $user): ?array
+    {
+        $tenants = app(TenantContextInterface::class);
+
+        if (! app(BroadcasterStatus::class)->enabled() || ! $tenants->isResolved()) {
+            return null;
+        }
+
+        return [
+            'channel' => StaffNotificationsChannel::name($tenants->get()->getId(), (string) $user->getKey()),
+            'event'   => StaffNotificationsChannel::EVENT,
         ];
     }
 

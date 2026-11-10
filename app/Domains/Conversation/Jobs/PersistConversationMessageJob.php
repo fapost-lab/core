@@ -8,6 +8,7 @@ use App\Domains\Conversation\Contracts\ConversationStoreInterface;
 use App\Domains\Conversation\DTO\MessageLogEntry;
 use App\Domains\Conversation\Enums\MessageDirection;
 use App\Domains\Conversation\Live\ConversationActivityNotifier;
+use App\Domains\Conversation\Notifications\ConversationOperatorNotifier;
 use App\Domains\Conversation\Settings\ConversationSettings;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
 use App\Domains\Tenancy\Services\TenantSwitcher;
@@ -35,10 +36,11 @@ final class PersistConversationMessageJob implements ShouldQueue
         TenantRepositoryInterface $tenants,
         TenantSwitcher $switcher,
         ConversationActivityNotifier $activity,
+        ConversationOperatorNotifier $operators,
     ): void {
         $tenant = $tenants->getById($this->entry->tenantId);
 
-        $switcher->runForTenant($tenant, function () use ($store, $activity): void {
+        $switcher->runForTenant($tenant, function () use ($store, $activity, $operators): void {
             // Resolved inside the switch, in the entry's own tenant: a tenant that has turned its log off after the
             // entry was queued writes nothing. The memo is per tenant id, so a scoped instance is safe either way.
             $settings = app(ConversationSettings::class);
@@ -55,6 +57,12 @@ final class PersistConversationMessageJob implements ShouldQueue
 
                 // An open inbox shows the new message (and the unread count) without waiting for its next poll.
                 $activity->touched($this->entry->tenantId, $this->entry->assistantId);
+
+                // The operator holding the thread hears of the contact's message in the bell; a retried job recorded
+                // nothing new and says nothing.
+                if (MessageDirection::Inbound === $this->entry->direction) {
+                    $operators->messageReceived($this->entry->tenantId, $conversationId);
+                }
             }
         });
     }

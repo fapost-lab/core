@@ -1,3 +1,4 @@
+import type { LiveChannel } from '../lib/live-updates'
 import type { DataTableLabels } from '@fapost/ui/lib/messages'
 
 /** What the server shares with every console page (see HandleInertiaRequests). */
@@ -11,6 +12,8 @@ export interface NavItem {
     /** The screen is not an Inertia page: a plain link with a full page load, never an Inertia visit. */
     external: boolean
     badge: string | null
+    /** A second count beside the badge (threads waiting for an operator), with the words a screen reader says for it. */
+    attention?: { count: string; label: string } | null
 }
 
 export interface NavGroup {
@@ -101,6 +104,8 @@ export interface ShellNotifications {
     indexUrl: string
     countUrl: string
     readAllUrl: string
+    /** The user's own channel while a broadcaster delivers; without it the bell polls. */
+    live?: LiveChannel | null
 }
 
 export interface NotificationsTranslations {

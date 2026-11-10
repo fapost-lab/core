@@ -16,11 +16,17 @@ import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { interpolate } from '@fapost/ui/lib/utils'
 import { NOTIFICATION_POLL_MS, READ_BEFORE_LEAVING_MS, allMarkedRead, badgeText, markedRead, settleWithin, type ShellNotification } from './notifications'
 import type { NotificationsTranslations, ShellNotifications } from './types'
+import { useBellUpdates } from './useBellUpdates'
 
 /**
- * The shell's notification bell, in both panels: the unread count from the shared `notifications` prop (kept current by
- * every visit and by polling the count while the tab is visible), and on opening, the latest notifications of the
- * signed-in user. Choosing one marks it read and opens its link, if it has one. Text is shown as text, never as HTML.
+ * The shell's notification bell, in both panels: the unread count from the shared `notifications` prop, and on opening,
+ * the latest notifications of the signed-in user. Choosing one marks it read and opens its link, if it has one. Text is
+ * shown as text, never as HTML.
+ *
+ * The count stays current through every visit and, between visits, either over the user's own private channel (when the
+ * server gives one and the app's websocket is connected: an announcement carries nothing, the bell asks for the count,
+ * and for the list too while it is open) or by polling every minute while the tab is visible — when there is no
+ * websocket, it dropped, or the server refused the subscription.
  */
 const props = defineProps<{
   notifications: ShellNotifications
@@ -33,12 +39,11 @@ type State = 'idle' | 'loading' | 'ready' | 'error'
 const unread = ref(props.notifications.unread)
 const items = ref<ShellNotification[]>([])
 const state = ref<State>('idle')
+const open = ref(false)
 
 const list = useHttp<Record<string, never>, { unread: number; items: ShellNotification[] }>({})
 const counter = useHttp<Record<string, never>, { unread: number }>({})
 const writer = useHttp<Record<string, never>, { unread: number }>({})
-
-let timer: ReturnType<typeof setInterval> | null = null
 
 // Every Inertia visit brings a fresh count.
 watch(
@@ -83,9 +88,20 @@ function refreshCount(): void {
     })
 }
 
-function onOpenChange(open: boolean): void {
-  if (open) {
+function onOpenChange(value: boolean): void {
+  open.value = value
+
+  if (value) {
     load()
+  }
+}
+
+/** The server says the user's notifications changed: read the count again, and the list while it is open. */
+function onAnnouncement(): void {
+  if (open.value) {
+    load()
+  } else {
+    refreshCount()
   }
 }
 
@@ -129,16 +145,18 @@ function onVisibility(): void {
   }
 }
 
+useBellUpdates({
+  live: () => props.notifications.live,
+  refresh: refreshCount,
+  onAnnouncement,
+  pollMs: NOTIFICATION_POLL_MS,
+})
+
 onMounted(() => {
-  timer = setInterval(refreshCount, NOTIFICATION_POLL_MS)
   document.addEventListener('visibilitychange', onVisibility)
 })
 
 onBeforeUnmount(() => {
-  if (timer !== null) {
-    clearInterval(timer)
-  }
-
   document.removeEventListener('visibilitychange', onVisibility)
   list.cancel()
   counter.cancel()

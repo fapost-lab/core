@@ -11,7 +11,9 @@ use App\Domains\Staff\Jobs\SendStaffNotificationJob;
 use App\Domains\Staff\Mail\StaffNotificationMail;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Notifications\StaffMessage;
 use App\Domains\Staff\Notifications\StaffMessageNotification;
+use App\Domains\Staff\Notifications\StaffNotifierRegistry;
 use App\Domains\Staff\Notifications\StaffRecipientResolver;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\DB;
@@ -126,7 +128,7 @@ final class StaffNotificationTest extends FeatureTestCase
      */
     public function test_the_in_app_notification_is_never_queued(): void
     {
-        $this->assertNotInstanceOf(ShouldQueue::class, new StaffMessageNotification('Operator needed'));
+        $this->assertNotInstanceOf(ShouldQueue::class, new StaffMessageNotification(new StaffMessage('Operator needed')));
     }
 
     public function test_job_delivers_email(): void
@@ -140,6 +142,46 @@ final class StaffNotificationTest extends FeatureTestCase
         $this->runJob($session, ['target' => 'assistant'], [StaffNotifyChannel::Email->value]);
 
         Mail::assertSent(StaffNotificationMail::class, fn (StaffNotificationMail $m): bool => $m->hasTo($user->email));
+    }
+
+    /**
+     * A message with a link keeps Filament's shape and puts the link in its one action, which the bell opens.
+     */
+    public function test_an_in_app_message_with_a_link_stores_it_as_its_action(): void
+    {
+        $user = User::factory()->create();
+
+        $this->app->make(StaffNotifierRegistry::class)->get(StaffNotifyChannel::InApp->value)
+            ?->send($user, new StaffMessage('Operator requested', '/assistant/a1/conversations/c1', 'Open'));
+
+        $data = json_decode((string) DB::table('notifications')->where('notifiable_id', $user->id)->sole()->data, true, flags: JSON_THROW_ON_ERROR);
+
+        $this->assertSame([['name' => 'open', 'label' => 'Open', 'url' => '/assistant/a1/conversations/c1']], $data['actions']);
+        $this->assertSame('Operator requested', $data['title']);
+        $this->assertSame('filament', $data['format']);
+    }
+
+    /**
+     * A mail is read outside the console: a path becomes an address on the tenant's host; an address stays as it is.
+     */
+    public function test_an_email_with_a_link_carries_an_absolute_address(): void
+    {
+        Mail::fake();
+        $user   = User::factory()->create();
+        $mailer = $this->app->make(StaffNotifierRegistry::class)->get(StaffNotifyChannel::Email->value);
+
+        $mailer?->send($user, new StaffMessage('Operator requested', '/assistant/a1/conversations/c1'));
+        $mailer?->send($user, new StaffMessage('Elsewhere', 'https://panel.example.test/x'));
+        $mailer?->send($user, new StaffMessage('No link'));
+
+        Mail::assertSent(StaffNotificationMail::class, fn (StaffNotificationMail $mail): bool => 'Operator requested' === $mail->messageBody
+            && null !== $mail->actionUrl
+            && str_starts_with($mail->actionUrl, 'http')
+            && str_ends_with($mail->actionUrl, '/assistant/a1/conversations/c1'));
+        Mail::assertSent(StaffNotificationMail::class, fn (StaffNotificationMail $mail): bool => 'Elsewhere' === $mail->messageBody
+            && 'https://panel.example.test/x' === $mail->actionUrl);
+        Mail::assertSent(StaffNotificationMail::class, fn (StaffNotificationMail $mail): bool => 'No link' === $mail->messageBody
+            && null === $mail->actionUrl);
     }
 
     public function test_job_is_idempotent_on_retry(): void

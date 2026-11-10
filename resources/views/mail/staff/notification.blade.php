@@ -3,4 +3,10 @@
 
 {{ $messageBody }}
 
+@if ($actionUrl)
+<x-mail::button :url="$actionUrl">
+{{ $actionLabel }}
+</x-mail::button>
+@endif
+
 </x-mail::message>

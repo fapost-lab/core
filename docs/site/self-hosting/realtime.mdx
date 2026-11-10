@@ -3,8 +3,9 @@ title: "Realtime"
 description: "Optional websocket live updates for the console, with Reverb or any Pusher-protocol server."
 ---
 
-The console screens that follow live activity — flow sessions and flow logs — stay
-current either by polling or over a websocket.
+The console screens that follow live activity — flow sessions, flow logs and
+conversations — and the notification bell stay current either by polling or over a
+websocket.
 
 **Polling is the default and needs nothing.** With `BROADCAST_CONNECTION=null`
 the application broadcasts nothing, and each live screen reloads its data every
@@ -27,6 +28,11 @@ channel of the assistant, at most once every couple of seconds. Each open screen
 listens on that channel and reloads its own data when it hears something. The
 announcement carries no data; the reload goes through the normal authorized
 request, so the websocket never sees what the screen shows.
+
+The bell works the same way on a channel of its own: when one of your
+notifications arrives or is read, the application announces it there, and the
+bell asks for its count again. Only you may listen on your channel. Without a
+websocket, or while it is down, the bell asks once a minute.
 
 Who may listen is checked by the application at `/broadcasting/auth`, on the
 tenant's own host, with the same session and account checks as the console. The
