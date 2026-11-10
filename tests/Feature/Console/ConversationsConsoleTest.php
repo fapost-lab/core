@@ -29,6 +29,7 @@ use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Models\Tenant;
+use App\Http\Middleware\HandleInertiaRequests;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Media\Enums\MediaKind;
 use Fapost\Foundation\Messaging\DeliveryResult;
@@ -36,7 +37,6 @@ use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderI
 use Fapost\Foundation\Messaging\OutboundMessage;
 use Fapost\Foundation\Quota\Contracts\UsageMeterInterface;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
-use App\Http\Middleware\HandleInertiaRequests;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -120,6 +120,36 @@ final class ConversationsConsoleTest extends FeatureTestCase
                     'event'   => 'conversation.activity',
                 ])
                 ->where('navigation.groups', fn ($groups): bool => '1' === $this->badgeOf($groups, 'console.conversations.index'))
+                ->etc());
+    }
+
+    public function test_the_menu_counts_the_threads_waiting_for_an_operator_beside_the_unread_ones(): void
+    {
+        $this->thread(['owner_type' => ConversationOwner::Queued, 'queued_at' => Carbon::now()]);
+        $this->thread(['owner_type' => ConversationOwner::Queued, 'queued_at' => Carbon::now()]);
+        $this->thread(['owner_type' => ConversationOwner::Staff, 'owner_staff_user_id' => (string) $this->operator()->getKey()]);
+        $this->thread(['owner_type' => ConversationOwner::Queued, 'queued_at' => Carbon::now()], assistant: Assistant::factory()->create());
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('navigation.groups', fn ($groups): bool => [
+                    'count' => '2',
+                    'label' => '2 conversations wait for an operator',
+                ] === $this->itemOf($groups, 'console.conversations.index')['attention'])
+                ->etc());
+    }
+
+    public function test_the_menu_shows_no_waiting_count_when_nothing_waits(): void
+    {
+        $this->thread();
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('navigation.groups', fn ($groups): bool => null === $this->itemOf($groups, 'console.conversations.index')['attention'])
                 ->etc());
     }
 
@@ -1004,6 +1034,22 @@ final class ConversationsConsoleTest extends FeatureTestCase
         }
 
         return null;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function itemOf(mixed $groups, string $key): array
+    {
+        foreach (collect($groups)->all() as $group) {
+            foreach ($group['items'] as $item) {
+                if ($item['key'] === $key) {
+                    return $item;
+                }
+            }
+        }
+
+        $this->fail("No menu item {$key}.");
     }
 
     private function reservation(Conversation $thread, string $requestId): string

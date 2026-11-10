@@ -9,6 +9,7 @@ return [
 
     'notifications' => [
         'escalation_subject' => 'Сповіщення від :app',
+        'open'               => 'Відкрити',
     ],
 
     'tenant_settings' => [

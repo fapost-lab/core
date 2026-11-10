@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Staff\Jobs;
 
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Staff\Notifications\StaffMessage;
 use App\Domains\Staff\Notifications\StaffNotifierRegistry;
 use App\Domains\Staff\Notifications\StaffRecipientResolver;
 use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
@@ -100,7 +101,7 @@ final class SendStaffNotificationJob implements ShouldQueue, TenantAccessGatedJo
                     }
 
                     try {
-                        $notifier->send($recipient, $this->message);
+                        $notifier->send($recipient, new StaffMessage($this->message));
                     } catch (Throwable $e) {
                         // One failing channel must not block the others or fail the
                         // whole job (which would re-deliver on retry).

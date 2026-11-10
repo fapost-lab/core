@@ -29,7 +29,7 @@ interface StaffNotifierInterface
     public function isAvailableFor(User $user): bool;
 
     /**
-     * Deliver the already-rendered notification text to the user.
+     * Deliver the already-rendered message, and its link when it has one, to the user.
      */
-    public function send(User $user, string $message): void;
+    public function send(User $user, StaffMessage $message): void;
 }

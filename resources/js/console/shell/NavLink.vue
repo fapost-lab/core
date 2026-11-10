@@ -12,6 +12,8 @@ const props = defineProps<{
   label: string
   icon?: string
   badge?: string | null
+  /** A second count beside the badge, in the warning colour, with its own words for a screen reader. */
+  attention?: { count: string; label: string } | null
   external?: boolean
   active?: boolean
 }>()
@@ -30,10 +32,28 @@ const linkClass = (): string =>
     <ShellIcon :name="icon" v-if="icon" class="size-[18px] shrink-0" aria-hidden="true" />
     <span class="min-w-0 flex-1 truncate">{{ label }}</span>
     <span v-if="badge" class="bg-primary text-primary-foreground inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold">{{ badge }}</span>
+    <span
+      v-if="attention"
+      class="bg-warning text-warning-foreground inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold"
+      :title="attention.label"
+      data-test="nav-attention"
+    >
+      <span aria-hidden="true">{{ attention.count }}</span>
+      <span class="sr-only">{{ attention.label }}</span>
+    </span>
   </a>
   <Link v-else :href="href" :class="linkClass()" :aria-current="active ? 'page' : undefined">
     <ShellIcon :name="icon" v-if="icon" class="size-[18px] shrink-0" aria-hidden="true" />
     <span class="min-w-0 flex-1 truncate">{{ label }}</span>
     <span v-if="badge" class="bg-primary text-primary-foreground inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold">{{ badge }}</span>
+    <span
+      v-if="attention"
+      class="bg-warning text-warning-foreground inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold"
+      :title="attention.label"
+      data-test="nav-attention"
+    >
+      <span aria-hidden="true">{{ attention.count }}</span>
+      <span class="sr-only">{{ attention.label }}</span>
+    </span>
   </Link>
 </template>

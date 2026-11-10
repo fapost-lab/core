@@ -13,7 +13,7 @@ paths:
   - config/conversation.php
   - "database/migrations/tenant/*conversation*"
   - "tests/*/Domains/Conversation/**"
-reviewed_at: 2026-10-17
+reviewed_at: 2026-11-10
 ---
 # Conversation rules
 
@@ -37,6 +37,9 @@ broken.
 - **Every ownership change is one conditional UPDATE** on the expected state or holder (take over from
   `bot`/`queued`, finish/transfer by the holder, seize from the holder the admin saw): two operators at once
   never both win. Enforced: `ConversationOwnershipTest`.
+- **An operator's bell holds at most one unread message notification per thread** (`ConversationOperatorNotifier`),
+  and the notifier never throws to the transcript job or the operator's action. Enforced:
+  `ConversationOperatorNotificationTest`.
 - **A `queued` thread stops inbound routing exactly as a `staff` one** (`isHandledByStaff`, `MessageRouter`).
 - **Reading and answering a thread needs access to its assistant** (`ConversationPolicy::view` / `reply`:
   admin or assigned), on top of `ViewConversations` / `ReplyConversations`; a transfer target needs both

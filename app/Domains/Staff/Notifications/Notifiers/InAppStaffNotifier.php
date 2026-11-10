@@ -6,14 +6,15 @@ namespace App\Domains\Staff\Notifications\Notifiers;
 
 use App\Domains\Staff\Enums\StaffNotifyChannel;
 use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Notifications\StaffMessage;
 use App\Domains\Staff\Notifications\StaffMessageNotification;
 use App\Domains\Staff\Notifications\StaffNotifierInterface;
 
 /**
  * Delivers staff notifications as in-app (database) notifications.
  *
- * This is the Core baseline transport (D1): zero external dependencies, always available. The rows are
- * stored for an inbox to show; the console has none yet.
+ * This is the Core baseline transport (D1): zero external dependencies, always available. The rows are what the
+ * console's bell lists; a message's link becomes the notification's action.
  */
 final class InAppStaffNotifier implements StaffNotifierInterface
 {
@@ -27,7 +28,7 @@ final class InAppStaffNotifier implements StaffNotifierInterface
         return true;
     }
 
-    public function send(User $user, string $message): void
+    public function send(User $user, StaffMessage $message): void
     {
         $user->notifyNow(new StaffMessageNotification($message));
     }

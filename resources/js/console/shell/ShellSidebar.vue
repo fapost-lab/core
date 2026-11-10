@@ -51,6 +51,7 @@ const application = computed(() => {
           :label="item.label"
           :icon="item.icon"
           :badge="item.badge"
+          :attention="item.attention"
           :external="item.external"
           :active="active?.key === item.key"
         />

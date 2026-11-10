@@ -106,4 +106,24 @@ return [
         'failed'                => 'Failed to download',
         'storage_limit_reached' => 'Not saved: media storage is full',
     ],
+
+    'operator_notifications' => [
+        'open'    => 'Open conversation',
+        'message' => [
+            'title' => 'New message from :contact',
+            'body'  => 'In a conversation you are handling.',
+        ],
+        'transferred' => [
+            'title' => ':actor handed you the conversation with :contact',
+            'body'  => 'You are handling it now.',
+        ],
+        'seized' => [
+            'title' => ':actor took over your conversation with :contact',
+            'body'  => 'An administrator is handling it now.',
+        ],
+    ],
+
+    'navigation' => [
+        'waiting' => ':count conversation waits for an operator|:count conversations wait for an operator',
+    ],
 ];

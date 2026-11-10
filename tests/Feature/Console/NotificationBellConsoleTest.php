@@ -7,6 +7,7 @@ namespace Tests\Feature\Console;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Notifications\StaffMessage;
 use App\Domains\Staff\Notifications\StaffMessageNotification;
 use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Carbon;
@@ -61,10 +62,10 @@ final class NotificationBellConsoleTest extends FeatureTestCase
         $assistant = Assistant::factory()->create();
         $user      = $this->admin();
         $other     = $this->admin();
-        $user->notifyNow(new StaffMessageNotification('First'));
-        $user->notifyNow(new StaffMessageNotification('Second'));
+        $user->notifyNow(new StaffMessageNotification(new StaffMessage('First')));
+        $user->notifyNow(new StaffMessageNotification(new StaffMessage('Second')));
         $this->store($user, ['title' => 'Read already'], readAt: Carbon::now());
-        $other->notifyNow(new StaffMessageNotification('Not yours'));
+        $other->notifyNow(new StaffMessageNotification(new StaffMessage('Not yours')));
 
         $this->actingAs($user);
 
@@ -74,6 +75,7 @@ final class NotificationBellConsoleTest extends FeatureTestCase
             'indexUrl'   => '/console/notifications',
             'countUrl'   => '/console/notifications/count',
             'readAllUrl' => '/console/notifications/read',
+            'live'       => null,
         ], $admin);
 
         $console = $this->get($this->panelUrl("/assistant/{$assistant->getKey()}/_probe"))->assertOk()->viewData('page')['props']['notifications'];
@@ -143,7 +145,7 @@ final class NotificationBellConsoleTest extends FeatureTestCase
     public function test_a_notification_written_by_the_notify_node_is_listed(): void
     {
         $user = User::factory()->create();
-        $user->notifyNow(new StaffMessageNotification('Operator needed'));
+        $user->notifyNow(new StaffMessageNotification(new StaffMessage('Operator needed')));
 
         $item = $this->actingAs($user)->getJson($this->panelUrl('/console/notifications'))->assertOk()->json('items.0');
 

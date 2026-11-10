@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Domains\Staff\Listeners\AnnounceStaffNotification;
 use App\Domains\Staff\Listeners\CloseSupportAccessEntry;
 use App\Domains\Staff\Listeners\NotifyAdminsOfLimit;
 use App\Domains\Staff\Listeners\NotifyAdminsOfWorkspaceDeletion;
@@ -26,17 +27,20 @@ use App\Domains\Staff\Services\RoleWriterService;
 use App\Domains\Staff\Services\TenantAdminDirectory;
 use App\Domains\Staff\Services\UserService;
 use App\Domains\Tenancy\Contracts\TenantAdminDirectoryInterface;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Events\LimitApproaching;
 use App\Domains\Tenancy\Events\LimitReached;
 use App\Domains\Tenancy\Events\WorkspaceDeletionCancelled;
 use App\Domains\Tenancy\Events\WorkspaceDeletionScheduled;
 use App\Domains\Tenancy\Services\TenantUsageCounters;
+use App\Domains\Tenancy\Support\TenantHost;
 use Fapost\Foundation\Operator\Contracts\OperatorAccessInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
 use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
 use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
@@ -72,7 +76,12 @@ final class StaffServiceProvider extends ServiceProvider
         $this->app->singleton(StaffNotifierRegistry::class, function (): StaffNotifierRegistry {
             $registry = new StaffNotifierRegistry();
             $registry->register(new InAppStaffNotifier());
-            $registry->register(new EmailStaffNotifier());
+            // Resolved at the time of sending, inside the job's tenant switch: the registry outlives the job.
+            $registry->register(new EmailStaffNotifier(static function (string $path): string {
+                $tenants = app(TenantContextInterface::class);
+
+                return $tenants->isResolved() ? TenantHost::urlFor($tenants->get(), $path) : url($path);
+            }));
 
             return $registry;
         });
@@ -103,6 +112,8 @@ final class StaffServiceProvider extends ServiceProvider
         });
 
         Event::listen(Logout::class, CloseSupportAccessEntry::class);
+        // The bell hears of every in-app notification on the user's own channel.
+        Event::listen(NotificationSent::class, AnnounceStaffNotification::class);
         Event::listen(Login::class, RememberUserLocale::class);
         Event::listen(LimitReached::class, NotifyAdminsOfLimit::class);
         Event::listen(LimitApproaching::class, NotifyAdminsOfLimit::class);
