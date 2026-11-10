@@ -8,13 +8,19 @@ use App\Domains\Solution\DTO\SolutionUiBundle;
 use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Solution\Services\InstalledSolutions;
 use App\Domains\Solution\Services\PublishedSolutionUi;
+use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Illuminate\Contracts\Container\Container;
 
 /**
  * Which Solutions the console serves to the current tenant: active for the tenant ({@see ActiveSolutions}) and, when
- * the Solution ships a console UI, with that UI published. Everything a Solution adds to the console — its routes, its
- * application, its declarations, its page map — is shown only for these.
+ * the Solution ships a console UI, with that UI published and built for the kit, Vue and Inertia this Core ships
+ * ({@see SolutionUiCompatibility}). Everything a Solution adds to the console — its routes, its application, its
+ * declarations, its page map — is shown only for these.
+ *
+ * An active Solution whose published UI no longer fits (a Core upgrade moved the kit past its range) keeps its
+ * activation, data, flows and PHP, but is not served: {@see self::needsUpdate()} says so, and the app switcher and its
+ * pages show that it needs an update (`adr-20261014-solution-console-ui`, Stability).
  *
  * Bound `scoped`, memoized per request. Without a tenant nothing is served; when no installed Solution has a published
  * bundle, the bundle map and the Inertia version suffix are answered without asking the database.
@@ -24,9 +30,13 @@ final class SolutionUi implements SolutionUiMapInterface
     /** @var list<string>|null */
     private ?array $served = null;
 
+    /** @var list<string>|null */
+    private ?array $outdated = null;
+
     public function __construct(
         private readonly PublishedSolutionUi $published,
         private readonly InstalledSolutions $installed,
+        private readonly SolutionUiCompatibility $compatibility,
         private readonly TenantContextInterface $tenantContext,
         private readonly Container $container,
     ) {
@@ -37,17 +47,11 @@ final class SolutionUi implements SolutionUiMapInterface
      */
     public function servedIds(): array
     {
-        if (null !== $this->served) {
-            return $this->served;
+        if (null === $this->served) {
+            $this->classify();
         }
 
-        if (! $this->tenantContext->isResolved() || [] === $this->installed->all()) {
-            return $this->served = [];
-        }
-
-        $active = $this->container->make(ActiveSolutions::class)->ids();
-
-        return $this->served = array_values(array_filter($active, $this->isServable(...)));
+        return $this->served ?? [];
     }
 
     public function isServed(string $solutionId): bool
@@ -56,14 +60,37 @@ final class SolutionUi implements SolutionUiMapInterface
     }
 
     /**
-     * The seam for the version check of `first-solution` phase 0: a Solution whose bundle was built against a kit,
-     * Vue or Inertia this Core does not satisfy keeps its activation but gets no console UI. Today every one passes.
+     * Whether the Solution is active for the tenant but its published console UI was built for a kit, Vue or Inertia
+     * this Core does not ship: it is not served, and the console says it needs an update.
+     */
+    public function needsUpdate(string $solutionId): bool
+    {
+        if (null === $this->outdated) {
+            $this->classify();
+        }
+
+        return in_array($solutionId, $this->outdated ?? [], true);
+    }
+
+    /**
+     * Whether the Solution's console UI may be served once it is active: it is installed and either ships no console UI,
+     * or its UI is published and fits the kit, Vue and Inertia this Core ships.
      */
     public function isServable(string $solutionId): bool
     {
         $solution = $this->installed->find($solutionId);
 
-        return null !== $solution && (null === $solution->ui || null !== $this->published->find($solutionId));
+        if (null === $solution) {
+            return false;
+        }
+
+        if (null === $solution->ui) {
+            return true;
+        }
+
+        $bundle = $this->published->find($solutionId);
+
+        return null !== $bundle && [] === $this->compatibility->mismatches($bundle);
     }
 
     public function bundles(): array
@@ -109,5 +136,33 @@ final class SolutionUi implements SolutionUiMapInterface
         }
 
         return array_intersect_key($published, array_flip($this->servedIds()));
+    }
+
+    /**
+     * Splits the Solutions active for the tenant into those served and those whose published UI no longer fits.
+     */
+    private function classify(): void
+    {
+        $this->served   = [];
+        $this->outdated = [];
+
+        if (! $this->tenantContext->isResolved() || [] === $this->installed->all()) {
+            return;
+        }
+
+        foreach ($this->container->make(ActiveSolutions::class)->ids() as $id) {
+            if ($this->isServable($id)) {
+                $this->served[] = $id;
+            } elseif ($this->isOutdated($id)) {
+                $this->outdated[] = $id;
+            }
+        }
+    }
+
+    private function isOutdated(string $solutionId): bool
+    {
+        $bundle = $this->published->find($solutionId);
+
+        return null !== $bundle && [] !== $this->compatibility->mismatches($bundle);
     }
 }

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { Link, router } from '@inertiajs/vue3'
 import { toast } from '@fapost/ui/components/sonner'
 import { ChevronDown, ChevronUp, Pin, PinOff, Search } from '@lucide/vue'
+import { Badge } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@fapost/ui/components/dialog'
 import ShellIcon from './ShellIcon.vue'
@@ -13,7 +14,8 @@ import type { ApplicationsTranslations, ShellApplication, ShellApplications } fr
 /**
  * "All applications": every application the user may open, searchable, each with a pin toggle, and the pinned ones in
  * the rail's order with buttons to move them. A change is shown at once and sent as the whole new rail; the shell
- * redraws from the answer, and a refused change is undone with an error toast.
+ * redraws from the answer, and a refused change is undone with an error toast. A Solution's application whose interface
+ * needs an update is listed with a warning badge, so its pin stays and the user learns why it does not open.
  */
 const props = defineProps<{
   data: ShellApplications
@@ -99,6 +101,7 @@ function isPinned(item: ShellApplication): boolean {
             </span>
             <span class="text-center text-[12.5px] leading-tight font-semibold">{{ item.label }}</span>
             <span class="text-faint-foreground text-center text-[11px] leading-tight">{{ item.scope }}</span>
+            <Badge v-if="item.needsUpdate" variant="warning" :data-test="`needs-update-${item.key}`">{{ labels.needs_update }}</Badge>
           </component>
           <Button
             variant="ghost"
@@ -124,6 +127,7 @@ function isPinned(item: ShellApplication): boolean {
           <li v-for="(item, index) in pinned" :key="item.key" class="flex min-h-9 items-center gap-2 rounded-md border px-2.5" :data-test="`rail-order-${item.key}`">
             <ShellIcon :name="item.icon" class="text-sidebar-foreground size-4 shrink-0" aria-hidden="true" />
             <span class="min-w-0 flex-1 truncate text-sm">{{ item.label }}</span>
+            <Badge v-if="item.needsUpdate" variant="warning">{{ labels.needs_update }}</Badge>
             <Button
               variant="ghost"
               size="icon-sm"

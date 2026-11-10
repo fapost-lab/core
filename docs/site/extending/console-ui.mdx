@@ -401,7 +401,12 @@ permissions. Prefix your own CSS classes so they cannot collide with the kit's.
   the console ships (the syntax is in the table above). `platform:update` warns about
   a mismatch, and the [Solutions page](/using/solutions#a-console-interface-that-does-not-fit)
   of the admin panel refuses to turn the Solution on and says why. A Solution that was
-  already on when a Core upgrade made its range fail stays on, and can be turned off.
+  already on when a Core upgrade made its range fail stays on — its flows, actions and
+  data keep working, and it can be turned off — but its console UI is not served: its
+  declarations and page map are left out, the app switcher marks its application as
+  needing an update, and its routes answer `503` with a page saying so (a user its
+  application's ability does not let in still gets `404`). A build that fits is served
+  again after the next `platform:update`.
 - **The derived image.** Publication writes to the `public/` of the container that
   runs `platform:update`. The Docker Compose installation serves static files from
   its separate `web` image, which does not see that directory, so it does not serve

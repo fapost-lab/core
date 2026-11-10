@@ -38,7 +38,7 @@ paths:
   - "testing/**"
   - "tests/Feature/Testing/**"
   - tests/Support/FakeSolutionStorefront.php
-reviewed_at: 2026-10-21
+reviewed_at: 2026-11-10
 ---
 # Solution
 
@@ -158,8 +158,10 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
     library cannot read counts as a mismatch. `ConsoleRuntimeConfigTest` holds the config equal to `package-lock.json`.
     A mismatch makes `SolutionsPresenter::isActivatable()` false: the card shows the reason beside a disabled button, the
     controller refuses a direct POST with a flashed reason, and `platform:update` warns (exit 0). Turning off is always
-    allowed. Not done: an already-active Solution whose range fails after a Core upgrade is still served its UI, because
-    `SolutionUi::isServable()` still passes every bundle (the ADR says it should not; `first-solution` phase 0).
+    allowed. An already-active Solution whose range fails after a Core upgrade keeps its activation, flows and data,
+    but `SolutionUi::isServable()` (in `app/Http/Shell`) refuses its bundle, so its UI is not served; `SolutionUi::needsUpdate()`
+    is the one rule for "on, but needs an update" that the app switcher, its routes (`EnsureSolutionActive`: 503 page) and
+    the card's `ui.needsUpdate` all read. The proof is in `SolutionLifecycleTest`.
 - `platform:update` also checks that every action a valid manifest declares is registered in the booted
   `ActionHandlerRegistry` (`<package>: extra.fapost.actions[i]: "<id>" is declared but not registered`, exit 1), after the manifest and console UI checks and before any migration.
 - `platform:update` (`app/Console/Commands/Platform`): validate the manifests and the console UI bundles, then
@@ -174,7 +176,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   PHPat (`SolutionBoundariesTest`) forbids a dependency on any other `App\Domains` namespace, and
   forbids facades and `Illuminate\Database` outside `Infrastructure` and `Providers`, so discovery
   and the services run without a database.
-- Not here yet: registrar methods other than `registerActionHandler`, per-phase migrations of a Solution, the `migrations` manifest field, and hiding the UI of an active Solution whose kit range fails (`SolutionUi::isServable()` is the seam; `first-solution` phase 0).
+- Not here yet: registrar methods other than `registerActionHandler`, per-phase migrations of a Solution and the `migrations` manifest field.
   Plugins (`type: fapost-plugin`) are reserved and not discovered.
 - The Foundation constraint is not re-checked in Core: Composer refuses to install a package whose
   `require["fapost/foundation"]` does not fit the locked version, and a package Composer did not

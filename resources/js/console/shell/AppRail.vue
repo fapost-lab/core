@@ -6,12 +6,13 @@ import { cn } from '@fapost/ui/lib/utils'
 import AllApplicationsDialog from './AllApplicationsDialog.vue'
 import ShellIcon from './ShellIcon.vue'
 import { railApplications } from './rail'
-import type { ShellPageProps } from './types'
+import type { ShellApplication, ShellPageProps } from './types'
 
 /**
  * The application rail left of the side menu (the app switcher): the brand, the applications the user pinned in their
  * order (and the current one, pinned or not), and "All applications", where the user finds, pins and orders them.
- * An application whose home is not an Inertia page (`external`) is a plain link, a full page load.
+ * An application whose home is not an Inertia page (`external`) is a plain link, a full page load. A Solution's
+ * application that needs an update carries a warning dot and says so in its name.
  */
 const page = usePage<ShellPageProps>()
 
@@ -19,6 +20,8 @@ const data = computed(() => page.props.applications)
 const t = computed(() => page.props.translations.console.applications)
 const items = computed(() => (data.value ? railApplications(data.value) : []))
 const allOpen = ref(false)
+
+const itemName = (item: ShellApplication): string => (item.needsUpdate ? `${item.label} · ${t.value.needs_update}` : item.label)
 
 const itemClass = (active: boolean): string =>
   cn(
@@ -36,8 +39,8 @@ const itemClass = (active: boolean): string =>
       v-for="item in items"
       :key="item.key"
       :href="item.href"
-      :title="item.label"
-      :aria-label="item.label"
+      :title="itemName(item)"
+      :aria-label="itemName(item)"
       :aria-current="item.key === data.current ? 'page' : undefined"
       :class="itemClass(item.key === data.current)"
       :data-test="`rail-${item.key}`"
@@ -47,6 +50,12 @@ const itemClass = (active: boolean): string =>
         aria-hidden="true"
       />
       <ShellIcon :name="item.icon" class="size-5" aria-hidden="true" />
+      <span
+        v-if="item.needsUpdate"
+        class="bg-warning-dot ring-rail absolute top-2 right-2.5 size-2 rounded-full ring-2"
+        aria-hidden="true"
+        :data-test="`rail-needs-update-${item.key}`"
+      />
       <span class="max-w-full truncate px-0.5 text-[10px] leading-none font-semibold" aria-hidden="true">{{ item.short }}</span>
     </component>
 

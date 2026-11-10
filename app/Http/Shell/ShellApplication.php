@@ -8,7 +8,8 @@ use App\Domains\Assistant\Models\Assistant;
 
 /**
  * One application of the shell's rail, as {@see ApplicationRegistry} gives it for a user: where it opens, how it is
- * named and drawn, and whether it works per assistant (then it carries the assistant it opens on).
+ * named and drawn, whether it works per assistant (then it carries the assistant it opens on), and whether it is a
+ * Solution's application whose console UI needs an update before it can be served (then it opens on a page saying so).
  */
 final readonly class ShellApplication
 {
@@ -22,6 +23,7 @@ final readonly class ShellApplication
         public bool $external,
         public bool $pinnedByDefault,
         public ?Assistant $assistant = null,
+        public bool $needsUpdate = false,
     ) {
     }
 
@@ -34,7 +36,7 @@ final readonly class ShellApplication
     }
 
     /**
-     * @return array{key: string, label: string, short: string, scope: string, icon: string, href: string, external: bool, perAssistant: bool}
+     * @return array{key: string, label: string, short: string, scope: string, icon: string, href: string, external: bool, perAssistant: bool, needsUpdate: bool}
      */
     public function toArray(): array
     {
@@ -47,6 +49,7 @@ final readonly class ShellApplication
             'href'         => $this->href,
             'external'     => $this->external,
             'perAssistant' => $this->isPerAssistant(),
+            'needsUpdate'  => $this->needsUpdate,
         ];
     }
 }

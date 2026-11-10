@@ -83,7 +83,9 @@ final readonly class SolutionExtensions
 
     /**
      * The applications of the Solutions the user may open, ordered by Solution id. A per-assistant application opens
-     * on the assistant the Console opens on, and is not offered without one.
+     * on the assistant the Console opens on, and is not offered without one. The application of an active Solution
+     * whose console UI needs an update ({@see SolutionUi::needsUpdate()}) stays, marked, so the user learns why it does
+     * not open and keeps their pin; it has no menu.
      *
      * @return list<ShellApplication>
      */
@@ -92,7 +94,9 @@ final readonly class SolutionExtensions
         $applications = [];
 
         foreach ($this->registry->applications() as $id => $application) {
-            if (! $this->ui->isServed($id) || ! $this->allows($user, $application->ability)) {
+            $needsUpdate = $this->ui->needsUpdate($id);
+
+            if ((! $needsUpdate && ! $this->ui->isServed($id)) || ! $this->allows($user, $application->ability)) {
                 continue;
             }
 
@@ -120,6 +124,7 @@ final readonly class SolutionExtensions
                 external: false,
                 pinnedByDefault: false,
                 assistant: $assistant,
+                needsUpdate: $needsUpdate,
             );
         }
 
@@ -129,7 +134,7 @@ final readonly class SolutionExtensions
     /**
      * The menu of a Solution's application, in the shape of Core's menus: entries without a group first, then the
      * groups in the order their first entry was declared. An entry the user may not see, or whose route is missing, is
-     * left out.
+     * left out; an application that needs an update has none, since its pages are not served.
      *
      * @return list<Group>
      */
@@ -137,7 +142,7 @@ final readonly class SolutionExtensions
     {
         $declared = $this->registry->applicationOf($application->key);
 
-        if (null === $declared) {
+        if (null === $declared || $application->needsUpdate) {
             return [];
         }
 

@@ -38,6 +38,9 @@ const translations = {
         badge: 'Interface does not fit',
         title: 'Cannot be turned on',
         description: 'Built for other versions.',
+        needs_update: 'Needs an update',
+        needs_update_title: 'On, but hidden',
+        needs_update_note: 'Its interface is hidden until it is updated.',
         mismatch: ':runtime: built for :required, ships :provided.',
         unreadable: ':runtime: built for ":required", unreadable; ships :provided.',
         runtime: { kit: 'Interface kit', vue: 'Vue', inertia: 'Inertia' },
@@ -119,6 +122,7 @@ const published = (over: Partial<NonNullable<SolutionRow['ui']>> = {}): NonNulla
   registrations: [],
   pages: [],
   mismatches: [],
+  needsUpdate: false,
   ...over,
 })
 
@@ -256,6 +260,27 @@ describe('solutions page', () => {
     expect(dialog('[data-test="kit-mismatch"]')?.textContent).toContain('Cannot be turned on')
     expect(dialog('[data-test="mismatch-kit"]')?.textContent).toBe('Interface kit: built for ^2.0, ships 0.1.0.')
     expect(dialog('[data-test="mismatch-inertia"]')?.textContent).toBe('Inertia: built for "latest", unreadable; ships 3.7.1.')
+  })
+
+  it('marks an active Solution whose interface no longer fits as needing an update, not as refused', async () => {
+    const wrapper = mountPage([
+      solution({
+        active: true,
+        canActivate: false,
+        ui: published({ needsUpdate: true, mismatches: [{ component: 'kit', required: '^0.1', provided: '0.2.0', unreadable: false }] }),
+      }),
+    ])
+
+    expect(wrapper.get('[data-test="needs-update-badge"]').text()).toBe('Needs an update')
+    expect(wrapper.find('[data-test="kit-badge"]').exists()).toBe(false)
+    // It stays on and can be turned off.
+    expect(wrapper.get('[data-test="deactivate"]').attributes('disabled')).toBeUndefined()
+
+    await openDetails(wrapper)
+
+    expect(dialog('[data-test="kit-mismatch"]')?.textContent).toContain('On, but hidden')
+    expect(dialog('[data-test="needs-update-note"]')?.textContent).toContain('hidden until it is updated')
+    expect(dialog('[data-test="mismatch-kit"]')?.textContent).toBe('Interface kit: built for ^0.1, ships 0.2.0.')
   })
 
   it('says a console interface is not published yet', async () => {

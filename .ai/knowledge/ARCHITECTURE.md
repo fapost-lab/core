@@ -100,8 +100,9 @@ Assistant and Media models directly, and import cycles exist (for example Contac
   `SolutionUi`) and `resources/js/console/solutions/`, and `platform:update` publishes the
   prebuilt bundles; its rules are `conventions/solution-console-ui.md`. The activation screen
   (`admin/solutions`) and the operator's entitlement (grants, allowed, the storefront) are in the Solution domain's
-  overview. Absent: the other registrar methods, and the author's half of Solution UI (the Vite preset, the kit-range check, the derived-image
-  recipe — `first-solution` phase 0).
+  overview. Absent: the other registrar methods, and the author's half of Solution UI (the Vite preset and the derived-image
+  recipe — `first-solution` phase 0). The kit-range check is built: on activation, and for an active Solution
+  after a Core upgrade (its UI is not served and the switcher marks it).
 - **Landlord data is reached only through Tenancy.** Other domains depend on
   `Tenancy/Contracts`; the `landlord` connection is opened only inside Tenancy infrastructure. Only the SaaS operator
   package may open it, for its own prefixed tables and never for Core's; Plugin and Solution packages may not

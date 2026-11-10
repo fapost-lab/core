@@ -40,6 +40,8 @@ export interface ShellApplication {
     external: boolean
     /** It works per assistant: only then does the menu show the assistant switcher. */
     perAssistant: boolean
+    /** A Solution's application whose interface no longer fits this platform: marked, and it opens on a page saying so. */
+    needsUpdate: boolean
 }
 
 /** The application rail (see `ApplicationRail::props()`). */
@@ -70,6 +72,7 @@ export interface ApplicationsTranslations {
     rail_empty: string
     note: string
     save_failed: string
+    needs_update: string
 }
 
 export interface SwitcherAssistant {

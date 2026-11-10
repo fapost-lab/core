@@ -11,6 +11,7 @@ const app = (key: string, label = key, short = label): ShellApplication => ({
     href: `/${key}`,
     external: false,
     perAssistant: key === 'console',
+    needsUpdate: false,
 })
 
 const data = (rail: string[], current: string | null): ShellApplications => ({

@@ -1628,12 +1628,15 @@ return [
             'table_column'     => 'Table column',
         ],
         'kit' => [
-            'badge'       => 'Interface does not fit',
-            'title'       => 'Cannot be turned on: its console interface does not fit',
-            'description' => 'Its console interface was built for versions this platform does not ship, so it cannot be turned on until the Solution is rebuilt. If it is already on, it can still be turned off.',
-            'mismatch'    => ':runtime: built for :required, this platform ships :provided.',
-            'unreadable'  => ':runtime: built for ":required", a range this platform cannot evaluate; it ships :provided.',
-            'runtime'     => [
+            'badge'              => 'Interface does not fit',
+            'title'              => 'Cannot be turned on: its console interface does not fit',
+            'description'        => 'Its console interface was built for versions this platform does not ship, so it cannot be turned on until the Solution is rebuilt. If it is already on, it can still be turned off.',
+            'mismatch'           => ':runtime: built for :required, this platform ships :provided.',
+            'unreadable'         => ':runtime: built for ":required", a range this platform cannot evaluate; it ships :provided.',
+            'needs_update'       => 'Needs an update',
+            'needs_update_title' => 'On, but its console interface is hidden: it needs an update',
+            'needs_update_note'  => 'This platform now ships versions its console interface was not built for, so the interface is hidden and its application is marked in the app switcher. The Solution stays on: its flows, actions and data keep working. Ask whoever maintains it for a build that fits.',
+            'runtime'            => [
                 'kit'     => 'Interface kit',
                 'vue'     => 'Vue',
                 'inertia' => 'Inertia',
@@ -1756,22 +1759,23 @@ return [
 
     // The application rail and "All applications" (the app switcher).
     'applications' => [
-        'rail'        => 'Applications',
-        'all'         => 'All applications',
-        'find'        => 'Find an application',
-        'empty'       => 'No application matches.',
-        'pinned'      => 'Pinned',
-        'pin'         => 'Pin',
-        'unpin'       => 'Unpin',
-        'pin_named'   => 'Pin :name to the rail',
-        'unpin_named' => 'Unpin :name from the rail',
-        'move_up'     => 'Move :name up',
-        'move_down'   => 'Move :name down',
-        'rail_title'  => 'In the rail',
-        'rail_empty'  => 'Nothing is pinned: the rail shows only the application you are in.',
-        'note'        => 'Pinned applications stay in the rail on the left, in your order. You see only the applications you may open.',
-        'save_failed' => 'The rail could not be saved. Refresh the page and try again.',
-        'apps'        => [
+        'rail'         => 'Applications',
+        'all'          => 'All applications',
+        'find'         => 'Find an application',
+        'empty'        => 'No application matches.',
+        'pinned'       => 'Pinned',
+        'pin'          => 'Pin',
+        'unpin'        => 'Unpin',
+        'pin_named'    => 'Pin :name to the rail',
+        'unpin_named'  => 'Unpin :name from the rail',
+        'move_up'      => 'Move :name up',
+        'move_down'    => 'Move :name down',
+        'rail_title'   => 'In the rail',
+        'rail_empty'   => 'Nothing is pinned: the rail shows only the application you are in.',
+        'note'         => 'Pinned applications stay in the rail on the left, in your order. You see only the applications you may open.',
+        'save_failed'  => 'The rail could not be saved. Refresh the page and try again.',
+        'needs_update' => 'Needs an update',
+        'apps'         => [
             'console' => ['label' => 'Console', 'short' => 'Console', 'scope' => 'Per assistant'],
             'admin'   => ['label' => 'Admin panel', 'short' => 'Admin', 'scope' => 'The whole organization'],
         ],
@@ -1779,9 +1783,13 @@ return [
 
     // The page shown inside the shell when a Solution page cannot be loaded (extension-contract).
     'solution_unavailable' => [
-        'title'       => 'This page is unavailable',
-        'description' => 'The application that provides it is not active or failed to load. Try again later or contact your administrator.',
-        'back'        => 'Go back',
+        'title'           => 'This page is unavailable',
+        'description'     => 'The application that provides it is not active or failed to load. Try again later or contact your administrator.',
+        'back'            => 'Go back',
+        'update_required' => [
+            'title'       => 'This application needs an update',
+            'description' => 'It is still on, and its flows and data keep working, but its interface was built for an earlier version of this platform and cannot be shown. Ask your administrator to install an update of the Solution.',
+        ],
     ],
     // The platform settings screen of the admin panel (single-tenant deployments).
     'platform_settings' => [

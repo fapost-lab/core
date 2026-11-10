@@ -23,6 +23,8 @@ export interface SolutionUi {
   registrations: Registration[]
   pages: string[]
   mismatches: RangeMismatch[]
+  /** On, but its published interface no longer fits this platform, so the console does not serve it. */
+  needsUpdate: boolean
 }
 
 export interface LastChange {
@@ -97,7 +99,17 @@ export interface SolutionsTranslations {
   registers: { title: string; actions: string; none: string }
   ui: { title: string; application: string; pages: string; not_published: string; inactive_note: string }
   points: Record<RegistrationPoint, string>
-  kit: { badge: string; title: string; description: string; mismatch: string; unreadable: string; runtime: Record<RangeMismatch['component'], string> }
+  kit: {
+    badge: string
+    title: string
+    description: string
+    needs_update: string
+    needs_update_title: string
+    needs_update_note: string
+    mismatch: string
+    unreadable: string
+    runtime: Record<RangeMismatch['component'], string>
+  }
   entitlement: { badge: string; paused: string; not_entitled: string; unavailable: string; paused_note: string; off_note: string; unavailable_note: string }
   grant: { plan_badge: string; addon_badge: string; until: string; plan_note: string; addon_note: string; addon_until: string }
   offer: { connect: string; connect_price: string; request_sent: string; trial_note: string; request_note: string; pending_note: string }
