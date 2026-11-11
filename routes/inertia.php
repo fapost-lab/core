@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Domains\Tenancy\Support\TenantHost;
+use App\Http\Controllers\Admin\ActivityLogController as AdminActivityLogController;
 use App\Http\Controllers\Admin\AssistantChannelController as AdminAssistantChannelController;
 use App\Http\Controllers\Admin\AssistantController as AdminAssistantController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
@@ -161,6 +162,8 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         Route::put('admin/platform-settings', [AdminPlatformSettingsController::class, 'update'])->name('console.admin.platform-settings.update');
         // Support access log: read only, and never a Filament screen, so the name is the console's own.
         Route::get('admin/support-access', [AdminSupportAccessController::class, 'index'])->name('console.admin.support-access.index');
+        // Activity log: who changed what in the console and the builder, read only; a new screen, so its own URI.
+        Route::get('admin/activity', [AdminActivityLogController::class, 'index'])->name('console.admin.activity.index');
 
         // Health: Reverb and the gateway as the health service reports them (the whole installation in `single` mode, the tenant's own slice in `host`); the page polls `report`.
         Route::get('admin/health', [AdminHealthController::class, 'index'])->name('console.admin.health.index');

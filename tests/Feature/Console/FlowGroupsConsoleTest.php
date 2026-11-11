@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Staff\Enums\Permission;
@@ -152,6 +153,29 @@ final class FlowGroupsConsoleTest extends FeatureTestCase
             ->assertInertiaFlash('success');
 
         $this->assertDatabaseHas('flow_groups', ['id' => $group->getKey(), 'name' => 'New']);
+    }
+
+    public function test_every_group_write_is_in_the_audit_log(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin);
+
+        $this->post($this->listUrl(), ['name' => 'Alpha'])->assertRedirect();
+        $group = FlowGroup::query()->sole();
+        $this->put($this->listUrl("/{$group->getKey()}"), ['name' => 'Beta'])->assertRedirect();
+        $this->put($this->listUrl("/{$group->getKey()}"), ['name' => 'Beta'])->assertRedirect();
+        $this->delete($this->listUrl("/{$group->getKey()}"))->assertRedirect();
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(['flow_group.created', 'flow_group.updated', 'flow_group.deleted'], $entries->pluck('description')->all());
+        $this->assertTrue($entries->every(fn (ActivityEntry $entry): bool => 'flows' === $entry->log_name
+            && (string) $group->getKey() === $entry->subject_id
+            && (string) $this->assistant->getKey() === $entry->assistant_id
+            && (string) $admin->getKey() === $entry->causer_id));
+        $this->assertSame(['attributes' => ['name' => 'Alpha']], $entries[0]->attribute_changes?->toArray());
+        $this->assertSame(['attributes' => ['name' => 'Beta'], 'old' => ['name' => 'Alpha']], $entries[1]->attribute_changes?->toArray());
+        $this->assertSame('Beta', $entries[2]->subject_label);
     }
 
     public function test_an_empty_group_is_deleted(): void

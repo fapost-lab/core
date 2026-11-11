@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
@@ -263,6 +264,53 @@ final class AssistantSettingsConsoleTest extends FeatureTestCase
             ->assertSessionHasErrors('commands');
 
         $this->assertSame([], $this->assistant->fresh()?->commands ?? []);
+    }
+
+    public function test_saving_the_settings_is_one_audit_entry_that_names_texts_and_never_stores_them(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin);
+
+        $payload = $this->payload([
+            'default_language'    => 'ru',
+            'available_countries' => ['UA'],
+            'fallback_message'    => ['en' => 'Audit-SECRET-TEXT-1'],
+            'commands'            => [['command' => 'help', 'type' => 'send_message', 'text' => ['en' => 'Audit-SECRET-TEXT-2']]],
+            'settings'            => [['key' => 'tone', 'value' => 'Audit-SECRET-VALUE-3']],
+        ]);
+
+        $this->put($this->url(), $payload)->assertRedirect();
+        // Saved again as it is: nothing changed, nothing recorded.
+        $this->put($this->url(), $payload)->assertRedirect();
+
+        $entry = ActivityEntry::query()->sole();
+
+        $this->assertSame('assistant.settings_updated', $entry->description);
+        $this->assertSame('assistants', $entry->log_name);
+        $this->assertSame((string) $this->assistant->getKey(), $entry->subject_id);
+        $this->assertSame((string) $this->assistant->getKey(), $entry->assistant_id);
+        $this->assertSame((string) $admin->getKey(), $entry->causer_id);
+        $this->assertSame(
+            [
+                'attributes' => ['default_language' => 'ru', 'available_countries' => ['UA']],
+                'old'        => ['default_language' => 'en', 'available_countries' => []],
+                'changed'    => ['fallback_message', 'commands', 'settings'],
+            ],
+            $entry->attribute_changes?->toArray(),
+        );
+
+        $raw = (string) json_encode(ActivityEntry::query()->get()->map->getAttributes());
+        foreach (['Audit-SECRET-TEXT-1', 'Audit-SECRET-TEXT-2', 'Audit-SECRET-VALUE-3', 'tone'] as $secret) {
+            $this->assertStringNotContainsString($secret, $raw);
+        }
+    }
+
+    public function test_a_save_with_a_new_flow_is_one_settings_entry_and_a_refused_one_leaves_none(): void
+    {
+        $this->actingAs($this->admin())
+            ->post($this->url('/flows'), $this->payload(['fallback_message' => ['en' => 'Sorry'], 'new_flow_name' => 'Welcome', 'new_flow_target' => 'default']), ['X-Inertia' => 'true']);
+
+        $this->assertSame(['assistant.settings_updated'], ActivityEntry::query()->pluck('description')->all());
     }
 
     public function test_a_new_flow_becomes_the_default_flow_and_the_form_is_saved_with_it(): void

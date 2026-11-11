@@ -12,5 +12,6 @@ Schedule::job(new CleanupSoftDeletedMediaJob())->dailyAt('03:30');
 Schedule::command('flow:sweep-subflow-timeouts')->everyMinute()->withoutOverlapping();
 Schedule::command('support-access:prune')->dailyAt('03:45');
 Schedule::command('limit-refusals:prune')->dailyAt('04:00');
+Schedule::command('audit:prune')->dailyAt('04:15');
 Schedule::command('horizon:snapshot')->everyFiveMinutes();
 Schedule::command('tenants:start-deletions')->everyMinute()->withoutOverlapping();

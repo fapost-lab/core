@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Channels\Services;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Channels\Contracts\ChannelServiceInterface;
 use App\Domains\Channels\DTOs\ChannelLimitStatus;
 use App\Domains\Channels\Models\Channel;
@@ -13,6 +17,7 @@ use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -23,6 +28,11 @@ use Illuminate\Support\Str;
  * argument, not a dependency, so a screen that gets it from its own URL (the tenant-wide admin) can use the service
  * as the assistant console does. The writes are {@see ChannelServiceInterface}'s: it checks the channel limit, keeps
  * the webhook routing in step and is the only path that rotates the webhook hash.
+ *
+ * Each write and its audit entry commit together, in one transaction; the routing and the provider are reached after
+ * the commit, as the observer always defers them. Only the type and the active flag are recorded with their
+ * values; a changed config is a marker, and the credentials are never named: a new token or secret token is recorded as
+ * its own action, `channel.token_rotated`, with no value.
  */
 final readonly class AssistantChannelService
 {
@@ -30,6 +40,7 @@ final readonly class AssistantChannelService
         private TenantContextInterface $tenants,
         private ChannelServiceInterface $channels,
         private RecordQuotaInterface $recordQuota,
+        private AuditTrailInterface $audit,
     ) {
     }
 
@@ -88,7 +99,18 @@ final readonly class AssistantChannelService
      */
     public function create(Assistant $assistant, array $fields): Channel
     {
-        return $this->channels->create($assistant, $fields);
+        $channel = DB::transaction(function () use ($assistant, $fields): Channel {
+            $channel = $this->channels->create($assistant, $fields);
+
+            $this->record(AuditAction::ChannelCreated, $channel, AuditChanges::created([
+                'type'      => $channel->type,
+                'is_active' => (bool) $channel->is_active,
+            ]));
+
+            return $channel;
+        });
+
+        return self::afterCommit($channel);
     }
 
     /**
@@ -98,12 +120,40 @@ final readonly class AssistantChannelService
      */
     public function update(Channel $channel, array $fields): Channel
     {
-        return $this->channels->update($channel, $fields);
+        $updated = DB::transaction(function () use ($channel, $fields): Channel {
+            $before = self::snapshot($channel);
+
+            $updated = $this->channels->update($channel, $fields);
+            $after   = self::snapshot($updated);
+
+            $changes = AuditChanges::between($before, $after, ['type', 'is_active'], ['config']);
+
+            if (! $changes->isEmpty()) {
+                $this->record(AuditAction::ChannelUpdated, $updated, $changes);
+            }
+
+            // Compared in memory only: neither credential is ever written to the log.
+            if ($before['token'] !== $after['token'] || $before['secret_token'] !== $after['secret_token']) {
+                $this->record(AuditAction::ChannelTokenRotated, $updated);
+            }
+
+            return $updated;
+        });
+
+        return self::afterCommit($updated);
     }
 
     public function rotateWebhookHash(Channel $channel): Channel
     {
-        return $this->channels->rotateWebhookHash($channel);
+        $rotated = DB::transaction(function () use ($channel): Channel {
+            $rotated = $this->channels->rotateWebhookHash($channel);
+
+            $this->record(AuditAction::ChannelWebhookHashRotated, $rotated);
+
+            return $rotated;
+        });
+
+        return self::afterCommit($rotated);
     }
 
     public function reregisterWebhook(Channel $channel): Channel
@@ -117,6 +167,46 @@ final readonly class AssistantChannelService
      */
     public function delete(Channel $channel): void
     {
-        $channel->delete();
+        DB::transaction(function () use ($channel): void {
+            $channel->delete();
+
+            $this->record(AuditAction::ChannelDeleted, $channel);
+        });
+    }
+
+    /**
+     * The channel as stored once the transaction committed: the routing and the provider are reached after the commit
+     * (the observer defers them), and the provider's answer is the channel's stored webhook status.
+     */
+    private static function afterCommit(Channel $channel): Channel
+    {
+        return $channel->fresh() ?? $channel;
+    }
+
+    /**
+     * What a write may change, read before and after it. The credentials are here only to tell whether they changed.
+     *
+     * @return array{type: string, is_active: bool, config: mixed, token: string, secret_token: string}
+     */
+    private static function snapshot(Channel $channel): array
+    {
+        return [
+            'type'         => (string) $channel->type,
+            'is_active'    => (bool) $channel->is_active,
+            'config'       => $channel->config,
+            'token'        => (string) $channel->token,
+            'secret_token' => (string) $channel->secret_token,
+        ];
+    }
+
+    private function record(AuditAction $action, Channel $channel, ?AuditChanges $changes = null): void
+    {
+        $this->audit->record(new AuditRecord(
+            action: $action,
+            subject: $channel,
+            subjectLabel: $channel->type,
+            assistantId: (string) $channel->assistant_id,
+            changes: $changes,
+        ));
     }
 }

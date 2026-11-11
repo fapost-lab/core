@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Services;
 
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Staff\Exceptions\StaffChangeRefusedException;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
@@ -40,6 +44,7 @@ final readonly class StaffUserService
     public function __construct(
         private RecordQuotaInterface $recordQuota,
         private UserService $users,
+        private AuditTrailInterface $audit,
     ) {
     }
 
@@ -120,8 +125,27 @@ final readonly class StaffUserService
 
             $target->save();
 
+            // The password is a marker only: neither the new value nor its hash is recorded.
+            $changes = AuditChanges::ofSavedModel($target, ['name', 'email', 'phone'], ['password']);
+
+            if (! $changes->isEmpty()) {
+                $this->record(AuditAction::UserUpdated, $target, $changes);
+            }
+
             if (null !== $roleIds) {
+                $rolesBefore = $this->roleNames($target);
+
                 $this->syncRoles($actor, $target, $roleIds);
+
+                $rolesChanges = AuditChanges::between(
+                    ['roles' => $rolesBefore],
+                    ['roles' => $this->roleNames($target)],
+                    ['roles'],
+                );
+
+                if (! $rolesChanges->isEmpty()) {
+                    $this->record(AuditAction::UserRolesChanged, $target, $rolesChanges);
+                }
             }
 
             return $target->refresh();
@@ -141,6 +165,8 @@ final readonly class StaffUserService
             $this->assertDeletable($actor, $target);
 
             $target->delete();
+
+            $this->record(AuditAction::UserDeleted, $target);
         });
     }
 
@@ -219,6 +245,26 @@ final readonly class StaffUserService
         }
 
         $target->syncRoles($kept->concat($requested)->unique(static fn (Role $role): string => (string) $role->getKey())->values()->all());
+    }
+
+    private function record(AuditAction $action, User $target, ?AuditChanges $changes = null): void
+    {
+        $this->audit->record(new AuditRecord(
+            action: $action,
+            subject: $target,
+            subjectLabel: $target->name,
+            changes: $changes,
+        ));
+    }
+
+    /**
+     * The target's role names as stored now, sorted.
+     *
+     * @return list<string>
+     */
+    private function roleNames(User $target): array
+    {
+        return $target->roles()->pluck('name')->map(static fn (mixed $name): string => (string) $name)->sort()->values()->all();
     }
 
     /**

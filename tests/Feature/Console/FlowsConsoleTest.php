@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Enums\FlowTriggerType;
@@ -446,6 +447,50 @@ final class FlowsConsoleTest extends FeatureTestCase
         $this->assertEquals([['from' => 'a', 'to' => 'b']], $flow->edges);
         $this->assertSame(7, $flow->draft_version);
         $this->assertFalse($flow->is_active);
+    }
+
+    public function test_every_flow_write_is_in_the_audit_log_and_the_graph_never_is(): void
+    {
+        $admin = $this->admin();
+        $group = $this->group('Support');
+        $this->actingAs($admin);
+
+        $this->post($this->listUrl(), ['name' => 'Welcome', 'description' => 'Greets people SECRET-DESC', 'is_public' => true, 'logging_enabled' => false], ['X-Inertia' => 'true']);
+        $flow = FlowDraft::query()->where('name', 'Welcome')->sole();
+
+        $this->put($this->listUrl("/{$flow->getKey()}"), [
+            'name'            => 'Welcome v2',
+            'flow_group_id'   => $group->getKey(),
+            'description'     => 'Changed SECRET-DESC-2',
+            'is_public'       => false,
+            'logging_enabled' => false,
+        ])->assertRedirect();
+        $this->patch($this->listUrl("/{$flow->getKey()}/active"), ['active' => false])->assertRedirect();
+        $this->patch($this->listUrl("/{$flow->getKey()}/active"), ['active' => false])->assertRedirect();
+        $this->delete($this->listUrl("/{$flow->getKey()}"))->assertRedirect();
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(['flow.created', 'flow.updated', 'flow.updated', 'flow.deleted'], $entries->pluck('description')->all());
+        $this->assertTrue($entries->every(fn (ActivityEntry $entry): bool => 'flows' === $entry->log_name
+            && (string) $flow->getKey() === $entry->subject_id
+            && (string) $this->assistant->getKey() === $entry->assistant_id
+            && (string) $admin->getKey() === $entry->causer_id));
+        $this->assertSame('Welcome', $entries[0]->subject_label);
+        $this->assertSame('Welcome v2', $entries[1]->subject_label);
+        $this->assertSame(
+            [
+                'attributes' => ['name' => 'Welcome v2', 'flow_group_id' => (string) $group->getKey(), 'is_public' => false],
+                'old'        => ['name' => 'Welcome', 'flow_group_id' => null, 'is_public' => true],
+                'changed'    => ['description'],
+            ],
+            $entries[1]->attribute_changes?->toArray(),
+        );
+        $this->assertSame(['attributes' => ['is_active' => false], 'old' => ['is_active' => true]], $entries[2]->attribute_changes?->toArray());
+
+        $raw = (string) json_encode(ActivityEntry::query()->get()->map->getAttributes());
+        $this->assertStringNotContainsString('SECRET-DESC', $raw);
+        $this->assertStringNotContainsString('"nodes"', $raw);
     }
 
     public function test_a_flow_can_be_taken_out_of_its_group(): void

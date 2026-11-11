@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
@@ -33,6 +36,7 @@ final readonly class PublishFlowService
         private VariableSchemaRegistryInterface $schemaRegistry,
         private TenantEventRepositoryInterface $tenantEvents,
         private EmittedEventCollector $emittedEvents,
+        private AuditTrailInterface $audit,
     ) {
     }
 
@@ -130,6 +134,15 @@ final readonly class PublishFlowService
                 tenantId: (string)$draft->tenant_id,
                 eventNames: $this->emittedEvents->collect($nodes),
             );
+
+            // The graph itself is never stored in the trail: the action says a version went live.
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::FlowPublished,
+                subject: $draft,
+                subjectLabel: (string) $draft->name,
+                assistantId: $draft->assistant_id,
+                properties: ['version' => $newVersion],
+            ));
 
             return $definition;
         });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\UserStatus;
@@ -20,6 +21,7 @@ use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
@@ -569,6 +571,88 @@ final class AdminUsersConsoleTest extends FeatureTestCase
 
         $this->actingAs($manager)->delete($this->url("/{$lower->getKey()}"))->assertRedirect($this->url());
         $this->assertNull($lower->fresh());
+    }
+
+    public function test_every_staff_user_write_is_in_the_audit_log_without_a_secret(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin);
+
+        $this->post($this->url(), $this->invitation('audited@example.test', $this->roleId(RoleEnum::Analyst)))->assertRedirect();
+        $target = User::query()->where('email', 'audited@example.test')->firstOrFail();
+
+        $this->post($this->url("/{$target->getKey()}/resend-activation"))->assertInertiaFlash('success');
+        $tokens = [];
+        Bus::assertDispatched(SendActivationEmailJob::class, function (SendActivationEmailJob $job) use (&$tokens): bool {
+            $tokens[] = $job->plainToken;
+            $tokens[] = hash('sha256', $job->plainToken);
+
+            return true;
+        });
+
+        $this->put($this->url("/{$target->getKey()}"), [
+            'name'     => 'Audited Renamed',
+            'email'    => 'audited@example.test',
+            'phone'    => '+100',
+            'password' => 'brand-new-SECRET-777',
+            'roles'    => [$this->roleId(RoleEnum::ContentManager)],
+        ])->assertRedirect();
+        $hash = (string) $target->refresh()->password;
+
+        $this->patch($this->url("/{$target->getKey()}/active"), ['active' => false])->assertInertiaFlash('success');
+        $this->patch($this->url("/{$target->getKey()}/active"), ['active' => true])->assertInertiaFlash('success');
+        $this->delete($this->url("/{$target->getKey()}"))->assertRedirect();
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(
+            ['user.invited', 'user.activation_resent', 'user.updated', 'user.roles_changed', 'user.deactivated', 'user.activated', 'user.deleted'],
+            $entries->pluck('description')->all(),
+        );
+        $this->assertTrue($entries->every(fn (ActivityEntry $entry): bool => 'staff' === $entry->log_name
+            && (string) $target->getKey() === $entry->subject_id
+            && null === $entry->assistant_id
+            && (string) $admin->getKey() === $entry->causer_id));
+        $this->assertSame(
+            ['attributes' => ['name' => 'Invited', 'email' => 'audited@example.test', 'roles' => [RoleEnum::Analyst->value]]],
+            $entries[0]->attribute_changes?->toArray(),
+        );
+        $this->assertSame(
+            ['attributes' => ['name' => 'Audited Renamed', 'phone' => '+100'], 'old' => ['name' => 'Invited', 'phone' => null], 'changed' => ['password']],
+            $entries[2]->attribute_changes?->toArray(),
+        );
+        $this->assertSame(
+            ['attributes' => ['roles' => [RoleEnum::ContentManager->value]], 'old' => ['roles' => [RoleEnum::Analyst->value]]],
+            $entries[3]->attribute_changes?->toArray(),
+        );
+
+        $raw = (string) json_encode(ActivityEntry::query()->get()->map->getAttributes());
+        foreach (['brand-new-SECRET-777', $hash, ...$tokens] as $secret) {
+            $this->assertNotSame('', $secret);
+            $this->assertStringNotContainsString($secret, $raw);
+        }
+    }
+
+    public function test_a_refused_profile_update_leaves_no_audit_entry(): void
+    {
+        $admin  = $this->admin();
+        $target = $this->staff(RoleEnum::Analyst);
+
+        try {
+            // The profile is saved and recorded, then the unknown role refuses the whole update.
+            $this->app->make(StaffUserService::class)->update(
+                $admin,
+                $target,
+                ['name' => 'Never Saved', 'email' => $target->email, 'phone' => null, 'password' => null],
+                [(string) Str::uuid()],
+            );
+            $this->fail('The unknown role was accepted.');
+        } catch (ValidationException) {
+            // Expected.
+        }
+
+        $this->assertNotSame('Never Saved', $target->fresh()->name);
+        $this->assertSame(0, ActivityEntry::query()->count());
     }
 
     private function url(string $suffix = ''): string

@@ -6,6 +6,7 @@ namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Exceptions\BroadcastNotEditableException;
 use App\Domains\Broadcasting\Jobs\RunBroadcastJob;
@@ -25,9 +26,12 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Database\Seeders\TenantAclSeeder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
+use RuntimeException;
+use Spatie\Activitylog\Actions\LogActivityAction;
 use Tests\Feature\FeatureTestCase;
 
 /**
@@ -734,6 +738,63 @@ final class BroadcastsConsoleTest extends FeatureTestCase
         $this->assertModelMissing($completed);
         $this->assertModelExists($running);
         $this->assertSame(BroadcastStatus::Running, $running->fresh()->status);
+    }
+
+    public function test_every_broadcast_write_is_in_the_audit_log_without_the_message(): void
+    {
+        Bus::fake();
+        $admin = $this->admin();
+        $this->actingAs($admin);
+
+        $this->post($this->listUrl(), $this->payload(['name' => 'Promo', 'message' => ['en' => 'SECRET-TEXT-ONE']]))->assertRedirect();
+        $broadcast = Broadcast::query()->sole();
+        $this->put($this->listUrl("/{$broadcast->getKey()}"), $this->payload(['name' => 'Promo 2', 'message' => ['en' => 'SECRET-TEXT-TWO']]))->assertRedirect();
+        $this->post($this->listUrl("/{$broadcast->getKey()}/send"), ['revision' => $this->revisionOf($broadcast->refresh())])->assertRedirect();
+        $this->post($this->listUrl("/{$broadcast->getKey()}/cancel"))->assertRedirect();
+        $this->post($this->listUrl("/{$broadcast->getKey()}/cancel"))->assertRedirect();
+        $this->delete($this->listUrl("/{$broadcast->getKey()}"))->assertRedirect();
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(
+            ['broadcast.created', 'broadcast.updated', 'broadcast.sent', 'broadcast.cancelled', 'broadcast.deleted'],
+            $entries->pluck('description')->all(),
+        );
+        $this->assertTrue($entries->every(fn (ActivityEntry $entry): bool => 'broadcasts' === $entry->log_name
+            && (string) $broadcast->getKey() === $entry->subject_id
+            && (string) $this->assistant->getKey() === $entry->assistant_id
+            && (string) $admin->getKey() === $entry->causer_id));
+        $this->assertSame('Promo', $entries[0]->subject_label);
+        $this->assertSame(['attributes' => ['name' => 'Promo 2'], 'old' => ['name' => 'Promo'], 'changed' => ['message']], $entries[1]->attribute_changes?->toArray());
+
+        $raw = (string) json_encode(ActivityEntry::query()->get()->map->getAttributes());
+        $this->assertStringNotContainsString('SECRET-TEXT', $raw);
+    }
+
+    public function test_a_send_whose_entry_cannot_be_written_does_not_start_the_run(): void
+    {
+        Bus::fake();
+        $broadcast = $this->broadcast('Promo');
+        $revision  = $this->revisionOf($broadcast);
+
+        $failing = new class () extends LogActivityAction {
+            protected function save(Model $activity): void
+            {
+                throw new RuntimeException('insert refused');
+            }
+        };
+        config(['activitylog.actions.log_activity' => $failing::class]);
+        $this->actingAs($this->admin())->withoutExceptionHandling();
+
+        try {
+            $this->post($this->listUrl("/{$broadcast->getKey()}/send"), ['revision' => $revision]);
+            $this->fail('The send passed although its entry was not written.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('insert refused', $exception->getMessage());
+        }
+
+        $this->assertSame(BroadcastStatus::Draft, $broadcast->fresh()->status);
+        $this->assertSame(0, ActivityEntry::query()->count());
     }
 
     // ---- reach ---------------------------------------------------------------------------------------------------

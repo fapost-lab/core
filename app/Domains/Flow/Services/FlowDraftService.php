@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Services;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Domains\Flow\DTOs\FlowLimitStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
@@ -18,6 +22,7 @@ use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -50,6 +55,7 @@ final readonly class FlowDraftService
         private CurrentAssistantInterface $assistant,
         private RecordQuotaInterface $recordQuota,
         private CreateFlowAction $createFlow,
+        private AuditTrailInterface $audit,
     ) {
     }
 
@@ -171,10 +177,22 @@ final readonly class FlowDraftService
      */
     public function create(array $data): FlowDraft
     {
-        return $this->createFlow->execute([
-            ...$data,
-            'assistant_id' => (string) $this->assistant->get()->getKey(),
-        ]);
+        return DB::transaction(function () use ($data): FlowDraft {
+            $flow = $this->createFlow->execute([
+                ...$data,
+                'assistant_id' => (string) $this->assistant->get()->getKey(),
+            ]);
+
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::FlowCreated,
+                subject: $flow,
+                subjectLabel: $flow->name,
+                assistantId: $flow->assistant_id,
+                changes: AuditChanges::created(self::auditValues($flow)),
+            ));
+
+            return $flow;
+        });
     }
 
     /**
@@ -184,13 +202,17 @@ final readonly class FlowDraftService
      */
     public function update(FlowDraft $flow, array $data): FlowDraft
     {
-        $flow->update([
-            'name'            => $data['name'],
-            'flow_group_id'   => $data['flow_group_id'] ?? null,
-            'description'     => $data['description'] ?? null,
-            'is_public'       => $data['is_public'],
-            'logging_enabled' => $data['logging_enabled'],
-        ]);
+        DB::transaction(function () use ($flow, $data): void {
+            $flow->update([
+                'name'            => $data['name'],
+                'flow_group_id'   => $data['flow_group_id'] ?? null,
+                'description'     => $data['description'] ?? null,
+                'is_public'       => $data['is_public'],
+                'logging_enabled' => $data['logging_enabled'],
+            ]);
+
+            $this->recordUpdated($flow);
+        });
 
         return $flow;
     }
@@ -201,7 +223,11 @@ final readonly class FlowDraftService
     public function setActive(FlowDraft $flow, bool $active): FlowDraft
     {
         if ($flow->is_active !== $active) {
-            $flow->update(['is_active' => $active]);
+            DB::transaction(function () use ($flow, $active): void {
+                $flow->update(['is_active' => $active]);
+
+                $this->recordUpdated($flow);
+            });
         }
 
         return $flow;
@@ -230,7 +256,16 @@ final readonly class FlowDraftService
             throw new FlowHasLiveSessionsException($flow->flow_id);
         }
 
-        $flow->delete();
+        DB::transaction(function () use ($flow): void {
+            $flow->delete();
+
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::FlowDeleted,
+                subject: $flow,
+                subjectLabel: $flow->name,
+                assistantId: $flow->assistant_id,
+            ));
+        });
     }
 
     /**
@@ -260,6 +295,43 @@ final readonly class FlowDraftService
         }
 
         return $result;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function auditValues(FlowDraft $flow): array
+    {
+        return [
+            'name'          => $flow->name,
+            'flow_group_id' => $flow->flow_group_id,
+            'is_public'     => $flow->is_public,
+        ];
+    }
+
+    /**
+     * Records what the last save of the flow changed. Only metadata is named: the graph and the draft version belong
+     * to the builder and are never recorded (publishing is). The description is free text, so it is a marker.
+     */
+    private function recordUpdated(FlowDraft $flow): void
+    {
+        $changes = AuditChanges::ofSavedModel(
+            $flow,
+            ['name', 'flow_group_id', 'is_public', 'is_active', 'logging_enabled'],
+            ['description'],
+        );
+
+        if ($changes->isEmpty()) {
+            return;
+        }
+
+        $this->audit->record(new AuditRecord(
+            action: AuditAction::FlowUpdated,
+            subject: $flow,
+            subjectLabel: $flow->name,
+            assistantId: $flow->assistant_id,
+            changes: $changes,
+        ));
     }
 
     /**

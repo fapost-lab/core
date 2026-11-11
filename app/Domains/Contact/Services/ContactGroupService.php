@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Domains\Contact\Services;
 
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -16,11 +21,16 @@ use Illuminate\Support\Str;
  * Groups are tenant-level, so every read and write is bounded by the tenant in {@see TenantContextInterface}: a group
  * of another tenant is "not found", never "forbidden". Membership rows go with the group (the pivot's foreign key
  * cascades on delete).
+ *
+ * Each write is recorded in the audit log, with the name and description as values; a group belongs to the tenant, so
+ * its entry has no assistant.
  */
 final readonly class ContactGroupService
 {
-    public function __construct(private TenantContextInterface $tenants)
-    {
+    public function __construct(
+        private TenantContextInterface $tenants,
+        private AuditTrailInterface $audit,
+    ) {
     }
 
     /**
@@ -50,11 +60,20 @@ final readonly class ContactGroupService
      */
     public function create(array $data): ContactGroup
     {
-        return ContactGroup::query()->create([
-            'tenant_id'   => $this->tenantId(),
-            'name'        => $data['name'],
-            'description' => $data['description'] ?? null,
-        ]);
+        return DB::transaction(function () use ($data): ContactGroup {
+            $group = ContactGroup::query()->create([
+                'tenant_id'   => $this->tenantId(),
+                'name'        => $data['name'],
+                'description' => $data['description'] ?? null,
+            ]);
+
+            $this->record(AuditAction::ContactGroupCreated, $group, AuditChanges::created([
+                'name'        => $group->name,
+                'description' => $group->description,
+            ]));
+
+            return $group;
+        });
     }
 
     /**
@@ -62,24 +81,36 @@ final readonly class ContactGroupService
      */
     public function update(ContactGroup $group, array $data): ContactGroup
     {
-        $group->update([
-            'name'        => $data['name'],
-            'description' => $data['description'] ?? null,
-        ]);
+        return DB::transaction(function () use ($group, $data): ContactGroup {
+            $group->update([
+                'name'        => $data['name'],
+                'description' => $data['description'] ?? null,
+            ]);
 
-        return $group;
+            $changes = AuditChanges::ofSavedModel($group, ['name', 'description']);
+
+            if (! $changes->isEmpty()) {
+                $this->record(AuditAction::ContactGroupUpdated, $group, $changes);
+            }
+
+            return $group;
+        });
     }
 
     public function delete(ContactGroup $group): void
     {
-        $group->delete();
+        DB::transaction(function () use ($group): void {
+            $group->delete();
+
+            $this->record(AuditAction::ContactGroupDeleted, $group);
+        });
     }
 
     /**
      * Deletes the listed groups that belong to the current tenant; other ids are ignored.
      *
      * A query delete: no model events fire, which is fine as nothing listens to a group's deletion and the pivot rows
-     * go with it by the foreign key's cascade.
+     * go with it by the foreign key's cascade. The groups are read first so each one is recorded in the audit log.
      *
      * @param  list<string>  $ids
      *
@@ -93,7 +124,31 @@ final readonly class ContactGroupService
             return 0;
         }
 
-        return $this->query()->whereKey($ids)->delete();
+        return DB::transaction(function () use ($ids): int {
+            $groups = $this->query()->whereKey($ids)->get();
+
+            if ($groups->isEmpty()) {
+                return 0;
+            }
+
+            $count = $this->query()->whereKey($groups->modelKeys())->delete();
+
+            foreach ($groups as $group) {
+                $this->record(AuditAction::ContactGroupDeleted, $group);
+            }
+
+            return $count;
+        });
+    }
+
+    private function record(AuditAction $action, ContactGroup $group, ?AuditChanges $changes = null): void
+    {
+        $this->audit->record(new AuditRecord(
+            action: $action,
+            subject: $group,
+            subjectLabel: $group->name,
+            changes: $changes,
+        ));
     }
 
     private function tenantId(): string

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
@@ -524,6 +525,40 @@ final class ContactsConsoleTest extends FeatureTestCase
 
         $this->assertSame([$mine->getKey()], $contact->groups()->pluck('contact_groups.id')->all());
     }
+
+    public function test_card_writes_are_in_the_audit_log_as_markers_without_personal_data(): void
+    {
+        $contact = $this->contact([
+            'external_id' => 'secret-handle-7731',
+            'meta'        => ['first_name' => 'Zinaida', 'last_name' => 'Quasimodo', 'username' => 'quasi_user', 'phone' => '+380501234567'],
+            'attributes'  => ['city' => 'Hidden-City-Attr'],
+        ]);
+        $group = $this->group('VIP');
+        $admin = $this->admin();
+        $this->actingAs($admin);
+
+        $this->putJson($this->cardUrl($contact) . '/tags', ['tags' => ['gold']])->assertRedirect();
+        // The same set again is not an action.
+        $this->putJson($this->cardUrl($contact) . '/tags', ['tags' => ['gold']])->assertRedirect();
+        $this->putJson($this->cardUrl($contact) . '/groups', ['groups' => [$group->getKey()]])->assertRedirect();
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(['contact.updated', 'contact.updated'], $entries->pluck('description')->all());
+        $this->assertTrue($entries->every(fn (ActivityEntry $entry): bool => 'contacts' === $entry->log_name
+            && (string) $contact->getKey() === $entry->subject_id
+            && (string) $this->assistant->getKey() === $entry->assistant_id
+            && (string) $admin->getKey() === $entry->causer_id
+            && 'Contact · ' . mb_substr((string) $contact->getKey(), -8) === $entry->subject_label));
+        $this->assertSame(['changed' => ['tags']], $entries[0]->attribute_changes?->toArray());
+        $this->assertSame(['changed' => ['groups']], $entries[1]->attribute_changes?->toArray());
+
+        $raw = (string) json_encode(ActivityEntry::query()->get()->map->getAttributes());
+        foreach (['secret-handle-7731', 'Zinaida', 'Quasimodo', 'quasi_user', '+380501234567', 'Hidden-City-Attr', 'gold', 'VIP'] as $personal) {
+            $this->assertStringNotContainsString($personal, $raw);
+        }
+    }
+
 
     private function listUrl(string $suffix = ''): string
     {

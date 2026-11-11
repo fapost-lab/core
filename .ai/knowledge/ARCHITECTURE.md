@@ -39,6 +39,7 @@ sessions. The platform is extended from outside through public contracts, not by
 | `assistant` | `app/Domains/Assistant` | The assistant aggregate and the current-assistant context | — |
 | `staff` | `app/Domains/Staff` | Staff users, roles, staff notifications | — |
 | `solution` | `app/Domains/Solution` | Installed extension packages — Solutions and, experimental, connectors (`adr-20261016-connector-package-type`): manifest discovery and validation, the catalog and its cache, `platform:update`, per-tenant activation (`ActiveSolutions`, `SolutionActivator`), the console extension registry (`Console/ConsoleExtensionRegistry`) and the check and publication of a Solution's prebuilt console UI (`SolutionUiBundleReader`, `SolutionUiPublisher`, `PublishedSolutionUi`) | Depend on a domain other than the Tenancy contracts, or on the database outside `Infrastructure` |
+| `audit` | `app/Domains/Audit`, `app/Infrastructure/Audit` | The tenant's audit log: what staff and platform support did in the console and builder, recorded explicitly by the write-path services in their transaction (`AuditTrailInterface`, `adr-20261111-audit-log-explicit-recording`); actor resolution, the screen's policy, sign-in listeners and the retention setting live in `Infrastructure/Audit`; `audit:prune` | Depend on a domain other than the Tenancy contracts; be called from the flow runtime, Messaging, Webhook or broadcast jobs (`AuditBoundariesTest`) |
 
 `app/Infrastructure/<X>` also holds the seams that compose two domains so neither knows the other:
 `app/Infrastructure/Solution` writes a Solution's actions into the Flow registry and answers Flow's
@@ -46,7 +47,9 @@ sessions. The platform is extended from outside through public contracts, not by
 hands them to `Channels\ChannelRegistration`, which writes them into `Channels\ConnectorChannels` and tags their media
 services into Media's registries (the same path Telegram's `BuiltInChannelRegistrar` takes). `Domains/Flow` and
 `Infrastructure/Flow` do not depend on `Domains/Solution`, and `Domains/Channels` and `Domains/Media` depend on
-neither `Domains/Solution` nor `Infrastructure` (`SolutionBoundariesTest`).
+neither `Domains/Solution` nor `Infrastructure` (`SolutionBoundariesTest`). `app/Infrastructure/Audit` tells the
+Audit domain who is acting (it knows Staff and the support session) and records sign-ins and Tenancy's workspace
+deletion events, so every domain may call the audit trail while Audit itself depends on none of them.
 
 `Presale` (the public site's lead form) and `Shared` (base model concerns) carry no domain
 logic and have no knowledge pack.

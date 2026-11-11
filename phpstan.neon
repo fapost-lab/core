@@ -61,6 +61,10 @@ services:
 		class: Tests\Architecture\TestingKitBoundaryTest
 		tags:
 			- phpat.test
+	-
+		class: Tests\Architecture\AuditBoundariesTest
+		tags:
+			- phpat.test
 
 parameters:
 	level: 0

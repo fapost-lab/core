@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Flow;
 
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditRecord;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
@@ -25,6 +27,13 @@ final class PublishFlowServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // This test builds its own tables; what a publish records is covered by the builder API test.
+        $this->app->instance(AuditTrailInterface::class, new class () implements AuditTrailInterface {
+            public function record(AuditRecord $record): void
+            {
+            }
+        });
 
         Schema::dropIfExists('media_file_references');
         Schema::dropIfExists('flow_definitions');

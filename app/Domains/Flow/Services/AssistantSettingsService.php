@@ -6,6 +6,10 @@ namespace App\Domains\Flow\Services;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Domains\Flow\Commands\CommandActionType;
 use App\Domains\Flow\Models\FlowDraft;
@@ -43,6 +47,7 @@ final readonly class AssistantSettingsService
         private TenantSettings $tenantSettings,
         private CreateFlowAction $createFlow,
         private AssistantCommandsValidator $commandsValidator,
+        private AuditTrailInterface $audit,
     ) {
     }
 
@@ -135,7 +140,8 @@ final readonly class AssistantSettingsService
      */
     public function save(array $fields): Assistant
     {
-        return $this->write($fields, $this->languageLocked());
+        // The settings and their audit entry commit together.
+        return DB::transaction(fn (): Assistant => $this->write($fields, $this->languageLocked()));
     }
 
     /**
@@ -310,6 +316,25 @@ final readonly class AssistantSettingsService
     }
 
     /**
+     * The fields a save may change, read before and after it. The texts and the free-form settings are compared here
+     * and recorded by name only.
+     *
+     * @return array<string, mixed>
+     */
+    private static function auditSnapshot(Assistant $assistant): array
+    {
+        return [
+            'default_language'    => $assistant->default_language,
+            'default_flow_id'     => $assistant->default_flow_id,
+            'available_countries' => $assistant->available_countries,
+            'fallback_message'    => $assistant->fallback_message,
+            'busy_message'        => $assistant->busy_message,
+            'commands'            => $assistant->commands,
+            'settings'            => $assistant->settings,
+        ];
+    }
+
+    /**
      * @param  array{default_language?: string|null, available_countries?: list<string>|null, default_flow_id?: string|null, fallback_message?: mixed, busy_message?: mixed, commands?: list<array<string, mixed>>|null, settings?: list<array{key: string, value?: string|null}>|null}  $fields
      *
      * @throws InvalidArgumentException when the commands break a rule of {@see AssistantCommandsValidator}
@@ -338,7 +363,26 @@ final readonly class AssistantSettingsService
             $attributes['default_language'] = (string) $fields['default_language'];
         }
 
+        $before = self::auditSnapshot($assistant);
+
         $assistant->update($attributes);
+
+        $changes = AuditChanges::between(
+            $before,
+            self::auditSnapshot($assistant),
+            ['default_language', 'default_flow_id', 'available_countries'],
+            ['fallback_message', 'busy_message', 'commands', 'settings'],
+        );
+
+        if (! $changes->isEmpty()) {
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::AssistantSettingsUpdated,
+                subject: $assistant,
+                subjectLabel: (string) $assistant->name,
+                assistantId: (string) $assistant->getKey(),
+                changes: $changes,
+            ));
+        }
 
         return $assistant;
     }

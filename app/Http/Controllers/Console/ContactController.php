@@ -126,7 +126,7 @@ final class ContactController extends Controller
         $contact   = $this->contacts->findFor($assistant, $record);
         $back      = $this->url('show', ['record' => $contact->getKey()]);
 
-        $this->contacts->syncTags($contact, $request->tags(), (string) $request->user()?->getAuthIdentifier());
+        $this->contacts->syncTags($assistant, $contact, $request->tags(), (string) $request->user()?->getAuthIdentifier());
 
         return $this->backToCard($back, trans('console.contacts.tags_updated'));
     }
@@ -137,7 +137,7 @@ final class ContactController extends Controller
         $contact   = $this->contacts->findFor($assistant, $record);
         $back      = $this->url('show', ['record' => $contact->getKey()]);
 
-        $this->contacts->syncGroups($contact, $request->groupIds());
+        $this->contacts->syncGroups($assistant, $contact, $request->groupIds());
 
         return $this->backToCard($back, trans('console.contacts.groups_updated'));
     }

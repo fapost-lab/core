@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Services;
 
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Exceptions\StaffChangeRefusedException;
 use App\Domains\Staff\Models\Role;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Spatie\Permission\PermissionRegistrar;
 
@@ -24,6 +28,7 @@ final readonly class StaffRoleService
 {
     public function __construct(
         private PermissionRegistrar $permissionRegistrar,
+        private AuditTrailInterface $audit,
     ) {
     }
 
@@ -93,7 +98,16 @@ final readonly class StaffRoleService
             throw new StaffChangeRefusedException(StaffChangeRefusedException::SYSTEM_ROLE);
         }
 
-        $role->delete();
+        DB::transaction(function () use ($role): void {
+            $role->delete();
+
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::RoleDeleted,
+                subject: $role,
+                subjectLabel: $role->display_name ?? $role->name,
+            ));
+        });
+
         $this->permissionRegistrar->forgetCachedPermissions();
     }
 

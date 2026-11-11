@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Services;
 
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Jobs\SendActivationEmailJob;
 use App\Domains\Staff\Models\Role;
@@ -16,7 +20,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Creates a pending staff user, assigns a role, issues activation token, queues email.
+ * Creates a pending staff user, assigns a role, issues activation token, queues email. The invitation is recorded in the
+ * audit log with the name, email and role; never the activation token.
  */
 final class CreatePendingUserService
 {
@@ -25,6 +30,7 @@ final class CreatePendingUserService
         private readonly TenantContextInterface $tenantContext,
         private readonly RecordQuotaInterface $recordQuota,
         private readonly RecordLimitWatch $limitWatch,
+        private readonly AuditTrailInterface $audit,
     ) {
     }
 
@@ -57,6 +63,17 @@ final class CreatePendingUserService
             $role = Role::query()->findOrFail($data['role_id']);
             $this->assertCanAssignRole($actor, $role);
             $user->assignRole($role);
+
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::UserInvited,
+                subject: $user,
+                subjectLabel: $user->name,
+                changes: AuditChanges::created([
+                    'name'  => $user->name,
+                    'email' => $user->email,
+                    'roles' => [$role->name],
+                ]),
+            ));
 
             $plain = $this->activationTokenService->issue($user);
 

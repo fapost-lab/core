@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Mail\WorkspaceDeletionMail;
 use App\Domains\Staff\Models\User;
@@ -285,6 +286,22 @@ final class AdminWorkspaceDeletionConsoleTest extends FeatureTestCase
             ->etc());
         $this->actingAs($asker)->post($this->url('/delete'), ['slug' => $this->slug()])->assertRedirect();
         $this->assertSame(2, TenantDeletionRequest::on('landlord')->count());
+    }
+
+    public function test_asking_and_cancelling_are_each_one_audit_entry_by_the_admin_who_acted(): void
+    {
+        $this->allowSelfDeletion();
+        $asker     = $this->user(RoleEnum::Admin);
+        $canceller = $this->user(RoleEnum::Admin);
+
+        $this->actingAs($asker)->post($this->url('/delete'), ['slug' => $this->slug()])->assertRedirect();
+        $this->actingAs($canceller)->post($this->url('/delete/cancel'))->assertRedirect();
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(['workspace.deletion_requested', 'workspace.deletion_cancelled'], $entries->pluck('description')->all());
+        $this->assertSame(['settings', 'settings'], $entries->pluck('log_name')->all());
+        $this->assertSame([(string) $asker->getKey(), (string) $canceller->getKey()], $entries->pluck('causer_id')->all());
     }
 
     public function test_cancelling_with_nothing_scheduled_says_so(): void

@@ -60,6 +60,11 @@ enum Permission: string
     case ViewOperatorScreens = 'view_operator_screens';
 
     /**
+     * Opens the tenant's audit log: what each staff user (and platform support, inside the tenant) did in the console.
+     */
+    case ViewActivityLog = 'view_activity_log';
+
+    /**
      * Enum cases grouped by their logical UI group.
      *
      * @return array<string, list<self>>
@@ -134,8 +139,10 @@ enum Permission: string
             // Replying puts words in the assistant's mouth, to a real person.
             self::ReplyConversations,
             // Queue payloads and logs of the whole installation.
-            self::ViewOperatorScreens => true,
-            default                   => false,
+            self::ViewOperatorScreens,
+            // Shows what every colleague did, and when.
+            self::ViewActivityLog => true,
+            default               => false,
         };
     }
 
@@ -174,6 +181,7 @@ enum Permission: string
 
             self::ViewSystem,
             self::ViewOperatorScreens,
+            self::ViewActivityLog,
             self::ManageSettings => 'system',
         };
     }

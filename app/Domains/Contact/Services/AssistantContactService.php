@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Contact\Services;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Contact\Contracts\ContactTagRepositoryInterface;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Models\ContactGroup;
@@ -12,6 +16,7 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -25,6 +30,9 @@ use Illuminate\Support\Str;
  *
  * {@see \App\Domains\Contact\Policies\ContactPolicy} does not look at the assistant of the record, so no ability probe is
  * needed for the `can` flags; if the policy starts to check it, add one as {@see \App\Domains\Flow\Services\FlowDraftService} has.
+ *
+ * A staff write is recorded in the audit log as markers only (`tags`, `groups`) and the contact is labelled by a short
+ * id: the log never holds a contact's name, phone, username, tag or attribute value.
  */
 final readonly class AssistantContactService
 {
@@ -37,6 +45,7 @@ final readonly class AssistantContactService
         private TenantContextInterface $tenants,
         private ContactTagRepositoryInterface $tags,
         private ContactPlatforms $platforms,
+        private AuditTrailInterface $audit,
     ) {
     }
 
@@ -153,9 +162,15 @@ final readonly class AssistantContactService
      *
      * @param  list<string>  $tags
      */
-    public function syncTags(Contact $contact, array $tags, string $staffUserId): void
+    public function syncTags(Assistant $assistant, Contact $contact, array $tags, string $staffUserId): void
     {
-        $this->tags->syncForContact((string) $contact->getKey(), $tags, $staffUserId);
+        DB::transaction(function () use ($assistant, $contact, $tags, $staffUserId): void {
+            $before = $this->tags($contact);
+
+            $this->tags->syncForContact((string) $contact->getKey(), $tags, $staffUserId);
+
+            $this->recordUpdate($assistant, $contact, ['tags' => $before], ['tags' => $this->tags($contact)], 'tags');
+        });
     }
 
     /**
@@ -164,17 +179,23 @@ final readonly class AssistantContactService
      *
      * @param  list<string>  $groupIds
      */
-    public function syncGroups(Contact $contact, array $groupIds): void
+    public function syncGroups(Assistant $assistant, Contact $contact, array $groupIds): void
     {
-        $ids = [] === $groupIds
-            ? []
-            : ContactGroup::query()
-                ->where('tenant_id', $this->tenantId())
-                ->whereKey($groupIds)
-                ->pluck('id')
-                ->all();
+        DB::transaction(function () use ($assistant, $contact, $groupIds): void {
+            $ids = [] === $groupIds
+                ? []
+                : ContactGroup::query()
+                    ->where('tenant_id', $this->tenantId())
+                    ->whereKey($groupIds)
+                    ->pluck('id')
+                    ->all();
 
-        $contact->groups()->sync($ids);
+            $before = $this->groupIds($contact);
+
+            $contact->groups()->sync($ids);
+
+            $this->recordUpdate($assistant, $contact, ['groups' => $before], ['groups' => $this->groupIds($contact)], 'groups');
+        });
     }
 
     /**
@@ -185,6 +206,41 @@ final readonly class AssistantContactService
     public function tagSuggestions(): array
     {
         return $this->tags->distinctTags();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function groupIds(Contact $contact): array
+    {
+        $ids = $contact->groups()->pluck('contact_groups.id')->map(static fn (mixed $id): string => (string) $id)->all();
+        sort($ids);
+
+        return array_values($ids);
+    }
+
+    /**
+     * Records a card write as a marker, when it changed anything. The label is a short id, never the contact's name.
+     *
+     * @param  array<string, mixed>  $before
+     * @param  array<string, mixed>  $after
+     */
+    private function recordUpdate(Assistant $assistant, Contact $contact, array $before, array $after, string $marker): void
+    {
+        $changes = AuditChanges::between($before, $after, [], [$marker]);
+
+        if ($changes->isEmpty()) {
+            return;
+        }
+
+        $this->audit->record(new AuditRecord(
+            action: AuditAction::ContactUpdated,
+            subject: $contact,
+            // The tail of the ULID is its random part (the head is the time), so it tells contacts apart.
+            subjectLabel: 'Contact · ' . mb_substr((string) $contact->getKey(), -8),
+            assistantId: (string) $assistant->getKey(),
+            changes: $changes,
+        ));
     }
 
     private function tenantId(): string

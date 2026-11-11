@@ -56,7 +56,8 @@ final class StaffServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(AclBootstrapService::class);
-        $this->app->singleton(RoleWriterService::class);
+        // Not a singleton: it records to the audit trail, which is scoped (the actor and the log status of one job).
+        $this->app->bind(RoleWriterService::class);
         $this->app->when(RoleWriterService::class)
             ->needs('$guard')
             ->giveConfig('auth.defaults.guard', 'web');

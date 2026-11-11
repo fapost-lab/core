@@ -88,6 +88,7 @@ return [
             'view_system'               => 'View system',
             'manage_settings'           => 'Manage settings',
             'view_operator_screens'     => 'View operator screens',
+            'view_activity_log'         => 'View the activity log',
         ],
         'descriptions' => [
             'rotate_channel_token'  => 'Reissues the webhook URL hash. Existing webhook configurations become invalid until re-configured on the platform side.',
@@ -97,6 +98,7 @@ return [
             'view_conversations'    => 'Opens full message transcripts between contacts and the assistant, including media.',
             'reply_conversations'   => 'Sends messages to a contact from the operator inbox under the assistant identity.',
             'view_operator_screens' => 'Opens the queue dashboard and the other operator screens of the whole installation: job payloads, logs and load figures.',
+            'view_activity_log'     => 'Opens the audit log of the workspace: who did what in the console and when, including platform support inside the workspace.',
         ],
         'sensitive_warning' => 'Sensitive — review carefully before assigning.',
     ],

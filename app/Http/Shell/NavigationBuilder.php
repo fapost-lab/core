@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Shell;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\Contact;
@@ -130,6 +131,7 @@ final readonly class NavigationBuilder
                 $user->can(Permission::ViewMedia->value) || $user->can(Permission::ManageMedia->value),
             ),
             $this->entry($media, 'console.admin.translations.index', __('staff.tenant_translations.navigation'), 'languages', 60, $user->can(Permission::ManageTranslations->value)),
+            $this->entry($system, 'console.admin.activity.index', __('console.activity_log.title'), 'file-text', 90, $this->canViewAny($user, ActivityEntry::class)),
             $this->entry($system, 'console.admin.tenant-settings.edit', __('staff.tenant_settings.navigation'), 'sliders-horizontal', 100, $user->can(Permission::ManageSettings->value)),
             $this->entry(
                 $system,

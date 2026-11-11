@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Broadcasting\Models\Broadcast;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Models\ContactGroup;
@@ -572,6 +573,48 @@ final class ContactSegmentsConsoleTest extends FeatureTestCase
     public function test_a_guest_is_sent_to_the_login(): void
     {
         $this->get($this->listUrl())->assertRedirect(route('console.auth.login'));
+    }
+
+    public function test_every_segment_write_is_in_the_audit_log_with_the_rules_as_a_marker(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin);
+
+        $this->post($this->listUrl(), [
+            'name'       => 'Buyers',
+            'match'      => 'all',
+            'conditions' => [['type' => 'tag', 'operator' => 'has', 'value' => ['rules-secret-tag']]],
+        ])->assertRedirect();
+        $segment = ContactSegment::query()->sole();
+
+        $this->put($this->listUrl("/{$segment->getKey()}"), [
+            'name'       => 'Whales',
+            'match'      => 'any',
+            'conditions' => [['type' => 'platform', 'operator' => 'eq', 'value' => ['telegram']]],
+        ])->assertRedirect();
+        $this->delete($this->listUrl("/{$segment->getKey()}"))->assertRedirect();
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(
+            ['contact_segment.created', 'contact_segment.updated', 'contact_segment.deleted'],
+            $entries->pluck('description')->all(),
+        );
+        $this->assertTrue($entries->every(fn (ActivityEntry $entry): bool => 'contacts' === $entry->log_name
+            && (string) $segment->getKey() === $entry->subject_id
+            && null === $entry->assistant_id
+            && (string) $admin->getKey() === $entry->causer_id));
+        $this->assertSame(['Buyers', 'Whales', 'Whales'], $entries->pluck('subject_label')->all());
+        $this->assertSame(['attributes' => ['name' => 'Buyers'], 'changed' => ['rules']], $entries[0]->attribute_changes?->toArray());
+        $this->assertSame(
+            ['attributes' => ['name' => 'Whales'], 'old' => ['name' => 'Buyers'], 'changed' => ['rules']],
+            $entries[1]->attribute_changes?->toArray(),
+        );
+
+        $raw = (string) json_encode(ActivityEntry::query()->get()->map->getAttributes());
+        foreach (['rules-secret-tag', 'telegram'] as $rule) {
+            $this->assertStringNotContainsString($rule, $raw);
+        }
     }
 
     private function listUrl(string $suffix = ''): string
