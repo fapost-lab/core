@@ -120,8 +120,10 @@ think not to tie it to my stack but to choose the optimal one for the task."
   it and marks it "tested with 0.x".
 - The update check is the heartbeat: installation id and versions, no tenant data, switchable off on the
   installation's side; it shows the owner which Core versions live in the field.
-- Licences and the Composer repository are built, Packeton as a reference — rejected: Keygen (no
-  Composer distribution engine in its docs, no watermarking, no organisations of our shape), Anystack
+- Licences and the Composer repository are built, Packeton as a reference — rejected: Keygen (it
+  advertises a private Composer repository with the licence key as password, though Composer is not
+  among its documented distribution engines; but no per-licence watermarking, no organisations with a
+  "managed by" relation, and its self-hosted edition is under the Fair Core License), Anystack
   (not self-hostable, not a merchant of record, a share of every sale), Private Packagist for Vendors
   (from €649 a year, no runtime licences, no watermarking) — all leave the unusual rules to us anyway.
 - Payments behind an abstraction. While the owner is the only seller: a merchant of record (Paddle or
