@@ -35,17 +35,4 @@ return [
         'inertia' => '3.9.1',
     ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Where to find more Solutions
-    |--------------------------------------------------------------------------
-    |
-    | Only the default of the platform setting `solutions.marketplace_url`: the address the Solutions page of the admin
-    | panel links to, on a self-hosted installation (single resolution mode) that does not sell Solutions itself. A value stored in Platform settings wins. Empty
-    | hides the link.
-    |
-    */
-
-    'marketplace_url' => env('SOLUTIONS_MARKETPLACE_URL', 'https://docs.fapost.in/self-hosting/solutions-directory'),
-
 ];

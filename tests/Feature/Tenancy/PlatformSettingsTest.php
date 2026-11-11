@@ -88,12 +88,12 @@ final class PlatformSettingsTest extends FeatureTestCase
         $definitions = $this->settings()->definitions();
         $keys        = array_map(static fn (PlatformSettingDefinition $d): string => $d->key, $definitions);
 
-        $this->assertSame(['audit.retention_days', PartitionRetention::SETTING, self::ITERATIONS, 'solutions.marketplace_url', self::REDIRECT], $keys, 'Audit, then Conversations, then Flow, then Solutions, then Tenants.');
+        $this->assertSame(['audit.retention_days', PartitionRetention::SETTING, self::ITERATIONS, self::REDIRECT], $keys, 'Audit, then Conversations, then Flow, then Tenants.');
         $this->assertSame(300, $definitions[2]->default);
         $this->assertSame(10, $definitions[2]->min);
         $this->assertSame(10000, $definitions[2]->max);
         $this->assertFalse($definitions[2]->hostModeOnly);
-        $this->assertTrue($definitions[4]->hostModeOnly);
+        $this->assertTrue($definitions[3]->hostModeOnly);
     }
 
     public function test_a_refused_change_writes_nothing(): void
