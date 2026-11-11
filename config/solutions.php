@@ -30,7 +30,7 @@ return [
     */
 
     'console_runtime' => [
-        'kit'     => '0.1.1',
+        'kit'     => '0.1.2',
         'vue'     => '3.5.44',
         'inertia' => '3.9.1',
     ],
