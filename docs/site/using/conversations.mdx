@@ -33,6 +33,8 @@ A conversation is always handled by someone:
 - **Assistant** — the flows answer the contact.
 - **Waiting for an operator** — an operator was requested and nobody has accepted
   yet. The flows stand down; the contact's messages wait in the transcript.
+  A flow asks for one with the [Request operator](/using/node-catalogue#request-operator)
+  block, which also tells the operators and the contact.
 - **Handled by** a named operator — that person answers, and only they can reply.
 
 Opening a conversation marks it read. New messages that arrive while it is open

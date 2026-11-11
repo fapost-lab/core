@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Providers;
 
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
+use App\Domains\Conversation\Events\OperatorRequestStateChanged;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Call\Egress\AddressClassifier;
@@ -47,6 +48,7 @@ use App\Domains\Flow\Contracts\MutableDataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Contracts\NodeUsageStatisticsInterface;
+use App\Domains\Flow\Contracts\OperatorRequestTimeoutSchedulerInterface;
 use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
 use App\Domains\Flow\Contracts\SendMessageTimeoutSchedulerInterface;
 use App\Domains\Flow\Contracts\SystemTranslationCatalogInterface;
@@ -71,6 +73,7 @@ use App\Domains\Flow\Handlers\LoopEndNodeHandler;
 use App\Domains\Flow\Handlers\LoopNodeHandler;
 use App\Domains\Flow\Handlers\NotifyNodeHandler;
 use App\Domains\Flow\Handlers\RagQueryNodeHandler;
+use App\Domains\Flow\Handlers\RequestOperatorNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Handlers\SetTagNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
@@ -79,6 +82,7 @@ use App\Domains\Flow\Handlers\Support\TemplateResolver;
 use App\Domains\Flow\History\DefaultHistoryWriter;
 use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\History\NoOpHistoryWriter;
+use App\Domains\Flow\Listeners\ContinueAfterOperatorRequest;
 use App\Domains\Flow\Live\FlowSessionActivityObserver;
 use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
 use App\Domains\Flow\Logging\FlowLogPartitionManager;
@@ -152,6 +156,7 @@ use App\Infrastructure\Flow\ContainerNodeHandlerFactory;
 use App\Infrastructure\Flow\DnsHostResolver;
 use App\Infrastructure\Flow\FlowExecutionGuard;
 use App\Infrastructure\Flow\QueuedDelayResumeScheduler;
+use App\Infrastructure\Flow\QueuedOperatorRequestTimeoutScheduler;
 use App\Infrastructure\Flow\QueuedSendMessageTimeoutScheduler;
 use App\Infrastructure\Solution\ContainerActionAvailability;
 use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
@@ -161,6 +166,7 @@ use Fapost\Foundation\Quota\DTO\LimitDefinition;
 use Fapost\Foundation\Quota\Enums\LimitKind;
 use Fapost\Foundation\Settings\Enums\PlatformSettingType;
 use Illuminate\Database\DatabaseManager;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Psr\Log\LoggerInterface;
@@ -183,6 +189,9 @@ final class FlowServiceProvider extends ServiceProvider
         Gate::policy(FlowLog::class, FlowLogPolicy::class);
 
         FlowSession::observe(FlowSessionActivityObserver::class);
+
+        // The Conversation → Flow seam of operator requests: Conversation announces, Flow continues the contact's side.
+        Event::listen(OperatorRequestStateChanged::class, ContinueAfterOperatorRequest::class);
 
         // Registered the way a Solution registers its keys: from boot(), before the registry is frozen.
         $this->app->make(LimitRegistryInterface::class)->register(new LimitDefinition(
@@ -303,6 +312,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->bind(FlowTriggerEventPublisherInterface::class, QueuedFlowTriggerEventPublisher::class);
         $this->app->bind(DelayResumeSchedulerInterface::class, QueuedDelayResumeScheduler::class);
         $this->app->bind(SendMessageTimeoutSchedulerInterface::class, QueuedSendMessageTimeoutScheduler::class);
+        $this->app->bind(OperatorRequestTimeoutSchedulerInterface::class, QueuedOperatorRequestTimeoutScheduler::class);
         $this->app->bind(NodeUsageStatisticsInterface::class, NodeUsageStatisticsService::class);
         $this->app->bind(
             SubflowResumerInterface::class,
@@ -504,6 +514,7 @@ final class FlowServiceProvider extends ServiceProvider
             AuthRequestNodeHandler::class,
             LoopNodeHandler::class,
             LoopEndNodeHandler::class,
+            RequestOperatorNodeHandler::class,
         ];
 
         foreach ($handlers as $handlerClass) {

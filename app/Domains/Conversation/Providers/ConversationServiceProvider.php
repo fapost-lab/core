@@ -8,12 +8,16 @@ use App\Domains\Conversation\Contracts\ConversationLoggerInterface;
 use App\Domains\Conversation\Contracts\ConversationOwnershipInterface;
 use App\Domains\Conversation\Contracts\ConversationReplyServiceInterface;
 use App\Domains\Conversation\Contracts\ConversationStoreInterface;
+use App\Domains\Conversation\Contracts\OperatorRequestsInterface;
+use App\Domains\Conversation\Events\OperatorRequestStateChanged;
+use App\Domains\Conversation\Listeners\DimOperatorRequestNotifications;
 use App\Domains\Conversation\Models\Conversation;
 use App\Domains\Conversation\Policies\ConversationPolicy;
 use App\Domains\Conversation\Retention\PartitionRetention;
 use App\Domains\Conversation\Services\ConversationLogger;
 use App\Domains\Conversation\Services\ConversationOwnership;
 use App\Domains\Conversation\Services\ConversationReplyService;
+use App\Domains\Conversation\Services\OperatorRequests;
 use App\Domains\Conversation\Settings\ConversationSettings;
 use App\Domains\Conversation\Store\Postgres\PostgresConversationStore;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -21,6 +25,7 @@ use App\Domains\Tenancy\Services\PlatformSettingRegistry;
 use App\Domains\Tenancy\ValueObjects\PlatformSettingField;
 use Fapost\Foundation\Settings\Enums\PlatformSettingType;
 use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
@@ -64,11 +69,15 @@ final class ConversationServiceProvider extends ServiceProvider
 
         $this->app->scoped(ConversationOwnershipInterface::class, ConversationOwnership::class);
         $this->app->scoped(ConversationReplyServiceInterface::class, ConversationReplyService::class);
+        // Scoped: it reads the tenant's conversation settings.
+        $this->app->scoped(OperatorRequestsInterface::class, OperatorRequests::class);
     }
 
     public function boot(): void
     {
         Gate::policy(Conversation::class, ConversationPolicy::class);
+
+        Event::listen(OperatorRequestStateChanged::class, DimOperatorRequestNotifications::class);
 
         $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
             key: PartitionRetention::SETTING,

@@ -299,6 +299,9 @@ function contentSnippet(node: FlowNodeLike): string | null {
     if (node.type === 'call') {
         return typeof config.url === 'string' ? truncate(config.url) : null
     }
+    if (node.type === 'request_operator') {
+        return typeof config.wait_seconds === 'number' && config.wait_seconds > 0 ? `${config.wait_seconds}s` : null
+    }
     return null
 }
 

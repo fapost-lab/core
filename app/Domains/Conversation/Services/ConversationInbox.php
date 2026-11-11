@@ -26,9 +26,6 @@ use App\Domains\Media\Exceptions\MediaNotFoundException;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Messaging\Exceptions\RateLimitExceededException;
 use App\Domains\Messaging\Exceptions\UnsupportedChannelException;
-use App\Domains\Staff\Enums\Permission;
-use App\Domains\Staff\Enums\RoleEnum;
-use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\User;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -83,6 +80,7 @@ final readonly class ConversationInbox
         private MediaServiceInterface $media,
         private ConversationActivityNotifier $activity,
         private ConversationOperatorNotifier $operators,
+        private ConversationOperators $staff,
         private Cache $cache,
         private ExceptionHandler $exceptions,
     ) {
@@ -316,9 +314,9 @@ final readonly class ConversationInbox
      */
     public function transferTargets(Assistant $assistant, User $me): array
     {
-        return $this->eligibleStaff($assistant)
+        return $this->staff->eligibleStaff($assistant)
             ->reject(static fn (User $user): bool => (string) $user->getKey() === (string) $me->getKey())
-            ->filter(fn (User $user): bool => $this->canTakeThreads($assistant, $user))
+            ->filter(fn (User $user): bool => $this->staff->canTakeThreads($assistant, $user))
             ->sortBy(static fn (User $user): string => mb_strtolower((string) $user->name))
             ->map(static fn (User $user): array => ['id' => (string) $user->getKey(), 'name' => (string) $user->name])
             ->values()
@@ -449,34 +447,10 @@ final readonly class ConversationInbox
         }
     }
 
-    /**
-     * Active, panel-eligible staff who work with the assistant (assigned to it, or administrators).
-     *
-     * @return Collection<int, User>
-     */
-    private function eligibleStaff(Assistant $assistant): Collection
-    {
-        return User::query()
-            ->withoutPlatformSupport()
-            ->where('is_active', true)
-            ->where('status', UserStatus::Active->value)
-            ->where(static fn (Builder $query) => $query
-                ->whereHas('assistants', static fn (Builder $sub): Builder => $sub->whereKey($assistant->getKey()))
-                ->orWhereHas('roles', static fn (Builder $sub): Builder => $sub->where('name', RoleEnum::Admin->value)))
-            ->get();
-    }
-
     private function eligibleTarget(Assistant $assistant, string $userId): ?User
     {
-        return $this->eligibleStaff($assistant)
-            ->first(fn (User $user): bool => (string) $user->getKey() === $userId && $this->canTakeThreads($assistant, $user));
-    }
-
-    private function canTakeThreads(Assistant $assistant, User $user): bool
-    {
-        return $user->can(Permission::ViewConversations->value)
-            && $user->can(Permission::ReplyConversations->value)
-            && $user->hasAssistantAccess($assistant);
+        return $this->staff->eligibleStaff($assistant)
+            ->first(fn (User $user): bool => (string) $user->getKey() === $userId && $this->staff->canTakeThreads($assistant, $user));
     }
 
     private function announced(Conversation $conversation, bool $changed): bool

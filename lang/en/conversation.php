@@ -121,6 +121,15 @@ return [
             'title' => ':actor took over your conversation with :contact',
             'body'  => 'An administrator is handling it now.',
         ],
+        'requested' => [
+            'title'    => ':contact is waiting for an operator',
+            'body'     => 'Accept the conversation to answer them.',
+            'outcomes' => [
+                'accepted'  => 'Accepted by :actor.',
+                'cancelled' => 'The contact cancelled the request.',
+                'timeout'   => 'Nobody accepted the request in time.',
+            ],
+        ],
     ],
 
     'navigation' => [

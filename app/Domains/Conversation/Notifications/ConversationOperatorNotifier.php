@@ -4,15 +4,20 @@ declare(strict_types=1);
 
 namespace App\Domains\Conversation\Notifications;
 
+use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Conversation\Enums\ConversationOwner;
+use App\Domains\Conversation\Enums\OperatorRequestState;
 use App\Domains\Conversation\Models\Conversation;
+use App\Domains\Conversation\Services\ConversationOperators;
 use App\Domains\Conversation\Support\ContactLabel;
+use App\Domains\Staff\Live\StaffNotificationsAnnouncer;
 use App\Domains\Staff\Models\User;
 use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Repository as Cache;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Routing\UrlGenerator;
 use Illuminate\Notifications\DatabaseNotification;
+use Illuminate\Support\Carbon;
 use Throwable;
 
 /**
@@ -21,11 +26,15 @@ use Throwable;
  * - a new message from the contact in a thread they hold — at most one unread notification per thread: while one is
  *   unread, further messages add nothing; once it is read, the next message brings a new one;
  * - a thread another operator transferred to them;
- * - a thread an administrator seized from them.
+ * - a thread an administrator seized from them;
+ * - a contact waiting for an operator (a flow's operator request), to everyone the request goes to. Once the request
+ *   stops waiting — accepted, cancelled or timed out — each of those notifications is marked read and rendered again
+ *   with the outcome ("Accepted by Y"), the accepting operator's own included: an unread one would hold back their
+ *   message notifications for the thread.
  *
- * Never throws: a failure is reported, so it never fails the transcript job (the logger never throws to its caller)
- * or the operator's transfer or seizure, which has already happened. A recipient who may not use the console (not
- * active, or switched off) gets nothing.
+ * Never throws: a failure is reported, so it never fails the transcript job (the logger never throws to its caller),
+ * the operator's transfer or seizure, which has already happened, or the request. A recipient who may not read the
+ * thread — not active, switched off, without `ViewConversations` or without access to its assistant — gets nothing.
  */
 final readonly class ConversationOperatorNotifier
 {
@@ -36,6 +45,8 @@ final readonly class ConversationOperatorNotifier
         private Cache $cache,
         private UrlGenerator $urls,
         private ExceptionHandler $exceptions,
+        private ConversationOperators $operators,
+        private StaffNotificationsAnnouncer $announcer,
     ) {
     }
 
@@ -52,7 +63,7 @@ final readonly class ConversationOperatorNotifier
                 return;
             }
 
-            $holder = $this->recipient((string) $conversation->owner_staff_user_id);
+            $holder = $this->recipient((string) $conversation->owner_staff_user_id, $conversation);
 
             if (null === $holder) {
                 return;
@@ -76,7 +87,7 @@ final readonly class ConversationOperatorNotifier
     public function transferred(Conversation $conversation, string $toUserId, string $fromUserId): void
     {
         try {
-            $recipient = $this->recipient($toUserId);
+            $recipient = $this->recipient($toUserId, $conversation);
 
             if (null !== $recipient) {
                 $this->send($recipient, ConversationOperatorNotification::TRANSFERRED, $conversation, $this->name($fromUserId));
@@ -92,7 +103,7 @@ final readonly class ConversationOperatorNotifier
     public function seized(Conversation $conversation, string $previousOwnerId, User $admin): void
     {
         try {
-            $recipient = $this->recipient($previousOwnerId);
+            $recipient = $this->recipient($previousOwnerId, $conversation);
 
             if (null !== $recipient) {
                 $this->send($recipient, ConversationOperatorNotification::SEIZED, $conversation, (string) $admin->name);
@@ -102,7 +113,64 @@ final readonly class ConversationOperatorNotifier
         }
     }
 
-    private function send(User $recipient, string $kind, Conversation $conversation, ?string $actor): void
+    /**
+     * A contact waits for an operator: `$recipient`, chosen by the request, hears of it in their bell. The caller checked
+     * that they may take the assistant's threads.
+     */
+    public function requested(User $recipient, Conversation $conversation, string $requestId, ?string $note): void
+    {
+        try {
+            $this->send($recipient, ConversationOperatorNotification::REQUESTED, $conversation, null, $requestId, $note);
+        } catch (Throwable $exception) {
+            $this->exceptions->report($exception);
+        }
+    }
+
+    /**
+     * The request stopped waiting: every notification about it is marked read and rendered again with the outcome, and
+     * the recipients' bells are told.
+     */
+    public function settled(string $requestId, OperatorRequestState $state, ?string $actorUserId): void
+    {
+        $outcome = $state->value;
+
+        if (! in_array($outcome, ConversationOperatorNotification::OUTCOMES, true)) {
+            return;
+        }
+
+        try {
+            $actor = null !== $actorUserId ? $this->name($actorUserId) : null;
+
+            // `data` is a text column: narrowed by the id it contains, then compared exactly here (see hasUnread()).
+            $notifications = DatabaseNotification::query()
+                ->where('type', ConversationOperatorNotification::class)
+                ->where('data', 'like', '%' . $requestId . '%')
+                ->get();
+
+            foreach ($notifications as $notification) {
+                $data = $notification->data;
+
+                if (! is_array($data) || ($data['request_id'] ?? null) !== $requestId || ConversationOperatorNotification::REQUESTED !== ($data['kind'] ?? null)) {
+                    continue;
+                }
+
+                $user = $notification->notifiable;
+
+                $notification->forceFill([
+                    'data'    => ConversationOperatorNotification::settle($data, $outcome, $actor, $user instanceof User ? $user->preferredLocale() : null),
+                    'read_at' => $notification->read_at ?? Carbon::now(),
+                ])->save();
+
+                if ($user instanceof User) {
+                    $this->announcer->changed($user);
+                }
+            }
+        } catch (Throwable $exception) {
+            $this->exceptions->report($exception);
+        }
+    }
+
+    private function send(User $recipient, string $kind, Conversation $conversation, ?string $actor, ?string $requestId = null, ?string $note = null): void
     {
         $url = $this->urls->route('console.conversations.show', [
             'assistant' => (string) $conversation->assistant_id,
@@ -115,6 +183,8 @@ final readonly class ConversationOperatorNotifier
             ContactLabel::of($conversation),
             $url,
             $actor,
+            $requestId,
+            $note,
         ));
     }
 
@@ -151,12 +221,17 @@ final readonly class ConversationOperatorNotifier
         $store->lock($key, self::LOCK_SECONDS)->get($callback);
     }
 
-    private function recipient(string $userId): ?User
+    /**
+     * The user, when they may still open the thread the notification links to: access is checked again here, since it
+     * may have changed since they took the thread (an administrator unassigned them from the assistant).
+     */
+    private function recipient(string $userId, Conversation $conversation): ?User
     {
-        $user = '' === $userId ? null : User::query()->find($userId);
+        $user      = '' === $userId ? null : User::query()->find($userId);
+        $assistant = Assistant::query()->find((string) $conversation->assistant_id);
 
-        // The platform support user is not one of the tenant's people (support access ADR).
-        return $user instanceof User && $user->canAccessConsole() && ! $user->isPlatformSupport() ? $user : null;
+        // The platform support user is not one of the tenant's people (support access ADR); the check says so too.
+        return $user instanceof User && $assistant instanceof Assistant && $this->operators->canReadThreads($assistant, $user) ? $user : null;
     }
 
     private function name(string $userId): ?string

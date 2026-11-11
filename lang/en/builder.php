@@ -104,6 +104,32 @@ return [
             ],
         ],
 
+        'request_operator' => [
+            'section_operators'   => 'Operators',
+            'target'              => 'Who to notify',
+            'target_help'         => 'The staff who get the request in their bell. Pick everyone on the assistant, a role or specific users.',
+            'role'                => 'Role',
+            'user_ids'            => 'Users',
+            'notify_by_email'     => 'Also notify by email',
+            'operator_text'       => 'Text for operators',
+            'operator_text_help'  => 'Empty = the standard text "Contact X is waiting for an operator". Admin-UI language. Supports {{flow.*}} templates.',
+            'wait_seconds'        => 'Wait for an operator (seconds)',
+            'wait_seconds_help'   => '0 = wait without a limit; then the timeout handle never fires.',
+            'section_contact'     => 'Contact',
+            'requested_text'      => '"Request sent" text',
+            'cancel_button'       => 'Show a "Cancel request" button',
+            'cancel_button_help'  => 'Shown only on channels with inline buttons; removed once the request stops waiting.',
+            'cancel_label'        => 'Cancel button label',
+            'connected_text'      => '"Operator connected" text',
+            'connected_text_help' => 'Optional. Empty = nothing is sent.',
+            'disconnected_text'   => '"Operator left" text',
+            'defaults'            => [
+                'requested_text'    => 'We are looking for an operator, please wait…',
+                'cancel_label'      => 'Cancel request',
+                'disconnected_text' => 'The operator has left the conversation.',
+            ],
+        ],
+
         'auth_request' => [
             'section'         => 'Authentication',
             'method'          => 'Method',

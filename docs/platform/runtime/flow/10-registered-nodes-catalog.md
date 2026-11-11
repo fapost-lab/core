@@ -1,7 +1,7 @@
 # 10. Registered Nodes Catalog
 
 Reflects the handlers actually registered in `FlowServiceProvider::registerCoreNodeHandlers()`
-(called from the `NodeHandlerRegistry` singleton factory in `register()`). All 15 are Core
+(called from the `NodeHandlerRegistry` singleton factory in `register()`). All 16 are Core
 handlers at `v1`.
 
 | Type | Version | Category | Class | Purpose | Spec |
@@ -21,6 +21,7 @@ handlers at `v1`.
 | `set_tag` | 1 | `Data` | `SetTagNodeHandler` | Adds, removes or toggles a tag on the current contact. | [set-tag.md](../../../reference/specs/flow-engine/nodes/set-tag.md) |
 | `notify` | 1 | `Contact` | `NotifyNodeHandler` | Sends a queued notification, either to staff (admin-panel escalation) or to contacts (broadcast via an assistant). | [notify.md](../../../reference/specs/flow-engine/nodes/notify.md) |
 | `auth_request` | 1 | `Contact` | `AuthRequestNodeHandler` | Evaluates a challenge (currently `basic`: operator comparison) and, on a pass, raises the `contact.is_authenticated` flag. Always continues through `default`. | [auth-request.md](../../../reference/specs/flow-engine/nodes/auth-request.md) |
+| `request_operator` | 1 | `Conversation` | `RequestOperatorNodeHandler` | Places an operator request on the conversation thread (bot to `queued`), notifies the operators and the contact, and waits; leaves by `returned`, `cancelled` or `timeout`. | [request-operator.md](../../../reference/specs/flow-engine/nodes/request-operator.md) |
 
 `category()` values above come from each handler's own override; `SendMessageNodeHandler` and
 `InputNodeHandler` don't override it and fall back to `AbstractVersionedHandler::category()`,
@@ -29,7 +30,7 @@ which returns `'Core'`.
 ## How registration works
 
 `FlowServiceProvider::register()` binds `NodeHandlerRegistry` as a singleton whose factory calls
-`registerCoreNodeHandlers()`, which lists the 15 handler classes above and calls
+`registerCoreNodeHandlers()`, which lists the 16 handler classes above and calls
 `$registry->register($handlerClass)` for each. Per
 [ADR-0001](../../../../.ai/knowledge/adr/0001-node-handlers-built-per-scope.md), the registry
 keeps only the handler **class** (a throwaway instance is built once at registration to read and

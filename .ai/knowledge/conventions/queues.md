@@ -10,7 +10,7 @@ paths:
   - "app/Domains/Broadcasting/**"
   - "app/Domains/Messaging/**"
 summary: Queues are split by purpose (flow.execution, messaging.*, scheduled.triggers, sync.external); rate limits and backpressure are preventive, not reactive.
-reviewed_at: 2026-10-10
+reviewed_at: 2026-11-11
 ---
 # Messaging and queues
 
@@ -46,7 +46,8 @@ repurposing it for something else.
 Queue assignment by purpose, as it exists in the codebase today:
 
 - `flow.execution`: `app/Jobs/Flow/ResumeDelayedFlowSessionJob.php`,
-  `app/Jobs/Flow/ResumeTimedOutSendMessageNodeJob.php`, and the webhook controller's initial
+  `app/Jobs/Flow/ResumeTimedOutSendMessageNodeJob.php`, `ExpireOperatorRequestJob.php`,
+  `ContinueAfterOperatorRequestJob.php`, and the webhook controller's initial
   dispatch (`app/Domains/Webhook/Http/WebhookController.php`). Flow replies are sent inline inside
   these jobs, not through a separate queue.
 - `messaging.transactional`: reserved like `sync.external` — no job targets it. A reply delivered
@@ -58,6 +59,7 @@ Queue assignment by purpose, as it exists in the codebase today:
 - `messaging.system`: `app/Jobs/Messaging/SyncChannelWebhookJob.php`,
   `app/Domains/Staff/Jobs/SendStaffNotificationJob.php`,
   `app/Domains/Staff/Jobs/SendLimitNoticeJob.php`,
+  `app/Domains/Conversation/Jobs/NotifyOperatorRequestJob.php`,
   `app/Jobs/Media/CleanupSoftDeletedMediaJob.php`, and the broadcast job of
   `app/Domains/Flow/Live/FlowActivityChanged.php` (live updates of the sessions and flow log screens). Its cost
   is bounded on purpose: none without a delivering broadcaster, none while no screen watches the assistant, and at

@@ -65,4 +65,11 @@ final class SystemStateKeys
      * fails; cleared when the node finally emits success or `invalid`.
      */
     public const string INPUT_RETRY_PREFIX = StateNamespace::System->value . '.input';
+
+    /**
+     * Prefix for the per-node `request_operator` marker. Full path: `system.request_operator.{nodeId}`, holding the id
+     * of the operator request the node placed or bound to. A re-execution of the node while that request still waits
+     * places nothing new; once the request has ended, the next pass (a loop) places a new one.
+     */
+    public const string REQUEST_OPERATOR_PREFIX = StateNamespace::System->value . '.request_operator';
 }

@@ -13,7 +13,7 @@ paths:
   - config/conversation.php
   - "database/migrations/tenant/*conversation*"
   - "tests/*/Domains/Conversation/**"
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-11
 ---
 # Conversation rules
 
@@ -41,6 +41,21 @@ broken.
   and the notifier never throws to the transcript job or the operator's action. Enforced:
   `ConversationOperatorNotificationTest`.
 - **A `queued` thread stops inbound routing exactly as a `staff` one** (`isHandledByStaff`, `MessageRouter`).
+  The one exception is a press of an operator request's cancel button (reserved id), which `MessageRouter`
+  recognises under the lock before that check, uses to cancel the request and drops.
+- **An operator request lives on its thread and changes only under a row lock, by one conditional UPDATE** on
+  the handling and `operator_request_id`, never on a JSON field; the JSON body (`operator_request`) is
+  rewritten whole from the locked row. Taking over a `queued` thread accepts its pending request, finishing
+  returns an accepted one, cancel and timeout send a pending one back to the bot. Why: the flow session that
+  asked may die while an operator holds the thread (`adr-20261111-operator-request-on-thread`). Enforced:
+  `OperatorRequestsTest`.
+- **Conversation does not depend on Flow.** What Flow must do after a request changes state reaches it only
+  through `OperatorRequestStateChanged`, dispatched after commit. Review only.
+- **Every notification about an operator request is dimmed once the request stops waiting** (marked read and
+  rendered again with the outcome, the acceptor's own included), so no bell calls into a taken thread and the
+  "one unread per thread" rule does not hold back the acceptor's message notifications. Request recipients and
+  the holder of a message notification are re-checked for access to the thread's assistant
+  (`ConversationOperators`). Enforced: `ConversationOperatorNotificationTest`.
 - **Reading and answering a thread needs access to its assistant** (`ConversationPolicy::view` / `reply`:
   admin or assigned), on top of `ViewConversations` / `ReplyConversations`; a transfer target needs both
   permissions and that access. Enforced: `ConversationResourceAuthorizationTest`, `OperatorHandoffTest`.

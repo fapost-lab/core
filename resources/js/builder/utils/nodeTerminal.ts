@@ -28,6 +28,9 @@ export function nodeMustBeLast(node: TerminalCheckInput): boolean {
     // Call is always terminal — continuation is only via success/error.
     if (node.type === 'call') return true
 
+    // Request operator is always terminal — continuation is only via returned/cancelled/timeout.
+    if (node.type === 'request_operator') return true
+
     // Branch/condition node is terminal when it has at least one rule —
     // continuation is only via named branch handles, not the default chain.
     if (node.type === 'branch' || node.type === 'condition') {

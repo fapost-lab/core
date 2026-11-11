@@ -23,7 +23,7 @@ paths:
   - "database/migrations/tenant/*tenant_translations*"
   - app/Console/Commands/CreateNextFlowLogPartitionCommand.php
   - app/Console/Commands/PruneFlowLogsCommand.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-11-11
 ---
 # Flow
 
@@ -81,7 +81,8 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   `assistant.commands`) without the lock; (2) typing indicator start; (3) session lock
   `session_lock:{tenant}:{contact}:{assistant}` (`Concurrency/LockScope`, Redis, 30 s TTL) taken through
   `LockAcquisitionPolicy` (3 attempts, 2 s apart) and published to `SessionLockRegistry`, so
-  `FlowExecutionGuard` stays re-entrant and the engine extends the TTL before each node; (4) staff
+  `FlowExecutionGuard` stays re-entrant and the engine extends the TTL before each node; (4) a press of an
+  operator request's cancel button (`operator_request_cancel` drop, `Support/OperatorRequestCancelButton`), then the staff
   ownership check (`staff_handled` drop, before session classification, because the session may still
   be in `waiting_input` from before the takeover), then session classification by `SessionStateRouter`;
   (5) `FlowOrchestrator::handle()`; (6) cleanup. A lock miss sends the busy reply and returns
@@ -98,6 +99,13 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   skips persisting the stale `Waiting` result (skipPersist). `resumeAfterSubflow()` advances the
   parent, `resumeFromNode()` creates a session at the node after a given handle, and
   `runSession($session, resumedAfterDelay)` re-enters the loop for a woken session.
+- Operator requests: the `request_operator` node places a request through Conversation's
+  `OperatorRequestsInterface` and waits; `ExpireOperatorRequestJob` (`flow.execution`, scheduled through
+  `OperatorRequestTimeoutSchedulerInterface` → `DeferredResumeDispatcher`) times it out; Flow's
+  `Listeners/ContinueAfterOperatorRequest` queues `ContinueAfterOperatorRequestJob` on every
+  `OperatorRequestStateChanged`, which under the session lock removes the cancel button, sends the stored text and
+  resumes the session through `resume()` with a wake-up message while it still waits in that node. Commands that end a
+  session cancel its pending request (`GlobalCommandExecutor`).
 - Events and schedules: `StartFlowFromEventJob` (queue `scheduled.triggers`) and
   `DispatchFlowTriggerEventJob`. Timeouts: `ResumeTimedOutSendMessageNodeJob`.
 - Delays: the `delay` handler schedules `ResumeDelayedFlowSessionJob` (queue `flow.execution`)

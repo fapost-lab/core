@@ -15,9 +15,13 @@ use App\Domains\Staff\Notifications\StaffMessage;
 use App\Domains\Staff\Notifications\StaffMessageNotification;
 use App\Domains\Staff\Notifications\StaffNotifierRegistry;
 use App\Domains\Staff\Notifications\StaffRecipientResolver;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
+use App\Domains\Tenancy\Exceptions\TenantNotResolvedException;
+use App\Domains\Tenancy\Models\Tenant;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Feature\FeatureTestCase;
 
@@ -27,6 +31,24 @@ final class StaffNotificationTest extends FeatureTestCase
     {
         parent::setUp();
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function links(): iterable
+    {
+        yield 'a path on this host' => ['/assistant/x', true];
+        yield 'an https address' => ['https://x', true];
+        yield 'an http address with a path' => ['http://panel.test/a?b=1', true];
+        yield 'a javascript scheme' => ['javascript:alert(1)', false];
+        yield 'a protocol-relative address' => ['//evil', false];
+        yield 'a backslash after the slash' => ['/\\evil', false];
+        yield 'a tab inside the path' => ["/\t/evil.test", false];
+        yield 'a space' => ['/assistant x', false];
+        yield 'an empty string' => ['', false];
+        yield 'a scheme without a host' => ['https://', false];
+        yield 'a bare word' => ['evil.test/x', false];
     }
 
     public function test_resolver_returns_staff_assigned_to_assistant(): void
@@ -167,6 +189,7 @@ final class StaffNotificationTest extends FeatureTestCase
     public function test_an_email_with_a_link_carries_an_absolute_address(): void
     {
         Mail::fake();
+        $this->app->make(TenantContextInterface::class)->set(Tenant::query()->firstOrFail());
         $user   = User::factory()->create();
         $mailer = $this->app->make(StaffNotifierRegistry::class)->get(StaffNotifyChannel::Email->value);
 
@@ -182,6 +205,52 @@ final class StaffNotificationTest extends FeatureTestCase
             && 'https://panel.example.test/x' === $mail->actionUrl);
         Mail::assertSent(StaffNotificationMail::class, fn (StaffNotificationMail $mail): bool => 'No link' === $mail->messageBody
             && null === $mail->actionUrl);
+    }
+
+    /**
+     * A path has no host to resolve against outside a tenant: the mail fails instead of linking to the base domain.
+     */
+    public function test_an_email_with_a_path_link_fails_outside_a_tenant(): void
+    {
+        Mail::fake();
+        $user   = User::factory()->create();
+        $mailer = $this->app->make(StaffNotifierRegistry::class)->get(StaffNotifyChannel::Email->value);
+        $this->app->make(TenantContextInterface::class)->reset();
+
+        try {
+            $mailer?->send($user, new StaffMessage('Operator requested', '/assistant/a1/conversations/c1'));
+            $this->fail('A path link outside a tenant must not be turned into an address.');
+        } catch (TenantNotResolvedException) {
+            Mail::assertNothingSent();
+        }
+
+        // An absolute address needs no tenant.
+        $mailer?->send($user, new StaffMessage('Elsewhere', 'https://panel.example.test/x'));
+        Mail::assertSent(StaffNotificationMail::class, fn (StaffNotificationMail $mail): bool => 'https://panel.example.test/x' === $mail->actionUrl);
+    }
+
+    public function test_an_email_is_sent_in_the_recipients_language(): void
+    {
+        Mail::fake();
+        $ru     = User::factory()->create(['locale' => 'ru']);
+        $en     = User::factory()->create(['locale' => 'en']);
+        $mailer = $this->app->make(StaffNotifierRegistry::class)->get(StaffNotifyChannel::Email->value);
+
+        $mailer?->send($ru, new StaffMessage('One'));
+        $mailer?->send($en, new StaffMessage('Two'));
+
+        Mail::assertSent(StaffNotificationMail::class, fn (StaffNotificationMail $mail): bool => $mail->hasTo($ru->email) && 'ru' === $mail->locale);
+        Mail::assertSent(StaffNotificationMail::class, fn (StaffNotificationMail $mail): bool => $mail->hasTo($en->email) && 'en' === $mail->locale);
+    }
+
+    #[DataProvider('links')]
+    public function test_a_message_keeps_only_a_safe_link(string $url, bool $kept): void
+    {
+        $message = new StaffMessage('Text', $url, 'Open');
+
+        $this->assertSame($kept, StaffMessage::isSafeUrl($url));
+        $this->assertSame($kept ? $url : null, $message->url);
+        $this->assertSame($kept, $message->hasLink());
     }
 
     public function test_job_is_idempotent_on_retry(): void
