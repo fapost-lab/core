@@ -35,6 +35,7 @@ use Tests\Feature\FeatureTestCase;
 use Tests\Fixtures\Connectors\Echo\EchoChannelProfile;
 use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
 use Tests\Fixtures\Connectors\Echo\EchoSender;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Channels on the Inertia console: the assistant's list and the channel limit, creating and changing a channel by its
@@ -43,6 +44,7 @@ use Tests\Fixtures\Connectors\Echo\EchoSender;
  */
 final class ChannelsConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
     use SetsRecordLimits;
 
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
@@ -539,7 +541,7 @@ final class ChannelsConsoleTest extends FeatureTestCase
             && (string) $channel->getKey() === $entry->subject_id
             && (string) $this->assistant->getKey() === $entry->assistant_id
             && (string) $admin->getKey() === $entry->causer_id));
-        $this->assertSame(
+        $this->assertSameJson(
             ['attributes' => ['is_active' => false], 'old' => ['is_active' => true], 'changed' => ['config']],
             $entries[1]->attribute_changes?->toArray(),
         );

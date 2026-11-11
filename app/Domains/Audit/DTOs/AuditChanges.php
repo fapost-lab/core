@@ -175,8 +175,31 @@ final readonly class AuditChanges
         return $value;
     }
 
+    /**
+     * Compares two values as JSON compares them: the keys of an object in any order, the items of a list in theirs.
+     * A `jsonb` column (Postgres) hands its objects back with the keys re-ordered, so a value read back from storage
+     * must not differ from the same value as it was written.
+     */
     private static function differs(mixed $was, mixed $now): bool
     {
-        return json_encode($was) !== json_encode($now);
+        return json_encode(self::canonical($was)) !== json_encode(self::canonical($now));
+    }
+
+    /**
+     * The value with the keys of every object sorted; a list keeps its order.
+     */
+    private static function canonical(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        $value = array_map(self::canonical(...), $value);
+
+        if (! array_is_list($value)) {
+            ksort($value, SORT_STRING);
+        }
+
+        return $value;
     }
 }

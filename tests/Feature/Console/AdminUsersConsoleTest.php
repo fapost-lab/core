@@ -26,6 +26,7 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Staff users in the admin panel, served by the console shell in its admin mode, with every guard of the Filament
@@ -34,6 +35,7 @@ use Tests\Feature\FeatureTestCase;
  */
 final class AdminUsersConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
     use SetsRecordLimits;
 
     protected function setUp(): void
@@ -613,15 +615,15 @@ final class AdminUsersConsoleTest extends FeatureTestCase
             && (string) $target->getKey() === $entry->subject_id
             && null === $entry->assistant_id
             && (string) $admin->getKey() === $entry->causer_id));
-        $this->assertSame(
+        $this->assertSameJson(
             ['attributes' => ['name' => 'Invited', 'email' => 'audited@example.test', 'roles' => [RoleEnum::Analyst->value]]],
             $entries[0]->attribute_changes?->toArray(),
         );
-        $this->assertSame(
+        $this->assertSameJson(
             ['attributes' => ['name' => 'Audited Renamed', 'phone' => '+100'], 'old' => ['name' => 'Invited', 'phone' => null], 'changed' => ['password']],
             $entries[2]->attribute_changes?->toArray(),
         );
-        $this->assertSame(
+        $this->assertSameJson(
             ['attributes' => ['roles' => [RoleEnum::ContentManager->value]], 'old' => ['roles' => [RoleEnum::Analyst->value]]],
             $entries[3]->attribute_changes?->toArray(),
         );

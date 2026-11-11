@@ -27,6 +27,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Bus;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Contacts on the Inertia console: which contacts an assistant sees (tenant and channel link), the list with its search,
@@ -34,6 +35,8 @@ use Tests\Feature\FeatureTestCase;
  */
 final class ContactsConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
     private const string OTHER_TENANT_ID = '00000000-0000-0000-0000-0000000000ff';
@@ -550,8 +553,8 @@ final class ContactsConsoleTest extends FeatureTestCase
             && (string) $this->assistant->getKey() === $entry->assistant_id
             && (string) $admin->getKey() === $entry->causer_id
             && 'Contact · ' . mb_substr((string) $contact->getKey(), -8) === $entry->subject_label));
-        $this->assertSame(['changed' => ['tags']], $entries[0]->attribute_changes?->toArray());
-        $this->assertSame(['changed' => ['groups']], $entries[1]->attribute_changes?->toArray());
+        $this->assertSameJson(['changed' => ['tags']], $entries[0]->attribute_changes?->toArray());
+        $this->assertSameJson(['changed' => ['groups']], $entries[1]->attribute_changes?->toArray());
 
         $raw = (string) json_encode(ActivityEntry::query()->get()->map->getAttributes());
         foreach (['secret-handle-7731', 'Zinaida', 'Quasimodo', 'quasi_user', '+380501234567', 'Hidden-City-Attr', 'gold', 'VIP'] as $personal) {

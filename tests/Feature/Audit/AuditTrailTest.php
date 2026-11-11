@@ -25,6 +25,7 @@ use RuntimeException;
 use Spatie\Activitylog\Actions\LogActivityAction;
 use Spatie\Activitylog\Support\ActivityLogStatus;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * The audit trail itself: what an entry stores, who it names as the actor, that it lives and dies with the transaction
@@ -32,6 +33,8 @@ use Tests\Feature\FeatureTestCase;
  */
 final class AuditTrailTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     public function test_an_entry_names_the_action_the_area_the_subject_and_the_staff_user(): void
     {
         $user      = User::factory()->create(['name' => 'Anna']);
@@ -60,9 +63,22 @@ final class AuditTrailTest extends FeatureTestCase
         $this->assertSame((string) $assistant->getKey(), $entry->subject_id);
         $this->assertSame('Helper', $entry->subject_label);
         $this->assertSame((string) $assistant->getKey(), $entry->assistant_id);
-        $this->assertSame(['attributes' => ['name' => 'Helper'], 'old' => ['name' => 'Old']], $entry->attribute_changes?->toArray());
-        $this->assertSame(['reason' => 'test'], $entry->properties?->toArray());
+        $this->assertSameJson(['attributes' => ['name' => 'Helper'], 'old' => ['name' => 'Old']], $entry->attribute_changes?->toArray());
+        $this->assertSameJson(['reason' => 'test'], $entry->properties?->toArray());
         $this->assertNull($entry->getAttribute('updated_at'));
+    }
+
+    public function test_a_value_read_back_with_its_object_keys_re_ordered_is_not_a_change(): void
+    {
+        // A jsonb column (Postgres) hands an object back with its keys re-ordered; the order of a list still counts.
+        $stored = ['commands' => [['type' => 'send_message', 'command' => 'help', 'text' => ['en' => 'Hi']]], 'tags' => ['a', 'b']];
+        $saved  = ['commands' => [['command' => 'help', 'text' => ['en' => 'Hi'], 'type' => 'send_message']], 'tags' => ['a', 'b']];
+
+        $this->assertTrue(AuditChanges::between($stored, $saved, ['tags'], ['commands'])->isEmpty());
+        $this->assertSame(
+            ['attributes' => ['tags' => ['b', 'a']], 'old' => ['tags' => ['a', 'b']]],
+            AuditChanges::between($stored, ['tags' => ['b', 'a']] + $saved, ['tags'], ['commands'])->toArray(),
+        );
     }
 
     public function test_without_a_signed_in_user_the_actor_is_the_system(): void
@@ -117,7 +133,7 @@ final class AuditTrailTest extends FeatureTestCase
         $this->assertSame(AuditActorKind::Support, $entry->actor_kind);
         $this->assertSame('Platform support (Olga)', $entry->actor_label);
         $this->assertSame((string) $support->getKey(), $entry->causer_id);
-        $this->assertSame(['support_entry_id' => 'entry-1', 'operator_name' => 'Olga'], $entry->properties?->toArray());
+        $this->assertSameJson(['support_entry_id' => 'entry-1', 'operator_name' => 'Olga'], $entry->properties?->toArray());
         $this->assertStringNotContainsString('olga@example.com', (string) json_encode($entry->getAttributes()));
     }
 

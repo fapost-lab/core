@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Contact segments on the Inertia console: the list, the rule builder's server side (what is stored, what is refused),
@@ -26,6 +27,8 @@ use Tests\Feature\FeatureTestCase;
  */
 final class ContactSegmentsConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
     private const string OTHER_TENANT_ID = '00000000-0000-0000-0000-0000000000ff';
@@ -605,8 +608,8 @@ final class ContactSegmentsConsoleTest extends FeatureTestCase
             && null === $entry->assistant_id
             && (string) $admin->getKey() === $entry->causer_id));
         $this->assertSame(['Buyers', 'Whales', 'Whales'], $entries->pluck('subject_label')->all());
-        $this->assertSame(['attributes' => ['name' => 'Buyers'], 'changed' => ['rules']], $entries[0]->attribute_changes?->toArray());
-        $this->assertSame(
+        $this->assertSameJson(['attributes' => ['name' => 'Buyers'], 'changed' => ['rules']], $entries[0]->attribute_changes?->toArray());
+        $this->assertSameJson(
             ['attributes' => ['name' => 'Whales'], 'old' => ['name' => 'Buyers'], 'changed' => ['rules']],
             $entries[1]->attribute_changes?->toArray(),
         );

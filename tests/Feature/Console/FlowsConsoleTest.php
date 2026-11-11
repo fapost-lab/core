@@ -23,6 +23,7 @@ use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Flows on the Inertia console: the list with its filters and grouping, the flow limit, creating a flow (which ends
@@ -30,6 +31,7 @@ use Tests\Feature\FeatureTestCase;
  */
 final class FlowsConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
     use SetsRecordLimits;
 
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
@@ -478,7 +480,7 @@ final class FlowsConsoleTest extends FeatureTestCase
             && (string) $admin->getKey() === $entry->causer_id));
         $this->assertSame('Welcome', $entries[0]->subject_label);
         $this->assertSame('Welcome v2', $entries[1]->subject_label);
-        $this->assertSame(
+        $this->assertSameJson(
             [
                 'attributes' => ['name' => 'Welcome v2', 'flow_group_id' => (string) $group->getKey(), 'is_public' => false],
                 'old'        => ['name' => 'Welcome', 'flow_group_id' => null, 'is_public' => true],
@@ -486,7 +488,7 @@ final class FlowsConsoleTest extends FeatureTestCase
             ],
             $entries[1]->attribute_changes?->toArray(),
         );
-        $this->assertSame(['attributes' => ['is_active' => false], 'old' => ['is_active' => true]], $entries[2]->attribute_changes?->toArray());
+        $this->assertSameJson(['attributes' => ['is_active' => false], 'old' => ['is_active' => true]], $entries[2]->attribute_changes?->toArray());
 
         $raw = (string) json_encode(ActivityEntry::query()->get()->map->getAttributes());
         $this->assertStringNotContainsString('SECRET-DESC', $raw);

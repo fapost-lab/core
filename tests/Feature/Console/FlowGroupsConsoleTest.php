@@ -14,6 +14,7 @@ use App\Domains\Staff\Models\User;
 use Database\Seeders\TenantAclSeeder;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Flow groups on the Inertia console: the list scoped to the assistant, create, change, inline create from a flow's
@@ -21,6 +22,8 @@ use Tests\Feature\FeatureTestCase;
  */
 final class FlowGroupsConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
     private const string OTHER_TENANT_ID = '00000000-0000-0000-0000-0000000000ff';
@@ -173,8 +176,8 @@ final class FlowGroupsConsoleTest extends FeatureTestCase
             && (string) $group->getKey() === $entry->subject_id
             && (string) $this->assistant->getKey() === $entry->assistant_id
             && (string) $admin->getKey() === $entry->causer_id));
-        $this->assertSame(['attributes' => ['name' => 'Alpha']], $entries[0]->attribute_changes?->toArray());
-        $this->assertSame(['attributes' => ['name' => 'Beta'], 'old' => ['name' => 'Alpha']], $entries[1]->attribute_changes?->toArray());
+        $this->assertSameJson(['attributes' => ['name' => 'Alpha']], $entries[0]->attribute_changes?->toArray());
+        $this->assertSameJson(['attributes' => ['name' => 'Beta'], 'old' => ['name' => 'Alpha']], $entries[1]->attribute_changes?->toArray());
         $this->assertSame('Beta', $entries[2]->subject_label);
     }
 

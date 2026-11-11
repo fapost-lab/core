@@ -33,6 +33,7 @@ use Inertia\Testing\AssertableInertia;
 use RuntimeException;
 use Spatie\Activitylog\Actions\LogActivityAction;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Broadcasts on the Inertia console. A broadcast reaches real people, so most of this file is about what must not
@@ -41,6 +42,8 @@ use Tests\Feature\FeatureTestCase;
  */
 final class BroadcastsConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
     private const string OTHER_TENANT_ID = '00000000-0000-0000-0000-0000000000ff';
@@ -765,7 +768,7 @@ final class BroadcastsConsoleTest extends FeatureTestCase
             && (string) $this->assistant->getKey() === $entry->assistant_id
             && (string) $admin->getKey() === $entry->causer_id));
         $this->assertSame('Promo', $entries[0]->subject_label);
-        $this->assertSame(['attributes' => ['name' => 'Promo 2'], 'old' => ['name' => 'Promo'], 'changed' => ['message']], $entries[1]->attribute_changes?->toArray());
+        $this->assertSameJson(['attributes' => ['name' => 'Promo 2'], 'old' => ['name' => 'Promo'], 'changed' => ['message']], $entries[1]->attribute_changes?->toArray());
 
         $raw = (string) json_encode(ActivityEntry::query()->get()->map->getAttributes());
         $this->assertStringNotContainsString('SECRET-TEXT', $raw);

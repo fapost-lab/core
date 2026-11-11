@@ -17,9 +17,12 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 final class BuilderApiTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     /**
      * Assistants of the drafts built so far; the staff user is assigned to all of them.
      *
@@ -400,8 +403,8 @@ final class BuilderApiTest extends FeatureTestCase
             && 'Welcome' === $entry->subject_label
             && (string) $draft->assistant_id === $entry->assistant_id
             && (string) $user->getKey() === $entry->causer_id));
-        $this->assertSame(['version' => 1], $entries[0]->properties?->toArray());
-        $this->assertSame(['version' => 2], $entries[1]->properties?->toArray());
+        $this->assertSameJson(['version' => 1], $entries[0]->properties?->toArray());
+        $this->assertSameJson(['version' => 2], $entries[1]->properties?->toArray());
         $this->assertStringNotContainsString('"nodes"', (string) json_encode($entries->map->getAttributes()));
     }
 

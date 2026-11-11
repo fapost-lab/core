@@ -15,6 +15,7 @@ use Database\Seeders\TenantAclSeeder;
 use Inertia\Testing\AssertableInertia;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Staff roles in the admin panel, served by the console shell in its admin mode: only an administrator with
@@ -23,6 +24,8 @@ use Tests\Feature\FeatureTestCase;
  */
 final class AdminRolesConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -210,11 +213,11 @@ final class AdminRolesConsoleTest extends FeatureTestCase
             return $names;
         };
 
-        $this->assertSame(
+        $this->assertSameJson(
             ['attributes' => ['name' => 'support_agent', 'display_name' => 'Support agent', 'permissions' => $sorted(Permission::ViewContacts, Permission::ViewAnalytics)]],
             $entries[0]->attribute_changes?->toArray(),
         );
-        $this->assertSame(
+        $this->assertSameJson(
             ['attributes' => ['permissions' => $sorted(Permission::ViewAnalytics, Permission::ManageContacts)], 'old' => ['permissions' => $sorted(Permission::ViewContacts, Permission::ViewAnalytics)]],
             $entries[1]->attribute_changes?->toArray(),
         );

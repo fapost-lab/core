@@ -29,6 +29,7 @@ use Fapost\Foundation\DTO\NodeExecutionResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Flow templates expanded at publish time (task flow-templates, AC-01..AC-07): the copy in the host's definition,
@@ -37,6 +38,8 @@ use Tests\Feature\FeatureTestCase;
  */
 final class FlowTemplatePublishTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     private const string UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/';
 
     private string $tenantId;
@@ -284,12 +287,12 @@ final class FlowTemplatePublishTest extends FeatureTestCase
 
         $templateEntry = $entries->firstWhere('subject_id', (string) $template->getKey());
         $this->assertNotNull($templateEntry);
-        $this->assertSame(['version' => 2], $templateEntry->properties?->toArray());
+        $this->assertSameJson(['version' => 2], $templateEntry->properties?->toArray());
 
         $hostEntry = $entries->firstWhere('subject_id', (string) $host->getKey());
         $this->assertNotNull($hostEntry);
         $this->assertSame('Host flow', $hostEntry->subject_label);
-        $this->assertSame([
+        $this->assertSameJson([
             'version'                         => 2,
             'republished_by_template_flow_id' => $template->flow_id,
             'republished_by_template_version' => 2,

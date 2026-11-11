@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Assistants in the admin panel, served by the console shell in its admin mode: who sees which assistant, the
@@ -33,6 +34,7 @@ use Tests\Feature\FeatureTestCase;
  */
 final class AdminAssistantsConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
     use SetsRecordLimits;
 
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
@@ -548,11 +550,11 @@ final class AdminAssistantsConsoleTest extends FeatureTestCase
             && $id === $entry->subject_id
             && $id === $entry->assistant_id
             && (string) $admin->getKey() === $entry->causer_id));
-        $this->assertSame(
+        $this->assertSameJson(
             ['name' => 'Audited Bot', 'default_language' => 'en', 'is_active' => true],
             $entries[0]->attribute_changes?->toArray()['attributes'],
         );
-        $this->assertSame(
+        $this->assertSameJson(
             ['attributes' => ['name' => 'Renamed Bot'], 'old' => ['name' => 'Audited Bot']],
             $entries[1]->attribute_changes?->toArray(),
         );

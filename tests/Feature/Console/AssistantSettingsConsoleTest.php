@@ -17,6 +17,7 @@ use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * The assistant's settings on the Inertia console: the form and what it offers, saving it in the canonical shape the
@@ -25,6 +26,7 @@ use Tests\Feature\FeatureTestCase;
  */
 final class AssistantSettingsConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
     use SetsRecordLimits;
 
     private const string OTHER_TENANT_ID = '00000000-0000-0000-0000-0000000000ff';
@@ -312,7 +314,7 @@ final class AssistantSettingsConsoleTest extends FeatureTestCase
         $this->assertSame((string) $this->assistant->getKey(), $entry->subject_id);
         $this->assertSame((string) $this->assistant->getKey(), $entry->assistant_id);
         $this->assertSame((string) $admin->getKey(), $entry->causer_id);
-        $this->assertSame(
+        $this->assertSameJson(
             [
                 'attributes' => ['default_language' => 'ru', 'available_countries' => ['UA']],
                 'old'        => ['default_language' => 'en', 'available_countries' => []],
