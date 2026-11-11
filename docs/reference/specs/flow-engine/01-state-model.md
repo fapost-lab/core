@@ -91,7 +91,7 @@ user-defined variable cannot take these names.
 ## 1.5 `system.*` keys
 
 Keys are constants in `App\Domains\Flow\State\SystemStateKeys`; which node types may write
-`system.*` is `SystemStateNamespacePolicy` (`send_message`, `input`, `delay`, `notify`, `set_tag`).
+`system.*` is `SystemStateNamespacePolicy` (`send_message`, `input`, `delay`, `notify`, `set_tag`, `request_operator`).
 
 | Key | Written by |
 |-----|-----------|
@@ -105,6 +105,7 @@ Keys are constants in `App\Domains\Flow\State\SystemStateKeys`; which node types
 | `system.delayed.{nodeId}.resume_at` | `FlowSessionPersister` (a `delayed(resumeAt)` result), outside the whitelist |
 | `system.staff_notified.{nodeId}`, `system.contacts_notified.{nodeId}` | `notify` |
 | `system.set_tag.{nodeId}` | `set_tag` |
+| `system.request_operator.{nodeId}` | `request_operator` (id of the operator request it waits for) |
 
 Channel data is therefore read as `{{system.channel.bot_handle}}`, not through the `contact` namespace.
 

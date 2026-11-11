@@ -76,12 +76,10 @@ final class StaffServiceProvider extends ServiceProvider
         $this->app->singleton(StaffNotifierRegistry::class, function (): StaffNotifierRegistry {
             $registry = new StaffNotifierRegistry();
             $registry->register(new InAppStaffNotifier());
-            // Resolved at the time of sending, inside the job's tenant switch: the registry outlives the job.
-            $registry->register(new EmailStaffNotifier(static function (string $path): string {
-                $tenants = app(TenantContextInterface::class);
-
-                return $tenants->isResolved() ? TenantHost::urlFor($tenants->get(), $path) : url($path);
-            }));
+            // Resolved at the time of sending, inside the job's tenant switch: the registry outlives the job. A mail sent
+            // outside a tenant has no host to link to, so it fails (the tenant context throws) instead of linking to the
+            // base domain, which does not serve the console.
+            $registry->register(new EmailStaffNotifier(static fn (string $path): string => TenantHost::urlFor(app(TenantContextInterface::class)->get(), $path)));
 
             return $registry;
         });

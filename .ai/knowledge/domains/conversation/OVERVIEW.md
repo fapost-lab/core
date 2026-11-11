@@ -12,7 +12,7 @@ paths:
   - config/conversation.php
   - "database/migrations/tenant/*conversation*"
   - "tests/*/Domains/Conversation/**"
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-11
 ---
 # Conversation
 
@@ -66,8 +66,15 @@ or `staff` (see the glossary). `takeOver()`, `finish()`, `transfer()` and `seize
 conditional UPDATE on the expected current state or holder, so the database decides a race.
 `isHandledByStaff()` (true for `queued` and `staff`) is read by Flow's `MessageRouter` on every inbound
 message. Operators reply through `ConversationReplyService`; `ConversationInbox` checks the holder and the
-transfer target. Nothing sets `queued` yet: the flow node that requests an operator is a later task
-(`operator-handoff-node`).
+transfer target. Flow's `request_operator` node sets `queued` through `OperatorRequestsInterface` (`Services/OperatorRequests`):
+the request is recorded on the thread (`operator_request_id` + JSON `operator_request`), creating the thread when
+the transcript job has not yet, and refused when the tenant keeps no conversation log. `takeOver()` accepts a
+pending request and `finish()` returns an accepted one; cancel (button or a command ending the session) and the
+timeout send a pending one back to the bot. Each outcome is announced as `Events/OperatorRequestStateChanged`
+after commit: `Listeners/DimOperatorRequestNotifications` dims the request notifications, and Flow continues the
+contact's side (`adr-20261111-operator-request-on-thread`). `Jobs/NotifyOperatorRequestJob` (`messaging.system`,
+once per request) tells the node's recipients, narrowed by `Services/ConversationOperators` to those who may take
+the assistant's threads (administrators as the fallback), in the bell and optionally by email.
 
 `Notifications/ConversationOperatorNotifier` puts an operator's threads in their bell, in-app only: a contact's message
 in a thread they hold (from `PersistConversationMessageJob`, inbound and newly recorded only), a thread transferred to
@@ -84,7 +91,9 @@ ones (`ConversationInbox::queuedCount`).
 - Depends on Tenancy, Media (ingestor, dispatcher, `MediaFile`), the `Channel` model, Contact's
   `Contact` and `ChannelContact`, and Staff.
 - Consumers: Webhook and Messaging's `MessageSender` (capture and logger); Flow's `MessageRouter`,
-  which checks staff ownership on every inbound message; Contact and Broadcasting (the
+  which checks staff ownership on every inbound message and cancels operator requests on a cancel-button press;
+  Flow's `request_operator` node, `GlobalCommandExecutor` and the operator-request jobs (`OperatorRequestsInterface`,
+  `OperatorRequestStateChanged`); Contact and Broadcasting (the
   `MessageOrigin` enum only).
 
 ## Entry points

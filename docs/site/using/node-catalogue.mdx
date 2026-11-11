@@ -249,6 +249,68 @@ The second mode is a broadcast raised from inside a flow rather than composed by
 hand, which is why it shares the pacing described in
 [Broadcasts](/using/broadcasts).
 
+## Conversation
+
+Blocks that hand the conversation itself to someone.
+
+### Request operator
+
+Asks for a human operator and waits until one has dealt with the contact.
+
+The conversation moves from the assistant to **Waiting for an operator**, and the
+assistant stays silent while it waits; the contact's messages go to the inbox only.
+Operators are chosen as in [Notify](#notify) (the assistant's staff, a role, or
+specific users), but only those who can view and reply to conversations and have
+access to the assistant are told. If nobody is left, the administrators are. They
+get a bell notification that opens the conversation, and an email if you switch it
+on. You can write a text for them; left empty, it says the contact is waiting for an
+operator.
+
+The contact is told in the block's own settings, in the content language:
+
+- **Request sent** — with a **Cancel request** button where the channel supports
+  buttons. The button goes away once the request stops waiting.
+- **Operator connected** — optional, sent when an operator accepts.
+- **Operator left** — sent when the operator finishes and returns the conversation
+  to the assistant.
+
+The block has three exits, and no `default`. An exit you leave unwired ends the
+session.
+
+| Exit | When |
+|---|---|
+| `returned` | The operator finished. "Operator left" goes out first, then the flow continues, for instance by asking for a rating. |
+| `cancelled` | The contact pressed **Cancel request**. |
+| `timeout` | Nobody accepted within **Wait for an operator** (300 seconds by default; `0` waits without a limit, and then `timeout` fires only when the request cannot be placed). |
+
+When an operator accepts, the notifications dim for everyone and show who accepted;
+a cancelled or expired request dims them too.
+
+<Note>
+  The conversation log must be enabled in the tenant settings. With it off, no
+  request is placed: the block takes `timeout` at once, because an operator would
+  see an empty thread. The same happens when the contact has no active channel. The
+  wait itself needs an asynchronous queue; on a `sync` queue the timeout never
+  fires, as with a [Send message](#send-message) timeout.
+</Note>
+
+If the conversation is already waiting for an operator, or an operator already
+handles it, when the block runs, nobody is notified again and no "request sent" text
+goes out. The session waits for that state, and finishing exits through `returned`.
+
+`/reset`, `/cancel` and tenant commands that start a flow cancel the pending request
+of the session they end: the conversation goes back to the assistant and the button
+is removed. Informational commands do not. While an operator handles the
+conversation, commands do not affect it.
+
+The block is self-contained. To reuse a configured request, put it in a
+[Subflow](#subflow) and map its exits with `End` blocks: `returned` to `success`,
+`cancelled` to `cancelled`, `timeout` to `failed`. The parent cannot tell that
+`failed` from the subflow's own error or timeout. Give that subflow a timeout longer
+than an operator conversation (hours, for example `P1D`); otherwise it is ended
+while the operator may still be talking, and the parent continues through `failed`.
+Messages the flow sends are not blocked while an operator holds the conversation.
+
 ## Annotation
 
 ### Comment

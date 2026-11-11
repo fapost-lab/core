@@ -32,6 +32,7 @@ final class SystemStateNamespacePolicyTest extends TestCase
         yield 'delay writes system schedule' => ['delay', 'system.delay.n1.scheduled_at'];
         yield 'notify writes system marker' => ['notify', 'system.staff_notified.n1'];
         yield 'set_tag writes system marker' => ['set_tag', 'system.set_tag.n1'];
+        yield 'request_operator writes its request marker' => ['request_operator', 'system.request_operator.n1'];
         yield 'rag_query writes rag.*' => ['rag_query', 'rag.answer'];
     }
 
@@ -41,6 +42,7 @@ final class SystemStateNamespacePolicyTest extends TestCase
     public static function forbiddenWrites(): iterable
     {
         yield 'foreign handler writes system.*' => ['custom_solution_node', 'system.language'];
+        yield 'request_operator writes rag.*' => ['request_operator', 'rag.answer'];
         yield 'branch writes system.*' => ['branch', 'system.sent_messages.n1'];
         yield 'foreign handler writes rag.*' => ['send_message', 'rag.answer'];
         yield 'module namespace is read-only' => ['custom_solution_node', 'module.hr.department'];

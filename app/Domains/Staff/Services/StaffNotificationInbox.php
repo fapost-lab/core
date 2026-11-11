@@ -7,6 +7,7 @@ namespace App\Domains\Staff\Services;
 use App\Domains\Staff\Contracts\LocalizedDatabaseNotification;
 use App\Domains\Staff\Live\StaffNotificationsAnnouncer;
 use App\Domains\Staff\Models\User;
+use App\Domains\Staff\Notifications\StaffMessage;
 use Illuminate\Notifications\DatabaseNotification;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -188,29 +189,11 @@ final readonly class StaffNotificationInbox
         foreach ($candidates as $candidate) {
             $url = $candidate['url'] ?? null;
 
-            if (is_string($url) && $this->isSafeUrl($url)) {
+            if (is_string($url) && StaffMessage::isSafeUrl($url)) {
                 return ['label' => $this->text($candidate['label'] ?? null), 'url' => $url];
             }
         }
 
         return null;
-    }
-
-    /**
-     * A path on this host (`/…`, never `//…`) or an `http(s)` address on any host: a limit notice links to the tenant's
-     * panel or to the operator's own page. Whitespace, control characters and backslashes are refused anywhere, since
-     * browsers drop or reinterpret them (`/<tab>/evil.test` and `/\evil.test` both open another host).
-     */
-    private function isSafeUrl(string $url): bool
-    {
-        if ('' === $url || 1 === preg_match('/[\x00-\x20\x7F\\\\]/', $url)) {
-            return false;
-        }
-
-        if (str_starts_with($url, '/')) {
-            return ! str_starts_with($url, '//');
-        }
-
-        return 1 === preg_match('#^https?://[^/?\#]+#i', $url);
     }
 }

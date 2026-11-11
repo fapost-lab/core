@@ -18,7 +18,7 @@ paths:
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
   - tests/Architecture/EgressGuardTest.php
-reviewed_at: 2026-10-16
+reviewed_at: 2026-11-11
 ---
 # Flow rules
 
@@ -73,7 +73,8 @@ broken.
   unknown key throws. Publishing rejects unknown versions. Enforced: `NodeHandlerRegistry`,
   `ValidateFlowService`.
 - **Only whitelisted node types write `system.*` and `rag.*`.** `system.*`: `send_message`,
-  `input`, `delay`, `notify`, `set_tag`; `rag.*`: `rag_query`. `flow.*` and `call.*` are open to
+  `input`, `delay`, `notify`, `set_tag`, `request_operator` (its marker holds the id of the operator request it
+  waits for); `rag.*`: `rag_query`. `flow.*` and `call.*` are open to
   every handler. Enforced: `SystemStateNamespacePolicy`, applied in `FlowSessionPersister`.
   Adding a writer means editing the whitelist, on purpose.
 - **A session runs the definition it started with.** `flow_definition_id` is set once, and
@@ -101,8 +102,8 @@ broken.
 - **Running the engine outside `FlowOrchestrator` requires the session lock** through
   `FlowExecutionGuard`, keyed like `MessageRouter` (`contact->tenant_id`, contact, assistant),
   with the session re-read under the lock; a busy lock throws `SessionLockTimeoutException` and
-  the queue retries. `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `StartFlowFromEventJob` and
-  `SubflowTimeoutSweeper` follow it (`tests/Feature/Redis`); the sweeper skips a parent whose lock
+  the queue retries. `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `ContinueAfterOperatorRequestJob`,
+  `StartFlowFromEventJob` and `SubflowTimeoutSweeper` follow it (`tests/Feature/Redis`); the sweeper skips a parent whose lock
   is busy and retries on its next run.
 - **New state namespaces go into the foundation `StateNamespace` enum.** Core keeps no enum of
   its own (ADR-0002). *(proposed)*

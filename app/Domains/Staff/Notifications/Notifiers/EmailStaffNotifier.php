@@ -46,7 +46,8 @@ final readonly class EmailStaffNotifier implements StaffNotifierInterface
 
     public function send(User $user, StaffMessage $message): void
     {
-        Mail::to($user->email)->send(
+        // A queued job has no session locale: the subject and the button speak the recipient's language.
+        Mail::to($user->email)->locale($user->preferredLocale())->send(
             new StaffNotificationMail($user->name, $message->text, $this->url($message), $message->actionLabel),
         );
     }

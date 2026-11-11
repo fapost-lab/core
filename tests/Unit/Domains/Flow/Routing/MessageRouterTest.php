@@ -10,6 +10,7 @@ use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Conversation\Contracts\ConversationOwnershipInterface;
+use App\Domains\Conversation\Contracts\OperatorRequestsInterface;
 use App\Domains\Flow\Commands\BuiltinCommandsRegistry;
 use App\Domains\Flow\Commands\CommandMatcher;
 use App\Domains\Flow\Commands\GlobalCommandExecutorInterface;
@@ -29,6 +30,8 @@ use App\Domains\Flow\Orchestration\DelayedSessionResumer;
 use App\Domains\Flow\Routing\DropPolicyInterface;
 use App\Domains\Flow\Routing\MessageRouter;
 use App\Domains\Flow\Routing\SessionStateRouter;
+use App\Domains\Flow\Support\CallbackDataCodec;
+use App\Domains\Flow\Support\OperatorRequestCancelButton;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
 use Fapost\Foundation\DTO\IncomingMessage;
@@ -402,6 +405,64 @@ final class MessageRouterTest extends TestCase
         $this->assertSame('executed', $outcome->kind);
     }
 
+    public function test_operator_request_cancel_button_cancels_the_request_even_when_staff_handles_the_thread(): void
+    {
+        $sessionId = '0e7a7c1e-0000-4000-8000-00000000aaaa';
+
+        $operatorRequests = Mockery::mock(OperatorRequestsInterface::class);
+        $operatorRequests->shouldReceive('cancelForSession')
+            ->once()
+            ->with('tenant-1', 'assistant-1', 'contact-1', $sessionId)
+            ->andReturnTrue();
+
+        // Ownership, the session repository and the orchestrator must not be reached: the press is dropped before.
+        $ownership = Mockery::mock(ConversationOwnershipInterface::class);
+        $ownership->shouldNotReceive('isHandledByStaff');
+
+        $sessions = Mockery::mock(FlowSessionRepositoryInterface::class);
+        $sessions->shouldNotReceive('findActiveForContact');
+
+        $orchestrator = Mockery::mock(FlowOrchestratorInterface::class);
+        $orchestrator->shouldNotReceive('handle');
+
+        $router = $this->router(
+            ownership: $ownership,
+            sessions: $sessions,
+            orchestrator: $orchestrator,
+            operatorRequests: $operatorRequests,
+        );
+
+        $outcome = $router->route(
+            contact: $this->contact(),
+            message: $this->message(CallbackDataCodec::encode($sessionId, OperatorRequestCancelButton::ID)),
+            assistant: $this->assistant(),
+            channel: $this->channel(),
+        );
+
+        $this->assertTrue($outcome->wasDropped());
+        $this->assertSame('operator_request_cancel', $outcome->reason);
+    }
+
+    public function test_a_press_of_another_button_does_not_cancel_an_operator_request(): void
+    {
+        $operatorRequests = Mockery::mock(OperatorRequestsInterface::class);
+        $operatorRequests->shouldNotReceive('cancelForSession');
+
+        $ownership = Mockery::mock(ConversationOwnershipInterface::class);
+        $ownership->shouldReceive('isHandledByStaff')->once()->andReturn(true);
+
+        $router = $this->router(ownership: $ownership, operatorRequests: $operatorRequests);
+
+        $outcome = $router->route(
+            contact: $this->contact(),
+            message: $this->message(CallbackDataCodec::encode('0e7a7c1e-0000-4000-8000-00000000aaaa', '11111111-2222-4333-8444-555555555555')),
+            assistant: $this->assistant(),
+            channel: $this->channel(),
+        );
+
+        $this->assertSame('staff_handled', $outcome->reason);
+    }
+
     private function router(
         ?GlobalCommandExecutorInterface $commandExecutor = null,
         ?TypingIndicatorService $typing = null,
@@ -415,6 +476,7 @@ final class MessageRouterTest extends TestCase
         ?SessionLockRegistry $lockRegistry = null,
         ?ConversationOwnershipInterface $ownership = null,
         ?DelayedSessionResumer $delayedResumer = null,
+        ?OperatorRequestsInterface $operatorRequests = null,
     ): MessageRouter {
         // Use real CommandMatcher (final class). Built-ins include /reset and
         // /cancel — assistant.commands stays empty so no tenant overrides apply.
@@ -437,6 +499,7 @@ final class MessageRouterTest extends TestCase
             ownership: $ownership ?? $this->notHandledByStaff(),
             typingHeartbeat: new TypingHeartbeatRegistry(),
             delayedResumer: $delayedResumer ?? $this->noOpDelayedResumer(),
+            operatorRequests: $operatorRequests ?? Mockery::mock(OperatorRequestsInterface::class)->shouldIgnoreMissing(),
         );
     }
 

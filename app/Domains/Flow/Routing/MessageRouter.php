@@ -8,6 +8,7 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Conversation\Contracts\ConversationOwnershipInterface;
+use App\Domains\Conversation\Contracts\OperatorRequestsInterface;
 use App\Domains\Conversation\DTO\ConversationRef;
 use App\Domains\Flow\Commands\CommandMatcher;
 use App\Domains\Flow\Commands\GlobalCommandExecutorInterface;
@@ -22,6 +23,7 @@ use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Exceptions\SessionLockLostException;
 use App\Domains\Flow\Exceptions\SessionLockTimeoutException;
 use App\Domains\Flow\Orchestration\DelayedSessionResumer;
+use App\Domains\Flow\Support\OperatorRequestCancelButton;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
 use App\Domains\Messaging\Typing\TypingIndicatorService;
 use Fapost\Foundation\DTO\IncomingMessage;
@@ -70,6 +72,7 @@ final readonly class MessageRouter
         private ConversationOwnershipInterface $ownership,
         private TypingHeartbeatRegistry $typingHeartbeat,
         private DelayedSessionResumer $delayedResumer,
+        private OperatorRequestsInterface $operatorRequests,
         private LoggerInterface $logger = new NullLogger(),
     ) {
     }
@@ -128,6 +131,20 @@ final readonly class MessageRouter
             $this->lockRegistry->set($handle);
 
             try {
+                // Step 4a′: the contact pressed the "Cancel request" button of an
+                // operator request. Recognised by its reserved id before the
+                // check below, which holds every other message back while the
+                // thread is queued. A late press (accepted, timed out, already
+                // back with the bot) cancels nothing and is dropped as well, so
+                // its payload never reaches a flow as input or starts one.
+                $buttonSession = OperatorRequestCancelButton::pressedIn($message->text);
+
+                if (null !== $buttonSession) {
+                    $this->operatorRequests->cancelForSession((string)$contact->tenant_id, $assistantId, (string)$contact->getKey(), $buttonSession);
+
+                    return RoutingOutcome::dropped('operator_request_cancel');
+                }
+
                 // Step 4a: an operator holding this thread, or one requested and
                 // not yet accepted (queued), outranks the flow engine. Checked before session state because the session may
                 // still be sitting in waiting_input from before the takeover —

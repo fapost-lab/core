@@ -1,6 +1,6 @@
 # Flow Engine: per-node specs
 
-The 15 Core handlers registered in `FlowServiceProvider::registerCoreNodeHandlers()`. The same list, with
+The 16 Core handlers registered in `FlowServiceProvider::registerCoreNodeHandlers()`. The same list, with
 categories and classes, is `docs/platform/runtime/flow/10-registered-nodes-catalog.md`.
 
 | File | Node type | Handler |
@@ -18,6 +18,7 @@ categories and classes, is `docs/platform/runtime/flow/10-registered-nodes-catal
 | [set-tag](set-tag.md) | `set_tag` | `SetTagNodeHandler` |
 | [notify](notify.md) | `notify` | `NotifyNodeHandler` |
 | [auth-request](auth-request.md) | `auth_request` | `AuthRequestNodeHandler` |
+| [request-operator](request-operator.md) | `request_operator` | `RequestOperatorNodeHandler` |
 
 `rag_query` (`RagQueryNodeHandler`) is registered too and has no standalone node spec here; see
 `.ai/specs/rag-knowledge-bases/`.

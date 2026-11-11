@@ -12,7 +12,7 @@ paths:
   - config/conversation.php
   - "database/migrations/tenant/*conversation*"
   - "tests/*/Domains/Conversation/**"
-reviewed_at: 2026-10-05
+reviewed_at: 2026-11-11
 ---
 # Conversation glossary
 
@@ -60,6 +60,12 @@ Switching a thread to staff: **take over** from `bot`, **accept** from `queued` 
 **seize** (an admin takes a thread from its holder), **transfer** (the holder hands it to another
 operator). **Finish** returns it to the bot. While a thread is `queued` or `staff`, inbound messages do
 not reach flows.
+
+## Operator request
+
+A flow's request for a human operator on a thread (`request_operator` node): `pending` while the thread is
+`queued`, `accepted` once an operator takes it, then `returned`, `cancelled` or `timeout`
+(`OperatorRequestState`). Recorded on the thread, so it outlives the flow session that placed it.
 
 ## Inbox
 

@@ -52,6 +52,14 @@ export function nodeHandles(node: FlowNodeLike): NodeHandle[] {
     ]
   }
 
+  if (node.type === 'request_operator') {
+    return [
+      {handle: 'returned',  label: 'Operator finished'},
+      {handle: 'cancelled', label: 'Cancelled'},
+      {handle: 'timeout',   label: 'Timed out'},
+    ]
+  }
+
   return [{handle: 'default', label: 'Next'}]
 }
 

@@ -68,3 +68,11 @@ describe('nodeHandles for a condition', () => {
         expect(handles.map((h) => h.handle)).toEqual(['u-1', 'u-2', 'u-3', 'default'])
     })
 })
+
+describe('request_operator node', () => {
+    it('exposes the returned, cancelled and timeout handles and no default one', () => {
+        const handles = nodeHandles({id: 'n1', type: 'request_operator'}).map((h) => h.handle)
+
+        expect(handles).toEqual(['returned', 'cancelled', 'timeout'])
+    })
+})

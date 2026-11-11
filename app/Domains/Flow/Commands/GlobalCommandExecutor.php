@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Commands;
 
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Conversation\Contracts\OperatorRequestsInterface;
 use App\Domains\Flow\Contracts\ContentTranslatorInterface;
 use App\Domains\Flow\Contracts\FallbackMessageServiceInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
@@ -28,6 +29,11 @@ use App\Domains\Tenancy\Settings\TenantSettings;
  *    requested flow as a fresh top-level session
  *  - {@code send_message}: pushes the configured text without touching the
  *    session — informational replies (e.g. /help)
+ *
+ * A session a command ends takes its pending operator request with it: the
+ * thread goes back to the bot instead of waiting for an operator forever (the
+ * bot stays silent while it waits). A thread an operator already handles is
+ * left to them.
  */
 final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInterface
 {
@@ -39,6 +45,7 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
         private ContentTranslatorInterface $translator,
         private TenantSettings $tenantSettings,
         private FlowActivityNotifier $activity,
+        private OperatorRequestsInterface $operatorRequests,
     ) {
     }
 
@@ -170,5 +177,12 @@ final readonly class GlobalCommandExecutor implements GlobalCommandExecutorInter
 
         // A query write raises no model event, so the live screens are told here.
         $this->activity->touched($session);
+
+        $this->operatorRequests->cancelForSession(
+            (string) $session->tenant_id,
+            (string) $session->assistant_id,
+            (string) $session->contact_id,
+            (string) $session->getKey(),
+        );
     }
 }
