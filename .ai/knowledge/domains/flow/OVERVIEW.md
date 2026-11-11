@@ -23,6 +23,7 @@ paths:
   - "database/migrations/tenant/*tenant_translations*"
   - app/Console/Commands/CreateNextFlowLogPartitionCommand.php
   - app/Console/Commands/PruneFlowLogsCommand.php
+  - "app/Domains/Flow/Templates/**"
 reviewed_at: 2026-11-11
 ---
 # Flow
@@ -47,6 +48,7 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
 | Concurrency | `Concurrency/` (Redis session lock and heartbeat), `app/Infrastructure/Flow/FlowExecutionGuard.php` |
 | State | `State/` (`ScopedStateReader`, `Writers/ContactWriter`, `SystemStateNamespacePolicy`, `SystemStateKeys`, `Variables/`) |
 | Subflow | `Subflow/` (starter, resumer, call-graph validator, timeout sweeper) |
+| Flow templates | `Templates/` (`TemplateExpander` copies a template's active definition into a host at publish, `TemplateUsageRepository` over `flow_template_usages`, `TemplateUsageFinder`, `TemplateNodeOrigins` labels copied nodes by `origin` on the session and log screens); handlers `TemplateNodeHandler`, `TemplateOutputNodeHandler` are pass-throughs (`adr-20261111-flow-templates-expanded-at-publish`) |
 | Triggers and events | `Services/Resolvers/`, `SyncFlowTriggerService`, `ResolveEventTriggersService`, `Events/`, `app/Jobs/Flow/` |
 | Call, RAG, Action, Expression | `Call/`, `Rag/`, `Action/`, `Expression/` — small registries |
 | History and logging | `History/`, `Logging/` (partitioned `flow_logs`) |
@@ -106,6 +108,10 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   `OperatorRequestStateChanged`, which under the session lock removes the cancel button, sends the stored text and
   resumes the session through `resume()` with a wake-up message while it still waits in that node. Commands that end a
   session cancel its pending request (`GlobalCommandExecutor`).
+- Flow templates: a `FlowDraft` with `kind = template` is never started (the definition repository's
+  `runnable()`); publishing a host expands each `template` node into a copy that runs in the host's
+  session, and publishing a template republishes every host from its active definition in the same
+  transaction (`PublishFlowService`), refusing the publish if any host would break.
 - Events and schedules: `StartFlowFromEventJob` (queue `scheduled.triggers`) and
   `DispatchFlowTriggerEventJob`. Timeouts: `ResumeTimedOutSendMessageNodeJob`.
 - Delays: the `delay` handler schedules `ResumeDelayedFlowSessionJob` (queue `flow.execution`)

@@ -79,6 +79,8 @@ use App\Domains\Flow\Handlers\SetTagNodeHandler;
 use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Handlers\Support\TemplateResolver;
+use App\Domains\Flow\Handlers\TemplateNodeHandler;
+use App\Domains\Flow\Handlers\TemplateOutputNodeHandler;
 use App\Domains\Flow\History\DefaultHistoryWriter;
 use App\Domains\Flow\History\HistoryWriterFactory;
 use App\Domains\Flow\History\NoOpHistoryWriter;
@@ -515,6 +517,8 @@ final class FlowServiceProvider extends ServiceProvider
             LoopNodeHandler::class,
             LoopEndNodeHandler::class,
             RequestOperatorNodeHandler::class,
+            TemplateNodeHandler::class,
+            TemplateOutputNodeHandler::class,
         ];
 
         foreach ($handlers as $handlerClass) {

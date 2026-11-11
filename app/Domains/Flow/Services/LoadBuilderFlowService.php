@@ -13,7 +13,11 @@ use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\DTOs\BuilderFlowDto;
+use App\Domains\Flow\Enums\FlowKind;
+use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Flow\Templates\TemplateExpander;
+use App\Domains\Flow\Templates\TemplateUsageFinder;
 use App\Domains\Tenancy\Settings\TenantSettings;
 
 final readonly class LoadBuilderFlowService
@@ -27,17 +31,20 @@ final readonly class LoadBuilderFlowService
         private ActionHandlerRegistry $actionHandlers,
         private ActionAvailabilityInterface $actionAvailability,
         private CountryCatalog $countries,
+        private TemplateExpander $expander,
+        private TemplateUsageFinder $templateUsages,
     ) {
     }
 
     public function execute(string $flowId): BuilderFlowDto
     {
         $draft     = $this->drafts->findByFlowId($flowId);
-        $published = $this->definitions->findLatestActiveByFlowId($flowId);
+        $published = $this->definitions->findLatestPublishedByFlowId($flowId);
         $trigger   = $this->triggers->findByFlowId($flowId);
 
         $availableFlows = FlowDraft::query()
             ->where('assistant_id', $draft->assistant_id)
+            ->where('kind', FlowKind::Flow->value)
             ->orderBy('name')
             ->get(['flow_id', 'name'])
             ->map(static fn (FlowDraft $f): array => ['id' => $f->flow_id, 'name' => $f->name])
@@ -57,6 +64,10 @@ final readonly class LoadBuilderFlowService
             availableFlows: $availableFlows,
             availableActions: $this->availableActions(),
             availableCountries: $this->countries->toOptions($assistantCountries),
+            availableTemplates: $draft->isTemplate() ? [] : $this->availableTemplates((string) $draft->assistant_id),
+            usedBy: $draft->isTemplate()
+                ? array_map(static fn (FlowDraft $host): array => ['id' => $host->flow_id, 'name' => $host->name], $this->templateUsages->hostsOf($draft))
+                : [],
         );
     }
 
@@ -72,5 +83,45 @@ final readonly class LoadBuilderFlowService
             $this->actionHandlers->ids(),
             fn (string $id): bool => $this->actionAvailability->isAvailable($this->actionHandlers->ownerOf($id)),
         ));
+    }
+
+    /**
+     * The assistant's published templates with the outputs of their active version.
+     *
+     * @return list<array{id: string, name: string, version: int, outputs: list<array{name: string, label: string|null}>}>
+     */
+    private function availableTemplates(string $assistantId): array
+    {
+        $templates = FlowDraft::query()
+            ->where('assistant_id', $assistantId)
+            ->where('kind', FlowKind::Template->value)
+            ->orderBy('name')
+            ->get(['flow_id', 'name']);
+
+        $definitions = FlowDefinition::query()
+            ->whereIn('flow_id', $templates->pluck('flow_id')->all())
+            ->where('kind', FlowKind::Template->value)
+            ->active()
+            ->get()
+            ->keyBy('flow_id');
+
+        $options = [];
+
+        foreach ($templates as $template) {
+            $definition = $definitions->get($template->flow_id);
+
+            if (! $definition instanceof FlowDefinition) {
+                continue;
+            }
+
+            $options[] = [
+                'id'      => $template->flow_id,
+                'name'    => $template->name,
+                'version' => $definition->version,
+                'outputs' => $this->expander->outputsOf($definition),
+            ];
+        }
+
+        return $options;
     }
 }

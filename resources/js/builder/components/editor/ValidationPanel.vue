@@ -4,9 +4,11 @@ import {useBuilderStore} from '@builder/store/builderStore';
 import {useRegistryStore} from '@builder/store/registryStore';
 import {useSelectionStore} from '@builder/store/selectionStore';
 import {useValidation} from '@builder/composables/useValidation';
+import {useTranslations} from '@builder/composables/useTranslations';
 import type {TreeNode} from '@builder/utils/buildTree';
 
 const store = useBuilderStore();
+const { t } = useTranslations();
 const registryStore = useRegistryStore();
 const selectionStore = useSelectionStore();
 const { validate } = useValidation();
@@ -36,6 +38,9 @@ async function jumpToNode(error: { path?: string; message?: string }) {
         return
     }
 
+    // template.hosts.<flowId> and other `template.*` paths are flow-level, not nodes.
+    if (isFlowLevelPath(error?.path)) return;
+
     const nodeId = error?.path?.split('.')?.[1];
     if (!nodeId) return;
 
@@ -54,8 +59,21 @@ async function jumpToNode(error: { path?: string; message?: string }) {
     if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+/** Paths that do not point at a node: the template-wide errors a publish can return. */
+function isFlowLevelPath(path: string | undefined): boolean {
+    return path === 'template' || (path?.startsWith('template.') ?? false);
+}
+
 function humanPath(path: string | undefined): string {
     if (!path) return '';
+
+    if (path.startsWith('template.hosts.')) {
+        const hostId = path.slice('template.hosts.'.length);
+        const hostName = store.usedBy.find((flow) => flow.id === hostId)?.name ?? hostId;
+        return t('validation.template_flow').replace(':flow', hostName);
+    }
+
+    if (isFlowLevelPath(path)) return t('validation.flow_level');
 
     if (path.startsWith('trigger.')) {
         const rest = path.slice('trigger.'.length);

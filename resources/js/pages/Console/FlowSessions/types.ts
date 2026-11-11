@@ -1,4 +1,5 @@
 import type { ShellPageProps } from '@console/shell'
+import type { TemplateNodeOrigin } from './templateNode'
 
 export type FlowSessionStatus =
   | 'pending'
@@ -21,6 +22,7 @@ export interface LiveTranslations {
 }
 
 export interface FlowSessionsTranslations {
+  template_node: string
   title: string
   description: string
   search_label: string
@@ -74,6 +76,7 @@ export interface FlowSessionRow extends Record<string, unknown> {
   contactExternalId: string | null
   flowName: string | null
   currentNodeId: string | null
+  currentNodeOrigin: TemplateNodeOrigin | null
   updatedAt: string | null
   viewUrl: string
 }
@@ -83,6 +86,7 @@ export interface FlowSessionDetails {
   status: FlowSessionStatus
   endStatus: string | null
   currentNodeId: string | null
+  currentNodeOrigin: TemplateNodeOrigin | null
   version: number
   flowName: string | null
   flowVersion: number
@@ -104,6 +108,7 @@ export interface HistoryEntry {
   id: string
   createdAt: string | null
   nodeId: string
+  nodeOrigin: TemplateNodeOrigin | null
   event: string
   path: string | null
   payload: string | null

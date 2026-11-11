@@ -36,8 +36,25 @@ export type BuilderTriggerPayload =
           config: Record<string, unknown>
       }
 
+export type FlowKind = 'flow' | 'template'
+
+export interface TemplateOutput {
+    name: string
+    label: string | null
+}
+
+export interface AvailableTemplate {
+    id: string
+    name: string
+    version: number
+    outputs: TemplateOutput[]
+}
+
 export interface BuilderFlowPayload {
     flowId: string
+    kind?: FlowKind
+    availableTemplates?: AvailableTemplate[]
+    usedBy?: Array<{id: string; name: string}>
     name: string
     draftVersion: number
     publishedVersion?: number | null

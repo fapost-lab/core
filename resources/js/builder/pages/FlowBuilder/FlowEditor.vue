@@ -77,6 +77,22 @@ async function runValidate() {
 }
 
 async function runPublish() {
+    // Publishing a template republishes every flow that uses it — say which ones first.
+    if (builderStore.isTemplate && builderStore.usedBy.length > 0) {
+        const ok = await confirm({
+            title:        t('topbar.publish_template_title'),
+            message:      t('topbar.publish_template_message')
+                .replace(':count', String(builderStore.usedBy.length))
+                .replace(':flows', builderStore.usedBy.map((flow) => flow.name).join(', ')),
+            confirmLabel: t('topbar.publish_template_ok'),
+            cancelLabel:  t('topbar.publish_template_cancel'),
+        })
+
+        if (!ok) {
+            return
+        }
+    }
+
     publishing.value = true
     publishedMsg.value = null
 
@@ -135,6 +151,8 @@ useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
             :validating="validating"
             :publishing="publishing"
             :published-msg="publishedMsg"
+            :used-by="builderStore.usedBy"
+            :is-template="builderStore.isTemplate"
             @tab-change="builderStore.setActiveTab"
             @save-draft="save"
             @undo="builderStore.undo"

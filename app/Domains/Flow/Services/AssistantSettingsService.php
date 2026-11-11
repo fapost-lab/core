@@ -8,6 +8,7 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Domains\Flow\Commands\CommandActionType;
+use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -344,11 +345,14 @@ final readonly class AssistantSettingsService
     }
 
     /**
+     * The flows the settings may point at: a template is never one of them.
+     *
      * @return Builder<FlowDraft>
      */
     private function flows(): Builder
     {
         return FlowDraft::query()
+            ->where('flow_drafts.kind', FlowKind::Flow->value)
             ->where('flow_drafts.tenant_id', $this->tenants->get()->getId())
             ->where('flow_drafts.assistant_id', (string) $this->assistant()->getKey());
     }

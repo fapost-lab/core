@@ -1,0 +1,136 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Domains\Flow\Templates;
+
+use App\Domains\Flow\Models\FlowDefinition;
+use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Flow\Models\FlowSession;
+
+/**
+ * Where a node of a published definition came from, for the screens that show node ids of running and finished
+ * sessions (the session list and card, the session history, the flow log). A node copied from a template carries
+ * `origin` ({@see TemplateExpander::ORIGIN}); its id is a UUIDv5 nobody recognises, so the screens show
+ * "template X vN → node" instead.
+ *
+ * Memoises definitions, template names and session definitions for one request; built per resolve, never shared.
+ */
+final class TemplateNodeOrigins
+{
+    /** @var array<string, array<string, array{template_flow_id: string, template_version: int, node_id: string, node_type: string}>> */
+    private array $originsByDefinition = [];
+
+    /** @var array<string, string> */
+    private array $templateNames = [];
+
+    /** @var array<string, string|null> */
+    private array $definitionBySession = [];
+
+    /**
+     * @return array{template: string, version: int, nodeId: string, nodeType: string}|null null for a node of the
+     *                                                                                    flow itself, or an unknown one
+     */
+    public function describe(?string $definitionId, ?string $nodeId): ?array
+    {
+        if (null === $definitionId || '' === $definitionId || null === $nodeId || '' === $nodeId) {
+            return null;
+        }
+
+        $origin = $this->originsOf($definitionId)[$nodeId] ?? null;
+
+        if (null === $origin) {
+            return null;
+        }
+
+        return [
+            'template' => $this->templateName($origin['template_flow_id']),
+            'version'  => $origin['template_version'],
+            'nodeId'   => $origin['node_id'],
+            'nodeType' => $origin['node_type'],
+        ];
+    }
+
+    /**
+     * Same as {@see describe()}, for a node of a session known only by its id (a flow log row).
+     *
+     * @return array{template: string, version: int, nodeId: string, nodeType: string}|null
+     */
+    public function describeForSession(string $sessionId, ?string $nodeId): ?array
+    {
+        return $this->describe($this->definitionOfSession($sessionId), $nodeId);
+    }
+
+    /**
+     * Loads the definitions of many sessions at once, ahead of {@see describeForSession()} calls for a list.
+     *
+     * @param  list<string>  $sessionIds
+     */
+    public function preloadSessions(array $sessionIds): void
+    {
+        $missing = array_values(array_diff(array_unique($sessionIds), array_keys($this->definitionBySession)));
+
+        if ([] === $missing) {
+            return;
+        }
+
+        $found = FlowSession::query()->whereKey($missing)->pluck('flow_definition_id', 'id');
+
+        foreach ($missing as $sessionId) {
+            $definitionId                          = $found[$sessionId] ?? null;
+            $this->definitionBySession[$sessionId] = null === $definitionId ? null : (string) $definitionId;
+        }
+    }
+
+    private function definitionOfSession(string $sessionId): ?string
+    {
+        if (! array_key_exists($sessionId, $this->definitionBySession)) {
+            $this->preloadSessions([$sessionId]);
+        }
+
+        return $this->definitionBySession[$sessionId] ?? null;
+    }
+
+    /**
+     * @return array<string, array{template_flow_id: string, template_version: int, node_id: string, node_type: string}>
+     */
+    private function originsOf(string $definitionId): array
+    {
+        if (isset($this->originsByDefinition[$definitionId])) {
+            return $this->originsByDefinition[$definitionId];
+        }
+
+        $nodes   = FlowDefinition::query()->whereKey($definitionId)->value('nodes');
+        $nodes   = is_string($nodes) ? json_decode($nodes, true) : $nodes;
+        $origins = [];
+
+        foreach (is_array($nodes) ? $nodes : [] as $node) {
+            $origin = is_array($node) ? ($node[TemplateExpander::ORIGIN] ?? null) : null;
+
+            if (! is_array($origin) || ! is_string($node['id'] ?? null)) {
+                continue;
+            }
+
+            $origins[$node['id']] = [
+                'template_flow_id' => (string) ($origin['template_flow_id'] ?? ''),
+                'template_version' => (int) ($origin['template_version'] ?? 0),
+                'node_id'          => (string) ($origin['node_id'] ?? ''),
+                'node_type'        => is_string($node['type'] ?? null) ? $node['type'] : '',
+            ];
+        }
+
+        return $this->originsByDefinition[$definitionId] = $origins;
+    }
+
+    private function templateName(string $templateFlowId): string
+    {
+        if (! isset($this->templateNames[$templateFlowId])) {
+            $name = FlowDraft::query()->where('flow_id', $templateFlowId)->value('name')
+                ?? FlowDefinition::query()->where('flow_id', $templateFlowId)->orderByDesc('version')->value('name');
+
+            $this->templateNames[$templateFlowId] = is_string($name) && '' !== $name ? $name : $templateFlowId;
+        }
+
+        return $this->templateNames[$templateFlowId];
+    }
+}

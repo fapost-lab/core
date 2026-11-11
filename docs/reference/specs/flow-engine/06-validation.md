@@ -117,6 +117,16 @@ actual number. A limit a channel leaves `null` is not checked. What is counted m
 
 ## Publish-time checks (`PublishFlowService`)
 
+Before `ValidateFlowService`, each `template` node is expanded into a copy of its template
+(`TemplateExpander`, `adr-20261111-flow-templates-expanded-at-publish`), and the copy is then validated
+with the rest of the graph. Expansion refuses `template_missing`, `template_not_found`,
+`template_cross_assistant`, `template_not_published`, `template_nested`, `template_unknown_output` (an
+edge from an output the template no longer has) and `template_output_outside_template`. A template's own
+publish checks `template_entry_not_single`, `template_output_invalid_name`, `template_output_has_edges`
+and `template_nested`, and fails with `template_breaks_flow` (path `template.hosts.<flowId>`) when a flow
+that uses it would not pass these checks with the new version. The builder's validate endpoint runs the
+same template checks on the draft.
+
 After `ValidateFlowService` passes, still inside the transaction:
 
 - `subflow_cross_assistant`: a subflow may only call a flow owned by the same assistant (looked up

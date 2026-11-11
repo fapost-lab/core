@@ -1,7 +1,7 @@
 # 10. Registered Nodes Catalog
 
 Reflects the handlers actually registered in `FlowServiceProvider::registerCoreNodeHandlers()`
-(called from the `NodeHandlerRegistry` singleton factory in `register()`). All 16 are Core
+(called from the `NodeHandlerRegistry` singleton factory in `register()`). All 18 are Core
 handlers at `v1`.
 
 | Type | Version | Category | Class | Purpose | Spec |
@@ -14,6 +14,8 @@ handlers at `v1`.
 | `call` | 1 | `Integration` | `CallNodeHandler` | Invokes an external HTTP endpoint or an in-process action handler through a pluggable transport; routes on `success`/`error`. | [06-call.md](../../../reference/specs/flow-engine/nodes/06-call.md) |
 | `emit_event` | 1 | `Logic` | `EmitEventNodeHandler` | Publishes a tenant-scoped event, fire-and-forget, so subscribed event-triggers can start other flows. | [07-emit-event.md](../../../reference/specs/flow-engine/nodes/07-emit-event.md) |
 | `subflow` | 1 | `Logic` | `SubflowNodeHandler` | Pauses the parent session and starts a child flow session, resuming the parent when the child ends. | [08-subflow.md](../../../reference/specs/flow-engine/nodes/08-subflow.md) |
+| `template` | 1 | `Logic` | `App\Domains\Flow\Handlers\TemplateNodeHandler` | Pass-through reference node for a flow template; returns handle `enter`. Expanded into the template's published graph at flow publish. | No standalone node spec; see `.ai/knowledge/adr/20261111-flow-templates-expanded-at-publish.md` |
+| `template_output` | 1 | `Logic` | `TemplateOutputNodeHandler` | Pass-through named exit of a template (template-only); returns `default`. | No standalone node spec; see `.ai/knowledge/adr/20261111-flow-templates-expanded-at-publish.md` |
 | `rag_query` | 1 | `AI` | `RagQueryNodeHandler` | Queries a RAG provider via `RagAdapterRegistry` and writes the structured result into `state.rag.*`. | No standalone node spec; see `.ai/specs/rag-knowledge-bases/` |
 | `end` | 1 | `Logic` | `EndNodeHandler` | Terminal node — marks the session ended with a discriminated status (`success`/`cancelled`/`failed`). | [10-end.md](../../../reference/specs/flow-engine/nodes/10-end.md) |
 | `loop` | 1 | `Logic` | `LoopNodeHandler` | Evaluates a loop continuation condition (counted or while) and routes into the loop body (`loop`) or past it (`default`). | [11-loop.md](../../../reference/specs/flow-engine/nodes/11-loop.md) |
@@ -30,7 +32,7 @@ which returns `'Core'`.
 ## How registration works
 
 `FlowServiceProvider::register()` binds `NodeHandlerRegistry` as a singleton whose factory calls
-`registerCoreNodeHandlers()`, which lists the 16 handler classes above and calls
+`registerCoreNodeHandlers()`, which lists the 18 handler classes above and calls
 `$registry->register($handlerClass)` for each. Per
 [ADR-0001](../../../../.ai/knowledge/adr/0001-node-handlers-built-per-scope.md), the registry
 keeps only the handler **class** (a throwaway instance is built once at registration to read and

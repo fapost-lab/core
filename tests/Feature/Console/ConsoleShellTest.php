@@ -44,6 +44,7 @@ final class ConsoleShellTest extends FeatureTestCase
         $this->assertSame(['console.channels.index'], $this->keys($props['navigation']['groups'][1]));
         $this->assertSame([
             'console.flows.index',
+            'console.flow-templates.index',
             'console.flow-groups.index',
         ], $this->keys($props['navigation']['groups'][2]));
         $this->assertSame([
@@ -71,7 +72,8 @@ final class ConsoleShellTest extends FeatureTestCase
         $this->assertFalse($groups[0]['items'][0]['external'], 'The dashboard.');
         $this->assertFalse($groups[1]['items'][0]['external'], 'Channels.');
         $this->assertFalse($groups[2]['items'][0]['external'], 'Flows.');
-        $this->assertFalse($groups[2]['items'][1]['external'], 'Flow groups.');
+        $this->assertFalse($groups[2]['items'][1]['external'], 'Flow templates.');
+        $this->assertFalse($groups[2]['items'][2]['external'], 'Flow groups.');
         $this->assertFalse($groups[3]['items'][0]['external'], 'Flow sessions.');
         $this->assertFalse($groups[3]['items'][1]['external'], 'The flow log.');
         $this->assertFalse($groups[3]['items'][4]['external'], 'Conversations.');

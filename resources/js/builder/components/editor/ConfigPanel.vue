@@ -18,6 +18,7 @@ import NotifyConfig from './config/overrides/NotifyConfig.vue'
 import SetTagConfig from './config/overrides/SetTagConfig.vue'
 import LoopConfig from './config/overrides/LoopConfig.vue'
 import LoopEndConfig from './config/overrides/LoopEndConfig.vue'
+import TemplateConfig from './config/overrides/TemplateConfig.vue'
 import TriggerConfig from './config/overrides/TriggerConfig.vue'
 
 // Core bespoke config panels. A type without an override falls back to the
@@ -34,6 +35,7 @@ const OVERRIDES: Record<string, object> = {
     auth_request: AuthRequestConfig,
     loop: LoopConfig,
     loop_end: LoopEndConfig,
+    template: TemplateConfig,
 }
 
 const selectionStore = useSelectionStore()

@@ -25,6 +25,10 @@ export function nodeMustBeLast(node: TerminalCheckInput): boolean {
     // Subflow is always terminal — continuation is only via success/cancelled/failed.
     if (node.type === 'subflow') return true
 
+    // A template reference exits only through its template's outputs; an output
+    // node closes the template. Neither has a default chain.
+    if (node.type === 'template' || node.type === 'template_output') return true
+
     // Call is always terminal — continuation is only via success/error.
     if (node.type === 'call') return true
 

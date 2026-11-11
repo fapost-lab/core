@@ -12,6 +12,7 @@ import FlowSubflowCard from './FlowSubflowCard.vue'
 import FlowCallCard from './FlowCallCard.vue'
 import FlowRequestOperatorCard from './FlowRequestOperatorCard.vue'
 import FlowLoopCard from './FlowLoopCard.vue'
+import FlowTemplateCard from './FlowTemplateCard.vue'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 import {nodeHandles} from '@builder/utils/nodeHandles'
 
@@ -254,7 +255,7 @@ const breadcrumbs = computed(() => {
             if (node?.type === 'loop' && handle === 'loop') {
                 handleLabel = 'Loop body'
             }
-            if (node?.type === 'branch' || node?.type === 'condition') {
+            if (node?.type === 'branch' || node?.type === 'condition' || node?.type === 'template') {
                 // The same text as the card and the structure tree: the branch name or its condition, never the handle id.
                 handleLabel = nodeHandles(node).find((h) => h.handle === handle)?.label ?? handleLabel
             }
@@ -401,7 +402,7 @@ const trailingInsertContext = computed(() => {
 
             <div class="sequence-card-body">
                 <!-- Trigger card (only at root) -->
-                <template v-if="isAtRoot">
+                <template v-if="isAtRoot && !builderStore.isTemplate">
                     <div class="trigger-card" @click="selectionStore.selectTrigger()">
                         <div class="trigger-icon">⚡</div>
                         <div>
@@ -466,6 +467,12 @@ const trailingInsertContext = computed(() => {
                     />
                     <FlowRequestOperatorCard
                         v-else-if="item.node.type === 'request_operator'"
+                        :index="index + 1"
+                        :parent-branch="selectionStore.activeBranch"
+                        :tree-node="item"
+                    />
+                    <FlowTemplateCard
+                        v-else-if="item.node.type === 'template'"
                         :index="index + 1"
                         :parent-branch="selectionStore.activeBranch"
                         :tree-node="item"

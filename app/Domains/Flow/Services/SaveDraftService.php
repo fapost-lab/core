@@ -6,6 +6,7 @@ namespace App\Domains\Flow\Services;
 
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Exceptions\DraftVersionConflictException;
+use App\Domains\Flow\Exceptions\InvalidTriggerPayloadException;
 use App\Domains\Flow\Models\FlowDraft;
 use Illuminate\Support\Facades\DB;
 
@@ -34,6 +35,11 @@ final class SaveDraftService
 
             if (null === $draft) {
                 throw new DraftVersionConflictException($flowId);
+            }
+
+            // A template never starts on its own, so it has no trigger to save.
+            if ($draft->isTemplate() && null !== $trigger && true !== ($trigger['_delete'] ?? false)) {
+                throw new InvalidTriggerPayloadException('A template has no trigger: it runs only where a flow places it.');
             }
 
             $draft->forceFill([

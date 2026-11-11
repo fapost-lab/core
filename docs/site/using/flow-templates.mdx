@@ -1,0 +1,90 @@
+---
+title: "Flow templates"
+description: "Describe a reusable piece of a dialogue once and place it in flows as one block."
+---
+
+A flow template is a reusable piece of a flow — "call an operator", a survey,
+"rate the answer" — described once and placed in flows as **one block**.
+
+## Creating a template
+
+Templates are created in the console under **Templates**, next to **Flows**, and
+edited in the builder like a flow. A template:
+
+- belongs to an assistant. A flow can use only its own assistant's templates;
+- counts under the plan's flow limit;
+- cannot be started on its own. It is not offered as the default flow, as a
+  `start_flow` command target or as a subflow target, and it has no trigger.
+
+A template has exactly one starting block and cannot contain another template. A
+subflow block inside a template is allowed.
+
+## Outputs
+
+Inside a template, a **Template output** block is a named exit. The name uses
+lowercase latin letters, digits and `_` and starts with a letter; the label is what
+authors see. Several outputs with the same name are one exit.
+
+An output ends a branch of the template, so it has no connections after it.
+
+<Warning>
+  **End** inside a template still ends the whole conversation. It is not an exit —
+  use a Template output to hand control back to the flow.
+</Warning>
+
+## Using a template in a flow
+
+Add a **Template** block and pick a published template. Its connections are the
+template's outputs. The inner blocks are not visible or editable from the flow;
+**Open template** opens the template. An output with nothing connected ends the
+session there.
+
+## How it runs
+
+When the flow is published, the Template block is expanded into a copy of the
+template's current published version inside the flow's published version. It runs in
+the **same session** as the flow: there is no child session, no timeout and no paused
+parent.
+
+Variables are shared with the flow. The template reads `flow.*` and `contact.*`, and
+what it writes the flow reads afterwards — this is how a template returns data.
+
+<Warning>
+  A template overwrites a flow variable of the same name. Publishing rejects only
+  type conflicts, so choose variable names that will not clash.
+</Warning>
+
+Texts are translated in the template itself, on its **Content** tab, and are the same
+everywhere the template is placed.
+
+## Editing a template
+
+Publishing a template automatically republishes every flow that uses it, from each
+flow's currently published version. Unpublished draft changes of those flows are
+**not** published. Those flows get a new version number.
+
+Conversations already running continue on the version they started with; new
+conversations get the new copy.
+
+If the new version would break a flow — an output the flow continues from was
+removed, or a variable type conflicts — the template publish is refused with the list
+of flows and the reasons. The builder shows where a template is used and warns before
+publishing ("updates N flows").
+
+## Deleting a template
+
+A template cannot be deleted while a flow uses it, whether in a published version or
+in a draft.
+
+## Template or subflow
+
+| | Template | Subflow |
+|---|---|---|
+| Session | Same session as the flow | Separate child session |
+| Variables | Shared with the flow | Its own empty `flow.*` |
+| Exits | Named by the template | Fixed: success, cancelled, failed |
+| Timeout | None | Yes |
+| Version used | Copied at the flow's publish; edits republish the flow | Latest published version at start |
+
+Use a template to reuse a piece of the dialogue inside one conversation. Use a
+subflow for a self-contained flow that runs on its own and reports back.

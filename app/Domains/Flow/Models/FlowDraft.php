@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Models;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Flow\Enums\FlowKind;
 use Database\Factories\FlowDraftFactory;
 use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Fapost\Support\Models\BaseModel;
@@ -20,6 +21,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string                  $id
  * @property string                  $tenant_id
  * @property string                  $flow_id
+ * @property FlowKind                $kind
  * @property string                  $assistant_id
  * @property string|null             $flow_group_id
  * @property int                     $draft_version
@@ -63,11 +65,19 @@ final class FlowDraft extends BaseModel
     public const string LIMIT_KEY = 'flows';
 
     /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'kind' => 'flow',
+    ];
+
+    /**
      * @var list<string>
      */
     protected $fillable = [
         'tenant_id',
         'flow_id',
+        'kind',
         'assistant_id',
         'flow_group_id',
         'draft_version',
@@ -86,6 +96,11 @@ final class FlowDraft extends BaseModel
     public static function countForLimit(): int
     {
         return self::query()->count();
+    }
+
+    public function isTemplate(): bool
+    {
+        return FlowKind::Template === $this->kind;
     }
 
     public function assistant(): BelongsTo
@@ -116,6 +131,7 @@ final class FlowDraft extends BaseModel
         return [
             'nodes'           => 'array',
             'edges'           => 'array',
+            'kind'            => FlowKind::class,
             'draft_version'   => 'integer',
             'is_public'       => 'boolean',
             'is_active'       => 'boolean',

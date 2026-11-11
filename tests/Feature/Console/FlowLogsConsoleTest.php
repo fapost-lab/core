@@ -196,6 +196,31 @@ final class FlowLogsConsoleTest extends FeatureTestCase
         $this->actingAs($allowed)->get($this->viewUrl($entry))->assertOk();
     }
 
+    public function test_an_entry_of_a_node_copied_from_a_template_shows_its_origin(): void
+    {
+        $template = FlowDraft::factory()->template()->create(['assistant_id' => $this->assistant->getKey(), 'name' => 'Rate the answer']);
+        $copyId   = '1c9e2d3f-4a5b-5c6d-8e7f-9a0b1c2d3e4f';
+        $this->session->flowDefinition()->update(['nodes' => [
+            ['id' => $copyId, 'type' => 'send_message', 'version' => 1, 'config' => [], 'origin' => [
+                'ref' => 'ref', 'template_flow_id' => $template->flow_id, 'template_version' => 2, 'node_id' => 'r-ask',
+            ]],
+        ]]);
+        $copied = $this->entry(CarbonImmutable::now()->subMinute(), ['node_id' => $copyId]);
+        $this->entry(CarbonImmutable::now()->subMinutes(2));
+        $origin = ['template' => 'Rate the answer', 'version' => 2, 'nodeId' => 'r-ask', 'nodeType' => 'send_message'];
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.nodeOrigin', $origin)
+                ->where('table.rows.1.nodeOrigin', null)
+                ->etc());
+
+        $this->actingAs($this->admin())
+            ->get($this->viewUrl($copied))
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('log.nodeOrigin', $origin)->etc());
+    }
+
     private function listUrl(string $suffix = ''): string
     {
         return $this->panelUrl("/assistant/{$this->assistant->getKey()}/flow-logs{$suffix}");

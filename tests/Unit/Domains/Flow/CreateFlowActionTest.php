@@ -25,6 +25,7 @@ final class CreateFlowActionTest extends TestCase
             $table->uuid('id')->primary();
             $table->uuid('tenant_id');
             $table->uuid('flow_id')->unique();
+            $table->string('kind', 16)->default('flow');
             $table->uuid('assistant_id');
             $table->uuid('flow_group_id')->nullable();
             $table->integer('draft_version')->default(1);

@@ -1,12 +1,19 @@
 import {defineStore} from 'pinia'
-import {computed, ref, watch} from 'vue'
+import {computed, nextTick, ref, watch} from 'vue'
 import {nanoid} from 'nanoid'
 import {buildTree} from '@builder/utils/buildTree'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
+import {
+    edgesToDropAfterReselect,
+    refreshTemplateSnapshots,
+    templateSelectionPatch,
+} from '@builder/utils/templateNodes'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {useRegistryStore} from '@builder/store/registryStore'
 import type {
   ActiveTab,
+  AvailableTemplate,
+  FlowKind,
   BuilderFlowPayload,
   BuilderTriggerPayload,
   FlowDefinition,
@@ -99,6 +106,11 @@ export const useBuilderStore = defineStore('builder', () => {
     const contentBaseLanguage = ref('en')
     const availableLanguages = ref<string[]>([])
     const availableFlows     = ref<Array<{id: string; name: string}>>([])
+    // 'template' flows have no trigger and no auto-appended End, and use template_output nodes.
+    const kind               = ref<FlowKind>('flow')
+    const availableTemplates = ref<AvailableTemplate[]>([])
+    const usedBy             = ref<Array<{id: string; name: string}>>([])
+    const isTemplate         = computed(() => kind.value === 'template')
     const availableActions   = ref<string[]>([])
     const availableCountries = ref<Array<{value: string; label: string}>>([])
 
@@ -202,6 +214,9 @@ export const useBuilderStore = defineStore('builder', () => {
      * appending after those would produce an unreachable node, not a terminal.
      */
     function healTerminalEnd(def: FlowDefinition): boolean {
+        // A template closes its paths with template_output nodes, never a flow End.
+        if (isTemplate.value) return false
+
         if (def.nodes.some((n) => n.type === 'end')) return false
 
         const endNode: FlowNode = {
@@ -247,6 +262,8 @@ export const useBuilderStore = defineStore('builder', () => {
      * never appends after real work. Returns true when a node was added.
      */
     function ensureBranchEnd(parentId: string, handle: string): boolean {
+        if (isTemplate.value) return false
+
         const def = definition.value
 
         const parent = def.nodes.find((n) => n.id === parentId)
@@ -288,11 +305,17 @@ export const useBuilderStore = defineStore('builder', () => {
     }
 
     function init(flow: BuilderFlowPayload) {
+        hydrated = false
         flowId.value = flow.flowId
         flowName.value = flow.name
         draftVersion.value = flow.draftVersion
         publishedVersion.value = flow.publishedVersion ?? null
+        kind.value = flow.kind === 'template' ? 'template' : 'flow'
+        availableTemplates.value = Array.isArray(flow.availableTemplates) ? flow.availableTemplates : []
+        usedBy.value = Array.isArray(flow.usedBy) ? flow.usedBy : []
         definition.value = normalizeDefinition(flow.definition)
+        // Template nodes follow their published template; flags dirty only on a real change.
+        const refreshedTemplates = refreshTemplateSnapshots(definition.value.nodes, availableTemplates.value)
         const healedLoops = healLoopConstructs(definition.value)
         const healedEnd   = healTerminalEnd(definition.value)
         trigger.value = normalizeTrigger(flow.trigger)
@@ -304,8 +327,13 @@ export const useBuilderStore = defineStore('builder', () => {
         availableCountries.value = Array.isArray(flow.availableCountries) ? flow.availableCountries : []
         // A healed definition differs from the persisted draft — flag dirty so
         // the repaired loop_end / end nodes reach the backend on the next save.
-        isDirty.value = healedLoops || healedEnd
-        hydrated      = true
+        isDirty.value = healedLoops || healedEnd || refreshedTemplates
+        // The dirty watcher is queued by the assignments above and runs after this
+        // function returns; re-arm it only once that flush is done, so loading a
+        // flow does not by itself mark the draft as edited.
+        void nextTick(() => {
+            hydrated = true
+        })
     }
 
     function setDraftVersion(v: number | null) {
@@ -967,6 +995,27 @@ export const useBuilderStore = defineStore('builder', () => {
      * For send_message nodes, automatically removes edges whose handle references
      * a button that no longer exists after the patch.
      */
+    /**
+     * Point a `template` node at a published template: writes the id and the
+     * outputs snapshot, and drops edges leaving through handles the new template
+     * does not have (their targets stay in the draft as unreachable chains the
+     * canvas lists, so nothing is deleted silently).
+     */
+    function selectTemplate(nodeId: string, templateId: string) {
+        const node = definition.value.nodes.find((n) => n.id === nodeId)
+        const template = availableTemplates.value.find((t) => t.id === templateId)
+        if (!node || !template) return
+
+        snapshot()
+        const patch = templateSelectionPatch(template)
+        node.config = {...(node.config ?? {}), ...patch}
+
+        const dropped = new Set(edgesToDropAfterReselect(definition.value.edges, nodeId, patch.outputs).map((e) => e.id))
+        if (dropped.size > 0) {
+            definition.value.edges = definition.value.edges.filter((e) => !dropped.has(e.id))
+        }
+    }
+
     function updateNodeConfig(nodeId: string, patch: NodeConfig) {
         const node = definition.value.nodes.find((n) => n.id === nodeId)
         if (!node) return
@@ -1075,6 +1124,10 @@ export const useBuilderStore = defineStore('builder', () => {
         contentBaseLanguage,
         availableLanguages,
         availableFlows,
+        kind,
+        isTemplate,
+        availableTemplates,
+        usedBy,
         availableActions,
         availableCountries,
         tree,
@@ -1099,6 +1152,7 @@ export const useBuilderStore = defineStore('builder', () => {
         undo,
         redo,
         updateNodeConfig,
+        selectTemplate,
         insertNode,
         ensureBranchEnd,
         deleteNode,
