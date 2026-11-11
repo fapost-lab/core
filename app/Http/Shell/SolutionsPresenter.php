@@ -17,7 +17,6 @@ use App\Domains\Solution\Services\InstalledSolutions;
 use App\Domains\Solution\Services\NoSolutionStorefront;
 use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionUiCompatibility;
-use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use Carbon\CarbonImmutable;
@@ -41,8 +40,8 @@ use Throwable;
  * own toggle) or offers it to connect (the operator's storefront) and, when it ships a console UI, whether the bundle is
  * published and fits the kit Core ships, and whether, being on, it needs an update before its UI is served again.
  * A Solution whose package is gone but whose activation is still stored is listed apart, so it can be put out.
- * On a self-hosted platform with no storefront of its own it also carries the address where more Solutions are found, from the
- * platform setting {@see self::MARKETPLACE_URL_SETTING}.
+ * On a self-hosted platform with no storefront of its own it also carries the address where more Solutions are found,
+ * {@see self::MARKETPLACE_URL}.
  *
  * Only valid Solutions are shown: the catalog is closed to a package whose manifest fails, and `platform:update`
  * refuses it before a tenant could see it. Built per request, with no state of its own: it reads the tenant's activation through the scoped registry.
@@ -51,7 +50,11 @@ use Throwable;
  */
 final readonly class SolutionsPresenter
 {
-    public const string MARKETPLACE_URL_SETTING = 'solutions.marketplace_url';
+    /**
+     * The one directory of Solutions for every FaPost installation. A redirect on our own site (fapost-lab/website) to the
+     * documentation page, so the directory can move without a release and without breaking installed copies.
+     */
+    public const string MARKETPLACE_URL = 'https://fapost.in/solutions';
 
     /**
      * The console points, by the name the screen shows them under.
@@ -76,7 +79,6 @@ final readonly class SolutionsPresenter
         private SolutionUi $ui,
         private SolutionStorefrontInterface $storefront,
         private TenantContextInterface $tenantContext,
-        private PlatformSettingsReaderInterface $settings,
     ) {
     }
 
@@ -181,8 +183,8 @@ final readonly class SolutionsPresenter
 
     /**
      * Where to find more Solutions, only on a self-hosted installation (single resolution mode) whose storefront is the
-     * default one (no operator sells them); null in host mode (the SaaS tenant has no directory to install from), when
-     * another storefront is bound or when the setting is empty.
+     * default one (no operator sells them); null in host mode (the SaaS tenant has no directory to install from) or when
+     * another storefront is bound.
      */
     private function marketplaceUrl(): ?string
     {
@@ -190,9 +192,7 @@ final readonly class SolutionsPresenter
             return null;
         }
 
-        $url = mb_trim($this->settings->text(self::MARKETPLACE_URL_SETTING));
-
-        return '' === $url ? null : $url;
+        return self::MARKETPLACE_URL;
     }
 
     /**
