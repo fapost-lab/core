@@ -60,6 +60,11 @@ the installation running with a notice.
       cannot be stated until an agent build's real duration is known (after: Phase 2)
 - [ ] fog: SaaS purchases — how a tenant's purchase in the marketplace becomes an activation; the
       shell's side and the marketplace's per-tenant licence are both unsettled
+- [ ] fog: the version story of the kit (`@fapost/ui`) and the extension contract — when each reaches
+      1.0 and how a product states the range it builds against; carried over from
+      `ecosystem-distribution` (and before it `ui-foundation`), the `0.x` rule is in ADR
+      `20261015-ui-kit-package-shape`, 1.0 waits for a Solution living on the kit (after:
+      `first-solution` — the first real consumer). Compatibility checks in Phase 3 read these ranges
 
 ## Waves
 
