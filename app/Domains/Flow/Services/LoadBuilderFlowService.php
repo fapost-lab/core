@@ -86,9 +86,10 @@ final readonly class LoadBuilderFlowService
     }
 
     /**
-     * The assistant's published templates with the outputs of their active version.
+     * The assistant's published templates with the outputs and parameters of their active version. A parameter's
+     * `default` is the template's current value of its field, which the builder shows where the flow sets none.
      *
-     * @return list<array{id: string, name: string, version: int, outputs: list<array{name: string, label: string|null}>}>
+     * @return list<array{id: string, name: string, version: int, outputs: list<array{name: string, label: string|null}>, parameters: list<array{key: string, label: string|null, node_type: string, node_version: int, field: string, default: mixed}>}>
      */
     private function availableTemplates(string $assistantId): array
     {
@@ -115,10 +116,15 @@ final readonly class LoadBuilderFlowService
             }
 
             $options[] = [
-                'id'      => $template->flow_id,
-                'name'    => $template->name,
-                'version' => $definition->version,
-                'outputs' => $this->expander->outputsOf($definition),
+                'id'         => $template->flow_id,
+                'name'       => $template->name,
+                'version'    => $definition->version,
+                'outputs'    => $this->expander->outputsOf($definition),
+                'parameters' => array_map(static function (array $parameter): array {
+                    unset($parameter['node_id']);
+
+                    return $parameter;
+                }, $this->expander->parametersOf($definition)),
             ];
         }
 

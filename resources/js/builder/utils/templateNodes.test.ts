@@ -2,6 +2,12 @@ import {describe, expect, it} from 'vitest'
 import type {AvailableTemplate, FlowNode, NodeTypePayload} from '@builder/dto/types'
 import {
     edgesToDropAfterReselect,
+    exposableFields,
+    isEmptyParameterValue,
+    nextParameterValues,
+    withBaseLanguageText,
+    parameterValueText,
+    readTemplateParameters,
     paletteNodeTypes,
     readTemplateOutputs,
     refreshTemplateSnapshots,
@@ -52,7 +58,7 @@ describe('refreshTemplateSnapshots', () => {
 
 describe('template selection', () => {
     it('builds the config patch from the template outputs', () => {
-        expect(templateSelectionPatch(template)).toEqual({template_flow_id: 'tpl-1', outputs: template.outputs})
+        expect(templateSelectionPatch(template)).toEqual({template_flow_id: 'tpl-1', outputs: template.outputs, parameters: []})
     })
 
     it('finds edges whose handle the new template does not have, and only for that node', () => {
@@ -85,5 +91,118 @@ describe('paletteNodeTypes', () => {
 
     it('offers Template output but not Template (no nesting) in a template', () => {
         expect(paletteNodeTypes(types, 'template').map((t) => t.type)).toEqual(['send_message', 'template_output'])
+    })
+})
+
+const param = {key: 'greeting', label: 'Greeting', node_type: 'send_message', node_version: 1, field: 'text'}
+const withParams: AvailableTemplate = {...template, parameters: [{...param, default: {en: 'Hi'}}]}
+
+describe('template parameters snapshot', () => {
+    it('normalises key order and drops malformed entries', () => {
+        const parsed = readTemplateParameters({parameters: [
+            {field: 'text', node_version: 1, node_type: 'send_message', label: '', key: 'greeting'},
+            {key: '', node_type: 'x', field: 'y'},
+            null,
+        ]})
+
+        expect(parsed).toEqual([{key: 'greeting', label: null, node_type: 'send_message', node_version: 1, field: 'text'}])
+        expect(Object.keys(parsed[0])).toEqual(['key', 'label', 'node_type', 'node_version', 'field'])
+    })
+
+    it('never writes the default into the selection patch', () => {
+        const patch = templateSelectionPatch(withParams)
+
+        expect(patch.parameters).toEqual([param])
+        expect(Object.keys(patch.parameters[0])).toEqual(['key', 'label', 'node_type', 'node_version', 'field'])
+    })
+
+    it('refreshes a missing parameters snapshot once, then stays clean', () => {
+        const node = refNode({template_flow_id: 'tpl-1', outputs: template.outputs.map((o) => ({...o}))})
+
+        expect(refreshTemplateSnapshots([node], [withParams])).toBe(true)
+        expect(node.config.parameters).toEqual([param])
+        expect(refreshTemplateSnapshots([node], [withParams])).toBe(false)
+    })
+
+    it('is not dirtied by jsonb key re-ordering', () => {
+        const node = refNode({
+            template_flow_id: 'tpl-1',
+            outputs: template.outputs.map((o) => ({...o})),
+            parameters: [{field: 'text', node_version: 1, node_type: 'send_message', label: 'Greeting', key: 'greeting'}],
+        })
+
+        expect(refreshTemplateSnapshots([node], [withParams])).toBe(false)
+    })
+
+    it('reports a change when the template drops a parameter', () => {
+        const node = refNode({template_flow_id: 'tpl-1', outputs: template.outputs.map((o) => ({...o})), parameters: [param]})
+
+        expect(refreshTemplateSnapshots([node], [template])).toBe(true)
+        expect(node.config.parameters).toEqual([])
+    })
+})
+
+describe('isEmptyParameterValue', () => {
+    it.each([undefined, null, '', '   ', [], {}, {en: ''}, {en: '  ', ru: ''}])('%j is empty', (v) => {
+        expect(isEmptyParameterValue(v)).toBe(true)
+    })
+
+    it.each([false, 0, 'x', [1], {en: 'Hi'}, {en: '', ru: 'Привет'}])('%j is a value', (v) => {
+        expect(isEmptyParameterValue(v)).toBe(false)
+    })
+})
+
+describe('exposableFields', () => {
+    const schema = {
+        default_config: {},
+        text: {type: 'text', label: 'Message text'},
+        mode: {type: 'enum'},
+        buttons: {type: 'object-array'},
+        meta: {type: 'json'},
+        pairs: {type: 'key-value'},
+        nested: {type: 'object'},
+        wait: {type: 'duration', label: 'Wait'},
+    }
+
+    it('keeps only exposable types with a label fallback', () => {
+        expect(exposableFields(schema, 'send_message')).toEqual([
+            {key: 'text', label: 'Message text', type: 'text'},
+            {key: 'mode', label: 'mode', type: 'enum'},
+            {key: 'wait', label: 'Wait', type: 'duration'},
+        ])
+    })
+
+    it.each(['template', 'template_output', 'loop', 'loop_end'])('exposes nothing on %s', (type) => {
+        expect(exposableFields(schema, type)).toEqual([])
+    })
+})
+
+describe('parameterValueText', () => {
+    it('renders the base language of a map, else the first filled one', () => {
+        expect(parameterValueText({en: 'Hi', ru: 'Привет'}, 'ru')).toBe('Привет')
+        expect(parameterValueText({en: '', ru: 'Привет'}, 'en')).toBe('Привет')
+        expect(parameterValueText(undefined, 'en')).toBe('')
+        expect(parameterValueText(false, 'en')).toBe('false')
+        expect(parameterValueText(['a', 'b'], 'en')).toBe('a, b')
+    })
+})
+
+describe('parameter values set in the reference panel', () => {
+    it('keeps a cleared base language next to a translation, so publishing fills it from the template', () => {
+        const value = withBaseLanguageText({en: 'Custom', uk: 'Своє'}, 'en', '')
+        expect(value).toEqual({en: '', uk: 'Своє'})
+        expect(nextParameterValues({searching: {en: 'Custom', uk: 'Своє'}}, 'searching', value))
+            .toEqual({searching: {en: '', uk: 'Своє'}})
+    })
+
+    it('drops a value whose only language is cleared, so the template text stays', () => {
+        const value = withBaseLanguageText({en: 'Custom'}, 'en', '  ')
+        expect(nextParameterValues({searching: {en: 'Custom'}, other: 1}, 'searching', value)).toEqual({other: 1})
+        expect(nextParameterValues({searching: {en: 'Custom'}}, 'searching', value)).toBeUndefined()
+    })
+
+    it('keeps false and 0 as values', () => {
+        expect(nextParameterValues({}, 'flag', false)).toEqual({flag: false})
+        expect(nextParameterValues({}, 'wait', 0)).toEqual({wait: 0})
     })
 })

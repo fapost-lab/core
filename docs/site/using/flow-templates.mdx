@@ -55,7 +55,32 @@ what it writes the flow reads afterwards — this is how a template returns data
 </Warning>
 
 Texts are translated in the template itself, on its **Content** tab, and are the same
-everywhere the template is placed.
+everywhere the template is placed — unless the template makes them parameters.
+
+## Parameters
+
+A parameter lets each flow that places the template set its own value for one setting
+of a block inside it: "Looking for an operator…" in one place, "Looking for a
+manager…" in another, without a copy of the template.
+
+**In the template.** Open the settings of a block and, under **Template parameters**,
+choose a setting, give it a key (lowercase latin letters, digits and `_`, starting with
+a letter, unique in the template) and a label. A parameter can be a text, a number, a
+choice, a toggle, a duration or a list. Settings that hold buttons or other nested
+structures, and the settings of Loop, Template output and Template blocks, cannot be
+parameters.
+
+**In the flow.** The Template block's settings show each parameter with the same
+control as in the template's block, and the template's own value as a hint. A value
+set there replaces the template's value in this flow's copy; an empty value keeps the
+template's value, and **Reset to template** empties it again.
+
+**Translations.** A message text set as a parameter is typed in the base language in
+the Template block and translated on the **flow's** Content tab. The value replaces the
+template's text with all its translations: languages the flow does not translate fall
+back to the flow's base-language text, not to the template's translations. A language
+the flow leaves blank keeps the template's text in that language, and a text the flow
+leaves empty keeps all of the template's translations.
 
 ## Editing a template
 
@@ -66,8 +91,12 @@ flow's currently published version. Unpublished draft changes of those flows are
 Conversations already running continue on the version they started with; new
 conversations get the new copy.
 
+A flow keeps the parameter values it set. A changed template text reaches only the
+flows that leave that parameter empty.
+
 If the new version would break a flow — an output the flow continues from was
-removed, or a variable type conflicts — the template publish is refused with the list
+removed, a parameter the flow sets was removed or renamed, or a variable type
+conflicts — the template publish is refused with the list
 of flows and the reasons. The builder shows where a template is used and warns before
 publishing ("updates N flows").
 

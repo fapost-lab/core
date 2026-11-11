@@ -56,7 +56,7 @@ final class BuilderFlowDto extends Data
          * Published templates of the same assistant, for the template node's picker. `outputs` are the handles of
          * the active version; the builder refreshes a placed node's snapshot from them when the flow opens.
          *
-         * @var list<array{id: string, name: string, version: int, outputs: list<array{name: string, label: string|null}>}>
+         * @var list<array{id: string, name: string, version: int, outputs: list<array{name: string, label: string|null}>, parameters: list<array{key: string, label: string|null, node_type: string, node_version: int, field: string, default: mixed}>}>
          */
         public readonly array $availableTemplates = [],
         /**
@@ -74,7 +74,7 @@ final class BuilderFlowDto extends Data
      * @param  list<array{id: string, name: string}>       $availableFlows
      * @param  list<string>                                $availableActions
      * @param  list<array{value: string, label: string}>  $availableCountries
-     * @param  list<array{id: string, name: string, version: int, outputs: list<array{name: string, label: string|null}>}>  $availableTemplates
+     * @param  list<array{id: string, name: string, version: int, outputs: list<array{name: string, label: string|null}>, parameters: list<array{key: string, label: string|null, node_type: string, node_version: int, field: string, default: mixed}>}>  $availableTemplates
      * @param  list<array{id: string, name: string}>      $usedBy
      */
     public static function fromDraftAndDefinition(

@@ -111,7 +111,9 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
 - Flow templates: a `FlowDraft` with `kind = template` is never started (the definition repository's
   `runnable()`); publishing a host expands each `template` node into a copy that runs in the host's
   session, and publishing a template republishes every host from its active definition in the same
-  transaction (`PublishFlowService`), refusing the publish if any host would break.
+  transaction (`PublishFlowService`), refusing the publish if any host would break. A host's
+  parameter values (`config.parameter_values` on the reference) replace the fields the template
+  exposes, in the copy (`adr-20261111-flow-template-parameters`).
 - Events and schedules: `StartFlowFromEventJob` (queue `scheduled.triggers`) and
   `DispatchFlowTriggerEventJob`. Timeouts: `ResumeTimedOutSendMessageNodeJob`.
 - Delays: the `delay` handler schedules `ResumeDelayedFlowSessionJob` (queue `flow.execution`)

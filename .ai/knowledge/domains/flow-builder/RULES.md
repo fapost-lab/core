@@ -19,7 +19,7 @@ paths:
   - app/Domains/Flow/Services/ValidateFlowService.php
   - app/Domains/Flow/Services/LoadBuilderFlowService.php
   - "app/Domains/Flow/Validation/**"
-reviewed_at: 2026-10-15
+reviewed_at: 2026-11-11
 ---
 # Flow builder rules
 
@@ -54,7 +54,7 @@ broken.
 - **A new node's UI starts as `configSchema()` on its handler.** Add a core override only when
   the schema renderer cannot express the UI, by adding a key to the map in `ConfigPanel.vue`.
   Review only.
-- **A new schema field type needs a `FIELD_COMPONENTS` entry.** An unknown type silently renders
+- **A new schema field type needs a `FIELD_COMPONENTS` entry** (`components/editor/config/fieldComponents.ts`). An unknown type silently renders
   as a text field. Review only. *(proposed)*
 - **Extensions ship no builder Vue components.** Solutions add no node types: their action
   handlers are configured in the `call` node through schema, and their UI goes to the console as

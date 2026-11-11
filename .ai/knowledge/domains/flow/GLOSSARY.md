@@ -95,6 +95,12 @@ which runs as a separate child session.
 The nodes a published host carries for one `template` node, each with an `origin` naming the
 reference node, the template and its version.
 
+## Template parameter
+
+A field of a node inside a flow template that the template exposes (node key `parameters`: key, label,
+field). A flow that places the template may set its value on the reference node
+(`config.parameter_values`); expansion puts it in the copy, and an empty value keeps the template's.
+
 ## Persistent button
 
 An inline button that re-enters a finished session's branch when pressed.

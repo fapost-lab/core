@@ -9,6 +9,8 @@ export interface FlowNode {
     label?: string
     config: NodeConfig
     outputs?: Record<string, { next?: string } | null>
+    /** Template drafts only: config fields of this node exposed as template parameters. */
+    parameters?: TemplateParameterDeclaration[]
 }
 
 export interface FlowEdge {
@@ -43,11 +45,30 @@ export interface TemplateOutput {
     label: string | null
 }
 
+/** A parameter as the template author declares it on an inner node of a template draft. */
+export interface TemplateParameterDeclaration {
+    key: string
+    label: string | null
+    field: string
+}
+
+/** A parameter as a `template` reference node snapshots it in `config.parameters`. */
+export interface TemplateParameter extends TemplateParameterDeclaration {
+    node_type: string
+    node_version: number
+}
+
+/** A parameter as the builder payload offers it; `default` is the template's current value (display only). */
+export interface AvailableTemplateParameter extends TemplateParameter {
+    default?: unknown
+}
+
 export interface AvailableTemplate {
     id: string
     name: string
     version: number
     outputs: TemplateOutput[]
+    parameters?: AvailableTemplateParameter[]
 }
 
 export interface BuilderFlowPayload {

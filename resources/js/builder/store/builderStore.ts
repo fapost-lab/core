@@ -13,6 +13,7 @@ import {useRegistryStore} from '@builder/store/registryStore'
 import type {
   ActiveTab,
   AvailableTemplate,
+  TemplateParameterDeclaration,
   FlowKind,
   BuilderFlowPayload,
   BuilderTriggerPayload,
@@ -1008,11 +1009,32 @@ export const useBuilderStore = defineStore('builder', () => {
 
         snapshot()
         const patch = templateSelectionPatch(template)
+        const previousId = node.config?.template_flow_id
         node.config = {...(node.config ?? {}), ...patch}
+        // Values belong to the previous template's parameters; the same template keeps them.
+        if (previousId !== templateId) {
+            delete node.config.parameter_values
+        }
 
         const dropped = new Set(edgesToDropAfterReselect(definition.value.edges, nodeId, patch.outputs).map((e) => e.id))
         if (dropped.size > 0) {
             definition.value.edges = definition.value.edges.filter((e) => !dropped.has(e.id))
+        }
+    }
+
+    /**
+     * Replace the template-parameter declarations of a node of a template draft.
+     * The node-level `parameters` key is removed when the list is empty.
+     */
+    function setNodeParameters(nodeId: string, parameters: TemplateParameterDeclaration[]) {
+        const node = definition.value.nodes.find((n) => n.id === nodeId)
+        if (!node) return
+
+        snapshot()
+        if (parameters.length === 0) {
+            delete node.parameters
+        } else {
+            node.parameters = parameters.map((p) => ({key: p.key, label: p.label ?? null, field: p.field}))
         }
     }
 
@@ -1153,6 +1175,7 @@ export const useBuilderStore = defineStore('builder', () => {
         redo,
         updateNodeConfig,
         selectTemplate,
+        setNodeParameters,
         insertNode,
         ensureBranchEnd,
         deleteNode,
