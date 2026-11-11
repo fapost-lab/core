@@ -14,6 +14,7 @@ use App\Domains\Flow\Models\FlowLog;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\FlowLogInspector;
 use App\Domains\Flow\Services\FlowSessionInspector;
+use App\Domains\Flow\Templates\TemplateNodeOrigins;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use Carbon\CarbonImmutable;
@@ -36,6 +37,7 @@ final class FlowLogController extends Controller
         private readonly FlowLogInspector $logs,
         private readonly CurrentAssistantInterface $assistant,
         private readonly FlowActivityWatchers $watchers,
+        private readonly TemplateNodeOrigins $origins,
     ) {
     }
 
@@ -71,6 +73,7 @@ final class FlowLogController extends Controller
                     'status'         => $log->status,
                     'nodeType'       => $log->node_type,
                     'nodeId'         => $log->node_id,
+                    'nodeOrigin'     => $this->origins->describeForSession((string) $log->session_id, $log->node_id),
                     'sourceHandle'   => '' === (string) $log->source_handle ? null : (string) $log->source_handle,
                     'hasError'       => is_array($log->error) && [] !== $log->error,
                     'sessionId'      => (string) $log->session_id,
@@ -106,6 +109,7 @@ final class FlowLogController extends Controller
                 'status'       => $log->status,
                 'sessionId'    => (string) $log->session_id,
                 'nodeId'       => $log->node_id,
+                'nodeOrigin'   => $this->origins->describeForSession((string) $log->session_id, $log->node_id),
                 'nodeType'     => $log->node_type,
                 'nodeVersion'  => $log->node_version,
                 'sourceHandle' => '' === (string) $log->source_handle ? null : (string) $log->source_handle,

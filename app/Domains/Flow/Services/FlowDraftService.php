@@ -7,12 +7,16 @@ namespace App\Domains\Flow\Services;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Flow\Actions\CreateFlowAction;
 use App\Domains\Flow\DTOs\FlowLimitStatus;
+use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowHasLiveSessionsException;
+use App\Domains\Flow\Exceptions\FlowTemplateInUseException;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Flow\Models\FlowSession;
+use App\Domains\Flow\Templates\TemplateUsageFinder;
+use App\Domains\Flow\Templates\TemplateUsageRepository;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
 use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
@@ -50,18 +54,21 @@ final readonly class FlowDraftService
         private CurrentAssistantInterface $assistant,
         private RecordQuotaInterface $recordQuota,
         private CreateFlowAction $createFlow,
+        private TemplateUsageFinder $templateUsages,
+        private TemplateUsageRepository $templateIndex,
     ) {
     }
 
     /**
-     * The flows of the current assistant for the list: with their trigger and group, the highest active published
+     * The flows (or the templates) of the current assistant for the list: with their trigger and group, the highest active published
      * version (`published_version`) and the group's name (`group_name`, to sort by).
      *
      * @return Builder<FlowDraft>
      */
-    public function query(): Builder
+    public function query(FlowKind $kind = FlowKind::Flow): Builder
     {
         return $this->scoped()
+            ->where('flow_drafts.kind', $kind->value)
             ->with('trigger')
             ->addSelect([
                 'published_version' => FlowDefinition::query()
@@ -75,15 +82,15 @@ final readonly class FlowDraftService
     }
 
     /**
-     * @throws ModelNotFoundException when the id is not a flow of the current assistant
+     * @throws ModelNotFoundException when the id is not a flow (or, for `Template`, a template) of the current assistant
      */
-    public function findForAssistant(string $id): FlowDraft
+    public function findForAssistant(string $id, FlowKind $kind = FlowKind::Flow): FlowDraft
     {
         if (! Str::isUuid($id)) {
             throw (new ModelNotFoundException())->setModel(FlowDraft::class, [$id]);
         }
 
-        return $this->scoped()->with('assistant')->whereKey($id)->firstOrFail();
+        return $this->scoped()->where('flow_drafts.kind', $kind->value)->with('assistant')->whereKey($id)->firstOrFail();
     }
 
     /**
@@ -163,16 +170,18 @@ final readonly class FlowDraftService
     }
 
     /**
-     * Creates a flow seeded with an `end` node, for the current assistant.
+     * Creates a flow seeded with an `end` node (or a template seeded with one output), for the current assistant.
+     * Templates count under the same flow limit.
      *
      * @param  array{name: string, flow_group_id?: string|null, description?: string|null, is_public?: bool, logging_enabled?: bool}  $data
      *
      * @throws RecordLimitReachedException when the tenant is at its flow limit
      */
-    public function create(array $data): FlowDraft
+    public function create(array $data, FlowKind $kind = FlowKind::Flow): FlowDraft
     {
         return $this->createFlow->execute([
             ...$data,
+            'kind'         => $kind,
             'assistant_id' => (string) $this->assistant->get()->getKey(),
         ]);
     }
@@ -221,27 +230,36 @@ final readonly class FlowDraftService
 
     /**
      * Deletes the draft only; its published versions, triggers and finished sessions stay, as they did in Filament.
+     * A deleted flow no longer counts as a user of the templates it carries, so they can be deleted and are not
+     * republished into it.
      *
      * @throws FlowHasLiveSessionsException when a session of the flow is still going
+     * @throws FlowTemplateInUseException when the flow is a template placed in another flow (published or draft)
      */
     public function delete(FlowDraft $flow): void
     {
+        if ($flow->isTemplate() && $this->templateUsages->isUsed($flow)) {
+            throw new FlowTemplateInUseException($flow->flow_id);
+        }
+
         if ($this->hasLiveSessions($flow)) {
             throw new FlowHasLiveSessionsException($flow->flow_id);
         }
 
         $flow->delete();
+
+        $this->templateIndex->forgetHost($flow->flow_id);
     }
 
     /**
-     * Deletes the listed flows of the current assistant one by one, with the guard of {@see delete()}: a flow with
-     * live sessions is skipped and counted, not deleted. Other ids are ignored.
+     * Deletes the listed flows (or templates) of the current assistant one by one, with the guards of {@see delete()}:
+     * a flow with live sessions or a template in use is skipped and counted, not deleted. Other ids are ignored.
      *
      * @param  list<string>  $ids
      *
      * @return array{deleted: int, blocked: int}
      */
-    public function deleteMany(array $ids): array
+    public function deleteMany(array $ids, FlowKind $kind = FlowKind::Flow): array
     {
         $ids    = array_values(array_filter($ids, static fn (string $id): bool => Str::isUuid($id)));
         $result = ['deleted' => 0, 'blocked' => 0];
@@ -250,11 +268,11 @@ final readonly class FlowDraftService
             return $result;
         }
 
-        foreach ($this->scoped()->whereKey($ids)->get() as $flow) {
+        foreach ($this->scoped()->where('flow_drafts.kind', $kind->value)->whereKey($ids)->get() as $flow) {
             try {
                 $this->delete($flow);
                 ++$result['deleted'];
-            } catch (FlowHasLiveSessionsException) {
+            } catch (FlowHasLiveSessionsException|FlowTemplateInUseException) {
                 ++$result['blocked'];
             }
         }

@@ -7,11 +7,13 @@ namespace App\Domains\Flow\Services;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Enums\FlowActivityPeriod;
+use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
+use App\Domains\Flow\Templates\TemplateNodeOrigins;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use BackedEnum;
 use Carbon\CarbonImmutable;
@@ -38,6 +40,7 @@ final readonly class FlowSessionInspector
 
     public function __construct(
         private TenantContextInterface $tenants,
+        private TemplateNodeOrigins $origins,
     ) {
     }
 
@@ -204,7 +207,7 @@ final readonly class FlowSessionInspector
     /**
      * The newest {@see self::HISTORY_LIMIT} audit rows of a session.
      *
-     * @return list<array{id: string, createdAt: string|null, nodeId: string, event: string, path: string|null, payload: string|null}>
+     * @return list<array{id: string, createdAt: string|null, nodeId: string, nodeOrigin: array{template: string, version: int, nodeId: string, nodeType: string}|null, event: string, path: string|null, payload: string|null}>
      */
     public function history(FlowSession $session): array
     {
@@ -215,12 +218,13 @@ final readonly class FlowSessionInspector
             ->limit(self::HISTORY_LIMIT)
             ->get()
             ->map(fn (FlowSessionHistoryEntry $entry): array => [
-                'id'        => (string) $entry->getKey(),
-                'createdAt' => $entry->created_at?->toIso8601String(),
-                'nodeId'    => (string) $entry->node_id,
-                'event'     => $entry->event_type instanceof BackedEnum ? (string) $entry->event_type->value : (string) $entry->event_type,
-                'path'      => null === $entry->path || '' === $entry->path ? null : (string) $entry->path,
-                'payload'   => $this->payload($entry),
+                'id'         => (string) $entry->getKey(),
+                'createdAt'  => $entry->created_at?->toIso8601String(),
+                'nodeId'     => (string) $entry->node_id,
+                'nodeOrigin' => $this->origins->describe((string) $session->flow_definition_id, (string) $entry->node_id),
+                'event'      => $entry->event_type instanceof BackedEnum ? (string) $entry->event_type->value : (string) $entry->event_type,
+                'path'       => null === $entry->path || '' === $entry->path ? null : (string) $entry->path,
+                'payload'    => $this->payload($entry),
             ])
             ->values()
             ->all();
@@ -283,6 +287,7 @@ final readonly class FlowSessionInspector
     private function flows(Assistant $assistant): Builder
     {
         return FlowDraft::query()
+            ->where('kind', FlowKind::Flow->value)
             ->where('tenant_id', $this->tenantId())
             ->where('assistant_id', (string) $assistant->getKey());
     }

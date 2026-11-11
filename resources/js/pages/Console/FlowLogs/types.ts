@@ -1,9 +1,11 @@
 import type { ShellPageProps } from '@console/shell'
+import type { TemplateNodeOrigin } from '../FlowSessions/templateNode'
 import type { ActivityPeriod, KeyValue, LiveTranslations, Tone } from '../FlowSessions/types'
 
 export type FlowLogStatus = 'executed' | 'failed' | 'conflict' | 'terminal'
 
 export interface FlowLogsTranslations {
+  template_node: string
   title: string
   description: string
   search_label: string
@@ -46,6 +48,7 @@ export interface FlowLogRow extends Record<string, unknown> {
   status: FlowLogStatus
   nodeType: string
   nodeId: string
+  nodeOrigin: TemplateNodeOrigin | null
   sourceHandle: string | null
   hasError: boolean
   sessionId: string
@@ -60,6 +63,7 @@ export interface FlowLogDetails {
   status: FlowLogStatus
   sessionId: string
   nodeId: string
+  nodeOrigin: TemplateNodeOrigin | null
   nodeType: string
   nodeVersion: number
   sourceHandle: string | null

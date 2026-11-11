@@ -364,6 +364,51 @@ return [
         'delete_many_blocked' => 'Flows deleted: :deleted. Skipped because they have active sessions: :blocked.',
     ],
 
+    'flow_templates' => [
+        'navigation'      => 'Templates',
+        'title'           => 'Flow templates',
+        'description'     => 'Reusable parts of a conversation. Build a template in the builder once and place it in any flow as one step.',
+        'new'             => 'New template',
+        'create_title'    => 'New template',
+        'create_and_open' => 'Create and open builder',
+        'columns'         => [
+            'name'    => 'Name',
+            'version' => 'Version',
+            'used_by' => 'Used in flows',
+        ],
+        'sections' => [
+            'general' => [
+                'title'       => 'General',
+                'description' => 'The name and the description of the template.',
+            ],
+        ],
+        'fields' => [
+            'name'        => 'Name',
+            'description' => 'Description',
+        ],
+        'search_label'    => 'Search templates',
+        'empty'           => 'No templates yet.',
+        'empty_hint'      => 'Create a template to reuse a part of a conversation in several flows.',
+        'no_version'      => 'Not published',
+        'not_used'        => 'Not used',
+        'builder'         => 'Builder',
+        'builder_named'   => 'Open the builder for :name',
+        'actions_for'     => 'Actions for :name',
+        'delete_selected' => 'Delete selected',
+        'delete_one'      => [
+            'title'       => 'Delete this template?',
+            'description' => 'The template ":name" will be deleted. A template that a flow uses cannot be deleted.',
+        ],
+        'delete_many' => [
+            'title'       => 'Delete the selected templates?',
+            'description' => 'Templates to delete: :count. A template that a flow uses is skipped.',
+        ],
+        'deleted'             => 'Template deleted.',
+        'deleted_many'        => 'Templates deleted: :count.',
+        'delete_blocked'      => 'Cannot delete: a flow uses this template. Remove it from the flow first.',
+        'delete_many_blocked' => 'Templates deleted: :deleted. Skipped because flows use them: :blocked.',
+    ],
+
     'channels' => [
         'title'        => 'Channels',
         'description'  => 'Where this assistant talks to people: messenger bots and their webhooks.',
@@ -670,10 +715,11 @@ return [
     ],
 
     'flow_sessions' => [
-        'title'        => 'Flow sessions',
-        'description'  => 'Runs of this assistant\'s flows: live ones by default, every one on request.',
-        'search_label' => 'Search by channel user ID',
-        'columns'      => [
+        'template_node' => 'Template «:template» v:version → :type :node',
+        'title'         => 'Flow sessions',
+        'description'   => 'Runs of this assistant\'s flows: live ones by default, every one on request.',
+        'search_label'  => 'Search by channel user ID',
+        'columns'       => [
             'id'           => 'Session',
             'status'       => 'Status',
             'end_status'   => 'Outcome',
@@ -750,10 +796,11 @@ return [
     ],
 
     'flow_logs' => [
-        'title'        => 'Flow log',
-        'description'  => 'One entry per executed node. Entries are kept for 30 days.',
-        'search_label' => 'Search by node ID',
-        'columns'      => [
+        'template_node' => 'Template «:template» v:version → :type :node',
+        'title'         => 'Flow log',
+        'description'   => 'One entry per executed node. Entries are kept for 30 days.',
+        'search_label'  => 'Search by node ID',
+        'columns'       => [
             'created_at'    => 'Time',
             'status'        => 'Status',
             'node_type'     => 'Node type',

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Models;
 
+use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Models\Builders\FlowDefinitionBuilder;
 use Fapost\Support\Concerns\HasUlidPrimaryKey;
 use Fapost\Support\Models\BaseModel;
@@ -13,6 +14,9 @@ use Fapost\Support\Models\BaseModel;
  * @property string $tenant_id
  * @property string $flow_id
  * @property int    $version
+ * @property FlowKind $kind
+ * @property string|null $republished_by_template_flow_id  Set when publishing this template republished the flow
+ * @property int|null    $republished_by_template_version  The template version that republished it
  * @property string $name
  * @property array<int, array<string, mixed>> $nodes
  * @property array<int, array<string, mixed>> $edges
@@ -21,6 +25,7 @@ use Fapost\Support\Models\BaseModel;
  * @property bool   $logging_enabled    Opt-in audit trail into flow_session_history
  * @property \Illuminate\Support\Carbon|null $published_at
  * @method static FlowDefinitionBuilder<static>|FlowDefinition active()
+ * @method static FlowDefinitionBuilder<static>|FlowDefinition runnable()
  * @method static FlowDefinitionBuilder<static>|FlowDefinition newModelQuery()
  * @method static FlowDefinitionBuilder<static>|FlowDefinition newQuery()
  * @method static FlowDefinitionBuilder<static>|FlowDefinition query()
@@ -52,6 +57,7 @@ final class FlowDefinition extends BaseModel
         'tenant_id',
         'flow_id',
         'version',
+        'kind',
         'name',
         'nodes',
         'edges',
@@ -60,6 +66,15 @@ final class FlowDefinition extends BaseModel
         'expression_engine',
         'logging_enabled',
         'published_at',
+        'republished_by_template_flow_id',
+        'republished_by_template_version',
+    ];
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'kind' => 'flow',
     ];
 
     /**
@@ -68,12 +83,14 @@ final class FlowDefinition extends BaseModel
     protected function casts(): array
     {
         return [
-            'nodes'           => 'array',
-            'edges'           => 'array',
-            'is_active'       => 'boolean',
-            'is_public'       => 'boolean',
-            'logging_enabled' => 'boolean',
-            'published_at'    => 'datetime',
+            'nodes'                           => 'array',
+            'edges'                           => 'array',
+            'kind'                            => FlowKind::class,
+            'is_active'                       => 'boolean',
+            'is_public'                       => 'boolean',
+            'logging_enabled'                 => 'boolean',
+            'published_at'                    => 'datetime',
+            'republished_by_template_version' => 'integer',
         ];
     }
 }

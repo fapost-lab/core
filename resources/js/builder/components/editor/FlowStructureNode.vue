@@ -6,6 +6,7 @@ import {nodeColors} from '@builder/utils/nodeColors'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 import {useTranslations} from '@builder/composables/useTranslations'
 import {branchRuleLabel} from '@builder/utils/branchLabel'
+import {nodeHandles} from '@builder/utils/nodeHandles'
 
 interface FlowNodeMeta {
     id: string
@@ -40,6 +41,11 @@ const isBranching = computed((): boolean => ['branch', 'condition'].includes(pro
  */
 const branchHandles = computed((): string[] => {
     const wired = handles.value.filter((h: string) => h !== 'default')
+    // A template reference lists every output of its template, wired or not.
+    if (props.treeNode.node.type === 'template') {
+        const outputs = nodeHandles(props.treeNode.node).map((h) => h.handle)
+        return [...outputs, ...wired.filter((h: string) => !outputs.includes(h))]
+    }
     if (!isBranching.value) {
         return wired
     }
@@ -135,6 +141,9 @@ function resolveHandleLabel(handle: string): string {
     }
     if (props.treeNode.node.type === 'loop' && handle === 'loop') {
         return 'Loop body'
+    }
+    if (props.treeNode.node.type === 'template') {
+        return nodeHandles(props.treeNode.node).find((h) => h.handle === handle)?.label ?? handle
     }
     // Branch/condition rule handles are generated ids — show the rule's label.
     if (props.treeNode.node.type === 'branch' || props.treeNode.node.type === 'condition') {

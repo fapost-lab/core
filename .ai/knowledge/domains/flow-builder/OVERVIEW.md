@@ -21,7 +21,9 @@ paths:
   - app/Http/Requests/SaveDraftRequest.php
   - app/Http/Requests/ValidateFlowRequest.php
   - app/Http/Requests/CallTestRequest.php
-reviewed_at: 2026-10-14
+  - app/Http/Controllers/Console/FlowTemplateController.php
+  - "resources/js/pages/Console/FlowTemplates/**"
+reviewed_at: 2026-11-11
 ---
 # Flow builder
 
@@ -55,6 +57,14 @@ The Telegram mini app (`resources/js/tma`) is a separate surface and not part of
   `api/builderApi.ts`, autosave `useAutoSave`.
 - Config UI: `components/editor/ConfigPanel.vue` (the override map) and `SchemaFields.vue`
   (`FIELD_COMPONENTS`).
+- Flow templates: the same editor opens a template (`kind = template`): the palette offers
+  "Template output" instead of "Template", there is no trigger, and the header lists where the
+  template is used and warns before a publish that republishes those flows. In a flow, the
+  `template` node's handles come from the snapshot `config.outputs`, refreshed from
+  `availableTemplates` on load (`utils/templateNodes.ts`). Publish expands it
+  (`adr-20261111-flow-templates-expanded-at-publish`); the validate endpoint also runs the
+  template checks (`TemplateExpander::draftErrors`). The console lists templates under
+  `console.flow-templates.*` (`FlowTemplateController`).
 - Variable vocabulary: `StorageRadio.vue` shows staff "Profile" or "Temporary", but
   `StatePathPicker.vue` and the expression placeholders still show `flow.*` / `contact.*` paths and
   namespace names.

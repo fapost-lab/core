@@ -8,12 +8,14 @@ import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 import {useMoveNode} from '@builder/composables/useMoveNode'
 import {useDeleteNode} from '@builder/composables/useDeleteNode'
 import NodeIcon from '@builder/components/NodeIcon.vue'
+import {useTranslations} from '@builder/composables/useTranslations'
 
 const props = defineProps({
     treeNode: { type: Object, required: true },
     index:    { type: Number, default: null },
 })
 
+const {t} = useTranslations()
 const selectionStore = useSelectionStore()
 const registryStore  = useRegistryStore()
 const builderStore   = useBuilderStore()
@@ -105,6 +107,15 @@ const summaryRows = computed(() => {
 
     if (type === 'loop_end') {
         return [{ key: '↻', val: 'back to loop', muted: true }]
+    }
+
+    if (type === 'template_output') {
+        const label = typeof config.label === 'string' ? config.label.trim() : ''
+        const name  = typeof config.name === 'string' ? config.name.trim() : ''
+        if (name === '') return [{ key: t('nodes.template_output.name'), val: t('nodes.template_output.unnamed'), muted: true }]
+        const rows = [{ key: t('nodes.template_output.name'), val: name, mono: true }]
+        if (label !== '') rows.push({ key: t('nodes.template_output.label'), val: label, mono: false })
+        return rows
     }
 
     if (type === 'condition') {

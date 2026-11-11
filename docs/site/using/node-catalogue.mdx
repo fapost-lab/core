@@ -3,7 +3,7 @@ title: "Node catalogue"
 description: "Every block you can put in a flow, and what it does."
 ---
 
-Fifteen blocks, grouped the way the builder's palette groups them. Each does one
+Seventeen blocks, grouped the way the builder's palette groups them. Each does one
 thing and reports an outcome; the flow decides what follows.
 
 For the technical contract behind each — its type, version and configuration
@@ -154,6 +154,27 @@ Runs another flow, and **pauses this one until it finishes**.
 This is how a piece of conversation gets reused — an address collection, an
 identity check — without copying it into every flow that needs it. The parent
 resumes with whatever the child produced.
+
+### Template
+
+Places a [flow template](/using/flow-templates) in the flow as a single block.
+
+Pick a published template of the same assistant. The block has one connection per
+output the template defines, so the flow continues from whichever exit the template
+reports. An output with nothing connected ends the session there. The template's
+inner blocks are not shown in the flow; **Open template** opens it for editing.
+
+The template runs in the same session as the flow and shares its variables.
+
+### Template output
+
+A named exit of a [flow template](/using/flow-templates). It exists only inside a
+template and is not offered in ordinary flows.
+
+Give it a name — lowercase latin letters, digits and `_`, starting with a letter —
+and a label. The name becomes a connection on the **Template** block wherever the
+template is placed; several outputs with the same name are one exit. It ends a branch
+of the template, so it has no connections of its own.
 
 ### Emit event
 

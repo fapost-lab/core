@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Factories;
 
+use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Models\FlowDraft;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -27,6 +28,11 @@ final class FlowDraftFactory extends Factory
             'name'          => 'Draft flow',
             'nodes'         => [],
         ];
+    }
+
+    public function template(): self
+    {
+        return $this->state(fn (): array => ['kind' => FlowKind::Template, 'name' => 'Draft template']);
     }
 
     public function withUnconnectedOutput(): self

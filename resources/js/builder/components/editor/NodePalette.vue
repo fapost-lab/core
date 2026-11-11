@@ -5,6 +5,7 @@ import {useRegistryStore} from '@builder/store/registryStore'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {nodeColors} from '@builder/utils/nodeColors'
+import {paletteNodeTypes} from '@builder/utils/templateNodes'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 
 const props = defineProps({
@@ -30,7 +31,8 @@ const paletteStyle   = ref<CSSProperties>({
 
 // Auto-managed types (palette === false) are registered for rendering/config
 // lookup but never inserted by hand — exclude them from the palette.
-const insertableNodeTypes = computed(() => registryStore.nodeTypes.filter((n) => n.palette !== false))
+// Template nodes are kind-specific: `template` only in a flow, `template_output` only in a template.
+const insertableNodeTypes = computed(() => paletteNodeTypes(registryStore.nodeTypes, builderStore.kind))
 
 const filteredNodeTypes = computed(() => {
     const query = searchQuery.value.trim().toLowerCase()

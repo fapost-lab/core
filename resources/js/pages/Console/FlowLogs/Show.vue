@@ -13,6 +13,7 @@ import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@fapost/ui/components/card'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import CopyButton from '../Contacts/CopyButton.vue'
+import { templateNodeLabel } from '../FlowSessions/templateNode'
 import { LOG_STATUS_TONES, type FlowLogDetails, type FlowLogsPageProps, type KeyValue } from './types'
 
 const props = defineProps<{
@@ -84,6 +85,7 @@ const sections = computed(() =>
           <div class="flex min-w-0 flex-col gap-1">
             <dt class="text-muted-foreground text-sm">{{ t.view.node_id }}</dt>
             <dd class="truncate font-mono text-sm">{{ log.nodeId }}</dd>
+            <dd v-if="log.nodeOrigin" class="text-muted-foreground truncate text-xs">{{ templateNodeLabel(t.template_node, log.nodeOrigin) }}</dd>
           </div>
           <div class="flex flex-col gap-1">
             <dt class="text-muted-foreground text-sm">{{ t.view.node_type }}</dt>

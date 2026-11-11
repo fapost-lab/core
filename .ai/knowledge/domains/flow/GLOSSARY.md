@@ -16,7 +16,7 @@ paths:
   - "tests/*/Domains/Flow/**"
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
-reviewed_at: 2026-10-05
+reviewed_at: 2026-11-11
 ---
 # Flow glossary
 
@@ -82,6 +82,18 @@ What starts a flow: `message`, `schedule`, `webhook`, `api`, `event`.
 A child session started by a subflow node. The parent waits in `paused_subflow`; the child
 reports an `end_status` of `success`, `cancelled` or `failed`. The call graph is limited to
 depth 3.
+
+## Flow template
+
+A flow draft with `kind = template`: a piece of a dialogue placed in flows as one `template` node and
+copied into each of them when they are published; its named exits are `template_output` nodes. It
+never runs on its own. Not the same as the `template` expression engine (below), and not a subflow,
+which runs as a separate child session.
+
+## Template copy
+
+The nodes a published host carries for one `template` node, each with an `origin` naming the
+reference node, the template and its version.
 
 ## Persistent button
 

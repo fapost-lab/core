@@ -14,6 +14,16 @@ final class FlowDefinitionRepository implements FlowDefinitionRepositoryInterfac
         return FlowDefinition::query()
             ->where('flow_id', $flowId)
             ->active()
+            ->runnable()
+            ->orderByDesc('version')
+            ->first();
+    }
+
+    public function findLatestPublishedByFlowId(string $flowId): ?FlowDefinition
+    {
+        return FlowDefinition::query()
+            ->where('flow_id', $flowId)
+            ->active()
             ->orderByDesc('version')
             ->first();
     }

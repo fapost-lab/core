@@ -7,6 +7,7 @@
 
 import {useTranslations} from '@builder/composables/useTranslations'
 import {branchRuleLabel} from '@builder/utils/branchLabel'
+import {readTemplateOutputs, templateOutputLabel} from '@builder/utils/templateNodes'
 
 export interface NodeHandle {
   handle: string
@@ -31,6 +32,16 @@ export function nodeHandles(node: FlowNodeLike): NodeHandle[] {
 
   if (node.type === 'end') {
     return []
+  }
+
+  // A template's reference node branches on the outputs of the template it
+  // embeds (snapshot in config.outputs); an output node closes the template.
+  if (node.type === 'template_output') {
+    return []
+  }
+
+  if (node.type === 'template') {
+    return readTemplateOutputs(node.config).map((o) => ({handle: o.name, label: templateOutputLabel(o)}))
   }
 
   if (node.type === 'input') {

@@ -13,6 +13,7 @@ use App\Domains\Flow\Live\FlowActivityWatchers;
 use App\Domains\Flow\Models\FlowLog;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\FlowSessionInspector;
+use App\Domains\Flow\Templates\TemplateNodeOrigins;
 use App\Http\Controllers\Controller;
 use App\Http\DataTable\DataTable;
 use Carbon\CarbonImmutable;
@@ -35,6 +36,7 @@ final class FlowSessionController extends Controller
         private readonly FlowSessionInspector $sessions,
         private readonly CurrentAssistantInterface $assistant,
         private readonly FlowActivityWatchers $watchers,
+        private readonly TemplateNodeOrigins $origins,
     ) {
     }
 
@@ -69,6 +71,7 @@ final class FlowSessionController extends Controller
                     'contactExternalId' => $this->text($session->getAttribute('contact_external_id')),
                     'flowName'          => $this->text($session->flowDefinition?->name),
                     'currentNodeId'     => $this->text($session->current_node_id),
+                    'currentNodeOrigin' => $this->origins->describe($this->text($session->flow_definition_id), $this->text($session->current_node_id)),
                     'updatedAt'         => $session->updated_at?->toIso8601String(),
                     'viewUrl'           => $this->url('flow-sessions.show', $assistant, ['record' => $session->getKey()]),
                 ],
@@ -101,6 +104,7 @@ final class FlowSessionController extends Controller
                 'status'             => $session->status->value,
                 'endStatus'          => $this->text($session->getAttribute('end_status')),
                 'currentNodeId'      => $this->text($session->current_node_id),
+                'currentNodeOrigin'  => $this->origins->describe($this->text($session->flow_definition_id), $this->text($session->current_node_id)),
                 'version'            => (int) $session->version,
                 'flowName'           => $this->text($session->flowDefinition?->name),
                 'flowVersion'        => (int) $session->flow_version,

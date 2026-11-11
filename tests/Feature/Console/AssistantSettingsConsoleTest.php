@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
@@ -243,6 +244,27 @@ final class AssistantSettingsConsoleTest extends FeatureTestCase
         $this->put($this->url(), $this->payload(['commands' => $startCommand($foreign->flow_id)]))->assertSessionHasErrors('commands.0.flow_id');
         $this->put($this->url(), $this->payload(['settings' => [['key' => 'a', 'value' => '1'], ['key' => 'a', 'value' => '2']]]))->assertSessionHasErrors('settings.1.key');
 
+        $this->assertSame([], $this->assistant->fresh()?->commands ?? []);
+    }
+
+    public function test_a_template_is_not_offered_and_not_accepted_as_a_flow_to_start(): void
+    {
+        $flow     = $this->flow('Welcome');
+        $template = $this->flow('Shared part', ['kind' => FlowKind::Template]);
+
+        $this->actingAs($this->admin());
+
+        $this->get($this->url())
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('options.flows', [['value' => $flow->flow_id, 'label' => 'Welcome', 'active' => true]])
+                ->etc());
+
+        $this->put($this->url(), $this->payload(['default_flow_id' => $template->flow_id]))->assertSessionHasErrors('default_flow_id');
+        $this->put($this->url(), $this->payload(['commands' => [['command' => 'go', 'type' => 'start_flow', 'flow_id' => $template->flow_id]]]))
+            ->assertSessionHasErrors('commands.0.flow_id');
+
+        $this->assertNull($this->assistant->fresh()?->default_flow_id);
         $this->assertSame([], $this->assistant->fresh()?->commands ?? []);
     }
 
