@@ -1,4 +1,5 @@
 import { interpolate } from '@console/shell'
+import type { MeterTone } from '@fapost/ui/components/meter'
 import type { UsageKind, UsageRowData, UsageState, UsageTranslations } from './types'
 
 const KIND_ORDER: UsageKind[] = ['records', 'per_period', 'bytes']
@@ -20,9 +21,8 @@ export function hasBar(row: UsageRowData): boolean {
   return row.limit !== null && row.used !== null && (row.state === 'ok' || row.state === 'near' || row.state === 'reached')
 }
 
-export type BarTone = 'primary' | 'warning' | 'danger'
-
-export function barTone(state: UsageState): BarTone {
+/** The tone of a row's meter: the brand colour while there is room, warning when nearly used up, danger at the limit. */
+export function barTone(state: UsageState): MeterTone {
   if (state === 'reached') {
     return 'danger'
   }
