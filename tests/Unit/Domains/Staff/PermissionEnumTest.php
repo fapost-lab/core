@@ -31,6 +31,7 @@ final class PermissionEnumTest extends TestCase
                 'publish_flow',
                 'reply_conversations',
                 'rotate_channel_token',
+                'view_activity_log',
                 'view_conversations',
                 'view_operator_screens',
             ],

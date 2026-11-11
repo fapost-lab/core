@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Enums\ChannelWebhookStatus;
@@ -24,6 +25,7 @@ use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Assistants in the admin panel, served by the console shell in its admin mode: who sees which assistant, the
@@ -32,6 +34,7 @@ use Tests\Feature\FeatureTestCase;
  */
 final class AdminAssistantsConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
     use SetsRecordLimits;
 
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
@@ -524,6 +527,37 @@ final class AdminAssistantsConsoleTest extends FeatureTestCase
         $this->put($this->panelUrl($base), ['is_active' => false])->assertNotFound();
 
         $this->assertModelExists($channel);
+    }
+
+    public function test_creating_changing_and_deleting_an_assistant_are_each_one_audit_entry(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin);
+
+        $this->post($this->url(), $this->payload(['name' => 'Audited Bot', 'default_language' => 'en']))->assertRedirect();
+        $assistant = Assistant::query()->where('name', 'Audited Bot')->sole();
+        $id        = (string) $assistant->getKey();
+
+        $this->put($this->url("/{$id}"), $this->payload(['name' => 'Renamed Bot', 'default_language' => 'en']))->assertRedirect();
+        // Nothing changed: nothing recorded.
+        $this->put($this->url("/{$id}"), $this->payload(['name' => 'Renamed Bot', 'default_language' => 'en']))->assertRedirect();
+        $this->delete($this->url("/{$id}"))->assertRedirect();
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(['assistant.created', 'assistant.updated', 'assistant.deleted'], $entries->pluck('description')->all());
+        $this->assertTrue($entries->every(fn (ActivityEntry $entry): bool => 'assistants' === $entry->log_name
+            && $id === $entry->subject_id
+            && $id === $entry->assistant_id
+            && (string) $admin->getKey() === $entry->causer_id));
+        $this->assertSameJson(
+            ['name' => 'Audited Bot', 'default_language' => 'en', 'is_active' => true],
+            $entries[0]->attribute_changes?->toArray()['attributes'],
+        );
+        $this->assertSameJson(
+            ['attributes' => ['name' => 'Renamed Bot'], 'old' => ['name' => 'Audited Bot']],
+            $entries[1]->attribute_changes?->toArray(),
+        );
     }
 
     public function test_a_visitor_is_sent_to_the_sign_in(): void

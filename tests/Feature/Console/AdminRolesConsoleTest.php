@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Console;
 
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\Role;
@@ -14,6 +15,7 @@ use Database\Seeders\TenantAclSeeder;
 use Inertia\Testing\AssertableInertia;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Staff roles in the admin panel, served by the console shell in its admin mode: only an administrator with
@@ -22,6 +24,8 @@ use Tests\Feature\FeatureTestCase;
  */
 final class AdminRolesConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -180,6 +184,45 @@ final class AdminRolesConsoleTest extends FeatureTestCase
     /**
      * Grants cached under the current tenant's key, as a request of that tenant would have left them.
      */
+    public function test_every_role_write_is_in_the_audit_log(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin);
+
+        $this->post($this->url(), ['name' => 'support_agent', 'display_name' => 'Support agent', 'permissions' => [Permission::ViewContacts->value, Permission::ViewAnalytics->value]])->assertRedirect();
+        $role = Role::query()->where('name', 'support_agent')->firstOrFail();
+
+        $this->put($this->url("/{$role->getKey()}"), ['name' => 'support_agent', 'display_name' => 'Support agent', 'permissions' => [Permission::ViewAnalytics->value, Permission::ManageContacts->value]])->assertRedirect();
+        // Nothing changed: nothing recorded.
+        $this->put($this->url("/{$role->getKey()}"), ['name' => 'support_agent', 'display_name' => 'Support agent', 'permissions' => [Permission::ManageContacts->value, Permission::ViewAnalytics->value]])->assertRedirect();
+        $this->delete($this->url("/{$role->getKey()}"))->assertRedirect();
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(['role.created', 'role.updated', 'role.deleted'], $entries->pluck('description')->all());
+        $this->assertTrue($entries->every(fn (ActivityEntry $entry): bool => 'staff' === $entry->log_name
+            && (string) $role->getKey() === $entry->subject_id
+            && 'Support agent' === $entry->subject_label
+            && null === $entry->assistant_id
+            && (string) $admin->getKey() === $entry->causer_id));
+
+        $sorted = static function (Permission ...$permissions): array {
+            $names = array_map(static fn (Permission $permission): string => $permission->value, $permissions);
+            sort($names);
+
+            return $names;
+        };
+
+        $this->assertSameJson(
+            ['attributes' => ['name' => 'support_agent', 'display_name' => 'Support agent', 'permissions' => $sorted(Permission::ViewContacts, Permission::ViewAnalytics)]],
+            $entries[0]->attribute_changes?->toArray(),
+        );
+        $this->assertSameJson(
+            ['attributes' => ['permissions' => $sorted(Permission::ViewAnalytics, Permission::ManageContacts)], 'old' => ['permissions' => $sorted(Permission::ViewContacts, Permission::ViewAnalytics)]],
+            $entries[1]->attribute_changes?->toArray(),
+        );
+    }
+
     private function cacheStalePermissions(): void
     {
         $this->app->make(TenantSwitcher::class)->runForTenant(

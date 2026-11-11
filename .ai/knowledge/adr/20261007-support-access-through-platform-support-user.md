@@ -113,3 +113,13 @@ Filament and Livewire were removed from Core (task `remove-filament`). The text 
 its points about Livewire (the 419 answer to an expired support session) and about frozen Filament screens
 are historical. An expired support session now answers an Inertia visit with a location (409), JSON with 401
 and a page with a redirect to the sign-in; the support access log is a console screen.
+
+## Amendment 2026-11-11: linked to the audit log, not absorbed
+
+The audit log arrived (`adr-20261111-audit-log-explicit-recording`). Contrary to the alternative above ("the
+minimal entries table is absorbed by it later"), `support_access_entries` stays a table and a screen of its own: an
+entry is an interval (entered, left, closed by the `Logout` listener or the prune), the audit log holds point
+events, and absorbing it would mean a data migration and rebuilding a working screen with no gain for the tenant.
+Instead every audit entry written while an operator acts carries `actor_kind = support`, the operator's name and
+the `support_entry_id` of their visit, and the activity log screen links to Support access. The support user's own
+sign-in and sign-out are not repeated in the audit log. Decided with the owner at the `activity-log` gate.

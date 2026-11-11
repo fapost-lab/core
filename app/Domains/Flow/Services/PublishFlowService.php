@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
@@ -36,6 +39,7 @@ final readonly class PublishFlowService
         private VariableSchemaRegistryInterface $schemaRegistry,
         private TenantEventRepositoryInterface $tenantEvents,
         private EmittedEventCollector $emittedEvents,
+        private AuditTrailInterface $audit,
         private TemplateExpander $templates,
         private TemplateUsageRepository $templateUsages,
     ) {
@@ -166,6 +170,23 @@ final readonly class PublishFlowService
             eventNames: $this->emittedEvents->collect($nodes),
         );
 
+        // The graph itself is never stored in the trail: the action says a version went live. A republish made by a
+        // template publish names the template version that caused it.
+        $properties = ['version' => $definition->version];
+
+        if (null !== $republishedBy) {
+            $properties['republished_by_template_flow_id'] = $republishedBy->flow_id;
+            $properties['republished_by_template_version'] = $republishedBy->version;
+        }
+
+        $this->audit->record(new AuditRecord(
+            action: AuditAction::FlowPublished,
+            subject: $draft,
+            subjectLabel: (string) $draft->name,
+            assistantId: $draft->assistant_id,
+            properties: $properties,
+        ));
+
         return $definition;
     }
 
@@ -197,6 +218,14 @@ final readonly class PublishFlowService
         $definition = $this->createDefinition($draft, $nodes, $edges, FlowKind::Template);
 
         $this->republishHosts($draft, $definition);
+
+        $this->audit->record(new AuditRecord(
+            action: AuditAction::FlowPublished,
+            subject: $draft,
+            subjectLabel: (string) $draft->name,
+            assistantId: $draft->assistant_id,
+            properties: ['version' => $definition->version],
+        ));
 
         return $definition;
     }

@@ -11,6 +11,7 @@ use App\Domains\Media\Providers\MediaServiceProvider;
 use App\Domains\Messaging\Providers\MessageSenderServiceProvider;
 use App\Domains\Solution\Providers\SolutionServiceProvider;
 use App\Domains\Webhook\Providers\WebhookServiceProvider;
+use App\Infrastructure\Audit\AuditServiceProvider;
 use App\Infrastructure\Onboarding\OnboardingServiceProvider;
 use App\Providers\AppServiceProvider;
 use App\Providers\AssistantServiceProvider;
@@ -34,4 +35,5 @@ return [
     HorizonServiceProvider::class,
     SolutionServiceProvider::class,
     OnboardingServiceProvider::class,
+    AuditServiceProvider::class,
 ];

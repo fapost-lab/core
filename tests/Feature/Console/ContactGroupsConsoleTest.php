@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Contact\Models\ContactGroup;
 use App\Domains\Staff\Enums\Permission;
@@ -14,6 +15,7 @@ use Database\Seeders\TenantAclSeeder;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Contact groups on the Inertia console: the list (search, sort, pages, tenant scope), create, change and delete,
@@ -21,6 +23,8 @@ use Tests\Feature\FeatureTestCase;
  */
 final class ContactGroupsConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
     private const string OTHER_TENANT_ID = '00000000-0000-0000-0000-0000000000ff';
@@ -356,6 +360,43 @@ final class ContactGroupsConsoleTest extends FeatureTestCase
     public function test_a_guest_is_sent_to_the_login(): void
     {
         $this->get($this->listUrl())->assertRedirect(route('console.auth.login'));
+    }
+
+    public function test_every_group_write_is_in_the_audit_log(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin);
+
+        $this->post($this->listUrl(), ['name' => 'VIP', 'description' => 'Best'])->assertRedirect();
+        $vip = ContactGroup::query()->where('name', 'VIP')->sole();
+        $this->put($this->listUrl("/{$vip->getKey()}"), ['name' => 'Gold', 'description' => 'Best'])->assertRedirect();
+        // Nothing changed: nothing recorded.
+        $this->put($this->listUrl("/{$vip->getKey()}"), ['name' => 'Gold', 'description' => 'Best'])->assertRedirect();
+        $this->delete($this->listUrl("/{$vip->getKey()}"))->assertRedirect();
+
+        $one = $this->group('One');
+        $two = $this->group('Two');
+        $this->delete($this->listUrl(), ['ids' => [$one->getKey(), $two->getKey()]])->assertRedirect();
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(
+            ['contact_group.created', 'contact_group.updated', 'contact_group.deleted', 'contact_group.deleted', 'contact_group.deleted'],
+            $entries->pluck('description')->all(),
+        );
+        $this->assertTrue($entries->every(fn (ActivityEntry $entry): bool => 'contacts' === $entry->log_name
+            && null === $entry->assistant_id
+            && (string) $admin->getKey() === $entry->causer_id));
+        $this->assertEqualsCanonicalizing(['VIP', 'Gold', 'Gold', 'One', 'Two'], $entries->pluck('subject_label')->all());
+        $this->assertSameJson(
+            ['attributes' => ['name' => 'Gold'], 'old' => ['name' => 'VIP']],
+            $entries[1]->attribute_changes?->toArray(),
+        );
+        $this->assertSame((string) $vip->getKey(), $entries[0]->subject_id);
+        $this->assertSame(
+            [(string) $one->getKey(), (string) $two->getKey()],
+            $entries->slice(3)->pluck('subject_id')->sort()->values()->all(),
+        );
     }
 
     private function listUrl(string $suffix = ''): string

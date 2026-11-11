@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Services;
 
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Models\Role;
 use App\Domains\Staff\Models\User;
@@ -26,6 +30,7 @@ final class RoleWriterService
      */
     public function __construct(
         private readonly PermissionRegistrar $permissionRegistrar,
+        private readonly AuditTrailInterface $audit,
         private readonly string $guard = 'web',
     ) {
     }
@@ -50,6 +55,18 @@ final class RoleWriterService
                 'is_system'    => false,
             ]);
             $role->syncPermissions($permissions);
+
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::RoleCreated,
+                subject: $role,
+                subjectLabel: $role->display_name ?? $role->name,
+                changes: AuditChanges::created([
+                    'name'         => $role->name,
+                    'display_name' => $role->display_name,
+                    'permissions'  => self::sorted($permissions),
+                ]),
+            ));
+
             $this->forgetPermissionCacheAfterCommit();
 
             return $role;
@@ -94,16 +111,48 @@ final class RoleWriterService
         $this->assertUniqueRoleName($nextName, $guard, $role->getKey());
 
         return DB::transaction(function () use ($role, $data, $permissions, $nextName): Role {
+            $permissionsBefore = self::sorted($role->permissions()->pluck('name')->map(static fn (mixed $name): string => (string) $name)->all());
+
             $role->fill([
                 'name'         => $nextName,
                 'display_name' => $data['display_name'] ?? null,
             ]);
             $role->save();
+            $changes = AuditChanges::ofSavedModel($role, ['name', 'display_name']);
+
             $role->syncPermissions($permissions);
+
+            $changes = $changes->merge(AuditChanges::between(
+                ['permissions' => $permissionsBefore],
+                ['permissions' => self::sorted($permissions)],
+                ['permissions'],
+            ));
+
+            if (! $changes->isEmpty()) {
+                $this->audit->record(new AuditRecord(
+                    action: AuditAction::RoleUpdated,
+                    subject: $role,
+                    subjectLabel: $role->display_name ?? $role->name,
+                    changes: $changes,
+                ));
+            }
+
             $this->forgetPermissionCacheAfterCommit();
 
             return $role->refresh();
         });
+    }
+
+    /**
+     * @param  list<string>  $names
+     *
+     * @return list<string>
+     */
+    private static function sorted(array $names): array
+    {
+        sort($names);
+
+        return array_values($names);
     }
 
     private function forgetPermissionCacheAfterCommit(): void

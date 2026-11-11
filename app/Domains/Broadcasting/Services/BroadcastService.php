@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Broadcasting\Services;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
 use App\Domains\Broadcasting\Enums\BroadcastTarget;
 use App\Domains\Broadcasting\Exceptions\BroadcastAlreadyStartedException;
@@ -45,6 +49,7 @@ final readonly class BroadcastService
         private TenantSettings $settings,
         private BroadcastDispatcher $dispatcher,
         private ContactTagRepositoryInterface $tags,
+        private AuditTrailInterface $audit,
     ) {
     }
 
@@ -88,13 +93,27 @@ final readonly class BroadcastService
      */
     public function create(array $fields, ?string $userId): Broadcast
     {
-        return Broadcast::query()->create([
-            ...$this->canonical($fields),
-            'tenant_id'    => $this->tenants->get()->getId(),
-            'assistant_id' => (string) $this->assistant->get()->getKey(),
-            'created_by'   => $userId,
-            'status'       => BroadcastStatus::Draft->value,
-        ]);
+        return DB::transaction(function () use ($fields, $userId): Broadcast {
+            $broadcast = Broadcast::query()->create([
+                ...$this->canonical($fields),
+                'tenant_id'    => $this->tenants->get()->getId(),
+                'assistant_id' => (string) $this->assistant->get()->getKey(),
+                'created_by'   => $userId,
+                'status'       => BroadcastStatus::Draft->value,
+            ]);
+
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::BroadcastCreated,
+                subject: $broadcast,
+                subjectLabel: $broadcast->name,
+                assistantId: $broadcast->assistant_id,
+                changes: AuditChanges::created(self::auditValues($broadcast))->merge(
+                    null === $broadcast->message ? AuditChanges::none() : AuditChanges::markers(['message']),
+                ),
+            ));
+
+            return $broadcast;
+        });
     }
 
     /**
@@ -111,12 +130,14 @@ final readonly class BroadcastService
         $canonical = $this->canonical($fields);
 
         $updated = DB::transaction(function () use ($broadcast, $canonical): int {
-            if (null === $this->query()->whereKey($broadcast->getKey())->lockForUpdate()->first()) {
+            $before = $this->query()->whereKey($broadcast->getKey())->lockForUpdate()->first();
+
+            if (null === $before) {
                 return 0;
             }
 
             // The query builder does not apply the model's casts, so the JSON columns are encoded here.
-            return $this->query()
+            $rows = $this->query()
                 ->whereKey($broadcast->getKey())
                 ->where('status', BroadcastStatus::Draft->value)
                 ->update([
@@ -126,6 +147,39 @@ final readonly class BroadcastService
                     'target_tags'       => null === $canonical['target_tags'] ? null : json_encode($canonical['target_tags'], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
                     'target_segment_id' => $canonical['target_segment_id'],
                 ]);
+
+            if (1 === $rows) {
+                // jsonb does not keep key order, so the messages are compared with sorted keys.
+                $wasMessage = is_array($before->message) ? $before->message : null;
+                $nowMessage = $canonical['message'];
+
+                if (null !== $wasMessage) {
+                    ksort($wasMessage);
+                }
+
+                if (null !== $nowMessage) {
+                    ksort($nowMessage);
+                }
+
+                $changes = AuditChanges::between(
+                    [...self::auditValues($before), 'message' => $wasMessage],
+                    [...$canonical, 'message' => $nowMessage],
+                    ['name', 'target_type', 'target_tags', 'target_segment_id'],
+                    ['message'],
+                );
+
+                if (! $changes->isEmpty()) {
+                    $this->audit->record(new AuditRecord(
+                        action: AuditAction::BroadcastUpdated,
+                        subject: $before,
+                        subjectLabel: $canonical['name'],
+                        assistantId: $before->assistant_id,
+                        changes: $changes,
+                    ));
+                }
+            }
+
+            return $rows;
         });
 
         if (1 !== $updated) {
@@ -170,6 +224,13 @@ final readonly class BroadcastService
             if (! $this->dispatcher->start($locked)) {
                 throw new BroadcastAlreadyStartedException($id);
             }
+
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::BroadcastSent,
+                subject: $locked,
+                subjectLabel: $locked->name,
+                assistantId: $locked->assistant_id,
+            ));
         });
     }
 
@@ -180,13 +241,26 @@ final readonly class BroadcastService
      */
     public function cancel(Broadcast $broadcast): bool
     {
-        return $this->query()
-            ->whereKey($broadcast->getKey())
-            ->where('status', BroadcastStatus::Running->value)
-            ->update([
-                'status'       => BroadcastStatus::Cancelled->value,
-                'completed_at' => Carbon::now(),
-            ]) > 0;
+        return DB::transaction(function () use ($broadcast): bool {
+            $cancelled = $this->query()
+                ->whereKey($broadcast->getKey())
+                ->where('status', BroadcastStatus::Running->value)
+                ->update([
+                    'status'       => BroadcastStatus::Cancelled->value,
+                    'completed_at' => Carbon::now(),
+                ]) > 0;
+
+            if ($cancelled) {
+                $this->audit->record(new AuditRecord(
+                    action: AuditAction::BroadcastCancelled,
+                    subject: $broadcast,
+                    subjectLabel: $broadcast->name,
+                    assistantId: $broadcast->assistant_id,
+                ));
+            }
+
+            return $cancelled;
+        });
     }
 
     /**
@@ -198,10 +272,23 @@ final readonly class BroadcastService
      */
     public function delete(Broadcast $broadcast): bool
     {
-        return $this->query()
-            ->whereKey($broadcast->getKey())
-            ->where('status', '!=', BroadcastStatus::Running->value)
-            ->delete() > 0;
+        return DB::transaction(function () use ($broadcast): bool {
+            $deleted = $this->query()
+                ->whereKey($broadcast->getKey())
+                ->where('status', '!=', BroadcastStatus::Running->value)
+                ->delete() > 0;
+
+            if ($deleted) {
+                $this->audit->record(new AuditRecord(
+                    action: AuditAction::BroadcastDeleted,
+                    subject: $broadcast,
+                    subjectLabel: $broadcast->name,
+                    assistantId: $broadcast->assistant_id,
+                ));
+            }
+
+            return $deleted;
+        });
     }
 
     /**
@@ -292,6 +379,21 @@ final readonly class BroadcastService
     public function baseLanguage(): string
     {
         return $this->settings->content_base_language;
+    }
+
+    /**
+     * The value-class fields of a broadcast, for the trail. The message is never among them.
+     *
+     * @return array<string, mixed>
+     */
+    private static function auditValues(Broadcast $broadcast): array
+    {
+        return [
+            'name'              => $broadcast->name,
+            'target_type'       => $broadcast->target_type,
+            'target_tags'       => $broadcast->target_tags,
+            'target_segment_id' => $broadcast->target_segment_id,
+        ];
     }
 
     /**

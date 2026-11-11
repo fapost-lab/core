@@ -11,7 +11,7 @@ role for it.
 
 | Role | Permissions | For |
 |---|---|---|
-| `admin` | 23 | Full access, including roles and settings |
+| `admin` | 25 | Full access, including roles and settings |
 | `content_manager` | 16 | Building and running assistants, without platform administration |
 | `analyst` | 3 | Reading — analytics and reports |
 
@@ -47,7 +47,7 @@ what they need to look at without the ability to change it.
 front of contacts are different permissions. That separation is the point of the
 Content group — see [Manage flows (legacy)](#manage-flows-legacy) below.
 
-## The five that warrant a pause
+## The ones that warrant a pause
 
 The editor marks certain permissions **Sensitive: give with care** and explains
 each one in place. They are worth repeating, because
@@ -73,6 +73,9 @@ what they do is not obvious from the name.
   **Reply in conversations** sends messages to a contact from the operator inbox
   **under the assistant's identity**. The contact sees the assistant, not the
   person typing.
+
+  **View the activity log** shows what every colleague did in the panels, and
+  when. Only administrators have it unless it is given.
 </Warning>
 
 The last two are the ones most often handed out without thinking, because

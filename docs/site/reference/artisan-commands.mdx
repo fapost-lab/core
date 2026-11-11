@@ -116,6 +116,15 @@ Options: `--tenant` for a single slug and `--json`.
 `conversations:prune` accepts `--dry-run`. Dropping is irreversible; threads and
 media are kept. See [Conversation retention](/self-hosting/observability#conversation-retention).
 
+## Activity log retention
+
+| Command | Does |
+|---|---|
+| `audit:prune` | Delete [activity log](/using/activity-log) entries older than the platform setting `audit.retention_days` (default 365, from `AUDIT_RETENTION_DAYS`), in every active tenant. Does nothing when it is `0`. Scheduled daily at 04:15 |
+
+`audit:prune` accepts `--dry-run`, which only counts. The package command
+`activitylog:clean` is not used: it does not walk the tenants.
+
 ## Limit refusals
 
 | Command | Does |

@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Contact\Services;
 
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Contact\Enums\SegmentConditionType;
 use App\Domains\Contact\Enums\SegmentMatch;
 use App\Domains\Contact\Enums\SegmentOperator;
@@ -13,6 +17,7 @@ use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -25,12 +30,16 @@ use Illuminate\Support\Str;
  *
  * Nothing references a segment by a foreign key: a broadcast draft keeps the id of a deleted segment and resolves to
  * nobody ({@see \App\Domains\Broadcasting\Services\BroadcastRecipientResolver}).
+ *
+ * Each write is recorded in the audit log: the name as a value, the rules as a marker (they name attributes and hold
+ * values about people). A segment belongs to the tenant, so its entry has no assistant.
  */
 final readonly class ContactSegmentService
 {
     public function __construct(
         private TenantContextInterface $tenants,
         private ContactSegmentResolver $resolver,
+        private AuditTrailInterface $audit,
     ) {
     }
 
@@ -61,11 +70,21 @@ final readonly class ContactSegmentService
      */
     public function create(string $name, array $rules): ContactSegment
     {
-        return ContactSegment::query()->create([
-            'tenant_id' => $this->tenantId(),
-            'name'      => $name,
-            'rules'     => $this->canonicalRules($rules),
-        ]);
+        return DB::transaction(function () use ($name, $rules): ContactSegment {
+            $segment = ContactSegment::query()->create([
+                'tenant_id' => $this->tenantId(),
+                'name'      => $name,
+                'rules'     => $this->canonicalRules($rules),
+            ]);
+
+            $this->record(
+                AuditAction::ContactSegmentCreated,
+                $segment,
+                AuditChanges::created(['name' => $segment->name])->merge(AuditChanges::markers(['rules'])),
+            );
+
+            return $segment;
+        });
     }
 
     /**
@@ -73,12 +92,20 @@ final readonly class ContactSegmentService
      */
     public function update(ContactSegment $segment, string $name, array $rules): ContactSegment
     {
-        $segment->update([
-            'name'  => $name,
-            'rules' => $this->canonicalRules($rules),
-        ]);
+        return DB::transaction(function () use ($segment, $name, $rules): ContactSegment {
+            $segment->update([
+                'name'  => $name,
+                'rules' => $this->canonicalRules($rules),
+            ]);
 
-        return $segment;
+            $changes = AuditChanges::ofSavedModel($segment, ['name'], ['rules']);
+
+            if (! $changes->isEmpty()) {
+                $this->record(AuditAction::ContactSegmentUpdated, $segment, $changes);
+            }
+
+            return $segment;
+        });
     }
 
     /**
@@ -86,7 +113,11 @@ final readonly class ContactSegmentService
      */
     public function delete(ContactSegment $segment): void
     {
-        $segment->delete();
+        DB::transaction(function () use ($segment): void {
+            $segment->delete();
+
+            $this->record(AuditAction::ContactSegmentDeleted, $segment);
+        });
     }
 
     /**
@@ -202,6 +233,16 @@ final readonly class ContactSegmentService
         }
 
         return $clean;
+    }
+
+    private function record(AuditAction $action, ContactSegment $segment, ?AuditChanges $changes = null): void
+    {
+        $this->audit->record(new AuditRecord(
+            action: $action,
+            subject: $segment,
+            subjectLabel: $segment->name,
+            changes: $changes,
+        ));
     }
 
     private function scalar(mixed $value): string

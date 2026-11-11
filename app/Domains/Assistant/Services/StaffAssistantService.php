@@ -7,6 +7,10 @@ namespace App\Domains\Assistant\Services;
 use App\Domains\Assistant\Contracts\AssistantServiceInterface;
 use App\Domains\Assistant\DTOs\AssistantLimitStatus;
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Fapost\Foundation\Quota\Contracts\RecordQuotaInterface;
@@ -31,6 +35,7 @@ final readonly class StaffAssistantService
         private AssistantServiceInterface $assistants,
         private RecordQuotaInterface $recordQuota,
         private ConnectionInterface $connection,
+        private AuditTrailInterface $audit,
     ) {
     }
 
@@ -94,6 +99,18 @@ final readonly class StaffAssistantService
                 $creator->assistants()->syncWithoutDetaching([(string) $assistant->getKey()]);
             }
 
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::AssistantCreated,
+                subject: $assistant,
+                subjectLabel: (string) $assistant->name,
+                assistantId: (string) $assistant->getKey(),
+                changes: AuditChanges::created([
+                    'name'             => $assistant->name,
+                    'default_language' => $assistant->default_language,
+                    'is_active'        => (bool) $assistant->is_active,
+                ]),
+            ));
+
             return $assistant;
         });
     }
@@ -106,7 +123,24 @@ final readonly class StaffAssistantService
      */
     public function update(Assistant $assistant, array $fields): Assistant
     {
-        return $this->assistants->update($assistant, $fields);
+        return $this->connection->transaction(function () use ($assistant, $fields): Assistant {
+            $before  = self::snapshot($assistant);
+            $updated = $this->assistants->update($assistant, $fields);
+
+            $changes = AuditChanges::between($before, self::snapshot($updated), ['name', 'default_language', 'is_active']);
+
+            if (! $changes->isEmpty()) {
+                $this->audit->record(new AuditRecord(
+                    action: AuditAction::AssistantUpdated,
+                    subject: $updated,
+                    subjectLabel: (string) $updated->name,
+                    assistantId: (string) $updated->getKey(),
+                    changes: $changes,
+                ));
+            }
+
+            return $updated;
+        });
     }
 
     /**
@@ -115,6 +149,29 @@ final readonly class StaffAssistantService
      */
     public function delete(Assistant $assistant): void
     {
-        $assistant->delete();
+        $this->connection->transaction(function () use ($assistant): void {
+            $assistant->delete();
+
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::AssistantDeleted,
+                subject: $assistant,
+                subjectLabel: (string) $assistant->name,
+                assistantId: (string) $assistant->getKey(),
+            ));
+        });
+    }
+
+    /**
+     * What the admin form edits, read before and after a write.
+     *
+     * @return array{name: string, default_language: string, is_active: bool}
+     */
+    private static function snapshot(Assistant $assistant): array
+    {
+        return [
+            'name'             => (string) $assistant->name,
+            'default_language' => (string) $assistant->default_language,
+            'is_active'        => (bool) $assistant->is_active,
+        ];
     }
 }

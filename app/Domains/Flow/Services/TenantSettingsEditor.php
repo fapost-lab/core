@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Services;
 
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Conversation\Settings\ConversationSettings;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Settings\TenantSettings;
+use Illuminate\Support\Facades\DB;
 
 /**
  * The tenant's settings screen in the admin panel: the language matrix (content base, available, fallback), the
@@ -24,6 +29,7 @@ final readonly class TenantSettingsEditor
         private TenantSettings $settings,
         private TenantContextInterface $tenant,
         private ConversationSettings $conversation,
+        private AuditTrailInterface $audit,
     ) {
     }
 
@@ -101,13 +107,7 @@ final readonly class TenantSettingsEditor
      */
     public function saveLanguages(string $base, array $available, string $fallback): void
     {
-        if (! $this->baseLanguageLocked()) {
-            $this->settings->content_base_language = $base;
-        }
-
-        $this->settings->available_languages = self::withBase($this->settings->content_base_language, $available);
-        $this->settings->fallback_language   = $fallback;
-        $this->settings->save();
+        DB::transaction(fn () => $this->writeLanguages($base, $available, $fallback));
     }
 
     /**
@@ -118,6 +118,34 @@ final readonly class TenantSettingsEditor
      */
     public function save(array $fields): void
     {
+        DB::transaction(fn () => $this->write($fields));
+    }
+
+    /**
+     * @param  list<string>  $available
+     */
+    private function writeLanguages(string $base, array $available, string $fallback): void
+    {
+        $before = $this->auditSnapshot();
+
+        if (! $this->baseLanguageLocked()) {
+            $this->settings->content_base_language = $base;
+        }
+
+        $this->settings->available_languages = self::withBase($this->settings->content_base_language, $available);
+        $this->settings->fallback_language   = $fallback;
+        $this->settings->save();
+
+        $this->record($before);
+    }
+
+    /**
+     * @param  array{content_base_language: string, available_languages: list<string>, fallback_language: string, messaging_rate_limit: int, broadcast_chunk_size: int, broadcast_backpressure: bool, conversation_logging: bool, conversation_media_fetch: bool, flow_session_ttl: int, max_retry_attempts: int, flow_fallback_message: string}  $fields
+     */
+    private function write(array $fields): void
+    {
+        $before = $this->auditSnapshot();
+
         if (! $this->baseLanguageLocked()) {
             $this->settings->content_base_language = $fields['content_base_language'];
         }
@@ -133,5 +161,40 @@ final readonly class TenantSettingsEditor
         $this->settings->max_retry_attempts       = $fields['max_retry_attempts'];
         $this->settings->flow_fallback_message    = $fields['flow_fallback_message'];
         $this->settings->save();
+
+        $this->record($before);
+    }
+
+    /**
+     * The fields of this screen, read before and after a write. Webhook settings are not here, and nothing secret is.
+     *
+     * @return array<string, mixed>
+     */
+    private function auditSnapshot(): array
+    {
+        return [
+            ...$this->state(),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $before
+     */
+    private function record(array $before): void
+    {
+        $changes = AuditChanges::between(
+            $before,
+            $this->auditSnapshot(),
+            [
+                'content_base_language', 'available_languages', 'fallback_language', 'messaging_rate_limit',
+                'broadcast_chunk_size', 'broadcast_backpressure', 'conversation_logging', 'conversation_media_fetch',
+                'flow_session_ttl', 'max_retry_attempts',
+            ],
+            ['flow_fallback_message'],
+        );
+
+        if (! $changes->isEmpty()) {
+            $this->audit->record(new AuditRecord(action: AuditAction::SettingsUpdated, changes: $changes));
+        }
     }
 }

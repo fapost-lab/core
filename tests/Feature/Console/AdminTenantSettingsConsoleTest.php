@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Staff\Enums\Permission;
@@ -151,6 +152,35 @@ final class AdminTenantSettingsConsoleTest extends FeatureTestCase
         $payload = $this->payload();
         unset($payload['conversation_logging'], $payload['conversation_media_fetch']);
         $this->put($this->url(), $payload)->assertSessionHasErrors(['conversation_logging', 'conversation_media_fetch']);
+    }
+
+    public function test_saving_is_one_audit_entry_with_values_and_a_marker_for_the_text(): void
+    {
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->put($this->url(), $this->payload(['messaging_rate_limit' => 77, 'flow_fallback_message' => 'Audit-SECRET-TEXT-9']))
+            ->assertRedirect();
+        // Saved again as it is: nothing changed, nothing recorded.
+        $this->put($this->url(), $this->payload(['messaging_rate_limit' => 77, 'flow_fallback_message' => 'Audit-SECRET-TEXT-9']))->assertRedirect();
+
+        $entry = ActivityEntry::query()->sole();
+
+        $this->assertSame('settings.updated', $entry->description);
+        $this->assertSame('settings', $entry->log_name);
+        $this->assertNull($entry->subject_id);
+        $this->assertNull($entry->assistant_id);
+        $this->assertSame((string) $admin->getKey(), $entry->causer_id);
+
+        $changes = $entry->attribute_changes?->toArray();
+
+        $this->assertSame(['flow_fallback_message'], $changes['changed'] ?? null);
+        $this->assertSame(77, $changes['attributes']['messaging_rate_limit'] ?? null);
+        $this->assertSame(30, $changes['old']['messaging_rate_limit'] ?? null);
+
+        $raw = (string) json_encode(ActivityEntry::query()->get()->map->getAttributes());
+        $this->assertStringNotContainsString('Audit-SECRET-TEXT-9', $raw);
+        $this->assertStringNotContainsString('webhook', $raw);
     }
 
     public function test_the_filament_rules_hold(): void

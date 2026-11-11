@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Domains\Flow;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
@@ -16,9 +17,12 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 final class BuilderApiTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     /**
      * Assistants of the drafts built so far; the staff user is assigned to all of them.
      *
@@ -379,6 +383,40 @@ final class BuilderApiTest extends FeatureTestCase
             ->assertOk()
             ->assertJsonPath('valid', false)
             ->assertJsonPath('errors.0.code', 'duplicate_exact_trigger_keyword');
+    }
+
+    public function test_a_publish_is_one_entry_with_the_version_and_without_the_graph(): void
+    {
+        $draft = $this->draft(['name' => 'Welcome']);
+        $user  = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        $this->actingAs($user);
+        $this->postJson("/builder/flows/{$draft->flow_id}/publish")->assertOk()->assertJsonPath('version', 1);
+        $this->postJson("/builder/flows/{$draft->flow_id}/publish")->assertOk()->assertJsonPath('version', 2);
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(['flow.published', 'flow.published'], $entries->pluck('description')->all());
+        $this->assertTrue($entries->every(fn (ActivityEntry $entry): bool => 'flows' === $entry->log_name
+            && (string) $draft->getKey() === $entry->subject_id
+            && 'Welcome' === $entry->subject_label
+            && (string) $draft->assistant_id === $entry->assistant_id
+            && (string) $user->getKey() === $entry->causer_id));
+        $this->assertSameJson(['version' => 1], $entries[0]->properties?->toArray());
+        $this->assertSameJson(['version' => 2], $entries[1]->properties?->toArray());
+        $this->assertStringNotContainsString('"nodes"', (string) json_encode($entries->map->getAttributes()));
+    }
+
+    public function test_a_publish_that_fails_validation_leaves_no_entry(): void
+    {
+        $draft = $this->draftWithUnconnectedOutput();
+        $user  = $this->staffUser();
+        /** @var \Illuminate\Contracts\Auth\Authenticatable $user */
+
+        $this->actingAs($user)->postJson("/builder/flows/{$draft->flow_id}/publish")->assertStatus(422);
+
+        $this->assertSame(0, ActivityEntry::query()->count());
     }
 
     public function test_publish_returns_422_on_invalid_draft(): void

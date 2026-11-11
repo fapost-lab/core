@@ -40,6 +40,10 @@ and PHP's unserialize does not apply a promoted parameter's default. Foundation 
 `Typed property ... must not be accessed before initialization` (fixed in
 `fix-payload-buttons-unserialize`, pinned by tests that unserialize a 0.25 payload).
 
+A service that takes a scoped collaborator is itself `bind` or `scoped`, never a `singleton`: the audit trail
+(`AuditTrailInterface`) is scoped, so every service that records to it follows its binding — `RoleWriterService`
+was moved off `singleton` for that (`adr-20261111-audit-log-explicit-recording`).
+
 This is review-only across the application in general. It is mechanically enforced for the
 Flow runtime specifically, by `tests/Architecture/FlowRuntimeIsolationTest.php` (the engine,
 handlers, orchestration, registry, routing and state must not touch facades, the container or

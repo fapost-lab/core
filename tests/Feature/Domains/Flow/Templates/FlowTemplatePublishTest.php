@@ -6,6 +6,7 @@ namespace Tests\Feature\Domains\Flow\Templates;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
@@ -28,6 +29,7 @@ use Fapost\Foundation\DTO\NodeExecutionResult;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Flow templates expanded at publish time (task flow-templates, AC-01..AC-07): the copy in the host's definition,
@@ -36,6 +38,8 @@ use Tests\Feature\FeatureTestCase;
  */
 final class FlowTemplatePublishTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
+
     private const string UUID_PATTERN = '/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/';
 
     private string $tenantId;
@@ -263,6 +267,37 @@ final class FlowTemplatePublishTest extends FeatureTestCase
 
         $this->assertSame(1, FlowDefinition::query()->where('flow_id', $template->flow_id)->max('version'), 'nothing is published');
         $this->assertSame(1, FlowDefinition::query()->where('flow_id', $host->flow_id)->max('version'));
+        $this->assertSame(2, ActivityEntry::query()->where('description', 'flow.published')->count(), 'a refused publish leaves no entry');
+    }
+
+    public function test_a_template_publish_records_its_own_publish_and_each_host_republish(): void
+    {
+        $template = $this->publishedTemplate(withButtons: false);
+        $host     = $this->hostDraft($template->flow_id);
+        $this->publish($host->flow_id);
+        ActivityEntry::query()->delete();
+
+        $this->publish($template->flow_id);
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(['flow.published', 'flow.published'], $entries->pluck('description')->all());
+        $this->assertTrue($entries->every(fn (ActivityEntry $entry): bool => 'flows' === $entry->log_name
+            && (string) $this->assistant->getKey() === $entry->assistant_id));
+
+        $templateEntry = $entries->firstWhere('subject_id', (string) $template->getKey());
+        $this->assertNotNull($templateEntry);
+        $this->assertSameJson(['version' => 2], $templateEntry->properties?->toArray());
+
+        $hostEntry = $entries->firstWhere('subject_id', (string) $host->getKey());
+        $this->assertNotNull($hostEntry);
+        $this->assertSame('Host flow', $hostEntry->subject_label);
+        $this->assertSameJson([
+            'version'                         => 2,
+            'republished_by_template_flow_id' => $template->flow_id,
+            'republished_by_template_version' => 2,
+        ], $hostEntry->properties?->toArray());
+        $this->assertStringNotContainsString('"nodes"', (string) json_encode($entries->map->getAttributes()));
     }
 
     public function test_publishing_refuses_a_nested_template_a_foreign_template_an_unpublished_one_and_an_output_in_a_flow(): void

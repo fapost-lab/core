@@ -5,11 +5,15 @@ declare(strict_types=1);
 namespace Tests\Feature\Console;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Enums\ChannelWebhookStatus;
 use App\Domains\Channels\Models\Channel;
+use App\Domains\Channels\Services\AssistantChannelService;
 use App\Domains\Channels\Services\ChannelPublicLinks;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
@@ -25,11 +29,13 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Inertia\Inertia;
 use Inertia\Testing\AssertableInertia;
+use RuntimeException;
 use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
 use Tests\Fixtures\Connectors\Echo\EchoChannelProfile;
 use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
 use Tests\Fixtures\Connectors\Echo\EchoSender;
+use Tests\Support\ComparesJsonColumns;
 
 /**
  * Channels on the Inertia console: the assistant's list and the channel limit, creating and changing a channel by its
@@ -38,6 +44,7 @@ use Tests\Fixtures\Connectors\Echo\EchoSender;
  */
 final class ChannelsConsoleTest extends FeatureTestCase
 {
+    use ComparesJsonColumns;
     use SetsRecordLimits;
 
     private const string TENANT_ID = '00000000-0000-0000-0000-000000000001';
@@ -504,6 +511,68 @@ final class ChannelsConsoleTest extends FeatureTestCase
         $this->assertSame([['remove', $old], ['set', $new]], array_slice($this->registry->calls, -2));
         // The new hash is told once, to the one who may rotate.
         $response->assertInertiaFlash('success', "Webhook hash rotated. New hash: {$new}");
+    }
+
+    public function test_every_channel_write_is_in_the_audit_log_without_a_secret(): void
+    {
+        $admin = $this->admin();
+        $this->actingAs($admin);
+
+        $this->post($this->listUrl(), $this->telegramPayload())->assertRedirect();
+        $channel = Channel::query()->sole();
+
+        $this->put($this->listUrl("/{$channel->getKey()}"), $this->telegramPayload([
+            'token'        => 'rotated-token-SECRET-333',
+            'secret_token' => '',
+            'is_active'    => false,
+            'config'       => ['allowed_updates' => ['message'], 'max_connections' => 25],
+        ]))->assertRedirect();
+        $this->post($this->listUrl("/{$channel->getKey()}/rotate-webhook"))->assertRedirect();
+        $hash = $channel->refresh()->webhook_public_hash;
+        $this->delete($this->listUrl("/{$channel->getKey()}"))->assertRedirect();
+
+        $entries = ActivityEntry::query()->orderBy('id')->get();
+
+        $this->assertSame(
+            ['channel.created', 'channel.updated', 'channel.token_rotated', 'channel.webhook_hash_rotated', 'channel.deleted'],
+            $entries->pluck('description')->all(),
+        );
+        $this->assertTrue($entries->every(fn (ActivityEntry $entry): bool => 'channels' === $entry->log_name
+            && (string) $channel->getKey() === $entry->subject_id
+            && (string) $this->assistant->getKey() === $entry->assistant_id
+            && (string) $admin->getKey() === $entry->causer_id));
+        $this->assertSameJson(
+            ['attributes' => ['is_active' => false], 'old' => ['is_active' => true], 'changed' => ['config']],
+            $entries[1]->attribute_changes?->toArray(),
+        );
+
+        $raw = (string) json_encode(ActivityEntry::query()->get()->map->getAttributes());
+        foreach ([self::TOKEN, self::SECRET, 'rotated-token-SECRET-333', $hash, 'max_connections'] as $secret) {
+            $this->assertStringNotContainsString($secret, $raw);
+        }
+    }
+
+    public function test_a_channel_change_whose_audit_entry_fails_is_not_saved(): void
+    {
+        $channel = $this->channel(['token' => self::TOKEN, 'is_active' => true]);
+        $this->app->instance(AuditTrailInterface::class, new class () implements AuditTrailInterface {
+            public function record(AuditRecord $record): void
+            {
+                throw new RuntimeException('audit insert refused');
+            }
+        });
+        $this->withoutExceptionHandling();
+
+        try {
+            $this->app->make(AssistantChannelService::class)->update($channel, ['is_active' => false, 'token' => 'other-token']);
+            $this->fail('The change was saved although its audit entry failed.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('audit insert refused', $exception->getMessage());
+        }
+
+        $channel->refresh();
+        $this->assertTrue($channel->is_active);
+        $this->assertSame(self::TOKEN, $channel->token);
     }
 
     public function test_rotating_needs_the_rotation_permission(): void

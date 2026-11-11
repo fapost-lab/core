@@ -1,0 +1,63 @@
+---
+title: "Activity log"
+description: "Who did what in the panels, and when."
+---
+
+The activity log lists what people did in this tenant's admin panel, assistant
+console and flow builder: who acted, what they did, to what, and when — newest
+first, and read only. It is under **System** in the admin panel's menu.
+
+## What is recorded
+
+| Area | Actions |
+|---|---|
+| **Assistants** | Created, changed, deleted; assistant settings saved |
+| **Channels** | Created, changed, deleted; token replaced; webhook hash rotated |
+| **Flows** | Created, changed, deleted, published (with the version); flow groups created, renamed, deleted |
+| **Broadcasts** | Created, changed, deleted, sent, cancelled |
+| **Contacts** | Tags and groups changed on a contact's card; contact groups and segments created, changed, deleted |
+| **Staff** | Users invited, changed, given other roles, activated, deactivated, deleted, sent a new activation link; roles created, changed, deleted |
+| **Settings** | Tenant settings saved; workspace deletion requested or cancelled |
+| **Sign-in** | A staff user signed in or signed out |
+
+What runs on its own is not recorded: flow sessions, message delivery, webhooks,
+a broadcast reaching its contacts, and the builder saving a draft while you edit
+(publishing is recorded).
+
+## What an entry shows
+
+**Details** on a row opens what changed. Names, statuses, switches, languages and
+role permissions are shown with their old and new values. Texts — assistant
+messages, broadcast messages, a segment's rules, a channel's settings, a password —
+show only that they changed. Tokens, webhook hashes and passwords never appear in
+the log in any form. For a contact the log names neither the person nor their
+details: the entry shows a short id and which part of the card changed.
+
+## Who acted
+
+Each entry names its author as they were named at the time, so it stays readable
+after the user is renamed or deleted.
+
+| Shown as | Means |
+|---|---|
+| A user's name | A staff user acting in the panels |
+| **Platform support** (operator) | The platform's support team inside your tenant; the entry names the operator and links to their visit in [Support access](/using/users#platform-support) |
+| **System** | A command or scheduled task, not a person |
+
+## Finding something
+
+Search matches the author and the name of what was changed. Filters narrow the
+list by area, author (a user, platform support or the system), assistant and
+period: the last 7, 30 (the default) or 90 days, or everything kept.
+
+## Who sees it
+
+The **View the activity log** permission opens it; administrators have it. It
+shows what every colleague did, so the role editor marks it sensitive — see
+[Roles and permissions](/using/roles-and-permissions).
+
+## How long entries are kept
+
+A year, unless the installation sets otherwise: entries older than the platform
+setting `audit.retention_days` are deleted every night by `audit:prune`
+([Platform settings](/self-hosting/platform-settings)). `0` keeps them forever.

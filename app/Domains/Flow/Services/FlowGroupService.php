@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Services;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditChanges;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Flow\Exceptions\FlowGroupNotEmptyException;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowGroup;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -26,6 +31,7 @@ final readonly class FlowGroupService
     public function __construct(
         private TenantContextInterface $tenants,
         private CurrentAssistantInterface $assistant,
+        private AuditTrailInterface $audit,
     ) {
     }
 
@@ -74,11 +80,23 @@ final readonly class FlowGroupService
      */
     public function create(array $data): FlowGroup
     {
-        return FlowGroup::query()->create([
-            'tenant_id'    => $this->tenantId(),
-            'assistant_id' => $this->assistantId(),
-            'name'         => $data['name'],
-        ]);
+        return DB::transaction(function () use ($data): FlowGroup {
+            $group = FlowGroup::query()->create([
+                'tenant_id'    => $this->tenantId(),
+                'assistant_id' => $this->assistantId(),
+                'name'         => $data['name'],
+            ]);
+
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::FlowGroupCreated,
+                subject: $group,
+                subjectLabel: $group->name,
+                assistantId: $group->assistant_id,
+                changes: AuditChanges::created(['name' => $group->name]),
+            ));
+
+            return $group;
+        });
     }
 
     /**
@@ -86,7 +104,23 @@ final readonly class FlowGroupService
      */
     public function update(FlowGroup $group, array $data): FlowGroup
     {
-        $group->update(['name' => $data['name']]);
+        DB::transaction(function () use ($group, $data): void {
+            $group->update(['name' => $data['name']]);
+
+            $changes = AuditChanges::ofSavedModel($group, ['name']);
+
+            if ($changes->isEmpty()) {
+                return;
+            }
+
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::FlowGroupUpdated,
+                subject: $group,
+                subjectLabel: $group->name,
+                assistantId: $group->assistant_id,
+                changes: $changes,
+            ));
+        });
 
         return $group;
     }
@@ -100,7 +134,16 @@ final readonly class FlowGroupService
             throw new FlowGroupNotEmptyException((string) $group->getKey());
         }
 
-        $group->delete();
+        DB::transaction(function () use ($group): void {
+            $group->delete();
+
+            $this->audit->record(new AuditRecord(
+                action: AuditAction::FlowGroupDeleted,
+                subject: $group,
+                subjectLabel: $group->name,
+                assistantId: $group->assistant_id,
+            ));
+        });
     }
 
     /**

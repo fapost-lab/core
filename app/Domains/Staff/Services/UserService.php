@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Staff\Services;
 
+use App\Domains\Audit\Contracts\AuditTrailInterface;
+use App\Domains\Audit\DTOs\AuditRecord;
+use App\Domains\Audit\Enums\AuditAction;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Enums\UserStatus;
 use App\Domains\Staff\Models\User;
@@ -21,6 +24,7 @@ final class UserService
     public function __construct(
         private readonly RecordQuotaInterface $recordQuota,
         private readonly RecordLimitWatch $limitWatch,
+        private readonly AuditTrailInterface $audit,
     ) {
     }
 
@@ -53,6 +57,8 @@ final class UserService
 
             // Invalidate all active sessions for this user.
             DB::table('sessions')->where('user_id', $target->getKey())->delete();
+
+            $this->record(AuditAction::UserDeactivated, $target);
         });
     }
 
@@ -76,7 +82,11 @@ final class UserService
             $this->recordQuota->assertCanCreate(User::LIMIT_KEY, $countBefore);
         }
 
-        $target->update(['is_active' => true]);
+        DB::transaction(function () use ($target): void {
+            $target->update(['is_active' => true]);
+
+            $this->record(AuditAction::UserActivated, $target);
+        });
 
         if (null !== $countBefore) {
             $this->limitWatch->afterSaved(User::LIMIT_KEY, $countBefore);
@@ -104,6 +114,15 @@ final class UserService
             ->map(static fn (mixed $id): string => (string) $id);
 
         return 1 === $activeAdminIds->count() && $activeAdminIds->first() === (string) $target->getKey();
+    }
+
+    private function record(AuditAction $action, User $target): void
+    {
+        $this->audit->record(new AuditRecord(
+            action: $action,
+            subject: $target,
+            subjectLabel: $target->name,
+        ));
     }
 
     private function assertCanChangeStatus(User $actor, User $target, string $ability): void

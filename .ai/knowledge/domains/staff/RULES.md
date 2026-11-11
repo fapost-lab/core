@@ -128,13 +128,14 @@ broken.
 
 - **Check authorization through policies against the `Permission` enum.** This is the pattern in
   every domain. Review only.
-  The enum has 23 cases in six groups (assistants, flow/content, users, contacts, conversations,
-  analytics/system), the deprecated `ManageFlow` included; the policies are `AssistantPolicy`, `ChannelPolicy`, `ContactPolicy`,
+  The enum has 25 cases in seven groups (assistants, content, users, contacts, conversations,
+  analytics, system), the deprecated `ManageFlow` included; the policies are `AssistantPolicy`, `ChannelPolicy`, `ContactPolicy`,
   `ContactGroupPolicy`, `ConversationPolicy`, the Flow policies (`FlowDraftPolicy`,
   `FlowGroupPolicy`, `FlowLogPolicy`, `FlowSessionPolicy`), `MediaFilePolicy`, `MediaFolderPolicy`,
   `RolePolicy` and `UserPolicy`.
 - **The sensitive permission set lives in `Permission::isSensitive()`** (`RotateChannelToken`,
-  `PublishFlow`, `ManageRoles`, `ViewConversations`, `ReplyConversations`); the Roles UI badges
+  `PublishFlow`, `ManageRoles`, `ViewConversations`, `ReplyConversations`, `ViewOperatorScreens`,
+  `ViewActivityLog`); the Roles UI badges
   those. A new permission with elevated risk is added to that `match`, not flagged elsewhere.
 - **`Permission::ManageFlow` is `@deprecated`** and kept for backward compatibility; use the granular
   flow permissions (`ManageFlowDefinitions`, `PublishFlow`, `ViewFlowSessions`, `ManageFlowGroups`,
