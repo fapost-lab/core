@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Services;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Logging\FlowLogStatus;
 use App\Domains\Flow\Models\FlowDefinition;
@@ -47,17 +48,20 @@ final readonly class TenantFlowActivity
      */
     public function publishedFlows(?EloquentBuilder $assistants = null): int
     {
-        $query = FlowDefinition::query()->where('tenant_id', $this->tenantId());
+        // A template's published versions are not published flows.
+        return FlowDefinition::query()
+            ->where('tenant_id', $this->tenantId())
+            ->whereIn('flow_id', function (Builder $drafts) use ($assistants): void {
+                $drafts->select('flow_id')
+                    ->from('flow_drafts')
+                    ->where('tenant_id', $this->tenantId())
+                    ->where('kind', FlowKind::Flow->value);
 
-        if (null !== $assistants) {
-            $query->whereIn('flow_id', fn (Builder $drafts): Builder => $drafts
-                ->select('flow_id')
-                ->from('flow_drafts')
-                ->where('tenant_id', $this->tenantId())
-                ->whereIn('assistant_id', $this->assistantIds($assistants)));
-        }
-
-        return $query->count();
+                if (null !== $assistants) {
+                    $drafts->whereIn('assistant_id', $this->assistantIds($assistants));
+                }
+            })
+            ->count();
     }
 
     /**

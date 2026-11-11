@@ -89,6 +89,19 @@ const SHAPES: Record<string, string> = {
         <rect x="10" y="10" width="4" height="4" rx="0.6" fill="currentColor" stroke="none" />
     `,
 
+    // ── template — puzzle-like block with an output arrow ──
+    template: `
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M4 9.5h16" />
+        <path d="M9 14.5h6M13 12.5l2 2-2 2" />
+    `,
+
+    // ── template_output — tray with an arrow leaving it ──
+    template_output: `
+        <path d="M5 13v5h14v-5" />
+        <path d="M12 15V5M8.5 8.5L12 5l3.5 3.5" />
+    `,
+
     // ── set_tag — price tag with hole ──
     set_tag: `
         <path d="M4 12.5l8-8H19v6.5L11 19z" />

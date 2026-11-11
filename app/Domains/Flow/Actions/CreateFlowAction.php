@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Actions;
 
 use App\Domains\Flow\Enums\EndStatus;
+use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Handlers\EndNodeHandler;
+use App\Domains\Flow\Handlers\TemplateOutputNodeHandler;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Services\RecordLimitWatch;
@@ -14,7 +16,8 @@ use Fapost\Foundation\Quota\Exceptions\RecordLimitReachedException;
 use Illuminate\Support\Str;
 
 /**
- * Creates a new flow draft seeded with a terminal `end` node (status=success).
+ * Creates a new flow draft seeded with a terminal `end` node (status=success), or a template (`kind`)
+ * seeded with one output.
  * Authors always need a terminal — seeding it removes the empty-canvas state
  * and gives the builder a real, selectable End node to configure instead of a
  * decorative placeholder. A caller that already has a graph (the load-test seed) passes `nodes`
@@ -42,9 +45,13 @@ final readonly class CreateFlowAction
 
         $this->recordQuota->assertCanCreate(FlowDraft::LIMIT_KEY, $countBefore);
 
+        $kind = $data['kind'] ?? FlowKind::Flow;
+        $kind = $kind instanceof FlowKind ? $kind : FlowKind::from((string) $kind);
+
         $draft = FlowDraft::create([
             'tenant_id'       => $this->tenantContext->get()->id,
             'flow_id'         => (string)Str::uuid(),
+            'kind'            => $kind,
             'assistant_id'    => $data['assistant_id'],
             'flow_group_id'   => $data['flow_group_id'] ?? null,
             'name'            => $data['name'],
@@ -52,19 +59,39 @@ final readonly class CreateFlowAction
             'is_public'       => $data['is_public'] ?? true,
             'logging_enabled' => $data['logging_enabled'] ?? false,
             'is_active'       => true,
-            'nodes'           => $data['nodes'] ?? [
-                [
-                    'id'      => Str::lower((string)Str::ulid()),
-                    'type'    => EndNodeHandler::TYPE,
-                    'version' => 1,
-                    'config'  => ['status' => EndStatus::Success->value],
-                ],
-            ],
-            'edges' => $data['edges'] ?? [],
+            'nodes'           => $data['nodes'] ?? [$this->seedNode($kind)],
+            'edges'           => $data['edges'] ?? [],
         ]);
 
         $this->limitWatch->afterSaved(FlowDraft::LIMIT_KEY, $countBefore);
 
         return $draft;
+    }
+
+    /**
+     * A flow starts with an `end` node; a template with one output, its first named exit.
+     *
+     * @return array<string, mixed>
+     */
+    private function seedNode(FlowKind $kind): array
+    {
+        if (FlowKind::Template === $kind) {
+            return [
+                'id'      => Str::lower((string)Str::ulid()),
+                'type'    => TemplateOutputNodeHandler::TYPE,
+                'version' => 1,
+                'config'  => [
+                    TemplateOutputNodeHandler::CONFIG_NAME  => 'done',
+                    TemplateOutputNodeHandler::CONFIG_LABEL => 'Done',
+                ],
+            ];
+        }
+
+        return [
+            'id'      => Str::lower((string)Str::ulid()),
+            'type'    => EndNodeHandler::TYPE,
+            'version' => 1,
+            'config'  => ['status' => EndStatus::Success->value],
+        ];
     }
 }

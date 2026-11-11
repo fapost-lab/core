@@ -67,6 +67,9 @@ defineProps({
     validating:       { type: Boolean, default: false },
     publishing:       { type: Boolean, default: false },
     publishedMsg:     { type: String as () => string | null, default: null },
+    /** Flows that use this flow as a template (empty for an ordinary flow). */
+    usedBy:           { type: Array as () => Array<{ id: string, name: string }>, default: () => [] },
+    isTemplate:       { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
@@ -146,6 +149,18 @@ const SAVE_COLORS: Record<string, string> = {
 
         <!-- Right -->
         <div class="topbar-right">
+            <details v-if="isTemplate" class="used-by">
+                <summary class="used-by-trigger">
+                    {{ usedBy.length > 0
+                        ? t('topbar.used_in').replace(':count', String(usedBy.length))
+                        : t('topbar.used_in_none') }}
+                </summary>
+                <ul v-if="usedBy.length > 0" class="used-by-list">
+                    <li v-for="flow in usedBy" :key="flow.id">
+                        <a :href="`/builder/flows/${flow.id}`">{{ flow.name }}</a>
+                    </li>
+                </ul>
+            </details>
             <TopBarMenu :label="t('topbar.language')" :value="currentLocale" :options="LOCALES" @select="switchLocale">
                 <Globe :size="15" aria-hidden="true" />
                 <span class="locale-code">{{ currentLocale }}</span>
@@ -262,6 +277,44 @@ const SAVE_COLORS: Record<string, string> = {
     letter-spacing: .01em;
     color: var(--text);
 }
+.used-by { position: relative; }
+.used-by-trigger {
+    list-style: none;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-2);
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    white-space: nowrap;
+}
+.used-by-trigger::-webkit-details-marker { display: none; }
+.used-by-trigger:hover { background: var(--surface-2); color: var(--text); }
+.used-by-list {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 30;
+    margin: 0;
+    padding: 6px;
+    min-width: 200px;
+    max-height: 280px;
+    overflow-y: auto;
+    list-style: none;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+}
+.used-by-list a {
+    display: block;
+    padding: 5px 8px;
+    border-radius: 5px;
+    font-size: 12.5px;
+    color: var(--text);
+    text-decoration: none;
+}
+.used-by-list a:hover { background: var(--surface-2); }
 .version-badge { display: flex; align-items: center; gap: 5px; }
 .badge {
     white-space: nowrap;

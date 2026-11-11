@@ -55,6 +55,7 @@ final class PublishFlowServiceTest extends TestCase
             $table->uuid('tenant_id');
             $table->uuid('assistant_id')->nullable();
             $table->uuid('flow_id')->unique();
+            $table->string('kind', 16)->default('flow');
             $table->integer('draft_version')->default(1);
             $table->string('name');
             $table->json('nodes')->nullable();
@@ -90,11 +91,22 @@ final class PublishFlowServiceTest extends TestCase
             $table->index('caller_flow_id');
         });
 
+        Schema::dropIfExists('flow_template_usages');
+        Schema::create('flow_template_usages', function (Blueprint $table): void {
+            $table->uuid('host_flow_id');
+            $table->uuid('host_definition_id');
+            $table->uuid('template_flow_id');
+            $table->primary(['host_definition_id', 'template_flow_id']);
+        });
+
         Schema::create('flow_definitions', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->uuid('tenant_id');
             $table->uuid('flow_id');
             $table->unsignedInteger('version');
+            $table->string('kind', 16)->default('flow');
+            $table->uuid('republished_by_template_flow_id')->nullable();
+            $table->integer('republished_by_template_version')->nullable();
             $table->string('name');
             $table->json('nodes');
             $table->json('edges')->nullable();

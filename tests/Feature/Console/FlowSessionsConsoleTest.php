@@ -260,6 +260,45 @@ final class FlowSessionsConsoleTest extends FeatureTestCase
             ->assertInertia(fn (AssertableInertia $page) => $page->has('urls.logs')->etc());
     }
 
+    public function test_a_node_copied_from_a_template_is_shown_by_its_origin(): void
+    {
+        $template = FlowDraft::factory()->template()->create(['assistant_id' => $this->assistant->getKey(), 'name' => 'Call operator']);
+        $copyId   = '0b8f1c2e-5d6a-5f3b-9c1d-2e3f4a5b6c7d';
+        $host     = FlowDefinition::query()->create([
+            'tenant_id' => self::TENANT_ID,
+            'flow_id'   => (string) Str::uuid(),
+            'version'   => 1,
+            'name'      => 'Support',
+            'nodes'     => [
+                ['id' => 'ref', 'type' => 'template', 'version' => 1, 'config' => ['template_flow_id' => $template->flow_id]],
+                ['id' => $copyId, 'type' => 'send_message', 'version' => 1, 'config' => [], 'origin' => [
+                    'ref' => 'ref', 'template_flow_id' => $template->flow_id, 'template_version' => 3, 'node_id' => 't-ask',
+                ]],
+            ],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+        $session = $this->sessionWith(FlowSessionStatus::WaitingInput, ['current_node_id' => $copyId], definition: $host);
+        $this->history($session, $copyId, Carbon::now()->subMinute());
+        $this->history($session, 'ref', Carbon::now()->subMinutes(2));
+        $origin = ['template' => 'Call operator', 'version' => 3, 'nodeId' => 't-ask', 'nodeType' => 'send_message'];
+
+        $this->actingAs($this->admin())
+            ->get($this->listUrl())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.currentNodeId', $copyId)
+                ->where('table.rows.0.currentNodeOrigin', $origin)
+                ->etc());
+
+        $this->actingAs($this->admin())
+            ->get($this->viewUrl($session))
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('session.currentNodeOrigin', $origin)
+                ->where('history.0.nodeOrigin', $origin)
+                ->where('history.1.nodeOrigin', null)
+                ->etc());
+    }
+
     private function listUrl(string $suffix = ''): string
     {
         return $this->panelUrl("/assistant/{$this->assistant->getKey()}/flow-sessions{$suffix}");

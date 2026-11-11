@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Builder;
 
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
+use App\Domains\Flow\DTOs\FlowValidationResultDto;
 use App\Domains\Flow\Exceptions\InvalidTriggerPayloadException;
 use App\Domains\Flow\Services\LoadBuilderFlowService;
 use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Flow\Services\SaveDraftService;
 use App\Domains\Flow\Services\ValidateFlowService;
+use App\Domains\Flow\Templates\TemplateExpander;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\SaveDraftRequest;
 use App\Http\Requests\ValidateFlowRequest;
@@ -44,8 +46,11 @@ final class BuilderFlowController extends Controller
                 'availableFlows'      => $dto->availableFlows,
                 'availableActions'    => $dto->availableActions,
                 'availableCountries'  => $dto->availableCountries,
+                'kind'                => $dto->kind,
+                'availableTemplates'  => $dto->availableTemplates,
+                'usedBy'              => $dto->usedBy,
             ],
-            'backUrl' => route('console.flows.index', ['assistant' => $dto->assistantId]),
+            'backUrl' => route('template' === $dto->kind ? 'console.flow-templates.index' : 'console.flows.index', ['assistant' => $dto->assistantId]),
         ]);
     }
 
@@ -98,19 +103,31 @@ final class BuilderFlowController extends Controller
         string $flow,
         ValidateFlowService $service,
         FlowDraftRepositoryInterface $drafts,
+        TemplateExpander $templates,
     ): JsonResponse {
         $definition      = $request->validated('definition');
         $definitionNodes = $this->extractDefinitionNodes($definition);
         $definitionEdges = $this->extractDefinitionEdges($definition);
         $triggerPayload  = $this->normalizeTriggerPayload($request->validated('trigger'));
+        $draft           = $drafts->findByFlowId($flow);
 
         $result = $service->execute(
             nodes: $definitionNodes,
             trigger: $triggerPayload,
             flowId: $flow,
             edges: $definitionEdges,
-            assistantId: $drafts->findByFlowId($flow)->assistant_id,
+            assistantId: $draft->assistant_id,
         );
+
+        $templateErrors = $templates->draftErrors($definitionNodes, $definitionEdges, $draft->assistant_id, $draft->isTemplate());
+
+        if ([] !== $templateErrors) {
+            $result = new FlowValidationResultDto(
+                valid: false,
+                errors: [...$result->errors, ...$templateErrors],
+                warnings: $result->warnings,
+            );
+        }
 
         return response()->json($result);
     }

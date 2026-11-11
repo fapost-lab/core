@@ -42,6 +42,7 @@ use App\Http\Controllers\Console\FlowController;
 use App\Http\Controllers\Console\FlowGroupController;
 use App\Http\Controllers\Console\FlowLogController;
 use App\Http\Controllers\Console\FlowSessionController;
+use App\Http\Controllers\Console\FlowTemplateController;
 use App\Http\Controllers\Console\LocaleController;
 use App\Http\Controllers\Console\NotificationController;
 use App\Http\Controllers\Console\TranslationController;
@@ -258,6 +259,14 @@ Route::domain(TenantHost::panelDomain())->group(function (): void {
         // The state is sent (`active`), not toggled, so a repeated request changes nothing.
         Route::patch('assistant/{assistant}/flows/{record}/active', [FlowController::class, 'updateActivity'])->name('console.flows.activity');
         Route::delete('assistant/{assistant}/flows/{record}', [FlowController::class, 'destroy'])->name('console.flows.destroy');
+
+        // Flow templates: drafts of kind `template`, listed beside the flows. Creating one ends in the builder; deleting
+        // is refused while a flow still places it.
+        Route::get('assistant/{assistant}/flow-templates', [FlowTemplateController::class, 'index'])->name('console.flow-templates.index');
+        Route::get('assistant/{assistant}/flow-templates/create', [FlowTemplateController::class, 'create'])->name('console.flow-templates.create');
+        Route::post('assistant/{assistant}/flow-templates', [FlowTemplateController::class, 'store'])->name('console.flow-templates.store');
+        Route::delete('assistant/{assistant}/flow-templates', [FlowTemplateController::class, 'destroyMany'])->name('console.flow-templates.destroy-many');
+        Route::delete('assistant/{assistant}/flow-templates/{record}', [FlowTemplateController::class, 'destroy'])->name('console.flow-templates.destroy');
 
         // Broadcasts reach real people. `send` carries the revision the person confirmed and starts a draft at most once;
         // `cancel` and `delete` are conditional on the status; `reach` is a read, throttled because each call counts in the database.

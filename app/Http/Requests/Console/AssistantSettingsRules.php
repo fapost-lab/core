@@ -8,6 +8,7 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Support\ContentLanguages;
 use App\Domains\Assistant\Support\CountryCatalog;
 use App\Domains\Flow\Commands\CommandActionType;
+use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Services\AssistantSettingsService;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -42,7 +43,9 @@ final class AssistantSettingsRules
     ): array {
         $flow = Rule::exists('flow_drafts', 'flow_id')
             ->where('tenant_id', $tenants->get()->getId())
-            ->where('assistant_id', (string) $assistant->get()->getKey());
+            ->where('assistant_id', (string) $assistant->get()->getKey())
+            // A template is never a flow to start: neither the default one nor the target of a command.
+            ->where('kind', FlowKind::Flow->value);
 
         $rules = [
             // A locked language is not validated: it is not saved either.

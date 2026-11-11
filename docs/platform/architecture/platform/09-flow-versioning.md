@@ -9,6 +9,7 @@
 | Component | Description |
 | --- | --- |
 | **flow_definitions** | Every publish creates a new row with a full JSON snapshot of the nodes and edges. `version` increments per logical `flow_id` (`PublishFlowService`). Publishing deactivates the previous row (`is_active`), so one definition per flow is active. |
+| **Template republish** | Publishing a flow template creates a new version of every flow that places it, built from that flow's active definition (never its draft) with a fresh copy of the template; the row records `republished_by_template_flow_id` / `_version`. Sessions already running keep their version (`adr-20261111-flow-templates-expanded-at-publish`). |
 | **flow_sessions** | Pin `flow_definition_id` and `flow_version` at start. A session runs against its own snapshot to the end and is never migrated automatically. |
 | **Node version field** | `{ "type": "condition", "version": 2, "config": {} }`. The engine resolves the handler by `type@version` from the in-memory registry. |
 | **NodeHandlerRegistry** | In-memory, assembled at boot from service providers (`NodeHandlerRegistry`). Code is the source of truth; the database holds no handler registry. |

@@ -48,6 +48,9 @@ export const NODE_TYPE_COLORS: Record<string, NodeColorScheme> = {
     // Composition
     subflow:       { bg: 'var(--indigo-bg)',          color: 'var(--indigo)',       icon: '🪆' },
 
+    template:        { bg: 'var(--indigo-bg)', color: 'var(--indigo)', icon: '🧩' },
+    template_output: { bg: 'var(--rose-bg)',   color: 'var(--rose)',   icon: '📤' },
+
     // Access control / branching on auth result
     auth_request:  { bg: 'var(--amber-bg)',  color: 'var(--amber)',  icon: '🔐' },
 

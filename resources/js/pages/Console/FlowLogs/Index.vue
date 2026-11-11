@@ -19,6 +19,7 @@ import type { LiveChannel } from '@console/lib/live-updates'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { useLiveUpdates } from '@console/lib/useLiveUpdates'
 import { interpolate } from '@console/shell'
+import { templateNodeLabel } from '../FlowSessions/templateNode'
 import CopyButton from '../Contacts/CopyButton.vue'
 import LiveHint from '../FlowSessions/LiveHint.vue'
 import type { ActivityPeriod } from '../FlowSessions/types'
@@ -141,6 +142,7 @@ const sessionFilter = computed(() => props.table.state.filters?.session ?? null)
 
       <template #cell-nodeId="{ row }">
         <span class="block max-w-40 truncate font-mono text-xs" :title="row.nodeId">{{ row.nodeId }}</span>
+        <span v-if="row.nodeOrigin" class="text-muted-foreground block max-w-56 truncate text-xs">{{ templateNodeLabel(t.template_node, row.nodeOrigin) }}</span>
       </template>
 
       <template #cell-sourceHandle="{ row }">

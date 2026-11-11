@@ -79,6 +79,17 @@ broken.
   Adding a writer means editing the whitelist, on purpose.
 - **A session runs the definition it started with.** `flow_definition_id` is set once, and
   definitions cannot be deleted while sessions reference them (`restrictOnDelete`).
+- **A flow template never starts a session.** Every start path (default flow, trigger, global
+  command, event job, subflow) loads its definition through
+  `FlowDefinitionRepositoryInterface::findLatestActiveByFlowId()`, which returns only `runnable()`
+  (`kind = flow`) definitions; a template has no trigger (refused on draft save) and is not offered
+  by any flow picker. A template runs only as a copy inside the flows that place it, expanded at
+  publish (`adr-20261111-flow-templates-expanded-at-publish`). Enforced:
+  `FlowTemplatePublishTest::test_a_template_is_never_found_as_a_flow_to_start_and_has_no_trigger`,
+  `AssistantSettingsConsoleTest`; a new start path that queries `flow_definitions` itself is review only.
+- **Copied template ids contain no dot and are the same in every template version.** Expansion
+  re-issues each id as `UUIDv5(reference node, old id)`, because state keys are split on `.` and
+  button ids are `uuid` columns and edge handles. Enforced: `FlowTemplatePublishTest`.
 - **Execution is bounded.** The engine stops after the platform setting `flow.execution.max_iterations`
   (`FlowEngineInterface::MAX_ITERATIONS_SETTING`, read through the scoped `PlatformSettingsReaderInterface`); a lost
   session lock aborts with `SessionLockLostException`.
@@ -88,7 +99,8 @@ broken.
 - **Keep old handler versions registered after a breaking change.** The registry resolves by
   `type@version()` only; `supportedVersions()` is validated but never used for lookup. So a
   handler that declares `[2, 1]` does not serve v1 nodes — the v1 class must stay registered.
-  Why: existing definitions keep their node versions forever. Review only.
+  Why: existing definitions keep their node versions forever. This holds for the template
+  pass-throughs too: `template@1` and `template_output@1` stay registered for good. Review only.
 - **A handler's side effect must be safe to repeat.** Markers are persisted after the side
   effect, in a separate step (`FlowEngine`), so a crash between the two repeats the effect on
   retry. Check a marker before acting, and rely on a downstream idempotency key where one exists

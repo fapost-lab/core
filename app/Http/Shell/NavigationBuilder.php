@@ -65,6 +65,7 @@ final readonly class NavigationBuilder
             $this->entry($overview, 'console.dashboard', __('console.navigation.dashboard'), 'layout-grid', -100, Gate::forUser($user)->allows('view', $assistant)),
             $this->entry($channels, 'console.channels.index', __('staff.channels.plural_label'), 'signal', 10, $this->canViewAny($user, Channel::class)),
             $this->entry($flow, 'console.flows.index', __('assistant.flows.plural_label'), 'arrow-left-right', 40, $this->canViewAny($user, FlowDraft::class)),
+            $this->entry($flow, 'console.flow-templates.index', __('console.flow_templates.navigation'), 'layout-template', 45, $this->canViewAny($user, FlowDraft::class)),
             $this->entry($flow, 'console.flow-groups.index', __('assistant.flow_groups.plural_label'), 'folder-open', 50, $this->canViewAny($user, FlowGroup::class)),
             $this->entry($operations, 'console.flow-sessions.index', __('assistant.flow_sessions.plural_label'), 'list', 60, $this->canViewAny($user, FlowSession::class)),
             $this->entry($operations, 'console.flow-logs.index', __('assistant.flow_logs.plural_label'), 'file-text', 70, $this->canViewAny($user, FlowLog::class)),

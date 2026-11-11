@@ -15,6 +15,7 @@ import type { LiveChannel } from '@console/lib/live-updates'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { useLiveUpdates } from '@console/lib/useLiveUpdates'
 import { interpolate } from '@console/shell'
+import { templateNodeLabel } from './templateNode'
 import CopyButton from '../Contacts/CopyButton.vue'
 import LiveHint from './LiveHint.vue'
 import { END_STATUS_TONES, STATUS_TONES, type FlowSessionDetails, type FlowSessionsPageProps, type HistoryEntry, type KeyValue } from './types'
@@ -95,6 +96,7 @@ function when(value: string | null): string | null {
           <div class="flex min-w-0 flex-col gap-1">
             <dt class="text-muted-foreground text-sm">{{ t.view.current_node }}</dt>
             <dd class="truncate font-mono text-sm">{{ session.currentNodeId ?? t.view.empty_value }}</dd>
+            <dd v-if="session.currentNodeOrigin" class="text-muted-foreground truncate text-xs">{{ templateNodeLabel(t.template_node, session.currentNodeOrigin) }}</dd>
           </div>
           <div class="flex min-w-0 flex-col gap-1">
             <dt class="text-muted-foreground text-sm">{{ t.view.flow }}</dt>
@@ -175,6 +177,7 @@ function when(value: string | null): string | null {
             <div class="flex flex-wrap items-center gap-2 text-sm">
               <Badge variant="neutral">{{ entry.event }}</Badge>
               <span class="font-mono text-xs">{{ entry.nodeId }}</span>
+              <span v-if="entry.nodeOrigin" class="text-muted-foreground text-xs">{{ templateNodeLabel(t.template_node, entry.nodeOrigin) }}</span>
               <span v-if="entry.path" class="text-muted-foreground font-mono text-xs">{{ entry.path }}</span>
               <span v-if="entry.createdAt" class="text-muted-foreground ml-auto text-xs" :title="entry.createdAt">{{ when(entry.createdAt) }}</span>
             </div>

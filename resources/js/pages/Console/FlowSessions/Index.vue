@@ -17,6 +17,7 @@ import type { LiveChannel } from '@console/lib/live-updates'
 import { relativeTime } from '@fapost/ui/lib/relative-time'
 import { useLiveUpdates } from '@console/lib/useLiveUpdates'
 import { interpolate } from '@console/shell'
+import { templateNodeLabel } from './templateNode'
 import CopyButton from '../Contacts/CopyButton.vue'
 import LiveHint from './LiveHint.vue'
 import { END_STATUS_TONES, STATUS_TONES, type ActivityPeriod, type FlowSessionRow, type FlowSessionStatus, type FlowSessionsPageProps } from './types'
@@ -145,7 +146,8 @@ function endStatusLabel(value: string): string {
       </template>
 
       <template #cell-currentNodeId="{ row }">
-        <span v-if="row.currentNodeId" class="font-mono text-xs">{{ row.currentNodeId }}</span>
+        <span v-if="row.currentNodeOrigin" class="block max-w-56 truncate text-xs" :title="row.currentNodeId ?? ''">{{ templateNodeLabel(t.template_node, row.currentNodeOrigin) }}</span>
+        <span v-else-if="row.currentNodeId" class="font-mono text-xs">{{ row.currentNodeId }}</span>
         <span v-else class="text-muted-foreground">—</span>
       </template>
 
