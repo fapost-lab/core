@@ -8,8 +8,8 @@ paths:
   - app/Domains/Flow/Providers/FlowServiceProvider.php
 source: docs/platform/runtime/flow/10-registered-nodes-catalog.md
 summary: "Every registered node handler: type, version, class, purpose"
-source_hash: 274f5bd63156b61dc781734e6bc4c86c64da743b
-reviewed_at: 2026-10-21
+source_hash: f5ad6c13cd3655983ffff53ed77e34ffac6021be
+reviewed_at: 2026-11-11
 ---
 # 10. Registered Nodes Catalog
 
