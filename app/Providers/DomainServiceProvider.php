@@ -63,7 +63,6 @@ use App\Domains\Tenancy\Settings\BuiltTenantSettings;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
 use App\Domains\Tenancy\ValueObjects\PlatformSettingField;
-use App\Http\Shell\SolutionsPresenter;
 use Closure;
 use Fapost\Foundation\Quota\Contracts\LimitNoticeInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
