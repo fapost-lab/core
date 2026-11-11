@@ -5,7 +5,6 @@ import { defineComponent } from 'vue'
 import UsageWidget from '../AdminDashboard/UsageWidget.vue'
 import type { UsageWidgetData } from '../AdminDashboard/types'
 import Index from './Index.vue'
-import UsageBar from './UsageBar.vue'
 import type { UsageRowData } from './types'
 
 const { page } = vi.hoisted(() => ({ page: { props: {} as Record<string, unknown>, url: '/admin/usage' } }))
@@ -60,24 +59,6 @@ beforeEach(() => {
   page.props = { translations, locale: 'en' }
 })
 
-describe('UsageBar', () => {
-  it('is a meter with its value and range for assistive technology', () => {
-    const bar = mount(UsageBar, { props: { percent: 82.4, tone: 'warning', label: 'Assistants, 82% used' } })
-    const meter = bar.get('[role="meter"]')
-
-    expect(meter.attributes('aria-valuenow')).toBe('82')
-    expect(meter.attributes('aria-valuemin')).toBe('0')
-    expect(meter.attributes('aria-valuemax')).toBe('100')
-    expect(meter.attributes('aria-label')).toBe('Assistants, 82% used')
-    expect(bar.get('[role="meter"] > div').classes()).toContain('bg-warning-dot')
-  })
-
-  it('never goes past the ends of the range', () => {
-    expect(mount(UsageBar, { props: { percent: 140, tone: 'danger', label: 'x' } }).get('[role="meter"]').attributes('aria-valuenow')).toBe('100')
-    expect(mount(UsageBar, { props: { percent: -3, tone: 'primary', label: 'x' } }).get('[role="meter"]').attributes('aria-valuenow')).toBe('0')
-  })
-})
-
 describe('usage page', () => {
   it('lists each limit in its card with "N of M", a bar and the state badge', () => {
     const wrapper = mount(Index, {
@@ -96,11 +77,11 @@ describe('usage page', () => {
     expect(wrapper.get('[data-test="row-assistants"] [data-test="value"]').text()).toBe('3 of 5')
     expect(wrapper.find('[data-test="row-assistants"] [data-test="state"]').exists()).toBe(false)
     expect(wrapper.get('[data-test="row-flows"] [data-test="state"]').text()).toBe('Almost used up')
-    expect(wrapper.get('[data-test="row-flows"] [data-test="usage-bar"]').attributes('data-tone')).toBe('warning')
+    expect(wrapper.get('[data-test="row-flows"] [data-slot="meter"]').attributes('data-tone')).toBe('warning')
     expect(wrapper.get('[data-test="row-calls"] [data-test="state"]').text()).toBe('Limit reached')
     expect(wrapper.get('[data-test="section-per_period"]').text()).toContain('Period until November 1, 2026')
     expect(wrapper.get('[data-test="row-media_storage"] [data-test="state"]').text()).toBe('Unlimited')
-    expect(wrapper.find('[data-test="row-media_storage"] [data-test="usage-bar"]').exists()).toBe(false)
+    expect(wrapper.find('[data-test="row-media_storage"] [data-slot="meter"]').exists()).toBe(false)
     expect(wrapper.get('[data-test="operator-action"]').attributes('href')).toBe('https://example.test/billing')
     expect(wrapper.find('[data-test="no-limits"]').exists()).toBe(false)
   })

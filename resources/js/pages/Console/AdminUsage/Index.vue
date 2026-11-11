@@ -12,8 +12,8 @@ import { Badge } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@fapost/ui/components/card'
 import { EmptyState } from '@fapost/ui/components/empty-state'
+import { Meter } from '@fapost/ui/components/meter'
 import { interpolate } from '@console/shell'
-import UsageBar from './UsageBar.vue'
 import type { UsageAction, UsagePageProps, UsageRowData } from './types'
 import { badgeFor, barTone, groupByKind, hasBar, sharedPeriodEnd, valueText } from './usage'
 
@@ -76,7 +76,7 @@ function meterLabel(row: UsageRowData): string {
               <span class="tabular-nums" data-test="value">{{ valueText(row, t) }}</span>
             </div>
 
-            <UsageBar v-if="hasBar(row)" :percent="row.percent ?? 0" :tone="barTone(row.state)" :label="meterLabel(row)" />
+            <Meter v-if="hasBar(row)" :value="row.percent ?? 0" :tone="barTone(row.state)" :label="meterLabel(row)" />
 
             <div class="flex flex-wrap items-center gap-2">
               <Badge v-if="badgeFor(row.state)" :variant="badgeFor(row.state)!.variant" data-test="state">{{ t.state[badgeFor(row.state)!.text] }}</Badge>

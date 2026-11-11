@@ -4,8 +4,8 @@ import { Link, usePage } from '@inertiajs/vue3'
 import { Gauge } from '@lucide/vue'
 import { Badge } from '@fapost/ui/components/badge'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@fapost/ui/components/card'
+import { Meter } from '@fapost/ui/components/meter'
 import { interpolate } from '@console/shell'
-import UsageBar from '../AdminUsage/UsageBar.vue'
 import { badgeFor, barTone, hasBar, valueText } from '../AdminUsage/usage'
 import type { UsageRowData } from '../AdminUsage/types'
 import type { AdminDashboardPageProps, UsageWidgetData } from './types'
@@ -45,7 +45,7 @@ function meterLabel(row: UsageRowData): string {
               <span class="text-[13px] tabular-nums">{{ valueText(row, labels) }}</span>
             </span>
           </div>
-          <UsageBar v-if="hasBar(row)" :percent="row.percent ?? 0" :tone="barTone(row.state)" :label="meterLabel(row)" />
+          <Meter v-if="hasBar(row)" :value="row.percent ?? 0" :tone="barTone(row.state)" :label="meterLabel(row)" />
         </li>
       </ul>
       <p v-if="props.usage.total > props.usage.rows.length" class="text-muted-foreground mt-3 text-[13px]">

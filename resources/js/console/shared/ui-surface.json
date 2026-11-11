@@ -17,6 +17,7 @@
         "components/input",
         "components/label",
         "components/localized-field",
+        "components/meter",
         "components/options-picker",
         "components/select",
         "components/separator",

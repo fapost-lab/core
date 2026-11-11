@@ -171,10 +171,6 @@ A console screen copies the contact-groups pilot; deviate only with a reason.
   and data older than two intervals each have their own state, and a request that hangs is cancelled after 10 s. What the
   probes say is scrubbed before it leaves (URLs lose credentials and query; channel names are not sent).
 
-- **Temporary exception: `UsageBar`.** `resources/js/pages/Console/AdminUsage/UsageBar.vue` is used by two screens (the usage
-  page and the dashboard card) although a control a second screen needs belongs in the kit. It waits for a kit release;
-  follow-up task `kit-meter-component` moves it to `@fapost/ui` as `Meter`. Do not copy this exception.
-
 ## Example
 
 `ContactGroupController`, `ContactGroupService`, `ContactGroupRequest`,
