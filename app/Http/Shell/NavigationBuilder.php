@@ -109,6 +109,10 @@ final readonly class NavigationBuilder
     /**
      * The menu of the tenant-wide screens (`admin/*`).
      *
+     * The support access log is listed only while support access is switched on (`tenancy.support_access.enabled`): an
+     * installation without an operator package, a self-hosted one among them, has no platform operator who could enter,
+     * so the entry would only lead to an empty table. The screen itself stays reachable by its address.
+     *
      * @return list<Group>
      */
     public function admin(User $user): array
@@ -122,7 +126,7 @@ final readonly class NavigationBuilder
             $this->entry(__('staff.assistants.label'), 'console.admin.assistants.index', __('staff.assistants.plural_label'), 'rocket', 0, $this->canViewAny($user, Assistant::class)),
             $this->entry($staff, 'console.admin.users.index', __('staff.users.plural_label'), 'users', 0, $this->canViewAny($user, User::class)),
             $this->entry($staff, 'console.admin.roles.index', __('staff.roles.plural_label'), 'shield-check', 0, $this->canViewAny($user, Role::class)),
-            $this->entry($staff, 'console.admin.support-access.index', __('console.support_access.title'), 'life-buoy', 10, $this->canViewAny($user, SupportAccessEntry::class)),
+            $this->entry($staff, 'console.admin.support-access.index', __('console.support_access.title'), 'life-buoy', 10, true === config('tenancy.support_access.enabled') && $this->canViewAny($user, SupportAccessEntry::class)),
             $this->entry(
                 $media,
                 'console.admin.media.index',

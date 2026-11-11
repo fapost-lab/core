@@ -84,6 +84,8 @@ final class AdminSupportAccessConsoleTest extends FeatureTestCase
 
     public function test_the_admin_menu_links_to_the_log_inside_the_shell(): void
     {
+        config(['tenancy.support_access.enabled' => true]);
+
         $this->actingAs($this->admin())
             ->get($this->url())
             ->assertInertia(fn (AssertableInertia $page) => $page
@@ -92,6 +94,19 @@ final class AdminSupportAccessConsoleTest extends FeatureTestCase
                     ->contains(static fn (array $item): bool => 'console.admin.support-access.index' === $item['key']
                         && '/admin/support-access' === $item['href']
                         && false === $item['external']))
+                ->etc());
+    }
+
+    public function test_the_admin_menu_hides_the_log_while_support_access_is_off(): void
+    {
+        config(['tenancy.support_access.enabled' => false]);
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('navigation.groups', fn ($groups): bool => ! collect($groups)
+                    ->flatMap(static fn (array $group): array => $group['items'])
+                    ->contains(static fn (array $item): bool => 'console.admin.support-access.index' === $item['key']))
                 ->etc());
     }
 

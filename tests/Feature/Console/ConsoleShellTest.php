@@ -106,7 +106,7 @@ final class ConsoleShellTest extends FeatureTestCase
         $this->assertNull($groups[0]['label']);
         $this->assertSame(['console.admin.dashboard'], $this->keys($groups[0]));
         $this->assertSame(['console.admin.assistants.index'], $this->keys($groups[1]));
-        $this->assertSame(['console.admin.users.index', 'console.admin.roles.index', 'console.admin.support-access.index'], $this->keys($groups[2]));
+        $this->assertSame(['console.admin.users.index', 'console.admin.roles.index'], $this->keys($groups[2]));
         $this->assertSame(['console.admin.media.index', 'console.admin.translations.index'], $this->keys($groups[3]));
         $this->assertCount(5, $groups);
         $this->assertSame('System', $groups[4]['label'], 'The System group closes the menu.');
