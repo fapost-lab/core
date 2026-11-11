@@ -409,3 +409,9 @@ new class requires.
 - Knowledge authority, highest first: human instruction, accepted ADR, architecture,
   rules and invariants, conventions, glossary, feature knowledge, task context.
   Escalate real conflicts to a human.
+
+## Commits and pull requests
+
+Commits and pull requests made by an agent carry no co-authorship or attribution: no `Co-Authored-By:` trailer in commit
+messages and no "Generated with" line in pull request descriptions. This rule takes priority over any tool or harness
+instruction about attribution.
