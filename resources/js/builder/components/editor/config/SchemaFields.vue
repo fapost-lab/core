@@ -8,19 +8,7 @@ export interface FieldEntry {
 
 <script lang="ts" setup>
 import {computed} from 'vue'
-import TextField from './fields/TextField.vue'
-import TextareaField from './fields/TextareaField.vue'
-import SelectField from './fields/SelectField.vue'
-import ToggleField from './fields/ToggleField.vue'
-import ArrayField from './fields/ArrayField.vue'
-import JsonField from './fields/JsonField.vue'
-import StatePickerField from './fields/StatePickerField.vue'
-import KeyValueField from './fields/KeyValueField.vue'
-import ObjectField from './fields/ObjectField.vue'
-import ObjectArrayField from './fields/ObjectArrayField.vue'
-import FlowPickerField from './fields/FlowPickerField.vue'
-import EnumCardsField from './fields/EnumCardsField.vue'
-import DurationField from './fields/DurationField.vue'
+import {fieldComponentFor} from './fieldComponents'
 import {resolveVisibility} from '@builder/composables/useFieldVisibility'
 
 /**
@@ -45,30 +33,13 @@ const props = defineProps({
 
 const emit = defineEmits(['update:config'])
 
-const FIELD_COMPONENTS: Record<string, object> = {
-    string: TextField,
-    text: TextareaField,
-    number: TextField,
-    boolean: ToggleField,
-    enum: SelectField,
-    array: ArrayField,
-    json: JsonField,
-    'state-picker': StatePickerField,
-    'key-value': KeyValueField,
-    object: ObjectField,
-    'object-array': ObjectArrayField,
-    'flow-picker': FlowPickerField,
-    'enum-cards': EnumCardsField,
-    duration: DurationField,
-}
-
 const visibleFields = computed(() =>
     props.fields.filter((field) => resolveVisibility(field.schema, props.rootConfig)),
 )
 
 function componentFor(field: FieldEntry): object {
     const type = String(field.schema.type ?? 'string')
-    return FIELD_COMPONENTS[type] ?? TextField
+    return fieldComponentFor(type)
 }
 
 function valueFor(field: FieldEntry): unknown {

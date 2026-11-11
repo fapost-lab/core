@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Templates;
 
+use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\Enums\FlowKind;
+use App\Domains\Flow\Handlers\LoopEndNodeHandler;
+use App\Domains\Flow\Handlers\LoopNodeHandler;
 use App\Domains\Flow\Handlers\TemplateNodeHandler;
 use App\Domains\Flow\Handlers\TemplateOutputNodeHandler;
 use App\Domains\Flow\Models\FlowDefinition;
@@ -30,7 +33,11 @@ use Ramsey\Uuid\Uuid;
  * 3. R keeps its incoming edges and gets an `enter` edge into the copy's entry node; every edge `R --name--> X`
  *    becomes `output' --default--> X` from each copy of an output with that name. R's config records the template
  *    definition and version it carries and its `exits` (name → target), so the published graph can be collapsed
- *    back to its draft shape ({@see collapse()}) when a template publish republishes the host.
+ *    back to its draft shape ({@see collapse()}) when a template publish republishes the host;
+ * 4. each parameter the host sets on R (`parameter_values`, by key) replaces, in the copy, the field the template
+ *    declared it for (`parameters` on the template's node). This happens after the ids are re-issued, so the host's
+ *    text never passes through the id map. An empty value keeps the template's own value; a non-empty value for a
+ *    key the template no longer has is an error, as an edge from a vanished output is.
  */
 final readonly class TemplateExpander
 {
@@ -43,8 +50,127 @@ final readonly class TemplateExpander
 
     /** Node key recording where a copied node came from. */
     public const string ORIGIN = 'origin';
+
+    /**
+     * Node key, in a template, declaring which fields of that node are parameters: `[{key, label, field}]`. A copy
+     * never carries it.
+     */
+    public const string NODE_PARAMETERS = 'parameters';
+
+    /** Reference config key holding the snapshot of the template's parameters the builder renders. */
+    public const string CONFIG_PARAMETERS = 'parameters';
+
+    /** Reference config key holding the host's values, by parameter key. */
+    public const string CONFIG_PARAMETER_VALUES = 'parameter_values';
+
+    public const string PARAMETER_KEY_PATTERN = '/^[a-z][a-z0-9_]{0,63}$/';
+
+    /**
+     * Schema field types a parameter may expose. Object-shaped fields are left out: their items carry ids (buttons)
+     * that the copy's edges hang off as handles, and a host value would not carry the copy's re-issued ids.
+     */
+    public const array EXPOSABLE_FIELD_TYPES = [
+        'string', 'text', 'number', 'boolean', 'enum', 'enum-cards', 'duration', 'array', 'state-picker', 'flow-picker',
+    ];
+
+    /** Node types whose fields hold the copy's own wiring, so none of them may be a parameter. */
+    public const array NON_PARAMETERIZABLE_NODE_TYPES = [
+        TemplateNodeHandler::TYPE,
+        TemplateOutputNodeHandler::TYPE,
+        LoopNodeHandler::TYPE,
+        LoopEndNodeHandler::TYPE,
+    ];
+
     /** Namespace of the copied ids. Changing it re-issues every id of every copy on the next publish. */
     private const string ID_NAMESPACE = '6f1c3a52-8f0e-5b7d-9c4e-2a9d1b7e3f60';
+
+    public function __construct(
+        private NodeHandlerRegistryInterface $registry,
+    ) {
+    }
+
+    /**
+     * The snapshot of a template's parameters a reference node keeps for the builder: no node id and no value, so a
+     * change of the template's texts never changes a host's draft.
+     *
+     * @param  list<array{key: string, label: string|null, node_id: string, node_type: string, node_version: int, field: string, default: mixed}>  $parameters
+     *
+     * @return list<array{key: string, label: string|null, node_type: string, node_version: int, field: string}>
+     */
+    public static function parameterSnapshot(array $parameters): array
+    {
+        return array_map(static fn (array $parameter): array => [
+            'key'          => $parameter['key'],
+            'label'        => $parameter['label'],
+            'node_type'    => $parameter['node_type'],
+            'node_version' => $parameter['node_version'],
+            'field'        => $parameter['field'],
+        ], $parameters);
+    }
+
+    /**
+     * Whether a host's parameter value is empty, so the template's own value stays: null, a blank string, an empty
+     * list, or a language map without a non-blank text. `false` and `0` are values.
+     */
+    public static function isEmptyParameterValue(mixed $value): bool
+    {
+        if (null === $value) {
+            return true;
+        }
+
+        if (is_string($value)) {
+            return '' === mb_trim($value);
+        }
+
+        if (! is_array($value)) {
+            return false;
+        }
+
+        if ([] === $value) {
+            return true;
+        }
+
+        if (array_is_list($value)) {
+            return false;
+        }
+
+        foreach ($value as $text) {
+            if (! is_string($text) || '' !== mb_trim($text)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * A host's non-empty value as it goes into the copy. In a language map, a language the host left blank keeps the
+     * template's text for that language (its map entry, or its plain text), so a contact never gets an empty message
+     * where the template has one; a blank language the template has no text for is dropped and resolves as any
+     * missing language does. Any other value is taken as it is.
+     */
+    public static function withTemplateLanguages(mixed $value, mixed $templateValue): mixed
+    {
+        if (! is_array($value) || array_is_list($value)) {
+            return $value;
+        }
+
+        foreach ($value as $language => $text) {
+            if (! is_string($text) || '' !== mb_trim($text)) {
+                continue;
+            }
+
+            $fallback = is_array($templateValue) ? ($templateValue[$language] ?? null) : $templateValue;
+
+            if (is_string($fallback) && '' !== mb_trim($fallback)) {
+                $value[$language] = $fallback;
+            } else {
+                unset($value[$language]);
+            }
+        }
+
+        return $value;
+    }
 
     /**
      * Expands every reference node of a host graph whose drafts belong to `$assistantId`.
@@ -226,7 +352,7 @@ final readonly class TemplateExpander
 
     /**
      * Checks a template's own graph before it is published: one entry node, valid and unique-per-name outputs, no
-     * template inside a template.
+     * template inside a template, and parameters with a valid key unique in the template on an exposable field.
      *
      * @param  array<int, mixed>  $nodes  annotations already stripped
      * @param  array<int, mixed>  $edges
@@ -235,8 +361,9 @@ final readonly class TemplateExpander
      */
     public function validateTemplateGraph(array $nodes, array $edges): array
     {
-        $errors = [];
-        $ids    = [];
+        $errors        = [];
+        $ids           = [];
+        $parameterKeys = [];
 
         foreach ($nodes as $node) {
             if (! is_array($node) || ! is_string($node['id'] ?? null)) {
@@ -269,6 +396,8 @@ final readonly class TemplateExpander
                     );
                 }
             }
+
+            array_push($errors, ...$this->parameterDeclarationErrors($node, $path, $parameterKeys));
         }
 
         $withIncoming = [];
@@ -333,6 +462,48 @@ final readonly class TemplateExpander
         }
 
         return array_values($outputs);
+    }
+
+    /**
+     * The parameters of a published template, in the order of its nodes and then of each node's declarations. Each
+     * names the node and field it replaces and carries the template's current value of that field (`default`); a
+     * malformed declaration (its template publish refuses it) is skipped, and so is a key seen before.
+     *
+     * @return list<array{key: string, label: string|null, node_id: string, node_type: string, node_version: int, field: string, default: mixed}>
+     */
+    public function parametersOf(FlowDefinition $template): array
+    {
+        $parameters = [];
+
+        foreach (is_array($template->nodes) ? $template->nodes : [] as $node) {
+            if (! is_array($node) || ! is_string($node['id'] ?? null) || ! is_array($node[self::NODE_PARAMETERS] ?? null)) {
+                continue;
+            }
+
+            $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+
+            foreach ($node[self::NODE_PARAMETERS] as $declaration) {
+                $key   = is_array($declaration) ? ($declaration['key'] ?? null) : null;
+                $field = is_array($declaration) ? ($declaration['field'] ?? null) : null;
+
+                if (! is_string($key) || '' === $key || ! is_string($field) || '' === $field || isset($parameters[$key])) {
+                    continue;
+                }
+
+                $label            = $declaration['label'] ?? null;
+                $parameters[$key] = [
+                    'key'          => $key,
+                    'label'        => is_string($label) && '' !== $label ? $label : null,
+                    'node_id'      => $node['id'],
+                    'node_type'    => is_string($node['type'] ?? null) ? $node['type'] : '',
+                    'node_version' => is_int($node['version'] ?? null) ? $node['version'] : 1,
+                    'field'        => $field,
+                    'default'      => $config[$field] ?? null,
+                ];
+            }
+        }
+
+        return array_values($parameters);
     }
 
     /**
@@ -416,7 +587,19 @@ final readonly class TemplateExpander
         }
 
         $outputNames = array_column($this->outputsOf($definition), 'name');
+        $parameters  = $this->parametersOf($definition);
+        $values      = is_array($config[self::CONFIG_PARAMETER_VALUES] ?? null) ? $config[self::CONFIG_PARAMETER_VALUES] : [];
         $errors      = [];
+
+        foreach ($values as $key => $value) {
+            if (! self::isEmptyParameterValue($value) && ! in_array((string) $key, array_column($parameters, 'key'), true)) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "{$path}.config.parameter_values.{$key}",
+                    code: 'template_unknown_parameter',
+                    message: "Template '{$draft->name}' v{$definition->version} has no parameter '{$key}', but this flow sets it.",
+                );
+            }
+        }
 
         foreach (array_keys($exits) as $handle) {
             if (! in_array($handle, $outputNames, true)) {
@@ -447,7 +630,19 @@ final readonly class TemplateExpander
                 continue;
             }
 
-            $copy               = $this->rewrite($templateNode, $idMap);
+            $copy = $this->rewrite($templateNode, $idMap);
+            unset($copy[self::NODE_PARAMETERS]);
+
+            // After the id rewrite, so the host's values never pass through the id map.
+            foreach ($parameters as $parameter) {
+                $value = $values[$parameter['key']] ?? null;
+
+                if ($parameter['node_id'] === $templateNode['id'] && ! self::isEmptyParameterValue($value)) {
+                    $copy['config']                      = is_array($copy['config'] ?? null) ? $copy['config'] : [];
+                    $copy['config'][$parameter['field']] = self::withTemplateLanguages($value, $copy['config'][$parameter['field']] ?? null);
+                }
+            }
+
             $copy[self::ORIGIN] = [
                 'ref'              => $refId,
                 'template_flow_id' => $templateFlowId,
@@ -493,6 +688,7 @@ final readonly class TemplateExpander
         }
 
         $config[TemplateNodeHandler::CONFIG_OUTPUTS] = $this->outputsOf($definition);
+        $config[self::CONFIG_PARAMETERS]             = self::parameterSnapshot($parameters);
         $config[self::CONFIG_DEFINITION_ID]          = (string) $definition->getKey();
         $config[self::CONFIG_VERSION]                = $definition->version;
         $config[self::CONFIG_EXITS]                  = $exits;
@@ -575,6 +771,72 @@ final readonly class TemplateExpander
         }
 
         return $value;
+    }
+
+    /**
+     * Checks the parameters a template's node declares: each a valid key unique in the template, naming a top-level
+     * field of an exposable type that the node's schema declares.
+     *
+     * @param  array<string, mixed>  $node
+     * @param  array<string, true>   $keys  keys declared so far in the template
+     *
+     * @return list<FlowValidationErrorDto>
+     */
+    private function parameterDeclarationErrors(array $node, string $path, array &$keys): array
+    {
+        if (! array_key_exists(self::NODE_PARAMETERS, $node) || null === $node[self::NODE_PARAMETERS] || [] === $node[self::NODE_PARAMETERS]) {
+            return [];
+        }
+
+        $type    = $node['type'] ?? null;
+        $version = $node['version'] ?? null;
+
+        if (! is_array($node[self::NODE_PARAMETERS]) || in_array($type, self::NON_PARAMETERIZABLE_NODE_TYPES, true)) {
+            return [new FlowValidationErrorDto(
+                path: "{$path}.parameters",
+                code: 'template_parameter_invalid_field',
+                message: 'This node cannot have parameters.',
+            )];
+        }
+
+        $schema = is_string($type) && is_int($version) && $this->registry->has($type, $version)
+            ? $this->registry->resolve($type, $version)->configSchema()
+            : [];
+        $errors = [];
+
+        foreach (array_values($node[self::NODE_PARAMETERS]) as $index => $declaration) {
+            $key   = is_array($declaration) ? ($declaration['key'] ?? null) : null;
+            $field = is_array($declaration) ? ($declaration['field'] ?? null) : null;
+            $at    = "{$path}.parameters.{$index}";
+
+            if (! is_string($key) || 1 !== preg_match(self::PARAMETER_KEY_PATTERN, $key)) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "{$at}.key",
+                    code: 'template_parameter_invalid_key',
+                    message: 'A parameter needs a key of lowercase latin letters, digits and _, starting with a letter.',
+                );
+            } elseif (isset($keys[$key])) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "{$at}.key",
+                    code: 'template_parameter_duplicate_key',
+                    message: "The template already has a parameter '{$key}'.",
+                );
+            } else {
+                $keys[$key] = true;
+            }
+
+            $fieldSchema = is_string($field) && is_array($schema[$field] ?? null) ? $schema[$field] : null;
+
+            if (null === $fieldSchema || ! in_array($fieldSchema['type'] ?? null, self::EXPOSABLE_FIELD_TYPES, true)) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "{$at}.field",
+                    code: 'template_parameter_invalid_field',
+                    message: 'A parameter must name a top-level setting of this node that holds text, a number, a choice or a toggle.',
+                );
+            }
+        }
+
+        return $errors;
     }
 
     private function issueId(string $refId, string $oldId): string

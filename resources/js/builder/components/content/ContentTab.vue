@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {computed, ref} from 'vue'
 import {useBuilderStore} from '@builder/store/builderStore'
+import {isTranslatableField} from '@builder/utils/translatableFields'
+import {isEmptyParameterValue, readTemplateParameters} from '@builder/utils/templateNodes'
 import ContentEditorPanel from './ContentEditorPanel.vue'
 
 const builderStore = useBuilderStore()
@@ -73,6 +75,23 @@ const contentEntries = computed(() => {
                     values:     resolveValues(raw),
                 })
             })
+        }
+
+        if (type === 'template') {
+            const raw = config.parameter_values
+            const values = raw !== null && typeof raw === 'object' ? raw as Record<string, unknown> : {}
+            for (const param of readTemplateParameters(config)) {
+                if (!isTranslatableField(param.node_type, param.field) || isEmptyParameterValue(values[param.key])) continue
+                entries.push({
+                    key: `${node.id}.parameter_values.${param.key}`,
+                    nodeId: node.id,
+                    nodeType: type,
+                    nodeLabel: label,
+                    fieldLabel: param.label ?? param.key,
+                    fieldKind: 'text',
+                    values: resolveValues(values[param.key]),
+                })
+            }
         }
 
         if (type === 'input') {
@@ -183,6 +202,13 @@ function onSave() {
         config.prompt = {...localTranslations.value}
     } else if (parts[0] === 'on_invalid_message') {
         config.on_invalid_message = {...localTranslations.value}
+    } else if (parts[0] === 'parameter_values' && parts.length >= 2) {
+        // The parameter key is a single [a-z0-9_] token, so everything after the prefix is the key.
+        const raw = config.parameter_values
+        config.parameter_values = {
+            ...(raw !== null && typeof raw === 'object' ? raw as Record<string, unknown> : {}),
+            [parts.slice(1).join('.')]: {...localTranslations.value},
+        }
     } else if (parts[0] === 'buttons' && parts[2] === 'label') {
         const idx = Number(parts[1])
         const buttons = [...(Array.isArray(config.buttons) ? config.buttons as Array<Record<string, unknown>> : [])]

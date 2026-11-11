@@ -121,9 +121,13 @@ Before `ValidateFlowService`, each `template` node is expanded into a copy of it
 (`TemplateExpander`, `adr-20261111-flow-templates-expanded-at-publish`), and the copy is then validated
 with the rest of the graph. Expansion refuses `template_missing`, `template_not_found`,
 `template_cross_assistant`, `template_not_published`, `template_nested`, `template_unknown_output` (an
-edge from an output the template no longer has) and `template_output_outside_template`. A template's own
-publish checks `template_entry_not_single`, `template_output_invalid_name`, `template_output_has_edges`
-and `template_nested`, and fails with `template_breaks_flow` (path `template.hosts.<flowId>`) when a flow
+edge from an output the template no longer has), `template_unknown_parameter` (a non-empty
+`parameter_values` entry for a parameter the template no longer has) and
+`template_output_outside_template`. A template's own publish checks `template_entry_not_single`,
+`template_output_invalid_name`, `template_output_has_edges`, `template_nested`,
+`template_parameter_invalid_key`, `template_parameter_duplicate_key` and `template_parameter_invalid_field`
+(a parameter on a field that is not a top-level schema field of an exposable type, or on a `template`,
+`template_output`, `loop` or `loop_end` node), and fails with `template_breaks_flow` (path `template.hosts.<flowId>`) when a flow
 that uses it would not pass these checks with the new version. The builder's validate endpoint runs the
 same template checks on the draft.
 

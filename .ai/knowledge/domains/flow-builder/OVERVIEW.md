@@ -55,15 +55,22 @@ The Telegram mini app (`resources/js/tma`) is a separate surface and not part of
 - Frontend: `resources/js/builder/app.ts`, the single page `pages/FlowBuilder/FlowEditor.vue`,
   stores in `store/` (`builderStore`, `registryStore`, `selectionStore`, …), API client
   `api/builderApi.ts`, autosave `useAutoSave`.
-- Config UI: `components/editor/ConfigPanel.vue` (the override map) and `SchemaFields.vue`
-  (`FIELD_COMPONENTS`).
+- Config UI: `components/editor/ConfigPanel.vue` (the override map), `SchemaFields.vue`, and
+  `components/editor/config/fieldComponents.ts` (`FIELD_COMPONENTS`, shared with the template
+  parameter fields). The top-level translatable fields the Content tab and template parameters
+  share are listed in `utils/translatableFields.ts`.
 - Flow templates: the same editor opens a template (`kind = template`): the palette offers
   "Template output" instead of "Template", there is no trigger, and the header lists where the
   template is used and warns before a publish that republishes those flows. In a flow, the
   `template` node's handles come from the snapshot `config.outputs`, refreshed from
   `availableTemplates` on load (`utils/templateNodes.ts`). Publish expands it
   (`adr-20261111-flow-templates-expanded-at-publish`); the validate endpoint also runs the
-  template checks (`TemplateExpander::draftErrors`). The console lists templates under
+  template checks (`TemplateExpander::draftErrors`). Template parameters
+  (`adr-20261111-flow-template-parameters`): in a template, `TemplateParameterDeclarations.vue`
+  under a node's config panel declares the node's exposed fields (node key `parameters`); in a
+  flow, `TemplateConfig.vue` renders the snapshot `config.parameters` with the source fields'
+  components into `config.parameter_values`, and the Content tab lists the translatable ones that
+  are set. The console lists templates under
   `console.flow-templates.*` (`FlowTemplateController`).
 - Variable vocabulary: `StorageRadio.vue` shows staff "Profile" or "Temporary", but
   `StatePathPicker.vue` and the expression placeholders still show `flow.*` / `contact.*` paths and

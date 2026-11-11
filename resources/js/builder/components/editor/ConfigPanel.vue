@@ -5,6 +5,7 @@ import {useBuilderStore} from '@builder/store/builderStore'
 import {useRegistryStore} from '@builder/store/registryStore'
 import type {BuilderTriggerPayload, NodeConfig} from '@builder/dto/types'
 import {useConfigResize} from '@builder/composables/useConfigResize'
+import {NON_PARAMETERIZABLE_NODE_TYPES} from '@builder/utils/templateNodes'
 import {nodeColors} from '@builder/utils/nodeColors'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 import SchemaConfigRenderer from './config/SchemaConfigRenderer.vue'
@@ -19,6 +20,7 @@ import SetTagConfig from './config/overrides/SetTagConfig.vue'
 import LoopConfig from './config/overrides/LoopConfig.vue'
 import LoopEndConfig from './config/overrides/LoopEndConfig.vue'
 import TemplateConfig from './config/overrides/TemplateConfig.vue'
+import TemplateParameterDeclarations from './config/TemplateParameterDeclarations.vue'
 import TriggerConfig from './config/overrides/TriggerConfig.vue'
 
 // Core bespoke config panels. A type without an override falls back to the
@@ -171,6 +173,12 @@ function deleteTrigger() {
                                 :node="selectedNode"
                                 :schema="handlerMeta?.config_schema ?? {}"
                                 @update:config="updateConfig"
+                            />
+                            <TemplateParameterDeclarations
+                                v-if="builderStore.isTemplate && !NON_PARAMETERIZABLE_NODE_TYPES.includes(selectedNode.type)"
+                                :node-id="selectedNode.id"
+                                :node-type="selectedNode.type"
+                                :schema="handlerMeta?.config_schema ?? {}"
                             />
                         </div>
                     </div>
