@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Support;
 
+use App\Domains\Solution\Services\InstalledPackagesReader;
+
 /**
  * The packages installed on top of Core's `composer.lock`: what `composer overlay` added, with the dependencies it
  * brought in, and nothing Core locks (tools/composer-overlay.php refuses to overlay those and writes its own lock).
@@ -41,10 +43,9 @@ final class OverlayPackages
      */
     private static function compute(string $installedPath, string $lockPath): array
     {
-        $installed = self::decode($installedPath);
-        $lock      = self::decode($lockPath);
+        $lock = self::decode($lockPath);
 
-        if (null === $installed || null === $lock) {
+        if (null === $lock || !is_file($installedPath)) {
             return [];
         }
 
@@ -58,8 +59,8 @@ final class OverlayPackages
 
         $overlay = [];
 
-        foreach ($installed['packages'] ?? $installed as $package) {
-            $name = is_array($package) ? ($package['name'] ?? null) : null;
+        foreach ((new InstalledPackagesReader(dirname($installedPath, 2)))->entries() as $package) {
+            $name = $package['name'] ?? null;
 
             if (is_string($name) && !isset($locked[mb_strtolower($name)])) {
                 $overlay[] = $name;

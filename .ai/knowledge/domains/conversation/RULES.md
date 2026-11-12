@@ -50,7 +50,8 @@ broken.
   asked may die while an operator holds the thread (`adr-20261111-operator-request-on-thread`). Enforced:
   `OperatorRequestsTest`.
 - **Conversation does not depend on Flow.** What Flow must do after a request changes state reaches it only
-  through `OperatorRequestStateChanged`, dispatched after commit. Review only.
+  through `OperatorRequestStateChanged`, dispatched after commit. Enforced: `ConversationBoundariesTest`
+  (PHPat; also covers `App\Jobs\Flow` and `App\Infrastructure\Flow`).
 - **Every notification about an operator request is dimmed once the request stops waiting** (marked read and
   rendered again with the outcome, the acceptor's own included), so no bell calls into a taken thread and the
   "one unread per thread" rule does not hold back the acceptor's message notifications. Request recipients and

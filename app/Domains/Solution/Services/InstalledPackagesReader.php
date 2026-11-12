@@ -71,11 +71,12 @@ final class InstalledPackagesReader
     }
 
     /**
-     * Both installed.json formats: Composer 2 wraps the list in `packages`, Composer 1 is the list.
+     * Every entry of installed.json, Solution or not. Both formats are read: Composer 2 wraps the list in `packages`,
+     * Composer 1 is the list.
      *
      * @return list<array<string, mixed>>
      */
-    private function entries(): array
+    public function entries(): array
     {
         $contents = $this->contents($this->installedJsonPath());
 
