@@ -138,8 +138,8 @@ From an independent failure hunt (2026-10-05), sharpest first.
   added when the shell needs it. The first slice is a walking skeleton: the shell provisions a
   tester tenant with a plan of at most one assistant, the tenant opens on its own host, and Core
   refuses the second assistant. — rejected: building every Core seam ahead of the shell, because
-  contracts designed without a consumer guess their shape (the same reason `ecosystem-distribution`
-  waits for the first Solution).
+  contracts designed without a consumer guess their shape (the same reason step 8, ecosystem distribution,
+  waited for the first Solution).
 - The shell is controlled exactly like `fapost/foundation` and `fapost/support`: its own
   repository from the first commit, checked out under `packages/` (git-ignored here), linked over
   `vendor/` by `composer dev:link`. It depends only on Foundation and Support — never on `App\*` —
@@ -233,8 +233,8 @@ From an independent failure hunt (2026-10-05), sharpest first.
 - How a closed package gets into an install: Core's `composer.json` cannot require a private
   package, and `dev:link` only replaces packages Composer already installed. The SaaS build
   (and local development) needs a way to add the shell on top of Core without committing it here
-  — first question of the shell's design; same as `ecosystem-distribution`'s "what a paid closed
-  extension needs in order to be installable at all".
+  — first question of the shell's design; same as step 8's "what a paid closed extension needs
+  in order to be installable at all", now answered by `extension-installer` and `fapost-agent`.
 
 - Shell data in the landlord database contradicts the Core rule "landlord data is reached only
   through Tenancy" — the rule needs an amendment (ADR) naming the operator-level package as the
