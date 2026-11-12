@@ -71,7 +71,11 @@ structures, and the settings of Loop, Template output and Template blocks, canno
 parameters.
 
 **In the flow.** The Template block's settings show each parameter with the same
-control as in the template's block, and the template's own value as a hint. A value
+control as in the template's block. While a parameter has no value in the flow, a toggle, choice,
+duration, list or flow picker shows the template's own value in the control, marked
+**Template value (inherited)**. Single-line text, a number and the state picker show it as
+a placeholder, and multi-line text shows a **Template value: …** line under the field. Changing the control sets a
+value of the flow's own. A value
 set there replaces the template's value in this flow's copy; an empty value keeps the
 template's value, and **Reset to template** empties it again.
 

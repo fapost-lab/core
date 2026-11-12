@@ -49,6 +49,8 @@ final readonly class PublishFlowService
     {
         /** @var FlowDefinition $definition */
         $definition = DB::transaction(function () use ($flowId): FlowDefinition {
+            $this->lockAssistantTemplatesBeforeOwnDraft($flowId);
+
             $draft = FlowDraft::query()
                 ->where('flow_id', $flowId)
                 ->lockForUpdate()
@@ -72,6 +74,37 @@ final readonly class PublishFlowService
         $this->schemaRegistry->invalidate();
 
         return $definition;
+    }
+
+    /**
+     * Lock order: template drafts before flow drafts. A flow publish that expands a template reads that template's
+     * active version and records the usage row only at commit; a concurrent publish of the template must either wait
+     * for that row or be waited for. A shared lock on every template draft of the assistant, in flow id order and
+     * taken before the flow's own draft, gives both: the template publish holds FOR UPDATE on its own draft, so the
+     * two conflict whichever came first. All templates of the assistant are locked, not only the ones the draft
+     * mentions now, because the draft may change between this read and the lock on it.
+     *
+     * Only the direct publish of a flow locks here. {@see self::republishHosts()} runs inside a template publish that
+     * already holds the template and the host, and a shared lock on a second template from there would wait for a
+     * publish of that template that waits for this host.
+     */
+    private function lockAssistantTemplatesBeforeOwnDraft(string $flowId): void
+    {
+        // The kind of a draft never changes, so reading it without a lock is safe.
+        $own = FlowDraft::query()
+            ->where('flow_id', $flowId)
+            ->first(['assistant_id', 'kind']);
+
+        if (null === $own || $own->isTemplate() || null === $own->assistant_id) {
+            return;
+        }
+
+        FlowDraft::query()
+            ->where('assistant_id', $own->assistant_id)
+            ->where('kind', FlowKind::Template->value)
+            ->orderBy('flow_id')
+            ->sharedLock()
+            ->get(['id']);
     }
 
     /**

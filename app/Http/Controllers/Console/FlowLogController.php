@@ -63,25 +63,36 @@ final class FlowLogController extends Controller
             ],
         );
 
+        $page = $table->respond(
+            $request,
+            $this->logs->query($assistant, $period, CarbonImmutable::now()),
+            fn (FlowLog $log): array => [
+                'id'             => (string) $log->getKey(),
+                'createdAt'      => $log->created_at->toIso8601String(),
+                'status'         => $log->status,
+                'nodeType'       => $log->node_type,
+                'nodeId'         => $log->node_id,
+                'nodeOrigin'     => null,
+                'sourceHandle'   => '' === (string) $log->source_handle ? null : (string) $log->source_handle,
+                'hasError'       => is_array($log->error) && [] !== $log->error,
+                'sessionId'      => (string) $log->session_id,
+                'sessionShortId' => mb_substr((string) $log->session_id, 0, 8),
+                'viewUrl'        => $this->url('flow-logs.show', $assistant, ['record' => $log->getKey()]),
+                'sessionUrl'     => $canSessions ? $this->url('flow-sessions.show', $assistant, ['record' => $log->session_id]) : null,
+            ],
+        );
+
+        // The origins of the whole page are loaded at once: resolving them per row asks the database for every new
+        // session, definition and template.
+        $this->origins->preloadSessions(array_values(array_unique(array_column($page['rows'], 'sessionId'))));
+
+        $page['rows'] = array_map(
+            fn (array $row): array => [...$row, 'nodeOrigin' => $this->origins->describeForSession($row['sessionId'], $row['nodeId'])],
+            $page['rows'],
+        );
+
         return Inertia::render('Console/FlowLogs/Index', [
-            'table' => $table->respond(
-                $request,
-                $this->logs->query($assistant, $period, CarbonImmutable::now()),
-                fn (FlowLog $log): array => [
-                    'id'             => (string) $log->getKey(),
-                    'createdAt'      => $log->created_at->toIso8601String(),
-                    'status'         => $log->status,
-                    'nodeType'       => $log->node_type,
-                    'nodeId'         => $log->node_id,
-                    'nodeOrigin'     => $this->origins->describeForSession((string) $log->session_id, $log->node_id),
-                    'sourceHandle'   => '' === (string) $log->source_handle ? null : (string) $log->source_handle,
-                    'hasError'       => is_array($log->error) && [] !== $log->error,
-                    'sessionId'      => (string) $log->session_id,
-                    'sessionShortId' => mb_substr((string) $log->session_id, 0, 8),
-                    'viewUrl'        => $this->url('flow-logs.show', $assistant, ['record' => $log->getKey()]),
-                    'sessionUrl'     => $canSessions ? $this->url('flow-sessions.show', $assistant, ['record' => $log->session_id]) : null,
-                ],
-            ),
+            'table'     => $page,
             'period'    => $period->value,
             'periods'   => array_map(static fn (FlowActivityPeriod $case): string => $case->value, FlowActivityPeriod::cases()),
             'statuses'  => array_map(static fn (FlowLogStatus $case): string => $case->value, FlowLogStatus::cases()),

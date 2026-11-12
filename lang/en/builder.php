@@ -170,6 +170,7 @@ return [
             'parameters'             => 'Parameters',
             'parameters_help'        => 'Values set here replace the template\'s own. Leave a field empty to keep the template\'s value.',
             'template_value'         => 'Template value',
+            'inherited'              => 'Template value (inherited)',
             'parameter_languages'    => 'Edits the base language. Other languages are in the Content tab.',
             'reset_parameter'        => 'Reset to template',
             'remove_parameter'       => 'Remove',
@@ -190,6 +191,13 @@ return [
             'label'   => 'Label',
             'unnamed' => 'Not named yet',
         ],
+    ],
+
+    'content' => [
+        'send_message_text'    => 'Message text',
+        'send_message_caption' => 'Caption',
+        'input_prompt'         => 'Prompt',
+        'input_on_invalid'     => 'On invalid',
     ],
 
     'operators' => [

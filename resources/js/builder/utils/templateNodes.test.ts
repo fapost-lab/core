@@ -1,6 +1,10 @@
 import {describe, expect, it} from 'vitest'
+import rules from '../../../../tests/Fixtures/flow-template-parameter-rules.json'
 import type {AvailableTemplate, FlowNode, NodeTypePayload} from '@builder/dto/types'
 import {
+    EXPOSABLE_FIELD_TYPES,
+    NON_PARAMETERIZABLE_NODE_TYPES,
+    PARAMETER_KEY_PATTERN,
     edgesToDropAfterReselect,
     exposableFields,
     isEmptyParameterValue,
@@ -204,5 +208,25 @@ describe('parameter values set in the reference panel', () => {
     it('keeps false and 0 as values', () => {
         expect(nextParameterValues({}, 'flag', false)).toEqual({flag: false})
         expect(nextParameterValues({}, 'wait', 0)).toEqual({wait: 0})
+    })
+})
+
+describe('parity with the server rules (tests/Fixtures/flow-template-parameter-rules.json)', () => {
+    it('exposes the same field types and blocks the same node types', () => {
+        expect(EXPOSABLE_FIELD_TYPES).toEqual(rules.exposable_field_types)
+        expect(NON_PARAMETERIZABLE_NODE_TYPES).toEqual(rules.non_parameterizable_node_types)
+    })
+
+    it('uses the same key pattern', () => {
+        expect(PARAMETER_KEY_PATTERN.source).toBe(rules.parameter_key_pattern)
+    })
+
+    it('judges every fixture value like the server', () => {
+        for (const value of rules.empty_value_cases.empty) {
+            expect(isEmptyParameterValue(value), JSON.stringify(value)).toBe(true)
+        }
+        for (const value of rules.empty_value_cases.not_empty) {
+            expect(isEmptyParameterValue(value), JSON.stringify(value)).toBe(false)
+        }
     })
 })

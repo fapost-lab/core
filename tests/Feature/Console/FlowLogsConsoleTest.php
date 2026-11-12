@@ -19,6 +19,10 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Models\Tenant;
 use Carbon\CarbonImmutable;
 use Database\Seeders\TenantAclSeeder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
+use Illuminate\Testing\TestResponse;
 use Inertia\Testing\AssertableInertia;
 use Symfony\Component\Uid\Ulid;
 use Tests\Feature\FeatureTestCase;
@@ -219,6 +223,78 @@ final class FlowLogsConsoleTest extends FeatureTestCase
         $this->actingAs($this->admin())
             ->get($this->viewUrl($copied))
             ->assertInertia(fn (AssertableInertia $page) => $page->where('log.nodeOrigin', $origin)->etc());
+    }
+
+    public function test_the_list_resolves_template_origins_without_a_query_per_row(): void
+    {
+        $admin = $this->admin();
+        $at    = CarbonImmutable::now()->subMinute();
+        $first = $this->entryOfTemplateCopy($at, 'Rate the answer');
+
+        // Warm what every request fills once (permissions, settings), so the counts compare like with like.
+        $this->actingAs($admin)->get($this->listUrl())->assertOk();
+
+        $one = $this->queriesDuring(fn () => $this->getListWithAFreshController($admin));
+
+        $this->entryOfTemplateCopy($at->subSecond(), 'Collect the phone');
+        $this->entryOfTemplateCopy($at->subSeconds(2), 'Ask for feedback');
+
+        $three = $this->queriesDuring(fn () => $this->getListWithAFreshController($admin)
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.rows.0.nodeOrigin.template', 'Rate the answer')
+                ->where('table.rows.1.nodeOrigin.template', 'Collect the phone')
+                ->where('table.rows.2.nodeOrigin.template', 'Ask for feedback')
+                ->etc()));
+
+        $this->assertSame($one, $three, 'the number of queries does not grow with the number of sessions');
+        $this->assertNotNull($first);
+    }
+
+    /**
+     * The router keeps the controller of a route between requests of one test, and with it the origins it memoised;
+     * in production every request builds both anew.
+     */
+    private function getListWithAFreshController(User $user): TestResponse
+    {
+        foreach (Route::getRoutes() as $route) {
+            $route->flushController();
+        }
+
+        return $this->actingAs($user)->get($this->listUrl());
+    }
+
+    /**
+     * An entry of its own session, whose definition holds a copy of a new template named `$templateName`.
+     */
+    private function entryOfTemplateCopy(CarbonImmutable $at, string $templateName): FlowLog
+    {
+        $template = FlowDraft::factory()->template()->create(['assistant_id' => $this->assistant->getKey(), 'name' => $templateName]);
+        $session  = $this->sessionOf($this->assistant);
+        $copyId   = (string) Str::uuid();
+
+        $session->flowDefinition()->update(['nodes' => [
+            ['id' => $copyId, 'type' => 'send_message', 'version' => 1, 'config' => [], 'origin' => [
+                'ref' => 'ref', 'template_flow_id' => $template->flow_id, 'template_version' => 1, 'node_id' => 'r-ask',
+            ]],
+        ]]);
+
+        return $this->entry($at, ['node_id' => $copyId], $session);
+    }
+
+    /**
+     * @param  callable(): mixed  $action
+     */
+    private function queriesDuring(callable $action): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $action();
+
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
     }
 
     private function listUrl(string $suffix = ''): string

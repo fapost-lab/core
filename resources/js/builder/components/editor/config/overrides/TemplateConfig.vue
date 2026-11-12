@@ -7,6 +7,7 @@ import {isTranslatableField} from '@builder/utils/translatableFields'
 import {useBuilderStore} from '@builder/store/builderStore'
 import {useTranslations} from '@builder/composables/useTranslations'
 import {
+    EXPOSABLE_FIELD_TYPES,
     isEmptyParameterValue,
     nextParameterValues,
     withBaseLanguageText,
@@ -45,6 +46,16 @@ const orphanKeys = computed(() => {
     return Object.keys(parameterValues.value).filter((key) => !known.has(key))
 })
 
+/** Controls that show the template's value as a placeholder: an empty input is how the host keeps it. */
+const PLACEHOLDER_TYPES = ['string', 'number', 'state-picker']
+
+/**
+ * The other exposable controls have no placeholder: with no host value they display the template's value
+ * themselves, marked as inherited, instead of an empty or false state that contradicts it. `text` is left out, its
+ * hint line stays.
+ */
+const INHERITING_TYPES = EXPOSABLE_FIELD_TYPES.filter((type) => type !== 'text' && !PLACEHOLDER_TYPES.includes(type))
+
 interface ParameterRow {
     key: string
     label: string
@@ -53,6 +64,8 @@ interface ParameterRow {
     schema: Record<string, unknown>
     templateValue: string
     placeholderInline: boolean
+    /** The template's own value as the control takes it; undefined when it is unknown or the control has no way to show it. */
+    inheritedValue: unknown
 }
 
 const rows = computed<ParameterRow[]>(() => parameters.value.map((p) => {
@@ -67,21 +80,37 @@ const rows = computed<ParameterRow[]>(() => parameters.value.map((p) => {
     delete schema.default
     const defaultValue = selectedTemplate.value?.parameters?.find((tp) => tp.key === p.key)?.default
     const templateValue = parameterValueText(defaultValue, baseLanguage.value)
-    const placeholderInline = type === 'string' || type === 'number'
+    const placeholderInline = PLACEHOLDER_TYPES.includes(type)
     if (placeholderInline && templateValue !== '') {
         schema.placeholder = templateValue
     }
+
+    const translatable = isTranslatableField(p.node_type, p.field)
 
     return {
         key: p.key,
         label: p.label ?? p.key,
         type,
-        translatable: isTranslatableField(p.node_type, p.field),
+        translatable,
         schema,
         templateValue,
         placeholderInline,
+        inheritedValue: !translatable && INHERITING_TYPES.includes(type) ? inheritedControlValue(type, defaultValue) : undefined,
     }
 }))
+
+function inheritedControlValue(type: string, defaultValue: unknown): unknown {
+    if (isEmptyParameterValue(defaultValue)) return undefined
+    if (type === 'boolean') return defaultValue === true || defaultValue === 'true' || defaultValue === 1
+    if (type === 'array') return Array.isArray(defaultValue) ? defaultValue : undefined
+
+    return typeof defaultValue === 'string' ? defaultValue : undefined
+}
+
+/** True when the control shows the template's own value because the host has set none. */
+function isInherited(row: ParameterRow): boolean {
+    return row.inheritedValue !== undefined && !hasValue(row.key)
+}
 
 function controlValue(row: ParameterRow): unknown {
     const stored = parameterValues.value[row.key]
@@ -93,6 +122,7 @@ function controlValue(row: ParameterRow): unknown {
         return typeof stored === 'string' ? stored : ''
     }
     if (stored === undefined || stored === null) {
+        if (row.inheritedValue !== undefined) return row.inheritedValue
         return row.type === 'boolean' ? false : row.type === 'array' ? [] : ''
     }
     return stored
@@ -173,7 +203,8 @@ function onChange(event: Event) {
                     :value="controlValue(row)"
                     @update:value="setValue(row, $event)"
                 />
-                <p v-if="!row.placeholderInline && row.templateValue !== ''" class="field-help">
+                <p v-if="isInherited(row)" class="field-help">{{ t('nodes.template.inherited') }}</p>
+                <p v-else-if="!row.placeholderInline && row.templateValue !== ''" class="field-help">
                     {{ t('nodes.template.template_value') }}: {{ row.templateValue }}
                 </p>
                 <p v-if="row.translatable" class="field-help">{{ t('nodes.template.parameter_languages') }}</p>

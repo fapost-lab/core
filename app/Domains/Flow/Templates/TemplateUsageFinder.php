@@ -27,23 +27,74 @@ final readonly class TemplateUsageFinder
      */
     public function hostsOf(FlowDraft $template): array
     {
-        $published = array_flip($this->usages->hostsOf($template->flow_id));
+        return $this->hostsByTemplate(
+            (string) $template->tenant_id,
+            (string) $template->assistant_id,
+            [$template->flow_id],
+        )[$template->flow_id] ?? [];
+    }
 
-        $hosts = FlowDraft::query()
-            ->where('tenant_id', $template->tenant_id)
-            ->where('assistant_id', $template->assistant_id)
-            ->where('kind', FlowKind::Flow->value)
-            ->orderBy('name')
-            ->get();
+    /**
+     * How many flows use each template, for a page of templates: two queries whatever the number of templates.
+     *
+     * @param  list<string>  $templateFlowIds
+     * @return array<string, int>  by template flow id, 0 for an unused template
+     */
+    public function usageCounts(string $tenantId, string $assistantId, array $templateFlowIds): array
+    {
+        $hosts = $this->hostsByTemplate($tenantId, $assistantId, $templateFlowIds, ['id', 'flow_id', 'nodes']);
 
-        return array_values($hosts
-            ->filter(fn (FlowDraft $host): bool => isset($published[$host->flow_id])
-                || in_array($template->flow_id, $this->expander->referencedTemplates(is_array($host->nodes) ? $host->nodes : []), true))
-            ->all());
+        return array_combine(
+            $templateFlowIds,
+            array_map(static fn (string $id): int => count($hosts[$id] ?? []), $templateFlowIds),
+        );
     }
 
     public function isUsed(FlowDraft $template): bool
     {
         return [] !== $this->hostsOf($template);
+    }
+
+    /**
+     * The rule in one place: a flow uses a template when its active definition carries a copy (the usage index) or
+     * its draft places it.
+     *
+     * @param  list<string>  $templateFlowIds
+     * @param  list<string>  $columns
+     * @return array<string, list<FlowDraft>>  hosts ordered by name, by template flow id
+     */
+    private function hostsByTemplate(string $tenantId, string $assistantId, array $templateFlowIds, array $columns = ['*']): array
+    {
+        if ([] === $templateFlowIds) {
+            return [];
+        }
+
+        $published = [];
+
+        foreach ($this->usages->hostsOfMany($templateFlowIds) as $templateFlowId => $hostFlowIds) {
+            $published[$templateFlowId] = array_flip($hostFlowIds);
+        }
+
+        $drafts = FlowDraft::query()
+            ->where('tenant_id', $tenantId)
+            ->where('assistant_id', $assistantId)
+            ->where('kind', FlowKind::Flow->value)
+            ->orderBy('name')
+            ->get($columns);
+
+        $wanted = array_flip($templateFlowIds);
+        $result = [];
+
+        foreach ($drafts as $host) {
+            $placed = array_flip($this->expander->referencedTemplates(is_array($host->nodes) ? $host->nodes : []));
+
+            foreach ($templateFlowIds as $templateFlowId) {
+                if (isset($published[$templateFlowId][$host->flow_id]) || isset($placed[$templateFlowId])) {
+                    $result[$templateFlowId][] = $host;
+                }
+            }
+        }
+
+        return array_intersect_key($result, $wanted);
     }
 }

@@ -11,7 +11,7 @@ paths:
   - app/Domains/Flow/Handlers/TemplateNodeHandler.php
   - app/Domains/Flow/Handlers/TemplateOutputNodeHandler.php
 summary: Why flow templates are copied into their host flows at publish time (UUIDv5 ids, origin, two pass-through nodes), and republished hosts from their active definitions instead of a runtime reference or a lighter subflow
-reviewed_at: 2026-11-11
+reviewed_at: 2026-11-12
 ---
 # Flow templates are expanded into their host flows at publish time; the runtime knows only two pass-through nodes
 
@@ -89,6 +89,12 @@ Two facts constrained the copy: state keys are split on `.` (`FlowSessionPersist
 - Accepted risk (review finding F1): a host that places a template for the first time while that template is
   being published can keep the old copy until the next publish of either; closing it needs one lock order
   (template drafts before host drafts) in the host publish.
+  Amended 2026-11-12 (flow-templates-followups): the risk is closed by that lock order. A flow publish takes shared
+  locks on every template draft of its assistant, in flow id order, before `FOR UPDATE` on its own draft; a template
+  publish locks its own draft and then its hosts'. The locks are taken only on the direct publish of a flow, never
+  inside the host republish, which already holds a template and would deadlock on a second one. Cost: a flow publish
+  waits for a running publish of any template of its assistant (seconds), and a template draft autosave waits for
+  running flow publishes of that assistant (milliseconds).
 - Code that maps published node ids to the draft sees copies by `origin`, not by the draft's ids; the session
   and log screens label a copied node "template X vN → node" through `TemplateNodeOrigins`.
 - Per-placement parameters (texts and settings set on the reference node) are phase 2 (task
