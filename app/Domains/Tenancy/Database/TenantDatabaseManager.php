@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Domains\Tenancy\Database;
 
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Contracts\TenantDatabaseManagerInterface;
 use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Exceptions\ConnectionStackEmptyException;
+use App\Domains\Tenancy\Services\TenantOwnCacheForgetter;
 use App\Domains\Tenancy\ValueObjects\MigrationScope;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Facades\Artisan;
@@ -30,6 +32,12 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
      * @var array<int, array{connection: string, search_path: array<int, string>|string|null}>
      */
     private array $stack = [];
+
+    public function __construct(
+        private readonly TenantContextInterface $context,
+        private readonly TenantOwnCacheForgetter $cacheForgetter,
+    ) {
+    }
 
     /**
      * Create schema for the given tenant on the tenant connection, so the schema lands
@@ -125,14 +133,24 @@ final class TenantDatabaseManager implements TenantDatabaseManagerInterface
 
     /**
      * Run migrations for the given migration scope (tenant/platform/etc.).
+     *
+     * Migrations write permissions and settings with plain queries, which no cache hears about, so afterwards (also
+     * after a run that stopped half way) the tenant's own permission and settings cache keys are forgotten. Nothing
+     * is forgotten when no tenant is active, as with a platform migration run outside a switch.
      */
     public function runMigrations(MigrationScope $scope): void
     {
-        Artisan::call('migrate', [
-            '--path'     => $scope->path,
-            '--force'    => true,
-            '--realpath' => true,
-        ]);
+        try {
+            Artisan::call('migrate', [
+                '--path'     => $scope->path,
+                '--force'    => true,
+                '--realpath' => true,
+            ]);
+        } finally {
+            if ($this->context->isResolved()) {
+                $this->cacheForgetter->forget($this->context->get());
+            }
+        }
     }
 
     /**

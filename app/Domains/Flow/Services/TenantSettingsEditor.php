@@ -13,6 +13,7 @@ use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Settings\TenantSettings;
 use Illuminate\Support\Facades\DB;
+use Spatie\LaravelSettings\Support\SettingsCacheFactory;
 
 /**
  * The tenant's settings screen in the admin panel: the language matrix (content base, available, fallback), the
@@ -30,6 +31,7 @@ final readonly class TenantSettingsEditor
         private TenantContextInterface $tenant,
         private ConversationSettings $conversation,
         private AuditTrailInterface $audit,
+        private SettingsCacheFactory $settingsCache,
     ) {
     }
 
@@ -107,7 +109,7 @@ final readonly class TenantSettingsEditor
      */
     public function saveLanguages(string $base, array $available, string $fallback): void
     {
-        DB::transaction(fn () => $this->writeLanguages($base, $available, $fallback));
+        $this->transaction(fn () => $this->writeLanguages($base, $available, $fallback));
     }
 
     /**
@@ -118,7 +120,21 @@ final readonly class TenantSettingsEditor
      */
     public function save(array $fields): void
     {
-        DB::transaction(fn () => $this->write($fields));
+        $this->transaction(fn () => $this->write($fields));
+    }
+
+    /**
+     * Runs a write and its audit entry as one unit. The settings cache is filled as soon as the settings are saved,
+     * before the transaction ends, so a rollback (an audit entry that cannot be written) forgets it: the next read
+     * comes from the database, which kept the old values.
+     */
+    private function transaction(callable $write): void
+    {
+        DB::transaction(function () use ($write): void {
+            DB::afterRollBack(fn () => $this->settingsCache->build(TenantSettings::repository())->clear());
+
+            $write();
+        });
     }
 
     /**

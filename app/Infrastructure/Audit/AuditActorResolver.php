@@ -49,7 +49,8 @@ final readonly class AuditActorResolver implements AuditActorResolverInterface
 
     /**
      * The platform support user is one per tenant and shared by every operator; the support session says which operator
-     * it is and which entry of the support access log the action belongs to.
+     * it is and which entry of the support access log the action belongs to. The label stored is the operator's name, or
+     * nothing without a support session: the words around it come from the language files when the entry is shown.
      */
     private function support(User $user): AuditActor
     {
@@ -60,13 +61,13 @@ final readonly class AuditActorResolver implements AuditActorResolverInterface
             : null;
 
         if (null === $current) {
-            return new AuditActor(AuditActorKind::Support, $user, 'Platform support');
+            return new AuditActor(AuditActorKind::Support, $user, null);
         }
 
         return new AuditActor(
             AuditActorKind::Support,
             $user,
-            sprintf('Platform support (%s)', $current['operator_name']),
+            $current['operator_name'],
             [
                 'support_entry_id' => $current['entry_id'],
                 'operator_name'    => $current['operator_name'],

@@ -40,6 +40,9 @@ interface TenantDatabaseManagerInterface
      *
      * Constraint: invoke while tenant DB is active when migrating tenant paths (e.g. inside
      * {@see \App\Domains\Tenancy\Services\TenantSwitcher::runForTenant()}).
+     *
+     * Leaves the active tenant's permission and settings cache keys forgotten, since migrations write behind the
+     * cache; with no tenant active nothing is forgotten.
      */
     public function runMigrations(MigrationScope $scope): void;
 }

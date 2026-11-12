@@ -33,7 +33,7 @@ paths:
   - tests/Feature/Staff/CoreOperatorAccessTest.php
   - tests/Feature/Staff/HorizonOperatorAccessTest.php
   - tests/Architecture/OperatorAccessBoundaryTest.php
-reviewed_at: 2026-10-26
+reviewed_at: 2026-11-12
 ---
 # Tenancy rules
 
@@ -109,10 +109,13 @@ broken.
   worker-wide singleton and the cache store is shared by every worker, so one global key served
   one tenant's roles and permissions to another's requests. Limits: an entry lives until
   `permission.cache.expiration_time` (24h), so a change made outside Eloquent's events — raw SQL,
-  a restored schema under the same tenant id — stays invisible until then; flush that tenant's key.
+  a restored schema under the same tenant id — stays invisible until then; flush that tenant's key. The
+  exception is a migration: `TenantDatabaseManager::runMigrations()` forgets the active tenant's permission and
+  settings keys when it ends (also after a failed run), through `TenantOwnCacheForgetter`; the migrations
+  themselves never touch the cache.
   `permission:cache-reset` clears only the platform key, not the tenants'. Role writes flush the
   key once more after their transaction commits (`RoleWriterService`), so a load racing the commit
-  cannot cache the old grants. Enforced: `TenantSwitcherTest`.
+  cannot cache the old grants. Enforced: `TenantSwitcherTest`, `TenantMigrationCacheResetTest`.
 - **Each tenant's settings are cached under a key of its own, and a switch never carries the
   loaded settings across.** `DomainServiceProvider` registers spatie's
   `SettingsCache::resolvePrefixUsing()`: every key becomes `tenant.<id>.settings.<class>`, or
@@ -127,8 +130,8 @@ broken.
   shared by every tenant and worker, and the class-only key spatie builds served one tenant's
   settings to another once `SETTINGS_CACHE_ENABLED` was on; a sync job or nested switch reused the
   outer tenant's instance even without the cache. Limits: `settings:clear-cache` clears only the
-  keys of the context it runs in; a write that bypasses `save()` (a settings migration, raw SQL)
-  does not invalidate the tenant's entry and the TTL is unset, so clear that tenant's key; a service
+  keys of the context it runs in; a write that bypasses `save()` (raw SQL; a settings migration is covered by
+  `runMigrations()`) does not invalidate the tenant's entry and the TTL is unset, so clear that tenant's key; a service
   that took `TenantSettings` in its constructor before a switch (`FlowOrchestrator`, `DropPolicy`,
   `GlobalCommandExecutor`) keeps that instance — resolve it inside the switch. The hook needs
   spatie/laravel-settings ^3.9. Enforced: `TenantSettingsCacheIsolationTest`.

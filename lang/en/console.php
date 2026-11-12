@@ -1523,8 +1523,10 @@ return [
             'support' => 'Support',
             'system'  => 'System',
         ],
-        'search_label' => 'Search by person or subject',
-        'filters'      => [
+        'actor_support'       => 'Platform support',
+        'actor_support_named' => 'Platform support (:name)',
+        'search_label'        => 'Search by person or subject',
+        'filters'             => [
             'area'          => 'Area',
             'area_all'      => 'All areas',
             'actor'         => 'Who',

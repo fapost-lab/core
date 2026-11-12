@@ -53,7 +53,6 @@ return [
         ],
         'contact' => [
             'updated' => 'Контакт изменён',
-            'deleted' => 'Контакт удалён',
         ],
         'contact_group' => [
             'created' => 'Группа контактов создана',

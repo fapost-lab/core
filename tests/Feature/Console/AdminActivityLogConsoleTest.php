@@ -185,7 +185,7 @@ final class AdminActivityLogConsoleTest extends FeatureTestCase
     {
         $this->entry([
             'actor_kind'  => AuditActorKind::Support,
-            'actor_label' => 'Platform support (Olga)',
+            'actor_label' => 'Olga',
             'properties'  => ['support_entry_id' => 'entry-42', 'operator_name' => 'Olga'],
         ]);
 
@@ -193,9 +193,33 @@ final class AdminActivityLogConsoleTest extends FeatureTestCase
             ->get($this->url())
             ->assertInertia(fn (AssertableInertia $page) => $page
                 ->where('table.rows.0.actorKind', 'support')
+                ->where('table.rows.0.actorLabel', 'Platform support (Olga)')
                 ->where('table.rows.0.supportEntryId', 'entry-42')
                 ->where('table.rows.0.properties', [['key' => 'operator_name', 'value' => 'Olga']])
                 ->etc());
+    }
+
+    public function test_a_support_label_is_translated_whatever_the_stored_label_says(): void
+    {
+        $this->entry([
+            'actor_kind'  => AuditActorKind::Support,
+            'actor_label' => 'Platform support (Olga)',
+            'properties'  => ['operator_name' => 'Olga'],
+        ]);
+        $this->entry([
+            'actor_kind'  => AuditActorKind::Support,
+            'actor_label' => null,
+            'created_at'  => '2026-11-10 09:00:00',
+        ]);
+
+        foreach (['en' => ['Platform support (Olga)', 'Platform support'], 'ru' => ['Поддержка платформы (Olga)', 'Поддержка платформы']] as $locale => [$named, $bare]) {
+            $this->actingAs($this->admin())
+                ->get($this->url("?lang={$locale}"))
+                ->assertInertia(fn (AssertableInertia $page) => $page
+                    ->where('table.rows.0.actorLabel', $named)
+                    ->where('table.rows.1.actorLabel', $bare)
+                    ->etc());
+        }
     }
 
     public function test_an_action_without_a_translation_shows_its_key(): void

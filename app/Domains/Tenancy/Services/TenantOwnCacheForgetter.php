@@ -14,6 +14,8 @@ use Spatie\LaravelSettings\Support\SettingsCacheFactory;
  * its permissions (a key of the tenant's own, see {@see TenantSwitcher}).
  *
  * The settings key follows the tenant context, so this runs inside the tenant's switch (the contract says it does).
+ *
+ * Called when a tenant is deleted and after the tenant's migrations, which write permissions and settings behind the cache.
  */
 final readonly class TenantOwnCacheForgetter implements TenantCacheForgetterInterface
 {
