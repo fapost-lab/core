@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Tenancy;
 
+use App\Domains\Staff\Models\Permission;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Database\TenantDatabaseManager;
 use App\Domains\Tenancy\Settings\TenantSettings;
@@ -12,7 +13,6 @@ use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\Feature\FeatureTestCase;
 
@@ -89,7 +89,7 @@ final class TenantMigrationCacheResetTest extends FeatureTestCase
         $registrar->getPermissions();
 
         DB::table(config('permission.table_names.permissions'))->insert([
-            'id'         => (string) Str::ulid(),
+            'id'         => mb_strtolower((string) Str::ulid()->toRfc4122()),
             'name'       => 'behind_the_cache_probe',
             'guard_name' => 'web',
             'created_at' => now(),
