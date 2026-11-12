@@ -151,18 +151,25 @@ final class SolutionUi implements SolutionUiMapInterface
         }
 
         foreach ($this->container->make(ActiveSolutions::class)->ids() as $id) {
-            if ($this->isServable($id)) {
+            $solution = $this->installed->find($id);
+
+            if (null !== $solution && null === $solution->ui) {
                 $this->served[] = $id;
-            } elseif ($this->isOutdated($id)) {
+
+                continue;
+            }
+
+            $bundle = $this->published->find($id);
+
+            if (null === $bundle) {
+                continue;
+            }
+
+            if ([] !== $this->compatibility->mismatches($bundle)) {
                 $this->outdated[] = $id;
+            } elseif (null !== $solution) {
+                $this->served[] = $id;
             }
         }
-    }
-
-    private function isOutdated(string $solutionId): bool
-    {
-        $bundle = $this->published->find($solutionId);
-
-        return null !== $bundle && [] !== $this->compatibility->mismatches($bundle);
     }
 }

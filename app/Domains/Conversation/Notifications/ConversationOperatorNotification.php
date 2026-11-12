@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Conversation\Notifications;
 
+use App\Domains\Conversation\Enums\ConversationNotificationKind;
 use App\Domains\Staff\Contracts\LocalizedDatabaseNotification;
 use App\Domains\Staff\Models\User;
 use Illuminate\Notifications\Notification;
@@ -22,29 +23,18 @@ use Illuminate\Notifications\Notification;
  */
 final class ConversationOperatorNotification extends Notification implements LocalizedDatabaseNotification
 {
-    public const string MESSAGE = 'conversation_message';
-
-    public const string TRANSFERRED = 'conversation_transferred';
-
-    public const string SEIZED = 'conversation_seized';
-
-    public const string REQUESTED = 'conversation_requested';
-
     /** The outcomes a request notification is rendered again with once the request stopped waiting. */
     public const array OUTCOMES = ['accepted', 'cancelled', 'timeout'];
 
-    private const array KINDS = [self::MESSAGE, self::TRANSFERRED, self::SEIZED, self::REQUESTED];
-
     /**
-     * @param  string       $kind       one of {@see self::MESSAGE}, {@see self::TRANSFERRED}, {@see self::SEIZED},
-     *                                  {@see self::REQUESTED}
+     * @param  ConversationNotificationKind  $kind  what the notification is about
      * @param  string       $url        the thread's path on the tenant's host
      * @param  string|null  $actor      who handed the thread over or took it, for the two ownership kinds
-     * @param  string|null  $requestId  the operator request, for {@see self::REQUESTED}
+     * @param  string|null  $requestId  the operator request, for {@see ConversationNotificationKind::Requested}
      * @param  string|null  $note       the request node's own text for the operators; null gives the standard one
      */
     public function __construct(
-        private readonly string $kind,
+        private readonly ConversationNotificationKind $kind,
         private readonly string $conversationId,
         private readonly string $contact,
         private readonly string $url,
@@ -56,10 +46,10 @@ final class ConversationOperatorNotification extends Notification implements Loc
 
     public static function localize(array $data, string $locale): array
     {
-        $kind    = $data['kind'] ?? null;
+        $kind    = is_string($data['kind'] ?? null) ? ConversationNotificationKind::tryFrom($data['kind']) : null;
         $contact = $data['contact'] ?? null;
 
-        if (! is_string($kind) || ! is_string($contact) || ! in_array($kind, self::KINDS, true)) {
+        if (null === $kind || ! is_string($contact)) {
             return [];
         }
 
@@ -86,7 +76,7 @@ final class ConversationOperatorNotification extends Notification implements Loc
         $data['actor']   = $actor;
 
         $text = self::text(
-            self::REQUESTED,
+            ConversationNotificationKind::Requested,
             is_string($data['contact'] ?? null) ? $data['contact'] : '',
             $actor,
             self::stringOrNull($data['note'] ?? null),
@@ -122,13 +112,13 @@ final class ConversationOperatorNotification extends Notification implements Loc
                 'label' => $text['actionLabel'],
                 'url'   => $this->url,
             ],
-            'kind'            => $this->kind,
+            'kind'            => $this->kind->value,
             'conversation_id' => $this->conversationId,
             'contact'         => $this->contact,
             'actor'           => $this->actor,
         ];
 
-        if (self::REQUESTED === $this->kind) {
+        if (ConversationNotificationKind::Requested === $this->kind) {
             $data['request_id'] = $this->requestId;
             $data['note']       = $this->note;
             $data['outcome']    = null;
@@ -140,20 +130,20 @@ final class ConversationOperatorNotification extends Notification implements Loc
     /**
      * @return array{title: string, body: string, actionLabel: string}
      */
-    private static function text(string $kind, string $contact, ?string $actor, ?string $note, ?string $outcome, ?string $locale): array
+    private static function text(ConversationNotificationKind $kind, string $contact, ?string $actor, ?string $note, ?string $outcome, ?string $locale): array
     {
         $key = 'conversation.operator_notifications.' . match ($kind) {
-            self::TRANSFERRED => 'transferred',
-            self::SEIZED      => 'seized',
-            self::REQUESTED   => 'requested',
-            default           => 'message',
+            ConversationNotificationKind::Transferred => 'transferred',
+            ConversationNotificationKind::Seized      => 'seized',
+            ConversationNotificationKind::Requested   => 'requested',
+            ConversationNotificationKind::Message     => 'message',
         };
         $parameters = ['contact' => $contact, 'actor' => $actor ?? '—'];
 
         $body = match (true) {
-            self::REQUESTED === $kind && in_array($outcome, self::OUTCOMES, true) => (string) trans($key . '.outcomes.' . $outcome, $parameters, $locale),
-            self::REQUESTED === $kind && null !== $note                           => $note,
-            default                                                               => (string) trans($key . '.body', $parameters, $locale),
+            ConversationNotificationKind::Requested === $kind && in_array($outcome, self::OUTCOMES, true) => (string) trans($key . '.outcomes.' . $outcome, $parameters, $locale),
+            ConversationNotificationKind::Requested === $kind && null !== $note                           => $note,
+            default                                                                                       => (string) trans($key . '.body', $parameters, $locale),
         };
 
         return [

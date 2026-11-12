@@ -1,5 +1,5 @@
 import { computed, shallowRef, toValue, watch, type ComputedRef, type MaybeRefOrGetter } from 'vue'
-import { chooseTransport, currentEchoClient, echoEventName, type LiveChannel, type LiveTransport } from '../lib/live-updates'
+import { chooseTransport, currentEchoClient, subscribeToAnnouncements, type LiveChannel, type LiveTransport } from '../lib/live-updates'
 
 export interface BellUpdatesOptions {
   /** The user's own channel from the shared `notifications` prop; without one the bell polls. */
@@ -47,18 +47,12 @@ export function useBellUpdates(options: BellUpdatesOptions): { transport: Comput
         return
       }
 
-      const event = echoEventName(live.event)
-      const channel = client.private(live.channel)
-      channel.listen(event, options.onAnnouncement)
-      channel.error?.(() => {
+      const unsubscribe = subscribeToAnnouncements(client, live, options.onAnnouncement, () => {
         refusedChannel.value = live.channel
       })
       options.refresh()
 
-      onCleanup(() => {
-        client.private(live.channel).stopListening?.(event)
-        client.leave(live.channel)
-      })
+      onCleanup(unsubscribe)
     },
     { immediate: true },
   )

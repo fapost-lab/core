@@ -22,6 +22,7 @@ use Fapost\Foundation\Console\Enums\SettingsTarget;
 use Fapost\Foundation\Console\Enums\ShellSlot;
 use Fapost\Foundation\Console\Enums\TableTarget;
 use Fapost\Foundation\Console\Enums\Tone;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Gate;
@@ -250,6 +251,14 @@ final readonly class SolutionExtensions
     }
 
     /**
+     * Whether the user has the ability; a declaration with none is open to everyone.
+     */
+    public function allows(?Authenticatable $user, ?string $ability): bool
+    {
+        return null === $ability || Gate::forUser($user)->allows($ability);
+    }
+
+    /**
      * @param  list<BackedEnum>  $cases
      *
      * @return array<string, list<array<string, mixed>>>
@@ -344,11 +353,6 @@ final readonly class SolutionExtensions
         $record = $route->parameter('record');
 
         return is_string($record) && '' !== $record ? $record : null;
-    }
-
-    private function allows(User $user, ?string $ability): bool
-    {
-        return null === $ability || Gate::forUser($user)->allows($ability);
     }
 
     /**

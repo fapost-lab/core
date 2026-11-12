@@ -1,6 +1,6 @@
 import { computed, onScopeDispose, shallowRef, toValue, watch, type ComputedRef, type MaybeRefOrGetter } from 'vue'
 import { router, usePage, usePoll } from '@inertiajs/vue3'
-import { chooseTransport, createAnnouncementReloader, currentEchoClient, echoEventName, type BroadcasterProp, type LiveChannel, type LiveTransport } from './live-updates'
+import { chooseTransport, createAnnouncementReloader, currentEchoClient, subscribeToAnnouncements, type BroadcasterProp, type LiveChannel, type LiveTransport } from './live-updates'
 
 /** Longer than the server's throttle window (FlowActivityNotifier::THROTTLE_SECONDS), see createAnnouncementReloader. */
 const TRAILING_RELOAD_MS = 3000
@@ -68,10 +68,7 @@ export function useLiveUpdates(options: LiveUpdatesOptions): { transport: Comput
         return
       }
 
-      const event = echoEventName(live.event)
-      const channel = client.private(live.channel)
-      channel.listen(event, reloader.notify)
-      channel.error?.(() => {
+      const unsubscribe = subscribeToAnnouncements(client, live, reloader.notify, () => {
         refusedChannel.value = live.channel
       })
       const heartbeat = setInterval(() => router.reload({ only: options.only }), HEARTBEAT_MS)
@@ -79,8 +76,7 @@ export function useLiveUpdates(options: LiveUpdatesOptions): { transport: Comput
       onCleanup(() => {
         clearInterval(heartbeat)
         reloader.dispose()
-        client.private(live.channel).stopListening?.(event)
-        client.leave(live.channel)
+        unsubscribe()
       })
     },
     { immediate: true },

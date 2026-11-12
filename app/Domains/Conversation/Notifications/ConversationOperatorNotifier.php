@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Conversation\Notifications;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Conversation\Enums\ConversationNotificationKind;
 use App\Domains\Conversation\Enums\ConversationOwner;
 use App\Domains\Conversation\Enums\OperatorRequestState;
 use App\Domains\Conversation\Models\Conversation;
@@ -73,7 +74,7 @@ final readonly class ConversationOperatorNotifier
             // leaves it to the one that does, which writes the single unread notification.
             $this->exclusively("conversation-operator-notify:{$tenantId}:{$conversationId}:{$holder->getKey()}", function () use ($holder, $conversation): void {
                 if (! $this->hasUnread($holder, (string) $conversation->getKey())) {
-                    $this->send($holder, ConversationOperatorNotification::MESSAGE, $conversation, null);
+                    $this->send($holder, ConversationNotificationKind::Message, $conversation, null);
                 }
             });
         } catch (Throwable $exception) {
@@ -90,7 +91,7 @@ final readonly class ConversationOperatorNotifier
             $recipient = $this->recipient($toUserId, $conversation);
 
             if (null !== $recipient) {
-                $this->send($recipient, ConversationOperatorNotification::TRANSFERRED, $conversation, $this->name($fromUserId));
+                $this->send($recipient, ConversationNotificationKind::Transferred, $conversation, $this->name($fromUserId));
             }
         } catch (Throwable $exception) {
             $this->exceptions->report($exception);
@@ -106,7 +107,7 @@ final readonly class ConversationOperatorNotifier
             $recipient = $this->recipient($previousOwnerId, $conversation);
 
             if (null !== $recipient) {
-                $this->send($recipient, ConversationOperatorNotification::SEIZED, $conversation, (string) $admin->name);
+                $this->send($recipient, ConversationNotificationKind::Seized, $conversation, (string) $admin->name);
             }
         } catch (Throwable $exception) {
             $this->exceptions->report($exception);
@@ -120,7 +121,7 @@ final readonly class ConversationOperatorNotifier
     public function requested(User $recipient, Conversation $conversation, string $requestId, ?string $note): void
     {
         try {
-            $this->send($recipient, ConversationOperatorNotification::REQUESTED, $conversation, null, $requestId, $note);
+            $this->send($recipient, ConversationNotificationKind::Requested, $conversation, null, $requestId, $note);
         } catch (Throwable $exception) {
             $this->exceptions->report($exception);
         }
@@ -150,7 +151,7 @@ final readonly class ConversationOperatorNotifier
             foreach ($notifications as $notification) {
                 $data = $notification->data;
 
-                if (! is_array($data) || ($data['request_id'] ?? null) !== $requestId || ConversationOperatorNotification::REQUESTED !== ($data['kind'] ?? null)) {
+                if (! is_array($data) || ($data['request_id'] ?? null) !== $requestId || ConversationNotificationKind::Requested->value !== ($data['kind'] ?? null)) {
                     continue;
                 }
 
@@ -170,7 +171,7 @@ final readonly class ConversationOperatorNotifier
         }
     }
 
-    private function send(User $recipient, string $kind, Conversation $conversation, ?string $actor, ?string $requestId = null, ?string $note = null): void
+    private function send(User $recipient, ConversationNotificationKind $kind, Conversation $conversation, ?string $actor, ?string $requestId = null, ?string $note = null): void
     {
         $url = $this->urls->route('console.conversations.show', [
             'assistant' => (string) $conversation->assistant_id,
