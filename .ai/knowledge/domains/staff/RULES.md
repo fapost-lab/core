@@ -16,7 +16,7 @@ paths:
   - app/Http/Controllers/Admin/UserController.php
   - app/Http/Controllers/Admin/RoleController.php
   - "app/Http/Requests/Admin/**"
-reviewed_at: 2026-11-10
+reviewed_at: 2026-11-12
 ---
 # Staff rules
 
@@ -146,4 +146,6 @@ broken.
   runs only at provisioning and through the manual `ops:tenants-seed-acl`, never on deploy, so
   existing tenants keep the old set. The migration hard-codes the `web` guard (migrations may not
   read config) and leaves custom roles alone; see
-  `2026_09_22_000001_grant_manage_channels_to_content_manager.php`. Review only.
+  `2026_09_22_000001_grant_manage_channels_to_content_manager.php`. The tenant's permission cache is
+  forgotten when the migrations end (`TenantDatabaseManager::runMigrations()`), so the migration does not touch
+  it. Review only.

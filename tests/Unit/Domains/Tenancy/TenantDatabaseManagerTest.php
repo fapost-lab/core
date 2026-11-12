@@ -166,7 +166,7 @@ final class TenantDatabaseManagerTest extends TestCase
      */
     public function test_schema_names_past_the_identifier_limit_never_reach_the_database(): void
     {
-        $manager = new TenantDatabaseManager();
+        $manager = $this->app->make(TenantDatabaseManager::class);
         $tenant  = $this->makeTenant(str_repeat('a', TenantDatabaseManager::MAX_IDENTIFIER_BYTES));
 
         DB::shouldReceive('connection')->never();
@@ -200,7 +200,7 @@ final class TenantDatabaseManagerTest extends TestCase
             ->shouldReceive('connection')->with('landlord')->never()
             ->shouldReceive('connection')->with('tenant_probe')->times(3)->andReturn($probe);
 
-        $manager = new TenantDatabaseManager();
+        $manager = $this->app->make(TenantDatabaseManager::class);
         $tenant  = $this->makeTenant('acme');
 
         $manager->createSchema($tenant);
@@ -210,7 +210,7 @@ final class TenantDatabaseManagerTest extends TestCase
 
     public function test_restore_throws_on_empty_stack(): void
     {
-        $manager = new TenantDatabaseManager();
+        $manager = $this->app->make(TenantDatabaseManager::class);
 
         $this->expectException(ConnectionStackEmptyException::class);
         $manager->restore();

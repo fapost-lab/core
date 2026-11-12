@@ -131,7 +131,7 @@ final class AuditTrailTest extends FeatureTestCase
         $entry = ActivityEntry::query()->sole();
 
         $this->assertSame(AuditActorKind::Support, $entry->actor_kind);
-        $this->assertSame('Platform support (Olga)', $entry->actor_label);
+        $this->assertSame('Olga', $entry->actor_label);
         $this->assertSame((string) $support->getKey(), $entry->causer_id);
         $this->assertSameJson(['support_entry_id' => 'entry-1', 'operator_name' => 'Olga'], $entry->properties?->toArray());
         $this->assertStringNotContainsString('olga@example.com', (string) json_encode($entry->getAttributes()));

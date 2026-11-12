@@ -40,7 +40,6 @@ enum AuditAction: string
     case BroadcastCancelled = 'broadcast.cancelled';
 
     case ContactUpdated        = 'contact.updated';
-    case ContactDeleted        = 'contact.deleted';
     case ContactGroupCreated   = 'contact_group.created';
     case ContactGroupUpdated   = 'contact_group.updated';
     case ContactGroupDeleted   = 'contact_group.deleted';
@@ -95,7 +94,6 @@ enum AuditAction: string
             self::BroadcastCancelled => AuditArea::Broadcasts,
 
             self::ContactUpdated,
-            self::ContactDeleted,
             self::ContactGroupCreated,
             self::ContactGroupUpdated,
             self::ContactGroupDeleted,

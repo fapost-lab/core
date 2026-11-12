@@ -8,12 +8,21 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowDraft;
+use App\Domains\Flow\Services\TenantSettingsEditor;
 use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
+use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Settings\TenantSettings;
+use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Database\Seeders\TenantAclSeeder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Events\Dispatcher as Events;
 use Inertia\Testing\AssertableInertia;
+use RuntimeException;
+use Spatie\Activitylog\Actions\LogActivityAction;
+use Spatie\LaravelSettings\SettingsContainer;
+use Spatie\LaravelSettings\SettingsEventSubscriber;
 use Tests\Feature\FeatureTestCase;
 
 /**
@@ -249,6 +258,40 @@ final class AdminTenantSettingsConsoleTest extends FeatureTestCase
     public function test_a_visitor_is_sent_to_the_sign_in(): void
     {
         $this->get($this->url())->assertRedirect(route('console.auth.login'));
+    }
+
+    /**
+     * The settings cache is filled when the settings are saved, before the audit entry is written; a save whose
+     * entry cannot be written is rolled back and must not leave the new values in the cache.
+     */
+    public function test_a_rolled_back_save_leaves_no_new_values_in_the_settings_cache(): void
+    {
+        config(['settings.cache.enabled' => true, 'settings.cache.store' => 'array']);
+        $this->app->make(SettingsContainer::class)->registerBindings();
+        $this->app->make(Events::class)->subscribe(SettingsEventSubscriber::class);
+        $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(self::TENANT_ID, 'tenant'));
+        $this->app->forgetInstance(TenantSettings::class);
+        $this->app->forgetInstance(TenantSettingsEditor::class);
+
+        $this->assertSame(30, app(TenantSettings::class)->messaging_rate_limit);
+
+        config(['activitylog.actions.log_activity' => new class () extends LogActivityAction {
+            protected function save(Model $activity): void
+            {
+                throw new RuntimeException('insert refused');
+            }
+        }::class]);
+
+        try {
+            $this->app->make(TenantSettingsEditor::class)->save($this->payload(['messaging_rate_limit' => 45]));
+            $this->fail('The save passed although its entry was not written.');
+        } catch (RuntimeException $exception) {
+            $this->assertSame('insert refused', $exception->getMessage());
+        }
+
+        $this->app->forgetInstance(TenantSettings::class);
+
+        $this->assertSame(30, app(TenantSettings::class)->messaging_rate_limit);
     }
 
     /**

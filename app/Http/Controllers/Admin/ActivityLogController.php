@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Domains\Assistant\Models\Assistant;
+use App\Domains\Audit\Enums\AuditActorKind;
 use App\Domains\Audit\Enums\AuditArea;
 use App\Domains\Audit\Models\ActivityEntry;
 use App\Domains\Audit\Services\ActivityLogQuery;
@@ -140,7 +141,7 @@ final class ActivityLogController extends Controller
             'id'             => (string) $entry->getKey(),
             'createdAt'      => $entry->created_at->toIso8601String(),
             'actorKind'      => $entry->actor_kind->value,
-            'actorLabel'     => $entry->actor_label,
+            'actorLabel'     => $this->actorLabel($entry, $properties),
             'action'         => $key,
             'actionLabel'    => $this->label('audit.actions.' . $key, $key),
             'area'           => (string) $entry->log_name,
@@ -177,6 +178,25 @@ final class ActivityLogController extends Controller
         }, $page['rows']);
 
         return $page;
+    }
+
+    /**
+     * The name shown for who acted. A support entry is named from the language files and the operator the entry
+     * records, never from the stored label, so rows written before the label held the operator read the same.
+     *
+     * @param  array<string, mixed>  $properties
+     */
+    private function actorLabel(ActivityEntry $entry, array $properties): ?string
+    {
+        if (AuditActorKind::Support !== $entry->actor_kind) {
+            return $entry->actor_label;
+        }
+
+        $operator = $properties['operator_name'] ?? null;
+
+        return is_string($operator) && '' !== $operator
+            ? __('console.activity_log.actor_support_named', ['name' => $operator])
+            : __('console.activity_log.actor_support');
     }
 
     /**

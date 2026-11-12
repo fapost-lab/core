@@ -1523,8 +1523,10 @@ return [
             'support' => 'Поддержка',
             'system'  => 'Система',
         ],
-        'search_label' => 'Поиск по сотруднику или объекту',
-        'filters'      => [
+        'actor_support'       => 'Поддержка платформы',
+        'actor_support_named' => 'Поддержка платформы (:name)',
+        'search_label'        => 'Поиск по сотруднику или объекту',
+        'filters'             => [
             'area'          => 'Раздел',
             'area_all'      => 'Все разделы',
             'actor'         => 'Кто',

@@ -13,6 +13,7 @@ paths:
   - config/audit.php
   - app/Console/Commands/PruneActivityLogCommand.php
   - tests/Architecture/AuditBoundariesTest.php
+reviewed_at: 2026-11-12
 ---
 # The audit log is recorded explicitly by the console's domain services, in their transaction, into the tenant's schema
 
@@ -66,7 +67,8 @@ is one account shared by every operator.
   `view_activity_log` (administrators through `Gate::before`; a tenant migration adds the row for existing tenants).
 - **Scope of v1.** Staff actions in the console and builder (catalogue in `AuditAction`), sign-in and sign-out,
   workspace deletion requests (from Tenancy's events). Not recorded: draft autosaves, job-driven status changes,
-  Solution activations (`solution_activation_events` stays their only journal), operator actions through
+  Solution activations (`solution_activation_events` stays their only journal), thread handling (takeover,
+  finish, transfer, seize, the operator's request), operator actions through
   Foundation contracts, the support user's own sign-in (it is in `support_access_entries`).
 
 ## Alternatives
@@ -93,3 +95,10 @@ is one account shared by every operator.
   `adr-20261007-support-access-through-platform-support-user`).
 
 Source: task `activity-log`, spec `audit-log`; design approved by the owner on 2026-11-11.
+
+## Amendment 2026-11-12: how a change is detected
+
+A change is detected on the canonical JSON of a value (`AuditChanges::canonical()`): the order of an object's
+keys does not matter, the order of a list does. Postgres `jsonb` reorders keys, so a stored value read back would
+otherwise look changed. Thread handling (takeover, finish, transfer, seize, the operator's request) is not
+recorded in v1, as the scope above says.
