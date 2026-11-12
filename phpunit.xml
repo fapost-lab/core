@@ -21,6 +21,8 @@
         <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <!-- Its own provider manifest: in an overlay checkout the dev app and the tests would otherwise rewrite one services.php in turn. -->
+        <env name="APP_SERVICES_CACHE" value="bootstrap/cache/services.testing.php" force="true"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
