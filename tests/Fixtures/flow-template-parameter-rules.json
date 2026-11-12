@@ -1,0 +1,11 @@
+{
+    "exposable_field_types": [
+        "string", "text", "number", "boolean", "enum", "enum-cards", "duration", "array", "state-picker", "flow-picker"
+    ],
+    "non_parameterizable_node_types": ["template", "template_output", "loop", "loop_end"],
+    "parameter_key_pattern": "^[a-z][a-z0-9_]{0,63}$",
+    "empty_value_cases": {
+        "empty": [null, "", "  ", [], {}, {"en": "  "}, {"en": "", "uk": " "}],
+        "not_empty": [false, 0, "x", ["a"], {"en": 1}, {"en": "hi"}]
+    }
+}

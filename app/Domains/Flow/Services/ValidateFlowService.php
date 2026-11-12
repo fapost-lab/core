@@ -12,6 +12,7 @@ use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\DTOs\FlowValidationResultDto;
 use App\Domains\Flow\Enums\EndStatus;
+use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Enums\FlowTriggerType;
 use App\Domains\Flow\Enums\SendMessageContentType;
 use App\Domains\Flow\Handlers\EndNodeHandler;
@@ -86,6 +87,7 @@ final readonly class ValidateFlowService
         }
 
         $this->validateEndNodeOutgoingEdges($nodeMap, $edges, $errors);
+        $this->validateSubflowTargetsAreNotTemplates($nodeMap, $errors);
         $this->validateSubflowCallGraph($flowId, $nodeMap, $errors);
         $this->validateNoNestedLoops($nodeMap, $edges, $errors);
         $this->validateLoopReachesLoopEnd($nodeMap, $edges, $errors);
@@ -601,6 +603,56 @@ final readonly class ValidateFlowService
                         message: "timeout '{$timeout}' is not a valid ISO 8601 duration.",
                     );
                 }
+            }
+        }
+    }
+
+    /**
+     * A template is never started on its own, so a subflow that calls one fails when it runs. The callees are looked
+     * up in one query; a flow id with no draft is left to the call-graph and runtime checks. Skipped, like the
+     * call-graph check, when that validator was not injected (legacy unit tests without a database).
+     *
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     * @param  list<FlowValidationErrorDto>         $errors
+     */
+    private function validateSubflowTargetsAreNotTemplates(array $nodeMap, array &$errors): void
+    {
+        if (null === $this->callGraphValidator) {
+            return;
+        }
+
+        $targets = [];
+
+        foreach ($nodeMap as $nodeId => $node) {
+            if (\App\Domains\Flow\Handlers\SubflowNodeHandler::TYPE !== ($node['type'] ?? null)) {
+                continue;
+            }
+
+            $config = is_array($node['config'] ?? null) ? $node['config'] : [];
+            $target = $config['flow_id'] ?? null;
+
+            if (is_string($target) && '' !== mb_trim($target) && ! str_contains($target, '{{')) {
+                $targets[(string) $nodeId] = mb_trim($target);
+            }
+        }
+
+        if ([] === $targets) {
+            return;
+        }
+
+        $templates = FlowDraft::query()
+            ->whereIn('flow_id', array_values(array_unique($targets)))
+            ->where('kind', FlowKind::Template->value)
+            ->pluck('flow_id')
+            ->all();
+
+        foreach ($targets as $nodeId => $target) {
+            if (in_array($target, $templates, true)) {
+                $errors[] = new FlowValidationErrorDto(
+                    path: "nodes.{$nodeId}.config.flow_id",
+                    code: 'subflow_target_is_template',
+                    message: "Subflow target '{$target}' is a template: templates are placed with a template node, not called as a subflow.",
+                );
             }
         }
     }

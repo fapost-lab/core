@@ -18,7 +18,7 @@ paths:
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
   - tests/Architecture/EgressGuardTest.php
-reviewed_at: 2026-11-11
+reviewed_at: 2026-11-12
 ---
 # Flow rules
 
@@ -90,6 +90,14 @@ broken.
 - **Copied template ids contain no dot and are the same in every template version.** Expansion
   re-issues each id as `UUIDv5(reference node, old id)`, because state keys are split on `.` and
   button ids are `uuid` columns and edge handles. Enforced: `FlowTemplatePublishTest`.
+- **A flow publish locks the assistant's template drafts before its own draft; the host republish does not.**
+  `PublishFlowService::execute()` takes `FOR SHARE` on every `kind = template` draft of the assistant, ordered by
+  `flow_id`, then `FOR UPDATE` on its own draft. `publishFlow()` and `republishHosts()` take no such lock: they run
+  holding a template and a host, and a second template lock from there deadlocks with that template's own publish.
+  Why: otherwise a host placing a template for the first time can miss the template's new version
+  (`adr-20261111-flow-templates-expanded-at-publish`). Enforced:
+  `FlowTemplatePublishTest::test_a_flow_publish_locks_the_assistants_templates_before_its_own_draft`,
+  `FlowTemplatePublishTest::test_a_template_publish_takes_no_shared_lock_on_templates`.
 - **Execution is bounded.** The engine stops after the platform setting `flow.execution.max_iterations`
   (`FlowEngineInterface::MAX_ITERATIONS_SETTING`, read through the scoped `PlatformSettingsReaderInterface`); a lost
   session lock aborts with `SessionLockLostException`.

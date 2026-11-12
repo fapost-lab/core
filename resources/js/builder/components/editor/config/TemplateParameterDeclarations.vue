@@ -46,7 +46,7 @@ watch(() => props.nodeId, () => {
     field.value = ''
 })
 
-/** Keys used by every other declaration in the whole template, optionally skipping one. */
+/** Keys declared anywhere in the template, this node included: a key is unique across the whole template. */
 function usedKeys(): string[] {
     return builderStore.definition.nodes.flatMap((n) => (n.parameters ?? []).map((p) => p.key))
 }

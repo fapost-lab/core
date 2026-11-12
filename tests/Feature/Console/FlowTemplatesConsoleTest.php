@@ -13,6 +13,7 @@ use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Database\Seeders\TenantAclSeeder;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\Concerns\SetsRecordLimits;
 use Tests\Feature\FeatureTestCase;
@@ -219,6 +220,63 @@ final class FlowTemplatesConsoleTest extends FeatureTestCase
         $this->app->make(TenantContextInterface::class)->set($this->tenant());
 
         $this->assertSame(1, $this->app->make(TenantFlowActivity::class)->publishedFlows());
+    }
+
+    public function test_the_list_counts_usage_without_a_query_per_row(): void
+    {
+        $admin = $this->admin();
+
+        $first      = $this->template('First');
+        $publishing = $this->host($first);
+        FlowDefinition::query()->create([
+            'tenant_id' => $publishing->tenant_id,
+            'flow_id'   => $publishing->flow_id,
+            'version'   => 1,
+            'name'      => $publishing->name,
+            'nodes'     => [],
+            'edges'     => [],
+            'is_active' => true,
+        ]);
+        DB::table('flow_template_usages')->insert([
+            'host_flow_id'       => $publishing->flow_id,
+            'host_definition_id' => FlowDefinition::query()->where('flow_id', $publishing->flow_id)->value('id'),
+            'template_flow_id'   => $first->flow_id,
+        ]);
+
+        // Warm the caches a request fills once (permissions, settings) so the counts compare like with like.
+        $this->actingAs($admin)->get($this->url())->assertOk();
+
+        $one = $this->queriesDuring(fn () => $this->actingAs($admin)->get($this->url())->assertOk());
+
+        $second = $this->template('Second');
+        $this->host($second);
+        $this->template('Third');
+
+        $three = $this->queriesDuring(fn () => $this->actingAs($admin)->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('table.meta.total', 3)
+                ->where('table.rows.0.usedBy', 1)
+                ->where('table.rows.1.usedBy', 1)
+                ->where('table.rows.2.usedBy', 0)
+                ->etc()));
+
+        $this->assertSame($one, $three, 'the number of queries does not grow with the number of templates');
+    }
+
+    /**
+     * @param  callable(): mixed  $action
+     */
+    private function queriesDuring(callable $action): int
+    {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+
+        $action();
+
+        $count = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        return $count;
     }
 
     private function url(string $suffix = ''): string

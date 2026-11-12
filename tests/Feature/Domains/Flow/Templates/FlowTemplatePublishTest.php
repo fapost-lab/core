@@ -20,6 +20,7 @@ use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Services\PublishFlowService;
 use App\Domains\Flow\Services\SaveDraftService;
+use App\Domains\Flow\Services\ValidateFlowService;
 use App\Domains\Flow\Templates\TemplateExpander;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
@@ -376,6 +377,107 @@ final class FlowTemplatePublishTest extends FeatureTestCase
             isTemplate: false,
         );
         $this->assertSame(['template_unknown_output'], array_map(static fn ($error): string => $error->code, $flowErrors));
+    }
+
+    public function test_a_flow_publish_locks_the_assistants_templates_before_its_own_draft(): void
+    {
+        $template = $this->publishedTemplate();
+        $host     = $this->hostDraft($template->flow_id);
+
+        $queries = $this->draftQueriesDuring(fn () => $this->publish($host->flow_id));
+
+        $templateLock = $this->firstIndex($queries, fn (array $q): bool => $q['bindings'] === [$this->assistant->getKey(), 'template']);
+        $ownLock      = $this->firstIndex($queries, fn (array $q): bool => [$host->flow_id] === $q['bindings'] && str_contains($q['sql'], 'limit'), skipFirst: true);
+
+        $this->assertNotNull($templateLock, 'the assistants template drafts are read');
+        $this->assertNotNull($ownLock, 'the flow draft is read again, as the lock');
+        $this->assertLessThan($ownLock, $templateLock, 'templates are locked before the flow draft');
+
+        if ('pgsql' === DB::getDriverName()) {
+            $this->assertStringContainsString('for share', $queries[$templateLock]['sql']);
+            $this->assertStringContainsString('for update', $queries[$ownLock]['sql']);
+            $this->assertStringContainsString('order by "flow_id"', $queries[$templateLock]['sql']);
+        }
+    }
+
+    public function test_a_template_publish_takes_no_shared_lock_on_templates(): void
+    {
+        $template = $this->publishedTemplate(withButtons: false);
+        $this->publish($this->hostDraft($template->flow_id)->flow_id);
+
+        $queries = $this->draftQueriesDuring(fn () => $this->publish($template->flow_id));
+
+        $this->assertNull(
+            $this->firstIndex($queries, static fn (array $q): bool => in_array('template', $q['bindings'], true) && str_contains($q['sql'], '"assistant_id"')),
+            'a template publish, and the republish of its hosts, lock no template drafts of the assistant',
+        );
+
+        if ('pgsql' === DB::getDriverName()) {
+            $this->assertNull($this->firstIndex($queries, static fn (array $q): bool => str_contains($q['sql'], 'for share')));
+        }
+    }
+
+    public function test_publishing_refuses_a_subflow_that_targets_a_template(): void
+    {
+        $target = $this->publishedTemplate(withButtons: false);
+
+        $subflow = static fn (): array => ['id' => 's', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => $target->flow_id]];
+
+        $host = FlowDraft::factory()->create([
+            'tenant_id'    => $this->tenantId,
+            'assistant_id' => $this->assistant->getKey(),
+            'nodes'        => [$subflow()],
+            'edges'        => [],
+        ]);
+        $this->assertRefused($host->flow_id, 'subflow_target_is_template');
+
+        $outer = $this->templateDraft(
+            nodes: [$subflow(), ['id' => 'o-done', 'type' => 'template_output', 'version' => 1, 'config' => ['name' => 'done']]],
+            edges: [['id' => 'oe1', 'from' => 's', 'to' => 'o-done', 'handle' => 'default']],
+        );
+        $this->assertRefused($outer->flow_id, 'subflow_target_is_template');
+
+        $result = $this->app->make(ValidateFlowService::class)->execute(nodes: $host->nodes, edges: [], flowId: $host->flow_id);
+        $this->assertContains('subflow_target_is_template', array_map(static fn ($error): string => $error->code, $result->errors));
+    }
+
+    /**
+     * @param  callable(): mixed  $action
+     * @return list<array{sql: string, bindings: list<mixed>}>
+     */
+    private function draftQueriesDuring(callable $action): array
+    {
+        $queries = [];
+        DB::listen(static function ($query) use (&$queries): void {
+            if (str_contains($query->sql, 'from "flow_drafts"')) {
+                $queries[] = ['sql' => $query->sql, 'bindings' => $query->bindings];
+            }
+        });
+
+        $action();
+
+        return $queries;
+    }
+
+    /**
+     * @param  list<array{sql: string, bindings: list<mixed>}>  $queries
+     * @param  callable(array{sql: string, bindings: list<mixed>}): bool  $matches
+     */
+    private function firstIndex(array $queries, callable $matches, bool $skipFirst = false): ?int
+    {
+        foreach ($queries as $index => $query) {
+            if ($matches($query)) {
+                if ($skipFirst) {
+                    $skipFirst = false;
+
+                    continue;
+                }
+
+                return $index;
+            }
+        }
+
+        return null;
     }
 
     private function publishedTemplate(bool $withButtons = true): FlowDraft

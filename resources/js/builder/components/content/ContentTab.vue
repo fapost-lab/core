@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import {computed, ref} from 'vue'
 import {useBuilderStore} from '@builder/store/builderStore'
-import {isTranslatableField} from '@builder/utils/translatableFields'
+import {useTranslations} from '@builder/composables/useTranslations'
+import {isTranslatableField, translatableFieldsOf} from '@builder/utils/translatableFields'
 import {isEmptyParameterValue, readTemplateParameters} from '@builder/utils/templateNodes'
 import ContentEditorPanel from './ContentEditorPanel.vue'
 
 const builderStore = useBuilderStore()
+const {t} = useTranslations()
 
 const LANGUAGE_NAMES: Record<string, string> = {
     uk: 'Ukrainian', en: 'English', ru: 'Russian', pl: 'Polish',
@@ -32,33 +34,20 @@ const contentEntries = computed(() => {
         const type   = node.type
         const label  = node.label ?? type
 
+        for (const descriptor of translatableFieldsOf(type)) {
+            if (!descriptor.shown(config)) continue
+            entries.push({
+                key:        `${node.id}.${descriptor.field}`,
+                nodeId:     node.id,
+                nodeType:   type,
+                nodeLabel:  label,
+                fieldLabel: t(descriptor.labelKey),
+                fieldKind:  descriptor.kind,
+                values:     resolveValues(config[descriptor.field] ?? ''),
+            })
+        }
+
         if (type === 'send_message') {
-            const ct = String(config.content_type ?? 'text')
-
-            if (ct === 'text' || ct === 'text_with_keyboard') {
-                entries.push({
-                    key:        `${node.id}.text`,
-                    nodeId:     node.id,
-                    nodeType:   type,
-                    nodeLabel:  label,
-                    fieldLabel: 'Message text',
-                    fieldKind: 'text',
-                    values:     resolveValues(config.text ?? ''),
-                })
-            }
-
-            if (['image', 'document', 'video'].includes(ct)) {
-                entries.push({
-                    key:        `${node.id}.caption`,
-                    nodeId:     node.id,
-                    nodeType:   type,
-                    nodeLabel:  label,
-                    fieldLabel: 'Caption',
-                    fieldKind: 'caption',
-                    values:     resolveValues(config.caption ?? ''),
-                })
-            }
-
             const buttons = Array.isArray(config.buttons) ? config.buttons as Array<Record<string, unknown>> : []
             buttons.forEach((btn: Record<string, unknown>, idx: number) => {
                 const raw = btn.label ?? ''
@@ -90,31 +79,6 @@ const contentEntries = computed(() => {
                     fieldLabel: param.label ?? param.key,
                     fieldKind: 'text',
                     values: resolveValues(values[param.key]),
-                })
-            }
-        }
-
-        if (type === 'input') {
-            if (config.prompt !== undefined && config.prompt !== null && config.prompt !== '') {
-                entries.push({
-                    key: `${node.id}.prompt`,
-                    nodeId: node.id,
-                    nodeType: type,
-                    nodeLabel: label,
-                    fieldLabel: 'Prompt',
-                    fieldKind: 'prompt',
-                    values: resolveValues(config.prompt),
-                })
-            }
-            if (config.on_invalid_message !== undefined && config.on_invalid_message !== null && config.on_invalid_message !== '') {
-                entries.push({
-                    key: `${node.id}.on_invalid_message`,
-                    nodeId: node.id,
-                    nodeType: type,
-                    nodeLabel: label,
-                    fieldLabel: 'On invalid',
-                    fieldKind: 'invalid',
-                    values: resolveValues(config.on_invalid_message),
                 })
             }
         }
@@ -194,14 +158,8 @@ function onSave() {
     const config = { ...node.config }
     const parts  = entry.key.slice(entry.nodeId.length + 1).split('.')
 
-    if (parts[0] === 'text') {
-        config.text = { ...localTranslations.value }
-    } else if (parts[0] === 'caption') {
-        config.caption = { ...localTranslations.value }
-    } else if (parts[0] === 'prompt') {
-        config.prompt = {...localTranslations.value}
-    } else if (parts[0] === 'on_invalid_message') {
-        config.on_invalid_message = {...localTranslations.value}
+    if (parts.length === 1 && isTranslatableField(node.type, parts[0])) {
+        config[parts[0]] = {...localTranslations.value}
     } else if (parts[0] === 'parameter_values' && parts.length >= 2) {
         // The parameter key is a single [a-z0-9_] token, so everything after the prefix is the key.
         const raw = config.parameter_values

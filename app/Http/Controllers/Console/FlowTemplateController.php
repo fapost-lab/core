@@ -47,21 +47,37 @@ final class FlowTemplateController extends Controller
             defaultSort: 'name',
         );
 
+        $page = $table->respond(
+            $request,
+            $this->flows->query(FlowKind::Template),
+            fn (FlowDraft $template): array => [
+                'id'               => (string) $template->getKey(),
+                'flowId'           => $template->flow_id,
+                'name'             => $template->name,
+                'description'      => $template->description,
+                'publishedVersion' => null === $template->getAttribute('published_version') ? null : (int) $template->getAttribute('published_version'),
+                'usedBy'           => 0,
+                'deleteUrl'        => $this->url('destroy', ['record' => $template->getKey()]),
+                'builderUrl'       => $this->builderUrl($template),
+            ],
+        );
+
+        // The usage of the whole page is counted at once: counting per row loads every flow graph of the assistant
+        // for each template.
+        $assistant = $this->assistant->get();
+        $counts    = $this->usages->usageCounts(
+            (string) $assistant->tenant_id,
+            (string) $assistant->getKey(),
+            array_column($page['rows'], 'flowId'),
+        );
+
+        $page['rows'] = array_map(
+            static fn (array $row): array => [...$row, 'usedBy' => $counts[$row['flowId']] ?? 0],
+            $page['rows'],
+        );
+
         return Inertia::render('Console/FlowTemplates/Index', [
-            'table' => $table->respond(
-                $request,
-                $this->flows->query(FlowKind::Template),
-                fn (FlowDraft $template): array => [
-                    'id'               => (string) $template->getKey(),
-                    'flowId'           => $template->flow_id,
-                    'name'             => $template->name,
-                    'description'      => $template->description,
-                    'publishedVersion' => null === $template->getAttribute('published_version') ? null : (int) $template->getAttribute('published_version'),
-                    'usedBy'           => count($this->usages->hostsOf($template)),
-                    'deleteUrl'        => $this->url('destroy', ['record' => $template->getKey()]),
-                    'builderUrl'       => $this->builderUrl($template),
-                ],
-            ),
+            'table' => $page,
             'limit' => [
                 'reached' => $limit->reached,
                 'hint'    => $limit->reached && null !== $limit->limit

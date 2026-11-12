@@ -62,7 +62,8 @@ final class TemplateNodeOrigins
     }
 
     /**
-     * Loads the definitions of many sessions at once, ahead of {@see describeForSession()} calls for a list.
+     * Loads, for a list of sessions, everything {@see describeForSession()} reads: the sessions' definitions, the
+     * template origins of those definitions and the names of the templates, in a fixed number of queries.
      *
      * @param  list<string>  $sessionIds
      */
@@ -70,15 +71,76 @@ final class TemplateNodeOrigins
     {
         $missing = array_values(array_diff(array_unique($sessionIds), array_keys($this->definitionBySession)));
 
+        if ([] !== $missing) {
+            $found = FlowSession::query()->whereKey($missing)->pluck('flow_definition_id', 'id');
+
+            foreach ($missing as $sessionId) {
+                $definitionId                          = $found[$sessionId] ?? null;
+                $this->definitionBySession[$sessionId] = null === $definitionId ? null : (string) $definitionId;
+            }
+        }
+
+        $definitionIds = array_values(array_unique(array_filter(
+            array_map(fn (string $sessionId): ?string => $this->definitionBySession[$sessionId] ?? null, $sessionIds),
+        )));
+
+        $this->preloadDefinitions($definitionIds);
+    }
+
+    /**
+     * @param  list<string>  $definitionIds
+     */
+    private function preloadDefinitions(array $definitionIds): void
+    {
+        $missing = array_values(array_diff($definitionIds, array_keys($this->originsByDefinition)));
+
+        if ([] !== $missing) {
+            $nodesById = FlowDefinition::query()->whereKey($missing)->pluck('nodes', 'id');
+
+            foreach ($missing as $definitionId) {
+                $this->originsByDefinition[$definitionId] = $this->originsFromNodes($nodesById[$definitionId] ?? null);
+            }
+        }
+
+        $templateFlowIds = [];
+
+        foreach ($definitionIds as $definitionId) {
+            foreach ($this->originsByDefinition[$definitionId] ?? [] as $origin) {
+                $templateFlowIds[$origin['template_flow_id']] = true;
+            }
+        }
+
+        $this->preloadTemplateNames(array_keys($templateFlowIds));
+    }
+
+    /**
+     * @param  list<string>  $templateFlowIds
+     */
+    private function preloadTemplateNames(array $templateFlowIds): void
+    {
+        $missing = array_values(array_diff($templateFlowIds, array_keys($this->templateNames)));
+
         if ([] === $missing) {
             return;
         }
 
-        $found = FlowSession::query()->whereKey($missing)->pluck('flow_definition_id', 'id');
+        $names = FlowDraft::query()->whereIn('flow_id', $missing)->pluck('name', 'flow_id')->all();
+        $rest  = array_values(array_diff($missing, array_keys($names)));
 
-        foreach ($missing as $sessionId) {
-            $definitionId                          = $found[$sessionId] ?? null;
-            $this->definitionBySession[$sessionId] = null === $definitionId ? null : (string) $definitionId;
+        if ([] !== $rest) {
+            // Newest version last, so it wins when the map is built.
+            $published = FlowDefinition::query()
+                ->whereIn('flow_id', $rest)
+                ->orderBy('version')
+                ->pluck('name', 'flow_id')
+                ->all();
+
+            $names += $published;
+        }
+
+        foreach ($missing as $flowId) {
+            $name                         = $names[$flowId] ?? null;
+            $this->templateNames[$flowId] = is_string($name) && '' !== $name ? $name : $flowId;
         }
     }
 
@@ -100,7 +162,16 @@ final class TemplateNodeOrigins
             return $this->originsByDefinition[$definitionId];
         }
 
-        $nodes   = FlowDefinition::query()->whereKey($definitionId)->value('nodes');
+        $this->preloadDefinitions([$definitionId]);
+
+        return $this->originsByDefinition[$definitionId];
+    }
+
+    /**
+     * @return array<string, array{template_flow_id: string, template_version: int, node_id: string, node_type: string}>
+     */
+    private function originsFromNodes(mixed $nodes): array
+    {
         $nodes   = is_string($nodes) ? json_decode($nodes, true) : $nodes;
         $origins = [];
 
@@ -119,16 +190,13 @@ final class TemplateNodeOrigins
             ];
         }
 
-        return $this->originsByDefinition[$definitionId] = $origins;
+        return $origins;
     }
 
     private function templateName(string $templateFlowId): string
     {
         if (! isset($this->templateNames[$templateFlowId])) {
-            $name = FlowDraft::query()->where('flow_id', $templateFlowId)->value('name')
-                ?? FlowDefinition::query()->where('flow_id', $templateFlowId)->orderByDesc('version')->value('name');
-
-            $this->templateNames[$templateFlowId] = is_string($name) && '' !== $name ? $name : $templateFlowId;
+            $this->preloadTemplateNames([$templateFlowId]);
         }
 
         return $this->templateNames[$templateFlowId];

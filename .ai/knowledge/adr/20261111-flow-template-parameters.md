@@ -12,7 +12,7 @@ paths:
   - resources/js/builder/components/editor/config/overrides/TemplateConfig.vue
   - resources/js/builder/components/editor/config/TemplateParameterDeclarations.vue
 summary: Why a template parameter is a field of a node inside the template, exposed by a node-level declaration and replaced in the copy by the host's value after the ids are re-issued, rather than {{param.x}} placeholders
-reviewed_at: 2026-11-11
+reviewed_at: 2026-11-12
 ---
 # A template parameter is an exposed field of a node inside the template, replaced in the copy by the host's value at expansion
 
@@ -67,6 +67,8 @@ and settings such as a timeout or a role are not texts at all.
 
 - The builder and the server keep two copies of the exposable types, the key pattern and the emptiness
   rule (`utils/templateNodes.ts`, `TemplateExpander`); the server is the authority at publish.
+  Amended 2026-11-12 (flow-templates-followups): a shared fixture (`tests/Fixtures/flow-template-parameter-rules.json`)
+  checked by `TemplateParameterRulesParityTest` and `templateNodes.test.ts` holds the two copies equal.
 - Translatable fields are the Content tab's list (`utils/translatableFields.ts`); a parameter on another
   text field (e.g. `request_operator` texts) is a plain string for every language.
 - A host value is not type-checked against the source field beyond what `ValidateFlowService` checks on

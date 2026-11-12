@@ -65,4 +65,31 @@ final readonly class TemplateUsageRepository
             ->values()
             ->all();
     }
+
+    /**
+     * The same as {@see self::hostsOf()} for several templates in one query.
+     *
+     * @param  list<string>  $templateFlowIds
+     * @return array<string, list<string>>  host flow ids by template flow id, only for templates that have hosts
+     */
+    public function hostsOfMany(array $templateFlowIds): array
+    {
+        if ([] === $templateFlowIds) {
+            return [];
+        }
+
+        $hosts = [];
+
+        $rows = $this->connection->table('flow_template_usages')
+            ->whereIn('template_flow_id', $templateFlowIds)
+            ->orderBy('host_flow_id')
+            ->distinct()
+            ->get(['template_flow_id', 'host_flow_id']);
+
+        foreach ($rows as $row) {
+            $hosts[(string) $row->template_flow_id][] = (string) $row->host_flow_id;
+        }
+
+        return $hosts;
+    }
 }
