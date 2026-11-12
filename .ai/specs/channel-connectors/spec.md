@@ -194,7 +194,7 @@ runtime-plugin draft; what still applies to Composer connectors is kept below.
   - A Viber connector until a customer asks for one: its bot-initiated messages are billed per delivery.
   - Microsoft Teams: the spec `teams-connector` — a different ingress authentication (Bot Framework JWT)
     and an OAuth-token sender, too big to be the contract's proof.
-  - Runtime zip plugins: they stay with `plugin-runtime-contract-idea` and `ecosystem-distribution`.
+  - Runtime zip plugins: they belong to `extension-installer` (which carries over the decisions of `plugin-runtime-contract-idea`).
   - Integrations that are not messaging channels (CRM, payments): they already have action handlers and
     data accessors.
   - Third-party trust, a store, licences.

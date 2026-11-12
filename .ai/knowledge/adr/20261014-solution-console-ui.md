@@ -11,7 +11,7 @@ paths:
   - "app/Http/Shell/**"
   - vite.config.ts
 summary: "How a Solution adds to the console: server-side declarations on named Core targets, pages by <id>::Path, a prebuilt dist/ on Core's shared Vue, Inertia and kit through an import map; supersedes ADR-06 for Solutions"
-reviewed_at: 2026-10-16
+reviewed_at: 2026-11-12
 ---
 # A Solution adds to the console through server-side declarations and a prebuilt bundle on Core's shared modules
 
@@ -98,7 +98,8 @@ Core endpoint as that user and read the screen it is mounted in. That adds no tr
 with the application's full rights, and installing it is the deploy-time decision of whoever builds the image.
 Authorization therefore stays on the server, secrets stay out of props, and a mounted component receives no more
 than the ids above. This model holds only for code an operator installs; UI uploaded into a running system is the
-sandbox question of `ecosystem-distribution`. Plugins ship no Vue.
+trust question of `extension-installer` (moved from `ecosystem-distribution` on 2026-11-12: there is no in-process
+sandbox; trust comes from trust levels and signing). Plugins ship no Vue.
 
 **Stability.** The contract is Foundation (declarations and targets), the `fapost-ui.json` schema and the naming rule;
 its version is Foundation's, gated by Composer. Every point is `@experimental` in PHPDoc and in the published docs
@@ -183,7 +184,7 @@ Why:      one Vue instance and one kit are what make prebuilt bundles work witho
   application id, which is the Solution `id`, so the manifest's rule that an `id` never changes now also protects
   page names, URLs, asset paths and pins.
 - Every kit change after `0.1.0` is a change to a run-time interface installed Solutions depend on.
-- How long an old kit major stays served after 1.0 is left open (the version-story fog item, moved from `ui-foundation` to `ecosystem-distribution` on 2026-10-16).
+- How long an old kit major stays served after 1.0 is left open (the version-story fog item, moved from `ui-foundation` to `ecosystem-distribution` on 2026-10-16, and to `extension-installer` Phase 5 on 2026-11-12).
 
 ## Amendments
 

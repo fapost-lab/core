@@ -30,7 +30,7 @@ A developer inside the Laravel ecosystem can stand up FaPost, extend it through 
 | 4 | Solution activation lifecycle — manifest validation, activation storage and registry, the activation screen (on the kit, step 5), and the lifecycle tests that prove install → activate → handler available | idea-brief.md §7 Recommendation | M | spec `.ai/specs/solution-activation-lifecycle/` |
 | 6 | First solution built through the public contracts only — Feedback (bug reports and suggestions with votes, for a tenant's own team and for the FaPost team), installed through the composer overlay with its UI prebuilt, so nothing in Core is rebuilt; plus the `artisan` scaffold every later Solution starts from | idea-brief.md §7 Recommendation; subject changed by the owner, 2026-10-07 | L | spec `.ai/specs/first-solution/` |
 | 7 | Extension documentation for outsiders — the Extending section rewritten against contracts that survived a real build | idea-brief.md §3 Users | M | spec `.ai/specs/extension-docs/` |
-| 8 | Ecosystem distribution → see [Not yet specified](#not-yet-specified) | idea-brief.md §7 Recommendation | fog | spec `.ai/specs/ecosystem-distribution/` |
+| 8 | Ecosystem distribution — installing, upgrading and licensing extensions from the admin (Core's side), the store, and the host agent that rebuilds a self-hosted installation | idea-brief.md §7 Recommendation; owner, 2026-11-12 | L | specs `.ai/specs/extension-installer/`, `.ai/specs/marketplace/`, `.ai/specs/fapost-agent/` |
 | 9 | Tenant quotas — limited test and trial tenants: host-based tenant resolution, Foundation quota and operator contracts with allow-everything Core defaults, an egress guard, and a runtime-stopped read-only tenant; a self-hosted install sees no difference | owner, 2026-10 (put Core online for testers; the SaaS trial tier) | L | spec `.ai/specs/tenant-quotas/` |
 
 Step progress is read from the specs themselves: `.ai/scripts/jig spec list`. Nothing tracks status here.
@@ -61,9 +61,7 @@ taken whenever a lane is free: `remove-dead-transactional-job` (`messaging.trans
 
 ## Not yet specified
 
-| Area | What we'd have to learn | Blocks | How it gets sharpened |
-|---|---|:---:|---|
-| Ecosystem distribution — how a third-party extension reaches another installation and what it is allowed to do once there | What an extension may do at runtime, where the sandbox boundary sits, whether distribution rides on the existing package channel or needs its own, and what a paid closed extension needs in order to be installable at all | 8 | A recon pass once the first solution has been built through the public contracts, since that build is what reveals which contracts an outsider actually touches |
+Nothing at the moment. Step 8, the last area listed here, was specified on 2026-11-12 as `extension-installer`, `marketplace` and `fapost-agent`.
 
 ## Out of scope
 
@@ -111,7 +109,7 @@ flowchart LR
   s5 -->|"the activation screen is built on the kit"| s4
   s5 -->|"the read-only banner and limit messages are built on the kit"| s9
   s6 -->|"documenting contracts that never survived a real build would fix the mistakes in writing"| s7
-  s4 -->|"the sandbox boundary is only askable once the activation surface is fixed"| s8
+  s4 -->|"the installer installs and activates Solutions through the lifecycle"| s8
   s4 -->|"its Solution entitlement seam extends the activation screen"| s9
 ```
 
@@ -138,6 +136,6 @@ Contract edits that step 4 or step 6 turn out to need happen in the foundation p
 
 | Step | Shipped | Link |
 |---|---|---|
-| 5 · UI foundation | 2026-10-16 | Every admin and console screen on Inertia + Vue, Filament and Livewire gone from Core (Core v0.10.0), the kit published as [`@fapost/ui`](https://www.npmjs.com/package/@fapost/ui) from `fapost-lab/ui` (Core v0.11.0), the app switcher and the Solution console contract. Spec closed; its two open questions moved to `first-solution` (mini-app point) and `ecosystem-distribution` (kit and contract versions); decisions live in ADRs `20261014-solution-console-ui` and `20261015-ui-kit-package-shape`. |
+| 5 · UI foundation | 2026-10-16 | Every admin and console screen on Inertia + Vue, Filament and Livewire gone from Core (Core v0.10.0), the kit published as [`@fapost/ui`](https://www.npmjs.com/package/@fapost/ui) from `fapost-lab/ui` (Core v0.11.0), the app switcher and the Solution console contract. Spec closed; its two open questions moved to `first-solution` (mini-app point) and `ecosystem-distribution` (kit and contract versions; since 2026-11-12 in `extension-installer` Phase 5); decisions live in ADRs `20261014-solution-console-ui` and `20261015-ui-kit-package-shape`. |
 | 3 · Positioning rewrite | 2026-09-23 | Project description and landing rebuilt on the three pillars — task `positioning-rewrite`. |
 | 1 · Ship the replacement | 2026-09-22 | Every production-readiness criterion closed, the concurrency suite running against real Redis and a load test of 100 concurrent sessions with no state leakage — [`platform/ROADMAP.md`](./platform/ROADMAP.md) § Критерии «Production Ready». Rolling the platform out to real clients is operational work and carries no spec. |
