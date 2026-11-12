@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Domains\Solution\Console\ConsoleExtensionRegistry;
+use App\Http\Shell\SolutionExtensions;
 use App\Http\Shell\SolutionUi;
 use Closure;
 use Fapost\Foundation\Console\ConsoleNames;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route;
-use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -26,7 +26,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final readonly class EnsureSolutionActive
 {
-    public function __construct(private SolutionUi $ui, private ConsoleExtensionRegistry $registry)
+    public function __construct(private SolutionUi $ui, private ConsoleExtensionRegistry $registry, private SolutionExtensions $extensions)
     {
     }
 
@@ -66,9 +66,7 @@ final readonly class EnsureSolutionActive
      */
     private function mayOpen(Request $request, string $solutionId): bool
     {
-        $ability = $this->registry->applicationOf($solutionId)?->ability;
-
-        return null === $ability || Gate::forUser($request->user())->allows($ability);
+        return $this->extensions->allows($request->user(), $this->registry->applicationOf($solutionId)?->ability);
     }
 
     private function updateRequired(Request $request): Response

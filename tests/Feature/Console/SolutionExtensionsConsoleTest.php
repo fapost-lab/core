@@ -225,6 +225,13 @@ final class SolutionExtensionsConsoleTest extends FeatureTestCase
 
         $this->getJson($this->panelUrl('/apps/showcase/board'))->assertStatus(Response::HTTP_SERVICE_UNAVAILABLE);
 
+        // A per-assistant route of the application answers the same.
+        $this->get($this->panelUrl("/assistant/{$this->assistant->getKey()}/apps/showcase/contacts/abc"))
+            ->assertStatus(Response::HTTP_SERVICE_UNAVAILABLE)
+            ->assertInertia(fn (AssertableInertia $inertia) => $inertia
+                ->component('Errors/SolutionUnavailable')
+                ->where('reason', 'update_required'));
+
         // The search palette finds the application, but none of its pages.
         $groups = $this->getJson($this->panelUrl('/admin/search?' . http_build_query(['q' => 'desk'])))->assertOk()->json('groups');
         $this->assertSame([], $groups);
@@ -459,9 +466,6 @@ final class SolutionExtensionsConsoleTest extends FeatureTestCase
     }
 
     /**
-     * The Inertia version a first visit of the console gets.
-     */
-    /**
      * What a Core upgrade to another kit does to the showcase bundle, built for `^0.1`: the platform ships a version
      * outside that range.
      */
@@ -472,6 +476,9 @@ final class SolutionExtensionsConsoleTest extends FeatureTestCase
         $this->forgetSolutionState();
     }
 
+    /**
+     * The Inertia version a first visit of the console gets.
+     */
     private function version(): string
     {
         return (string) $this->get($this->panelUrl('/admin/_probe'))->assertOk()->viewData('page')['version'];

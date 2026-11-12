@@ -22,7 +22,6 @@ use App\Domains\Tenancy\Models\Tenant;
 use App\Infrastructure\Broadcasting\BroadcasterStatus;
 use Database\Seeders\TenantAclSeeder;
 use Illuminate\Broadcasting\Broadcasters\Broadcaster;
-use Illuminate\Broadcasting\Broadcasters\UsePusherChannelConventions;
 use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Cache\Repository as Cache;
@@ -37,7 +36,6 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Mockery;
 use RuntimeException;
-use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Tests\Feature\FeatureTestCase;
 
 /**
@@ -351,34 +349,5 @@ final class FlowActivityLiveTest extends FeatureTestCase
             'status'             => FlowSessionStatus::Active,
             'version'            => 0,
         ]);
-    }
-}
-
-/**
- * A Pusher-style broadcaster without Pusher: it authorizes through the application's channels and "signs" with the
- * channel name, so a test can tell an allowed subscription from a refused one.
- */
-final class SigningTestBroadcaster extends Broadcaster
-{
-    use UsePusherChannelConventions;
-
-    public function auth($request): mixed
-    {
-        $channelName = $this->normalizeChannelName((string) $request->channel_name);
-
-        if ('' === $channelName || ($this->isGuardedChannel((string) $request->channel_name) && ! $this->retrieveUser($request, $channelName))) {
-            throw new AccessDeniedHttpException();
-        }
-
-        return $this->verifyUserCanAccessChannel($request, $channelName);
-    }
-
-    public function validAuthenticationResponse($request, $result): mixed
-    {
-        return ['auth' => 'signed:' . $request->channel_name];
-    }
-
-    public function broadcast(array $channels, $event, array $payload = []): void
-    {
     }
 }

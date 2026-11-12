@@ -18,7 +18,11 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
  */
 final readonly class StaffNotificationsChannel
 {
-    public const string PATTERN = 'tenant.{tenant}.user.{user}.notifications';
+    /**
+     * The placeholder is not called `{user}`: Echo's broadcaster binds a placeholder to the `join()` parameter of the same
+     * name when that is a model, and `join()`'s first parameter is the signed-in `$user`.
+     */
+    public const string PATTERN = 'tenant.{tenant}.user.{userId}.notifications';
 
     /** The name the event is broadcast as; Echo listens to it with a leading dot. */
     public const string EVENT = 'staff.notifications';

@@ -9,6 +9,7 @@ use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Conversation\Contracts\ConversationOwnershipInterface;
 use App\Domains\Conversation\DTO\MessageLogEntry;
+use App\Domains\Conversation\Enums\ConversationNotificationKind;
 use App\Domains\Conversation\Enums\ConversationOwner;
 use App\Domains\Conversation\Enums\DeliveryStatus;
 use App\Domains\Conversation\Enums\MessageContentType;
@@ -86,7 +87,7 @@ final class ConversationOperatorNotificationTest extends FeatureTestCase
 
         $notification = $this->operator->unreadNotifications()->sole();
         $this->assertSame(ConversationOperatorNotification::class, $notification->type);
-        $this->assertSame(ConversationOperatorNotification::MESSAGE, $notification->data['kind']);
+        $this->assertSame(ConversationNotificationKind::Message->value, $notification->data['kind']);
         $this->assertSame((string) $thread->getKey(), $notification->data['conversation_id']);
         $this->assertSame('New message from Ada Lovelace', $notification->data['title']);
         $this->assertSame($this->threadPath($thread), $notification->data['action']['url']);
@@ -179,7 +180,7 @@ final class ConversationOperatorNotificationTest extends FeatureTestCase
         $this->assertTrue($this->app->make(ConversationInbox::class)->transfer($this->assistant, $thread, (string) $colleague->getKey(), (string) $this->operator->getKey()));
 
         $notification = $this->operator->unreadNotifications()->sole();
-        $this->assertSame(ConversationOperatorNotification::TRANSFERRED, $notification->data['kind']);
+        $this->assertSame(ConversationNotificationKind::Transferred->value, $notification->data['kind']);
         $this->assertSame('Grace handed you the conversation with Ada Lovelace', $notification->data['title']);
         $this->assertSame($this->threadPath($thread), $notification->data['action']['url']);
         $this->assertSame(0, $colleague->notifications()->count());
@@ -194,7 +195,7 @@ final class ConversationOperatorNotificationTest extends FeatureTestCase
         $this->assertTrue($this->app->make(ConversationInbox::class)->seize($thread, (string) $this->operator->getKey(), $admin));
 
         $notification = $this->operator->unreadNotifications()->sole();
-        $this->assertSame(ConversationOperatorNotification::SEIZED, $notification->data['kind']);
+        $this->assertSame(ConversationNotificationKind::Seized->value, $notification->data['kind']);
         $this->assertSame('Root took over your conversation with Ada Lovelace', $notification->data['title']);
         $this->assertSame(0, $admin->notifications()->count());
     }
@@ -239,7 +240,7 @@ final class ConversationOperatorNotificationTest extends FeatureTestCase
         foreach ([$this->operator, $colleague] as $user) {
             $notification = $user->unreadNotifications()->sole();
             $this->assertSame(ConversationOperatorNotification::class, $notification->type);
-            $this->assertSame(ConversationOperatorNotification::REQUESTED, $notification->data['kind']);
+            $this->assertSame(ConversationNotificationKind::Requested->value, $notification->data['kind']);
             $this->assertSame($requestId, $notification->data['request_id']);
             $this->assertSame((string) $thread->getKey(), $notification->data['conversation_id']);
             $this->assertSame('Ada Lovelace is waiting for an operator', $notification->data['title']);
@@ -271,7 +272,7 @@ final class ConversationOperatorNotificationTest extends FeatureTestCase
 
         $this->runNotifyJob($requestId);
 
-        $this->assertSame(ConversationOperatorNotification::REQUESTED, $admin->unreadNotifications()->sole()->data['kind']);
+        $this->assertSame(ConversationNotificationKind::Requested->value, $admin->unreadNotifications()->sole()->data['kind']);
         $this->assertSame(0, $this->operator->notifications()->count());
         $this->assertSame(0, $viewer->notifications()->count());
     }
@@ -341,7 +342,7 @@ final class ConversationOperatorNotificationTest extends FeatureTestCase
 
         // The acceptor's own notification no longer holds back the message notifications of the thread.
         $this->persist(MessageDirection::Inbound);
-        $this->assertSame(ConversationOperatorNotification::MESSAGE, $colleague->unreadNotifications()->sole()->data['kind']);
+        $this->assertSame(ConversationNotificationKind::Message->value, $colleague->unreadNotifications()->sole()->data['kind']);
     }
 
     public function test_cancelled_and_timed_out_requests_dim_their_notifications_with_the_outcome(): void

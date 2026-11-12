@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Staff;
 
+use App\Domains\Staff\Enums\Permission;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Live\StaffNotificationsAnnouncer;
 use App\Domains\Staff\Live\StaffNotificationsChanged;
@@ -16,6 +17,8 @@ use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Infrastructure\Broadcasting\BroadcasterStatus;
 use Database\Seeders\TenantAclSeeder;
+use Illuminate\Broadcasting\Broadcasters\Broadcaster;
+use Illuminate\Broadcasting\BroadcastManager;
 use Illuminate\Contracts\Debug\ExceptionHandler;
 use Illuminate\Contracts\Events\Dispatcher;
 use Illuminate\Support\Facades\Event;
@@ -24,6 +27,7 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Mockery;
 use RuntimeException;
+use Tests\Feature\Domains\Flow\Live\SigningTestBroadcaster;
 use Tests\Feature\FeatureTestCase;
 
 /**
@@ -57,6 +61,36 @@ final class StaffNotificationsLiveTest extends FeatureTestCase
         $this->assertFalse($channel->join($user, self::TENANT_ID, (string) $admin->getKey()), 'another user');
         $this->assertFalse($channel->join($user, '00000000-0000-0000-0000-0000000000ff', (string) $user->getKey()), 'another tenant');
         $this->assertFalse($channel->join($user, self::TENANT_ID, ''));
+    }
+
+    public function test_the_auth_endpoint_signs_only_the_users_own_channel(): void
+    {
+        $this->useBroadcaster(new SigningTestBroadcaster());
+
+        // Both may open the console, so only the channel itself decides.
+        $user = User::factory()->create();
+        $user->givePermissionTo(Permission::ManageAssistants->value);
+        $admin = User::factory()->create();
+        $admin->assignRole(RoleEnum::Admin->value);
+        $mine = 'private-' . StaffNotificationsChannel::name(self::TENANT_ID, (string) $user->getKey());
+
+        $this->postJson($this->panelUrl('/broadcasting/auth'), ['channel_name' => $mine, 'socket_id' => '1.1'])->assertUnauthorized();
+
+        $this->actingAs($user)
+            ->postJson($this->panelUrl('/broadcasting/auth'), ['channel_name' => $mine, 'socket_id' => '1.1'])
+            ->assertOk()
+            ->assertExactJson(['auth' => 'signed:' . $mine]);
+
+        $this->actingAs($user)
+            ->postJson($this->panelUrl('/broadcasting/auth'), [
+                'channel_name' => 'private-' . StaffNotificationsChannel::name(self::TENANT_ID, (string) $admin->getKey()),
+                'socket_id'    => '1.1',
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($admin)
+            ->postJson($this->panelUrl('/broadcasting/auth'), ['channel_name' => $mine, 'socket_id' => '1.1'])
+            ->assertForbidden();
     }
 
     public function test_an_in_app_notification_is_announced_on_the_users_channel_with_no_data(): void
@@ -145,5 +179,22 @@ final class StaffNotificationsLiveTest extends FeatureTestCase
             'channel' => StaffNotificationsChannel::name(self::TENANT_ID, (string) $user->getKey()),
             'event'   => StaffNotificationsChannel::EVENT,
         ], $on['live']);
+    }
+
+    /**
+     * Makes `$broadcaster` the default connection, with the application's channels registered on it.
+     */
+    private function useBroadcaster(Broadcaster $broadcaster): void
+    {
+        config([
+            'broadcasting.default'             => 'testing',
+            'broadcasting.connections.testing' => ['driver' => 'testing'],
+        ]);
+
+        $manager = $this->app->make(BroadcastManager::class);
+        $manager->forgetDrivers();
+        $manager->extend('testing', static fn (): Broadcaster => $broadcaster);
+
+        require base_path('routes/channels.php');
     }
 }

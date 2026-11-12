@@ -158,6 +158,23 @@ export function echoEventName(event: string): string {
   return event.startsWith('.') ? event : `.${event}`
 }
 
+/**
+ * Listens for the server's announcement on a private channel and reports a refused subscription (403/419) through
+ * `onRefused`, so the caller can fall back to polling. Returns what ends the subscription: it stops listening and
+ * leaves the channel.
+ */
+export function subscribeToAnnouncements(client: EchoClientLike, live: LiveChannel, onAnnouncement: () => void, onRefused: () => void): () => void {
+  const event = echoEventName(live.event)
+  const channel = client.private(live.channel)
+  channel.listen(event, onAnnouncement)
+  channel.error?.(onRefused)
+
+  return () => {
+    client.private(live.channel).stopListening?.(event)
+    client.leave(live.channel)
+  }
+}
+
 export interface Timers {
   set: (callback: () => void, ms: number) => unknown
   clear: (handle: unknown) => void
