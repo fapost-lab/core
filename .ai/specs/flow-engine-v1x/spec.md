@@ -55,7 +55,9 @@ here so that none of them lives only in a document nobody plans from.
   - routing (ADR-09 V1.x): commands registered by a Solution, more command action types;
   - node capabilities: `auth_request` by phone/SMS/email (only `Basic` exists); `notify` staff
     identity on a messenger and staff targeting by tag.
-- Not doing: `rag_query` storage (spec `rag-knowledge-bases`); a prompt node, NLP date parsing,
+- Not doing: `rag_query` storage and a prompt node — both moved to the AI Solution (spec
+  `ai-solution`), which also needs `call@2` with action schemas (a config form and named outcomes for a
+  Solution's action) and may file it here; NLP date parsing,
   custom input validators and custom expression functions — named in the V1 out-of-scope list, kept
   out until a rollout asks; cross-assistant subflows (V2, needs its own ADR).
 

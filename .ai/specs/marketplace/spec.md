@@ -71,8 +71,9 @@ think not to tie it to my stack but to choose the optimal one for the task."
   licences; licence models; the Composer repository with licence auth and per-version access; release
   signing and revocation; compatibility CI against Core releases; per-licence watermarking; the catalogue
   and licence API Core reads; payments, payouts and tax; the owner's console; the single FaPost account.
-- Not doing: anything inside an installation (`extension-installer`, `fapost-agent`); activation inside
-  a SaaS tenant (the shell).
+- Not doing: anything inside an installation (`extension-installer`, `fapost-agent`); sales inside SaaS —
+  there the operator connects Solutions and grants them through the shell's plans, and a tenant buys
+  nothing in the marketplace (owner, 2026-11-13, spec `ai-solution`).
 
 ## Decisions
 
@@ -90,8 +91,10 @@ think not to tie it to my stack but to choose the optimal one for the task."
   period (use forever, versions released in the period downloadable forever). The fields for
   subscription-to-use and a grace period exist, unimplemented. The owner: "maybe it need not be so
   complicated, at least at first."
-- Defaults the owner accepted: SaaS — a subscription per tenant; self-hosted — per installation,
-  revoking never breaks a working system.
+- The marketplace sells only to self-hosted installations: per installation by default, and revoking
+  never breaks a working system. In SaaS the operator connects Solutions and puts them into plans
+  (owner, 2026-11-13: "simpler that way") — rejected: a per-tenant marketplace subscription in SaaS,
+  the default accepted earlier, because the operator's plans do the same job with one less system.
 - Protection is of the channel: a Composer repository where the licence key is the credential and the
   installation id is bound to it; on expiry only versions released after it close (the same as Shopware
   and Craft); an EULA for each paid product, which is not Apache-2.0.
@@ -111,9 +114,10 @@ think not to tie it to my stack but to choose the optimal one for the task."
   organisation manage licences owned by a client's organisation; licences can be bought in bulk and
   transferred.
 - A single FaPost account across the SaaS cabinet, the marketplace, support and later the publisher
-  cabinet; SaaS billing and marketplace payments are one process.
+  cabinet. SaaS billing stays in the shell; whether marketplace payments share its process is open.
 - Trust levels: "verified by FaPost" (review, signature, compatibility CI) and "community" (automatic
-  checks only, an explicit warning on install); SaaS installs only the first. The signing key lives
+  checks only, an explicit warning on install); the SaaS operator installs only the first — the
+  operator's own rule, not the marketplace's. The signing key lives
   outside the marketplace's servers (HSM or offline signing). A revoked version reaches installations
   through their update check.
 - Compatibility CI: on every Core release the marketplace installs and boots each listed product against
@@ -141,7 +145,11 @@ think not to tie it to my stack but to choose the optimal one for the task."
 - The stack and architecture of the marketplace itself — decided in its own repository, with this spec
   as input.
 - The exact revenue share, payout schedule, refunds and disputes for third-party publishers.
-- How a SaaS tenant's purchase becomes an activation — shared with the shell and `extension-installer`.
+- On what terms a SaaS operator installs a third-party product — a per-installation licence is unfair to
+  a publisher when one SaaS installation serves thousands of tenants; needed before third-party
+  publishers arrive (raised by spec `ai-solution`).
+- Whether marketplace payments share the SaaS shell's billing process now that the marketplace sells
+  only to self-hosted — decides the payments phase's coupling to the shell.
 - What review consists of for third-party code: which automatic checks, who reviews, how long.
 
 ## Set aside
@@ -150,13 +158,14 @@ think not to tie it to my stack but to choose the optimal one for the task."
   minimal; the fields exist.
 - unexplored: the publisher cabinet and moderation flow in detail.
 - unexplored: search, reviews and ratings, screenshots, a "try before you buy" demo tenant in SaaS.
-- unexplored: integration with the SaaS shell beyond the single account and shared billing.
+- unexplored: integration with the SaaS shell beyond the single account.
 
 ## Assumptions left untested
 
 - Licence policy v1 (free, and paid with an update period) is enough for the first paid products —
   taken at deep; the first paid product tests it.
 - Renewals are driven by Core upgrades needing product updates — taken at deep; the renewal rate tests
-  it.
+  it. The AI Solution (spec `ai-solution`) is the first paid product to test it; new models and
+  providers add their own pull towards updates.
 - Integrators want to manage clients' licences rather than resell under their own name — taken at deep;
   the first integrator with several clients tests it.

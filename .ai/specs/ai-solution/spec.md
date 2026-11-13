@@ -166,7 +166,7 @@ Said during the conversation (2026-11-12/13):
 - The vector extension is an installation step: Core's Postgres image ships pgvector, the operator
   enables it once, and the Solution refuses activation with a clear reason when it is missing.
 - Phases ship one by one, so no epic.
-- Consequences for other specs, each applied in its own change:
+- Consequences for other specs, applied together in task `ai-spec-followups`:
   - `rag-knowledge-bases` is absorbed by this spec and removed;
   - `flow-engine-v1x`: the "prompt node, kept out" line and the `rag_query` storage pointer now point
     here; `call@2` with action schemas is a candidate item there;

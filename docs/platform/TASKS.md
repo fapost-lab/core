@@ -48,7 +48,7 @@
 - [x] **C-2** `EndNodeHandler` (color-coded: success/cancelled/failed) — [specs/flow-engine/nodes/10-end](../reference/specs/flow-engine/nodes/10-end.md)
 - [x] **C-4** `SubflowNodeHandler` + CallGraphValidator + lifecycle — [specs/flow-engine/nodes/08-subflow](../reference/specs/flow-engine/nodes/08-subflow.md)
 - [x] **C-1** `EmitEventNodeHandler` (handler + validation + registry + event-chain flow start — `StartFlowFromEventJob` фанится на подписанные event-триггеры) — [specs/flow-engine/nodes/07-emit-event](../reference/specs/flow-engine/nodes/07-emit-event.md)
-- [-] **C-3** `RagQueryNodeHandler` (handler + registry + validation есть; RAG Feature/storage/providers ещё не готовы) — спека `.ai/specs/rag-knowledge-bases/`
+- [-] **C-3** `RagQueryNodeHandler` (handler + registry + validation есть; RAG Feature/storage/providers ещё не готовы) — спека `.ai/specs/ai-solution/`
 
 ### Routing pipeline (Phase D)
 - [x] **D-1** `MessageRouter` + `DropPolicy` + `SessionStateRouter` (6 шагов)
@@ -91,7 +91,7 @@
   - [x] Budget: `flow.execution.max_iterations` + publish-error на literal count > 100
   - Остаток (V1.x, warning-only): 8.5 (while condition не меняется), 8.7 (static number check), UI редактирования `max_size`, `{{…length}}` в TemplateEngine — спека `.ai/specs/flow-engine-v1x/`
 - [x] `emit_event` — event-chain start завершён: `DispatchFlowTriggerEventJob` теперь фанит `StartFlowFromEventJob` на каждый подписанный event-триггер (было — только лог); flow стартует для emitting-контакта, payload доступен как `flow.event.*`; выровнен формат имени события (trigger `event_name` теперь принимает dotted/mixed-case как emit `event_type`) — [specs/flow-engine/nodes/07-emit-event](../reference/specs/flow-engine/nodes/07-emit-event.md)
-- [-] `rag_query` — handler/registry/validation готовы; Feature: RAG ещё предстоит — спека `.ai/specs/rag-knowledge-bases/`
+- [-] `rag_query` — handler/registry/validation готовы; Feature: RAG ещё предстоит — спека `.ai/specs/ai-solution/`
 - [ ] `form` — сбор данных через веб-форму (TMA / hosted) вместо цепочки `input` — спека `.ai/specs/forms-data-collection/`
 
 ### P3
@@ -251,7 +251,7 @@
 
 ## 🧊 RAG (Feature) — бэклог
 
-Перенесено в спеку **`.ai/specs/rag-knowledge-bases/`**.
+Перенесено в спеку **`.ai/specs/ai-solution/`**.
 
 Что уже в коде: `RagAdapterRegistry`, `RagQueryNodeHandler`
 и RAG-валидация в `ValidateFlowService`. Нода `rag_query` остаётся в палитре и падает на runtime
