@@ -47,7 +47,7 @@ collected. It runs in the gaps between product steps, never ahead of them, and i
 | B2 | Flow engine V1.x — loop checks and budget, safe `call` retries, subflow parameters, per-tenant expression engine, node capabilities | Limits the V1 node design named as "later"; none needs a breaking change | L | spec `.ai/specs/flow-engine-v1x/` |
 | B3 | Operator insights — broadcast report, flow analytics, live inbox | The data is recorded and nobody can read it in the panel; every item is a screen, so it waits for step 5's kit | M | spec `.ai/specs/operator-insights/` |
 | B4 | Builder versioning and content — rollback, compare, preview, content keys | A bad publish has no undo in the builder | M | spec `.ai/specs/builder-versioning/` |
-| B5 | RAG knowledge bases — provider and storage decision, then a real adapter | `rag_query` is in the palette and always fails at its runtime guard | M | spec `.ai/specs/rag-knowledge-bases/` |
+| B5 | AI Solution — provider and keys, LLM actions, knowledge bases with `rag_query`, operator assist, agent; RAG leaves Core | `rag_query` is in the palette and always fails at its runtime guard | L | spec `.ai/specs/ai-solution/` |
 
 Step 5 freezes new screens on Filament: a backlog item's or a step's UI waits for the kit and is
 built on it, its backend ships as before.

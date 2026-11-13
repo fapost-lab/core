@@ -20,8 +20,8 @@ categories and classes, is `docs/platform/runtime/flow/10-registered-nodes-catal
 | [auth-request](auth-request.md) | `auth_request` | `AuthRequestNodeHandler` |
 | [request-operator](request-operator.md) | `request_operator` | `RequestOperatorNodeHandler` |
 
-`rag_query` (`RagQueryNodeHandler`) is registered too and has no standalone node spec here; see
-`.ai/specs/rag-knowledge-bases/`.
+`rag_query` (`RagQueryNodeHandler`) is registered too and has no standalone node spec here; it moves to the AI Solution, see
+`.ai/specs/ai-solution/`.
 
 `condition`, `webhook` and `set_attribute` are legacy types and are not registered.
 

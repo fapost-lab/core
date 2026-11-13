@@ -1,7 +1,7 @@
 # Roadmap — Marketplace
 
-Destination: the owner sells FaPost products — and later third-party publishers sell theirs — to SaaS
-tenants and self-hosted installations, with licences that decide which versions an installation may
+Destination: the owner sells FaPost products — and later third-party publishers sell theirs — to
+self-hosted installations, with licences that decide which versions an installation may
 download, run from one console with little manual work.
 
 ## Phase 1 — Free catalogue
