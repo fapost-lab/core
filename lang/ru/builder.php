@@ -186,6 +186,12 @@ return [
             'parameter_key_taken'    => 'Этот ключ уже используется в шаблоне.',
         ],
 
+        'unavailable' => [
+            'solution_off'     => 'Солюшен :name выключен',
+            'solution_missing' => 'Солюшен :id не установлен',
+            'read_only'        => 'Настройки этой ноды сохраняются как есть, но здесь их нельзя изменить.',
+        ],
+
         'template_output' => [
             'name'    => 'Имя',
             'label'   => 'Название',

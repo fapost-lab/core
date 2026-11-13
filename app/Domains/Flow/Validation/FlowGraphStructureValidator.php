@@ -7,6 +7,8 @@ namespace App\Domains\Flow\Validation;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Domains\Flow\State\Variables\Variable;
+use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
+use Fapost\Foundation\Flow\Enums\StateNamespace;
 use InvalidArgumentException;
 
 /**
@@ -28,13 +30,10 @@ use InvalidArgumentException;
  */
 final readonly class FlowGraphStructureValidator
 {
-    private const array BRANCH_ALLOWED_SOURCES = [
-        'contact',
-        'rag',
-        'call',
-        'system',
-        'flow',
-    ];
+    public function __construct(
+        private StateNamespacesInterface $namespaces,
+    ) {
+    }
 
     /**
      * @param  array<int|string, mixed>  $nodes
@@ -450,7 +449,7 @@ final readonly class FlowGraphStructureValidator
                     continue;
                 }
 
-                if (! in_array($source, self::BRANCH_ALLOWED_SOURCES, true) && ! str_starts_with($source, 'module.')) {
+                if (! $this->isAllowedBranchSource($source)) {
                     $errors[] = $this->error(
                         "{$base}.left.source",
                         'branch_rules_source_not_allowed',
@@ -505,6 +504,19 @@ final readonly class FlowGraphStructureValidator
         }
 
         return [$variable, []];
+    }
+
+    /**
+     * A branch rule reads a built-in namespace or a Solution's, or a `module.<accessor>` source. The bare
+     * `module` namespace is not a source: accessors are addressed by name.
+     */
+    private function isAllowedBranchSource(string $source): bool
+    {
+        if (str_starts_with($source, StateNamespace::Module->value . '.')) {
+            return true;
+        }
+
+        return StateNamespace::Module->value !== $source && $this->namespaces->has($source);
     }
 
     private function error(string $path, string $code, string $message): FlowValidationErrorDto

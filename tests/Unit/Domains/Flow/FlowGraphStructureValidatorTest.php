@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Flow;
 
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
+use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Flow\Validation\FlowGraphStructureValidator;
 use PHPUnit\Framework\TestCase;
 
@@ -126,9 +127,9 @@ final class FlowGraphStructureValidatorTest extends TestCase
         $nodes = [$this->node('a', 'send_message'), $this->node('b', 'send_message'), $this->node('note', 'comment')];
         $edges = [$this->edge('a', 'b')];
 
-        $this->assertSame([], (new FlowGraphStructureValidator())->validate($nodes, $edges));
+        $this->assertSame([], (self::validator())->validate($nodes, $edges));
 
-        $unstripped = (new FlowGraphStructureValidator())->validate($nodes, $edges, stripAnnotations: false);
+        $unstripped = (self::validator())->validate($nodes, $edges, stripAnnotations: false);
 
         $this->assertSame(['entry_node_count'], $this->codes($unstripped));
     }
@@ -395,6 +396,24 @@ final class FlowGraphStructureValidatorTest extends TestCase
         $this->assertSame('nodes.a.config.rules.0.left.source', $errors[0]->path);
     }
 
+    public function test_branch_source_may_be_the_namespace_of_a_solution_with_state(): void
+    {
+        $namespaces = new StateNamespaceRegistry();
+        $namespaces->registerSolutionNamespace('feedback');
+
+        $errors = (new FlowGraphStructureValidator($namespaces))->validate(
+            [$this->node('a', 'branch', ['rules' => [
+                ['left' => ['ref' => 'source', 'source' => 'feedback', 'field' => 'last_score']],
+                ['left' => ['ref' => 'source', 'source' => 'survey', 'field' => 'x']],
+                ['left' => ['ref' => 'source', 'source' => 'module', 'field' => 'x']],
+            ]])],
+            [],
+        );
+
+        $this->assertSame(['branch_rules_source_not_allowed', 'branch_rules_source_not_allowed'], $this->codes($errors));
+        $this->assertSame('nodes.a.config.rules.1.left.source', $errors[0]->path);
+    }
+
     public function test_branch_left_ref_must_be_known(): void
     {
         $errors = $this->validate(
@@ -421,6 +440,11 @@ final class FlowGraphStructureValidatorTest extends TestCase
         );
     }
 
+    private static function validator(): FlowGraphStructureValidator
+    {
+        return new FlowGraphStructureValidator(new StateNamespaceRegistry());
+    }
+
     /**
      * @param  list<array<string, mixed>>  $nodes
      * @param  list<array<string, mixed>>  $edges
@@ -429,7 +453,7 @@ final class FlowGraphStructureValidatorTest extends TestCase
      */
     private function validate(array $nodes, array $edges): array
     {
-        return (new FlowGraphStructureValidator())->validate($nodes, $edges);
+        return self::validator()->validate($nodes, $edges);
     }
 
     /**

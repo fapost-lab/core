@@ -13,6 +13,7 @@ use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
 use Fapost\Foundation\Flow\Contracts\ContactWriterInterface;
+use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 use Mockery;
 use Tests\TestCase;
 
@@ -104,6 +105,7 @@ final class AuthRequestNodeHandlerTest extends TestCase
             new OperandResolver(
                 app(DataAccessorRegistryInterface::class),
                 app(VariableResolverInterface::class),
+                app(StateNamespacesInterface::class),
             ),
             new OperatorComparator(),
             app(TemplateRenderer::class),

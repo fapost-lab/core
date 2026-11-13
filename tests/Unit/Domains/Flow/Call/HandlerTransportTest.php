@@ -6,7 +6,7 @@ namespace Tests\Unit\Domains\Flow\Call;
 
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Call\Transports\HandlerTransport;
-use App\Domains\Flow\Contracts\ActionAvailabilityInterface;
+use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use App\Infrastructure\Flow\ContainerActionHandlerFactory;
 use Fapost\Foundation\Action\ActionHandlerInterface;
 use Fapost\Foundation\Flow\Call\CallContext;
@@ -106,7 +106,7 @@ final class HandlerTransportTest extends TestCase
 
     private function transport(ActionHandlerRegistry $registry, bool $available = true): HandlerTransport
     {
-        return new HandlerTransport($registry, new class ($available) implements ActionAvailabilityInterface {
+        return new HandlerTransport($registry, new class ($available) implements SolutionAvailabilityInterface {
             public function __construct(private readonly bool $available)
             {
             }

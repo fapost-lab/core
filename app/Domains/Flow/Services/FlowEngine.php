@@ -14,6 +14,7 @@ use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowSessionRepositoryInterface;
 use App\Domains\Flow\Contracts\LanguageResolverInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use App\Domains\Flow\Contracts\VariableSchemaRegistryInterface;
 use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
@@ -41,6 +42,7 @@ use Fapost\Foundation\DTO\IncomingMessage;
 use Fapost\Foundation\DTO\NodeExecutionContext as FoundationNodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
+use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
 use Fapost\Foundation\Quota\Exceptions\VolumeLimitReachedException;
 use Illuminate\Database\ConnectionInterface;
@@ -75,6 +77,8 @@ final readonly class FlowEngine implements FlowEngineInterface
         private \App\Domains\Flow\Concurrency\LockHeartbeat $lockHeartbeat,
         private \App\Domains\Flow\State\ChannelStateProjector $channelProjector,
         private DelayResumeSchedulerInterface $delayResumeScheduler,
+        private SolutionAvailabilityInterface $solutionAvailability,
+        private StateNamespacesInterface $stateNamespaces,
     ) {
     }
 
@@ -332,84 +336,92 @@ final readonly class FlowEngine implements FlowEngineInterface
 
             $version = $this->resolveNodeVersion($node);
 
-            try {
-                $handler = $this->registry->resolve($type, $version);
-            } catch (LogicException $exception) {
-                throw HandlerNotFoundException::forTypeAndVersion($type, $version, $exception);
-            }
+            // A node of a Solution that is switched off for this tenant, or whose package is gone, does not
+            // build its handler: the node takes its `error` exit, like a handler that reports an error. Core
+            // types without a handler keep failing hard below.
+            $result = $this->solutionGate($type, $version);
 
-            $platform         = $incomingStep?->platform ?? $contact->platform;
-            $resolvedLanguage = $this->languageResolver->resolve($contact, $session);
+            if (null === $result) {
+                try {
+                    $handler = $this->registry->resolve($type, $version);
+                } catch (LogicException $exception) {
+                    throw HandlerNotFoundException::forTypeAndVersion($type, $version, $exception);
+                }
 
-            $idempotencyKey = null !== $incomingStep
-                ? $incomingStep->updateId . '|' . $session->getKey()
-                : $session->getKey() . ':' . $currentNodeId . ':' . $session->version;
+                $platform         = $incomingStep?->platform ?? $contact->platform;
+                $resolvedLanguage = $this->languageResolver->resolve($contact, $session);
 
-            $engineId = '' !== (string) ($definition->expression_engine ?? '')
-                ? (string) $definition->expression_engine
-                : \App\Domains\Flow\Expression\Engines\TemplateEngine::ID;
-            $expressionEngine = $this->expressionEngines->has($engineId)
-                ? $this->expressionEngines->get($engineId)
-                : $this->expressionEngines->get(\App\Domains\Flow\Expression\Engines\TemplateEngine::ID);
+                $idempotencyKey = null !== $incomingStep
+                    ? $incomingStep->updateId . '|' . $session->getKey()
+                    : $session->getKey() . ':' . $currentNodeId . ':' . $session->version;
 
-            $stateReader = new \App\Domains\Flow\State\Readers\ScopedStateReader(
-                sessionState: $session->state ?? [],
-                contact: $contact,
-                accessors: $this->dataAccessors,
-            );
+                $engineId = '' !== (string) ($definition->expression_engine ?? '')
+                    ? (string) $definition->expression_engine
+                    : \App\Domains\Flow\Expression\Engines\TemplateEngine::ID;
+                $expressionEngine = $this->expressionEngines->has($engineId)
+                    ? $this->expressionEngines->get($engineId)
+                    : $this->expressionEngines->get(\App\Domains\Flow\Expression\Engines\TemplateEngine::ID);
 
-            $schemaRegistry = $this->schemaRegistry;
-            $contactWriter  = new \App\Domains\Flow\State\Writers\ContactWriter(
-                contact: $contact,
-                sessionId: (string)$session->getKey(),
-                nodeId: $nodeId,
-                connection: $this->connection,
-                historyWriter: $this->historyWriterFactory->for($definition),
-                schemaRegistryResolver: static fn () => $schemaRegistry,
-            );
+                $stateReader = new \App\Domains\Flow\State\Readers\ScopedStateReader(
+                    sessionState: $session->state ?? [],
+                    contact: $contact,
+                    accessors: $this->dataAccessors,
+                    namespaces: $this->stateNamespaces,
+                );
 
-            $handlerContext = new FoundationNodeExecutionContext(
-                tenantId: $session->tenant_id,
-                contactId: $session->contact_id,
-                sessionId: (string)$session->getKey(),
-                nodeId: $nodeId,
-                idempotencyKey: $idempotencyKey,
-                platform: $platform,
-                resolvedLanguage: $resolvedLanguage,
-                incoming: $incomingStep,
-                stateReader: $stateReader,
-                contactWriter: $contactWriter,
-                expressionEngine: $expressionEngine,
-                resumedAfterDelay: $resumedAfterDelayStep,
-            );
+                $schemaRegistry = $this->schemaRegistry;
+                $contactWriter  = new \App\Domains\Flow\State\Writers\ContactWriter(
+                    contact: $contact,
+                    sessionId: (string)$session->getKey(),
+                    nodeId: $nodeId,
+                    connection: $this->connection,
+                    historyWriter: $this->historyWriterFactory->for($definition),
+                    schemaRegistryResolver: static fn () => $schemaRegistry,
+                );
 
-            // Keep the user-visible "typing…" indicator alive across multi-node
-            // execution: providers like Telegram drop the chat action after ~5s.
-            // No-op when no typing session is registered (e.g. queue jobs that
-            // bypass the routing pipeline).
-            $this->typingHeartbeat->current()?->refresh();
+                $handlerContext = new FoundationNodeExecutionContext(
+                    tenantId: $session->tenant_id,
+                    contactId: $session->contact_id,
+                    sessionId: (string)$session->getKey(),
+                    nodeId: $nodeId,
+                    idempotencyKey: $idempotencyKey,
+                    platform: $platform,
+                    resolvedLanguage: $resolvedLanguage,
+                    incoming: $incomingStep,
+                    stateReader: $stateReader,
+                    contactWriter: $contactWriter,
+                    expressionEngine: $expressionEngine,
+                    resumedAfterDelay: $resumedAfterDelayStep,
+                );
 
-            // Same cadence, different purpose: extend the session lock TTL so a
-            // long chain of nodes does not outlive the claim. Throws when the
-            // claim has drifted — see refreshSessionLock().
-            $this->refreshSessionLock();
+                // Keep the user-visible "typing…" indicator alive across multi-node
+                // execution: providers like Telegram drop the chat action after ~5s.
+                // No-op when no typing session is registered (e.g. queue jobs that
+                // bypass the routing pipeline).
+                $this->typingHeartbeat->current()?->refresh();
 
-            try {
-                $result = $handler->execute($node, $session->state ?? [], $handlerContext);
-            } catch (VolumeLimitReachedException $limitReached) {
-                // The node has no `error` exit to take (those catch this themselves). Retrying the job
-                // would only ask the operator again, so the session stops here and the job succeeds.
-                $this->markSessionFailed($session, $nodeId, $type, $version, $limitReached);
+                // Same cadence, different purpose: extend the session lock TTL so a
+                // long chain of nodes does not outlive the claim. Throws when the
+                // claim has drifted — see refreshSessionLock().
+                $this->refreshSessionLock();
 
-                // A child must hand control back to its parent, as it does when it ends: the parent's
-                // `failed` exit is taken now instead of the parent waiting for the timeout sweeper.
-                $this->subflowResumer->resumeIfChild($session, EndStatus::Failed->value);
+                try {
+                    $result = $handler->execute($node, $session->state ?? [], $handlerContext);
+                } catch (VolumeLimitReachedException $limitReached) {
+                    // The node has no `error` exit to take (those catch this themselves). Retrying the job
+                    // would only ask the operator again, so the session stops here and the job succeeds.
+                    $this->markSessionFailed($session, $nodeId, $type, $version, $limitReached);
 
-                return;
-            } catch (Throwable $handlerException) {
-                $this->markSessionFailed($session, $nodeId, $type, $version, $handlerException);
+                    // A child must hand control back to its parent, as it does when it ends: the parent's
+                    // `failed` exit is taken now instead of the parent waiting for the timeout sweeper.
+                    $this->subflowResumer->resumeIfChild($session, EndStatus::Failed->value);
 
-                throw $handlerException;
+                    return;
+                } catch (Throwable $handlerException) {
+                    $this->markSessionFailed($session, $nodeId, $type, $version, $handlerException);
+
+                    throw $handlerException;
+                }
             }
 
             $nextNodeId = null;
@@ -592,6 +604,40 @@ final readonly class FlowEngine implements FlowEngineInterface
                 'error'      => $exception->getMessage(),
             ]);
         }
+    }
+
+    /**
+     * The result of a node whose Solution cannot run it, or null when the node may run.
+     *
+     * The registry knows the owner of every registered type; availability is asked on every node, because it
+     * is per tenant and this engine lives for one job at most. A dotted type that is not registered at the node's
+     * version belongs to a Solution whose package was removed or no longer ships that version (Core types never
+     * contain a dot).
+     */
+    private function solutionGate(string $type, int $version): ?NodeExecutionResult
+    {
+        $owner = $this->registry->ownerOf($type);
+
+        if (null !== $owner && ! $this->solutionAvailability->isAvailable($owner)) {
+            return $this->solutionError('solution_inactive', $owner);
+        }
+
+        if (str_contains($type, '.') && ! $this->registry->has($type, $version)) {
+            return null !== $owner
+                ? $this->solutionError('solution_version_missing', $owner)
+                : $this->solutionError('solution_not_installed', mb_strstr($type, '.', true));
+        }
+
+        return null;
+    }
+
+    private function solutionError(string $reason, string $solutionId): NodeExecutionResult
+    {
+        return new NodeExecutionResult(
+            status: NodeExecutionStatus::Executed,
+            sourceHandle: 'error',
+            errorMessage: "{$reason}: {$solutionId}",
+        );
     }
 
     /**

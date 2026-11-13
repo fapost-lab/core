@@ -10,7 +10,7 @@ namespace App\Domains\Flow\Contracts;
  * The action registry and the handler transport are singletons and cannot hold tenant-scoped state,
  * so they ask this port on every call; the implementation answers from the current scope.
  */
-interface ActionAvailabilityInterface
+interface SolutionAvailabilityInterface
 {
     /**
      * @param  string|null  $solutionId  id of the Solution that registered the action; null for Core's own actions, which are always available

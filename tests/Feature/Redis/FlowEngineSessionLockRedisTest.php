@@ -127,7 +127,7 @@ final class RedisFlowEngineLockTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     public function configSchema(): array

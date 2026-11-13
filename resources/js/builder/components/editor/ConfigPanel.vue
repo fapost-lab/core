@@ -7,6 +7,8 @@ import type {BuilderTriggerPayload, NodeConfig} from '@builder/dto/types'
 import {useConfigResize} from '@builder/composables/useConfigResize'
 import {NON_PARAMETERIZABLE_NODE_TYPES} from '@builder/utils/templateNodes'
 import {nodeColors} from '@builder/utils/nodeColors'
+import {fallbackTypeLabel, isNodeUnavailable, nodeAvailability, unavailableReason} from '@builder/utils/nodeAvailability'
+import {useTranslations} from '@builder/composables/useTranslations'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 import SchemaConfigRenderer from './config/SchemaConfigRenderer.vue'
 import SendMessageConfig from './config/overrides/SendMessageConfig.vue'
@@ -43,6 +45,7 @@ const OVERRIDES: Record<string, object> = {
 const selectionStore = useSelectionStore()
 const builderStore   = useBuilderStore()
 const registryStore  = useRegistryStore()
+const { t } = useTranslations()
 const { width, handleRef } = useConfigResize()
 
 const selectedNode = computed(() =>
@@ -78,8 +81,16 @@ const colors = computed(() =>
 const nodeTypeLabel = computed(() => {
     if (!selectedNode.value) return ''
     if (handlerMeta.value?.label) return handlerMeta.value.label
-    return selectedNode.value.type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    return fallbackTypeLabel(selectedNode.value.type)
 })
+
+// A node of a turned-off or missing Solution: the form is read-only and the stored config is never rewritten.
+const availability = computed(() =>
+    selectedNode.value ? nodeAvailability(selectedNode.value.type, handlerMeta.value) : { state: 'available' as const },
+)
+const readOnly = computed(() => isNodeUnavailable(availability.value))
+const unavailableText = computed(() => unavailableReason(availability.value, t))
+const hasSchemaFields = computed(() => Object.keys(handlerMeta.value?.config_schema ?? {}).length > 0)
 
 function updateConfig(patch: unknown) {
     if (!selectionStore.selectedNodeId) return
@@ -168,14 +179,27 @@ function deleteTrigger() {
                             <button class="config-close-btn" title="Close" @click="close">×</button>
                         </div>
                         <div class="config-card-body">
+                            <template v-if="readOnly">
+                                <p class="config-unavailable-notice">
+                                    {{ unavailableText }}<br>{{ t('nodes.unavailable.read_only') }}
+                                </p>
+                                <div v-if="hasSchemaFields" class="config-readonly" inert>
+                                    <component
+                                        :is="configComponent"
+                                        :node="selectedNode"
+                                        :schema="handlerMeta?.config_schema ?? {}"
+                                    />
+                                </div>
+                            </template>
                             <component
                                 :is="configComponent"
+                                v-else
                                 :node="selectedNode"
                                 :schema="handlerMeta?.config_schema ?? {}"
                                 @update:config="updateConfig"
                             />
                             <TemplateParameterDeclarations
-                                v-if="builderStore.isTemplate && !NON_PARAMETERIZABLE_NODE_TYPES.includes(selectedNode.type)"
+                                v-if="!readOnly && builderStore.isTemplate && !NON_PARAMETERIZABLE_NODE_TYPES.includes(selectedNode.type)"
                                 :node-id="selectedNode.id"
                                 :node-type="selectedNode.type"
                                 :schema="handlerMeta?.config_schema ?? {}"

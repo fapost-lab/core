@@ -597,7 +597,7 @@ final class SequentialFlowTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     public function configSchema(): array
@@ -644,7 +644,7 @@ final class WaitingFlowTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     public function configSchema(): array
@@ -689,7 +689,7 @@ final class InfiniteLoopFlowTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     public function configSchema(): array
@@ -757,7 +757,7 @@ final class SetLanguageEffectTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     public function configSchema(): array
@@ -800,7 +800,7 @@ final class DelayedFlowTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     public function configSchema(): array
@@ -852,7 +852,7 @@ final class DelayedWithResumeAtFlowTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     public function configSchema(): array

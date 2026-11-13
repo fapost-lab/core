@@ -101,6 +101,25 @@ export interface NodeTypePayload {
     }
     /** false → type is registered but hidden from the insertable palette (auto-managed). */
     palette?: boolean
+    /** Palette group the type belongs to; absent in older responses (derived from `category`). */
+    group?: NodeGroup
+    /** false → the owning Solution is turned off for this tenant: the node renders read-only. */
+    available?: boolean
+    /** Owning Solution; null for Core types. */
+    solution?: { id: string, name: string } | null
+}
+
+export interface NodeGroup {
+    key: string
+    label: string
+    /** Solution id for a Solution's own group, null for a Core group. */
+    owner: string | null
+}
+
+/** State namespace of a Solution active for the tenant (`feedback.*`); keys inside it are free-form. */
+export interface StateNamespaceEntry {
+    key: string
+    owner: string
 }
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'conflict' | 'error'

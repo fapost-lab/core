@@ -6,7 +6,9 @@ namespace Tests\Unit\Domains\Flow;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
+use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\OperandResolver;
+use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Flow\State\Variables\Variable;
 use Fapost\Foundation\Contracts\DataAccessorInterface;
 use Fapost\Foundation\DTO\NodeExecutionContext;
@@ -55,7 +57,20 @@ final class OperandResolverLengthTest extends TestCase
         $this->assertSame('explicit', $value);
     }
 
-    private function makeResolver(): OperandResolver
+    public function test_a_solution_namespace_resolves_from_state_and_an_unregistered_one_is_rejected(): void
+    {
+        $namespaces = new StateNamespaceRegistry();
+        $namespaces->registerSolutionNamespace('feedback');
+        $resolver = $this->makeResolver($namespaces);
+        $state    = ['feedback' => ['last_score' => 4], 'ghost' => ['x' => 1]];
+
+        $this->assertSame(4, $resolver->resolveLegacyPath('feedback.last_score', $state, $this->context()));
+
+        $this->expectException(InvalidNodeConfigException::class);
+        $resolver->resolveLegacyPath('ghost.x', $state, $this->context());
+    }
+
+    private function makeResolver(?StateNamespaceRegistry $namespaces = null): OperandResolver
     {
         $accessors = new class () implements DataAccessorRegistryInterface {
             public function has(string $namespacePrefix): bool
@@ -86,7 +101,7 @@ final class OperandResolverLengthTest extends TestCase
             }
         };
 
-        return new OperandResolver($accessors, $variableResolver);
+        return new OperandResolver($accessors, $variableResolver, $namespaces ?? new StateNamespaceRegistry());
     }
 
     private function context(): NodeExecutionContext

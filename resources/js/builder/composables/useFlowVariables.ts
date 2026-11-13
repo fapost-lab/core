@@ -9,6 +9,7 @@
 
 import {computed} from 'vue'
 import {useBuilderStore} from '@builder/store/builderStore'
+import {useRegistryStore} from '@builder/store/registryStore'
 import {decompileLegacySaveTo} from '@builder/utils/variableCompiler'
 import type {FlowNode, Variable} from '@builder/dto/types'
 
@@ -19,6 +20,7 @@ export type PickerSourceKind =
     | 'api-response'
     | 'last-user-message'
     | 'module'
+    | 'solution'
 
 export type PickerSource =
     | { kind: 'contact-profile' }
@@ -27,6 +29,7 @@ export type PickerSource =
     | { kind: 'api-response' }
     | { kind: 'last-user-message' }
     | { kind: 'module', name: string }
+    | { kind: 'solution', namespace: string }
 
 export interface PickerVariable {
     /** Snippet inserted into text fields, e.g. '{{contact.foo}}'. */
@@ -154,7 +157,8 @@ function fromLegacyPath(saveTo: string, sourceNode: string, sourceNodeId: string
 // ── Composable ───────────────────────────────────────────────────────────────
 
 export function useFlowVariables() {
-    const builderStore = useBuilderStore()
+    const builderStore  = useBuilderStore()
+    const registryStore = useRegistryStore()
 
     /**
      * Variables collected from current flow nodes (Input / Assign /
@@ -374,6 +378,11 @@ export function useFlowVariables() {
         // Built-in API response
         for (const a of BUILTIN_API) {
             push(makeVar(a.path, a.label, { kind: 'api-response' }))
+        }
+        // State namespaces of the Solutions active for the tenant. The keys inside are the Solution's own, so there
+        // is one path-entry per namespace (`feedback.`); the author completes the key, as with a deep `call.*` path.
+        for (const ns of registryStore.stateNamespaces) {
+            push(makeVar(`${ns.key}.`, `${ns.key} (type the key)`, { kind: 'solution', namespace: ns.key }))
         }
         // User-defined (overrides built-ins on path collisions are avoided
         // because Map.set is gated by has()).

@@ -128,7 +128,7 @@ final class ThrowingFlowTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     public function configSchema(): array
@@ -169,7 +169,7 @@ final class ForbiddenNamespaceWriteTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     public function configSchema(): array

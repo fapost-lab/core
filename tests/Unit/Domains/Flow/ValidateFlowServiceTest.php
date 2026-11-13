@@ -828,7 +828,7 @@ final class RequiredConfigTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     public function configSchema(): array
@@ -921,7 +921,7 @@ final class SendMessageStubHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     public function configSchema(): array

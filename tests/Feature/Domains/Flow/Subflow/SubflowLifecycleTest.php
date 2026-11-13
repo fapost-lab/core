@@ -399,7 +399,7 @@ final class MarkerTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     public function configSchema(): array

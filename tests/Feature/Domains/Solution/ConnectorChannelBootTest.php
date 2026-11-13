@@ -9,6 +9,10 @@ use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Contracts\ActionHandlerFactoryInterface;
+use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
+use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Media\Registries\ChannelMediaLinkPolicyRegistry;
 use App\Domains\Solution\Providers\SolutionServiceProvider;
 use App\Domains\Solution\Services\InstalledConnectors;
@@ -18,6 +22,7 @@ use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionManifestValidator;
 use App\Infrastructure\Flow\ContainerActionHandlerFactory;
+use App\Infrastructure\Flow\ContainerNodeHandlerFactory;
 use Fapost\Foundation\Connector\ConnectorChannel;
 use Fapost\Foundation\Solution\Manifest\ManifestParser;
 use Illuminate\Config\Repository;
@@ -122,6 +127,9 @@ final class ConnectorChannelBootTest extends TestCase
         $app->instance(InstalledConnectors::class, new InstalledConnectors($cache, $discoverer));
         $app->singleton(ActionHandlerFactoryInterface::class, ContainerActionHandlerFactory::class);
         $app->singleton(ActionHandlerRegistry::class);
+        $app->singleton(NodeHandlerFactoryInterface::class, ContainerNodeHandlerFactory::class);
+        $app->singleton(NodeHandlerRegistryInterface::class, NodeHandlerRegistry::class);
+        $app->singleton(StateNamespaceRegistry::class);
         $app->singleton(ConnectorChannels::class);
         $app->singleton(
             ChannelRegistryInterface::class,

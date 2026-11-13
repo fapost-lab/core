@@ -29,16 +29,18 @@ Work through these in order. The first one that matches is your answer.
   </Step>
 
   <Step title="Does it register runtime behaviour?">
-    Node handlers, artisan commands, routes, schedules — these
-    are a **Plugin**. A Plugin extends what Core can do without adding a product
-    module of its own.
+    Node handlers, artisan commands, routes, schedules with no product module
+    behind them — these are a **Plugin**. A Plugin extends what Core can do without
+    adding a product module of its own. A Solution registers node handlers too,
+    for its own domain.
   </Step>
 </Steps>
 
 ## When two answers seem right
 
 A Solution may contain Plugin-shaped code: an HR Solution will almost certainly
-register node handlers and a data accessor. That is expected. The question is not
+register node handlers and a data accessor. That is expected, and Core supports
+a Solution's own [node types](/extending/solutions#registering-node-types). The question is not
 "which kind of code is this" but "what is the unit I ship". If you ship a product
 module, it is a Solution, and its handlers travel with it.
 

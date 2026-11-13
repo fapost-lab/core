@@ -176,6 +176,12 @@ final class SolutionServiceProvider extends ServiceProvider
      */
     public function registerExtensions(array $solutions): void
     {
+        // The factory reaches the node handler registry, which builds every Core handler when first resolved; an
+        // installation without a Solution has nothing to register and leaves that to the first use, as before.
+        if ([] === $solutions) {
+            return;
+        }
+
         $factory = $this->app->make(SolutionRegistrarFactoryInterface::class);
 
         foreach ($solutions as $solution) {

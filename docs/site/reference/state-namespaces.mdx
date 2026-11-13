@@ -26,6 +26,9 @@ enum StateNamespace: string
 | `module` | **No** — resolved lazily | Yes | Nobody |
 | `contact` | **No** — derived projection | Yes | Nobody (use the contact writer) |
 | `call` | Yes | Yes | Any handler |
+| `<solution id>` | Yes | Yes | That Solution's own node types |
+
+`rag` is deprecated and goes in the next major version of `fapost/foundation`.
 
 ## Path notation
 
@@ -45,12 +48,16 @@ call.status
 
 ## Adding a namespace
 
-New top-level namespaces go into the enum. They are not invented per node: a node
-that writes into a namespace nobody else knows about produces state that no
+Built-in top-level namespaces go into the enum. They are not invented per node: a
+node that writes into a namespace nobody else knows about produces state that no
 condition can read and no picker can offer.
 
-Solutions and Plugins consume the enum to declare allowed namespaces in schema
-fields and to resolve paths through a data accessor or the variable resolver.
+The one other way is a Solution that declares `"state": true` in its manifest: it
+owns a namespace named by its id, which conditions and pickers offer like the
+built-in ones. The full list at run time is
+`Fapost\Foundation\Flow\Contracts\StateNamespacesInterface`; the enum lists only
+the built-in namespaces. See
+[Your state namespace](/extending/solutions#your-state-namespace).
 
 See [State namespaces](/extending/flow-nodes/state-namespaces) for the rules
 behind these, and [Data accessors](/extending/data-accessors) for exposing data

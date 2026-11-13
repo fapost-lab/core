@@ -70,18 +70,21 @@ package's `require`; neither is repeated in the manifest.
 |---|---|---|
 | `type` | yes | `fapost-solution` (`fapost-plugin` is reserved) |
 | `extra.fapost.schema` | yes | An integer; `1` is the only supported number |
-| `extra.fapost.id` | yes | `^[a-z][a-z0-9_]{1,31}$`, and not `core`, `platform`, `fapost`, `app`, `system`, `flow`, `module`, `rag`, `solution` or `solutions` |
+| `extra.fapost.id` | yes | `^[a-z][a-z0-9_]{1,31}$`, and not `core`, `platform`, `fapost`, `app`, `system`, `flow`, `module`, `rag`, `contact`, `call`, `solution` or `solutions` |
 | `extra.fapost.name` | yes | One line, 1 to 60 characters, in English |
 | `extra.fapost.description` | no | Up to 280 characters |
 | `extra.fapost.provider` | yes | The class name of your service provider; the class must exist and extend `Fapost\Foundation\Lifecycle\AbstractSolutionServiceProvider` |
 | `extra.fapost.actions` | no | The action ids you register, each starting with `<id>.`, no duplicates |
+| `extra.fapost.nodes` | no | The flow node types you register, each `<id>.` followed by a snake_case name (`feedback.collect`), no duplicates; from `fapost/foundation` 0.36 — see [Registering node types](#registering-node-types) |
+| `extra.fapost.state` | no | `true` when your nodes keep state in a namespace of their own, named by your id; from `fapost/foundation` 0.36 — see [Your state namespace](#your-state-namespace) |
 | `extra.fapost.ui` | no | The path of your `fapost-ui.json` relative to the package root, ending in `.json`; from `fapost/foundation` 0.15, experimental — see [Console UI](/extending/console-ui) |
 | `extra.fapost.x-*` | no | Ignored, for your own tooling |
 | `require.fapost/foundation` | yes | The Foundation range you need; Composer enforces it when the package is installed |
 | `require.fapost/core` | forbidden | A Solution depends on contracts, never on Core |
 
 `solution` and `solutions` are reserved from `fapost/foundation` 0.14; use neither, whatever version
-you build against, because Core's own tables carry that prefix.
+you build against, because Core's own tables carry that prefix. `contact` and `call` are reserved from 0.36: they are
+names of the platform's state namespaces, and a Solution's id is also the name of its own.
 
 **The id never changes.** Plans, activations, action ids, permissions and limits all hang on it. A
 different id is a different Solution, and moving a customer's data across is your job.
@@ -133,7 +136,7 @@ Prints every problem, not just the first, and exits with code 1:
 ```
 acme/fapost-feedback: extra.fapost.id: required
 acme/fapost-feedback: extra.fapost.actions[1]: "score" must start with "feedback."
-acme/fapost-feedback: extra.fapost.migrations: unknown field (schema 1 allows: schema, id, name, description, provider, actions, ui); a newer fapost/foundation may be required
+acme/fapost-feedback: extra.fapost.migrations: unknown field (schema 1 allows: schema, id, name, description, provider, actions, nodes, state, ui); a newer fapost/foundation may be required
 acme/one, acme/two: extra.fapost.id: "feedback" is declared by both packages
 ```
 
@@ -165,8 +168,9 @@ way when its contract is settled, as `ui` was in 0.15.
 ## Registering actions
 
 A Solution gives flows something to do by registering **action handlers**, which the `call` node
-reaches with the `handler` transport. It does not add node types: a node's contract is a Core
-handler version, so a package cannot extend it. Implement
+reaches with the `handler` transport. An action is the right shape for one step with parameters and
+an outcome; a step that needs its own form, branches or state is a [node type](#registering-node-types).
+Implement
 `Fapost\Foundation\Action\ActionHandlerInterface`, declare the id in the manifest and register
 the class from your provider:
 
@@ -191,7 +195,7 @@ and the class, when:
 - the action id is not listed in `extra.fapost.actions`;
 - the id is already registered (two handlers, or a Solution and Core);
 - the class does not implement `ActionHandlerInterface`;
-- you call `registerNodeHandler()`, or `registerDataAccessor()`, `registerRagAdapter()`,
+- you call `registerDataAccessor()`, `registerRagAdapter()`,
   `registerRoutes()`, `registerSchedule()` or `registerMigrations()`, which Core does not support for a
   Solution yet.
 
@@ -228,6 +232,58 @@ with the first Solution that needs outbound HTTP.
 
 `onActivate()` and `onDeactivate()` are not called yet.
 
+## Registering node types
+
+A Solution can add its own blocks to the flow builder. A node type is a
+[node handler](/extending/flow-nodes/handler-contract) whose `type()` starts with your id and a dot
+(`feedback.collect`), so it can collide neither with Core's types, which never contain a dot, nor
+with another Solution's. Declare every type in `extra.fapost.nodes` and register its handler from the
+same `registerExtensions()` as your actions:
+
+```php
+protected function registerExtensions(CoreRegistrarInterface $registrar): void
+{
+    $registrar->registerActionHandler(SubmitFeedbackAction::class);
+    $registrar->registerNodeHandler(CollectFeedbackNodeHandler::class);
+}
+```
+
+**Where it appears in the palette.** `category()` decides the group: a value of
+`Fapost\Foundation\Flow\Enums\NodeCategory` (`Conversation`, `Logic`, `Data`, `Contact`,
+`Integration`, `AI`) puts the node into that group of Core, and your Solution's id puts it into a group
+of its own, labelled with your manifest `name`. Anything else fails the boot.
+
+**Versions.** A node type is versioned like Core's: the engine resolves `type@version`, a saved node
+keeps its version forever, and a breaking change is a new version registered beside the old one,
+which stays registered — see [Versioning](/extending/flow-nodes/versioning).
+
+**Registration fails the boot**, as for actions, when the type is not listed in `extra.fapost.nodes`,
+is already registered, does not start with your id, the class does not implement
+`NodeHandlerInterface`, or `category()` is neither a `NodeCategory` value nor your id. A type listed
+in the manifest that no handler registers is reported by `platform:update` and exits with code 1.
+
+**Activation is checked on every step.** A node of a Solution the tenant has not activated is not
+run: the engine does not build your handler, the node takes its `error` handle, and the flow log shows
+`solution_inactive: <solution id>`. A node whose Solution is no longer installed takes the same handle
+with `solution_not_installed: <solution id>`; when the installed Solution no longer ships the version the node was saved with, it is `solution_version_missing: <solution id>`. So give every node an `error` handle; publishing warns
+when it is not connected, and without an edge the session simply ends there. The builder offers your
+nodes only to tenants that have the Solution on; a flow that already holds them still opens, shows
+them greyed out with the reason, and keeps their settings. Publishing does not check activation.
+
+**Validating a node.** Beyond the `required` fields of `configSchema()`, a handler may also implement
+`Fapost\Foundation\Flow\Contracts\NodeConfigValidatorInterface`. Core calls `validate()` when it
+validates a flow for publishing and shows each `NodeConfigIssue`: an error blocks the publish, a
+warning does not. Keep it pure — no queries, no requests.
+
+## Your state namespace
+
+With `"state": true` in the manifest your Solution owns one more top-level
+[state namespace](/extending/flow-nodes/state-namespaces), named by its id: `feedback.*`. Only your
+own node types may write it, through `stateChanges`; anyone may read it in templates and conditions.
+Your actions do not write it: what an action returns reaches the flow through the `call` node's
+mapping, into `flow.*` or `call.*`. Values a session already holds stay there when the Solution is
+turned off.
+
 ## What a Solution typically contains
 
 Most Solutions are a combination of pieces documented elsewhere in this section:
@@ -238,6 +294,9 @@ Most Solutions are a combination of pieces documented elsewhere in this section:
   </Card>
   <Card title="A data accessor" href="/extending/data-accessors">
     So conditions can read your data without duplicating it.
+  </Card>
+  <Card title="Node types" href="#registering-node-types">
+    Blocks of your own in the builder, with their own form, branches and state.
   </Card>
   <Card title="Builder configuration" href="/extending/builder-ui">
     So your nodes can be configured on the canvas.

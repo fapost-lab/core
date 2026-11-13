@@ -1,10 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { fetchNodeTypes } from '@builder/api/builderApi'
-import type { NodeTypePayload } from '@builder/dto/types'
+import type { NodeGroup, NodeTypePayload, StateNamespaceEntry } from '@builder/dto/types'
 
 export const useRegistryStore = defineStore('registry', () => {
     const nodeTypes = ref<NodeTypePayload[]>([])
+    const groups = ref<NodeGroup[]>([])
+    const stateNamespaces = ref<StateNamespaceEntry[]>([])
     const loaded = ref(false)
     let pending: Promise<void> | null = null
 
@@ -18,8 +20,10 @@ export const useRegistryStore = defineStore('registry', () => {
         }
 
         pending = fetchNodeTypes()
-            .then((data) => {
-                nodeTypes.value = data
+            .then((response) => {
+                nodeTypes.value = response.data
+                groups.value = response.groups ?? []
+                stateNamespaces.value = response.state_namespaces ?? []
                 loaded.value = true
             })
             .finally(() => {
@@ -33,5 +37,5 @@ export const useRegistryStore = defineStore('registry', () => {
         return nodeTypes.value.find((n) => n.type === type && n.version === version)
     }
 
-    return { nodeTypes, loaded, load, getByType }
+    return { nodeTypes, groups, stateNamespaces, loaded, load, getByType }
 })

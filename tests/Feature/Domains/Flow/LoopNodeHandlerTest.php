@@ -10,6 +10,7 @@ use App\Domains\Flow\Handlers\LoopEndNodeHandler;
 use App\Domains\Flow\Handlers\LoopNodeHandler;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
+use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -186,6 +187,7 @@ final class LoopNodeHandlerTest extends TestCase
         return new LoopNodeHandler(
             $this->app->make(DataAccessorRegistryInterface::class),
             $this->app->make(VariableResolverInterface::class),
+            $this->app->make(StateNamespacesInterface::class),
         );
     }
 

@@ -10,7 +10,7 @@ use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Exceptions\UnknownDataAccessorNamespacePrefixException;
 use App\Domains\Flow\State\Variables\Variable;
 use Fapost\Foundation\DTO\NodeExecutionContext;
-use Fapost\Foundation\Flow\Enums\StateNamespace;
+use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 use InvalidArgumentException;
 
 /**
@@ -27,6 +27,7 @@ final class OperandResolver
     public function __construct(
         private readonly DataAccessorRegistryInterface $accessors,
         private readonly VariableResolverInterface $variableResolver,
+        private readonly StateNamespacesInterface $namespaces,
     ) {
     }
 
@@ -88,13 +89,9 @@ final class OperandResolver
             return $accessor->get($key, $context->contactId, $context->tenantId);
         }
 
-        if (
-            str_starts_with($path, StateNamespace::Flow->value . '.')
-            || str_starts_with($path, StateNamespace::System->value . '.')
-            || str_starts_with($path, StateNamespace::Rag->value . '.')
-            || str_starts_with($path, 'contact.')
-            || str_starts_with($path, 'call.')
-        ) {
+        $namespace = explode('.', $path, 2)[0];
+
+        if (str_contains($path, '.') && ('contact' === $namespace || $this->namespaces->has($namespace))) {
             return $this->resolveWithLength($state, $path);
         }
 

@@ -19,6 +19,7 @@ export const SOURCE_ORDER: PickerSourceKind[] = [
     'rag',
     'api-response',
     'module',
+    'solution',
 ]
 
 /** Group flat variables by source kind, preserving insertion order. */
@@ -32,6 +33,7 @@ export function groupVariablesBySource(
         'api-response':      [],
         'last-user-message': [],
         'module':            [],
+        'solution':          [],
     }
     for (const v of vars) {
         out[v.source.kind].push(v)

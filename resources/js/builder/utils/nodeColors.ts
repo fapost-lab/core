@@ -66,9 +66,15 @@ export const NODE_TYPE_COLORS: Record<string, NodeColorScheme> = {
     // Annotation — builder-only note, stripped on publish
     comment:       { bg: 'var(--note-bg)',          color: 'var(--note)',       icon: '🗒️' },
 
+    // Types owned by a Solution ("<solution>.<node>") — no per-type entry yet.
+    _extension:    { bg: 'var(--extension-bg)', color: 'var(--extension)', icon: '🧩' },
+
     _default:      { bg: 'var(--surface-2)', color: 'var(--text-2)', icon: '⚙️' },
 }
 
 export function nodeColors(type: string): NodeColorScheme {
-    return NODE_TYPE_COLORS[type] ?? NODE_TYPE_COLORS['_default']!
+    const own = NODE_TYPE_COLORS[type]
+    if (own) return own
+
+    return type.includes('.') ? NODE_TYPE_COLORS['_extension']! : NODE_TYPE_COLORS['_default']!
 }

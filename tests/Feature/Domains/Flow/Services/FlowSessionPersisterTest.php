@@ -10,12 +10,14 @@ use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Services\FlowSessionPersister;
+use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Flow\State\SystemStateNamespacePolicy;
 use DateTimeInterface;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Tests\Feature\FeatureTestCase;
+use Tests\Support\FakeNodeOwners;
 
 /**
  * {@see FlowSessionPersister} owns both `delayed()` forms: without a
@@ -34,7 +36,7 @@ final class FlowSessionPersisterTest extends FeatureTestCase
     {
         parent::setUp();
 
-        $this->persister = new FlowSessionPersister(new SystemStateNamespacePolicy());
+        $this->persister = new FlowSessionPersister(new SystemStateNamespacePolicy(new FakeNodeOwners(), new StateNamespaceRegistry()));
     }
 
     public function test_delayed_without_resume_at_parks_like_waiting(): void

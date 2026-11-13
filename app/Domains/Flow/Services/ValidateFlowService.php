@@ -28,7 +28,11 @@ use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Exception;
+use Fapost\Foundation\Flow\Contracts\NodeConfigValidatorInterface;
+use Fapost\Foundation\Flow\DTO\NodeConfigIssue;
+use Fapost\Foundation\Flow\Enums\NodeConfigIssueSeverity;
 use InvalidArgumentException;
+use Throwable;
 
 final readonly class ValidateFlowService
 {
@@ -60,8 +64,9 @@ final readonly class ValidateFlowService
         array $edges = [],
         ?string $assistantId = null,
     ): FlowValidationResultDto {
-        $errors  = [];
-        $nodeMap = $this->normalizeNodeMap($nodes, $errors);
+        $errors   = [];
+        $warnings = [];
+        $nodeMap  = $this->normalizeNodeMap($nodes, $errors);
 
         foreach ($nodeMap as $nodeId => $node) {
             // Annotation nodes (comment) are builder-only — no handler, no runtime
@@ -84,7 +89,10 @@ final readonly class ValidateFlowService
             $this->validateInputSaveTarget($node, $path, $errors);
             $this->validateLoopConfig($node, $path, $errors);
             $this->validateLoopEndConfig($node, $path, $nodeMap, $errors);
+            $this->validateWithNodeHandler($node, $path, $errors, $warnings);
         }
+
+        $this->warnSolutionNodesWithoutErrorExit($nodeMap, $edges, $warnings);
 
         $this->validateEndNodeOutgoingEdges($nodeMap, $edges, $errors);
         $this->validateSubflowTargetsAreNotTemplates($nodeMap, $errors);
@@ -97,12 +105,11 @@ final readonly class ValidateFlowService
         $this->validateButtonValueTypes($nodeMap, $errors);
         $this->validateTrigger($trigger, $errors, $flowId);
 
-        $warnings = [];
-
         if (null !== $assistantId) {
             $channelNodes = $this->withoutAnnotations($nodeMap);
 
             $warnings = [
+                ...$warnings,
                 ...($this->capabilityChecker?->check($channelNodes, $assistantId) ?? []),
                 ...($this->buttonLimitChecker?->check($channelNodes, $assistantId) ?? []),
             ];
@@ -187,6 +194,97 @@ final readonly class ValidateFlowService
                 path: "{$path}.type",
                 code: 'unknown_node_type',
                 message: "Node handler is not registered for {$type}@{$version}.",
+            );
+        }
+    }
+
+    /**
+     * A handler that implements {@see NodeConfigValidatorInterface} (a Solution's node, in practice) checks its own
+     * node after the generic checks above. An error issue blocks publishing like any other error.
+     *
+     * @param  array<string, mixed>  $node
+     * @param  list<FlowValidationErrorDto>  $errors
+     * @param  list<FlowValidationErrorDto>  $warnings
+     */
+    private function validateWithNodeHandler(array $node, string $path, array &$errors, array &$warnings): void
+    {
+        $type    = $node['type'] ?? null;
+        $raw     = $node['version'] ?? 1;
+        $version = is_int($raw) ? $raw : (is_numeric($raw) ? (int) $raw : 1);
+
+        if (! is_string($type) || ! $this->registry->has($type, $version)) {
+            return;
+        }
+
+        $handler = $this->registry->resolve($type, $version);
+
+        if (! $handler instanceof NodeConfigValidatorInterface) {
+            return;
+        }
+
+        try {
+            $issues = $handler->validate($node);
+        } catch (Throwable $exception) {
+            $errors[] = new FlowValidationErrorDto(
+                path: $path,
+                code: 'node_validator_failed',
+                message: "The validator of {$type} failed: {$exception->getMessage()}",
+            );
+
+            return;
+        }
+
+        foreach ($issues as $issue) {
+            $dto = $this->issueToDto($issue, $path);
+
+            if (NodeConfigIssueSeverity::Warning === $issue->severity) {
+                $warnings[] = $dto;
+
+                continue;
+            }
+
+            $errors[] = $dto;
+        }
+    }
+
+    private function issueToDto(NodeConfigIssue $issue, string $path): FlowValidationErrorDto
+    {
+        return new FlowValidationErrorDto(
+            path: null !== $issue->field && '' !== $issue->field ? "{$path}.config.{$issue->field}" : $path,
+            code: $issue->code,
+            message: $issue->message,
+        );
+    }
+
+    /**
+     * Every node of a Solution is expected to declare an `error` exit; a Solution that is switched off, or a
+     * failing call, leaves the run there. Without an edge the run simply ends, so the author is told.
+     *
+     * @param  array<string, array<string, mixed>>  $nodeMap
+     * @param  array<int, array<string, mixed>>     $edges
+     * @param  list<FlowValidationErrorDto>         $warnings
+     */
+    private function warnSolutionNodesWithoutErrorExit(array $nodeMap, array $edges, array &$warnings): void
+    {
+        $connected = [];
+
+        foreach ($edges as $edge) {
+            if (is_array($edge) && is_string($edge['from'] ?? null) && 'error' === ($edge['handle'] ?? null)) {
+                $connected[$edge['from']] = true;
+            }
+        }
+
+        foreach ($nodeMap as $nodeId => $node) {
+            $type = $node['type'] ?? null;
+
+            if (! is_string($type) || null === $this->registry->ownerOf($type) || isset($connected[$nodeId])) {
+                continue;
+            }
+
+            $warnings[] = new FlowValidationErrorDto(
+                path: "nodes.{$nodeId}",
+                code: 'solution_node_error_unhandled',
+                message: "Node {$nodeId} ({$type}) has no connection on its error exit: if its Solution is switched off for the tenant or the node fails, the flow ends there.",
             );
         }
     }
