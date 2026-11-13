@@ -62,7 +62,7 @@ broken.
   the handler through `ActionHandlerFactoryInterface` in the caller's scope, so a handler may take scoped
   services and nothing is kept between jobs. Core's own action ids start with `core.` or `platform.`
   (a Solution's start with its id, by the manifest), so a collision is impossible by construction; a
-  duplicate or a post-freeze registration throws. `HandlerTransport` asks `ActionAvailabilityInterface` on
+  duplicate or a post-freeze registration throws. `HandlerTransport` asks `SolutionAvailabilityInterface` on
   every call and returns `solution_inactive` (handler not built) for a Solution the tenant has not
   activated; the singleton transport and registry never hold the scoped `ActiveSolutions`. The Flow
   domain does not depend on the Solution domain. Enforced: `SolutionBoundariesTest::test_flow_does_not_depend_on_the_solution_domain`,
@@ -70,13 +70,21 @@ broken.
   (`adr-20261014-solution-actions-registered-per-process`).
 - **The handler registry is closed and unambiguous.** No registration after freeze; a handler's
   `version()` must be in its `supportedVersions()`; a duplicate `type@version` is rejected; an
-  unknown key throws. Publishing rejects unknown versions. Enforced: `NodeHandlerRegistry`,
+  unknown key throws. Publishing rejects unknown versions. Each entry has an owner (Solution id, null =
+  Core): a Core type never contains a dot, a Solution's starts with `<id>.`, and every `category()` is a
+  Foundation `NodeCategory` value or the owning Solution's id. Enforced: `NodeHandlerRegistry`,
   `ValidateFlowService`.
+- **A Solution's node is checked for activation on every step, before its handler is built.** `FlowEngine`
+  asks `SolutionAvailabilityInterface` for the owner and routes the node to `error` with
+  `solution_inactive`, `solution_version_missing` (installed, version not registered) or
+  `solution_not_installed` (dotted type, no owner); a Core type without a handler still throws. Enforced:
+  `FlowEngineSolutionNodeTest`, `SolutionLifecycleTest` (`adr-20261113-solution-node-types-and-state-namespace`).
 - **Only whitelisted node types write `system.*` and `rag.*`.** `system.*`: `send_message`,
   `input`, `delay`, `notify`, `set_tag`, `request_operator` (its marker holds the id of the operator request it
   waits for); `rag.*`: `rag_query`. `flow.*` and `call.*` are open to
-  every handler. Enforced: `SystemStateNamespacePolicy`, applied in `FlowSessionPersister`.
-  Adding a writer means editing the whitelist, on purpose.
+  every handler. A Solution's namespace (its id, `state: true`) is written only by node types with the same
+  owner; no whitelist. Enforced: `SystemStateNamespacePolicy`, applied in `FlowSessionPersister`.
+  Adding a writer of `system`/`rag` means editing the whitelist, on purpose.
 - **A session runs the definition it started with.** `flow_definition_id` is set once, and
   definitions cannot be deleted while sessions reference them (`restrictOnDelete`).
 - **A flow template never starts a session.** Every start path (default flow, trigger, global
@@ -125,8 +133,10 @@ broken.
   the queue retries. `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `ContinueAfterOperatorRequestJob`,
   `StartFlowFromEventJob` and `SubflowTimeoutSweeper` follow it (`tests/Feature/Redis`); the sweeper skips a parent whose lock
   is busy and retries on its next run.
-- **New state namespaces go into the foundation `StateNamespace` enum.** Core keeps no enum of
-  its own (ADR-0002). *(proposed)*
+- **New built-in state namespaces go into the foundation `StateNamespace` enum.** Core keeps no enum of
+  its own (ADR-0002). The runtime list is `StateNamespacesInterface` (`StateNamespaceRegistry`: built-ins plus
+  Solution namespaces, frozen at boot); readers (`ScopedStateReader`, `OperandResolver`) and the branch
+  validator ask it, never a hardcoded list. *(proposed)*
 - **A singleton in `FlowServiceProvider` must not receive a scoped service in its constructor.**
   It is transitive: a `bind` service that holds a scoped one (`CachedContentTranslator` holds the
   tenant context, current assistant and `TenantSettings`) counts as scoped. Make the consumer

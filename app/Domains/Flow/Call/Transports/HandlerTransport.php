@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Call\Transports;
 
 use App\Domains\Flow\Action\ActionHandlerRegistry;
-use App\Domains\Flow\Contracts\ActionAvailabilityInterface;
+use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use Fapost\Foundation\Flow\Call\CallContext;
 use Fapost\Foundation\Flow\Call\CallRequest;
 use Fapost\Foundation\Flow\Call\CallResult;
@@ -33,7 +33,7 @@ final readonly class HandlerTransport implements CallTransportInterface
 
     public function __construct(
         private ActionHandlerRegistry $registry,
-        private ActionAvailabilityInterface $availability,
+        private SolutionAvailabilityInterface $availability,
     ) {
     }
 

@@ -12,7 +12,9 @@
             "name": "Feedback",
             "description": "Collect and route customer feedback from flows.",
             "provider": "Tests\\Fixtures\\Solution\\FeedbackServiceProvider",
-            "actions": ["feedback.submit", "feedback.score"]
+            "actions": ["feedback.submit", "feedback.score"],
+            "nodes": ["feedback.collect"],
+            "state": true
         }
     }
 }

@@ -12,6 +12,7 @@ use App\Domains\Channels\Contracts\ChannelWebhookRegistryInterface;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Call\CallTester;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
+use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Services\LoadBuilderFlowService;
 use App\Domains\Solution\Contracts\SolutionActivationStoreInterface;
@@ -33,6 +34,7 @@ use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Http\Shell\SolutionUi;
 use Database\Seeders\TenantAclSeeder;
+use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
 use Fapost\Foundation\Solution\DTO\SolutionEntitlement;
 use Fapost\Foundation\Solution\DTO\SolutionGrant;
@@ -225,6 +227,44 @@ final class SolutionLifecycleTest extends FeatureTestCase
             $this->app->make(ActiveSolutions::class)->ids(),
         ]);
         $this->assertSame([['feedback', 'showcase'], [], ['feedback', 'showcase']], $nested);
+    }
+
+    public function test_a_node_of_the_solution_runs_for_the_tenant_that_activated_it_and_takes_the_error_exit_for_the_other(): void
+    {
+        $beta = $this->secondTenant();
+
+        $this->artisan('platform:update')->assertExitCode(0);
+        $this->forgetSolutionState();
+        $this->activate($this->alpha, 'feedback');
+
+        // The namespace and the node type are the image's, whoever has the Solution on.
+        $this->assertSame('feedback', $this->app->make(NodeHandlerRegistryInterface::class)->ownerOf('feedback.collect'));
+        $this->assertSame(['system', 'flow', 'rag', 'module', 'contact', 'call', 'feedback'], $this->app->make(StateNamespacesInterface::class)->all());
+        $this->assertSame('feedback', $this->app->make(StateNamespacesInterface::class)->ownerOf('feedback'));
+
+        $built = $this->calls->constructions;
+
+        $ran = $this->nodeFlowResult($this->alpha);
+        $this->assertSame(['end' => 'reached', 'error' => null, 'state' => ['last_score' => 4]], $ran);
+        $this->assertCount(1, $this->calls->calls);
+        $this->assertSame('feedback.collect', $this->calls->calls[0]['action']);
+        $this->assertSame($this->alpha->getId(), $this->calls->calls[0]['tenant_id']);
+        $this->assertSame($built + 1, $this->calls->constructions);
+
+        $refused = $this->nodeFlowResult($beta);
+        $this->assertSame(['end' => 'refused', 'error' => 'solution_inactive: feedback', 'state' => null], $refused);
+        $this->assertCount(1, $this->calls->calls, 'The handler was not built for beta.');
+        $this->assertSame($built + 1, $this->calls->constructions);
+
+        // The worker serves them alternately, and switching alpha off takes its next run to the error exit too.
+        foreach ([[$this->alpha, 'reached'], [$beta, 'refused'], [$this->alpha, 'reached']] as [$tenant, $end]) {
+            $this->app->forgetScopedInstances();
+
+            $this->assertSame($end, $this->nodeFlowResult($tenant)['end'], 'Job for ' . $tenant->getSlug());
+        }
+
+        $this->deactivate($this->alpha, 'feedback');
+        $this->assertSame(['end' => 'refused', 'error' => 'solution_inactive: feedback', 'state' => null], $this->nodeFlowResult($this->alpha));
     }
 
     public function test_the_operator_commands_drive_the_same_chain_on_the_real_store(): void
@@ -456,6 +496,50 @@ final class SolutionLifecycleTest extends FeatureTestCase
             return [
                 'end_status' => null === $session->end_status ? null : (string) $session->end_status,
                 'call_error' => null === $log?->error ? null : (string) (json_decode((string) $log->error, true)['message'] ?? $log->error),
+            ];
+        });
+    }
+
+    /**
+     * Runs a flow with the Solution's `feedback.collect` node (score 4) for the tenant: the `default` exit leads to
+     * an `end` named `reached`, the `error` exit to one named `refused`.
+     *
+     * @return array{end: string|null, error: string|null, state: array<string, mixed>|null} the end reached, the error
+     *         the node logged and the `feedback` part of the session state
+     */
+    private function nodeFlowResult(TenantInterface $tenant): array
+    {
+        return $this->inTenant($tenant, function () use ($tenant): array {
+            $tenantId  = $tenant->getId();
+            $assistant = Assistant::factory()->create(['tenant_id' => $tenantId]);
+            $contact   = Contact::factory()->forTenant($tenantId)->create();
+            $this->app->make(CurrentAssistantInterface::class)->set($assistant);
+
+            $definition = FlowDefinition::query()->create([
+                'tenant_id' => $tenantId,
+                'flow_id'   => (string) Str::uuid(),
+                'version'   => 1,
+                'name'      => 'Feedback node',
+                'nodes'     => [
+                    ['id' => 'collect', 'type' => 'feedback.collect', 'version' => 1, 'config' => ['score' => 4]],
+                    ['id' => 'reached', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+                    ['id' => 'refused', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'failed']],
+                ],
+                'edges' => [
+                    ['id' => 'e1', 'from' => 'collect', 'to' => 'reached', 'handle' => 'default'],
+                    ['id' => 'e2', 'from' => 'collect', 'to' => 'refused', 'handle' => 'error'],
+                ],
+                'is_active' => true,
+            ]);
+
+            $session = $this->app->make(FlowEngineInterface::class)->start($definition, $contact);
+            $log     = DB::table('flow_logs')->where('session_id', $session->getKey())->where('node_id', 'collect')->first();
+            $end     = DB::table('flow_logs')->where('session_id', $session->getKey())->whereIn('node_id', ['reached', 'refused'])->value('node_id');
+
+            return [
+                'end'   => null === $end ? null : (string) $end,
+                'error' => null === $log?->error ? null : (string) (json_decode((string) $log->error, true)['message'] ?? $log->error),
+                'state' => $session->state['feedback'] ?? null,
             ];
         });
     }

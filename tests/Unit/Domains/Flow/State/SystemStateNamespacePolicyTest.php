@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace Tests\Unit\Domains\Flow\State;
 
 use App\Domains\Flow\Exceptions\StateNamespaceViolationException;
+use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Flow\State\SystemStateNamespacePolicy;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Tests\Support\FakeNodeOwners;
 
 final class SystemStateNamespacePolicyTest extends TestCase
 {
@@ -17,7 +19,14 @@ final class SystemStateNamespacePolicyTest extends TestCase
     {
         parent::setUp();
 
-        $this->policy = new SystemStateNamespacePolicy();
+        $namespaces = new StateNamespaceRegistry();
+        $namespaces->registerSolutionNamespace('feedback');
+        $namespaces->registerSolutionNamespace('survey');
+
+        $this->policy = new SystemStateNamespacePolicy(
+            new FakeNodeOwners(['feedback.collect' => 'feedback', 'survey.ask' => 'survey', 'send_message' => null]),
+            $namespaces,
+        );
     }
 
     /**
@@ -34,6 +43,8 @@ final class SystemStateNamespacePolicyTest extends TestCase
         yield 'set_tag writes system marker' => ['set_tag', 'system.set_tag.n1'];
         yield 'request_operator writes its request marker' => ['request_operator', 'system.request_operator.n1'];
         yield 'rag_query writes rag.*' => ['rag_query', 'rag.answer'];
+        yield 'a Solution node writes its own namespace' => ['feedback.collect', 'feedback.last_score'];
+        yield 'a Solution node writes flow.*' => ['feedback.collect', 'flow.answer'];
     }
 
     /**
@@ -48,6 +59,11 @@ final class SystemStateNamespacePolicyTest extends TestCase
         yield 'module namespace is read-only' => ['custom_solution_node', 'module.hr.department'];
         yield 'contact projection not writable' => ['assign', 'contact.first_name'];
         yield 'unknown namespace' => ['assign', 'admin.secret'];
+        yield 'a Solution node writes the namespace of another Solution' => ['feedback.collect', 'survey.answer'];
+        yield 'a Core node writes a Solution namespace' => ['send_message', 'feedback.last_score'];
+        yield 'an unregistered node writes a Solution namespace' => ['ghost.node', 'feedback.last_score'];
+        yield 'a Solution node writes system.*' => ['feedback.collect', 'system.language'];
+        yield 'a Solution without state has no namespace' => ['feedback.collect', 'billing.total'];
     }
 
     #[DataProvider('allowedWrites')]

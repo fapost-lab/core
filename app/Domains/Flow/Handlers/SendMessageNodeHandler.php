@@ -64,6 +64,11 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
         return 1;
     }
 
+    public function category(): string
+    {
+        return 'Conversation';
+    }
+
     /**
      * @return array<string, mixed>
      */

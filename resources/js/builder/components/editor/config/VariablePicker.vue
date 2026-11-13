@@ -20,7 +20,7 @@ const searchQuery  = ref('')
 // Section collapse state. Initial set is empty — all collapsed by default.
 // Search overrides this and force-expands every section that has matches,
 // so the user always sees what they typed without extra clicks.
-const collapsedSections = ref<Set<PickerSourceKind>>(new Set(['contact-profile', 'temporary', 'last-user-message', 'rag', 'api-response', 'module']))
+const collapsedSections = ref<Set<PickerSourceKind>>(new Set(['contact-profile', 'temporary', 'last-user-message', 'rag', 'api-response', 'module', 'solution']))
 
 // ── Sectioning ───────────────────────────────────────────────────────────────
 
@@ -42,6 +42,7 @@ const SOURCE_META: Record<PickerSourceKind, { icon: string; title: string }> = {
     'rag':               { icon: '🧠', title: 'RAG' },
     'api-response':      { icon: '⚡', title: 'API response' },
     'module':            { icon: '🏢', title: 'Module' },
+    'solution':          { icon: '🧩', title: 'Solution state' },
 }
 
 function matchesSearch(v: PickerVariable, q: string): boolean {

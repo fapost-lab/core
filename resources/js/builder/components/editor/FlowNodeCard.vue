@@ -7,6 +7,7 @@ import {nodeColors} from '@builder/utils/nodeColors'
 import {nodeMustBeLast} from '@builder/utils/nodeTerminal'
 import {useMoveNode} from '@builder/composables/useMoveNode'
 import {useDeleteNode} from '@builder/composables/useDeleteNode'
+import {fallbackTypeLabel, isNodeUnavailable, nodeAvailability, unavailableReason} from '@builder/utils/nodeAvailability'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 import {useTranslations} from '@builder/composables/useTranslations'
 
@@ -27,8 +28,12 @@ const handlerMeta = computed(() => registryStore.getByType(props.treeNode.node.t
 
 const typeLabel = computed(() => {
     if (handlerMeta.value?.label) return handlerMeta.value.label
-    return props.treeNode.node.type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+    return fallbackTypeLabel(props.treeNode.node.type)
 })
+
+const availability  = computed(() => nodeAvailability(props.treeNode.node.type, handlerMeta.value))
+const unavailable   = computed(() => isNodeUnavailable(availability.value))
+const unavailableText = computed(() => unavailableReason(availability.value, t))
 
 /**
  * For `end` nodes, surface the configured completion status as a colour accent
@@ -206,6 +211,7 @@ function openMoveDialog() {
             {
                 selected: isSelected,
                 'has-error': hasError && !isSelected,
+                'node-card--unavailable': unavailable,
             },
             endStatus ? `node-card--end node-card--end-${endStatus}` : null,
         ]"
@@ -223,7 +229,11 @@ function openMoveDialog() {
             <button v-if="canDelete" class="node-delete-btn" title="Delete node" @click.stop="deleteNode">×</button>
         </div>
 
-        <div v-if="commentText !== null" class="node-card-body">
+        <div v-if="unavailableText" class="node-card-body">
+            <p class="node-unavailable-reason">{{ unavailableText }}</p>
+        </div>
+
+        <div v-else-if="commentText !== null" class="node-card-body">
             <p v-if="commentText.trim() !== ''" class="node-comment-text">{{ commentText }}</p>
             <p v-else class="node-comment-text node-comment-text--empty">Empty note — click to write one</p>
         </div>

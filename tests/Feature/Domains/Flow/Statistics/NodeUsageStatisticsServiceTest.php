@@ -268,7 +268,7 @@ final class UsageAlphaTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     /**
@@ -312,7 +312,7 @@ final class UsageUnusedTestHandler implements NodeHandlerInterface
 
     public function category(): string
     {
-        return 'Test';
+        return 'Logic';
     }
 
     /**

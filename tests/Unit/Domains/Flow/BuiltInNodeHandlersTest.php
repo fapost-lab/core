@@ -25,6 +25,7 @@ use App\Domains\Flow\Handlers\RagQueryNodeHandler;
 use App\Domains\Flow\Handlers\SendMessageNodeHandler;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\Rag\RagAdapterRegistry;
+use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Flow\State\SystemStateKeys;
 use App\Domains\Flow\State\Variables\VariableResolver;
 use App\Domains\Flow\Support\CallbackDataCodec;
@@ -406,7 +407,7 @@ final class BuiltInNodeHandlersTest extends TestCase
         $accessor->shouldReceive('get')->once()->with('department', 'contact-1', 'tenant-1')->andReturn('sales');
         $registry->shouldReceive('resolve')->once()->with('module.hr')->andReturn($accessor);
 
-        $handler  = new BranchNodeHandler($registry, new VariableResolver());
+        $handler  = new BranchNodeHandler($registry, new VariableResolver(), new StateNamespaceRegistry());
         $flowNode = [
             'id'     => 'condition-flow',
             'config' => [
@@ -443,7 +444,7 @@ final class BuiltInNodeHandlersTest extends TestCase
     public function test_condition_resolves_user_variable_left_via_variable_resolver(): void
     {
         $registry = Mockery::mock(DataAccessorRegistryInterface::class);
-        $handler  = new BranchNodeHandler($registry, new VariableResolver());
+        $handler  = new BranchNodeHandler($registry, new VariableResolver(), new StateNamespaceRegistry());
 
         // Session-scoped variable: {storage:session, name:code} → flow.code
         $sessionNode = [
@@ -501,7 +502,7 @@ final class BuiltInNodeHandlersTest extends TestCase
     public function test_condition_resolves_source_left_for_known_namespaces(): void
     {
         $registry = Mockery::mock(DataAccessorRegistryInterface::class);
-        $handler  = new BranchNodeHandler($registry, new VariableResolver());
+        $handler  = new BranchNodeHandler($registry, new VariableResolver(), new StateNamespaceRegistry());
 
         $node = [
             'id'     => 'cond-rag',
@@ -530,7 +531,7 @@ final class BuiltInNodeHandlersTest extends TestCase
     public function test_condition_legacy_string_left_falls_back_to_check(): void
     {
         $registry = Mockery::mock(DataAccessorRegistryInterface::class);
-        $handler  = new BranchNodeHandler($registry, new VariableResolver());
+        $handler  = new BranchNodeHandler($registry, new VariableResolver(), new StateNamespaceRegistry());
 
         $node = [
             'id'     => 'cond-legacy',

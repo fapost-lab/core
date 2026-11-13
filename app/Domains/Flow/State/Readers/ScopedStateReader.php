@@ -7,6 +7,7 @@ namespace App\Domains\Flow\State\Readers;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use Fapost\Foundation\Flow\Contracts\ScopedStateReaderInterface;
+use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 
 /**
  * Unified read surface across all state namespaces for a single node execution.
@@ -23,6 +24,7 @@ use Fapost\Foundation\Flow\Contracts\ScopedStateReaderInterface;
  *  - contact.<group>.<key>    → attributes[<group>][<key>] JSONB nested
  *  - module.<name>.<...>      → DataAccessor registered under `module.<name>`, get(<...>)
  *  - flow|system|rag|call.*   → flow_sessions.state.<namespace>.<...>
+ *  - <solution id>.*          → the same, for a namespace a Solution registered (StateNamespacesInterface)
  */
 final readonly class ScopedStateReader implements ScopedStateReaderInterface
 {
@@ -33,6 +35,7 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
         private array $sessionState,
         private Contact $contact,
         private DataAccessorRegistryInterface $accessors,
+        private StateNamespacesInterface $namespaces,
     ) {
     }
 
@@ -50,7 +53,7 @@ final readonly class ScopedStateReader implements ScopedStateReaderInterface
             'contact'                       => $this->readContact($rest),
             'module'                        => $this->readModule($rest),
             'flow', 'system', 'rag', 'call' => $this->readSession($namespace, $rest),
-            default                         => null,
+            default                         => $this->namespaces->has($namespace) ? $this->readSession($namespace, $rest) : null,
         };
     }
 

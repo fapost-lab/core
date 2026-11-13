@@ -50,8 +50,8 @@ singletons and must not hold a scoped service, and a deactivation must reach the
 - `ActionHandlerRegistry` stores `id => {class, owner}` (`owner` = Solution id, null = Core) and builds the
   handler on every `get()` through `ActionHandlerFactoryInterface` (`ContainerActionHandlerFactory`), in the
   scope of the caller (the ADR-0001 approach). One throwaway instance is built at registration to read `id()`.
-- Activation is checked per call. `HandlerTransport` asks `ActionAvailabilityInterface` (Flow port;
-  `ContainerActionAvailability` in `App\Infrastructure\Solution` resolves the scoped `ActiveSolutions` and the tenant context
+- Activation is checked per call. `HandlerTransport` asks `SolutionAvailabilityInterface` (Flow port;
+  `ContainerSolutionAvailability` in `App\Infrastructure\Solution` resolves the scoped `ActiveSolutions` and the tenant context
   from the container on each question, so the singleton transport holds no scoped service). A Solution's
   action for a tenant that has not activated it returns `CallResult::error('solution_inactive')` before the
   handler is built; `CallNodeHandler` routes it to the `error` handle and sets `errorMessage =
@@ -100,7 +100,7 @@ singletons and must not hold a scoped service, and a deactivation must reach the
   A handler constructor runs at boot outside any tenant, so it must be cheap and tenant-free.
 - To maintain: the registrar rejects unsupported methods loudly; supporting one means a decision about its
   rules. Any new Core action starts with `core.` or `platform.`. Anything new on the call path asks
-  `ActionAvailabilityInterface`, never a scoped service held by a singleton.
+  `SolutionAvailabilityInterface`, never a scoped service held by a singleton.
 - Reversal: before release, delete the code. After release, Solutions written for Foundation 0.17 depend on
   `registerActionHandler` and `registerExtensionsWith`; reversing is a new Foundation minor with a
   deprecation. No data is written and there is no migration.

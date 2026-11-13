@@ -8,6 +8,7 @@ use App\Console\Platform\PlatformMigratorInterface;
 use App\Console\Platform\UnservedChannelsFinderInterface;
 use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
+use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
@@ -19,6 +20,7 @@ use Tests\Fixtures\Connectors\Echo\EchoInboundAdapter;
 use Tests\Fixtures\Connectors\Echo\EchoSender;
 use Tests\Fixtures\Solution\Actions\FeedbackScoreAction;
 use Tests\Fixtures\Solution\Actions\FeedbackSubmitAction;
+use Tests\Fixtures\Solution\Nodes\FeedbackCollectNode;
 use Tests\Support\FakeVendor;
 use Tests\TestCase;
 
@@ -235,6 +237,20 @@ final class UpdatePlatformCommandTest extends TestCase
         $this->assertFileDoesNotExist($this->cache->path());
     }
 
+    public function test_a_declared_node_type_that_is_not_registered_fails_the_update_before_migrations_and_cache(): void
+    {
+        $this->registerFeedbackActions(node: false);
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('acme/fapost-feedback: extra.fapost.nodes[0]: "feedback.collect" is declared but not registered')
+            ->expectsOutputToContain('Nothing was changed')
+            ->assertExitCode(1);
+
+        $this->assertSame(0, $this->migrations);
+        $this->assertFileDoesNotExist($this->cache->path());
+    }
+
     public function test_validate_only_also_fails_on_a_declared_action_that_is_not_registered(): void
     {
         $this->vendor->package(FakeVendor::solutionComposer())->write();
@@ -326,8 +342,12 @@ final class UpdatePlatformCommandTest extends TestCase
         );
     }
 
-    private function registerFeedbackActions(bool $score = true): void
+    private function registerFeedbackActions(bool $score = true, bool $node = true): void
     {
+        if ($node) {
+            $this->app->make(NodeHandlerRegistryInterface::class)->register(FeedbackCollectNode::class, 'feedback');
+        }
+
         $registry = $this->app->make(ActionHandlerRegistry::class);
         $registry->register(FeedbackSubmitAction::class, 'feedback');
 

@@ -68,10 +68,13 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   and, in an `$app->booting()` callback (after every `register()`, before any `boot()`), hands each provider
   a registrar of its own through `registerExtensionsWith()` (`adr-20261014-solution-actions-registered-per-process`).
   The port is `Contracts/SolutionRegistrarFactoryInterface`; the implementation, `SolutionCoreRegistrar`, is in
-  `app/Infrastructure/Solution` because it writes into the Flow action registry. It accepts only
-  `registerActionHandler`, and only for ids in the Solution's `extra.fapost.actions`; every other call, an
-  undeclared id and a duplicate throw at boot. Whether an action may run for a tenant is asked per call through the Flow port
-  `ActionAvailabilityInterface` (`solution_inactive`). A `fapost-solution` package may carry no `extra.laravel.providers` entry at all (an empty
+  `app/Infrastructure/Solution` because it writes into the Flow registries. It accepts
+  `registerActionHandler` for ids in the Solution's `extra.fapost.actions` and `registerNodeHandler` for types in
+  `extra.fapost.nodes` (`<id>.<name>`, `category()` a `NodeCategory` value or the Solution id), and its factory
+  adds the Solution's state namespace (its id) to Flow's `StateNamespaceRegistry` when the manifest says
+  `state: true` (`adr-20261113-solution-node-types-and-state-namespace`); every other call, an undeclared id or
+  type and a duplicate throw at boot. Whether an action may run for a tenant is asked per call through the Flow port
+  `SolutionAvailabilityInterface` (`solution_inactive`). A `fapost-solution` package may carry no `extra.laravel.providers` entry at all (an empty
   list is fine): the manifest rejects any entry, in any spelling, because package discovery would boot it
   whether or not its manifest holds up.
   It wraps each provider in `booting`/`booted` callbacks that open and close the console registry for that
@@ -159,7 +162,9 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
     is the one rule for "on, but needs an update" that the app switcher, its routes (`EnsureSolutionActive`: 503 page) and
     the card's `ui.needsUpdate` all read. The proof is in `SolutionLifecycleTest`.
 - `platform:update` also checks that every action a valid manifest declares is registered in the booted
-  `ActionHandlerRegistry` (`<package>: extra.fapost.actions[i]: "<id>" is declared but not registered`, exit 1), after the manifest and console UI checks and before any migration.
+  `ActionHandlerRegistry` (`<package>: extra.fapost.actions[i]: "<id>" is declared but not registered`, exit 1), and every
+  declared node type in `NodeHandlerRegistry` (`extra.fapost.nodes[i]`), after the manifest and console UI checks and before any migration.
+  `InstalledSolution` carries `nodes` and `state`; a compiled cache without them is stale.
 - `platform:update` (`app/Console/Commands/Platform`): validate the manifests and the console UI bundles, then
   (unless `--validate-only`) `App\Console\Platform\PlatformMigratorInterface` (landlord migrate and `ops:tenants-migrate`; console-level and deliberately outside this domain, which only validates, publishes and caches), then publish the bundles, then write the cache with them.
   Any violation exits 1 before the database or the cache is touched. `--validate-only` needs no
@@ -172,7 +177,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   PHPat (`SolutionBoundariesTest`) forbids a dependency on any other `App\Domains` namespace, and
   forbids facades and `Illuminate\Database` outside `Infrastructure` and `Providers`, so discovery
   and the services run without a database.
-- Not here yet: registrar methods other than `registerActionHandler`, per-phase migrations of a Solution and the `migrations` manifest field.
+- Not here yet: registrar methods other than `registerActionHandler` and `registerNodeHandler`, per-phase migrations of a Solution and the `migrations` manifest field.
   Plugins (`type: fapost-plugin`) are reserved and not discovered.
 - The Foundation constraint is not re-checked in Core: Composer refuses to install a package whose
   `require["fapost/foundation"]` does not fit the locked version, and a package Composer did not

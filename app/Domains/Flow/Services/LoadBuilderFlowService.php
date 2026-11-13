@@ -7,10 +7,10 @@ namespace App\Domains\Flow\Services;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Assistant\Support\CountryCatalog;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
-use App\Domains\Flow\Contracts\ActionAvailabilityInterface;
 use App\Domains\Flow\Contracts\FlowDefinitionRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowDraftRepositoryInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
+use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\DTOs\BuilderFlowDto;
 use App\Domains\Flow\Enums\FlowKind;
@@ -29,7 +29,7 @@ final readonly class LoadBuilderFlowService
         private TenantEventRepositoryInterface $tenantEvents,
         private TenantSettings $tenantSettings,
         private ActionHandlerRegistry $actionHandlers,
-        private ActionAvailabilityInterface $actionAvailability,
+        private SolutionAvailabilityInterface $actionAvailability,
         private CountryCatalog $countries,
         private TemplateExpander $expander,
         private TemplateUsageFinder $templateUsages,

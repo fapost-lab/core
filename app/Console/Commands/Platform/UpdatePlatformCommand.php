@@ -8,6 +8,7 @@ use App\Console\Platform\PlatformMigratorInterface;
 use App\Console\Platform\UnservedChannelsFinderInterface;
 use App\Domains\Channels\ConnectorChannels;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
+use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Solution\DTO\ConnectorDiscovery;
 use App\Domains\Solution\DTO\ExtensionDiscovery;
 use App\Domains\Solution\DTO\InstalledConnector;
@@ -44,6 +45,7 @@ final class UpdatePlatformCommand extends Command
         SolutionCache $cache,
         PlatformMigratorInterface $migrator,
         ActionHandlerRegistry $actions,
+        NodeHandlerRegistryInterface $nodes,
         SolutionUiPublisher $publisher,
         PublishedSolutionUi $published,
         SolutionUiCompatibility $compatibility,
@@ -100,10 +102,10 @@ final class UpdatePlatformCommand extends Command
         $this->components->info(sprintf('Connector manifests are valid (%d installed).', count($all->connectors->valid)));
         $this->reportConnectors($all->connectors);
 
-        $unregistered = $this->unregisteredActions($discovery, $actions);
+        $unregistered = $this->unregisteredActions($discovery, $actions, $nodes);
 
         if ([] !== $unregistered) {
-            $this->components->error(sprintf('%d declared action(s) are not registered. Nothing was changed.', count($unregistered)));
+            $this->components->error(sprintf('%d declared action(s) and node type(s) are not registered. Nothing was changed.', count($unregistered)));
 
             foreach ($unregistered as $line) {
                 $this->line('  ' . $line);
@@ -164,7 +166,7 @@ final class UpdatePlatformCommand extends Command
      *
      * @return list<string>
      */
-    private function unregisteredActions(SolutionDiscovery $discovery, ActionHandlerRegistry $actions): array
+    private function unregisteredActions(SolutionDiscovery $discovery, ActionHandlerRegistry $actions, NodeHandlerRegistryInterface $nodes): array
     {
         $lines = [];
 
@@ -172,6 +174,12 @@ final class UpdatePlatformCommand extends Command
             foreach ($solution->actions as $index => $actionId) {
                 if (!$actions->has($actionId)) {
                     $lines[] = sprintf('%s: extra.fapost.actions[%d]: "%s" is declared but not registered', $solution->package, $index, $actionId);
+                }
+            }
+
+            foreach ($solution->nodes as $index => $nodeType) {
+                if ($nodes->ownerOf($nodeType) !== $solution->id) {
+                    $lines[] = sprintf('%s: extra.fapost.nodes[%d]: "%s" is declared but not registered', $solution->package, $index, $nodeType);
                 }
             }
         }

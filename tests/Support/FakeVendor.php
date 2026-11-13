@@ -31,6 +31,11 @@ final class FakeVendor
      */
     public static function solutionComposer(array $fapost = [], array $root = []): array
     {
+        // The fixture's node type is prefixed with its id; another id means another Solution, which has none of its own.
+        if (array_key_exists('id', $fapost) && !array_key_exists('nodes', $fapost)) {
+            $fapost['nodes'] = null;
+        }
+
         return self::adjust(dirname(__DIR__) . '/Fixtures/Solution/packages/feedback/composer.json', $fapost, $root);
     }
 

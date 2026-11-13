@@ -29,13 +29,20 @@ interface NodeHandlerInterface
 ## Identity
 
 `type()` is the node's unique identifier, such as `send_message`. It must be
-unique across every registered handler, including those from other extensions.
+unique across every registered handler, including those from other extensions:
+a Solution's types start with its id and a dot (`feedback.collect`), which Core's
+never contain.
 `version()` is the handler's current version; the engine resolves a handler by the
 pair `(type, version)` from an in-memory registry, with no database query on the
 hot path.
 
 `label()` and `category()` are what the builder shows: the node's name and the
-group it appears under.
+group it appears under. The group is a value of
+`Fapost\Foundation\Flow\Enums\NodeCategory` or, for a Solution's node, the
+Solution's id — see [Registering node types](/extending/solutions#registering-node-types).
+
+Override `category()`: the default of `AbstractVersionedHandler`, `Core`, is not a palette group, so a handler
+that keeps it fails the boot.
 
 ## Configuration
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\State;
 
+use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\Exceptions\StateNamespaceViolationException;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
 
@@ -16,6 +17,10 @@ use Fapost\Foundation\Flow\Enums\StateNamespace;
  * user-configured variable targets). `module.*` is read-only by contract
  * (DataAccessorInterface) and `contact.*` is a derived projection persisted
  * through ContactWriter — neither may ever appear in {@code stateChanges}.
+ *
+ * A Solution's namespace (named by its id) is writable only by node types the same Solution registered: the
+ * owner of the node type, from the node handler registry, must equal the owner of the namespace. There is no
+ * whitelist to maintain; Core's node types, and other Solutions', are refused.
  */
 final class SystemStateNamespacePolicy
 {
@@ -49,6 +54,12 @@ final class SystemStateNamespacePolicy
         StateNamespace::Call->value,
     ];
 
+    public function __construct(
+        private readonly NodeHandlerRegistryInterface $nodes,
+        private readonly StateNamespaceRegistry $namespaces,
+    ) {
+    }
+
     /**
      * Assert that {@code $nodeType} may write the namespaced state key.
      *
@@ -65,11 +76,18 @@ final class SystemStateNamespacePolicy
         $allowed = match ($namespace) {
             StateNamespace::System->value => in_array($nodeType, self::SYSTEM_WRITERS, true),
             StateNamespace::Rag->value    => in_array($nodeType, self::RAG_WRITERS, true),
-            default                       => false,
+            default                       => $this->isOwnSolutionNamespace($nodeType, $namespace),
         };
 
         if (! $allowed) {
             throw StateNamespaceViolationException::forWrite($nodeType, $key);
         }
+    }
+
+    private function isOwnSolutionNamespace(string $nodeType, string $namespace): bool
+    {
+        $owner = $this->namespaces->ownerOf($namespace);
+
+        return null !== $owner && $owner === $this->nodes->ownerOf($nodeType);
     }
 }

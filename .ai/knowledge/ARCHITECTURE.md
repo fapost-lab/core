@@ -43,7 +43,7 @@ sessions. The platform is extended from outside through public contracts, not by
 
 `app/Infrastructure/<X>` also holds the seams that compose two domains so neither knows the other:
 `app/Infrastructure/Solution` writes a Solution's actions into the Flow registry and answers Flow's
-`ActionAvailabilityInterface` from `ActiveSolutions`; it also checks a connector's channels against its manifest and
+`SolutionAvailabilityInterface` from `ActiveSolutions`; it also checks a connector's channels against its manifest and
 hands them to `Channels\ChannelRegistration`, which writes them into `Channels\ConnectorChannels` and tags their media
 services into Media's registries (the same path Telegram's `BuiltInChannelRegistrar` takes). `Domains/Flow` and
 `Infrastructure/Flow` do not depend on `Domains/Solution`, and `Domains/Channels` and `Domains/Media` depend on

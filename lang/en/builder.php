@@ -186,6 +186,12 @@ return [
             'parameter_key_taken'    => 'This key is already used in the template.',
         ],
 
+        'unavailable' => [
+            'solution_off'     => 'Solution :name is turned off',
+            'solution_missing' => 'Solution :id is not installed',
+            'read_only'        => 'The configuration of this node is kept as it is, but it cannot be edited here.',
+        ],
+
         'template_output' => [
             'name'    => 'Name',
             'label'   => 'Label',

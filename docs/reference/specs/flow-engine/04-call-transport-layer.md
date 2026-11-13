@@ -86,7 +86,7 @@ Registered in `FlowServiceProvider` through `CallTransportRegistry`.
   current scope.
 - An action owned by a Solution the current tenant has not activated returns
   `CallResult::error('solution_inactive')` (metadata `{action_id, solution_id}`) before the handler is
-  built; the check is `ActionAvailabilityInterface`, asked on every call.
+  built; the check is `SolutionAvailabilityInterface`, asked on every call.
 - `ActionHandlerInterface::handle($parameters, $context)` returns the payload, which becomes
   `CallResult::$payload`. Any exception from the action becomes `CallResult::error('action_exception')`;
   an unknown id becomes `action_not_found`; a Solution's action for a tenant without that Solution is

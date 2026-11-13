@@ -19,7 +19,9 @@ published flow keeps reaching the handler version it was built against — see
 [Versioning and compatibility](/extending/flow-nodes/versioning).
 
 **State namespaces.** The meaning of `system.*`, `flow.*`, `rag.*`, and `module.*`
-is fixed, along with who may write each.
+is fixed, along with who may write each. `rag` is deprecated and goes in the next
+major version of `fapost/foundation`. A Solution's own namespace, named by its id,
+is written only by that Solution's node types.
 
 **The console's run-time interface for Solutions.** What a prebuilt Solution bundle
 runs against in the browser — see [Console UI](/extending/console-ui):

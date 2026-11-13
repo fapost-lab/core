@@ -6,6 +6,10 @@ namespace Tests\Feature\Domains\Solution;
 
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Contracts\ActionHandlerFactoryInterface;
+use App\Domains\Flow\Contracts\NodeHandlerFactoryInterface;
+use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
+use App\Domains\Flow\Registry\NodeHandlerRegistry;
+use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Solution\Providers\SolutionServiceProvider;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\InstalledSolutions;
@@ -13,6 +17,7 @@ use App\Domains\Solution\Services\SolutionCache;
 use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionManifestValidator;
 use App\Infrastructure\Flow\ContainerActionHandlerFactory;
+use App\Infrastructure\Flow\ContainerNodeHandlerFactory;
 use ArrayObject;
 use Fapost\Foundation\Solution\Manifest\ManifestParser;
 use Illuminate\Config\Repository;
@@ -120,6 +125,9 @@ final class SolutionRegistrationBootTest extends TestCase
         $app->instance(FeedbackServiceProvider::LOG, $log);
         $app->singleton(ActionHandlerFactoryInterface::class, ContainerActionHandlerFactory::class);
         $app->singleton(ActionHandlerRegistry::class);
+        $app->singleton(NodeHandlerFactoryInterface::class, ContainerNodeHandlerFactory::class);
+        $app->singleton(NodeHandlerRegistryInterface::class, NodeHandlerRegistry::class);
+        $app->singleton(StateNamespaceRegistry::class);
         $app->register(SolutionServiceProvider::class);
 
         return $app;

@@ -12,6 +12,7 @@ use App\Domains\Flow\Handlers\Support\OperatorComparator;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
+use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use Fapost\Support\Builder\Schema\Fields\ObjectArrayField;
 use Fapost\Support\Builder\Schema\Fields\SelectField;
@@ -45,8 +46,9 @@ final class BranchNodeHandler extends AbstractVersionedHandler
     public function __construct(
         DataAccessorRegistryInterface $accessors,
         VariableResolverInterface $variableResolver,
+        StateNamespacesInterface $namespaces,
     ) {
-        $this->operands   = new OperandResolver($accessors, $variableResolver);
+        $this->operands   = new OperandResolver($accessors, $variableResolver, $namespaces);
         $this->comparator = new OperatorComparator();
     }
 

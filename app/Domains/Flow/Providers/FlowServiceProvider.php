@@ -23,7 +23,6 @@ use App\Domains\Flow\Concurrency\LockAcquisitionPolicy;
 use App\Domains\Flow\Concurrency\LockHeartbeat;
 use App\Domains\Flow\Concurrency\SessionLockManager;
 use App\Domains\Flow\Concurrency\SessionLockRegistry;
-use App\Domains\Flow\Contracts\ActionAvailabilityInterface;
 use App\Domains\Flow\Contracts\ActionHandlerFactoryInterface;
 use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
 use App\Domains\Flow\Contracts\AssistantTranslationRepositoryInterface;
@@ -51,6 +50,7 @@ use App\Domains\Flow\Contracts\NodeUsageStatisticsInterface;
 use App\Domains\Flow\Contracts\OperatorRequestTimeoutSchedulerInterface;
 use App\Domains\Flow\Contracts\PersistentButtonRegistryInterface;
 use App\Domains\Flow\Contracts\SendMessageTimeoutSchedulerInterface;
+use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use App\Domains\Flow\Contracts\SystemTranslationCatalogInterface;
 use App\Domains\Flow\Contracts\TenantEventRepositoryInterface;
 use App\Domains\Flow\Contracts\TenantTranslationRepositoryInterface;
@@ -127,6 +127,7 @@ use App\Domains\Flow\Services\Resolvers\ScheduleTriggerResolver;
 use App\Domains\Flow\Services\Resolvers\TriggerResolver;
 use App\Domains\Flow\Services\Resolvers\WebhookTriggerResolver;
 use App\Domains\Flow\Services\TenantTranslationService;
+use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Flow\State\Variables\CacheBackedVariableSchemaRegistry;
 use App\Domains\Flow\State\Variables\VariableCoercer;
 use App\Domains\Flow\State\Variables\VariableResolver;
@@ -160,7 +161,8 @@ use App\Infrastructure\Flow\FlowExecutionGuard;
 use App\Infrastructure\Flow\QueuedDelayResumeScheduler;
 use App\Infrastructure\Flow\QueuedOperatorRequestTimeoutScheduler;
 use App\Infrastructure\Flow\QueuedSendMessageTimeoutScheduler;
-use App\Infrastructure\Solution\ContainerActionAvailability;
+use App\Infrastructure\Solution\ContainerSolutionAvailability;
+use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use Fapost\Foundation\Messaging\MessageSenderInterface as OutboundMessageSenderInterface;
 use Fapost\Foundation\Quota\Contracts\LimitRegistryInterface;
@@ -241,6 +243,7 @@ final class FlowServiceProvider extends ServiceProvider
                 $this->app->make(ExpressionEngineRegistry::class)->freeze();
                 $this->app->make(CallTransportRegistry::class)->freeze();
                 $this->app->make(ActionHandlerRegistry::class)->freeze();
+                $this->app->make(StateNamespaceRegistry::class)->freeze();
                 $this->app->make(RagAdapterRegistry::class)->freeze();
             }
         });
@@ -393,10 +396,13 @@ final class FlowServiceProvider extends ServiceProvider
             return $registry;
         });
         // Action handlers are kept as classes and built per call in the current scope. Whether the action of a
-        // Solution may run for the current tenant is asked through ActionAvailabilityInterface; the answer comes from
+        // Solution may run for the current tenant is asked through SolutionAvailabilityInterface; the answer comes from
         // App\Infrastructure\Solution, the seam that composes Flow with the Solution domain.
         $this->app->singleton(ActionHandlerFactoryInterface::class, ContainerActionHandlerFactory::class);
-        $this->app->singleton(ActionAvailabilityInterface::class, ContainerActionAvailability::class);
+        $this->app->singleton(SolutionAvailabilityInterface::class, ContainerSolutionAvailability::class);
+        // Image-level: the built-in namespaces plus those of Solutions with `state: true`, filled while booting.
+        $this->app->singleton(StateNamespaceRegistry::class);
+        $this->app->singleton(StateNamespacesInterface::class, static fn ($app): StateNamespaceRegistry => $app->make(StateNamespaceRegistry::class));
         $this->app->singleton(ActionHandlerRegistry::class);
         $this->app->singleton(RagAdapterRegistry::class);
         // Egress guard of the call node. The policy is read once into a value object, so the

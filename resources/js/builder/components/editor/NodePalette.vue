@@ -6,6 +6,7 @@ import {useBuilderStore} from '@builder/store/builderStore'
 import {useSelectionStore} from '@builder/store/selectionStore'
 import {nodeColors} from '@builder/utils/nodeColors'
 import {paletteNodeTypes} from '@builder/utils/templateNodes'
+import {groupPaletteTypes} from '@builder/utils/paletteGroups'
 import NodeIcon from '@builder/components/NodeIcon.vue'
 
 const props = defineProps({
@@ -20,8 +21,9 @@ const registryStore  = useRegistryStore()
 const builderStore   = useBuilderStore()
 const selectionStore = useSelectionStore()
 const searchQuery    = ref('')
+const userToggled    = ref(false)
 const paletteRef     = useTemplateRef('paletteRef')
-const openCategories = ref(new Set(['Core']))
+const openCategories = ref(new Set<string>())
 const paletteStyle   = ref<CSSProperties>({
     position: 'fixed',
     top: '0px',
@@ -40,23 +42,23 @@ const filteredNodeTypes = computed(() => {
     return insertableNodeTypes.value.filter((n) => (n.label ?? '').toLowerCase().includes(query))
 })
 
-const grouped = computed((): Record<string, typeof filteredNodeTypes.value> =>
-    filteredNodeTypes.value.reduce((acc: Record<string, typeof filteredNodeTypes.value>, n) => {
-        const cat = n.category ?? 'Core'
-        if (!acc[cat]) acc[cat] = []
-        acc[cat].push(n)
-        return acc
-    }, {}),
-)
+const groups = computed(() => groupPaletteTypes(filteredNodeTypes.value, registryStore.groups))
 
-const categoryNames = computed(() => Object.keys(grouped.value))
+const categoryNames = computed(() => groups.value.map((g) => g.key))
+
+const groupsByKey = computed(() => new Map(groups.value.map((g) => [g.key, g])))
+
+// Nothing opened by hand yet → the first group is open.
+const effectiveOpen = computed(() =>
+    userToggled.value ? openCategories.value : new Set(categoryNames.value.slice(0, 1)),
+)
 
 const visibleCategoryNames = computed(() => {
     if (searchQuery.value.trim()) {
         return categoryNames.value
     }
 
-    return categoryNames.value.filter((categoryName) => openCategories.value.has(categoryName))
+    return categoryNames.value.filter((categoryName) => effectiveOpen.value.has(categoryName))
 })
 
 function insert(type: string, version: number) {
@@ -72,7 +74,7 @@ function isCategoryOpen(categoryName: string) {
         return true
     }
 
-    return openCategories.value.has(categoryName)
+    return effectiveOpen.value.has(categoryName)
 }
 
 function toggleCategory(categoryName: string) {
@@ -80,7 +82,8 @@ function toggleCategory(categoryName: string) {
         return
     }
 
-    const next = new Set(openCategories.value)
+    const next = new Set(effectiveOpen.value)
+    userToggled.value = true
 
     if (next.has(categoryName)) {
         next.delete(categoryName)
@@ -162,13 +165,13 @@ useEventListener(document, 'keydown', (e) => { if (e.key === 'Escape') emit('clo
                         type="button"
                         @click="toggleCategory(category)"
                     >
-                        <span>{{ category }}</span>
+                        <span>{{ groupsByKey.get(category)?.label ?? category }}</span>
                         <span>{{ isCategoryOpen(category) ? '▾' : '▸' }}</span>
                     </button>
 
                     <template v-if="visibleCategoryNames.includes(category)">
                         <button
-                            v-for="nodeType in grouped[category]"
+                            v-for="nodeType in groupsByKey.get(category)?.types"
                             :key="`${nodeType.type}@${nodeType.version}`"
                             class="node-palette-item"
                             @click="insert(nodeType.type, nodeType.version)"

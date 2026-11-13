@@ -7,6 +7,7 @@ namespace Tests\Unit\Domains\Flow\State;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
 use App\Domains\Flow\State\Readers\ScopedStateReader;
+use App\Domains\Flow\State\StateNamespaceRegistry;
 use App\Domains\Flow\Support\ModuleDataAccessorRegistry;
 use Fapost\Foundation\Contracts\DataAccessorInterface;
 use Tests\TestCase;
@@ -24,6 +25,7 @@ final class ScopedStateReaderTest extends TestCase
             ],
             contact: $this->contact(),
             accessors: $this->emptyRegistry(),
+            namespaces: new StateNamespaceRegistry(),
         );
 
         $this->assertSame(3, $reader->read('flow.attempts'));
@@ -43,6 +45,7 @@ final class ScopedStateReaderTest extends TestCase
             sessionState: [],
             contact: $contact,
             accessors: $this->emptyRegistry(),
+            namespaces: new StateNamespaceRegistry(),
         );
 
         $this->assertSame('es', $reader->read('contact.language'));
@@ -58,6 +61,7 @@ final class ScopedStateReaderTest extends TestCase
             sessionState: [],
             contact: $contact,
             accessors: $this->emptyRegistry(),
+            namespaces: new StateNamespaceRegistry(),
         );
 
         // Must come from the canonical column, not the attributes JSONB.
@@ -76,6 +80,7 @@ final class ScopedStateReaderTest extends TestCase
             sessionState: [],
             contact: $contact,
             accessors: $this->emptyRegistry(),
+            namespaces: new StateNamespaceRegistry(),
         );
 
         $this->assertSame('Иван', $reader->read('contact.first_name'));
@@ -94,7 +99,7 @@ final class ScopedStateReaderTest extends TestCase
             'phone'      => '+380501112233',
         ];
 
-        $reader = new ScopedStateReader([], $contact, $this->emptyRegistry());
+        $reader = new ScopedStateReader([], $contact, $this->emptyRegistry(), new StateNamespaceRegistry());
 
         $this->assertSame('Ivan Petrov', $reader->read('contact.name'));
         $this->assertSame('ivan_p', $reader->read('contact.username'));
@@ -107,7 +112,7 @@ final class ScopedStateReaderTest extends TestCase
         $contact       = $this->contact();
         $contact->meta = ['first_name' => 'Ivan', 'phone_number' => '+1'];
 
-        $reader = new ScopedStateReader([], $contact, $this->emptyRegistry());
+        $reader = new ScopedStateReader([], $contact, $this->emptyRegistry(), new StateNamespaceRegistry());
 
         $this->assertSame('Ivan', $reader->read('contact.name'));
         $this->assertSame('+1', $reader->read('contact.phone'));
@@ -119,7 +124,7 @@ final class ScopedStateReaderTest extends TestCase
         $contact->meta       = ['first_name' => 'Ivan', 'username' => 'ivan_p'];
         $contact->attributes = ['name' => 'Vanya', 'username' => 'custom'];
 
-        $reader = new ScopedStateReader([], $contact, $this->emptyRegistry());
+        $reader = new ScopedStateReader([], $contact, $this->emptyRegistry(), new StateNamespaceRegistry());
 
         $this->assertSame('Vanya', $reader->read('contact.name'));
         $this->assertSame('custom', $reader->read('contact.username'));
@@ -130,12 +135,25 @@ final class ScopedStateReaderTest extends TestCase
         $contact       = $this->contact();
         $contact->meta = ['first_name' => 'Ivan'];
 
-        $reader = new ScopedStateReader([], $contact, $this->emptyRegistry());
+        $reader = new ScopedStateReader([], $contact, $this->emptyRegistry(), new StateNamespaceRegistry());
 
         $this->assertNull($reader->read('contact.username'));
         $this->assertNull($reader->read('contact.phone'));
         $this->assertNull($reader->read('contact.channel'));
         $this->assertNull($reader->read('contact.name.first'));
+    }
+
+    public function test_reads_the_state_namespace_of_a_solution_only_once_it_is_registered(): void
+    {
+        $namespaces = new StateNamespaceRegistry();
+        $namespaces->registerSolutionNamespace('feedback');
+        $state = ['feedback' => ['last_score' => 4], 'other' => ['x' => 1]];
+
+        $reader = new ScopedStateReader($state, $this->contact(), $this->emptyRegistry(), $namespaces);
+
+        $this->assertSame(4, $reader->read('feedback.last_score'));
+        $this->assertSame(['last_score' => 4], $reader->read('feedback'));
+        $this->assertNull($reader->read('other.x'), 'A namespace nobody registered stays unreadable.');
     }
 
     public function test_returns_null_for_unknown_paths(): void
@@ -144,6 +162,7 @@ final class ScopedStateReaderTest extends TestCase
             sessionState: [],
             contact: $this->contact(),
             accessors: $this->emptyRegistry(),
+            namespaces: new StateNamespaceRegistry(),
         );
 
         $this->assertNull($reader->read('flow.unknown'));
@@ -183,6 +202,7 @@ final class ScopedStateReaderTest extends TestCase
             sessionState: [],
             contact: $this->contact(),
             accessors: $registry,
+            namespaces: new StateNamespaceRegistry(),
         );
 
         $this->assertSame('department-department', $reader->read('module.hr.department'));
@@ -219,6 +239,7 @@ final class ScopedStateReaderTest extends TestCase
             sessionState: [],
             contact: $this->contact(),
             accessors: $registry,
+            namespaces: new StateNamespaceRegistry(),
         );
 
         $this->assertSame('logistics', $reader->read('module.hr.department'));

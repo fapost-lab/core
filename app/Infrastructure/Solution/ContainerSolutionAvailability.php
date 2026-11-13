@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Infrastructure\Solution;
 
-use App\Domains\Flow\Contracts\ActionAvailabilityInterface;
+use App\Domains\Flow\Contracts\SolutionAvailabilityInterface;
 use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Illuminate\Contracts\Container\Container;
@@ -14,7 +14,7 @@ use Illuminate\Contracts\Container\Container;
  * {@see ActiveSolutions} and the tenant context are scoped, so they are resolved on every question
  * and a deactivation reaches the next job of any worker.
  */
-final readonly class ContainerActionAvailability implements ActionAvailabilityInterface
+final readonly class ContainerSolutionAvailability implements SolutionAvailabilityInterface
 {
     public function __construct(
         private Container $container,

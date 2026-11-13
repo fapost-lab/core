@@ -119,6 +119,17 @@ export function useConditionSources() {
             })
         }
 
+        // State namespaces of active Solutions: free-path sources, no field list (their keys are not declared).
+        for (const v of allVars.value) {
+            if (v.source.kind !== 'solution') continue
+            result.push({
+                id:     v.source.namespace,
+                label:  `${v.source.namespace} state`,
+                icon:   '🧩',
+                fields: [],
+            })
+        }
+
         return result
     })
 

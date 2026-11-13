@@ -54,6 +54,23 @@ final class SolutionCacheTest extends TestCase
         $this->assertSame('feedback', $solutions[0]->id);
         $this->assertSame(['feedback.submit', 'feedback.score'], $solutions[0]->actions);
         $this->assertSame('1.0.0', $solutions[0]->version);
+        $this->assertSame(['feedback.collect'], $solutions[0]->nodes);
+        $this->assertTrue($solutions[0]->state);
+    }
+
+    public function test_a_cache_written_before_node_types_and_state_existed_is_ignored_not_read_as_empty(): void
+    {
+        $this->cache->write($this->discoverer->discover());
+
+        $data = require $this->cache->path();
+        foreach ($data['solutions'] as &$solution) {
+            unset($solution['nodes'], $solution['state']);
+        }
+        unset($solution);
+        file_put_contents($this->cache->path(), '<?php return ' . var_export($data, true) . ";\n");
+        opcache_invalidate($this->cache->path(), true);
+
+        $this->assertNull($this->cache->read());
     }
 
     public function test_connectors_are_written_and_read_back_beside_the_solutions(): void

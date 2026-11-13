@@ -17,11 +17,15 @@ The canonical list is the `StateNamespace` enum in
 | `module` | Canonical data owned by a module | **Nobody** — read-only, resolved lazily through a data accessor |
 | `contact` | The contact profile | A derived projection, not stored in the session |
 | `call` | Values from HTTP call nodes | Any handler; stored in the session state |
+| `<solution id>` | What a Solution's nodes keep | Only that Solution's node types |
+
+`rag` is deprecated and goes in the next major version of `fapost/foundation`.
 
 <Note>
-  New top-level namespaces are added to the enum, never invented per node. A
-  Solution or Plugin consumes the enum to declare allowed namespaces in schema
-  fields and to resolve paths.
+  Built-in namespaces are added to the enum, never invented per node. A Solution
+  that declares `"state": true` in its manifest owns one more, named by its id —
+  see [Your state namespace](/extending/solutions#your-state-namespace). The full
+  list at run time is `StateNamespacesInterface`.
 </Note>
 
 Handlers write through `stateChanges` on their result:

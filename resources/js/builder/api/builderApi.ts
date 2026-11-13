@@ -1,4 +1,4 @@
-import type {BuilderTriggerPayload, FlowDefinition, NodeTypePayload, ValidationResult,} from '@builder/dto/types'
+import type {BuilderTriggerPayload, FlowDefinition, NodeGroup, NodeTypePayload, StateNamespaceEntry, ValidationResult,} from '@builder/dto/types'
 import {xsrfHeaders} from '@shared/http'
 
 const BASE = '/builder'
@@ -36,8 +36,14 @@ async function request<T>(method: string, url: string, body: unknown = null): Pr
     return res.json() as Promise<T>
 }
 
-export const fetchNodeTypes = (): Promise<NodeTypePayload[]> =>
-    request<{ data: NodeTypePayload[] }>('GET', '/node-types').then((r) => r.data)
+export interface NodeTypesResponse {
+    data: NodeTypePayload[]
+    groups?: NodeGroup[]
+    state_namespaces?: StateNamespaceEntry[]
+}
+
+export const fetchNodeTypes = (): Promise<NodeTypesResponse> =>
+    request<NodeTypesResponse>('GET', '/node-types')
 
 /** Distinct contact tags already used in this tenant — powers set_tag autocomplete. */
 export const fetchKnownTags = (): Promise<string[]> =>
