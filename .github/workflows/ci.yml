@@ -4,6 +4,15 @@
 # checked once more on the exact commit a release tag would point at. The parts
 # of the repository (PHP application, Go gateway, Vue builder, container images)
 # have nothing in common at build time, so they are separate jobs and run at once.
+#
+# A pull request runs only the parts it touches (the `changes` job decides; a
+# change to this workflow, a shared manifest or a push to main runs everything).
+# The checks branch protection requires (PHP, Gateway, Frontend) are never
+# skipped as whole jobs: GitHub reports a job skipped by a job-level `if:` under
+# its unexpanded name for a matrix, which would leave `PHP (pgsql)` waiting
+# forever, and `paths-ignore` would leave all of them waiting. Those jobs always
+# start and pass in seconds, and their steps are skipped instead. Jobs that are
+# not required checks and have no matrix (Solution, Images) are skipped whole.
 
 name: CI
 
@@ -25,8 +34,98 @@ env:
   NODE_VERSION: "26"
 
 jobs:
+  # Decides which parts of the repository this change touches. Every other job
+  # reads its answer. See the header for why the required checks are not
+  # skipped as whole jobs.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    outputs:
+      php: ${{ steps.detect.outputs.php }}
+      solution: ${{ steps.detect.outputs.solution }}
+      gateway: ${{ steps.detect.outputs.gateway }}
+      frontend: ${{ steps.detect.outputs.frontend }}
+      images: ${{ steps.detect.outputs.images }}
+
+    steps:
+      # On a pull request the checked-out commit is the merge of the head into
+      # the current base, so its first parent is the base the change is
+      # measured against. Depth 2 is enough for that.
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Detect the touched parts
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -u
+          php=true solution=true gateway=true frontend=true images=true
+
+          emit() {
+            {
+              echo "php=$php"
+              echo "solution=$solution"
+              echo "gateway=$gateway"
+              echo "frontend=$frontend"
+              echo "images=$images"
+            } >> "$GITHUB_OUTPUT"
+            echo "php=$php solution=$solution gateway=$gateway frontend=$frontend images=$images"
+          }
+
+          # A push to main checks the commit a release tag would point at:
+          # always everything.
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            echo "Not a pull request: running everything."
+            emit
+            exit 0
+          fi
+
+          # Any trouble reading the diff means running everything.
+          if ! files=$(git diff --name-only HEAD^1 HEAD); then
+            echo "Could not read the diff: running everything."
+            emit
+            exit 0
+          fi
+          echo "Changed files:"
+          echo "$files"
+
+          php=false solution=false gateway=false frontend=false images=false
+
+          while IFS= read -r file; do
+            [ -n "$file" ] || continue
+            case "$file" in
+              # Documents only: nothing in the code, the tests or the images
+              # reads them (a root-level *.md is a document, a fixture under
+              # tests/ is not, hence no wider *.md pattern).
+              .ai/*|docs/*|*.mdx|LICENSE) ;;
+              */*.md) php=true solution=true gateway=true frontend=true images=true ;;
+              *.md) ;;
+              # Shared: a change here can alter any part.
+              .github/workflows/*|composer.json|composer.lock|package.json|package-lock.json|gateway/go.mod|gateway/go.sum|docker/*|Makefile|*/Makefile|phpunit.xml|phpstan.neon|pint.json|.env.example|.dockerignore)
+                php=true solution=true gateway=true frontend=true images=true ;;
+              gateway/*)
+                # PHP tests read the gateway sources (GatewayArtifacts), and the
+                # image copies the whole tree.
+                php=true solution=true gateway=true images=true ;;
+              resources/*|public/*|vite.config.ts|vitest.config.ts|tsconfig.json|tsconfig.*.json|tools/dev-link-npm.mjs)
+                # PHP tests read resources/js (the Solution import map), the
+                # image builds the assets.
+                php=true solution=true frontend=true images=true ;;
+              # Anything else (app, database, tests, config, routes, lang,
+              # contracts, testing, tools, deploy...): when unsure, run what
+              # builds from PHP and the whole image. The Go gateway and the Vue
+              # builder do not depend on it.
+              *) php=true solution=true images=true ;;
+            esac
+          done <<< "$files"
+
+          emit
+
   php:
     name: PHP (${{ matrix.database }})
+    needs: changes
     runs-on: ubuntu-latest
 
     strategy:
@@ -73,8 +172,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        if: needs.changes.outputs.php == 'true'
 
       - uses: shivammathur/setup-php@v2
+        if: needs.changes.outputs.php == 'true'
         with:
           php-version: ${{ env.PHP_VERSION }}
           # The same set the production image installs (docker/Dockerfile),
@@ -85,6 +186,7 @@ jobs:
           fail-fast: true
 
       - name: Cache Composer packages
+        if: needs.changes.outputs.php == 'true'
         uses: actions/cache@v6
         with:
           path: ~/.composer/cache
@@ -92,6 +194,7 @@ jobs:
           restore-keys: composer-${{ runner.os }}-
 
       - name: Install dependencies
+        if: needs.changes.outputs.php == 'true'
         # fapost/foundation and fapost/support are public, but they are `vcs`
         # repositories: Composer reads them through the GitHub API and their
         # zipballs come from api.github.com. Unauthenticated that is 60 calls
@@ -103,11 +206,13 @@ jobs:
         run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Prepare environment
+        if: needs.changes.outputs.php == 'true'
         run: |
           cp .env.example .env
           php artisan key:generate --ansi
 
       - name: Code style
+        if: needs.changes.outputs.php == 'true'
         # --test reports without changing anything; a style problem fails the
         # job so it is fixed in the branch, not silently on main.
         run: vendor/bin/pint --test
@@ -116,12 +221,13 @@ jobs:
         # The landlord connection gets a database of its own, as the local
         # PostgreSQL setup in docs/site/contributing/testing.mdx has it. The
         # service only creates POSTGRES_DB; psql ships on the runner image.
-        if: matrix.database == 'pgsql'
+        if: needs.changes.outputs.php == 'true' && matrix.database == 'pgsql'
         run: psql -h 127.0.0.1 -U fapost -d fapost_test -c 'CREATE DATABASE fapost_landlord_test'
         env:
           PGPASSWORD: secret
 
       - name: Tests
+        if: needs.changes.outputs.php == 'true'
         env:
           # phpunit.xml sets these for SQLite; a variable that already exists
           # in the environment wins, which is how the pgsql leg switches over.
@@ -143,7 +249,7 @@ jobs:
 
       - name: Architecture rules
         # Static analysis; the database it runs against is irrelevant.
-        if: matrix.database == 'sqlite'
+        if: needs.changes.outputs.php == 'true' && matrix.database == 'sqlite'
         run: composer run test:arch
 
   # A real external Solution, installed into this change's Core the way an
@@ -158,6 +264,8 @@ jobs:
   # exists, a generated package replaces or joins this one.
   solution:
     name: Solution (hello-world)
+    needs: changes
+    if: needs.changes.outputs.solution == 'true'
     runs-on: ubuntu-latest
 
     env:
@@ -239,6 +347,7 @@ jobs:
 
   gateway:
     name: Gateway
+    needs: changes
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -246,36 +355,49 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        if: needs.changes.outputs.gateway == 'true'
 
       - uses: actions/setup-go@v7
+        if: needs.changes.outputs.gateway == 'true'
         with:
           go-version-file: gateway/go.mod
           cache-dependency-path: gateway/go.sum
 
       - run: go vet ./...
+        if: needs.changes.outputs.gateway == 'true'
       - run: go test ./...
+        if: needs.changes.outputs.gateway == 'true'
 
   frontend:
     name: Frontend
+    needs: changes
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v7
+        if: needs.changes.outputs.frontend == 'true'
 
       - uses: actions/setup-node@v7
+        if: needs.changes.outputs.frontend == 'true'
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
       - run: npm ci
+        if: needs.changes.outputs.frontend == 'true'
       - run: npm run type-check
+        if: needs.changes.outputs.frontend == 'true'
       - run: npm test
+        if: needs.changes.outputs.frontend == 'true'
       # The production image runs this same build; a change that breaks it
       # should fail here rather than at release time.
       - run: npm run build
+        if: needs.changes.outputs.frontend == 'true'
 
   images:
     name: Images
+    needs: changes
+    if: needs.changes.outputs.images == 'true'
     runs-on: ubuntu-latest
 
     steps:
