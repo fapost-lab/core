@@ -42,6 +42,16 @@ return [
         'publish_template_cancel'  => 'Cancel',
     ],
 
+    'palette_groups' => [
+        'Conversation' => 'Conversation',
+        'Logic'        => 'Logic',
+        'Data'         => 'Data',
+        'Contact'      => 'Contact',
+        'Integration'  => 'Integration',
+        'AI'           => 'AI',
+        'Annotation'   => 'Annotation',
+    ],
+
     'nodes' => [
         'branch' => [
             'branches'         => 'Branches',

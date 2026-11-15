@@ -42,6 +42,16 @@ return [
         'publish_template_cancel'  => 'Скасувати',
     ],
 
+    'palette_groups' => [
+        'Conversation' => 'Діалог',
+        'Logic'        => 'Логіка',
+        'Data'         => 'Дані',
+        'Contact'      => 'Контакт',
+        'Integration'  => 'Інтеграції',
+        'AI'           => 'ШІ',
+        'Annotation'   => 'Нотатки',
+    ],
+
     'nodes' => [
         'branch' => [
             'branches'         => 'Гілки',

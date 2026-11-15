@@ -42,6 +42,16 @@ return [
         'publish_template_cancel'  => 'Отмена',
     ],
 
+    'palette_groups' => [
+        'Conversation' => 'Диалог',
+        'Logic'        => 'Логика',
+        'Data'         => 'Данные',
+        'Contact'      => 'Контакт',
+        'Integration'  => 'Интеграции',
+        'AI'           => 'ИИ',
+        'Annotation'   => 'Заметки',
+    ],
+
     'nodes' => [
         'branch' => [
             'branches'         => 'Ветки',

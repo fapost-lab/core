@@ -14,6 +14,7 @@ use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 use Fapost\Foundation\Flow\Enums\NodeCategory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Lang;
 
 final class NodeTypesController extends Controller
 {
@@ -52,7 +53,7 @@ final class NodeTypesController extends Controller
             $isOwnGroup = null !== $owner && $category === $owner;
             $group      = [
                 'key'   => $category,
-                'label' => $isOwnGroup ? $solution['name'] : $category,
+                'label' => $isOwnGroup ? $solution['name'] : $this->coreGroupLabel($category),
                 'owner' => $isOwnGroup ? $owner : null,
             ];
             $available = null === $owner || $availability->isAvailable($owner);
@@ -75,8 +76,12 @@ final class NodeTypesController extends Controller
 
         // Annotation nodes (e.g. comment) have no handler — surface them in
         // the palette manually so the builder can drop them on the canvas.
-        $annotation = ['key' => self::ANNOTATION_GROUP, 'label' => self::ANNOTATION_GROUP, 'owner' => null];
-        $entries[]  = [
+        $annotation = [
+            'key'   => self::ANNOTATION_GROUP,
+            'label' => $this->coreGroupLabel(self::ANNOTATION_GROUP),
+            'owner' => null,
+        ];
+        $entries[] = [
             'type'          => AnnotationNodeTypes::COMMENT,
             'version'       => 1,
             'label'         => 'Comment',
@@ -95,6 +100,17 @@ final class NodeTypesController extends Controller
             // State namespaces of the Solutions active for the tenant, offered by the pickers as free-path sources.
             'state_namespaces' => $this->solutionStateNamespaces($stateNamespaces, $availability),
         ]);
+    }
+
+    /**
+     * A Core group's label in the admin UI language; the key stays the contract. A key without a translation
+     * (a category Core does not know) is shown as is. A Solution's own group keeps the name from its manifest.
+     */
+    private function coreGroupLabel(string $key): string
+    {
+        $line = 'builder.palette_groups.' . $key;
+
+        return Lang::has($line) ? (string) trans($line) : $key;
     }
 
     /**
