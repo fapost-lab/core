@@ -56,13 +56,19 @@ broken.
   Review only.
 - **A new schema field type needs a `FIELD_COMPONENTS` entry** (`components/editor/config/fieldComponents.ts`). An unknown type silently renders
   as a text field. Review only. *(proposed)*
-- **Extensions ship no builder Vue components.** Solutions add no node types: their action
-  handlers are configured in the `call` node through schema, and their UI goes to the console as
-  a prebuilt bundle. Source: `adr-20261014-solution-console-ui`. The build-time vendor glob of
+- **Extensions ship no builder Vue components.** A Solution's node types and its action handlers
+  are configured through `configSchema()` (the node's form, the `call` node's parameters), and its
+  UI goes to the console as a prebuilt bundle. Sources: `adr-20261014-solution-console-ui`,
+  `adr-20261113-solution-node-types-and-state-namespace`. The build-time vendor glob of
   ADR-06 (`vendorComponents.ts`) was removed; do not bring back a per-extension hook in
   `ConfigPanel.vue` or `FlowNodeCard.vue`. Review only.
 - **A button or select `value` is language-agnostic; only its label is translated.** Source:
   `conventions/multilingual.md`. Review only.
+- **A palette group's key is the contract; only its label is translated.** `/builder/node-types`
+  labels a Core group (a `NodeCategory` case, or `Annotation`) with `builder.palette_groups.<key>`
+  in the admin UI language and a Solution's own group with its manifest `name`. A new
+  `NodeCategory` case needs that line in every `lang/*/builder.php`; without it the key is shown.
+  Enforced in part: `NodeTypesTenantTest`.
 - **Storage-choice controls (`StorageRadio.vue`) use the Profile/Temporary vocabulary, never
   session, contact or namespace terms** — the intent of the archived builder storage spec. Review
   only. *(proposed)*

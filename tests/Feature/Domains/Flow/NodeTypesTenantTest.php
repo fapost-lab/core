@@ -120,6 +120,24 @@ final class NodeTypesTenantTest extends FeatureTestCase
         $this->assertSame(['key' => 'Logic', 'label' => 'Logic', 'owner' => null], $groups[1]);
     }
 
+    public function test_core_group_labels_follow_the_admin_language_and_keys_stay_the_same(): void
+    {
+        $groups = $this->actingAs($this->staffUser())
+            ->withSession(['locale' => 'ru'])
+            ->getJson('/builder/node-types')
+            ->assertOk()
+            ->json('groups');
+
+        $this->assertSame(
+            ['Conversation', 'Logic', 'Data', 'Contact', 'Integration', 'AI', 'feedback', 'Annotation'],
+            array_column($groups, 'key'),
+        );
+        $this->assertSame('Диалог', $groups[0]['label']);
+        $this->assertSame('Логика', $groups[1]['label']);
+        $this->assertSame('Заметки', $groups[7]['label']);
+        $this->assertSame('Feedback', $groups[6]['label'], 'A Solution group keeps the name from its manifest.');
+    }
+
     /**
      * @param  list<array<string, mixed>>  $data
      *
