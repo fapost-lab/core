@@ -99,6 +99,16 @@ A pull request is merged only when all of them are green. The push-to-`main` run
 exists so that the commit a release tag points at has been checked as merged,
 not only as proposed.
 
+A pull request runs only the parts it changes. A light `Changes` job reads the
+pull request's diff: a change that touches only documents (`.ai/`, `docs/`,
+`.mdx`, root-level Markdown) skips the work of every job; a change to `gateway/`
+skips the front end, a change to `resources/` skips the gateway, and anything
+else in the application skips both. A change to a workflow, a dependency manifest
+or lockfile, `docker/` or a Makefile runs everything, and so does every push to
+`main`. The required checks (PHP, Gateway, Frontend) still start on every pull
+request and pass with their steps skipped: a job skipped as a whole would never
+report under its required name, and the pull request could not be merged.
+
 <Warning>
   The PostgreSQL leg is the only place schema-per-tenant switching, partitioned
   tables and `uuid` columns are exercised for real; SQLite approximates them.
