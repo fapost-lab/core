@@ -147,6 +147,16 @@ final class NodeHandlerRegistryTest extends TestCase
         $registry->register(WeirdCategoryNodeHandler::class);
     }
 
+    public function test_the_foundation_default_category_is_named_in_the_error(): void
+    {
+        $registry = $this->makeRegistry();
+
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('returns category "Core" from category(); it must be a NodeCategory value. "Core" is the deprecated default');
+
+        $registry->register(DefaultCategoryNodeHandler::class);
+    }
+
     public function test_a_core_handler_may_not_use_a_solution_id_as_category(): void
     {
         $registry = $this->makeRegistry();
@@ -360,6 +370,21 @@ final class CoreInAcmeGroupNodeHandler extends \Fapost\Foundation\Flow\Handlers\
     public function category(): string
     {
         return 'acme';
+    }
+
+    public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
+    {
+        return NodeExecutionResult::executed();
+    }
+}
+
+final class DefaultCategoryNodeHandler extends \Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler
+{
+    final public const string TYPE = 'default_category';
+
+    public function version(): int
+    {
+        return 1;
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
