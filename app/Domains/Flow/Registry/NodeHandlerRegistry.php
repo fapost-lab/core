@@ -146,7 +146,11 @@ final class NodeHandlerRegistry implements NodeHandlerRegistryInterface
             ? 'a NodeCategory value'
             : "a NodeCategory value or the Solution id \"{$owner}\"";
 
-        throw new LogicException("Handler \"{$type}\" returns category \"{$category}\" from category(); it must be {$allowed}.");
+        $hint = 'Core' === $category
+            ? ' "Core" is the deprecated default of Foundation\'s AbstractVersionedHandler, not a palette group: override category() in the handler.'
+            : '';
+
+        throw new LogicException("Handler \"{$type}\" returns category \"{$category}\" from category(); it must be {$allowed}.{$hint}");
     }
 
     private function key(string $type, int $version): string

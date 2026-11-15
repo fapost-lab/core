@@ -103,8 +103,10 @@ final class SendMessageNodeHandler extends AbstractVersionedHandler
 }
 ```
 
-The base class defaults `label()` to a humanised form of the type and `category()`
-to `Core`; override either to place a node elsewhere in the builder's palette.
+The base class defaults `label()` to a humanised form of the type. Always override
+`category()` and return a `NodeCategory` value (or, for a Solution, its id): the
+base class still returns `Core`, which is not a palette group and fails the boot.
+That default is deprecated and becomes abstract in Foundation 1.0.
 
 See [Handler contract](/extending/flow-nodes/handler-contract) for the full
 interface and [Versioning](/extending/flow-nodes/versioning) for when the version
