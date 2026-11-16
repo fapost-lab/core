@@ -18,8 +18,15 @@ use RuntimeException;
  */
 final class PackageAutoloader
 {
+    /** @var array<string, true> package roots already registered in this process */
+    private static array $registered = [];
+
     public static function register(string $packageRoot): void
     {
+        if (isset(self::$registered[$packageRoot])) {
+            return;
+        }
+
         $composerFile = mb_rtrim($packageRoot, '/') . '/composer.json';
 
         if (! is_file($composerFile)) {
@@ -39,6 +46,8 @@ final class PackageAutoloader
 
         // Longest prefix first, so `Vendor\Pkg\Tests\` is tried before `Vendor\Pkg\`.
         uksort($map, static fn (string $a, string $b): int => mb_strlen($b) <=> mb_strlen($a));
+
+        self::$registered[$packageRoot] = true;
 
         spl_autoload_register(static function (string $class) use ($map): void {
             foreach ($map as $prefix => $directories) {

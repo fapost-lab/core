@@ -169,6 +169,8 @@ directory, so publishing your bundle never touches Core's `public/`.
 | `assertSolutionPage($response, string $component, ?Closure $props = null)` | Asserts the response is your Solution's page, `"<id>::<Page>"`, and hands the page to `$props` for assertions on its props |
 | `callAction(string $action, array $parameters = [], string $tenant = 'main')` | Runs your action the way a `call` node's test call does, inside the tenant, and returns an `ActionCallResult` |
 | `assertActionRegistered(string $action, string $handlerClass)` | Asserts Core registered the action, owned by your Solution, with your handler class |
+| `assertSolutionJobQueued(string $jobClass, ?Closure $callback = null)` | Asserts a [background job](/extending/solutions#background-jobs) of that class was queued through `SolutionQueueInterface`; the callback receives each queued job and returns whether it matches |
+| `runQueuedSolutionJobs()` | Runs the queued Solution jobs through Core's gate, each in the tenant that queued it, as the worker would (a job put back for later is run on the next call), and returns how many went through. A job queued with `dispatch()` instead of `SolutionQueueInterface` fails at once. If your test calls `Bus::fake()` itself, queued jobs are still found, but that check is lost |
 
 Each method that changes what a tenant can see also clears what Core remembers within one request,
 so the next request in the test sees the change, as a real one would.

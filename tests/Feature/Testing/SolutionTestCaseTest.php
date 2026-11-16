@@ -4,16 +4,29 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Testing;
 
+use Acme\Feedback\RecordFeedbackJob;
 use App\Domains\Solution\Providers\SolutionServiceProvider;
 use App\Domains\Solution\Services\InstalledSolutions;
+use App\Domains\Tenancy\Contracts\TenantInterface;
+use App\Domains\Tenancy\Contracts\TenantRepositoryInterface;
+use App\Domains\Tenancy\Services\TenantSwitcher;
+use ArrayObject;
+use Fapost\Foundation\Solution\Queue\SolutionQueueInterface;
 use Fapost\Testing\ActionCallResult;
 use Fapost\Testing\PackageAutoloader;
 use Fapost\Testing\SolutionTestCase;
+use Illuminate\Contracts\Bus\Dispatcher;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Bus;
+use LogicException;
 use PHPUnit\Framework\AssertionFailedError;
 use RuntimeException;
 use Tests\Fixtures\Solutions\Showcase\ShowcasePingAction;
+use Tests\Support\FakeVendor;
+use Tests\Support\ForeignSolutionJob;
+use Tests\Support\InstallsFeedbackSolution;
 use Tests\Support\InstallsShowcaseSolution;
+use Throwable;
 
 /**
  * The Solution testing kit proven against a fixture Solution that has both an action and a console page: a copy of the
@@ -23,6 +36,7 @@ use Tests\Support\InstallsShowcaseSolution;
  */
 final class SolutionTestCaseTest extends SolutionTestCase
 {
+    use InstallsFeedbackSolution;
     use InstallsShowcaseSolution;
 
     /** @var list<string> */
@@ -32,7 +46,11 @@ final class SolutionTestCaseTest extends SolutionTestCase
     {
         parent::setUp();
 
-        $this->installShowcase(publish: false, package: $this->packageWithAction());
+        $this->installShowcase(
+            publish: false,
+            package: $this->packageWithAction(),
+            prepareVendor: static fn (FakeVendor $vendor) => self::linkFeedback($vendor),
+        );
 
         // What Core does at startup: give the provider its registrar, which registers the action handler.
         (new SolutionServiceProvider($this->app))->registerExtensions($this->app->make(InstalledSolutions::class)->all());
@@ -133,6 +151,124 @@ final class SolutionTestCaseTest extends SolutionTestCase
         }
     }
 
+    public function test_a_queued_solution_job_is_asserted_and_then_run_in_its_tenant_through_core_s_middleware(): void
+    {
+        $tenant = $this->mainTenant();
+        $this->createFeedbackJobLog($tenant);
+        $this->activateSolution('feedback');
+
+        $this->queueFeedbackJob($tenant, 'first');
+        $this->queueFeedbackJob($tenant, 'second');
+
+        $this->assertSolutionJobQueued(RecordFeedbackJob::class);
+        $this->assertSolutionJobQueued(
+            RecordFeedbackJob::class,
+            static fn (RecordFeedbackJob $job): bool => 'second' === $job->title && 'solution-jobs.feedback' === $job->queue && $job->tenantId === $tenant->getId(),
+        );
+        $this->assertSame([], $this->feedbackJobLog($tenant), 'Nothing runs before the test says so.');
+
+        $this->assertSame(2, $this->runQueuedSolutionJobs());
+        $this->assertSame(['first', 'second'], $this->feedbackJobLog($tenant));
+
+        $this->assertSame(0, $this->runQueuedSolutionJobs(), 'A job is run once.');
+        $this->assertSame(['first', 'second'], $this->feedbackJobLog($tenant));
+
+        $this->queueFeedbackJob($tenant, 'third');
+        $this->assertSame(1, $this->runQueuedSolutionJobs());
+        $this->assertSame(['first', 'second', 'third'], $this->feedbackJobLog($tenant));
+    }
+
+    public function test_a_queued_job_of_a_solution_that_is_not_active_is_dropped_by_the_middleware_when_run(): void
+    {
+        $tenant = $this->mainTenant();
+        $this->createFeedbackJobLog($tenant);
+
+        $this->queueFeedbackJob($tenant, 'unwanted');
+
+        $this->assertSame(1, $this->runQueuedSolutionJobs());
+        $this->assertSame([], $this->feedbackJobLog($tenant));
+    }
+
+    public function test_the_queue_assertion_fails_for_a_job_that_was_not_queued_or_does_not_match(): void
+    {
+        $tenant = $this->mainTenant();
+
+        foreach ([
+            fn () => $this->assertSolutionJobQueued(RecordFeedbackJob::class),
+            function () use ($tenant): void {
+                $this->queueFeedbackJob($tenant, 'one');
+                $this->assertSolutionJobQueued(RecordFeedbackJob::class, static fn (RecordFeedbackJob $job): bool => 'other' === $job->title);
+            },
+            fn () => $this->assertSolutionJobQueued(ForeignSolutionJob::class),
+        ] as $check) {
+            try {
+                $check();
+                $this->fail('The assertion should have failed.');
+            } catch (AssertionFailedError $e) {
+                $this->assertStringNotContainsString('should have failed', $e->getMessage());
+            }
+        }
+    }
+
+    public function test_a_solution_job_dispatched_around_the_solution_queue_fails_at_the_dispatch(): void
+    {
+        $this->expectException(LogicException::class);
+        $this->expectExceptionMessage('queued without a tenant');
+
+        $this->app->make(Dispatcher::class)->dispatch(new RecordFeedbackJob('around'));
+    }
+
+    public function test_the_queued_job_is_a_serialized_and_restored_copy_and_one_that_cannot_be_serialized_fails(): void
+    {
+        $tenant   = $this->mainTenant();
+        $original = new RecordFeedbackJob('copy');
+        $this->app->make(TenantSwitcher::class)->runForTenant($tenant, fn () => $this->app->make(SolutionQueueInterface::class)->dispatch($original));
+
+        $this->assertSolutionJobQueued(RecordFeedbackJob::class, static fn (RecordFeedbackJob $job): bool => $job !== $original && 'copy' === $job->title);
+
+        // Handed to the bus with a closure inside, as the dispatcher would have refused: a worker could not read it.
+        $broken = new RecordFeedbackJob('broken', static fn (): int => 1);
+        $broken->forTenant($tenant->getId());
+
+        $this->expectException(Throwable::class);
+        $this->expectExceptionMessage('Closure');
+
+        $this->app->make(Dispatcher::class)->dispatch($broken);
+    }
+
+    public function test_jobs_are_found_whatever_the_test_fakes_on_the_bus(): void
+    {
+        $tenant = $this->mainTenant();
+
+        Bus::fake([ForeignSolutionJob::class]);
+        $this->queueFeedbackJob($tenant, 'beside another fake');
+        $this->assertSolutionJobQueued(RecordFeedbackJob::class, static fn (RecordFeedbackJob $job): bool => 'beside another fake' === $job->title);
+
+        Bus::fake();
+        $this->queueFeedbackJob($tenant, 'under a full fake');
+        $this->assertSolutionJobQueued(RecordFeedbackJob::class, static fn (RecordFeedbackJob $job): bool => 'under a full fake' === $job->title);
+        $this->assertSolutionJobQueued(RecordFeedbackJob::class, static fn (RecordFeedbackJob $job): bool => 'beside another fake' === $job->title);
+    }
+
+    public function test_other_jobs_still_reach_the_real_dispatcher(): void
+    {
+        $ran = new ArrayObject();
+
+        $this->app->make(Dispatcher::class)->dispatchSync(new class ($ran) {
+            public function __construct(private readonly ArrayObject $ran)
+            {
+            }
+
+            public function handle(): void
+            {
+                $this->ran->append('ran');
+            }
+        });
+
+        $this->assertSame(['ran'], $ran->getArrayCopy());
+        $this->assertSame(0, $this->runQueuedSolutionJobs());
+    }
+
     public function test_the_package_autoloader_maps_both_psr4_sections_ahead_of_other_loaders(): void
     {
         $root = sys_get_temp_dir() . '/fapost-pkg-' . bin2hex(random_bytes(6));
@@ -159,6 +295,22 @@ final class SolutionTestCaseTest extends SolutionTestCase
         $this->expectException(RuntimeException::class);
 
         PackageAutoloader::register(sys_get_temp_dir() . '/fapost-no-such-package');
+    }
+
+    private function mainTenant(): TenantInterface
+    {
+        $tenant = $this->app->make(TenantRepositoryInterface::class)->findBySlug('main');
+        $this->assertNotNull($tenant);
+
+        return $tenant;
+    }
+
+    private function queueFeedbackJob(TenantInterface $tenant, string $title): void
+    {
+        $this->app->make(TenantSwitcher::class)->runForTenant(
+            $tenant,
+            fn () => $this->app->make(SolutionQueueInterface::class)->dispatch(new RecordFeedbackJob($title)),
+        );
     }
 
     /**

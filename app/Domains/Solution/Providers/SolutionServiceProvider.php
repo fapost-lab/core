@@ -33,6 +33,8 @@ use App\Domains\Solution\Services\SolutionUiBundleReader;
 use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Solution\Services\SolutionUiPublisher;
 use App\Infrastructure\Solution\ConnectorChannelRegistrarFactory;
+use App\Infrastructure\Solution\CoreSolutionQueue;
+use App\Infrastructure\Solution\RunsSolutionJob;
 use App\Infrastructure\Solution\SolutionCoreRegistrarFactory;
 use Fapost\Foundation\Console\Contracts\ConsoleExtensionsInterface;
 use Fapost\Foundation\Lifecycle\AbstractConnectorServiceProvider;
@@ -40,6 +42,8 @@ use Fapost\Foundation\Lifecycle\AbstractSolutionServiceProvider;
 use Fapost\Foundation\Solution\Contracts\InstalledSolutionCatalogInterface;
 use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
 use Fapost\Foundation\Solution\Contracts\SolutionStorefrontInterface;
+use Fapost\Foundation\Solution\Queue\SolutionJobMiddlewareInterface;
+use Fapost\Foundation\Solution\Queue\SolutionQueueInterface;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\ServiceProvider;
@@ -101,6 +105,10 @@ final class SolutionServiceProvider extends ServiceProvider
         // Implemented outside the domain, in App\Infrastructure\Solution: it writes into the registries of the
         // domains a Solution extends.
         $this->app->singleton(SolutionRegistrarFactoryInterface::class, SolutionCoreRegistrarFactory::class);
+        // Solution jobs: the dispatcher a Solution queues through and the gate Core puts in front of every job. Both
+        // hold only the container and resolve the scoped tenant context and activation per call.
+        $this->app->singleton(SolutionQueueInterface::class, CoreSolutionQueue::class);
+        $this->app->singleton(SolutionJobMiddlewareInterface::class, RunsSolutionJob::class);
         $this->app->singleton(ConnectorRegistrarFactoryInterface::class, ConnectorChannelRegistrarFactory::class);
 
         // Connectors come first: they bring channels for the whole installation, which a Solution's flows may rely on.

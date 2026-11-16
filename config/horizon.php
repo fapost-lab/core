@@ -242,6 +242,25 @@ return [
             'timeout'             => 60,
             'nice'                => 5,
         ],
+        // Solution jobs: one queue per installed Solution (`solution-jobs.<id>`), filled in at boot from the catalog
+        // (App\Infrastructure\Solution\SolutionQueues); removed when no Solution is installed. Balanced between the
+        // queues so one Solution cannot hold the others back.
+        'solution-jobs' => [
+            'connection'          => 'redis-long',
+            'queue'               => [],
+            'balance'             => 'auto',
+            'autoScalingStrategy' => 'size',
+            'minProcesses'        => 1,
+            'maxProcesses'        => 2,
+            'balanceMaxShift'     => 1,
+            'balanceCooldown'     => 3,
+            'maxTime'             => 0,
+            'maxJobs'             => 0,
+            'memory'              => 256,
+            'tries'               => 3,
+            'timeout'             => 1500,
+            'nice'                => 0,
+        ],
         // Preparing a Solution's tables in a tenant schema: a flow step waits for it, so it never queues behind a removal.
         'solutions' => [
             'connection'   => 'redis-long',
@@ -308,6 +327,9 @@ return [
             'solutions' => [
                 'maxProcesses' => 1,
             ],
+            'solution-jobs' => [
+                'maxProcesses' => 2,
+            ],
             'removal' => [
                 'maxProcesses' => 1,
             ],
@@ -333,6 +355,9 @@ return [
             ],
             'solutions' => [
                 'maxProcesses' => 1,
+            ],
+            'solution-jobs' => [
+                'maxProcesses' => 2,
             ],
             'removal' => [
                 'maxProcesses' => 1,

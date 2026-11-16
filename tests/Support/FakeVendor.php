@@ -77,7 +77,10 @@ final class FakeVendor
     public function linkedPackage(array $listed, string $target, string $version = 'dev-main'): self
     {
         $name = (string) $listed['name'];
-        mkdir(dirname($this->path . '/' . $name), 0777, true);
+        if (!is_dir(dirname($this->path . '/' . $name))) {
+            mkdir(dirname($this->path . '/' . $name), 0777, true);
+        }
+
         symlink($target, $this->path . '/' . $name);
 
         $this->entries[] = ['version' => $version, 'install-path' => '../' . $name] + $listed;

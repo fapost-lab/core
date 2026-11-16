@@ -12,10 +12,12 @@ to look matters more than having alerts on everything.
 Queues are processed by Horizon, and its dashboard is the first place to look
 when messages arrive but nothing happens.
 
-Four supervisors run, grouped so that the latency-critical work is isolated:
+Supervisors are grouped so that the latency-critical work is isolated:
 inbound processing and conversation replies share dedicated processes, while
-broadcasts, logging and background synchronisation are worked elsewhere. See
-[Queues](/reference/queues).
+broadcasts, logging and background synchronisation are worked elsewhere. Tenant
+removal, the preparation of Solutions' tables and the Solutions' own jobs
+(`solution-jobs`, only while a Solution is installed) have supervisors of their
+own. See [Queues](/reference/queues).
 
 On a `single` installation the dashboard is at `/horizon` for signed-in staff who hold the
 **View operator screens** permission; administrators hold every permission. The platform

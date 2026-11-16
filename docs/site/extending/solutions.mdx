@@ -230,6 +230,79 @@ still runs.
   it and exits with code 1 before anything is migrated.
 - **Deactivation keeps the tables.**
 
+## Background jobs
+
+<Note>
+  Experimental. It needs `fapost/foundation` `^0.39`, and the contract may still change.
+</Note>
+
+A Solution queues background work as a `SolutionJob`. Extend `Fapost\Foundation\Solution\Queue\SolutionJob`,
+return your Solution's id from `solution()` and do the work in `perform()`:
+
+```php
+final class IndexSourceJob extends SolutionJob
+{
+    public int $tries = 5;
+
+    public function __construct(public readonly string $sourceId)
+    {
+    }
+
+    public function solution(): string
+    {
+        return 'feedback';
+    }
+
+    protected function perform(): void
+    {
+        // The tenant is already current; load the model by id here.
+    }
+}
+```
+
+Dispatch it through `Fapost\Foundation\Solution\Queue\SolutionQueueInterface`, which you inject where you
+need it, for example into an action handler:
+
+```php
+$queue->dispatch(new IndexSourceJob($sourceId));
+$queue->dispatch(new IndexSourceJob($sourceId), delaySeconds: 600);
+```
+
+Never call `dispatch()` on the job itself or use Laravel's dispatcher: such a job has no tenant, and it fails
+(and is retried until its tries run out) when it runs.
+
+**What Core does**
+
+- It runs the job in the tenant that queued it, so `perform()` sees that tenant's schema.
+- Your jobs go to a queue of their own, `solution-jobs.<id>`, so another Solution's backlog does not hold them back.
+- `tries` and `timeout` are yours to set (defaults 3 and 300 seconds).
+- `handle()` and `middleware()` are `final`: Core's gate around the job cannot be replaced or extended.
+- The job is serialized before the tenant is known, so do not do work in `__wakeup()`, `__unserialize()` or a
+  constructor-time read of the database: it would run outside any tenant.
+
+**Refused at dispatch.** `dispatch()` throws `SolutionJobRejectedException` and queues nothing when:
+
+- no tenant is current;
+- the job's class is not in your Solution's package;
+- a property is not null, a scalar, a backed enum or an array of those, private properties of your own base
+  classes included. Pass ids and load models in `perform()`;
+- the timeout is below 1 or above 1500 seconds;
+- the class or a parent carries one of Laravel's queue attributes (`#[Timeout]`, `#[Queue]`, `#[Delay]`…),
+  defines a `queue()` method or a `middleware` property: Core decides the queue, the connection and the gate;
+- the job implements `ShouldBeUnique`: not supported for Solution jobs yet.
+
+**Decided when the job runs**
+
+- The tenant no longer exists: the job is dropped.
+- The tenant is stopped: the job is retried an hour later, for as long as the tenant stays stopped.
+- Your Solution is turned off for the tenant: the job is dropped.
+- The Solution's tables are not ready yet: the job is retried a minute later. This does not spend an attempt,
+  and the job is dropped, with a warning in the log, after 48 such postponements.
+
+Every drop and postponement is written to the application log.
+
+Chains and batches are not supported.
+
 ## Registering actions
 
 A Solution gives flows something to do by registering **action handlers**, which the `call` node

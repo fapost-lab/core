@@ -34,6 +34,11 @@ supervisors by priority:
 | `low`      | `messaging.broadcast`, `messaging.system`, `messaging.logging` | Bulk sends and bookkeeping, niced down |
 | `default`  | `default`                                                   | Anything unclassified |
 
+A supervisor of its own, `solution-jobs`, serves the `solution-jobs.<id>` queues of installed
+[Solutions](/extending/solutions#background-jobs) on `redis-long`. It exists only while at
+least one Solution is installed, with one worker per Solution and one more for the busiest. A Solution installed later has its queue served after
+`php artisan horizon:terminate`, which every upgrade runs.
+
 Two things about this matter operationally:
 
 **Do not consolidate the queues into one worker pool.** A broadcast to fifty

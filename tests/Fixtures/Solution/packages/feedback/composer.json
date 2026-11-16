@@ -3,7 +3,12 @@
     "description": "Fixture Solution used by the manifest tests.",
     "type": "fapost-solution",
     "require": {
-        "fapost/foundation": "^0.13"
+        "fapost/foundation": "^0.39"
+    },
+    "autoload": {
+        "psr-4": {
+            "Acme\\Feedback\\": "src/"
+        }
     },
     "extra": {
         "fapost": {

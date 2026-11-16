@@ -156,6 +156,13 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
     and Solution, queue `solutions.migrate`, Horizon supervisor `solutions`); the admin screen's `preparing` flag asks it too.
     No DDL runs on a step or a page.
   - `platform:update` refuses a path registered with `loadMigrationsFrom()` inside an installed Solution or connector package.
+- Background jobs of a Solution (`adr-20261116-solution-jobs`, Foundation 0.39, experimental): a job extends `SolutionJob` and is
+  queued only through `SolutionQueueInterface` (`App\Infrastructure\Solution\CoreSolutionQueue`: tenant stamp, ownership by the
+  class file's package, scalar-only properties, timeout ≤ 1500 s, queue `solution-jobs.<id>` on `redis-long`). Every job runs behind
+  `RunsSolutionJob` (final `middleware()`): tenant gone → drop, stopped → copy in an hour, inside the tenant: inactive → drop, not
+  ready → preparation queued and a copy in a minute (48 such postponements at most; a stopped tenant's are unlimited). Queue
+  attributes, a `queue()` method, a `middleware` property and `ShouldBeUnique` are refused at dispatch. `SolutionQueues` fills Horizon's `solution-jobs`
+  supervisor from the catalog at boot and removes it when nothing is installed.
   - The activation screen is `admin/solutions` (`Admin\SolutionController`, props from `Http/Shell/SolutionsPresenter`,
     page `Console/AdminSolutions`), behind `manage_settings` like tenant settings and usage. It lists only valid Solutions
     (a failing manifest never reaches the catalog, and `platform:update` refuses it first) plus stored-active rows whose
@@ -193,7 +200,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   PHPat (`SolutionBoundariesTest`) forbids a dependency on any other `App\Domains` namespace, and
   forbids facades and `Illuminate\Database` outside `Infrastructure` and `Providers`, so discovery
   and the services run without a database.
-- Not here yet: registrar methods other than `registerActionHandler` and `registerNodeHandler` (`registerMigrations` stays refused: migrations are declared in the manifest), per-phase rollback of `platform:update`, and a queue of a Solution's own (task `solution-queue`).
+- Not here yet: registrar methods other than `registerActionHandler` and `registerNodeHandler` (`registerMigrations` stays refused: migrations are declared in the manifest), per-phase rollback of `platform:update`, chained or batched Solution jobs.
   Plugins (`type: fapost-plugin`) are reserved and not discovered.
 - The Foundation constraint is not re-checked in Core: Composer refuses to install a package whose
   `require["fapost/foundation"]` does not fit the locked version, and a package Composer did not
