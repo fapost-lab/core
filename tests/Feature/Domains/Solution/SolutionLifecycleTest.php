@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Domains\Solution;
 
+use Acme\Feedback\RecordFeedbackJob;
 use App\Console\Platform\PlatformMigratorInterface;
 use App\Console\Platform\UnservedChannelsFinderInterface;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
@@ -41,6 +42,9 @@ use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
 use Fapost\Foundation\Solution\DTO\SolutionEntitlement;
 use Fapost\Foundation\Solution\DTO\SolutionGrant;
 use Fapost\Foundation\Solution\Enums\SolutionGrantSource;
+use Fapost\Foundation\Solution\Queue\SolutionJob;
+use Fapost\Foundation\Solution\Queue\SolutionQueueInterface;
+use Illuminate\Pipeline\Pipeline;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
@@ -56,6 +60,7 @@ use Tests\Fixtures\Solution\FeedbackProbe;
 use Tests\Support\FakeSolutionEntitlement;
 use Tests\Support\FakeVendor;
 use Tests\Support\InMemorySolutionActivationStore;
+use Tests\Support\InstallsFeedbackSolution;
 use Tests\Support\InstallsShowcaseSolution;
 use Tests\Support\NoUnservedChannels;
 
@@ -75,6 +80,7 @@ use Tests\Support\NoUnservedChannels;
  */
 final class SolutionLifecycleTest extends FeatureTestCase
 {
+    use InstallsFeedbackSolution;
     use InstallsShowcaseSolution;
 
     private const string BETA_ID = '00000000-0000-0000-0000-0000000000b2';
@@ -116,7 +122,7 @@ final class SolutionLifecycleTest extends FeatureTestCase
 
         // What the image holds and a booting application does with it: the two packages, their providers, their
         // routes, and (after `installShowcase`) the actions the feedback provider registers.
-        $this->installShowcase(publish: false, alsoInstalled: [FakeVendor::solutionComposer()]);
+        $this->installShowcase(publish: false, prepareVendor: static fn (FakeVendor $vendor) => self::linkFeedback($vendor));
         (new SolutionServiceProvider($this->app))->registerExtensions($this->app->make(InstalledSolutions::class)->all());
 
         $alpha = $this->app->make(TenantRepositoryInterface::class)->findBySlug('main');
@@ -235,6 +241,49 @@ final class SolutionLifecycleTest extends FeatureTestCase
             $this->app->make(ActiveSolutions::class)->ids(),
         ]);
         $this->assertSame([['feedback', 'showcase'], [], ['feedback', 'showcase']], $nested);
+    }
+
+    public function test_a_job_of_the_solution_runs_in_the_schema_of_the_tenant_that_queued_it_and_is_dropped_once_the_solution_is_off(): void
+    {
+        $beta = $this->secondTenant();
+        $this->createFeedbackJobLog($this->alpha);
+        $this->activate($this->alpha, 'feedback');
+        Bus::fake();
+
+        // Tenant alpha queues a job through the Solution queue; the worker takes it and it writes in alpha's schema.
+        $this->queueFeedbackJob($this->alpha, 'from alpha');
+        $queued = Bus::dispatched(RecordFeedbackJob::class)->first();
+        $this->assertInstanceOf(RecordFeedbackJob::class, $queued);
+        $this->assertSame($this->alpha->getId(), $queued->tenantId);
+        $this->assertSame('solution-jobs.feedback', $queued->queue);
+
+        $this->workOff($queued);
+
+        $this->assertSame(['from alpha'], $this->feedbackJobLog($this->alpha));
+        $this->assertSame(
+            [$this->alpha->getId()],
+            $this->inTenant($this->alpha, fn (): array => DB::table(RecordFeedbackJob::TABLE)->pluck('tenant_id')->all()),
+            'The row names the tenant the job ran for.',
+        );
+
+        if ($this->hasTenantSchemas()) {
+            $this->assertNull($this->feedbackJobLog($beta), 'Beta\'s schema has no table the job could have written to.');
+
+            // Beta never switched the Solution on: its job is dropped before it runs, and no table appears.
+            $this->queueFeedbackJob($beta, 'from beta');
+            $this->workOff(Bus::dispatched(RecordFeedbackJob::class)->last());
+            $this->assertNull($this->feedbackJobLog($beta));
+        }
+
+        // Alpha switches the Solution off while a job waits: the worker drops it.
+        $this->queueFeedbackJob($this->alpha, 'too late');
+        $waiting = Bus::dispatched(RecordFeedbackJob::class)->last();
+        $this->deactivate($this->alpha, 'feedback');
+
+        $this->workOff($waiting);
+
+        $this->assertSame(['from alpha'], $this->feedbackJobLog($this->alpha), 'The dropped job wrote nothing.');
+        $this->assertSame([], $this->inTenant($this->alpha, fn (): array => $this->app->make(ActiveSolutions::class)->ids()));
     }
 
     public function test_a_node_of_the_solution_runs_for_the_tenant_that_activated_it_and_takes_the_error_exit_for_the_other(): void
@@ -641,6 +690,26 @@ final class SolutionLifecycleTest extends FeatureTestCase
         $latest = $this->inTenant($tenant, fn (): array => DB::table('solution_schemas')->orderBy('solution_id')->pluck('latest_migration', 'solution_id')->all());
 
         return $latest;
+    }
+
+    private function queueFeedbackJob(TenantInterface $tenant, string $title): void
+    {
+        $this->inTenant($tenant, fn () => $this->app->make(SolutionQueueInterface::class)->dispatch(new RecordFeedbackJob($title)));
+    }
+
+    /**
+     * What a worker does with a queued job: a fresh container scope, Core's middleware, then the job.
+     */
+    private function workOff(mixed $job): void
+    {
+        $this->assertInstanceOf(SolutionJob::class, $job);
+        $this->app->forgetScopedInstances();
+        $this->forgetSolutionState();
+
+        (new Pipeline($this->app))
+            ->send($job)
+            ->through($job->middleware())
+            ->then(fn (SolutionJob $given): mixed => $this->app->call([$given, 'handle']));
     }
 
     private function inTenant(TenantInterface $tenant, callable $callback): mixed

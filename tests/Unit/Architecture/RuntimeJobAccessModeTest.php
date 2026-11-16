@@ -18,7 +18,9 @@ use App\Domains\Staff\Jobs\SendWorkspaceDeletionNoticeJob;
 use App\Domains\Tenancy\Jobs\DecommissionTenantJob;
 use App\Domains\Tenancy\Queue\RespectsTenantAccessMode;
 use App\Domains\Tenancy\Queue\TenantAccessGatedJob;
+use App\Domains\Tenancy\Services\TenantAccessStates;
 use App\Domains\Webhook\Jobs\IncomingMessageJob;
+use App\Infrastructure\Solution\RunsSolutionJob;
 use App\Jobs\Flow\ContinueAfterOperatorRequestJob;
 use App\Jobs\Flow\DispatchFlowTriggerEventJob;
 use App\Jobs\Flow\ExpireOperatorRequestJob;
@@ -29,9 +31,12 @@ use App\Jobs\Media\CleanupSoftDeletedMediaJob;
 use App\Jobs\Messaging\BroadcastSendJob;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
 use App\Jobs\Solution\PrepareSolutionSchemaJob;
+use Fapost\Foundation\Solution\Queue\SolutionJob;
+use Fapost\Foundation\Solution\Queue\SolutionJobMiddlewareInterface;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use ReflectionClass;
+use ReflectionMethod;
 use Symfony\Component\Finder\Finder;
 use Tests\TestCase;
 
@@ -157,6 +162,23 @@ final class RuntimeJobAccessModeTest extends TestCase
             );
             $this->assertStringContainsString('Pipeline', $source);
         }
+    }
+
+    /**
+     * Solution jobs live in Solution packages, so the scan of `app/` above never sees them. The guarantee is the type: a
+     * Solution cannot override `middleware()` or `handle()`, and the middleware Core puts there asks the access mode.
+     */
+    public function test_a_solution_job_is_gated_by_the_access_mode_and_cannot_opt_out(): void
+    {
+        foreach (['middleware', 'handle'] as $method) {
+            $this->assertTrue((new ReflectionMethod(SolutionJob::class, $method))->isFinal(), 'SolutionJob::' . $method . '() must be final.');
+        }
+
+        $source = (string) file_get_contents((string) (new ReflectionClass(RunsSolutionJob::class))->getFileName());
+
+        $this->assertStringContainsString(TenantAccessStates::class, $source);
+        $this->assertStringContainsString('->isStopped()', $source);
+        $this->assertInstanceOf(RunsSolutionJob::class, $this->app->make(SolutionJobMiddlewareInterface::class));
     }
 
     public function test_the_scan_catches_a_new_job_and_a_runtime_job_without_the_gate(): void

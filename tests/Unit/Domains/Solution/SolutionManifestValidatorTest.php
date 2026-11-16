@@ -47,7 +47,7 @@ final class SolutionManifestValidatorTest extends TestCase
         $this->assertSame('Feedback', $solution->name);
         $this->assertSame('acme/fapost-feedback', $solution->package);
         $this->assertSame('1.2.0', $solution->version);
-        $this->assertSame('^0.13', $solution->foundationConstraint);
+        $this->assertSame('^0.39', $solution->foundationConstraint);
         $this->assertSame(FeedbackServiceProvider::class, $solution->provider);
         $this->assertSame(['feedback.submit', 'feedback.score'], $solution->actions);
     }

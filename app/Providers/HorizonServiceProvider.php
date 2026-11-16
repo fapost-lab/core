@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Infrastructure\Solution\SolutionQueues;
 use Fapost\Foundation\Operator\Contracts\OperatorAccessInterface;
 use Fapost\Foundation\Operator\Enums\OperatorSurface;
 use Illuminate\Support\Facades\Gate;
@@ -22,6 +23,9 @@ final class HorizonServiceProvider extends HorizonApplicationServiceProvider
     public function boot(): void
     {
         parent::boot();
+
+        // The Solution jobs supervisor serves one queue per installed Solution; the list comes from the image's catalog.
+        $this->app->make(SolutionQueues::class)->configureHorizon();
 
         // Horizon::routeSmsNotificationsTo('15556667777');
         // Horizon::routeMailNotificationsTo('example@example.com');
