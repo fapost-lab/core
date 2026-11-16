@@ -13,7 +13,7 @@ and a fixture Solution's migration runs in exactly the tenants that activated it
 - [ ] Compiled Solution registry — manifests validated once at install time into one cached file,
       lazy providers, `boot()` side effects declared in the manifest, a boot-time budget held by a
       benchmark in CI
-- [ ] Solution migrations on activation — expand-only, applied in a tenant's schema when it activates
+- [ ] `solution-tenant-migrations` — Solution migrations on activation — expand-only, applied in a tenant's schema when it activates
       the Solution and on upgrade only where activated; lifts the `registerMigrations` ban with an ADR
 
 ## Phase 2 — Upgrade FaPost from the admin
