@@ -11,7 +11,7 @@ test Solution shows an action in the palette with its own form and branches, kee
 a job on its own queue, registers a quota key and exposes a data accessor.
 
 - [ ] `call@2` with action schemas — a Solution action appears in the palette as its own item with a form, named outcomes and a wait while a job runs
-- [ ] `solution-queue` — Solution tenant migrations and queue — a Solution keeps tenant tables and runs background jobs on a queue of its own
+- [x] `solution-queue` — Solution tenant migrations and queue — a Solution keeps tenant tables and runs background jobs on a queue of its own
 - [ ] Solution quota keys — a Solution registers a per-period limit key the SaaS shell can meter
 - [ ] Solution data accessors — a Solution exposes its data under `module.<namespace>.*` for flows and for other Solutions
 
