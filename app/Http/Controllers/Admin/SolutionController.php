@@ -8,6 +8,7 @@ use App\Domains\Solution\DTO\ActivationActor;
 use App\Domains\Solution\Enums\ActivationChange;
 use App\Domains\Solution\Exceptions\SolutionEntitlementUnavailableException;
 use App\Domains\Solution\Exceptions\SolutionGrantedException;
+use App\Domains\Solution\Exceptions\SolutionMigrationFailedException;
 use App\Domains\Solution\Exceptions\SolutionNotEntitledException;
 use App\Domains\Solution\Exceptions\SolutionNotInstalledException;
 use App\Domains\Solution\Services\ActiveSolutions;
@@ -73,6 +74,12 @@ final class SolutionController extends Controller
         } catch (SolutionNotEntitledException|SolutionEntitlementUnavailableException $exception) {
             // The entitlement changed between the check above and the write: refuse with the same reason.
             Inertia::flash('error', trans('console.solutions.flash.refused', ['solution' => $solution, 'reasons' => trans($exception instanceof SolutionNotEntitledException ? 'console.solutions.entitlement.not_entitled' : 'console.solutions.entitlement.unavailable')]));
+
+            return $this->back();
+        } catch (SolutionMigrationFailedException $exception) {
+            // Nothing was stored and the tenant's schema is unchanged; the cause is for the operator's log, not the screen.
+            report($exception);
+            Inertia::flash('error', trans('console.solutions.flash.migration_failed', ['solution' => $solution]));
 
             return $this->back();
         }

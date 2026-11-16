@@ -65,6 +65,8 @@ export interface SolutionRow {
   package: string
   version: string | null
   active: boolean
+  /** On, but its tables in this tenant's schema are missing or behind and are being prepared on the queue. */
+  preparing: boolean
   actions: string[]
   ui: SolutionUi | null
   lastChange: LastChange | null
@@ -104,6 +106,7 @@ export interface SolutionsTranslations {
     title: string
     description: string
     needs_update: string
+    preparing: string
     needs_update_title: string
     needs_update_note: string
     mismatch: string

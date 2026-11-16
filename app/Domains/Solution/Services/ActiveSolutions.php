@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Solution\Services;
 
 use App\Domains\Solution\Contracts\SolutionActivationStoreInterface;
+use App\Domains\Solution\Contracts\SolutionSchemaStoreInterface;
 use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Fapost\Foundation\Solution\DTO\SolutionEntitlement;
@@ -31,11 +32,15 @@ final class ActiveSolutions
     /** @var array<string, list<string>> stored active ids by tenant id; not yet intersected with the installed Solutions */
     private array $stored = [];
 
+    /** @var array<string, array<string, string>> applied migrations digest by Solution id, by tenant id */
+    private array $schemas = [];
+
     public function __construct(
         private readonly TenantContextInterface $tenantContext,
         private readonly SolutionActivationStoreInterface $store,
         private readonly InstalledSolutions $installed,
         private readonly SolutionEntitlements $entitlements,
+        private readonly SolutionSchemaStoreInterface $schemaStore,
     ) {
     }
 
@@ -76,6 +81,28 @@ final class ActiveSolutions
     }
 
     /**
+     * Whether the current tenant's schema holds every tenant migration the installed Solution ships, so its code may
+     * run here. A Solution with no migrations is always ready; one that is not installed never is. Says nothing about
+     * activation: ask {@see isActive()} first. Read lazily, once per tenant and scope, from the tenant's schema.
+     */
+    public function isReady(string $solutionId): bool
+    {
+        $solution = $this->installed->find($solutionId);
+
+        if (null === $solution) {
+            return false;
+        }
+
+        if (null === $solution->migrationsDigest) {
+            return true;
+        }
+
+        $tenantId = $this->tenantContext->get()->getId();
+
+        return $solution->isSchemaCurrent(($this->schemas[$tenantId] ??= $this->schemaStore->appliedDigests())[$solutionId] ?? null);
+    }
+
+    /**
      * How the operator grants the Solution to the current tenant (its plan's bundle or a running add-on), or null when
      * it does not, or when its answer could not be had.
      */
@@ -103,11 +130,11 @@ final class ActiveSolutions
     }
 
     /**
-     * Drops the memo of one tenant. The activator calls it after a write.
+     * Drops the memo of one tenant. The activator and the schema preparation call it after a write.
      */
     public function forget(string $tenantId): void
     {
-        unset($this->stored[$tenantId]);
+        unset($this->stored[$tenantId], $this->schemas[$tenantId]);
     }
 
     /**

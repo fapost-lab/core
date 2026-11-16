@@ -81,7 +81,15 @@ final class SolutionManifestValidator
                 continue;
             }
 
-            $byId[$result->manifest->id][] = InstalledSolution::fromManifest($result->manifest, $package->version, $package->composerPath);
+            $migrations = $this->migrationsProblem($result->manifest->migrations, $package->composerPath);
+
+            if (is_string($migrations)) {
+                $violations[] = new SolutionViolation($package->name, 'extra.fapost.migrations', $migrations);
+
+                continue;
+            }
+
+            $byId[$result->manifest->id][] = InstalledSolution::fromManifest($result->manifest, $package->version, $package->composerPath, $migrations['latest'] ?? null, $migrations['digest'] ?? null);
         }
 
         $valid = [];
@@ -131,5 +139,38 @@ final class SolutionManifestValidator
         }
 
         return null;
+    }
+
+    /**
+     * Checks the directory `extra.fapost.migrations` names: it exists inside the package and does not lead out of it.
+     * Answers the problem as a string, or the newest migration in it (file name without `.php`) and the digest of every name
+     * in it (both null when it holds none);
+     * null when the Solution declares no migrations or its package directory is unknown.
+     *
+     * @return string|array{latest: string|null, digest: string|null}|null
+     */
+    private function migrationsProblem(?string $migrations, ?string $composerPath): string|array|null
+    {
+        if (null === $migrations || null === $composerPath) {
+            return null;
+        }
+
+        $root      = realpath(dirname($composerPath));
+        $directory = realpath(dirname($composerPath) . '/' . $migrations);
+
+        if (false === $directory || !is_dir($directory)) {
+            return sprintf('"%s" is not a directory in the package', $migrations);
+        }
+
+        if (false === $root || !str_starts_with($directory . '/', $root . '/') || $directory === $root) {
+            return sprintf('"%s" leads out of the package', $migrations);
+        }
+
+        $names = array_map(static fn (string $file): string => basename($file, '.php'), glob($directory . '/*.php') ?: []);
+        sort($names);
+
+        return [] === $names
+            ? ['latest' => null, 'digest' => null]
+            : ['latest' => $names[array_key_last($names)], 'digest' => InstalledSolution::digestOf($names)];
     }
 }

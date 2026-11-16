@@ -20,6 +20,7 @@ use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Solution\Services\SolutionUiPublisher;
 use Illuminate\Console\Command;
+use Illuminate\Database\Migrations\Migrator;
 
 /**
  * The one command of an upgrade: check the installed Solutions, migrate, publish their console UI, remember the result.
@@ -28,6 +29,11 @@ use Illuminate\Console\Command;
  * (`fapost-ui.json`, the files it lists, the components the Solution's PHP declarations name), stops the command before
  * the database, `public/` or the cache is touched. `--validate-only` stops after that check and needs no database,
  * so an extension's CI and a derived image's build can run it.
+ *
+ * Migrations: the landlord, every tenant's schema, then each Solution's tables where they already are
+ * ({@see MigrateSolutionsCommand}). An extension that registered a migration path with
+ * Laravel's migrator (`loadMigrationsFrom()`) is refused before that: the landlord migration would run it on the
+ * landlord, where no extension keeps tables; a Solution declares `extra.fapost.migrations` instead.
  *
  * After the migrations it warns, per tenant and type, about channels no installed integration serves any more.
  */
@@ -51,6 +57,7 @@ final class UpdatePlatformCommand extends Command
         SolutionUiCompatibility $compatibility,
         ConnectorChannels $connectorChannels,
         UnservedChannelsFinderInterface $unserved,
+        Migrator $schemaMigrator,
     ): int {
         $all       = $discoverer->discoverAll();
         $discovery = $all->solutions;
@@ -120,6 +127,18 @@ final class UpdatePlatformCommand extends Command
             $this->components->error(sprintf('%d declared channel type(s) are not registered. Nothing was changed.', count($unregisteredChannels)));
 
             foreach ($unregisteredChannels as $line) {
+                $this->line('  ' . $line);
+            }
+
+            return self::FAILURE;
+        }
+
+        $landlordPaths = $this->extensionMigrationPaths($all, $schemaMigrator);
+
+        if ([] !== $landlordPaths) {
+            $this->components->error(sprintf('%d extension migration path(s) were registered with the landlord migrator. Nothing was changed.', count($landlordPaths)));
+
+            foreach ($landlordPaths as $line) {
                 $this->line('  ' . $line);
             }
 
@@ -256,5 +275,40 @@ final class UpdatePlatformCommand extends Command
                 $discovery->valid,
             ),
         );
+    }
+
+    /**
+     * Migration paths registered with Laravel's migrator that lie inside an installed Solution or connector package.
+     *
+     * @return list<string>
+     */
+    private function extensionMigrationPaths(ExtensionDiscovery $all, Migrator $migrator): array
+    {
+        /** @var array<string, string> $roots package directory by package name */
+        $roots = [];
+
+        foreach ([...$all->solutions->valid, ...$all->connectors->valid] as $extension) {
+            $root = null === $extension->composerPath ? false : realpath(dirname($extension->composerPath));
+
+            if (false !== $root) {
+                $roots[$extension->package] = $root;
+            }
+        }
+
+        $lines = [];
+
+        foreach ($migrator->paths() as $path) {
+            $real = realpath($path);
+
+            foreach (false === $real ? [] : $roots as $package => $root) {
+                if (str_starts_with($real . '/', $root . '/')) {
+                    $lines[] = sprintf('%s: "%s" is registered with loadMigrationsFrom(); a Solution declares extra.fapost.migrations, which run in tenant schemas', $package, $path);
+                }
+            }
+        }
+
+        sort($lines);
+
+        return $lines;
     }
 }

@@ -19,6 +19,7 @@ use App\Domains\Solution\Services\PublishedSolutionUi;
 use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\Support\TenancyResolutionMode;
+use App\Infrastructure\Solution\SolutionPreparation;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Fapost\Foundation\Console\DTO\ContextAction;
@@ -38,7 +39,8 @@ use Throwable;
  * whether the tenant has it on, what it registers (the actions of its manifest and its console declarations, as the
  * registry holds them), whether the operator grants it (plan or add-on: on, with no Turn off), allows it (the tenant's
  * own toggle) or offers it to connect (the operator's storefront) and, when it ships a console UI, whether the bundle is
- * published and fits the kit Core ships, and whether, being on, it needs an update before its UI is served again.
+ * published and fits the kit Core ships, and whether, being on, it needs an update before its UI is served again or its
+ * tables in the tenant's schema are still being prepared.
  * A Solution whose package is gone but whose activation is still stored is listed apart, so it can be put out.
  * On a self-hosted platform with no storefront of its own it also carries the address where more Solutions are found,
  * {@see self::MARKETPLACE_URL}.
@@ -79,6 +81,7 @@ final readonly class SolutionsPresenter
         private SolutionUi $ui,
         private SolutionStorefrontInterface $storefront,
         private TenantContextInterface $tenantContext,
+        private SolutionPreparation $preparation,
     ) {
     }
 
@@ -219,6 +222,7 @@ final readonly class SolutionsPresenter
             'package'     => $solution->package,
             'version'     => $solution->version,
             'active'      => $this->active->isActive($solution->id),
+            'preparing'   => $this->active->isActive($solution->id) && ! $this->preparation->isReadyOrPrepare($solution->id),
             'actions'     => $solution->actions,
             'ui'          => $this->ui($solution),
             'lastChange'  => null === $stored ? null : $this->lastChange($latest),

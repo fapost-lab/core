@@ -19,6 +19,7 @@ use App\Domains\Tenancy\Contracts\TenantInterface;
 use App\Domains\Tenancy\Models\Tenant;
 use App\Http\Shell\SolutionExtensions;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
+use App\Jobs\Solution\PrepareSolutionSchemaJob;
 use Database\Seeders\TenantAclSeeder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Events\QueryExecuted;
@@ -66,6 +67,7 @@ final class SolutionExtensionsConsoleTest extends FeatureTestCase
     protected function tearDown(): void
     {
         $this->removeShowcase();
+        $this->removeShowcaseCopies();
 
         parent::tearDown();
     }
@@ -235,6 +237,47 @@ final class SolutionExtensionsConsoleTest extends FeatureTestCase
         // The search palette finds the application, but none of its pages.
         $groups = $this->getJson($this->panelUrl('/admin/search?' . http_build_query(['q' => 'desk'])))->assertOk()->json('groups');
         $this->assertSame([], $groups);
+    }
+
+    public function test_an_active_solution_whose_tables_are_not_ready_answers_503_preparing_and_has_them_prepared(): void
+    {
+        $this->activateShowcase();
+        // The package now ships a tenant migration this tenant's schema has not applied.
+        $this->installShowcase(package: $this->showcasePackageWithMigration());
+        $this->actingAs($this->admin());
+        $version = $this->version();
+        Bus::fake();
+
+        $this->get($this->panelUrl('/apps/showcase/board'))
+            ->assertStatus(Response::HTTP_SERVICE_UNAVAILABLE)
+            ->assertInertia(fn (AssertableInertia $inertia) => $inertia
+                ->component('Errors/SolutionUnavailable')
+                ->where('reason', 'preparing')
+                ->where('applications.current', 'showcase'));
+
+        $this->get($this->panelUrl('/apps/showcase/desk'), ['X-Inertia' => 'true', 'X-Inertia-Version' => $version])
+            ->assertStatus(Response::HTTP_SERVICE_UNAVAILABLE)
+            ->assertHeader('X-Inertia')
+            ->assertJsonPath('props.reason', 'preparing');
+
+        $this->getJson($this->panelUrl('/apps/showcase/board'))->assertStatus(Response::HTTP_SERVICE_UNAVAILABLE);
+
+        Bus::assertDispatched(PrepareSolutionSchemaJob::class, static fn (PrepareSolutionSchemaJob $job): bool => true);
+    }
+
+    public function test_a_user_the_application_does_not_let_in_is_refused_while_tables_are_not_ready_and_prepares_nothing(): void
+    {
+        $this->activateShowcase();
+        $this->installShowcase(package: $this->showcasePackageWithMigration());
+        Gate::define('showcase.use', static fn (mixed $user): bool => false);
+        $user = User::factory()->create();
+        $user->givePermissionTo(Permission::ManageAssistants->value);
+        $this->actingAs($user);
+        Bus::fake();
+
+        $this->get($this->panelUrl('/apps/showcase/board'))->assertForbidden();
+
+        Bus::assertNotDispatched(PrepareSolutionSchemaJob::class);
     }
 
     public function test_a_user_the_application_does_not_let_in_still_gets_404_when_it_needs_an_update(): void

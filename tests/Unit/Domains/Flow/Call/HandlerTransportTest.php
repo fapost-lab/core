@@ -99,21 +99,69 @@ final class HandlerTransportTest extends TestCase
 
         $this->assertTrue($this->transport($registry, available: true)->execute(new CallRequest(target: 'core.probe'), $this->context())->success);
     }
+    public function test_a_solutions_action_whose_tables_are_not_ready_is_refused_and_its_handler_is_not_built(): void
+    {
+        $constructed = 0;
+        $this->app->bind(ProbeAction::class, static function () use (&$constructed): ProbeAction {
+            ++$constructed;
+
+            return new ProbeAction(returnPayload: ['ok' => true]);
+        });
+        $registry = $this->registry();
+        $registry->register(ProbeAction::class, 'feedback');
+        $constructed = 0;
+
+        $refused = $this->transport($registry, ready: false)->execute(new CallRequest(target: 'core.probe'), $this->context());
+
+        $this->assertFalse($refused->success);
+        $this->assertSame('solution_not_ready', $refused->errorCode);
+        $this->assertSame(['action_id' => 'core.probe', 'solution_id' => 'feedback'], $refused->metadata);
+        $this->assertSame(0, $constructed, 'The handler is not built for a refused call.');
+
+        $this->assertTrue($this->transport($registry, ready: true)->execute(new CallRequest(target: 'core.probe'), $this->context())->success);
+    }
+
+    public function test_an_inactive_solution_is_refused_as_inactive_even_when_its_tables_are_not_ready(): void
+    {
+        $registry = $this->registry();
+        $registry->register(ProbeAction::class, 'feedback');
+
+        $refused = $this->transport($registry, available: false, ready: false)->execute(new CallRequest(target: 'core.probe'), $this->context());
+
+        $this->assertSame('solution_inactive', $refused->errorCode);
+    }
+
+    public function test_a_core_action_is_never_held_back_by_readiness(): void
+    {
+        $this->app->instance(ProbeAction::class, new ProbeAction(returnPayload: ['ok' => true]));
+        $registry = $this->registry();
+        $registry->register(ProbeAction::class);
+
+        $result = $this->transport($registry, ready: false)->execute(new CallRequest(target: 'core.probe'), $this->context());
+
+        $this->assertTrue($result->success);
+    }
+
     private function registry(): ActionHandlerRegistry
     {
         return new ActionHandlerRegistry(new ContainerActionHandlerFactory($this->app));
     }
 
-    private function transport(ActionHandlerRegistry $registry, bool $available = true): HandlerTransport
+    private function transport(ActionHandlerRegistry $registry, bool $available = true, bool $ready = true): HandlerTransport
     {
-        return new HandlerTransport($registry, new class ($available) implements SolutionAvailabilityInterface {
-            public function __construct(private readonly bool $available)
+        return new HandlerTransport($registry, new class ($available, $ready) implements SolutionAvailabilityInterface {
+            public function __construct(private readonly bool $available, private readonly bool $ready)
             {
             }
 
             public function isAvailable(?string $solutionId): bool
             {
                 return null === $solutionId || $this->available;
+            }
+
+            public function isReady(string $solutionId): bool
+            {
+                return $this->ready;
             }
         });
     }

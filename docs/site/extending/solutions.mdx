@@ -110,10 +110,13 @@ own schema, so it goes with the tenant's backup and is removed with the tenant.
   Solution is allowed and nothing is granted — see
   [Solution entitlement](/reference/foundation-contracts#solution-entitlement). Remove the package, break its
   manifest or lose the grant or the entitlement, and it is inactive; bring it back and it is active again. Nothing
-  is written in between, and your Solution learns of it only as `solution_inactive`.
+  is written in between, and your Solution learns of it only as `solution_inactive`, or as `solution_not_ready` while the tenant's tables
+  are still being prepared (see [Tenant migrations](#tenant-migrations)).
 - **Do not rely on the moment of activation.** A grant turns a Solution on and off with no call into your code, and
-  Core does not call `onActivate()` or `onDeactivate()`. Create what each tenant needs with your migrations, which
-  run for every tenant, and initialise anything else lazily and idempotently on first use.
+  Core does not call `onActivate()` or `onDeactivate()`. Create your tables with the migrations declared in the manifest: Core applies them in a tenant's
+  schema when the Solution starts running there (activation, or the first use of a granted Solution) and keeps
+  them current on upgrade where it is on or already has them. Initialise anything else lazily and idempotently on first
+  use.
 - Deactivating never touches the Solution's data. The activation record stays, and every change is
   journalled with who made it, when, and why.
 - A change is seen by the next request or job of any process; a job already running keeps the answer it
@@ -136,7 +139,7 @@ Prints every problem, not just the first, and exits with code 1:
 ```
 acme/fapost-feedback: extra.fapost.id: required
 acme/fapost-feedback: extra.fapost.actions[1]: "score" must start with "feedback."
-acme/fapost-feedback: extra.fapost.migrations: unknown field (schema 1 allows: schema, id, name, description, provider, actions, nodes, state, ui); a newer fapost/foundation may be required
+acme/fapost-feedback: extra.fapost.routes: unknown field (schema 1 allows: schema, id, name, description, provider, actions, nodes, state, ui, migrations); a newer fapost/foundation may be required
 acme/one, acme/two: extra.fapost.id: "feedback" is declared by both packages
 ```
 
@@ -162,8 +165,70 @@ installs quietly without part of its behaviour. A new optional field arrives in 
 `fapost/foundation`; to use it, require that version, and Composer then refuses to install your
 Solution on a platform that does not have it. A breaking change gets a new `schema` number;
 Foundation reads the current schema and the previous one within one major version, and refuses
-anything else. A field not in schema 1 yet, for example a Solution's migrations, is added the same
-way when its contract is settled, as `ui` was in 0.15.
+anything else. A field not in schema 1 yet is added the same
+way when its contract is settled, as `ui` was in 0.15 and `migrations` in 0.38.
+
+## Tenant migrations
+
+A Solution that stores data creates its tables with migrations declared in the manifest:
+
+```json
+{
+  "extra": {
+    "fapost": {
+      "id": "feedback",
+      "migrations": "database/migrations"
+    }
+  }
+}
+```
+
+The value is a directory relative to the package root. It needs `fapost/foundation` `^0.38`, and Core checks
+that it exists inside the package. Each file returns an anonymous class extending
+`Illuminate\Database\Migrations\Migration` and names no connection:
+
+```php
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('feedback_entries', function (Blueprint $table): void {
+            $table->ulid('id')->primary();
+            $table->text('body');
+            $table->timestamps();
+        });
+    }
+};
+```
+
+Files run in name order, and only `up()` is called: there is no `down()` and nothing is rolled back. Each file
+runs once per tenant, whatever its name: a file added in a later version that sorts before ones already applied
+still runs.
+
+**When they run**, in a tenant's own schema:
+
+- **On activation.** The migrations run before the activation is stored. If one fails, the activation is
+  refused and nothing is stored: the console says the Solution's data could not be set up, the cause goes to the
+  application log, and `solutions:activate` prints it.
+- **On the first use of a granted Solution.** A Solution the operator grants has no activation moment. Until its
+  tables are prepared, a step or call answers `solution_not_ready`, console pages show that the Solution is
+  preparing, and a queued job prepares the schema.
+- **On upgrade.** `platform:update` brings current the tenants where the Solution's tables already exist
+  (deactivated Solutions included) and those that turned it on themselves, even before it had migrations. It does
+  not touch the others: a Solution only granted, with no tables yet, is prepared on its first use.
+- **At once.** `solutions:migrate --tenant=<slug>` prepares a tenant's Solutions immediately; see the
+  [command reference](/reference/artisan-commands#solutions).
+
+**Rules**
+
+- **Expand only.** Add tables named `<id>_...`, columns and indexes. Never drop, rename or change the type of
+  anything: older code may still run against the new schema, and nothing is rolled back.
+- **One transaction.** Everything of one Solution in one tenant runs in a single transaction, so do not use
+  `CREATE INDEX CONCURRENTLY` or any other statement that cannot run in a transaction. A failure leaves that
+  tenant's schema unchanged.
+- **Never `loadMigrationsFrom()`.** It would run your migrations on the landlord, so `platform:update` refuses
+  it and exits with code 1 before anything is migrated.
+- **Deactivation keeps the tables.**
 
 ## Registering actions
 
@@ -197,7 +262,7 @@ and the class, when:
 - the class does not implement `ActionHandlerInterface`;
 - you call `registerDataAccessor()`, `registerRagAdapter()`,
   `registerRoutes()`, `registerSchedule()` or `registerMigrations()`, which Core does not support for a
-  Solution yet.
+  Solution yet. Migrations are declared in the manifest instead; see [Tenant migrations](#tenant-migrations).
 
 The opposite case, an action listed in the manifest that no handler registers, is reported by
 `platform:update` (also with `--validate-only`) as
@@ -218,7 +283,9 @@ with a contact that does not exist.
 **Activation is checked on every call.** The action of a Solution the tenant has not activated, or has
 just deactivated, is refused: the `call` node takes its `error` handle with
 `error_code = solution_inactive`, the flow log shows `solution_inactive: <solution id>` on the block,
-and your handler is not built or called. A session that is running when a Solution is deactivated is
+and your handler is not built or called. While the tenant's tables for an active Solution are still being
+prepared, the call is refused the same way with `error_code = solution_not_ready` (the log shows
+`solution_not_ready: <solution id>`); the preparation is queued automatically. A session that is running when a Solution is deactivated is
 not failed: its next `call` to that Solution takes the `error` handle. The builder lists the actions
 of Core and of the tenant's active Solutions only; a flow that already uses an action of a Solution
 that is off still opens and shows the saved value.
@@ -264,7 +331,8 @@ in the manifest that no handler registers is reported by `platform:update` and e
 
 **Activation is checked on every step.** A node of a Solution the tenant has not activated is not
 run: the engine does not build your handler, the node takes its `error` handle, and the flow log shows
-`solution_inactive: <solution id>`. A node whose Solution is no longer installed takes the same handle
+`solution_inactive: <solution id>`. While the tenant's tables are being prepared it takes the same handle with
+`solution_not_ready: <solution id>`; the preparation is queued automatically. A node whose Solution is no longer installed takes the same handle
 with `solution_not_installed: <solution id>`; when the installed Solution no longer ships the version the node was saved with, it is `solution_version_missing: <solution id>`. So give every node an `error` handle; publishing warns
 when it is not connected, and without an edge the session simply ends there. The builder offers your
 nodes only to tenants that have the Solution on; a flow that already holds them still opens, shows

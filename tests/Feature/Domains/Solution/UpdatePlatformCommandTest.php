@@ -331,6 +331,98 @@ final class UpdatePlatformCommandTest extends TestCase
         $this->assertFileDoesNotExist($this->cache->path());
     }
 
+    public function test_a_migration_path_a_solution_registered_with_the_landlord_migrator_refuses_the_update_before_any_migration(): void
+    {
+        $this->registerFeedbackActions();
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+        $path = $this->registerWithLandlordMigrator('acme/fapost-feedback', 'database/migrations');
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('1 extension migration path(s) were registered with the landlord migrator. Nothing was changed.')
+            ->expectsOutputToContain('acme/fapost-feedback: "' . $path . '" is registered with loadMigrationsFrom()')
+            ->assertExitCode(1);
+
+        $this->assertSame(0, $this->migrations, 'The migrator never ran.');
+        $this->assertFileDoesNotExist($this->cache->path());
+    }
+
+    public function test_the_refusal_holds_for_validate_only_too(): void
+    {
+        $this->registerFeedbackActions();
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+        $this->registerWithLandlordMigrator('acme/fapost-feedback', 'database');
+
+        $this->artisan('platform:update', ['--validate-only' => true])
+            ->expectsOutputToContain('extension migration path(s) were registered with the landlord migrator')
+            ->assertExitCode(1);
+    }
+
+    public function test_a_migration_path_a_connector_registered_with_the_landlord_migrator_is_refused_too(): void
+    {
+        $this->registerEchoChannel();
+        $this->vendor->package(FakeVendor::connectorComposer())->write();
+        $this->registerWithLandlordMigrator('acme/fapost-connector-echo', 'database/migrations');
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('acme/fapost-connector-echo: ')
+            ->assertExitCode(1);
+
+        $this->assertSame(0, $this->migrations);
+    }
+
+    public function test_every_registered_path_inside_a_package_is_listed(): void
+    {
+        $this->registerFeedbackActions();
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+        $this->registerWithLandlordMigrator('acme/fapost-feedback', 'database/migrations');
+        $this->registerWithLandlordMigrator('acme/fapost-feedback', 'other');
+
+        $this->artisan('platform:update')
+            ->expectsOutputToContain('2 extension migration path(s) were registered with the landlord migrator')
+            ->assertExitCode(1);
+    }
+
+    public function test_a_path_registered_outside_every_package_and_one_that_does_not_exist_do_not_refuse_the_update(): void
+    {
+        $this->registerFeedbackActions();
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+        $outside = dirname($this->vendor->path) . '/elsewhere';
+        mkdir($outside);
+        $this->app->make('migrator')->path($outside);
+        $this->app->make('migrator')->path($this->vendor->path . '/acme/fapost-feedback/never-created');
+
+        $this->artisan('platform:update')->assertExitCode(0);
+
+        $this->assertSame(1, $this->migrations);
+    }
+
+    public function test_a_sibling_directory_whose_name_starts_like_a_package_is_not_inside_it(): void
+    {
+        $this->registerFeedbackActions();
+        $this->vendor->package(FakeVendor::solutionComposer())->write();
+        $sibling = $this->vendor->path . '/acme/fapost-feedback-extras';
+        mkdir($sibling, 0o777, true);
+        $this->app->make('migrator')->path($sibling);
+
+        $this->artisan('platform:update')->assertExitCode(0);
+    }
+
+    /**
+     * Registers a directory of the installed package with Laravel's migrator, as `loadMigrationsFrom()` in a provider does.
+     */
+    private function registerWithLandlordMigrator(string $package, string $directory): string
+    {
+        $path = $this->vendor->path . '/' . $package . '/' . $directory;
+
+        if (!is_dir($path)) {
+            mkdir($path, 0o777, true);
+        }
+
+        $this->app->make('migrator')->path($path);
+
+        return $path;
+    }
+
     /**
      * What the booted application holds once the fixture Solution has registered its handlers.
      */

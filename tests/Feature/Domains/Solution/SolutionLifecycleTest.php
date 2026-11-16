@@ -22,6 +22,7 @@ use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Solution\Services\InstalledSolutions;
 use App\Domains\Solution\Services\SolutionActivator;
 use App\Domains\Solution\Services\SolutionCache;
+use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionUiCompatibility;
 use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
@@ -33,14 +34,17 @@ use App\Domains\Tenancy\Services\TenantProvisioningService;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use App\Http\Shell\SolutionUi;
+use App\Jobs\Solution\PrepareSolutionSchemaJob;
 use Database\Seeders\TenantAclSeeder;
 use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
 use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
 use Fapost\Foundation\Solution\DTO\SolutionEntitlement;
 use Fapost\Foundation\Solution\DTO\SolutionGrant;
 use Fapost\Foundation\Solution\Enums\SolutionGrantSource;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Inertia\Inertia;
@@ -74,6 +78,10 @@ final class SolutionLifecycleTest extends FeatureTestCase
     use InstallsShowcaseSolution;
 
     private const string BETA_ID = '00000000-0000-0000-0000-0000000000b2';
+
+    private const string CREATE_ENTRIES = '2026_11_16_000001_create_feedback_entries_table';
+
+    private const string CREATE_SCORES = '2026_11_16_000002_create_feedback_scores_table';
 
     private FeedbackCalls $calls;
 
@@ -394,13 +402,131 @@ final class SolutionLifecycleTest extends FeatureTestCase
         $this->assertServedTo($this->alpha, true);
     }
 
+    public function test_a_solution_that_keeps_tables_gets_them_in_the_schema_of_the_tenant_that_activates_it_only(): void
+    {
+        $beta = $this->secondTenant();
+        $this->installFeedbackWithTables();
+        $this->artisan('platform:update')->assertExitCode(0);
+        $this->forgetSolutionState();
+
+        // The compiled catalog carries the newest migration the package ships.
+        $feedback = collect($this->app->make(SolutionCache::class)->read())->firstWhere('id', 'feedback');
+        $this->assertSame(self::CREATE_ENTRIES, $feedback?->latestMigration);
+
+        // Installed is not prepared: no schema holds a table of it.
+        $this->assertSame([], $this->feedbackTables($this->alpha));
+        $this->assertSame([], $this->feedbackTables($beta));
+
+        $this->activate($this->alpha, 'feedback');
+
+        $this->assertSame(['feedback_entries'], $this->feedbackTables($this->alpha));
+        $this->assertSame(['feedback' => self::CREATE_ENTRIES], $this->footprints($this->alpha));
+        $this->assertSame('success', $this->flowResult($this->alpha)['end_status']);
+
+        if ($this->hasTenantSchemas()) {
+            $this->assertSame([], $this->feedbackTables($beta), 'The other tenant\'s schema was not touched.');
+            $this->assertSame([], $this->footprints($beta));
+            $this->assertSame('solution_inactive: feedback', $this->flowResult($beta)['call_error']);
+        }
+    }
+
+    public function test_a_granted_solution_answers_not_ready_until_the_queued_job_has_prepared_its_tables(): void
+    {
+        // The job looks its tenant up in the landlord: a real tenant, with a schema of its own on PostgreSQL.
+        $beta = $this->hasTenantSchemas() ? $this->secondTenant() : $this->alpha;
+        $this->installFeedbackWithTables();
+        Bus::fake([PrepareSolutionSchemaJob::class]);
+        $operator                          = new FakeSolutionEntitlement();
+        $operator->answers[$beta->getId()] = SolutionEntitlement::grants([new SolutionGrant('feedback', SolutionGrantSource::Plan)]);
+        $this->app->instance(SolutionEntitlementInterface::class, $operator);
+        $this->artisan('platform:update')->assertExitCode(0);
+        $this->forgetSolutionState();
+
+        // The grant runs it with nothing stored, and nobody pressed a button: its tables are not there.
+        $this->assertSame(['end_status' => 'failed', 'call_error' => 'solution_not_ready: feedback'], $this->flowResult($beta));
+        $this->inTenant($beta, function (): void {
+            $tested = $this->app->make(CallTester::class)->run($this->callConfig(), []);
+
+            $this->assertFalse($tested['success']);
+            $this->assertSame('solution_not_ready', $tested['error_code']);
+        });
+        $this->assertSame([], $this->calls->calls, 'The handler was not called.');
+        $this->assertSame([], $this->feedbackTables($beta), 'Asking never runs DDL.');
+        Bus::assertDispatched(PrepareSolutionSchemaJob::class, static fn (PrepareSolutionSchemaJob $job): bool => $job->tenantId === $beta->getId() && 'feedback' === $job->solutionId);
+
+        // The worker runs the queued job; the next step goes through.
+        $job = Bus::dispatched(PrepareSolutionSchemaJob::class)->first();
+        $this->assertInstanceOf(PrepareSolutionSchemaJob::class, $job);
+        $this->app->call([$job, 'handle']);
+        $this->forgetSolutionState();
+
+        $this->assertSame(['end_status' => 'success', 'call_error' => null], $this->flowResult($beta));
+        $this->assertSame($beta->getId(), $this->calls->calls[0]['tenant_id']);
+        $this->assertSame(['feedback_entries'], $this->feedbackTables($beta));
+        $this->assertSame(0, $this->inTenant($beta, fn (): int => DB::table('solution_activations')->count()), 'Nothing was stored for a grant.');
+
+        if ($this->hasTenantSchemas()) {
+            $this->assertSame([], $this->feedbackTables($this->alpha), 'The main tenant never ran it.');
+            $this->assertSame([], $this->footprints($this->alpha));
+        }
+    }
+
+    public function test_an_upgrade_through_solutions_migrate_reaches_the_schemas_that_have_the_tables_and_no_others(): void
+    {
+        $this->installFeedbackWithTables();
+        Bus::fake([PrepareSolutionSchemaJob::class]);
+        $this->artisan('platform:update')->assertExitCode(0);
+        $this->forgetSolutionState();
+
+        // Alpha runs the Solution. On PostgreSQL a second tenant turned it on and off again (its tables stay), and a
+        // third never used it.
+        $this->activate($this->alpha, 'feedback');
+        $deactivated = $untouched = null;
+
+        if ($this->hasTenantSchemas()) {
+            $deactivated = $this->secondTenant('lifecycle-dee');
+            $untouched   = $this->secondTenant('lifecycle-nil');
+            $this->activate($deactivated, 'feedback');
+            $this->deactivate($deactivated, 'feedback');
+        }
+
+        // The package is upgraded (a new image, `platform:update` caching it): every schema is behind, and what runs
+        // is refused until it is prepared.
+        $this->shipFeedbackUpgrade();
+
+        $this->assertSame('solution_not_ready: feedback', $this->flowResult($this->alpha)['call_error']);
+        $this->assertSame(['feedback_entries'], $this->feedbackTables($this->alpha));
+
+        // The second half of `platform:update`.
+        $command = $this->artisan('solutions:migrate')->expectsOutputToContain('✔ main feedback: ' . self::CREATE_SCORES);
+
+        if (null !== $deactivated) {
+            $command->expectsOutputToContain('✔ lifecycle-dee feedback: ' . self::CREATE_SCORES);
+        }
+
+        // A command held in a variable would run only when it is destroyed.
+        $command->assertExitCode(0)->run();
+        $this->forgetSolutionState();
+
+        $this->assertSame(['feedback_entries', 'feedback_scores'], $this->feedbackTables($this->alpha));
+        $this->assertSame(['feedback' => self::CREATE_SCORES], $this->footprints($this->alpha));
+        $this->assertSame('success', $this->flowResult($this->alpha)['end_status']);
+
+        if (null !== $deactivated && null !== $untouched) {
+            $this->assertSame(['feedback_entries', 'feedback_scores'], $this->feedbackTables($deactivated), 'Deactivated, but its tables stay current.');
+            $this->assertSame(['feedback' => self::CREATE_SCORES], $this->footprints($deactivated));
+            $this->assertSame([], $this->feedbackTables($untouched), 'No footprint, no tables: an upgrade never creates them.');
+            $this->assertSame([], $this->footprints($untouched));
+        }
+    }
+
     /**
      * The tenant that never activates anything for the first part of the scenario. On PostgreSQL it is a real tenant
      * with a schema of its own; on SQLite, which has none, a tenant id the in-memory store keeps a list for.
      */
-    private function secondTenant(): TenantInterface
+    private function secondTenant(string $slug = 'lifecycle-beta'): TenantInterface
     {
-        if ('pgsql' !== DB::connection('landlord')->getDriverName() || 'pgsql' !== DB::connection((string) config('tenancy.tenant_connection'))->getDriverName()) {
+        if (!$this->hasTenantSchemas()) {
             $store = new InMemorySolutionActivationStore(fn (): TenantContextInterface => $this->app->make(TenantContextInterface::class));
             $this->app->instance(SolutionActivationStoreInterface::class, $store);
             $this->app->forgetInstance(ActiveSolutions::class);
@@ -417,13 +543,104 @@ final class SolutionLifecycleTest extends FeatureTestCase
 
         try {
             $id = $this->app->make(TenantProvisioningService::class)
-                ->provision('lifecycle-beta', 'admin@lifecycle-beta.test', 'S3cret-p@ss-value', 'Admin')
+                ->provision($slug, 'admin@' . $slug . '.test', 'S3cret-p@ss-value', 'Admin')
                 ->getId();
         } finally {
             config(['tenancy.resolution' => $previous]);
         }
 
         return Tenant::on('landlord')->findOrFail($id);
+    }
+
+    /**
+     * Whether every tenant has a schema of its own (PostgreSQL); SQLite has one database for all of them.
+     */
+    private function hasTenantSchemas(): bool
+    {
+        return 'pgsql' === DB::connection('landlord')->getDriverName() && 'pgsql' === DB::connection((string) config('tenancy.tenant_connection'))->getDriverName();
+    }
+
+    /**
+     * Installs the fixture packages again, `feedback` now keeping one table (`feedback_entries`) in the tenant schema.
+     */
+    private function installFeedbackWithTables(): void
+    {
+        $this->installShowcase(
+            publish: false,
+            alsoInstalled: [FakeVendor::solutionComposer(['migrations' => 'database/migrations'])],
+            prepareVendor: function (FakeVendor $vendor): void {
+                $directory = $vendor->path . '/acme/fapost-feedback/database/migrations';
+                mkdir($directory, 0o777, true);
+                file_put_contents($directory . '/' . self::CREATE_ENTRIES . '.php', $this->createTableMigration('feedback_entries'));
+            },
+        );
+    }
+
+    /**
+     * What a new image does to `feedback`: one more migration in its package, `platform:update` caching the catalog,
+     * and the processes that start afterwards reading it.
+     */
+    private function shipFeedbackUpgrade(): void
+    {
+        $directory = $this->showcaseVendor?->path . '/acme/fapost-feedback/database/migrations';
+        file_put_contents($directory . '/' . self::CREATE_SCORES . '.php', $this->createTableMigration('feedback_scores'));
+
+        $this->artisan('platform:update')->assertExitCode(0);
+        $this->app->instance(InstalledSolutions::class, new InstalledSolutions($this->app->make(SolutionCache::class), $this->app->make(SolutionDiscoverer::class)));
+        $this->app->forgetScopedInstances();
+        $this->forgetSolutionState();
+    }
+
+    private function createTableMigration(string $table): string
+    {
+        return <<<PHP
+            <?php
+
+            use Illuminate\Database\Migrations\Migration;
+            use Illuminate\Database\Schema\Blueprint;
+            use Illuminate\Support\Facades\Schema;
+
+            return new class () extends Migration {
+                public function up(): void
+                {
+                    Schema::create('{$table}', static function (Blueprint \$table): void {
+                        \$table->uuid('id')->primary();
+                    });
+                }
+            };
+            PHP;
+    }
+
+    /**
+     * Names of the tables `feedback` keeps in the tenant's own schema (not the other tenants').
+     *
+     * @return list<string>
+     */
+    private function feedbackTables(TenantInterface $tenant): array
+    {
+        return $this->inTenant($tenant, function () use ($tenant): array {
+            $names = $this->hasTenantSchemas()
+                ? DB::table('information_schema.tables')->where('table_schema', $tenant->getSchemaName())->pluck('table_name')->all()
+                : array_column(Schema::getTables(), 'name');
+
+            $names = array_values(array_filter(array_map(strval(...), $names), static fn (string $name): bool => str_starts_with($name, 'feedback_')));
+            sort($names);
+
+            return $names;
+        });
+    }
+
+    /**
+     * The newest migration of each Solution applied in the tenant's schema.
+     *
+     * @return array<string, string>
+     */
+    private function footprints(TenantInterface $tenant): array
+    {
+        /** @var array<string, string> $latest */
+        $latest = $this->inTenant($tenant, fn (): array => DB::table('solution_schemas')->orderBy('solution_id')->pluck('latest_migration', 'solution_id')->all());
+
+        return $latest;
     }
 
     private function inTenant(TenantInterface $tenant, callable $callback): mixed

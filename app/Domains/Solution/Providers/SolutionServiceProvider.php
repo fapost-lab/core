@@ -8,12 +8,16 @@ use App\Domains\Solution\Console\ConsoleExtensionRegistry;
 use App\Domains\Solution\Contracts\ConnectorRegistrarFactoryInterface;
 use App\Domains\Solution\Contracts\SolutionActivationStoreInterface;
 use App\Domains\Solution\Contracts\SolutionGrantSnapshotStoreInterface;
+use App\Domains\Solution\Contracts\SolutionMigratorInterface;
 use App\Domains\Solution\Contracts\SolutionRegistrarFactoryInterface;
+use App\Domains\Solution\Contracts\SolutionSchemaStoreInterface;
 use App\Domains\Solution\DTO\InstalledConnector;
 use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\Infrastructure\CacheSolutionGrantSnapshotStore;
 use App\Domains\Solution\Infrastructure\CoreInstalledSolutionCatalog;
+use App\Domains\Solution\Infrastructure\DatabaseSolutionMigrator;
 use App\Domains\Solution\Infrastructure\EloquentSolutionActivationStore;
+use App\Domains\Solution\Infrastructure\EloquentSolutionSchemaStore;
 use App\Domains\Solution\Infrastructure\SolutionGrantCacheForgetter;
 use App\Domains\Solution\Services\ActiveSolutions;
 use App\Domains\Solution\Services\AllSolutionsEntitled;
@@ -79,6 +83,9 @@ final class SolutionServiceProvider extends ServiceProvider
         // Activation belongs to a tenant. `scoped`: a worker drops it before every job, and it keeps its
         // memo per tenant id, so no process holds one tenant's answer for another or past a deactivation.
         $this->app->bind(SolutionActivationStoreInterface::class, EloquentSolutionActivationStore::class);
+        // The footprint of each Solution in the tenant's schema and the runner of its migrations: stateless, per call.
+        $this->app->bind(SolutionSchemaStoreInterface::class, EloquentSolutionSchemaStore::class);
+        $this->app->bind(SolutionMigratorInterface::class, DatabaseSolutionMigrator::class);
         $this->app->scoped(ActiveSolutions::class);
         // What a tenant may run is the operator's answer. bindIf: an operator package registers before this provider
         // and its binding wins; without one every installed Solution is entitled. Asked through the scoped,

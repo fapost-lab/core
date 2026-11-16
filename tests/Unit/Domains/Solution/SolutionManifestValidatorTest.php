@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Domains\Solution;
 
+use App\Domains\Solution\DTO\InstalledSolution;
 use App\Domains\Solution\DTO\SolutionDiscovery;
 use App\Domains\Solution\Services\InstalledPackagesReader;
 use App\Domains\Solution\Services\SolutionDiscoverer;
@@ -30,24 +31,6 @@ final class SolutionManifestValidatorTest extends TestCase
         $this->vendor->cleanup();
 
         parent::tearDown();
-    }
-
-    private function discover(): SolutionDiscovery
-    {
-        $this->vendor->write();
-
-        return (new SolutionDiscoverer(
-            new InstalledPackagesReader($this->vendor->path),
-            new SolutionManifestValidator(new ManifestParser()),
-        ))->discover();
-    }
-
-    /**
-     * @return list<string>
-     */
-    private function lines(SolutionDiscovery $discovery): array
-    {
-        return array_map(static fn ($violation): string => $violation->line(), $discovery->violations);
     }
 
     public function test_a_valid_solution_is_in_the_catalog(): void
@@ -119,7 +102,7 @@ final class SolutionManifestValidatorTest extends TestCase
     {
         $this->vendor->package(FakeVendor::solutionComposer(root: ['extra' => [
             'laravel' => ['providers' => [FeedbackServiceProvider::class]],
-            'fapost' => FakeVendor::solutionComposer()['extra']['fapost'],
+            'fapost'  => FakeVendor::solutionComposer()['extra']['fapost'],
         ]]));
 
         $discovery = $this->discover();
@@ -169,5 +152,136 @@ final class SolutionManifestValidatorTest extends TestCase
         $this->vendor->writePackageFile('acme/fapost-feedback', '{ not json');
 
         $this->assertSame(['acme/fapost-feedback: composer.json: is not valid JSON'], $this->lines($this->discover()));
+    }
+
+    public function test_a_solution_that_declares_no_migrations_has_none_and_no_latest(): void
+    {
+        $this->vendor->package(FakeVendor::solutionComposer());
+
+        $solution = $this->discover()->valid[0];
+
+        $this->assertNull($solution->migrations);
+        $this->assertNull($solution->latestMigration);
+        $this->assertNull($solution->migrationsDigest);
+        $this->assertNull($solution->migrationsPath());
+    }
+
+    public function test_the_newest_migration_file_name_is_recorded_without_its_extension(): void
+    {
+        $this->vendor->package(FakeVendor::solutionComposer(['migrations' => 'database/migrations']));
+        $this->migrationsDirectory('2026_11_16_000002_add_notes_index.php', '2026_11_16_000001_create_notes.php', '2026_10_01_000009_older.php', 'README.md', '.gitkeep');
+
+        $discovery = $this->discover();
+
+        $this->assertTrue($discovery->isValid());
+        $this->assertSame('database/migrations', $discovery->valid[0]->migrations);
+        $this->assertSame('2026_11_16_000002_add_notes_index', $discovery->valid[0]->latestMigration);
+        $this->assertSame(
+            InstalledSolution::digestOf(['2026_10_01_000009_older', '2026_11_16_000001_create_notes', '2026_11_16_000002_add_notes_index']),
+            $discovery->valid[0]->migrationsDigest,
+            'Every .php name, not only the newest.',
+        );
+        $this->assertSame(realpath($this->vendor->path . '/acme/fapost-feedback/database/migrations'), realpath((string) $discovery->valid[0]->migrationsPath()));
+    }
+
+    public function test_an_empty_migrations_directory_is_valid_and_has_no_latest(): void
+    {
+        $this->vendor->package(FakeVendor::solutionComposer(['migrations' => 'database/migrations']));
+        $this->migrationsDirectory('README.md');
+
+        $discovery = $this->discover();
+
+        $this->assertTrue($discovery->isValid());
+        $this->assertCount(1, $discovery->valid);
+        $this->assertNull($discovery->valid[0]->latestMigration);
+        $this->assertNull($discovery->valid[0]->migrationsDigest);
+    }
+
+    public function test_a_migrations_directory_that_is_missing_is_a_violation_and_keeps_the_package_out(): void
+    {
+        $this->vendor->package(FakeVendor::solutionComposer(['migrations' => 'database/migrations']));
+
+        $discovery = $this->discover();
+
+        $this->assertSame([], $discovery->valid);
+        $this->assertSame(['acme/fapost-feedback: extra.fapost.migrations: "database/migrations" is not a directory in the package'], $this->lines($discovery));
+    }
+
+    public function test_a_migrations_path_that_is_a_file_is_a_violation(): void
+    {
+        $this->vendor->package(FakeVendor::solutionComposer(['migrations' => 'database']));
+        file_put_contents($this->vendor->path . '/acme/fapost-feedback/database', 'not a directory');
+
+        $this->assertSame(['acme/fapost-feedback: extra.fapost.migrations: "database" is not a directory in the package'], $this->lines($this->discover()));
+    }
+
+    public function test_a_migrations_directory_that_leads_out_of_the_package_through_a_symlink_is_a_violation(): void
+    {
+        $outside = dirname($this->vendor->path) . '/outside/migrations';
+        mkdir($outside, 0o777, true);
+        touch($outside . '/2026_11_16_000001_create_elsewhere.php');
+
+        $this->vendor->package(FakeVendor::solutionComposer(['migrations' => 'database']));
+        symlink($outside, $this->vendor->path . '/acme/fapost-feedback/database');
+
+        $discovery = $this->discover();
+
+        $this->assertSame([], $discovery->valid);
+        $this->assertSame(['acme/fapost-feedback: extra.fapost.migrations: "database" leads out of the package'], $this->lines($discovery));
+    }
+
+    public function test_a_symlinked_migrations_directory_that_stays_inside_the_package_is_valid(): void
+    {
+        $this->vendor->package(FakeVendor::solutionComposer(['migrations' => 'linked']));
+        $this->migrationsDirectory('2026_11_16_000001_create_notes.php');
+        symlink($this->vendor->path . '/acme/fapost-feedback/database/migrations', $this->vendor->path . '/acme/fapost-feedback/linked');
+
+        $discovery = $this->discover();
+
+        $this->assertTrue($discovery->isValid());
+        $this->assertSame('2026_11_16_000001_create_notes', $discovery->valid[0]->latestMigration);
+    }
+
+    public function test_a_migrations_problem_does_not_hide_the_other_packages(): void
+    {
+        $this->vendor
+            ->package(FakeVendor::solutionComposer(['migrations' => 'database/migrations']))
+            ->package(FakeVendor::solutionComposer(['id' => 'survey', 'actions' => null], ['name' => 'acme/fapost-survey']));
+
+        $discovery = $this->discover();
+
+        $this->assertSame(['survey'], array_map(static fn ($solution): string => $solution->id, $discovery->valid));
+        $this->assertCount(1, $discovery->violations);
+    }
+
+    private function discover(): SolutionDiscovery
+    {
+        $this->vendor->write();
+
+        return (new SolutionDiscoverer(
+            new InstalledPackagesReader($this->vendor->path),
+            new SolutionManifestValidator(new ManifestParser()),
+        ))->discover();
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function lines(SolutionDiscovery $discovery): array
+    {
+        return array_map(static fn ($violation): string => $violation->line(), $discovery->violations);
+    }
+
+    /**
+     * Creates the declared migrations directory of the fixture package with empty files of the given names.
+     */
+    private function migrationsDirectory(string ...$files): void
+    {
+        $directory = $this->vendor->path . '/acme/fapost-feedback/database/migrations';
+        mkdir($directory, 0o777, true);
+
+        foreach ($files as $file) {
+            touch($directory . '/' . $file);
+        }
     }
 }

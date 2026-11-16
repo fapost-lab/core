@@ -33,6 +33,8 @@ final class FlowEngineSolutionNodeTest extends FeatureTestCase
     /** @var list<string> */
     private array $active = ['feedback'];
 
+    private bool $ready = true;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -53,7 +55,17 @@ final class FlowEngineSolutionNodeTest extends FeatureTestCase
             {
                 return null === $solutionId || in_array($solutionId, $this->test->activeSolutions(), true);
             }
+
+            public function isReady(string $solutionId): bool
+            {
+                return $this->test->solutionsReady();
+            }
         });
+    }
+
+    public function solutionsReady(): bool
+    {
+        return $this->ready;
     }
 
     /**
@@ -128,6 +140,56 @@ final class FlowEngineSolutionNodeTest extends FeatureTestCase
 
         $this->active = ['feedback'];
         $this->assertSame('ok', $this->endNode($this->runFlow('feedback.collect')));
+    }
+
+    public function test_a_node_of_a_solution_whose_tables_are_not_ready_takes_the_error_exit_without_building_the_handler(): void
+    {
+        $this->ready = false;
+        $built       = $this->calls->constructions;
+
+        $session = $this->runFlow('feedback.collect');
+
+        $this->assertSame($built, $this->calls->constructions, 'The handler was not built.');
+        $this->assertSame([], $this->calls->calls);
+        $this->assertSame('refused', $this->endNode($session));
+        $this->assertArrayNotHasKey('feedback', $session->state);
+        $this->assertSame('solution_not_ready: feedback', $this->errorLoggedFor($session, 'collect'));
+
+        $log = DB::table('flow_logs')->where('session_id', $session->getKey())->where('node_id', 'collect')->sole();
+        $this->assertSame('error', $log->source_handle);
+    }
+
+    public function test_an_inactive_solution_is_reported_as_inactive_before_readiness_is_asked(): void
+    {
+        $this->active = [];
+        $this->ready  = false;
+
+        $session = $this->runFlow('feedback.collect');
+
+        $this->assertSame('solution_inactive: feedback', $this->errorLoggedFor($session, 'collect'));
+    }
+
+    public function test_readiness_is_asked_on_every_run_and_the_node_runs_once_the_tables_are_there(): void
+    {
+        $this->ready = false;
+        $this->assertSame('refused', $this->endNode($this->runFlow('feedback.collect')));
+
+        $this->ready = true;
+        $this->assertSame('ok', $this->endNode($this->runFlow('feedback.collect')));
+    }
+
+    public function test_a_core_node_is_not_held_back_by_readiness(): void
+    {
+        $this->ready = false;
+
+        $session = $this->runCustomFlow(
+            [
+                ['id' => 'ok', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+            ],
+            [],
+        );
+
+        $this->assertSame(FlowSessionStatus::Ended, $session->status);
     }
 
     public function test_another_solutions_node_may_not_write_the_namespace(): void

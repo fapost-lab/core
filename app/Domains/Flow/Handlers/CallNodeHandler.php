@@ -64,6 +64,8 @@ final class CallNodeHandler extends AbstractVersionedHandler
 
     private const string ERROR_SOLUTION_INACTIVE = 'solution_inactive';
 
+    private const string ERROR_SOLUTION_NOT_READY = 'solution_not_ready';
+
     private const string HANDLE_SUCCESS = 'success';
     private const string HANDLE_ERROR   = 'error';
 
@@ -196,8 +198,8 @@ final class CallNodeHandler extends AbstractVersionedHandler
                 self::IDEMPOTENCY_KEY_META => $callContext->idempotencyKey,
             ], static fn (mixed $v): bool => null !== $v),
             // The flow log keeps only this field; without it the author would not see why the call was refused.
-            errorMessage: self::ERROR_SOLUTION_INACTIVE === $result->errorCode
-                ? self::ERROR_SOLUTION_INACTIVE . ': ' . (is_string($result->metadata['solution_id'] ?? null) ? $result->metadata['solution_id'] : 'unknown')
+            errorMessage: in_array($result->errorCode, [self::ERROR_SOLUTION_INACTIVE, self::ERROR_SOLUTION_NOT_READY], true)
+                ? $result->errorCode . ': ' . (is_string($result->metadata['solution_id'] ?? null) ? $result->metadata['solution_id'] : 'unknown')
                 : null,
         );
     }

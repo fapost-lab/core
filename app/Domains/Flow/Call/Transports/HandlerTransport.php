@@ -23,7 +23,7 @@ use Throwable;
  * {@code CallResult::error('action_exception', …)} — never bubble up.
  *
  * An action registered by a Solution that the current tenant has not activated is refused with
- * {@code solution_inactive} before its handler is built, let alone called. The check runs on every
+ * {@code solution_inactive} (or {@code solution_not_ready} while its tables are being prepared) before its handler is built, let alone called. The check runs on every
  * call, against the scope the call runs in. A refusal still counts as one call execution: the node
  * spends the quota before it reaches the transport.
  */
@@ -58,6 +58,10 @@ final readonly class HandlerTransport implements CallTransportInterface
 
         if (!$this->availability->isAvailable($solutionId)) {
             return CallResult::error('solution_inactive', metadata: ['action_id' => $actionId, 'solution_id' => $solutionId]);
+        }
+
+        if (null !== $solutionId && !$this->availability->isReady($solutionId)) {
+            return CallResult::error('solution_not_ready', metadata: ['action_id' => $actionId, 'solution_id' => $solutionId]);
         }
 
         try {

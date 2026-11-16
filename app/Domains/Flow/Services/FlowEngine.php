@@ -622,6 +622,10 @@ final readonly class FlowEngine implements FlowEngineInterface
             return $this->solutionError('solution_inactive', $owner);
         }
 
+        if (null !== $owner && ! $this->solutionAvailability->isReady($owner)) {
+            return $this->solutionError('solution_not_ready', $owner);
+        }
+
         if (str_contains($type, '.') && ! $this->registry->has($type, $version)) {
             return null !== $owner
                 ? $this->solutionError('solution_version_missing', $owner)

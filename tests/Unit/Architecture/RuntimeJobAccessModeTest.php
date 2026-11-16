@@ -28,6 +28,7 @@ use App\Jobs\Flow\StartFlowFromEventJob;
 use App\Jobs\Media\CleanupSoftDeletedMediaJob;
 use App\Jobs\Messaging\BroadcastSendJob;
 use App\Jobs\Messaging\SyncChannelWebhookJob;
+use App\Jobs\Solution\PrepareSolutionSchemaJob;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use ReflectionClass;
@@ -83,6 +84,8 @@ final class RuntimeJobAccessModeTest extends TestCase
         CleanupSoftDeletedMediaJob::class,
         // Deleting a tenant: its owner may delete a stopped tenant, and the operator's retention deletes stopped tenants.
         DecommissionTenantJob::class,
+        // Prepares a Solution's tables in the tenant's schema: no tenant code runs, and repeating it is harmless.
+        PrepareSolutionSchemaJob::class,
         // Tells the admins that the workspace's deletion was scheduled or cancelled: about the tenant's own state.
         SendWorkspaceDeletionNoticeJob::class,
     ];

@@ -32,6 +32,8 @@ platform is updated, so it never appears here.
 Click **Turn on**. The change is immediate, and the next flow run can use the Solution's actions. The page
 records you as the person who did it, in the same journal the command line writes to.
 
+A Solution that stores data may show **Preparing** for a short while when a plan first turns it on. Its pages say that it is being prepared, and a flow that reaches it leaves the node by the **error** output with the reason `solution_not_ready` until it is ready.
+
 ## Turning one off
 
 Click **Turn off** and confirm. From then on:

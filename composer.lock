@@ -4,7 +4,7 @@
     "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
     "This file is @generated automatically"
   ],
-  "content-hash": "d6a4ceb87dea375302ca8947a2fabfdd",
+  "content-hash": "e757b74b0373da954b8b6d2b736e2b8c",
   "packages": [
     {
       "name": "aws/aws-crt-php",
@@ -966,16 +966,16 @@
     },
     {
       "name": "fapost/foundation",
-      "version": "v0.36.0",
+      "version": "v0.38.0",
       "source": {
         "type": "git",
         "url": "https://github.com/fapost-lab/foundation.git",
-        "reference": "305421a7d9fcbf1c553fbf411f6ae254b500307e"
+        "reference": "2f274a29b9094414b66918ef9df8d9a0f1da8b48"
       },
       "dist": {
         "type": "zip",
-        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/305421a7d9fcbf1c553fbf411f6ae254b500307e",
-        "reference": "305421a7d9fcbf1c553fbf411f6ae254b500307e",
+        "url": "https://api.github.com/repos/fapost-lab/foundation/zipball/2f274a29b9094414b66918ef9df8d9a0f1da8b48",
+        "reference": "2f274a29b9094414b66918ef9df8d9a0f1da8b48",
         "shasum": ""
       },
       "require": {
@@ -1015,10 +1015,10 @@
       ],
       "description": "FaPost public contract layer for Solutions, Plugins and external integrations",
       "support": {
-        "source": "https://github.com/fapost-lab/foundation/tree/v0.36.0",
+        "source": "https://github.com/fapost-lab/foundation/tree/v0.38.0",
         "issues": "https://github.com/fapost-lab/foundation/issues"
       },
-      "time": "2026-11-13T19:18:32+00:00"
+      "time": "2026-11-16T13:58:56+00:00"
     },
     {
       "name": "fapost/support",
@@ -12917,5 +12917,5 @@
     "ext-pdo_pgsql": "*"
   },
   "platform-dev": {},
-  "plugin-api-version": "2.9.0"
+  "plugin-api-version": "2.11.0"
 }
