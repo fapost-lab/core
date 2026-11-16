@@ -78,3 +78,11 @@ domain rules named as its source; this file is the index of what holds and how i
 - **Core never depends on the Solution testing kit.** `testing/` (`Fapost\Testing\`) is autoload-dev and absent
   from production images; the kit depends on Core, not the other way round. Source: `domains/solution/OVERVIEW.md`.
   Enforced: `tests/Architecture/TestingKitBoundaryTest.php` (`App`, `Database`).
+- **An outside author's pull request is merged only after its CLA check passes.** `CLA.md` gives the project the right
+  to relicense a contribution; without a signature the code stays Apache-2.0 only, for good. The check ("Contributor
+  licence agreement", `.github/workflows/cla.yml`) is deliberately **not** a required status of the `main` ruleset
+  (owner decision, 2026-11-17): every pull request today is the owner's or an agent's under the owner's account
+  (allowlisted), and an infrastructure failure of the check (`startup_failure`) blocked merges. Whoever merges — the
+  owner or an agent — reads the check on a pull request by anyone not in the workflow's `allowlist` and does not merge
+  it while the check is not green. Make it a required status again once outside contributors arrive. Source:
+  `CLA.md`, `docs/site/contributing/legal.mdx`. Review only.
