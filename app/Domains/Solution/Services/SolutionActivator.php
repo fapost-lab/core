@@ -10,6 +10,7 @@ use App\Domains\Solution\Enums\ActivationChange;
 use App\Domains\Solution\Enums\SolutionActivationStatus;
 use App\Domains\Solution\Exceptions\SolutionEntitlementUnavailableException;
 use App\Domains\Solution\Exceptions\SolutionGrantedException;
+use App\Domains\Solution\Exceptions\SolutionMigrationFailedException;
 use App\Domains\Solution\Exceptions\SolutionNotEntitledException;
 use App\Domains\Solution\Exceptions\SolutionNotInstalledException;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
@@ -33,13 +34,19 @@ final class SolutionActivator
         private readonly InstalledSolutions $installed,
         private readonly ActiveSolutions $active,
         private readonly SolutionEntitlements $entitlements,
+        private readonly SolutionSchemas $schemas,
     ) {
     }
 
     /**
+     * Brings the Solution's tables in the tenant's schema current before it is turned on, so a failed migration refuses
+     * the activation and nothing is stored. A granted Solution is prepared here too: its admin pressing the button is the
+     * one moment it has.
+     *
      * @throws SolutionNotInstalledException when the Solution is not installed with a valid manifest
      * @throws SolutionNotEntitledException when the operator does not entitle the tenant to it
      * @throws SolutionEntitlementUnavailableException when the operator's answer could not be had
+     * @throws SolutionMigrationFailedException when the Solution's migrations fail in the tenant's schema
      */
     public function activate(string $solutionId, ActivationActor $actor): ActivationChange
     {
@@ -56,6 +63,8 @@ final class SolutionActivator
         if (!$entitlement->allows($solutionId)) {
             throw SolutionNotEntitledException::forId($solutionId);
         }
+
+        $this->schemas->bringCurrent($solutionId);
 
         if ($entitlement->isGranted($solutionId)) {
             return ActivationChange::Unchanged;

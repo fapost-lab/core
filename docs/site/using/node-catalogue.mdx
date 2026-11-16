@@ -234,6 +234,7 @@ An internal action that comes from a Solution works only while your workspace ha
 Solution switched on. When it is off, the call is not made and the flow takes the failure
 outcome, with `error_code = solution_inactive` (the flow log shows
 `solution_inactive: ...` on the block); the Test call in the builder answers the same way. The
+A Solution that is on but still preparing its tables for your workspace answers with `error_code = solution_not_ready` instead. The
 action list in the builder shows only the actions you can use now.
 
 <Warning>

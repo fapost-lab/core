@@ -139,7 +139,23 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
     deactivating one is allowed; it then drops its tenant's memo. Default: nothing active.
   - `solutions:activate|deactivate|list` need `--tenant=<slug>` and run inside `runForTenant()`; `list` shows the source
     (`plan`, `addon`, `manual`). The `onActivate`/`onDeactivate` hooks are not called, and a grant has no moment to call them in:
-    a Solution must not rely on activation for per-tenant setup (migrations for every tenant, lazy initialisation).
+    a Solution must not rely on activation hooks for per-tenant setup. Its tables come from its declared migrations instead (below).
+- Tenant migrations of a Solution (`adr-20261116-solution-tenant-migrations`): the manifest's `extra.fapost.migrations` (Foundation 0.38)
+  names a directory; `SolutionManifestValidator` checks it lies inside the package and records the newest file
+  (`InstalledSolution::$latestMigration`) and the digest of every file name (`$migrationsDigest`); a schema is current when
+  `solution_schemas.migrations_digest` equals it. `SolutionSchemas::bringCurrent()` is the only caller of `Contracts/SolutionMigratorInterface`
+  (`Infrastructure/DatabaseSolutionMigrator`: every pending file, the journal `solution_migrations` and the footprint `solution_schemas`
+  in one transaction on the tenant connection, an advisory lock on PostgreSQL, `up()` only, no connection of its own).
+  - Activation migrates before it stores (a granted Solution too); `SolutionMigrationFailedException` refuses it.
+  - `solutions:migrate` (run by `platform:update` through `ArtisanPlatformMigrator`, also after a failed tenant) keeps current only
+    `SolutionSchemas::idsToKeepCurrent()` (footprint or stored active), and never asks the operator; with `--tenant` it also
+    prepares the tenant's effectively active ones.
+  - `ActiveSolutions::isReady()` reads `solution_schemas` once per tenant and scope. An active Solution that is not ready answers
+    `solution_not_ready` on steps and calls (`SolutionAvailabilityInterface::isReady()`) and 503 "preparing" in the console;
+    `App\Infrastructure\Solution\SolutionPreparation` then queues `App\Jobs\Solution\PrepareSolutionSchemaJob` (unique per tenant
+    and Solution, queue `solutions.migrate`, Horizon supervisor `solutions`); the admin screen's `preparing` flag asks it too.
+    No DDL runs on a step or a page.
+  - `platform:update` refuses a path registered with `loadMigrationsFrom()` inside an installed Solution or connector package.
   - The activation screen is `admin/solutions` (`Admin\SolutionController`, props from `Http/Shell/SolutionsPresenter`,
     page `Console/AdminSolutions`), behind `manage_settings` like tenant settings and usage. It lists only valid Solutions
     (a failing manifest never reaches the catalog, and `platform:update` refuses it first) plus stored-active rows whose
@@ -177,7 +193,7 @@ carries an `extra.fapost` block (schema 1: `schema`, `id`, `name`, `description`
   PHPat (`SolutionBoundariesTest`) forbids a dependency on any other `App\Domains` namespace, and
   forbids facades and `Illuminate\Database` outside `Infrastructure` and `Providers`, so discovery
   and the services run without a database.
-- Not here yet: registrar methods other than `registerActionHandler` and `registerNodeHandler`, per-phase migrations of a Solution and the `migrations` manifest field.
+- Not here yet: registrar methods other than `registerActionHandler` and `registerNodeHandler` (`registerMigrations` stays refused: migrations are declared in the manifest), per-phase rollback of `platform:update`, and a queue of a Solution's own (task `solution-queue`).
   Plugins (`type: fapost-plugin`) are reserved and not discovered.
 - The Foundation constraint is not re-checked in Core: Composer refuses to install a package whose
   `require["fapost/foundation"]` does not fit the locked version, and a package Composer did not

@@ -7,6 +7,7 @@ namespace App\Http\Middleware;
 use App\Domains\Solution\Console\ConsoleExtensionRegistry;
 use App\Http\Shell\SolutionExtensions;
 use App\Http\Shell\SolutionUi;
+use App\Infrastructure\Solution\SolutionPreparation;
 use Closure;
 use Fapost\Foundation\Console\ConsoleNames;
 use Illuminate\Http\Request;
@@ -23,10 +24,13 @@ use Symfony\Component\HttpFoundation\Response;
  * ({@see SolutionUi::needsUpdate()}) answers 503 instead, to a user its application lets in: a page request gets Core's
  * `Errors/SolutionUnavailable` page inside the shell, saying the Solution needs an update, and a JSON request a bare
  * 503; a user the application does not let in still gets 404.
+ *
+ * A served Solution whose tables in the tenant's schema are missing or behind ({@see SolutionPreparation}) answers 503 the
+ * same way with `reason: 'preparing'`, and has them prepared on the queue: the user tries again in a minute.
  */
 final readonly class EnsureSolutionActive
 {
-    public function __construct(private SolutionUi $ui, private ConsoleExtensionRegistry $registry, private SolutionExtensions $extensions)
+    public function __construct(private SolutionUi $ui, private ConsoleExtensionRegistry $registry, private SolutionExtensions $extensions, private SolutionPreparation $preparation)
     {
     }
 
@@ -52,10 +56,14 @@ final readonly class EnsureSolutionActive
         $solution = self::solutionOf($request);
 
         if (null !== $solution && $this->ui->needsUpdate($solution) && $this->mayOpen($request, $solution)) {
-            return $this->updateRequired($request);
+            return $this->unavailable($request, 'update_required');
         }
 
         abort_if(null === $solution || ! $this->ui->isServed($solution), Response::HTTP_NOT_FOUND);
+
+        if ($this->mayOpen($request, $solution) && ! $this->preparation->isReadyOrPrepare($solution)) {
+            return $this->unavailable($request, 'preparing');
+        }
 
         return $next($request);
     }
@@ -69,13 +77,13 @@ final readonly class EnsureSolutionActive
         return $this->extensions->allows($request->user(), $this->registry->applicationOf($solutionId)?->ability);
     }
 
-    private function updateRequired(Request $request): Response
+    private function unavailable(Request $request, string $reason): Response
     {
         if ($request->expectsJson() && ! $request->header('X-Inertia')) {
             abort(Response::HTTP_SERVICE_UNAVAILABLE);
         }
 
-        return Inertia::render('Errors/SolutionUnavailable', ['reason' => 'update_required'])
+        return Inertia::render('Errors/SolutionUnavailable', ['reason' => $reason])
             ->toResponse($request)
             ->setStatusCode(Response::HTTP_SERVICE_UNAVAILABLE);
     }

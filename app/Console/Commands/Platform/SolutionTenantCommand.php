@@ -10,8 +10,8 @@ use Closure;
 use Illuminate\Console\Command;
 
 /**
- * Base of the `solutions:activate|deactivate|list` commands: finds the tenant named by the required
- * `--tenant=<slug>` and runs the work inside that tenant's context. There is no "every tenant" form.
+ * Base of the `solutions:activate|deactivate|list|migrate` commands: finds the tenant named by `--tenant=<slug>` and
+ * runs the work inside that tenant's context. Only `solutions:migrate` has an "every tenant" form.
  */
 abstract class SolutionTenantCommand extends Command
 {

@@ -12,6 +12,7 @@ use App\Domains\Solution\Services\SolutionDiscoverer;
 use App\Domains\Solution\Services\SolutionManifestValidator;
 use App\Domains\Solution\Services\SolutionUiPublisher;
 use App\Http\Shell\SolutionRoutes;
+use Closure;
 use Fapost\Foundation\Solution\Manifest\ManifestParser;
 use Fapost\Testing\Support\SolutionRequestState;
 use Illuminate\Filesystem\Filesystem;
@@ -29,16 +30,68 @@ trait InstallsShowcaseSolution
 
     private ?string $showcasePublic = null;
 
+    /** @var list<string> */
+    private array $showcaseCopies = [];
+
     protected static function showcasePackage(): string
     {
         return dirname(__DIR__) . '/Fixtures/Solutions/Showcase/package';
     }
 
     /**
+     * A copy of the fixture package that ships one tenant migration (`showcase_notes`), so a tenant that turned the
+     * Solution on before has no tables for it: not ready until they are prepared. Delete it with {@see removeShowcaseCopies()}.
+     */
+    protected function showcasePackageWithMigration(): string
+    {
+        $copy = sys_get_temp_dir() . '/fapost-showcase-migrating-' . bin2hex(random_bytes(6));
+        (new Filesystem())->copyDirectory(self::showcasePackage(), $copy);
+        $this->showcaseCopies[] = $copy;
+
+        $composer                                  = json_decode((string) file_get_contents($copy . '/composer.json'), true, 512, JSON_THROW_ON_ERROR);
+        $composer['extra']['fapost']['migrations'] = 'database/migrations';
+        file_put_contents($copy . '/composer.json', json_encode($composer, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+
+        mkdir($copy . '/database/migrations', 0o777, true);
+        file_put_contents($copy . '/database/migrations/2026_11_16_000001_create_showcase_notes_table.php', <<<'PHP'
+            <?php
+
+            declare(strict_types=1);
+
+            use Illuminate\Database\Migrations\Migration;
+            use Illuminate\Database\Schema\Blueprint;
+            use Illuminate\Support\Facades\Schema;
+
+            return new class extends Migration {
+                public function up(): void
+                {
+                    Schema::create('showcase_notes', static function (Blueprint $table): void {
+                        $table->uuid('id')->primary();
+                        $table->string('title');
+                    });
+                }
+            };
+            PHP);
+
+        return $copy;
+    }
+
+    protected function removeShowcaseCopies(): void
+    {
+        foreach ($this->showcaseCopies as $copy) {
+            (new Filesystem())->deleteDirectory($copy);
+        }
+
+        $this->showcaseCopies = [];
+    }
+
+    /**
      * @param  string|null  $package  a copy of the fixture package to install instead, as a test changed it
      * @param  list<array<string, mixed>>  $alsoInstalled  composer.json of further packages to install beside it
+     * @param  Closure(FakeVendor): void|null  $prepareVendor  called once the vendor tree is written and before any Solution is discovered, to put
+     *                                                      files into a package listed in `$alsoInstalled` (a package's declared directories must exist by then)
      */
-    protected function installShowcase(bool $publish = true, ?string $package = null, array $alsoInstalled = []): void
+    protected function installShowcase(bool $publish = true, ?string $package = null, array $alsoInstalled = [], ?Closure $prepareVendor = null): void
     {
         $this->removeShowcase();
 
@@ -54,6 +107,10 @@ trait InstallsShowcaseSolution
         }
 
         $this->showcaseVendor->write();
+
+        if (null !== $prepareVendor) {
+            $prepareVendor($this->showcaseVendor);
+        }
 
         $this->showcasePublic = dirname($this->showcaseVendor->path) . '/public';
         mkdir($this->showcasePublic, 0o777, true);

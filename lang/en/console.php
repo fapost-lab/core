@@ -1733,6 +1733,7 @@ return [
             'mismatch'           => ':runtime: built for :required, this platform ships :provided.',
             'unreadable'         => ':runtime: built for ":required", a range this platform cannot evaluate; it ships :provided.',
             'needs_update'       => 'Needs an update',
+            'preparing'          => 'Preparing',
             'needs_update_title' => 'On, but its console interface is hidden: it needs an update',
             'needs_update_note'  => 'This platform now ships versions its console interface was not built for, so the interface is hidden and its application is marked in the app switcher. The Solution stays on: its flows, actions and data keep working. Ask whoever maintains it for a build that fits.',
             'runtime'            => [
@@ -1784,6 +1785,7 @@ return [
         'flash' => [
             'activated'           => 'Solution :solution is on.',
             'already_active'      => 'Solution :solution was already on.',
+            'migration_failed'    => 'Solution :solution could not be turned on: its data could not be set up in your workspace. Nothing was changed; the error was logged for the administrator of this installation.',
             'deactivated'         => 'Solution :solution is off. Its data is kept.',
             'already_inactive'    => 'Solution :solution was already off.',
             'not_allowed'         => 'This workspace may not turn that Solution on.',
@@ -1888,6 +1890,10 @@ return [
         'update_required' => [
             'title'       => 'This application needs an update',
             'description' => 'It is still on, and its flows and data keep working, but its interface was built for an earlier version of this platform and cannot be shown. Ask your administrator to install an update of the Solution.',
+        ],
+        'preparing' => [
+            'title'       => 'This application is being prepared',
+            'description' => 'Its data is being set up for your workspace. Try again in a minute.',
         ],
     ],
     // The platform settings screen of the admin panel (single-tenant deployments).

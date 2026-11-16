@@ -34,4 +34,13 @@ final readonly class ContainerSolutionAvailability implements SolutionAvailabili
 
         return $this->container->make(ActiveSolutions::class)->isActive($solutionId);
     }
+
+    /**
+     * A Solution whose tables are missing or behind in the tenant's schema is not ready; asking has them prepared on
+     * the queue ({@see SolutionPreparation}) and never runs DDL here, on a step.
+     */
+    public function isReady(string $solutionId): bool
+    {
+        return $this->container->make(SolutionPreparation::class)->isReadyOrPrepare($solutionId);
+    }
 }

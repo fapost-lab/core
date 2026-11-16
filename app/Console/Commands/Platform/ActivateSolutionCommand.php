@@ -7,6 +7,7 @@ namespace App\Console\Commands\Platform;
 use App\Domains\Solution\DTO\ActivationActor;
 use App\Domains\Solution\Enums\ActivationChange;
 use App\Domains\Solution\Exceptions\SolutionEntitlementUnavailableException;
+use App\Domains\Solution\Exceptions\SolutionMigrationFailedException;
 use App\Domains\Solution\Exceptions\SolutionNotEntitledException;
 use App\Domains\Solution\Exceptions\SolutionNotInstalledException;
 use App\Domains\Solution\Services\ActiveSolutions;
@@ -34,7 +35,7 @@ final class ActivateSolutionCommand extends SolutionTenantCommand
         return $this->runForTenantOption($tenants, $switcher, function () use ($solution): int {
             try {
                 $change = $this->laravel->make(SolutionActivator::class)->activate($solution, ActivationActor::console());
-            } catch (SolutionNotInstalledException|SolutionNotEntitledException|SolutionEntitlementUnavailableException $exception) {
+            } catch (SolutionNotInstalledException|SolutionNotEntitledException|SolutionEntitlementUnavailableException|SolutionMigrationFailedException $exception) {
                 $this->components->error($exception->getMessage());
 
                 return self::FAILURE;

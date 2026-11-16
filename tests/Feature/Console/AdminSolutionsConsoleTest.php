@@ -9,6 +9,7 @@ use App\Domains\Solution\DTO\ActivationActor;
 use App\Domains\Solution\Enums\ActivationAction;
 use App\Domains\Solution\Enums\ActivationActorKind;
 use App\Domains\Solution\Enums\SolutionActivationStatus;
+use App\Domains\Solution\Exceptions\SolutionMigrationFailedException;
 use App\Domains\Solution\Infrastructure\SolutionActivationEventRecord;
 use App\Domains\Solution\Infrastructure\SolutionActivationRecord;
 use App\Domains\Solution\Services\ActiveSolutions;
@@ -16,6 +17,7 @@ use App\Domains\Staff\Enums\RoleEnum;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Services\TenantSwitcher;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use App\Jobs\Solution\PrepareSolutionSchemaJob;
 use Database\Seeders\TenantAclSeeder;
 use DateTimeImmutable;
 use Fapost\Foundation\Solution\Contracts\SolutionEntitlementInterface;
@@ -28,7 +30,10 @@ use Fapost\Foundation\Solution\DTO\SolutionPrice;
 use Fapost\Foundation\Solution\Enums\SolutionGrantSource;
 use Fapost\Foundation\Solution\Enums\SolutionPricePeriod;
 use Illuminate\Filesystem\Filesystem;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Exceptions;
+use Illuminate\Support\Facades\Schema;
+use Inertia\Support\SessionKey;
 use Inertia\Testing\AssertableInertia;
 use Tests\Feature\FeatureTestCase;
 use Tests\Support\FakeSolutionEntitlement;
@@ -57,6 +62,7 @@ final class AdminSolutionsConsoleTest extends FeatureTestCase
     protected function tearDown(): void
     {
         $this->removeShowcase();
+        $this->removeShowcaseCopies();
 
         foreach ($this->copies as $copy) {
             (new Filesystem())->deleteDirectory($copy);
@@ -286,6 +292,79 @@ final class AdminSolutionsConsoleTest extends FeatureTestCase
 
         $this->forgetActive();
         $this->assertFalse($this->isActive('showcase'));
+    }
+
+    public function test_an_active_solution_whose_tables_are_behind_is_marked_preparing_and_has_its_preparation_queued_once(): void
+    {
+        $this->installShowcase(alsoInstalled: [$this->feedback()]);
+        $this->activateShowcase();
+        $admin = $this->admin();
+
+        $this->actingAs($admin)
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('solutions.0.preparing', false)
+                ->where('solutions.1.preparing', false)
+                ->etc());
+
+        $this->installShowcase(package: $this->showcasePackageWithMigration());
+        Bus::fake();
+
+        $this->actingAs($admin)
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page
+                ->where('solutions.0.id', 'showcase')
+                ->where('solutions.0.active', true)
+                ->where('solutions.0.preparing', true)
+                ->etc());
+
+        Bus::assertDispatchedTimes(PrepareSolutionSchemaJob::class, 1);
+        Bus::assertDispatched(PrepareSolutionSchemaJob::class, static fn (PrepareSolutionSchemaJob $job): bool => 'showcase' === $job->solutionId);
+    }
+
+    public function test_a_solution_whose_migration_fails_is_not_turned_on_and_the_screen_says_so(): void
+    {
+        $package = $this->showcasePackageWithMigration();
+        file_put_contents($package . '/database/migrations/2026_11_16_000002_fails.php', <<<'PHP'
+            <?php
+
+            declare(strict_types=1);
+
+            use Illuminate\Database\Migrations\Migration;
+
+            return new class extends Migration {
+                public function up(): void
+                {
+                    throw new RuntimeException('broken migration');
+                }
+            };
+            PHP);
+        $this->installShowcase(package: $package);
+        Exceptions::fake();
+
+        $response = $this->actingAs($this->admin())
+            ->post($this->url('/showcase/activate'))
+            ->assertRedirect($this->url());
+
+        $flash = $response->baseRequest->session()->get(SessionKey::FLASH_DATA, []);
+        $this->assertSame(trans('console.solutions.flash.migration_failed', ['solution' => 'showcase']), is_array($flash) ? ($flash['error'] ?? null) : null);
+
+        $this->forgetActive();
+        $this->assertFalse($this->isActive('showcase'));
+        $this->assertFalse(Schema::hasTable('showcase_notes'));
+        Exceptions::assertReported(SolutionMigrationFailedException::class);
+    }
+
+    public function test_an_inactive_solution_is_never_preparing_and_queues_nothing(): void
+    {
+        $this->installShowcase(package: $this->showcasePackageWithMigration());
+        Bus::fake();
+
+        $this->actingAs($this->admin())
+            ->get($this->url())
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('solutions.0.preparing', false)->etc());
+
+        Bus::assertNothingDispatched();
     }
 
     public function test_a_range_core_cannot_read_is_reported_as_unreadable_not_as_a_fit(): void

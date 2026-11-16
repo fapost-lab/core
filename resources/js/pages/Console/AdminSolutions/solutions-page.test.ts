@@ -39,6 +39,7 @@ const translations = {
         title: 'Cannot be turned on',
         description: 'Built for other versions.',
         needs_update: 'Needs an update',
+        preparing: 'Preparing',
         needs_update_title: 'On, but hidden',
         needs_update_note: 'Its interface is hidden until it is updated.',
         mismatch: ':runtime: built for :required, ships :provided.',
@@ -84,6 +85,7 @@ function solution(over: Partial<SolutionRow> = {}): SolutionRow {
     package: 'acme/fapost-feedback',
     version: '1.2.0',
     active: false,
+    preparing: false,
     actions: ['feedback.run'],
     ui: null,
     lastChange: null,
@@ -281,6 +283,13 @@ describe('solutions page', () => {
     expect(dialog('[data-test="kit-mismatch"]')?.textContent).toContain('On, but hidden')
     expect(dialog('[data-test="needs-update-note"]')?.textContent).toContain('hidden until it is updated')
     expect(dialog('[data-test="mismatch-kit"]')?.textContent).toBe('Interface kit: built for ^0.1, ships 0.2.0.')
+  })
+
+  it('marks an active Solution whose data is still being prepared', () => {
+    const wrapper = mountPage([solution({ active: true, preparing: true }), solution({ id: 'other', active: true })])
+
+    expect(wrapper.get('[data-test="solution-feedback"] [data-test="preparing-badge"]').text()).toBe('Preparing')
+    expect(wrapper.find('[data-test="solution-other"] [data-test="preparing-badge"]').exists()).toBe(false)
   })
 
   it('says a console interface is not published yet', async () => {
