@@ -55,7 +55,7 @@ banner.
 - [x] `limit-warnings` — Limit warnings — an operator can ask Core to tell the tenant's admins that a limit is approaching (e.g. 80%): `UsageDecision::allowed()` carries the period end and an `approaching` flag, and Core sends it through the limit-notice path with a new `LimitNoticeReason::Approaching` (decided with the owner on 2026-10-10; after: Limit notifications — the same delivery)
 - [x] `tenant-usage-screen` — Tenant usage screen — the tenant's admin sees usage against limits on the admin shell: Core's own record and byte counts, and the operator's per-period usage read through a Foundation read contract (decided with the owner on 2026-10-10; after: Limit notifications; needs ui-foundation's admin shell)
 - [ ] fog: notification bot for tenant users — a platform bot each user of a tenant links to themselves (a deep link from their profile, behind a permission) that carries system notifications: limits, new Core versions, new Solutions; the owner prefers one platform bot over each tenant registering its own (credentials per tenant), since it also serves platform announcements. Open: which messenger first, how a self-hosted install configures its bot, and where announcements come from (decided as a direction with the owner on 2026-10-10)
-- [ ] fog: read-only depth in the builder — whether the builder opens without save or is closed, cannot be stated until the read-only panel exists on the kit
+- [ ] `builder-read-only-stopped` — read-only depth in the builder — whether the builder opens without save or is closed, cannot be stated until the read-only panel exists on the kit
 
 ## Waves
 
