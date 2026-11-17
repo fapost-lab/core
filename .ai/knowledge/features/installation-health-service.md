@@ -66,4 +66,6 @@ doctor command.
 - The contract's figures are a generic `HealthMetric` (name, value, unit, subject) with a documented catalogue, not
   a typed DTO per service: a new figure or service is a Foundation minor, not a breaking change. Rejected: exposing
   `HealthReport::toArray()` (untyped, leaks channel names and exception texts, ties packages to Core's `details`).
-- Spec: `.ai/specs/installation-health/` (branch `spec/installation-health`).
+- A snapshot, never a history: the service keeps no samples, and the console page shows the state now. History over
+  time (a sparkline of connections, queue throughput) is the monitoring package's, where Pulse already keeps samples
+  with Reverb's cards; a second store of samples in Core would duplicate it (decided with the owner on 2026-11-17).
