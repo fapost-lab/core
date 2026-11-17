@@ -88,6 +88,16 @@ export interface BuilderFlowPayload {
     availableFlows?: Array<{id: string; name: string}>
     availableActions?: string[]
     availableCountries?: Array<{value: string; label: string}>
+    /** The tenant is stopped and the user may only look: no editing, no saving, no publishing. */
+    readOnly?: boolean
+}
+
+/** The operator's notice for a stopped tenant, as the shared `accessState` prop and a 423 answer carry it. */
+export interface ReadOnlyNotice {
+    title: string
+    message: string | null
+    actionLabel: string | null
+    actionUrl: string | null
 }
 
 export interface NodeTypePayload {

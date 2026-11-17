@@ -88,9 +88,13 @@ const nodeTypeLabel = computed(() => {
 const availability = computed(() =>
     selectedNode.value ? nodeAvailability(selectedNode.value.type, handlerMeta.value) : { state: 'available' as const },
 )
-const readOnly = computed(() => isNodeUnavailable(availability.value))
-const unavailableText = computed(() => unavailableReason(availability.value, t))
+const readOnly = computed(() => builderStore.readOnly || isNodeUnavailable(availability.value))
+// A stopped workspace is the other reason for a read-only form; the banner above the builder explains it.
+const unavailableText = computed(() => (isNodeUnavailable(availability.value) ? unavailableReason(availability.value, t) : ''))
+const readOnlyText = computed(() => (isNodeUnavailable(availability.value) ? t('nodes.unavailable.read_only') : t('read_only.node')))
 const hasSchemaFields = computed(() => Object.keys(handlerMeta.value?.config_schema ?? {}).length > 0)
+// An available node in a view-only builder still shows its form (inert); an unavailable one only when its schema is known.
+const showReadOnlyForm = computed(() => hasSchemaFields.value || (builderStore.readOnly && !isNodeUnavailable(availability.value)))
 
 function updateConfig(patch: unknown) {
     if (!selectionStore.selectedNodeId) return
@@ -145,12 +149,14 @@ function deleteTrigger() {
                             <button class="config-close-btn" title="Close" @click="close">×</button>
                         </div>
                         <div class="config-card-body">
-                            <TriggerConfig
-                                :trigger="builderStore.trigger"
-                                :available-events="builderStore.availableEvents"
-                                @update:trigger="updateTrigger"
-                                @delete:trigger="deleteTrigger"
-                            />
+                            <div :class="{ 'config-readonly': builderStore.readOnly }" :inert="builderStore.readOnly">
+                                <TriggerConfig
+                                    :trigger="builderStore.trigger"
+                                    :available-events="builderStore.availableEvents"
+                                    @update:trigger="updateTrigger"
+                                    @delete:trigger="deleteTrigger"
+                                />
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -181,9 +187,9 @@ function deleteTrigger() {
                         <div class="config-card-body">
                             <template v-if="readOnly">
                                 <p class="config-unavailable-notice">
-                                    {{ unavailableText }}<br>{{ t('nodes.unavailable.read_only') }}
+                                    <template v-if="unavailableText">{{ unavailableText }}<br></template>{{ readOnlyText }}
                                 </p>
-                                <div v-if="hasSchemaFields" class="config-readonly" inert>
+                                <div v-if="showReadOnlyForm" class="config-readonly" inert>
                                     <component
                                         :is="configComponent"
                                         :node="selectedNode"

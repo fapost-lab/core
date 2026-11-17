@@ -13,9 +13,11 @@ use App\Domains\Flow\Services\SaveDraftService;
 use App\Domains\Flow\Services\ValidateFlowService;
 use App\Domains\Flow\Templates\TemplateExpander;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\RefuseWritesWhenTenantStopped;
 use App\Http\Requests\SaveDraftRequest;
 use App\Http\Requests\ValidateFlowRequest;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -26,6 +28,8 @@ final class BuilderFlowController extends Controller
         string $flow,
         FlowDraftRepositoryInterface $drafts,
         LoadBuilderFlowService $service,
+        RefuseWritesWhenTenantStopped $writeGuard,
+        Request $request,
     ): Response {
         Gate::authorize('view', $drafts->findByFlowId($flow));
 
@@ -49,6 +53,7 @@ final class BuilderFlowController extends Controller
                 'kind'                => $dto->kind,
                 'availableTemplates'  => $dto->availableTemplates,
                 'usedBy'              => $dto->usedBy,
+                'readOnly'            => $writeGuard->refusesWritesFor($request->user()),
             ],
             'backUrl' => route('template' === $dto->kind ? 'console.flow-templates.index' : 'console.flows.index', ['assistant' => $dto->assistantId]),
         ]);

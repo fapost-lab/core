@@ -1,7 +1,7 @@
 import { useBuilderStore } from '@builder/store/builderStore';
 import { useValidation } from '@builder/composables/useValidation';
 import type { ApiError } from '@builder/api/builderApi';
-import { publishFlow, saveDraft } from '@builder/api/builderApi';
+import { publishFlow, saveDraft, tenantStoppedNotice } from '@builder/api/builderApi';
 import type { ValidationError } from '@builder/dto/types';
 
 type PublishResult = { success: true; version: number } | { success: false }
@@ -11,6 +11,10 @@ export function usePublish() {
     const { validate } = useValidation();
 
     async function publish(): Promise<PublishResult> {
+        if (store.readOnly) {
+            return { success: false };
+        }
+
         const result = await validate({ open: false });
         if (!result.valid) {
             store.setValidationResult(result, true);
@@ -38,6 +42,13 @@ export function usePublish() {
             return { success: true, version: data.version };
         } catch (e) {
             const error = e as ApiError & { body?: { valid?: unknown; errors?: ValidationError[] } };
+            const stopped = tenantStoppedNotice(e);
+            if (stopped !== null) {
+                store.enterReadOnly(stopped.notice);
+
+                return { success: false };
+            }
+
             if (error.status === 422 && error.body) {
                 const payload = error.body;
                 if (typeof payload.valid === 'boolean') {

@@ -157,6 +157,41 @@ final class StoppedTenantRequestTest extends FeatureTestCase
                 ->etc());
     }
 
+    public function test_the_builder_opens_read_only_for_a_stopped_tenant(): void
+    {
+        $draft = $this->draft();
+
+        $this->actingAs($this->admin())
+            ->get("/builder/flows/{$draft->flow_id}")
+            ->assertInertia(fn ($page) => $page->where('flow.readOnly', true)->etc());
+    }
+
+    public function test_the_builder_opens_editable_for_an_active_tenant(): void
+    {
+        $this->mode->resume();
+        $draft = $this->draft();
+
+        $this->actingAs($this->admin())
+            ->get("/builder/flows/{$draft->flow_id}")
+            ->assertInertia(fn ($page) => $page->where('flow.readOnly', false)->etc());
+    }
+
+    public function test_the_builder_opens_editable_for_platform_support_in_a_stopped_tenant(): void
+    {
+        config(['tenancy.support_access.enabled' => true]);
+        $support = $this->app->make(PlatformSupportUserService::class)->ensure();
+        $draft   = $this->draft();
+
+        $this->actingAs($support)->withSession([SupportAccessSession::KEY => [
+            'entry_id'       => 'entry-1',
+            'operator_name'  => 'Olga',
+            'operator_email' => 'olga@example.com',
+            'expires_at'     => now()->addHour()->toIso8601String(),
+        ]])->get("/builder/flows/{$draft->flow_id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page->where('flow.readOnly', false)->etc());
+    }
+
     private function admin(): User
     {
         $user = User::factory()->create();

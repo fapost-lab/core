@@ -214,8 +214,9 @@ function onSave() {
             </div>
         </div>
 
-        <!-- Right: translation editor -->
+        <!-- Right: translation editor; view-only while the tenant is stopped, the key list stays usable -->
         <ContentEditorPanel
+            :inert="builderStore.readOnly"
             :content-key="selectedEntry?.fieldLabel ?? undefined"
             :translations="localTranslations"
             :languages="languages"

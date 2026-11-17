@@ -21,6 +21,7 @@ import type {
   FlowEdge,
   FlowNode,
   NodeConfig,
+  ReadOnlyNotice,
   SaveStatus,
   TriggerType,
   ValidationResult,
@@ -135,6 +136,14 @@ export const useBuilderStore = defineStore('builder', () => {
       .filter((name) => name !== '')
     return Array.from(new Set([...tenantEvents.value, ...fromNodes])).sort()
   })
+    /**
+     * View-only mode: the tenant is stopped and the user is not platform support. Set from the
+     * server on load, or flipped by a 423 `tenant_stopped` answer when the mode changed while the tab
+     * was open. Every mutator below is a no-op in it; the server refuses the writes as well.
+     */
+    const readOnly = ref(false)
+    /** The operator's notice carried by a 423 answer; null until one arrives (the shared page prop covers load). */
+    const readOnlyNotice = ref<ReadOnlyNotice | null>(null)
     const saveStatus = ref<SaveStatus>('idle')
     // True from the moment the user mutates definition or trigger after the
     // last successful save. Flips back to false on `setSaveStatus('saved')`
@@ -311,6 +320,8 @@ export const useBuilderStore = defineStore('builder', () => {
         flowName.value = flow.name
         draftVersion.value = flow.draftVersion
         publishedVersion.value = flow.publishedVersion ?? null
+        readOnly.value = flow.readOnly === true
+        readOnlyNotice.value = null
         kind.value = flow.kind === 'template' ? 'template' : 'flow'
         availableTemplates.value = Array.isArray(flow.availableTemplates) ? flow.availableTemplates : []
         usedBy.value = Array.isArray(flow.usedBy) ? flow.usedBy : []
@@ -328,13 +339,20 @@ export const useBuilderStore = defineStore('builder', () => {
         availableCountries.value = Array.isArray(flow.availableCountries) ? flow.availableCountries : []
         // A healed definition differs from the persisted draft — flag dirty so
         // the repaired loop_end / end nodes reach the backend on the next save.
-        isDirty.value = healedLoops || healedEnd || refreshedTemplates
+        isDirty.value = !readOnly.value && (healedLoops || healedEnd || refreshedTemplates)
         // The dirty watcher is queued by the assignments above and runs after this
         // function returns; re-arm it only once that flush is done, so loading a
         // flow does not by itself mark the draft as edited.
         void nextTick(() => {
             hydrated = true
         })
+    }
+
+    function enterReadOnly(notice: ReadOnlyNotice | null = null) {
+        readOnly.value = true
+        readOnlyNotice.value = notice
+        isDirty.value = false
+        saveStatus.value = 'idle'
     }
 
     function setDraftVersion(v: number | null) {
@@ -346,10 +364,12 @@ export const useBuilderStore = defineStore('builder', () => {
     }
 
     function setTrigger(nextTrigger: BuilderTriggerPayload | null) {
+        if (readOnly.value) return
         trigger.value = normalizeTrigger(nextTrigger)
     }
 
     function updateTrigger(patch: Record<string, unknown>) {
+        if (readOnly.value) return
         const current = (trigger.value as ActiveTrigger | null) ?? defaultTrigger()
         trigger.value = {
             ...current,
@@ -362,6 +382,7 @@ export const useBuilderStore = defineStore('builder', () => {
     }
 
     function deleteTrigger() {
+        if (readOnly.value) return
         trigger.value = { _delete: true }
     }
 
@@ -396,6 +417,7 @@ export const useBuilderStore = defineStore('builder', () => {
     }
 
     function undo() {
+        if (readOnly.value) return
         if (!undoStack.value.length) {
             return
         }
@@ -405,6 +427,7 @@ export const useBuilderStore = defineStore('builder', () => {
     }
 
     function redo() {
+        if (readOnly.value) return
         if (!redoStack.value.length) {
             return
         }
@@ -414,6 +437,7 @@ export const useBuilderStore = defineStore('builder', () => {
     }
 
     function insertNode(afterNodeId: string, handle = 'default', type: string, version: number): string | null {
+        if (readOnly.value) return null
         const newNodeId = nanoid(10)
 
         if (!afterNodeId) {
@@ -573,6 +597,7 @@ export const useBuilderStore = defineStore('builder', () => {
      * and come here.
      */
     function deleteNodeWithBranches(nodeId: string): boolean {
+        if (readOnly.value) return false
         const target = definition.value.nodes.find((n) => n.id === nodeId) ?? null
 
         if (!target || target.type === 'loop_end') return false
@@ -617,6 +642,7 @@ export const useBuilderStore = defineStore('builder', () => {
     }
 
     function deleteNode(nodeId: string): boolean {
+        if (readOnly.value) return false
         const selectionStore = useSelectionStore()
 
         if (!nodeId) {
@@ -681,6 +707,7 @@ export const useBuilderStore = defineStore('builder', () => {
      * Bridging in that case would resurrect the broken edge.
      */
     function removeNodes(nodeIds: string[]): boolean {
+        if (readOnly.value) return false
         if (nodeIds.length === 0) return false
 
         const targetSet = new Set(nodeIds)
@@ -733,6 +760,7 @@ export const useBuilderStore = defineStore('builder', () => {
    * flow entry — the current entry becomes its default successor.
    */
   function moveNode(movingId: string, targetNodeId: string | null, handle: string): boolean {
+    if (readOnly.value) return false
     if (!movingId || movingId === targetNodeId) return false
 
     const movingExists = definition.value.nodes.some((node) => node.id === movingId)
@@ -847,6 +875,7 @@ export const useBuilderStore = defineStore('builder', () => {
    * entry — current entry latches onto the chain's tail.
    */
   function moveChain(headNodeId: string, sourceNodeId: string | null, handle: string): boolean {
+    if (readOnly.value) return false
     if (!headNodeId || headNodeId === sourceNodeId) return false
 
         const headExists = definition.value.nodes.some((node) => node.id === headNodeId)
@@ -935,6 +964,7 @@ export const useBuilderStore = defineStore('builder', () => {
     }
 
     function moveNodeUp(nodeId: string) {
+        if (readOnly.value) return
         const node = definition.value.nodes.find((n) => n.id === nodeId)
         if (!node) return
         // Terminal nodes (end, send_message with buttons / reply keyboard)
@@ -952,6 +982,7 @@ export const useBuilderStore = defineStore('builder', () => {
     }
 
     function moveNodeDown(nodeId: string) {
+        if (readOnly.value) return
         const outgoingEdge = definition.value.edges.find(
             (edge) => edge.from === nodeId && (edge.handle ?? 'default') === 'default',
         )
@@ -1003,6 +1034,7 @@ export const useBuilderStore = defineStore('builder', () => {
      * canvas lists, so nothing is deleted silently).
      */
     function selectTemplate(nodeId: string, templateId: string) {
+        if (readOnly.value) return
         const node = definition.value.nodes.find((n) => n.id === nodeId)
         const template = availableTemplates.value.find((t) => t.id === templateId)
         if (!node || !template) return
@@ -1027,6 +1059,7 @@ export const useBuilderStore = defineStore('builder', () => {
      * The node-level `parameters` key is removed when the list is empty.
      */
     function setNodeParameters(nodeId: string, parameters: TemplateParameterDeclaration[]) {
+        if (readOnly.value) return
         const node = definition.value.nodes.find((n) => n.id === nodeId)
         if (!node) return
 
@@ -1039,6 +1072,7 @@ export const useBuilderStore = defineStore('builder', () => {
     }
 
     function updateNodeConfig(nodeId: string, patch: NodeConfig) {
+        if (readOnly.value) return
         const node = definition.value.nodes.find((n) => n.id === nodeId)
         if (!node) return
 
@@ -1153,6 +1187,8 @@ export const useBuilderStore = defineStore('builder', () => {
         availableActions,
         availableCountries,
         tree,
+        readOnly,
+        readOnlyNotice,
         saveStatus,
         isDirty,
         activeTab,
@@ -1162,6 +1198,7 @@ export const useBuilderStore = defineStore('builder', () => {
         undoStack,
         redoStack,
         init,
+        enterReadOnly,
         setDraftVersion,
         setPublishedVersion,
         setTrigger,

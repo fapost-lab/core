@@ -2,7 +2,7 @@ import {watch} from 'vue';
 import {useDebounceFn} from '@vueuse/core';
 import {useBuilderStore} from '@builder/store/builderStore';
 import type {ApiError} from '@builder/api/builderApi';
-import {saveDraft} from '@builder/api/builderApi';
+import {saveDraft, tenantStoppedNotice} from '@builder/api/builderApi';
 
 export function useAutoSave() {
     const store = useBuilderStore();
@@ -18,6 +18,11 @@ export function useAutoSave() {
     let queued   = false;
 
     async function persist(): Promise<void> {
+        // A stopped tenant refuses every write, so nothing is sent from a view-only builder.
+        if (store.readOnly) {
+            return;
+        }
+
         if (store.flowId == null || store.draftVersion == null) {
             return;
         }
@@ -43,7 +48,11 @@ export function useAutoSave() {
             store.setSaveStatus('saved');
         } catch (e) {
             const err = e as ApiError & { body?: { valid?: unknown } };
-            if (err.status === 409) {
+            const stopped = tenantStoppedNotice(e);
+            if (stopped !== null) {
+                // The mode changed while the tab was open: fall back to view-only instead of an error.
+                store.enterReadOnly(stopped.notice);
+            } else if (err.status === 409) {
                 store.setSaveStatus('conflict');
             } else if (err.status === 422 && typeof err.body?.valid === 'boolean') {
                 store.setValidationResult(err.body as { valid: boolean }, true);
@@ -56,7 +65,7 @@ export function useAutoSave() {
 
             // Edits that landed mid-request go out now, against the version the
             // server just handed back.
-            if (queued && store.saveStatus !== 'conflict') {
+            if (queued && !store.readOnly && store.saveStatus !== 'conflict') {
                 queued = false;
                 void persist();
             }

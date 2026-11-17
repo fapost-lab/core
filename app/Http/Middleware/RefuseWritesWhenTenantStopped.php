@@ -7,6 +7,7 @@ namespace App\Http\Middleware;
 use App\Domains\Staff\Models\User;
 use App\Domains\Tenancy\Services\CurrentAccessState;
 use Closure;
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -27,21 +28,26 @@ final readonly class RefuseWritesWhenTenantStopped
     ) {
     }
 
+    /**
+     * Whether this user's changes are refused right now: the tenant is stopped and the user is not
+     * the platform support user. The builder page asks the same question to open view-only.
+     */
+    public function refusesWritesFor(?Authenticatable $user): bool
+    {
+        if (! $this->accessState->get()->isStopped()) {
+            return false;
+        }
+
+        return ! ($user instanceof User && $user->isPlatformSupport());
+    }
+
     public function handle(Request $request, Closure $next): Response
     {
-        $state = $this->accessState->get();
-
-        if (! $state->isStopped() || $request->isMethodSafe()) {
+        if ($request->isMethodSafe() || ! $this->refusesWritesFor($request->user())) {
             return $next($request);
         }
 
-        $user = $request->user();
-
-        if ($user instanceof User && $user->isPlatformSupport()) {
-            return $next($request);
-        }
-
-        $notice = $state->notice;
+        $notice = $this->accessState->get()->notice;
 
         return response()->json([
             'error'   => 'tenant_stopped',

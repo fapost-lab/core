@@ -3,6 +3,11 @@
 declare(strict_types=1);
 
 return [
+    'read_only' => [
+        'banner' => 'This workspace is stopped, so the flow is open for viewing only. Changes are not saved.',
+        'node'   => 'The workspace is stopped: this configuration can be viewed but not edited.',
+    ],
+
     'topbar' => [
         'back'                     => 'Back',
         'language'                 => 'Interface language',

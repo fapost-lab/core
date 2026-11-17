@@ -281,7 +281,11 @@ broken.
   `RespectsTenantAccessMode`, and `flow:sweep-subflow-timeouts` skips the tenant. The tenant stays `Active` so
   console commands see it. A postponed job is re-queued as a delayed copy, never `release()`d (a release spends
   an attempt). Fail open: an operator that throws is reported and counts as active (`TenantAccessStates`). A
-  gateway "Class@method" handler must run the job's middleware itself. Every queued job in `app/` is either listed as runtime (and gated) or as keeping running. Enforced:
+  gateway "Class@method" handler must run the job's middleware itself. The builder opens view-only rather than closed
+  (decided with the owner on 2026-11-17): its page gets `flow.readOnly` from
+  `RefuseWritesWhenTenantStopped::refusesWritesFor()`, the one rule, never re-derived in JS from `accessState`; the
+  client hides editing and skips autosave, and a 423 `tenant_stopped` met mid-session switches it to view-only — the
+  423 stays the protection. Every queued job in `app/` is either listed as runtime (and gated) or as keeping running. Enforced:
   `StoppedTenantRequestTest`, `StoppedTenantRuntimeTest`, `RespectsTenantAccessModeTest`,
   `RuntimeJobAccessModeTest` (`adr-20261008-access-mode-is-a-mode-not-a-status`).
 
