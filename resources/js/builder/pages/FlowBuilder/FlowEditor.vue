@@ -7,6 +7,7 @@ import {useAutoSave} from '@builder/composables/useAutoSave'
 import {useValidation} from '@builder/composables/useValidation'
 import {usePublish} from '@builder/composables/usePublish'
 import AppTopBar from '@builder/components/AppTopBar.vue'
+import ReadOnlyBanner from '@builder/components/ReadOnlyBanner.vue'
 import FlowStructure from '@builder/components/editor/FlowStructure.vue'
 import FlowSequence from '@builder/components/editor/FlowSequence.vue'
 import ConfigPanel from '@builder/components/editor/ConfigPanel.vue'
@@ -110,6 +111,10 @@ async function runPublish() {
 }
 
 useEventListener(document, 'keydown', (event) => {
+    if (builderStore.readOnly) {
+        return
+    }
+
     if ((event.metaKey || event.ctrlKey) && event.key === 'z' && !event.shiftKey) {
         event.preventDefault()
         builderStore.undo()
@@ -137,7 +142,8 @@ useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
 </script>
 
 <template>
-    <div class="editor-root">
+    <div class="editor-root" :class="{ 'editor-root--read-only': builderStore.readOnly }">
+        <ReadOnlyBanner />
         <AppTopBar
             :flow-name="builderStore.flowName"
             :draft-version="builderStore.draftVersion"
@@ -153,6 +159,7 @@ useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
             :published-msg="publishedMsg"
             :used-by="builderStore.usedBy"
             :is-template="builderStore.isTemplate"
+            :read-only="builderStore.readOnly"
             @tab-change="builderStore.setActiveTab"
             @save-draft="save"
             @undo="builderStore.undo"
@@ -190,6 +197,13 @@ useEventListener(window, 'beforeunload', (event: BeforeUnloadEvent) => {
 </template>
 
 <style scoped>
+/* View-only: the controls that change the flow go away; the store refuses those changes as well. */
+.editor-root--read-only :deep(.node-delete-btn),
+.editor-root--read-only :deep(.node-side-actions),
+.editor-root--read-only :deep(.node-side-btn),
+.editor-root--read-only :deep(.insert-point) {
+    display: none;
+}
 .editor-root {
     height: 100vh;
     display: flex;

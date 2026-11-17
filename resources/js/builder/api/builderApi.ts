@@ -1,4 +1,4 @@
-import type {BuilderTriggerPayload, FlowDefinition, NodeGroup, NodeTypePayload, StateNamespaceEntry, ValidationResult,} from '@builder/dto/types'
+import type {BuilderTriggerPayload, FlowDefinition, NodeGroup, NodeTypePayload, ReadOnlyNotice, StateNamespaceEntry, ValidationResult,} from '@builder/dto/types'
 import {xsrfHeaders} from '@shared/http'
 
 const BASE = '/builder'
@@ -34,6 +34,20 @@ async function request<T>(method: string, url: string, body: unknown = null): Pr
     }
 
     return res.json() as Promise<T>
+}
+
+/**
+ * The 423 answer the server gives to a write while the tenant is stopped: `null` for any other error,
+ * otherwise the operator's notice (itself null when the operator wrote none).
+ */
+export function tenantStoppedNotice(error: unknown): { notice: ReadOnlyNotice | null } | null {
+    const err = error as Partial<ApiError> & { body?: { error?: unknown; notice?: ReadOnlyNotice | null } }
+
+    if (err?.status !== 423 || err.body?.error !== 'tenant_stopped') {
+        return null
+    }
+
+    return { notice: err.body.notice ?? null }
 }
 
 export interface NodeTypesResponse {

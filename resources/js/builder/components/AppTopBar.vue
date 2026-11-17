@@ -70,6 +70,8 @@ defineProps({
     /** Flows that use this flow as a template (empty for an ordinary flow). */
     usedBy:           { type: Array as () => Array<{ id: string, name: string }>, default: () => [] },
     isTemplate:       { type: Boolean, default: false },
+    /** View-only: the tenant is stopped, so nothing can be edited, saved or published. */
+    readOnly:         { type: Boolean, default: false },
 })
 
 const emit = defineEmits([
@@ -169,6 +171,7 @@ const SAVE_COLORS: Record<string, string> = {
                 <component :is="themeIcon" :size="15" aria-hidden="true" />
             </TopBarMenu>
             <button
+                v-if="!readOnly"
                 class="btn btn-ghost btn-icon"
                 :disabled="!canUndo"
                 :title="t('topbar.undo')"
@@ -176,6 +179,7 @@ const SAVE_COLORS: Record<string, string> = {
                 @click="emit('undo')"
             >↩</button>
             <button
+                v-if="!readOnly"
                 class="btn btn-ghost btn-icon"
                 :disabled="!canRedo"
                 :title="t('topbar.redo')"
@@ -185,8 +189,8 @@ const SAVE_COLORS: Record<string, string> = {
             <button class="btn btn-outline" :disabled="validating" @click="emit('validate')">
                 {{ validating ? t('topbar.validating') : `✓ ${t('topbar.validate')}` }}
             </button>
-            <button class="btn btn-ghost" @click="emit('saveDraft')">{{ t('topbar.save_draft') }}</button>
-            <button class="btn btn-primary" :disabled="publishing" @click="emit('publish')">
+            <button v-if="!readOnly" class="btn btn-ghost" @click="emit('saveDraft')">{{ t('topbar.save_draft') }}</button>
+            <button v-if="!readOnly" class="btn btn-primary" :disabled="publishing" @click="emit('publish')">
                 {{ publishing ? t('topbar.publishing') : `↑ ${t('topbar.publish')}` }}
             </button>
             <Transition name="fade">
