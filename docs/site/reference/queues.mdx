@@ -10,6 +10,7 @@ description: "Every queue, what belongs on it, and why they stay separate."
 | `messaging.broadcast` | Low-priority fan-out for broadcasts |
 | `messaging.system` | Service notifications, and live-update announcements to open operator screens (only with a delivering `BROADCAST_CONNECTION`) |
 | `scheduled.triggers` | Scheduled and event trigger fan-out |
+| `flow.automations` | Automation runs — flows started by a trigger rather than a message: their start and each of their execution segments |
 | `sync.external` | External synchronisations |
 | `messaging.logging` | Conversation capture, written outside the delivery path |
 | `tenancy.decommission` | Removing a tenant completely (see below); one job at a time, on its own connection |
@@ -33,6 +34,14 @@ query, and a reply should not queue behind the next contact's inbound message. T
 replies are sent from inside the `flow.execution` job that produced them, so the queue
 is reserved and Horizon only keeps a worker on it.
 
+`flow.automations` keeps background runs off the conversation path: an automation that
+makes several calls in a row must not hold the workers that answer contacts, nor wait
+behind a retrying external sync. An automation run never holds one job for long — after
+a number of steps or seconds (the platform settings `flow.automation.segment_steps` and
+`flow.automation.segment_seconds`) it saves its position and continues in a new job, so
+no job outlives its timeout and a retried job continues the run instead of starting it
+again.
+
 `sync.external` is isolated for a different reason: it depends on systems whose
 availability is not ours. When a third party is down and its jobs are retrying with
 backoff, that retry storm must not occupy the workers that answer contacts.
@@ -54,18 +63,19 @@ rate limit into tens of thousands of failed jobs, each of which will retry.
 
 ## Which worker takes which
 
-Horizon runs six supervisors, a seventh while a Solution is installed, and the grouping is the
+Horizon runs seven supervisors, an eighth while a Solution is installed, and the grouping is the
 separation made operational:
 
 | Supervisor | Queues |
 |---|---|
 | 1 | `flow.execution`, `messaging.transactional` |
 | 2 | `sync.external`, `scheduled.triggers` |
-| 3 | `messaging.broadcast`, `messaging.system`, `messaging.logging` |
-| 4 | `default` |
-| 5 | `tenancy.decommission`, on the `redis-long` connection |
-| 6 | `solutions.migrate`, on the `redis-long` connection, so preparing a Solution never waits behind a removal |
-| 7 | `solution-jobs.<id>` of every installed Solution, on the `redis-long` connection, balanced between them; present only while a Solution is installed, and a new Solution's queue is served after `php artisan horizon:terminate` |
+| 3 | `flow.automations`; its job timeout (60 seconds) stays below the `redis` connection's `retry_after` (90 seconds), so a running segment is never handed to a second worker |
+| 4 | `messaging.broadcast`, `messaging.system`, `messaging.logging` |
+| 5 | `default` |
+| 6 | `tenancy.decommission`, on the `redis-long` connection |
+| 7 | `solutions.migrate`, on the `redis-long` connection, so preparing a Solution never waits behind a removal |
+| 8 | `solution-jobs.<id>` of every installed Solution, on the `redis-long` connection, balanced between them; present only while a Solution is installed, and a new Solution's queue is served after `php artisan horizon:terminate` |
 
 The first pair is the latency-critical path — a message arriving and the reply
 going out — and it has its own processes so nothing else can crowd it.

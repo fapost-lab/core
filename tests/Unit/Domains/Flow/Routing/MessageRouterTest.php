@@ -17,6 +17,8 @@ use App\Domains\Flow\Commands\GlobalCommandExecutorInterface;
 use App\Domains\Flow\Concurrency\LockAcquisitionPolicy;
 use App\Domains\Flow\Concurrency\SessionLockManager;
 use App\Domains\Flow\Concurrency\SessionLockRegistry;
+use App\Domains\Flow\Contracts\AfterCommitDispatcherInterface;
+use App\Domains\Flow\Contracts\AutomationContinuationSchedulerInterface;
 use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
@@ -30,6 +32,7 @@ use App\Domains\Flow\Orchestration\DelayedSessionResumer;
 use App\Domains\Flow\Routing\DropPolicyInterface;
 use App\Domains\Flow\Routing\MessageRouter;
 use App\Domains\Flow\Routing\SessionStateRouter;
+use App\Domains\Flow\Services\SegmentHandOff;
 use App\Domains\Flow\Support\CallbackDataCodec;
 use App\Domains\Flow\Support\OperatorRequestCancelButton;
 use App\Domains\Messaging\Typing\TypingHeartbeatRegistry;
@@ -38,6 +41,7 @@ use Fapost\Foundation\DTO\IncomingMessage;
 use Fapost\Foundation\DTO\IncomingMessageType;
 use Fapost\Foundation\Flow\Contracts\TriggerResolverInterface;
 use Illuminate\Contracts\Redis\Factory as RedisFactory;
+use Illuminate\Database\ConnectionInterface;
 use Illuminate\Redis\Connections\Connection;
 use Mockery;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -183,6 +187,11 @@ final class MessageRouterTest extends TestCase
             guard: Mockery::mock(FlowExecutionGuardInterface::class)->shouldIgnoreMissing(),
             engine: $engine,
             scheduler: Mockery::mock(DelayResumeSchedulerInterface::class)->shouldIgnoreMissing(),
+            handOff: new SegmentHandOff(
+                Mockery::mock(ConnectionInterface::class)->shouldIgnoreMissing(),
+                Mockery::mock(AfterCommitDispatcherInterface::class)->shouldIgnoreMissing(),
+                Mockery::mock(AutomationContinuationSchedulerInterface::class)->shouldIgnoreMissing(),
+            ),
         );
 
         $router = $this->router(
@@ -516,6 +525,11 @@ final class MessageRouterTest extends TestCase
             guard: Mockery::mock(FlowExecutionGuardInterface::class)->shouldIgnoreMissing(),
             engine: Mockery::mock(FlowEngineInterface::class)->shouldIgnoreMissing(),
             scheduler: Mockery::mock(DelayResumeSchedulerInterface::class)->shouldIgnoreMissing(),
+            handOff: new SegmentHandOff(
+                Mockery::mock(ConnectionInterface::class)->shouldIgnoreMissing(),
+                Mockery::mock(AfterCommitDispatcherInterface::class)->shouldIgnoreMissing(),
+                Mockery::mock(AutomationContinuationSchedulerInterface::class)->shouldIgnoreMissing(),
+            ),
         );
     }
 

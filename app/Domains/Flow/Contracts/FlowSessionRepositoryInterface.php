@@ -19,6 +19,11 @@ interface FlowSessionRepositoryInterface
     public function findById(string $sessionId): ?FlowSession;
 
     /**
+     * The run a trigger already started for this fire, if any — `(trigger_id, fire_key)` is unique.
+     */
+    public function findByFireKey(string $triggerId, string $fireKey): ?FlowSession;
+
+    /**
      * @param  array<string, mixed>  $attributes
      */
     public function create(array $attributes): FlowSession;

@@ -17,6 +17,15 @@ return [
         'dedup_ttl_hours' => (int) env('FLOW_CALL_DEDUP_TTL_HOURS', 192),
     ],
 
+    // Only the defaults of the platform settings `flow.automation.segment_steps` and `flow.automation.segment_seconds`:
+    // an automation run stops at its saved position after this many steps or seconds, whichever comes first, and
+    // continues in a new job on `flow.automations`. The seconds stay under the job timeout (60 s) minus the slowest
+    // node, which is why the setting caps them at 30.
+    'automation' => [
+        'segment_steps'   => (int) env('FLOW_AUTOMATION_SEGMENT_STEPS', 50),
+        'segment_seconds' => (int) env('FLOW_AUTOMATION_SEGMENT_SECONDS', 20),
+    ],
+
     /*
      * Session execution lock — ADR Message Routing & Concurrency Control
      * § "Distributed Lock Strategy". One lock per (tenant, contact, assistant),

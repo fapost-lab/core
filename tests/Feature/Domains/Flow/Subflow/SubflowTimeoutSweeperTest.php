@@ -8,6 +8,7 @@ use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Enums\EndStatus;
+use App\Domains\Flow\Enums\FlowRunKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
@@ -231,6 +232,84 @@ final class SubflowTimeoutSweeperTest extends FeatureTestCase
         $this->assertSame(FlowSessionStatus::Expired, $mid->refresh()->status);
         $this->assertSame(FlowSessionStatus::Ended, $top->refresh()->status);
         $this->assertSame(EndStatus::Failed->value, $top->end_status);
+    }
+
+    public function test_a_contactless_parent_without_a_trigger_is_skipped_and_the_pass_goes_on(): void
+    {
+        $definition = $this->createDefinition([
+            ['id' => 'p-sub', 'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => 'orphan', 'timeout' => 'PT1H']],
+        ], []);
+
+        // The pass goes newest first: it reaches the contactless parent before the conversation one.
+        $contactless = $this->createSession([
+            'created_at'         => Carbon::now()->subMinutes(1),
+            'flow_definition_id' => $definition->getKey(),
+            'contact_id'         => null,
+            'assistant_id'       => null,
+            'run_kind'           => FlowRunKind::Automation,
+            'current_node_id'    => 'p-sub',
+            'status'             => FlowSessionStatus::PausedSubflow,
+            'expires_at'         => Carbon::now()->subMinutes(10),
+        ]);
+        $conversation = $this->createSession([
+            'created_at'         => Carbon::now()->subMinutes(30),
+            'flow_definition_id' => $definition->getKey(),
+            'current_node_id'    => 'p-sub',
+            'status'             => FlowSessionStatus::PausedSubflow,
+            'expires_at'         => Carbon::now()->subMinutes(5),
+        ]);
+
+        $report = $this->app->make(SubflowTimeoutSweeper::class)->sweep();
+
+        $this->assertSame(1, $report['orphans_expired']);
+        $this->assertSame(FlowSessionStatus::PausedSubflow, $contactless->refresh()->status);
+        $this->assertSame(FlowSessionStatus::Expired, $conversation->refresh()->status);
+    }
+
+    public function test_a_contactless_parent_of_a_trigger_is_swept_under_the_trigger_lock(): void
+    {
+        $childDefinition = $this->createDefinition([
+            ['id' => 'c-end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ], []);
+        $parentDefinition = $this->createDefinition(
+            nodes: [
+                ['id' => 'p-sub',  'type' => 'subflow', 'version' => 1, 'config' => ['flow_id' => $childDefinition->flow_id, 'timeout' => 'PT1H']],
+                ['id' => 'p-fail', 'type' => 'end',     'version' => 1, 'config' => ['status' => 'failed']],
+            ],
+            edges: [
+                ['id' => 'e1', 'from' => 'p-sub', 'to' => 'p-fail', 'handle' => 'failed'],
+            ],
+        );
+        $triggerId   = (string) Str::uuid();
+        $contactless = [
+            'contact_id'   => null,
+            'assistant_id' => null,
+            'run_kind'     => FlowRunKind::Automation,
+            'trigger_id'   => $triggerId,
+        ];
+
+        $parent = $this->createSession([
+            ...$contactless,
+            'flow_definition_id' => $parentDefinition->getKey(),
+            'current_node_id'    => 'p-sub',
+            'status'             => FlowSessionStatus::PausedSubflow,
+            'expires_at'         => Carbon::now()->subMinutes(5),
+        ]);
+        $child = $this->createSession([
+            ...$contactless,
+            'flow_definition_id'    => $childDefinition->getKey(),
+            'current_node_id'       => 'c-end',
+            'status'                => FlowSessionStatus::Active,
+            'parent_session_id'     => $parent->getKey(),
+            'parent_resume_node_id' => 'p-sub',
+        ]);
+
+        $report = $this->app->make(SubflowTimeoutSweeper::class)->sweep();
+
+        $this->assertSame(1, $report['forced_failures']);
+        $this->assertSame(EndStatus::Failed->value, $child->refresh()->end_status);
+        $this->assertSame(FlowSessionStatus::Ended, $parent->refresh()->status);
+        $this->assertSame(EndStatus::Failed->value, $parent->end_status);
     }
 
     private function failedExitParentDefinition(): FlowDefinition

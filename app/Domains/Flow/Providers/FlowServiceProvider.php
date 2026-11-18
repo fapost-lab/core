@@ -247,6 +247,32 @@ final class FlowServiceProvider extends ServiceProvider
             max: 720,
         ));
 
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: FlowEngineInterface::SEGMENT_STEPS_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.automation.segment_steps',
+            fallback: 50,
+            label: 'Steps per automation segment',
+            description: 'How many nodes an automation run passes through in one queue job before it saves its position and continues in a new job.',
+            group: 'Flow',
+            unit: 'steps',
+            min: 1,
+            max: 1000,
+        ));
+
+        $this->app->make(PlatformSettingRegistry::class)->register(new PlatformSettingField(
+            key: FlowEngineInterface::SEGMENT_SECONDS_SETTING,
+            type: PlatformSettingType::Integer,
+            configKey: 'flow.automation.segment_seconds',
+            fallback: 20,
+            label: 'Seconds per automation segment',
+            description: 'How long an automation run executes in one queue job before it saves its position and continues in a new job. At most 30, so a segment plus its slowest node stays under the 60-second job timeout.',
+            group: 'Flow',
+            unit: 'seconds',
+            min: 1,
+            max: FlowEngineInterface::MAX_SEGMENT_SECONDS,
+        ));
+
         // Seed Core's system translation keys. Features and Solutions register
         // their own keys through the same catalog from their providers.
         // Idempotent so the test bootstrap can boot the provider repeatedly.
@@ -334,6 +360,10 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->bind(TenantEventRepositoryInterface::class, TenantEventRepository::class);
         $this->app->bind(FlowTriggerEventPublisherInterface::class, QueuedFlowTriggerEventPublisher::class);
         $this->app->bind(DelayResumeSchedulerInterface::class, QueuedDelayResumeScheduler::class);
+        $this->app->bind(
+            \App\Domains\Flow\Contracts\AutomationContinuationSchedulerInterface::class,
+            \App\Infrastructure\Flow\QueuedAutomationContinuationScheduler::class,
+        );
         $this->app->bind(SendMessageTimeoutSchedulerInterface::class, QueuedSendMessageTimeoutScheduler::class);
         $this->app->bind(OperatorRequestTimeoutSchedulerInterface::class, QueuedOperatorRequestTimeoutScheduler::class);
         $this->app->bind(NodeUsageStatisticsInterface::class, NodeUsageStatisticsService::class);
@@ -408,6 +438,8 @@ final class FlowServiceProvider extends ServiceProvider
         // Per-request slot holding this worker's claim: keeps the execution
         // guard re-entrant and gives the engine a handle to heartbeat.
         $this->app->scoped(SessionLockRegistry::class);
+        // Per-job budget of an automation run's execution segment, shared by nested engine calls.
+        $this->app->scoped(\App\Domains\Flow\Services\ExecutionSegment::class);
         $this->app->singleton(CallTransportRegistry::class, function ($app): CallTransportRegistry {
             $registry = new CallTransportRegistry();
             $registry->register($app->make(HttpTransport::class));

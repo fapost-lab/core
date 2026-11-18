@@ -20,7 +20,23 @@ interface FlowEngineInterface
     public const string MAX_ITERATIONS_SETTING = 'flow.execution.max_iterations';
 
     /**
-     * Creates a session at the definition's entry node and runs it to its first wait point or its end.
+     * The platform setting that caps the steps of one execution segment of an automation run (env default
+     * `FLOW_AUTOMATION_SEGMENT_STEPS`); past it the run stops at its saved position and continues in a new job.
+     */
+    public const string SEGMENT_STEPS_SETTING = 'flow.automation.segment_steps';
+
+    /**
+     * The platform setting that caps the seconds of one execution segment of an automation run (env default
+     * `FLOW_AUTOMATION_SEGMENT_SECONDS`). Its maximum keeps the budget plus the slowest node under the job timeout.
+     */
+    public const string SEGMENT_SECONDS_SETTING = 'flow.automation.segment_seconds';
+
+    /** The most seconds a segment may run, whatever the setting or its installation default say. */
+    public const int MAX_SEGMENT_SECONDS = 30;
+
+    /**
+     * Creates a session at the definition's entry node and runs it to its first wait point or its end — for an
+     * automation run, to the end of its first execution segment; the rest runs in new jobs.
      *
      * With a contact the session is the contact's conversation with the current assistant, as always. Without
      * one ({@code $contact} null) it is a contactless automation run: the tenant comes from the definition, the

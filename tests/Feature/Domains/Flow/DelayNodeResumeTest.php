@@ -7,8 +7,10 @@ namespace Tests\Feature\Domains\Flow;
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\Concurrency\LockScope;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Contracts\FlowExecutionGuardInterface;
+use App\Domains\Flow\DTOs\FlowRunOrigin;
 use App\Domains\Flow\Enums\EndStatus;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Models\FlowDefinition;
@@ -55,7 +57,14 @@ final class DelayNodeResumeTest extends FeatureTestCase
 
             public function run(string $tenantId, string $contactId, string $assistantId, Closure $callback): mixed
             {
-                $this->scopes[] = [$tenantId, $contactId, $assistantId];
+                return $this->runInScope(new LockScope($tenantId, $contactId, $assistantId), $callback);
+            }
+
+            public function runInScope(LockScope $scope, Closure $callback): mixed
+            {
+                $this->scopes[] = null === $scope->triggerId
+                    ? [$scope->tenantId, $scope->contactId, $scope->assistantId]
+                    : [$scope->tenantId, 'trigger', $scope->triggerId];
 
                 return $callback();
             }
@@ -127,7 +136,24 @@ final class DelayNodeResumeTest extends FeatureTestCase
         Queue::assertPushed(ResumeDelayedFlowSessionJob::class, 1);
     }
 
-    private function startDelayFlow(): FlowSession
+    public function test_a_contactless_automation_resumes_after_its_delay_under_its_trigger_lock(): void
+    {
+        $triggerId = (string) Str::uuid();
+        $session   = $this->startDelayFlow(FlowRunOrigin::automation($triggerId));
+
+        $this->assertNull($session->contact_id);
+        $this->assertSame(FlowSessionStatus::WaitingInput, $session->status);
+
+        $job = $this->soleResumeJob();
+
+        $this->travel(61)->seconds();
+        $this->app->call([$job, 'handle']);
+
+        $this->assertSame(FlowSessionStatus::Ended, $session->refresh()->status);
+        $this->assertSame([[self::TENANT_ID, 'trigger', $triggerId]], $this->guardedScopes);
+    }
+
+    private function startDelayFlow(?FlowRunOrigin $contactlessOrigin = null): FlowSession
     {
         $definition = FlowDefinition::query()->create([
             'tenant_id' => self::TENANT_ID,
@@ -142,7 +168,9 @@ final class DelayNodeResumeTest extends FeatureTestCase
             'is_active' => true,
         ]);
 
-        return $this->app->make(FlowEngineInterface::class)->start($definition, $this->contact);
+        return null === $contactlessOrigin
+            ? $this->app->make(FlowEngineInterface::class)->start($definition, $this->contact)
+            : $this->app->make(FlowEngineInterface::class)->start($definition, null, [], $contactlessOrigin);
     }
 
     private function soleResumeJob(): ResumeDelayedFlowSessionJob

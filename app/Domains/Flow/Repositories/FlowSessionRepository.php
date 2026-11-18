@@ -31,6 +31,14 @@ final class FlowSessionRepository implements FlowSessionRepositoryInterface
         return FlowSession::query()->find($sessionId);
     }
 
+    public function findByFireKey(string $triggerId, string $fireKey): ?FlowSession
+    {
+        return FlowSession::query()
+            ->where('trigger_id', $triggerId)
+            ->where('fire_key', $fireKey)
+            ->first();
+    }
+
     public function create(array $attributes): FlowSession
     {
         return FlowSession::query()->create($attributes);

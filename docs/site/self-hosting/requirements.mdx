@@ -82,7 +82,7 @@ processes, and the system is silently degraded without them:
 | Gateway        | Optional Go webhook ingress                          | Webhooks stay on the PHP path (fine)     |
 
 Queues are separated by purpose (`flow.execution`, `messaging.transactional`,
-`messaging.broadcast`, `messaging.system`, `scheduled.triggers`, `sync.external`),
+`messaging.broadcast`, `messaging.system`, `scheduled.triggers`, `flow.automations`, `sync.external`),
 and Horizon must be configured to consume all of them.
 
 ## Network

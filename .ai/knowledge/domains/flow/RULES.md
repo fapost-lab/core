@@ -107,8 +107,20 @@ broken.
   `FlowTemplatePublishTest::test_a_flow_publish_locks_the_assistants_templates_before_its_own_draft`,
   `FlowTemplatePublishTest::test_a_template_publish_takes_no_shared_lock_on_templates`.
 - **Execution is bounded.** The engine stops after the platform setting `flow.execution.max_iterations`
-  (`FlowEngineInterface::MAX_ITERATIONS_SETTING`, read through the scoped `PlatformSettingsReaderInterface`); a lost
+  (`FlowEngineInterface::MAX_ITERATIONS_SETTING`, read through the scoped `PlatformSettingsReaderInterface`) — per
+  engine call for a conversation, per session over all its segments (`step_count`) for an automation run; a lost
   session lock aborts with `SessionLockLostException`.
+- **An automation run never outlives its job and runs once per fire.** One engine call of a `run_kind = automation`
+  session — nested subflow and parent-resume calls included, sharing the scoped `ExecutionSegment` — stops before the
+  next node after `flow.automation.segment_steps` or `flow.automation.segment_seconds` (whichever first, at least one
+  step), and only the outermost call queues the continuation, after writing a new `segment_id` on the run's root
+  session. A continuation runs only while the root carries its `segment_id`, and then runs the run's one `active`
+  session (down the `paused_subflow` chain); a start runs only when `(trigger_id, fire_key)` has no run yet, and
+  otherwise continues the run's `active` session. Jobs on `flow.automations` keep their timeout below the connection's
+  `retry_after`, and the seconds setting's maximum keeps a segment plus the slowest node under that timeout. Why: a
+  second runner or a re-reserved job repeats `call` side effects in somebody else's system, silently
+  (`adr-20261118-segmented-automation-runs`). Enforced: `AutomationRunTest`, `AutomationRunLockRedisTest`,
+  `ExecutionSegmentTest`, `HorizonAutomationsSupervisorTest`.
 
 ## Rules
 
@@ -137,19 +149,22 @@ broken.
   second record at the remote system (`adr-20261118-call-outbound-idempotency-strategy`). Enforced:
   `CallNodeIdempotencyTest`, `RedisCallExecutionLedgerRedisTest` (also the tenant forgetter), `HttpTransportTest`.
 - **Running the engine outside `FlowOrchestrator` requires the session lock** through
-  `FlowExecutionGuard`, keyed like `MessageRouter` (`contact->tenant_id`, contact, assistant),
-  with the session re-read under the lock; a busy lock throws `SessionLockTimeoutException` and
-  the queue retries. `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `ContinueAfterOperatorRequestJob`,
-  `StartFlowFromEventJob` and `SubflowTimeoutSweeper` follow it (`tests/Feature/Redis`); the sweeper skips a parent whose lock
-  is busy and retries on its next run.
+  `FlowExecutionGuard`, keyed like `MessageRouter` (`contact->tenant_id`, contact, assistant) — or, for a contactless
+  automation run, by `(tenant, trigger)` — with the session re-read under the lock; a busy lock throws
+  `SessionLockTimeoutException` and the queue retries (the automation jobs and `ResumeDelayedFlowSessionJob` release
+  themselves instead of spending an attempt). A caller that may hold a contactless session takes its scope from `LockScope::ofSession()`, never
+  builds it from the session's columns (callers that only ever hold a contact's session — buttons, operator requests,
+  event starts — still pass the triple). `DelayedSessionResumer`, `ResumeTimedOutSendMessageNodeJob`, `ContinueAfterOperatorRequestJob`,
+  `StartFlowFromEventJob`, `SubflowTimeoutSweeper` and `AutomationRunner` follow it (`tests/Feature/Redis`); the sweeper
+  skips a parent whose lock is busy and retries on its next run, and skips with a warning a parent it cannot lock at
+  all, so one parent never ends its pass.
 - **A contactless session never reaches a contact through an empty id.** Without a contact,
   `ScopedStateReader` refuses `contact.*` and `module.*`, `ContactWriter` refuses every write and
-  `LockScope` refuses the scope, all with `ContactlessSessionException`; `FlowEngine::start()` takes a
+  `LockScope` refuses a scope with neither a contact nor a trigger, all with `ContactlessSessionException`; `FlowEngine::start()` takes a
   contactless run's assistant only from `FlowRunOrigin`, never from the current assistant, and a subflow
   child copies `run_kind` and `trigger_id`. Why: an empty id turns a per-contact read or lock into a
   tenant-wide one, and an ambient assistant attaches a run to whichever assistant a job resolved.
-  `OperandResolver` reads `module.*` operands through the context's reader too. Known gap:
-  `SubflowTimeoutSweeper` lets the lock-scope error end its pass — before any trigger starts a contactless run
+  `OperandResolver` reads `module.*` operands through the context's reader too
   (`adr-20261118-contactless-runs-in-flow-sessions`). Enforced: `ContactlessFlowSessionTest`,
   `ScopedStateReaderTest`, `ContactWriterTest`, `LockScopeTest`, `OperandResolverModuleTest`.
 - **A node that needs a contact is never published into a flow whose trigger gives none.** A handler declares

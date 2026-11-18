@@ -31,7 +31,7 @@ reviewed_at: 2026-11-18
 ## Responsibility
 
 Flow executes published flow definitions for a contact, or as a contactless automation run
-(no contact, optionally no assistant; started only from tests so far). It routes an inbound message or event
+(no contact, optionally no assistant; started through `Orchestration/AutomationRunner` by `StartAutomationRunJob`, which no trigger dispatches yet). It routes an inbound message or event
 to a flow session, runs node handlers until the flow waits, ends or fails, and persists session
 state. It also owns triggers, subflows, the session lock, run history and logs, the template
 expression engine, and content translation (`Translations/`, `ContentTranslatorInterface`),
@@ -92,7 +92,12 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   `RoutingOutcome::dropped('lock_timeout')`; `engine_lock_timeout` and `lock_lost` come from the
   orchestrator. Entry points that bypass the router (`DelayedSessionResumer`,
   `ResumeTimedOutSendMessageNodeJob`, `StartFlowFromEventJob`) take the same lock through
-  `FlowExecutionGuard::run()`.
+  `FlowExecutionGuard::run()` / `runInScope()`; a contactless automation run takes its trigger's lock
+  (`LockScope::ofSession()`).
+- Automation runs: `AutomationRunner` starts a run once per `(trigger_id, fire_key)` under the trigger lock and runs
+  it in execution segments (`Services/ExecutionSegment`); a segment that runs out is handed on by
+  `Services/SegmentHandOff` (a new `segment_id` on the run's root, then `ContinueAutomationRunJob` on
+  `flow.automations`) (`adr-20261118-segmented-automation-runs`).
 - Engine navigation: `FlowSessionPersister::persist()` maps results to session columns (`Executed` →
   next node or completed, `Waiting` → `waiting_input`, `Delayed` → `paused` when it carries `resumeAt`, else `waiting_input`, `Failed`, `Finished`), `persistEnd()` closes
   the session with an `end_status`; all writes use the optimistic lock on `flow_sessions.version`.
