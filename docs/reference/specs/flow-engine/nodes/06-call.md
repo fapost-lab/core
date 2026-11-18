@@ -43,6 +43,7 @@ Calls an external or internal service. Combines Integration (HTTP) and Action (i
 | `result_mapping` | list of `{from, to}` | no | Each entry copies one response path into a `Variable` (`to`) |
 | `success_statuses` | list | no | Statuses that count as success, for every transport that reports one. Absent: the transport's own rule (`success_when`). See "`success_statuses`" |
 | `strict_mapping` | boolean | no | `true`: a mapped path missing from a successful response sends the node to `error` instead of writing null. Default `false`. See "Strict mapping" |
+| `retry` | object | no | Sends a failed call again with backoff, inside the node's 18-second window. Absent: one send. See "Retry" |
 
 A node with neither `transport` nor `target` is a **legacy** node and runs through `executeLegacy()`:
 it POSTs `url` through the `http` transport with `{session_id, contact_id, state}` from
@@ -62,6 +63,8 @@ it POSTs `url` through the `http` transport with `{session_id, contact_id, state
 
 The node always returns `Executed`; a failed call does not fail the session, it takes `error`.
 Metadata carries `status_code`, `error_code`, `idempotency_key`, `attempt_number` and, for a replayed call, `deduplicated` when present.
+With `retry`, `attempts` is the number of sends this execution made (when more than one), and `retry_stopped: "window"`
+says a retryable failure was not sent again because the next send did not fit the window.
 
 ## `success_when` policy (HTTP transport)
 
@@ -178,8 +181,37 @@ number and the record (`CallExecutionLedgerInterface`, Redis implementation `Red
 - **Limits:** a result over 256 KiB is not recorded; a Redis failure is logged and the call is sent anyway. The
   builder's test call never uses the ledger. Request headers and parameters are never stored.
 
-**There is no retry.** The `transport_options.retry` block seen in older drafts is not implemented; a
-failed call goes to `error` and the flow decides what to do.
+## Retry
+
+`adr-20261119-call-retry-inside-the-node-window`. An optional literal object (never templates):
+
+```json
+"retry": { "max_attempts": 3, "delay_ms": 500, "backoff": "exponential", "on": ["network", "5xx", "429"] }
+```
+
+| Field | Default | Bounds | Meaning |
+|-------|---------|--------|---------|
+| `max_attempts` | 3 | 1–5 | Sends in all, the first included; 1 is no retry |
+| `delay_ms` | 500 | 100–5000 | The wait before the first retry |
+| `backoff` | `exponential` | `fixed`, `exponential` | `exponential` doubles the wait on each retry, capped at 5000 ms |
+| `on` | all three | non-empty subset | Which failures are retried: `network` (`transport_failure`: no connection, a timeout), `5xx`, `429` |
+
+- **Only the node's verdict is retried.** `success_statuses` judges first, so a status the node accepts is a success
+  and is never sent again. A `strict_mapping` miss follows a successful call and is not retried. Every other failure
+  (another 4xx, `egress_denied`, `invalid_target`, a Solution refusal, `action_exception`) goes to `error` at once.
+- **`Retry-After`** in seconds (a 429 or a 503) replaces the backoff when it asks for longer; a date is ignored.
+- **Same key, next attempt.** Every send carries the same `Idempotency-Key`; the ledger counts each one, so
+  `X-FaPost-Attempt-Number` rises. Only a success is recorded. The execution spends one `call_executions` unit
+  however many sends it makes. A replayed execution sends nothing and so never retries.
+- **The window.** The waits happen inside the step, which holds the worker and the session lock (extended only between
+  nodes, TTL 30 s), and an automation segment is sized for a node of at most 18 s (`adr-20261118-segmented-automation-runs`).
+  So a retry is sent only when, counted from the first send, its wait, the longest name lookup (8 s) and at least one
+  second of request fit in 18 s, and its `timeout` is cut to what is left. With the default `timeout` of 10 s a call
+  that timed out is usually not retried (`retry_stopped: "window"`); lower the timeout to retry slow calls. A longer
+  backoff that parks the session (as `delay` does) is not built.
+- **Not retried:** legacy nodes and the builder's test call (one send each).
+
+Validation at publish: `call_invalid_retry` (an unknown field, a value out of bounds, an empty `on`), an error.
 
 ## Response handling
 

@@ -62,6 +62,10 @@ The attempt number is not in `CallContext` (Foundation owns it): the call node p
 `CallRequest::$options['attempt_number']` (`App\Domains\Flow\Call\CallAttempt::OPTION`). A transport never keeps
 idempotency state of its own: the node's ledger decides whether a call is sent at all.
 
+A node `retry` ([nodes/06-call.md](nodes/06-call.md#retry)) calls the transport again with the same `CallContext`, the
+next attempt number and `options['timeout']` cut to what is left of the node's window. A transport never retries on its
+own: one `execute()` is one send.
+
 ## 4.3 Built-in transports
 
 Registered in `FlowServiceProvider` through `CallTransportRegistry`.

@@ -79,7 +79,24 @@ const form = reactive({
     saveTo:       null as Variable | null,
     mappings:     [] as MapRow[],
     strictMapping: false,
+    // retry (shared by both transports)
+    retryEnabled: false,
+    retryAttempts: 3 as number,
+    retryDelay:    500 as number,
+    retryBackoff:  'exponential' as 'fixed' | 'exponential',
+    retryOn:       ['network', '5xx', '429'] as string[],
 })
+
+const RETRY_ON = [
+    { value: 'network', label: 'Network failure / timeout' },
+    { value: '5xx',     label: '5xx response' },
+    { value: '429',     label: '429 Too Many Requests' },
+]
+
+function clampInt(raw: string, min: number, max: number, fallback: number): number {
+    const n = Math.round(Number(raw))
+    return Number.isFinite(n) && raw.trim() !== '' ? Math.min(max, Math.max(min, n)) : fallback
+}
 
 // `success_statuses` is edited as comma-separated text ("200, 3xx, 400-404") and stored as a list; a bare number is
 // kept a number. A malformed entry is kept as typed so publish validation can name it.
@@ -141,6 +158,15 @@ function hydrate() {
     form.successStatuses = Array.isArray(cfg.success_statuses) ? cfg.success_statuses.join(', ') : ''
     form.strictMapping   = cfg.strict_mapping === true
 
+    const retry = (cfg.retry && typeof cfg.retry === 'object' && !Array.isArray(cfg.retry))
+        ? cfg.retry as Record<string, unknown> : null
+    form.retryEnabled  = retry !== null
+    form.retryAttempts = clampInt(String(retry?.max_attempts ?? ''), 1, 5, 3)
+    form.retryDelay    = clampInt(String(retry?.delay_ms ?? ''), 100, 5000, 500)
+    form.retryBackoff  = retry?.backoff === 'fixed' ? 'fixed' : 'exponential'
+    const on = Array.isArray(retry?.on) ? (retry.on as unknown[]).filter((v): v is string => RETRY_ON.some(o => o.value === v)) : []
+    form.retryOn       = on.length > 0 ? on : ['network', '5xx', '429']
+
     form.saveTo   = (cfg.save_to_variable && typeof cfg.save_to_variable === 'object')
         ? cfg.save_to_variable as Variable : null
     form.mappings = Array.isArray(cfg.result_mapping)
@@ -194,11 +220,22 @@ function commit() {
         body_mode:         form.transport === 'http' ? form.bodyMode : undefined,
         success_statuses:  parseStatuses(form.successStatuses).length > 0 ? parseStatuses(form.successStatuses) : undefined,
         strict_mapping:    form.strictMapping ? true : undefined,
+        retry:             form.retryEnabled
+            ? { max_attempts: form.retryAttempts, delay_ms: form.retryDelay, backoff: form.retryBackoff, on: form.retryOn }
+            : undefined,
         save_to_variable:  form.saveTo ?? undefined,
         result_mapping:    form.mappings
             .filter(m => m.from.trim() !== '' && m.to)
             .map(m => ({ from: m.from, to: m.to })),
     })
+}
+
+// At least one trigger must stay on: the last checked box cannot be cleared.
+function onRetryOn(value: string, el: HTMLInputElement) {
+    const next = el.checked ? [...form.retryOn, value] : form.retryOn.filter(v => v !== value)
+    if (next.length === 0) { el.checked = true; return }
+    form.retryOn = RETRY_ON.map(o => o.value).filter(v => next.includes(v))
+    commit()
 }
 
 // Row helpers
@@ -474,6 +511,39 @@ async function runTest() {
                 <button class="add-btn" @click="addRow(form.handlerParams)">+ Add parameter</button>
             </AccordionSection>
         </template>
+
+        <!-- ───────────────── RETRY (shared) ───────────────── -->
+        <AccordionSection title="Retry">
+            <label class="field-help" style="display:flex;gap:6px;align-items:center">
+                <input type="checkbox" :checked="form.retryEnabled" @change="form.retryEnabled = ($event.target as HTMLInputElement).checked; commit()">
+                Retry failed calls
+            </label>
+            <template v-if="form.retryEnabled">
+                <div class="config-field">
+                    <div class="field-label">Attempts (first send included)</div>
+                    <input class="field-input" style="width:100px" type="number" min="1" max="5" :value="form.retryAttempts" @change="form.retryAttempts = clampInt(($event.target as HTMLInputElement).value, 1, 5, 3); ($event.target as HTMLInputElement).value = String(form.retryAttempts); commit()">
+                </div>
+                <div class="config-field">
+                    <div class="field-label">Delay (ms)</div>
+                    <input class="field-input" style="width:100px" type="number" min="100" max="5000" step="100" :value="form.retryDelay" @change="form.retryDelay = clampInt(($event.target as HTMLInputElement).value, 100, 5000, 500); ($event.target as HTMLInputElement).value = String(form.retryDelay); commit()">
+                </div>
+                <div class="config-field">
+                    <div class="field-label">Backoff</div>
+                    <select class="field-input" :value="form.retryBackoff" @change="form.retryBackoff = ($event.target as HTMLSelectElement).value as 'fixed'|'exponential'; commit()">
+                        <option value="fixed">Fixed</option>
+                        <option value="exponential">Exponential (doubles, capped at 5000 ms)</option>
+                    </select>
+                </div>
+                <div class="config-field">
+                    <div class="field-label">Retry on</div>
+                    <label v-for="o in RETRY_ON" :key="o.value" class="field-help" style="display:flex;gap:6px;align-items:center">
+                        <input type="checkbox" :checked="form.retryOn.includes(o.value)" @change="onRetryOn(o.value, ($event.target as HTMLInputElement))">
+                        {{ o.label }}
+                    </label>
+                </div>
+            </template>
+            <p class="field-help">Retries must fit in 18 seconds from the first send; lower the timeout to retry slow calls. A status listed as success is never retried.</p>
+        </AccordionSection>
 
         <!-- ───────────────── TEST (shared) ───────────────── -->
         <AccordionSection title="Test request" default-open>

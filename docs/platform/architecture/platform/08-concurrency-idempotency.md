@@ -15,7 +15,7 @@ Without protection that means a double transition through the graph, a double se
 | **2. Distributed lock** | Redis lock `session_lock:{tenant}:{contact}:{assistant}` (`LockScope`), TTL 30s, kept alive by a heartbeat. `MessageRouter` acquires it through `LockAcquisitionPolicy`: 3 attempts, 2s apart. |
 | **3. Optimistic locking** | `flow_sessions.version`. `saveWithOptimisticLock()` runs `UPDATE ... WHERE version = N`; 0 rows raises `OptimisticLockConflictException`, and `FlowOrchestrator` makes 3 attempts in total with a growing delay between them. |
 | **4. Outbound idempotency** | `MessageSender` reserves Redis `msg:sent:{idempotency_key}` (`SET NX`, 24h) before delivery and releases it if delivery fails, so a retried job never sends the same message twice. |
-| **5. `call` idempotency** | The `call` node records a successful call in Redis (`flow:call:{tenant}:{key}:done`, window `flow.call.dedup_ttl_hours`, default 8 days) and replays it when the same step runs again; every send carries `Idempotency-Key` and an attempt number. `adr-20261118-call-outbound-idempotency-strategy`. |
+| **5. `call` idempotency** | The `call` node records a successful call in Redis (`flow:call:{tenant}:{key}:done`, window `flow.call.dedup_ttl_hours`, default 8 days) and replays it when the same step runs again; every send carries `Idempotency-Key` and an attempt number; an optional `retry` re-sends a failure with the same key and the next attempt number, inside the node's 18 s window. `adr-20261118-call-outbound-idempotency-strategy`, `adr-20261119-call-retry-inside-the-node-window`. |
 
 ### When the lock is not acquired
 

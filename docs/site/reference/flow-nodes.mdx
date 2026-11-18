@@ -86,6 +86,26 @@ handler is not called. While the Solution's tenant tables are still being prepar
   HTTP; until then the extension carries the requirement itself.
 </Note>
 
+### Retrying a failed call
+
+A `call` node can send a failed call again before it takes the `error` handle. The
+optional `retry` object sets the sends in all (`max_attempts`, 1 to 5, default 3), the
+first wait (`delay_ms`, 100 to 5000, default 500), the `backoff` (`exponential`, the
+default, doubles it up to 5 seconds; `fixed` keeps it) and which failures are retried
+(`on`: `network`, `5xx`, `429`, all three by default). A `Retry-After` header in seconds
+is honoured when it asks for longer.
+
+Every send carries the same `Idempotency-Key` and the next `X-FaPost-Attempt-Number`,
+and the node spends one call execution however many sends it makes. A status the node
+accepts as success (`success_statuses`) is never retried, and nor is another 4xx, a
+refused address or an invalid target.
+
+The waits happen inside the step, so the retries must fit in 18 seconds from the first
+send, counting up to 8 seconds for the name lookup; a retry's timeout is cut to what is
+left. With the default 10-second timeout a call that timed out is usually not retried
+(the node metadata says `retry_stopped: window`): lower the timeout to retry slow calls.
+The builder's test call sends once.
+
 ## Declaring a node
 
 `type`, `version`, `label`, and `category` come from the handler. Core handlers
