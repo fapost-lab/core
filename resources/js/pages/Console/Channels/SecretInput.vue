@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { usePage } from '@inertiajs/vue3'
 import { Eye, EyeOff, Sparkles } from '@lucide/vue'
+import { Badge } from '@fapost/ui/components/badge'
 import { Button } from '@fapost/ui/components/button'
 import { Input } from '@fapost/ui/components/input'
 import { generateSecret } from './secret'
@@ -16,6 +17,8 @@ defineProps<{
   name: string
   generatable?: boolean
   required?: boolean
+  /** Edit only: whether a value is stored (never the value). Absent when creating. */
+  stored?: boolean
   invalid?: boolean
   describedBy?: string
 }>()
@@ -34,12 +37,14 @@ function generate(): void {
 
 <template>
   <div class="flex items-center gap-2">
+    <Badge v-if="stored !== undefined" :variant="stored ? 'success' : 'neutral'" :data-testid="`${id}-state`">{{ stored ? t.secret_saved : t.secret_not_set }}</Badge>
     <Input
       :id="id"
       v-model="model"
       :name="name"
       :type="revealed ? 'text' : 'password'"
       :required="required"
+      :placeholder="stored ? t.secret_saved_placeholder : undefined"
       maxlength="65535"
       autocomplete="new-password"
       data-1p-ignore

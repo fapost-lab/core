@@ -18,7 +18,9 @@ use Fapost\Foundation\Channel\Settings\ChannelSettingType;
  * the tenant-wide admin. Each screen passes its own URLs; the shape of a row, of the edit form and of its options is
  * one.
  *
- * Secrets never reach the browser: neither the token nor the secret token is in a row or in the edit form.
+ * Secrets never reach the browser: neither the token nor the secret token is in a row or in the edit form. The edit
+ * form gets only whether each is stored (`hasToken`, `hasSecretToken`), so an operator can tell a saved secret from an
+ * empty one; never the value, nor any part of it.
  */
 trait PresentsChannels
 {
@@ -53,7 +55,8 @@ trait PresentsChannels
     }
 
     /**
-     * The channel as the edit form receives it: the webhook hash and the settings of its type, never its secrets.
+     * The channel as the edit form receives it: the webhook hash, the settings of its type and
+     * whether its token and secret token are stored, never the secrets themselves.
      *
      * @return array<string, mixed>
      */
@@ -73,6 +76,8 @@ trait PresentsChannels
             'webhookHash'        => $channel->webhook_public_hash,
             'handle'             => $link?->handle,
             'url'                => $link?->url,
+            'hasToken'           => filled($channel->token),
+            'hasSecretToken'     => filled($channel->secret_token),
             'settings'           => $this->settingValues($channel),
             'setup'              => app(ChannelSetupGuidePresenter::class)->forChannel($channel),
         ];

@@ -17,7 +17,8 @@ import type { ChannelTypeOption, ChannelsPageProps, EditableChannel, SettingFiel
 /**
  * The fields of a channel, shared by the create and the edit screen (and by the tenant-wide admin when it moves).
  * Creating chooses the type; editing shows it and cannot change it. The token and the secret token are never given
- * to the form: when editing they start empty and an empty one keeps what is stored. The server validates, and its
+ * to the form, only whether each is stored: when editing they start empty, an empty one keeps what is stored and the
+ * field says whether anything is. The server validates, and its
  * errors show under the fields.
  */
 const props = defineProps<{
@@ -138,7 +139,7 @@ function submit(): void {
       </div>
 
       <FormField id="token" :label="t.fields.token" :hint="editing ? t.fields.token_keep : undefined" :error="form.errors.token" v-slot="{ invalid, describedBy }">
-        <SecretInput id="token" v-model="form.token" name="bot_token" :required="!editing" :invalid="invalid" :described-by="describedBy" />
+        <SecretInput id="token" v-model="form.token" name="bot_token" :stored="editing ? channel?.hasToken : undefined" :required="!editing" :invalid="invalid" :described-by="describedBy" />
       </FormField>
 
       <FormField
@@ -149,7 +150,7 @@ function submit(): void {
         :error="form.errors.secret_token"
         v-slot="{ invalid, describedBy }"
       >
-        <SecretInput id="secret_token" v-model="form.secret_token" name="webhook_secret" generatable :required="!editing" :invalid="invalid" :described-by="describedBy" />
+        <SecretInput id="secret_token" v-model="form.secret_token" name="webhook_secret" generatable :stored="editing ? channel?.hasSecretToken : undefined" :required="!editing" :invalid="invalid" :described-by="describedBy" />
       </FormField>
 
       <FormField v-if="editing && channel" id="webhook_hash" :label="t.fields.webhook_hash" :hint="t.fields.webhook_hash_help">

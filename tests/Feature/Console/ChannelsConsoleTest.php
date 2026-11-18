@@ -214,6 +214,22 @@ final class ChannelsConsoleTest extends FeatureTestCase
         $this->get($this->listUrl('/create'))->assertOk()->assertDontSee(self::TOKEN);
     }
 
+    public function test_the_edit_form_says_whether_a_token_and_a_secret_token_are_stored_and_never_what_they_are(): void
+    {
+        $stored = $this->channel(['token' => self::TOKEN, 'secret_token' => self::SECRET]);
+        $bare   = $this->channel(['token' => '', 'secret_token' => '']);
+
+        $this->actingAs($this->admin());
+
+        $response = $this->get($this->listUrl("/{$stored->getKey()}/edit"))->assertOk();
+        $response->assertInertia(fn (AssertableInertia $page) => $page->where('channel.hasToken', true)->where('channel.hasSecretToken', true)->etc());
+        $this->assertStringNotContainsString(self::TOKEN, $response->getContent());
+        $this->assertStringNotContainsString(self::SECRET, $response->getContent());
+
+        $this->get($this->listUrl("/{$bare->getKey()}/edit"))->assertOk()
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('channel.hasToken', false)->where('channel.hasSecretToken', false)->etc());
+    }
+
     public function test_at_the_limit_the_list_closes_creating_even_for_an_administrator(): void
     {
         $this->channel();
@@ -401,6 +417,8 @@ final class ChannelsConsoleTest extends FeatureTestCase
                     'webhookHash'        => $channel->webhook_public_hash,
                     'handle'             => '@help_bot',
                     'url'                => 'https://t.me/help_bot',
+                    'hasToken'           => true,
+                    'hasSecretToken'     => true,
                     'settings'           => ['allowed_updates' => ['message'], 'max_connections' => 12],
                     'setup'              => [],
                 ])
