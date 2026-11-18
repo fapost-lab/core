@@ -16,6 +16,11 @@ Both tables live in the tenant schema.
 - `logs:create-partition` (`CreateNextFlowLogPartitionCommand`) creates the current and next month partitions for every
   active tenant, on the first of each month.
 - Partitioning is Postgres-only; other drivers (the SQLite test database) use a plain table.
+- `flow:prune-automation-runs` (`PruneAutomationRunsCommand`, `AutomationRunPruner`) deletes finished automation runs
+  (`flow_sessions.run_kind = automation`) with their `flow_session_history` and `flow_logs` rows, daily at 04:30:
+  succeeded runs after `flow.automation_runs.succeeded_retention_days` (7), every other terminal run after
+  `flow.automation_runs.failed_retention_days` (30), both platform settings. A subflow chain goes only as a whole.
+  Conversation sessions and their history are not pruned by anything yet (spec `data-lifecycle`).
 
 ### analytics_events has no aggregation and no pruning
 

@@ -152,6 +152,19 @@ broken.
   `SubflowTimeoutSweeper` lets the lock-scope error end its pass — before any trigger starts a contactless run
   (`adr-20261118-contactless-runs-in-flow-sessions`). Enforced: `ContactlessFlowSessionTest`,
   `ScopedStateReaderTest`, `ContactWriterTest`, `LockScopeTest`, `OperandResolverModuleTest`.
+- **Run retention deletes only finished automation runs, and a subflow chain only as a whole.**
+  `AutomationRunPruner` (daily `flow:prune-automation-runs`) deletes a session with its `flow_session_history` and
+  `flow_logs` only when it is the tenant's (passed explicitly), `run_kind = automation`, in the terminal whitelist
+  `AutomationRunRetention::TERMINAL`, and finished (`updated_at`) before the cutoff of its class: succeeded
+  (`completed`, or `ended` + `end_status = success`) after `flow.automation_runs.succeeded_retention_days` (7), any
+  other terminal status after `flow.automation_runs.failed_retention_days` (30); both are per-install platform settings,
+  0 keeps that class. A chain — a root and every session below it by `parent_session_id`, whatever its tenant or kind —
+  goes only when every member qualifies, re-checked under `FOR UPDATE`; a child is never picked alone. Why: a deletion
+  cannot be undone, so a mistake may only keep too much — a new status is never deleted until it is classified, and a
+  partly deleted chain would leave a run trace with a hole. Per install, not per tenant, follows audit and conversation
+  retention while spec `data-lifecycle` leaves that question open. A new path that ends a session must write `updated_at`.
+  Enforced: `AutomationRunPrunerTest` (status × kind × end status × age matrix, enum completeness, chains, tenant),
+  `PruneAutomationRunsCommandTest`.
 - **A node that needs a contact is never published into a flow whose trigger gives none.** A handler declares
   `contact`, `none` or `any` through `DeclaresContextRequirementInterface`; one that declares nothing (every Solution
   node) needs a contact. Under a `schedule`, `webhook` or `api` trigger, validate and publish refuse such a node, and

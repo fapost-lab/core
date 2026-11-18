@@ -120,6 +120,14 @@ Options: `--tenant` for a single slug and `--json`.
 `conversations:prune` accepts `--dry-run`. Dropping is irreversible; threads and
 media are kept. See [Conversation retention](/self-hosting/observability#conversation-retention).
 
+## Automation run retention
+
+| Command | Does |
+|---|---|
+| `flow:prune-automation-runs` | Delete finished automation runs, with their session history and flow logs, older than the platform settings `flow.automation_runs.succeeded_retention_days` (default 7) and `flow.automation_runs.failed_retention_days` (default 30), in every active tenant. Conversation sessions, runs still going and a subflow chain with any such member are never deleted. Does nothing when both are `0`. Scheduled daily at 04:30 |
+
+`flow:prune-automation-runs` accepts `--dry-run`, which only counts. Deleting is irreversible.
+
 ## Activity log retention
 
 | Command | Does |
