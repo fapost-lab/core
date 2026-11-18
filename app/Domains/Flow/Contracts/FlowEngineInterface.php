@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Contracts;
 
 use App\Domains\Contact\Models\Contact;
+use App\Domains\Flow\DTOs\FlowRunOrigin;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use Fapost\Foundation\DTO\IncomingMessage;
@@ -18,12 +19,23 @@ interface FlowEngineInterface
     public const string MAX_ITERATIONS_SETTING = 'flow.execution.max_iterations';
 
     /**
+     * Creates a session at the definition's entry node and runs it to its first wait point or its end.
+     *
+     * With a contact the session is the contact's conversation with the current assistant, as always. Without
+     * one ({@code $contact} null) it is a contactless automation run: the tenant comes from the definition, the
+     * assistant only from {@code $origin} (none by default — never the ambient current assistant), and a
+     * `contact.*` / `module.*` read, a contact write or a per-contact session lock on it throws
+     * {@see \App\Domains\Flow\State\Exceptions\ContactlessSessionException}.
+     *
      * @param  array<string, mixed>  $initialState  Merged into session state after system bootstrap keys are set
+     * @param  FlowRunOrigin|null  $origin  Run kind and trigger; defaults to a conversation with a contact and to an
+     *   automation without one. A conversation without a contact is refused with {@see \InvalidArgumentException}.
      */
     public function start(
         FlowDefinition $definition,
-        Contact $contact,
+        ?Contact $contact,
         array $initialState = [],
+        ?FlowRunOrigin $origin = null,
     ): FlowSession;
 
     /**

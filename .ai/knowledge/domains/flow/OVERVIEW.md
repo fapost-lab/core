@@ -24,13 +24,14 @@ paths:
   - app/Console/Commands/CreateNextFlowLogPartitionCommand.php
   - app/Console/Commands/PruneFlowLogsCommand.php
   - "app/Domains/Flow/Templates/**"
-reviewed_at: 2026-11-11
+reviewed_at: 2026-11-18
 ---
 # Flow
 
 ## Responsibility
 
-Flow executes published flow definitions for a contact. It routes an inbound message or event
+Flow executes published flow definitions for a contact, or as a contactless automation run
+(no contact, optionally no assistant; started only from tests so far). It routes an inbound message or event
 to a flow session, runs node handlers until the flow waits, ends or fails, and persists session
 state. It also owns triggers, subflows, the session lock, run history and logs, the template
 expression engine, and content translation (`Translations/`, `ContentTranslatorInterface`),
