@@ -42,6 +42,17 @@ final class CallNodeIdempotencyTest extends TestCase
         $this->assertSame('user-1', $second->stateChanges['flow.created_id'] ?? null);
     }
 
+    public function test_the_ledger_is_looked_up_once_per_execution(): void
+    {
+        [$handler, , $ledger] = $this->handler([CallResult::ok()]);
+
+        $handler->execute($this->node(), [], $this->context('session-1:call-1:3'));
+        $this->assertSame(1, $ledger->lookups);
+
+        $handler->execute($this->node(), [], $this->context('session-1:call-1:3'));
+        $this->assertSame(2, $ledger->lookups);
+    }
+
     public function test_a_failed_call_is_sent_again_with_the_same_key_and_the_next_attempt_number(): void
     {
         [$handler, $transport] = $this->handler([
@@ -160,7 +171,7 @@ final class CallNodeIdempotencyTest extends TestCase
     /**
      * @param  list<CallResult>  $results
      *
-     * @return array{0: CallNodeHandler, 1: ScriptedCallTransport}
+     * @return array{0: CallNodeHandler, 1: ScriptedCallTransport, 2: InMemoryCallExecutionLedger}
      */
     private function handler(array $results, string $transportId = 'recording'): array
     {
@@ -168,9 +179,12 @@ final class CallNodeIdempotencyTest extends TestCase
         $registry  = new CallTransportRegistry();
         $registry->register($transport);
 
+        $ledger = new InMemoryCallExecutionLedger();
+
         return [
-            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), new InMemoryCallExecutionLedger()),
+            new CallNodeHandler($registry, new TemplateRenderer(), new VariableResolver(), UsageGates::quota(), $ledger),
             $transport,
+            $ledger,
         ];
     }
 

@@ -22,8 +22,15 @@ final class InMemoryCallExecutionLedger implements CallExecutionLedgerInterface
      */
     public array $attempts = [];
 
+    /**
+     * How many times {@see self::completed()} was asked.
+     */
+    public int $lookups = 0;
+
     public function completed(string $tenantId, string $key): ?CallResult
     {
+        $this->lookups++;
+
         return $this->completed["{$tenantId}|{$key}"] ?? null;
     }
 

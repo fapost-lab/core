@@ -8,6 +8,7 @@ use App\Domains\Channels\Contracts\ChannelRegistryInterface;
 use App\Domains\Conversation\Events\OperatorRequestStateChanged;
 use App\Domains\Flow\Action\ActionHandlerRegistry;
 use App\Domains\Flow\Call\CallExecutionLedgerInterface;
+use App\Domains\Flow\Call\CallLedgerCacheForgetter;
 use App\Domains\Flow\Call\CallTransportRegistry;
 use App\Domains\Flow\Call\Egress\AddressClassifier;
 use App\Domains\Flow\Call\Egress\EgressGuardMiddleware;
@@ -239,7 +240,7 @@ final class FlowServiceProvider extends ServiceProvider
             configKey: 'flow.call.dedup_ttl_hours',
             fallback: 192,
             label: 'Call de-duplication window',
-            description: 'How long the call node remembers a successful call, so that a retried step is not sent to the remote system again. Keep it above the failed-job retention (7 days): a failed step can be retried by hand until then.',
+            description: 'How long the call node remembers a successful call, so that a retried step is not sent to the remote system again. Keep it above the Horizon failed-job retention (7 days): a step retried from the Horizon failed-job view until then is recognised; a retry after the window sends the call again with the same key.',
             group: 'Flow',
             unit: 'hours',
             min: 168,
@@ -453,6 +454,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->singleton(GuardedHttpClient::class);
         // Scoped: it reads a platform setting.
         $this->app->scoped(CallExecutionLedgerInterface::class, RedisCallExecutionLedger::class);
+        $this->app->tag(CallLedgerCacheForgetter::class, 'tenancy.cache_forgetters');
         $this->app->singleton(HttpTransport::class);
         $this->app->singleton(HandlerTransport::class);
         $this->app->singleton(BuiltinCommandsRegistry::class);
