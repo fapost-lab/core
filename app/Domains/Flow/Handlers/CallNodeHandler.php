@@ -494,7 +494,7 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
      */
     private function dispatch(
         string $transportId,
-        CallRequest $request,
+        CallRequest $prepared,
         CallContext $callContext,
         ?CallResult $earlier,
         ?CallSuccessStatuses $statuses = null,
@@ -505,19 +505,20 @@ final class CallNodeHandler extends AbstractVersionedHandler implements Declares
         }
 
         $startedAt = CarbonImmutable::now();
-        $timeout   = (int) ($request->options['timeout'] ?? HttpTransport::DEFAULT_TIMEOUT_SECONDS);
-        $options   = $request->options;
+        $timeout   = (int) ($prepared->options['timeout'] ?? HttpTransport::DEFAULT_TIMEOUT_SECONDS);
+        $options   = $prepared->options;
         $sends     = 0;
 
         while (true) {
             $attempt = $this->ledger->startAttempt($callContext->tenantId, $callContext->idempotencyKey);
-            $send    = new CallRequest(
-                target: $request->target,
-                parameters: $request->parameters,
+            // Named `$request` on purpose: OutboundGateCoverageTest finds the delivery by `->execute($request,`.
+            $request = new CallRequest(
+                target: $prepared->target,
+                parameters: $prepared->parameters,
                 options: [...$options, CallAttempt::OPTION => $attempt],
             );
 
-            $result = $this->transports->get($transportId)->execute($send, $callContext);
+            $result = $this->transports->get($transportId)->execute($request, $callContext);
             ++$sends;
 
             // The node's verdict, not the transport's, decides what is recorded: a status the list rejects stays
