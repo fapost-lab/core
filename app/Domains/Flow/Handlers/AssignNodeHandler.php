@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
-use App\Domains\Flow\Contracts\DeclaresContextRequirementInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Enums\AssignTarget;
-use App\Domains\Flow\Enums\NodeContextRequirement;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\Variables\Variable;
@@ -16,6 +14,8 @@ use App\Domains\Flow\State\Variables\VariableType;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
 use Fapost\Foundation\DTO\NodeExecutionStatus;
+use Fapost\Foundation\Flow\Contracts\DeclaresContextRequirementInterface;
+use Fapost\Foundation\Flow\Enums\NodeContextRequirement;
 use Fapost\Foundation\Flow\Enums\StateNamespace;
 use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use Fapost\Support\Builder\Schema\Fields\SelectField;

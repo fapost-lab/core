@@ -9,6 +9,7 @@ use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Exceptions\UnknownDataAccessorNamespacePrefixException;
 use App\Domains\Flow\Expression\PathLength;
+use App\Domains\Flow\State\Exceptions\ContactlessSessionException;
 use App\Domains\Flow\State\Variables\Variable;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\Flow\Contracts\StateNamespacesInterface;
@@ -92,6 +93,10 @@ final class OperandResolver
             // (legacy unit tests) reaches the accessor directly.
             if (null !== $context->stateReader) {
                 return $context->stateReader->read($path);
+            }
+
+            if (null === $context->contactId) {
+                throw ContactlessSessionException::forRead($path);
             }
 
             return $accessor->get($key, $context->contactId, $context->tenantId);

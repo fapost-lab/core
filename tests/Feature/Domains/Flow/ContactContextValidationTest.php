@@ -6,8 +6,6 @@ namespace Tests\Feature\Domains\Flow;
 
 use App\Domains\Assistant\Contracts\CurrentAssistantInterface;
 use App\Domains\Assistant\Models\Assistant;
-use App\Domains\Flow\Contracts\DeclaresContextRequirementInterface;
-use App\Domains\Flow\Enums\NodeContextRequirement;
 use App\Domains\Flow\Exceptions\FlowValidationException;
 use App\Domains\Flow\Models\FlowDraft;
 use App\Domains\Flow\Models\FlowTrigger;
@@ -20,6 +18,8 @@ use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use Fapost\Foundation\Contracts\NodeHandlerInterface;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
+use Fapost\Foundation\Flow\Contracts\DeclaresContextRequirementInterface;
+use Fapost\Foundation\Flow\Enums\NodeContextRequirement;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\Feature\FeatureTestCase;
@@ -87,9 +87,13 @@ final class ContactContextValidationTest extends FeatureTestCase
             ['type' => 'assign', 'config' => ['operations' => [['variable' => ['name' => 'tier', 'storage' => 'contact'], 'value' => 'gold']]]],
             "it uses the contact variable 'tier'",
         ];
-        yield 'a call node, which hands the contact id to its transport' => [
-            ['type' => 'call', 'config' => ['url' => 'https://example.com/hook']],
-            "the node type 'call' reaches the contact of the run",
+        yield 'a call node that saves its response to a contact variable' => [
+            ['type' => 'call', 'config' => ['transport' => 'http', 'target' => 'POST https://example.com/hook', 'save_to_variable' => ['name' => 'reply', 'storage' => 'contact']]],
+            "it uses the contact variable 'reply'",
+        ];
+        yield 'a call node whose target reads the contact' => [
+            ['type' => 'call', 'config' => ['transport' => 'http', 'target' => 'POST https://example.com/hook/{{contact.id}}']],
+            "it reads 'contact.id'",
         ];
         yield 'a bare contact placeholder' => [
             ['type' => 'assign', 'config' => ['operations' => [['variable' => ['name' => 'who', 'storage' => 'session'], 'value' => '{{contact}}']]]],
@@ -133,6 +137,25 @@ final class ContactContextValidationTest extends FeatureTestCase
         ], self::SCHEDULE);
 
         $this->assertSame([], $errors);
+    }
+
+    public function test_a_scheduled_flow_that_calls_an_endpoint_is_published(): void
+    {
+        $nodes = [
+            ['id' => 'call', 'type' => 'call', 'version' => 1, 'config' => ['transport' => 'http', 'target' => 'POST https://example.com/hook/{{flow.order_id}}']],
+            ['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']],
+        ];
+        $edges = [
+            ['id' => 'e1', 'from' => 'call', 'to' => 'end', 'handle' => 'success'],
+            ['id' => 'e2', 'from' => 'call', 'to' => 'end', 'handle' => 'error'],
+        ];
+
+        $scheduled = $this->draft($nodes, $edges);
+        $this->storeTrigger($scheduled, self::SCHEDULE);
+
+        $definition = $this->app->make(PublishFlowService::class)->execute($scheduled->flow_id);
+
+        $this->assertSame(1, $definition->version);
     }
 
     public function test_a_message_trigger_a_deleted_trigger_and_no_trigger_allow_contact_nodes(): void

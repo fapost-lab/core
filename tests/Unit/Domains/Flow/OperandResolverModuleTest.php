@@ -59,10 +59,22 @@ final class OperandResolverModuleTest extends TestCase
         );
 
         try {
-            $this->resolver($accessor)->resolveLegacyPath('module.hr.department', [], $this->context($reader, contactId: ''));
+            $this->resolver($accessor)->resolveLegacyPath('module.hr.department', [], $this->context($reader, contactId: null));
             $this->fail('A contactless session must refuse a module.* operand.');
         } catch (ContactlessSessionException) {
-            $this->assertSame([], $accessor->calls, 'no accessor is asked for an empty contact id');
+            $this->assertSame([], $accessor->calls, 'no accessor is asked without a contact');
+        }
+    }
+
+    public function test_without_a_reader_a_run_without_a_contact_refuses_a_module_operand(): void
+    {
+        $accessor = new RecordingAccessor();
+
+        try {
+            $this->resolver($accessor)->resolveLegacyPath('module.hr.department', [], $this->context(null, contactId: null));
+            $this->fail('A run without a contact must refuse a module.* operand.');
+        } catch (ContactlessSessionException) {
+            $this->assertSame([], $accessor->calls, 'no accessor is asked without a contact');
         }
     }
 
@@ -133,7 +145,7 @@ final class OperandResolverModuleTest extends TestCase
         };
     }
 
-    private function context(?ScopedStateReaderInterface $reader, string $contactId = 'c'): NodeExecutionContext
+    private function context(?ScopedStateReaderInterface $reader, ?string $contactId = 'c'): NodeExecutionContext
     {
         return new NodeExecutionContext(
             tenantId: 't',

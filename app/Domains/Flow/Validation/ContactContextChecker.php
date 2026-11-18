@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Validation;
 
-use App\Domains\Flow\Contracts\DeclaresContextRequirementInterface;
 use App\Domains\Flow\Contracts\FlowTriggerRepositoryInterface;
 use App\Domains\Flow\Contracts\NodeHandlerRegistryInterface;
 use App\Domains\Flow\DTOs\FlowValidationErrorDto;
 use App\Domains\Flow\Enums\AssignTarget;
 use App\Domains\Flow\Enums\FlowTriggerType;
-use App\Domains\Flow\Enums\NodeContextRequirement;
 use App\Domains\Flow\Expression\Engines\TemplateEngine;
 use App\Domains\Flow\Expression\ExpressionEngineRegistry;
 use App\Domains\Flow\State\Variables\VariableStorage;
+use Fapost\Foundation\Flow\Contracts\DeclaresContextRequirementInterface;
 use Fapost\Foundation\Flow\Contracts\ExpressionEngineInterface;
+use Fapost\Foundation\Flow\Enums\NodeContextRequirement;
 
 /**
  * Refuses a node that needs a contact in a flow whose trigger starts it without one.
@@ -24,7 +24,7 @@ use Fapost\Foundation\Flow\Contracts\ExpressionEngineInterface;
  * none, a node needs a contact when:
  *
  * - its handler needs one: it declares {@see NodeContextRequirement::Contact}, or declares nothing
- *   ({@see DeclaresContextRequirementInterface}), which is every Solution node today;
+ *   ({@see DeclaresContextRequirementInterface}, Foundation's, so a Solution's node can declare too);
  * - its config reads `contact.*` or `module.*` — a `{{…}}` placeholder, a bare state path, or a `source` operand
  *   (a data accessor is asked for a contact, so `module.*` cannot be read without one either);
  * - its config reads or writes a contact variable (`storage: contact`), or is a legacy `assign` to the contact.

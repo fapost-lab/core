@@ -422,9 +422,9 @@ final readonly class FlowEngine implements FlowEngineInterface
                     throw HandlerNotFoundException::forTypeAndVersion($type, $version, $exception);
                 }
 
-                // Foundation's context still requires strings: a contactless run passes '' for the platform and the
-                // contact id until NodeExecutionContext makes them nullable (task flow-contact-context).
-                $platform         = $incomingStep?->platform ?? $contact?->platform ?? '';
+                // A contactless run gives the handler no platform and no contact id (null); publishing keeps a node that
+                // needs a contact out of such a flow (ContactContextChecker).
+                $platform         = $incomingStep?->platform ?? $contact?->platform;
                 $resolvedLanguage = $this->languageResolver->resolve($contact, $session);
 
                 $idempotencyKey = null !== $incomingStep
@@ -457,7 +457,7 @@ final readonly class FlowEngine implements FlowEngineInterface
 
                 $handlerContext = new FoundationNodeExecutionContext(
                     tenantId: $session->tenant_id,
-                    contactId: $session->contact_id ?? '',
+                    contactId: $session->contact_id,
                     sessionId: (string)$session->getKey(),
                     nodeId: $nodeId,
                     idempotencyKey: $idempotencyKey,

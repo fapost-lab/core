@@ -351,7 +351,8 @@ constructor cheap and do the work, and every read of tenant data, in `handle()`.
 job of a tenant that has the Solution activated; `$context->tenantId` is that tenant. The builder's
 **Test call** reaches the same handler for the same tenant, with a synthetic context
 (`contactId` `test-contact`, `sessionId` `test-session`), and it really runs: a handler must cope
-with a contact that does not exist.
+with a contact that does not exist. In a flow started by a schedule, a webhook or an API call there is no contact
+at all: `$context->contactId` is `null`.
 
 **Activation is checked on every call.** The action of a Solution the tenant has not activated, or has
 just deactivated, is refused: the `call` node takes its `error` handle with

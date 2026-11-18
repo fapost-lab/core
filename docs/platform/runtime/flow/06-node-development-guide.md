@@ -303,7 +303,12 @@ Two classes validate a definition, and they behave differently. Details:
 registered `type@version`, the required config fields from `configSchema()`, the node-specific rules
 (branch rules, `emit_event`, `end`, `rag_query`, `input` save target, `subflow`, `loop` / `loop_end`,
 media, module references), and across the graph: terminal `end` nodes, nested loops, keyboard
-`send_message` terminal rules, button edges and the subflow call graph. Save-draft does **not**
+`send_message` terminal rules, button edges and the subflow call graph. In a flow whose trigger starts it without a
+contact (`schedule`, `webhook`, `api`), `ContactContextChecker` refuses every node that needs one
+(`node_needs_contact`): a handler needs a contact unless it implements Foundation's
+`DeclaresContextRequirementInterface` and returns `none` or `any`, and a config that reads `contact.*` / `module.*` or
+uses a contact variable needs one whatever the handler declares. A new handler that can run without a contact declares
+`any` and takes `null` for `NodeExecutionContext::$contactId` and `$platform`. Save-draft does **not**
 validate; validation runs on an explicit validate request and atomically on publish.
 
 **`FlowGraphStructureValidator`** is a structural validator that returns the same

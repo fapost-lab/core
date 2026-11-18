@@ -18,7 +18,7 @@ paths:
   - tests/Architecture/FlowRuntimeIsolationTest.php
   - tests/Architecture/HandlerVersionContractTest.php
   - tests/Architecture/EgressGuardTest.php
-reviewed_at: 2026-11-18
+reviewed_at: 2026-11-19
 ---
 # Flow rules
 
@@ -182,12 +182,13 @@ broken.
   Enforced: `AutomationRunPrunerTest` (status × kind × end status × age matrix, enum completeness, chains, tenant),
   `PruneAutomationRunsCommandTest`.
 - **A node that needs a contact is never published into a flow whose trigger gives none.** A handler declares
-  `contact`, `none` or `any` through `DeclaresContextRequirementInterface`; one that declares nothing (every Solution
-  node) needs a contact. Under a `schedule`, `webhook` or `api` trigger, validate and publish refuse such a node, and
+  `contact`, `none` or `any` through Foundation's `DeclaresContextRequirementInterface` (Solutions too); one that
+  declares nothing needs a contact. Under a `schedule`, `webhook` or `api` trigger, validate and publish refuse such a node, and
   any node whose config reads `contact.*` or `module.*` or uses a contact variable, with `node_needs_contact` at
   `nodes.<id>`. Declare `any` only for a handler checked never to use `NodeExecutionContext::$contactId`,
-  `$platform` or the contact writer without a contact, and never hands them on; `call` stays `contact` until
-  Foundation's `CallContext` takes a nullable id, `subflow` until its target is followed. Known gap: a trigger
+  `$platform` (both `null` there) or the contact writer without a contact, and hands them on only where the
+  receiver takes `null` — `call` is `any` because `CallContext::$contactId` is nullable; `subflow` stays `contact`
+  until its target is followed. Known gap: a trigger
   changed on draft save goes live before any publish runs this check.
   Why: a contactless run reaches a contact through an empty id or dies on a typed error nobody watches
   (`adr-20261118-node-contact-context-checked-at-publish`). Enforced: `ContactContextValidationTest`.
