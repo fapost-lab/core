@@ -24,6 +24,7 @@ use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Domains\Flow\Subflow\CallGraphValidator;
 use App\Domains\Flow\Validation\ButtonLimitChecker;
 use App\Domains\Flow\Validation\ChannelCapabilityChecker;
+use App\Domains\Flow\Validation\ContactContextChecker;
 use App\Domains\Flow\Validation\FlowGraphStructureValidator;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Tenancy\Contracts\PlatformSettingsReaderInterface;
@@ -51,6 +52,7 @@ final readonly class ValidateFlowService
         private ?ChannelCapabilityChecker $capabilityChecker = null,
         private ?ButtonLimitChecker $buttonLimitChecker = null,
         private ?FlowGraphStructureValidator $graphValidator = null,
+        private ?ContactContextChecker $contactContext = null,
     ) {
     }
 
@@ -111,6 +113,12 @@ final readonly class ValidateFlowService
         // Skipped when the validator was not injected (legacy unit tests that build the service by hand).
         if (null !== $this->graphValidator) {
             array_push($errors, ...$this->graphValidator->validate($nodes, $edges));
+        }
+
+        // A flow whose trigger gives no contact may hold no node that needs one. Without a trigger in the request
+        // (publish), the stored trigger of the flow decides. Skipped when the checker was not injected (legacy unit tests).
+        if (null !== $this->contactContext) {
+            array_push($errors, ...$this->contactContext->check($this->withoutAnnotations($nodeMap), $trigger, $flowId));
         }
 
         if (null !== $assistantId) {

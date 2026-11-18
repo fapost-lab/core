@@ -146,6 +146,7 @@ use App\Domains\Flow\Translations\InMemorySystemTranslationCatalog;
 use App\Domains\Flow\Validation\AssistantCommandsValidator;
 use App\Domains\Flow\Validation\ButtonLimitChecker;
 use App\Domains\Flow\Validation\ChannelCapabilityChecker;
+use App\Domains\Flow\Validation\ContactContextChecker;
 use App\Domains\Flow\Validation\FlowGraphStructureValidator;
 use App\Domains\Flow\Validation\FlowTriggerConfigValidator;
 use App\Domains\Media\Contracts\MediaDispatcherInterface;
@@ -348,6 +349,7 @@ final class FlowServiceProvider extends ServiceProvider
         $this->app->bind(ChannelCapabilityChecker::class);
         $this->app->bind(ButtonLimitChecker::class);
         $this->app->bind(FlowGraphStructureValidator::class);
+        $this->app->bind(ContactContextChecker::class);
         $this->app->scoped(SubflowStarterService::class, fn ($app): SubflowStarterService => new SubflowStarterService(
             definitions: $app->make(FlowDefinitionRepositoryInterface::class),
             sessions: $app->make(FlowSessionRepositoryInterface::class),

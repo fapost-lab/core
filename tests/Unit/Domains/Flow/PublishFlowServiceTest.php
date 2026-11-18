@@ -91,6 +91,14 @@ final class PublishFlowServiceTest extends TestCase
             $table->index('caller_flow_id');
         });
 
+        // Read by the contact-context check of publish (the flow's stored trigger); these flows have none.
+        Schema::dropIfExists('flow_triggers');
+        Schema::create('flow_triggers', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->uuid('flow_id');
+            $table->string('type');
+        });
+
         Schema::dropIfExists('flow_template_usages');
         Schema::create('flow_template_usages', function (Blueprint $table): void {
             $table->uuid('host_flow_id');

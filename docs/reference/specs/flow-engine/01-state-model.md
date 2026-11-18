@@ -23,7 +23,10 @@ never duplicated into session state.
 
 - Reads: `App\Domains\Flow\State\Readers\ScopedStateReader`, built per node execution over the
   in-memory session state, the `Contact` and the data accessor registry. An unknown path reads as
-  `null`.
+  `null`, with one exception: on a contactless session (an automation run without a contact) `contact.*` and
+  `module.*` throw `ContactlessSessionException`, because such a path cannot exist for that run
+  (`adr-20261118-contactless-runs-in-flow-sessions`). Publishing keeps such reads out of flows whose trigger gives
+  no contact (`node_needs_contact`, see 06-validation).
 - Session writes: a handler returns flat `stateChanges` (`flow.x`, `system.y`);
   `FlowSessionPersister` validates the namespace against `SystemStateNamespacePolicy` and persists the
   state in one `UPDATE flow_sessions` per node, with optimistic-lock versioning.

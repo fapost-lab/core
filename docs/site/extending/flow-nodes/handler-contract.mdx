@@ -60,6 +60,10 @@ shipping any front-end code — see [Builder UI extensions](/extending/builder-u
 | `$state` | Namespaced session state, **read-only** for the handler |
 | `$context` | `NodeExecutionContext` — tenant, contact, and session metadata, plus the writers a handler is allowed to use |
 
+A flow started by a schedule, a webhook or an API call runs without a contact. Core treats a node from an
+extension as one that needs a contact, so such a flow cannot be published while it holds your node; nodes in
+flows started by a message or an event are unaffected.
+
 It returns a `NodeExecutionResult`, built through one of its named constructors:
 
 ```php

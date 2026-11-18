@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
+use App\Domains\Flow\Contracts\DeclaresContextRequirementInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Enums\AssignTarget;
+use App\Domains\Flow\Enums\NodeContextRequirement;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use App\Domains\Flow\Handlers\Support\TemplateRenderer;
 use App\Domains\Flow\State\Variables\Variable;
@@ -22,7 +24,7 @@ use Fapost\Support\Builder\Schema\Fields\TextField;
 use Fapost\Support\Builder\Schema\Schema;
 use Fapost\Support\Builder\Schema\Section;
 
-final class AssignNodeHandler extends AbstractVersionedHandler
+final class AssignNodeHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface
 {
     final public const string TYPE = "assign";
 
@@ -70,6 +72,11 @@ final class AssignNodeHandler extends AbstractVersionedHandler
                     ]),
             )
             ->toArray();
+    }
+
+    public function contextRequirement(): NodeContextRequirement
+    {
+        return NodeContextRequirement::Any;
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult

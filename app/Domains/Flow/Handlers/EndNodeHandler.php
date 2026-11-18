@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
+use App\Domains\Flow\Contracts\DeclaresContextRequirementInterface;
 use App\Domains\Flow\Enums\EndStatus;
+use App\Domains\Flow\Enums\NodeContextRequirement;
 use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
@@ -25,7 +27,7 @@ use Fapost\Support\Builder\Schema\Schema;
  * delegate is invoked by the engine after this handler returns; see
  * {@see \App\Domains\Flow\Subflow\SubflowResumerInterface}.
  */
-final class EndNodeHandler extends AbstractVersionedHandler
+final class EndNodeHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface
 {
     final public const string TYPE = 'end';
 
@@ -77,6 +79,11 @@ final class EndNodeHandler extends AbstractVersionedHandler
                     ]),
             ])
             ->toArray();
+    }
+
+    public function contextRequirement(): NodeContextRequirement
+    {
+        return NodeContextRequirement::Any;
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult

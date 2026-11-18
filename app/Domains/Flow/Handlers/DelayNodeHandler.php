@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domains\Flow\Handlers;
 
+use App\Domains\Flow\Contracts\DeclaresContextRequirementInterface;
 use App\Domains\Flow\Contracts\DelayResumeSchedulerInterface;
+use App\Domains\Flow\Enums\NodeContextRequirement;
 use App\Domains\Flow\State\SystemStateKeys;
 use Fapost\Foundation\DTO\NodeExecutionContext;
 use Fapost\Foundation\DTO\NodeExecutionResult;
@@ -27,7 +29,7 @@ use Illuminate\Support\Carbon;
  * only looks up active and waiting sessions, so a paused one would let an inbound
  * message start a second session for the same contact.
  */
-final class DelayNodeHandler extends AbstractVersionedHandler
+final class DelayNodeHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface
 {
     final public const string TYPE = "delay";
 
@@ -61,6 +63,11 @@ final class DelayNodeHandler extends AbstractVersionedHandler
                     ->default(60),
             ])
             ->toArray();
+    }
+
+    public function contextRequirement(): NodeContextRequirement
+    {
+        return NodeContextRequirement::Any;
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult

@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Handlers;
 
 use App\Domains\Flow\Contracts\DataAccessorRegistryInterface;
+use App\Domains\Flow\Contracts\DeclaresContextRequirementInterface;
 use App\Domains\Flow\Contracts\VariableResolverInterface;
 use App\Domains\Flow\Enums\BranchOperator;
+use App\Domains\Flow\Enums\NodeContextRequirement;
 use App\Domains\Flow\Handlers\Support\OperandResolver;
 use App\Domains\Flow\Handlers\Support\OperatorComparator;
 use Fapost\Foundation\DTO\NodeExecutionContext;
@@ -33,7 +35,7 @@ use Fapost\Support\Builder\Schema\Section;
  * ({@see OperatorComparator}) are shared with other condition-style nodes so
  * the semantics live in one place.
  */
-final class BranchNodeHandler extends AbstractVersionedHandler
+final class BranchNodeHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface
 {
     final public const string TYPE = "branch";
 
@@ -93,6 +95,11 @@ final class BranchNodeHandler extends AbstractVersionedHandler
                     ]),
             )
             ->toArray();
+    }
+
+    public function contextRequirement(): NodeContextRequirement
+    {
+        return NodeContextRequirement::Any;
     }
 
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult

@@ -86,6 +86,13 @@ final class OperandResolver
                 throw new InvalidNodeConfigException($exception->getMessage(), previous: $exception);
             }
 
+            // The engine's reader is the one read path (ADR-0002): on a contactless session it refuses `module.*`
+            // instead of asking the accessor for an empty contact id. Only a context built without the engine
+            // (legacy unit tests) reaches the accessor directly.
+            if (null !== $context->stateReader) {
+                return $context->stateReader->read($path);
+            }
+
             return $accessor->get($key, $context->contactId, $context->tenantId);
         }
 
