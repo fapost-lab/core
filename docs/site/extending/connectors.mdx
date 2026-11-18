@@ -4,9 +4,9 @@ description: "Packages that bring a messaging channel to an installation."
 ---
 
 <Warning>
-  Experimental. A connector's channel can be created in the console, receives and sends
-  messages and describes its own settings, but the contract may still change in a minor
-  release until the first connector ships.
+  Experimental. The contract has been run end to end with the Slack connector against a
+  real Slack app, but it may still change in a minor release until the first connector has
+  a release of its own.
 </Warning>
 
 A connector brings one or more messaging channels — Telegram, Viber — to an
@@ -14,6 +14,10 @@ installation. It is a Composer package, installed when the image is built, like 
 [Solution](/extending/solutions). Unlike a Solution it is not activated per tenant:
 once installed, its channel types exist for the whole installation, and which tenant
 may use them is the operator's decision.
+
+Two channels serve as references: Telegram, built into Core, and Slack, the package
+[`fapost-lab/connector-slack`](https://github.com/fapost-lab/connector-slack).
+[Channel contracts](/extending/channel-drivers) maps each contract to their classes.
 
 ## The manifest
 

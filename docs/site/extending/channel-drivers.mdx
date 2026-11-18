@@ -1,58 +1,85 @@
 ---
-title: "Channel drivers"
-description: "Adding support for a new messaging provider."
+title: "Channel contracts"
+description: "The Foundation contracts a messaging channel implements, with Telegram and Slack as references."
 ---
 
-A channel has two halves: **ingress**, which accepts and verifies what the provider
-sends you, and **egress**, which delivers what the assistant says back.
+A messaging channel reaches an installation as a [Connector](/extending/connectors): a
+Composer package that registers its channel types through `ConnectorRegistrarInterface`.
+No channel needs a change in Core. This page is the reference for the contracts a channel
+implements. [Connectors](/extending/connectors) explains how to package and register them.
 
-<Note>
-  A channel ships as a [Connector](/extending/connectors) package that registers
-  the contracts below through `ConnectorRegistrarInterface`. Telegram is built into
-  Core and uses the same contracts.
-</Note>
+A channel has two halves. **Ingress** accepts and verifies what the provider sends you.
+**Egress** delivers what the assistant says back.
+
+## Two references
+
+Read the contracts below next to two working channels. Both describe themselves with the
+same `ConnectorChannel` and implement the same interfaces.
+
+- **Telegram** is built into Core, in
+  [`app/Domains/Channels/Telegram`](https://github.com/fapost-lab/core/tree/main/app/Domains/Channels/Telegram).
+  It uploads media to the provider and declares every kind of button.
+- **Slack** is a package,
+  [`fapost-lab/connector-slack`](https://github.com/fapost-lab/connector-slack). It is the
+  connector an outsider would write: a manifest, its own translations, a signed timestamp
+  and a URL challenge on ingress, and media sent by link. It has been run end to end against
+  a real Slack app but has no release yet.
+
+| Contract | Telegram (Core) | Slack (package) |
+|---|---|---|
+| Service provider | `TelegramChannelServiceProvider` | `SlackConnectorServiceProvider` |
+| `ProviderSenderInterface` | `TelegramSender` | `SlackSender` |
+| `ChannelInboundAdapterInterface` | `TelegramAdapter` | `SlackInboundAdapter` |
+| `WebhookRegistrarInterface` | `TelegramWebhookRegistrar` | `SlackWebhookRegistrar` |
+| `ChannelMediaUploaderInterface` | `TelegramMediaUploader` | — (media by link) |
+| `ChannelMediaLinkPolicyInterface` | — | `SlackMediaLinkPolicy` |
+| `ChannelMediaDownloaderInterface` | `TelegramMediaDownloader` | `SlackMediaDownloader` |
+| `ChannelProfileInterface` | `TelegramChannelProfile` | `SlackChannelProfile` (also the setup guide) |
+| `ChannelMediaLimitsInterface` | `TelegramMediaLimits` | — (Slack documents none) |
 
 ## Identity
 
 `Fapost\Foundation\Channel\ChannelInterface` is the minimal identity exposed across
-the extension boundary. Core's Eloquent channel models implement it so that
-adapters living outside Core can read identity and credentials without depending
-on `App\…`:
+the extension boundary. Core's channel models implement it, so code outside Core can
+read identity and credentials without depending on `App\…`:
 
 ```php
 interface ChannelInterface
 {
     public function getId(): string;      // ULID stored as lowercase RFC-4122 UUID
-    public function getType(): string;    // "telegram", "whatsapp", …
+    public function getType(): string;    // "telegram", "slack", …
     /** @return array<string, mixed> */
     public function getConfig(): array;   // transport credentials and per-channel options
 }
 ```
 
-`getType()` is deliberately a string rather than an enum, so that Foundation stays
-free of Core's taxonomies; Core casts to and from its own enum at the boundary.
+`getType()` is a string rather than an enum, so that Foundation stays free of Core's
+taxonomies.
 
 ## Ingress
 
-The ingress side is declarative. A provider integration describes how its webhook
-is authenticated and deduplicated through an `IngressSpec`, exposed by
-`ProvidesIngressSpecInterface`:
+The ingress side is declarative. The inbound adapter describes how its webhook is
+authenticated and deduplicated in an `IngressSpec`, and does no verification in code:
 
 | Piece | Role |
 |---|---|
 | `IngressSpec` | The declarative description of a provider's webhook contract |
-| `SignatureScheme` | How the request is verified — for example `header_equals` (a header equals the channel secret) or `hmac_sha256` (a header carries an HMAC-SHA256 of the raw body, keyed by the channel secret) |
+| `SignatureScheme` | How the request is verified: for example `header_equals` (a header equals the channel secret) or `hmac_sha256` (a header carries an HMAC-SHA256 keyed by the channel secret) |
 | `SignedRequest` | The request as presented for verification |
 | `IngressSpecExecutor` | Applies a spec to an incoming request |
 | `WebhookRegistrarInterface` / `WebhookRegistrationPayload` | Registering the webhook with the provider |
 
-Because the spec is data rather than code, the same description can be executed by
-PHP or by the Go [webhook gateway](/self-hosting/gateway) in front of it. The spec
-also carries the idempotency key template — this is where a value such as
-`tg:{channel}:{body.update_id}` is declared.
+Because the spec is data rather than code, the same description is executed by PHP
+and by the Go [webhook gateway](/self-hosting/gateway) in front of it. The spec also
+carries the idempotency key template, such as `tg:{channel}:{body.update_id}`. Signed
+timestamps, form-encoded bodies and URL challenges are covered by
+[`IngressSpec` version 2](/extending/connectors#signed-timestamps-forms-and-challenges-ingressspec-version-2).
 
-Verified traffic becomes an `InboundWebhookPayload`, and then an `IncomingMessage`
-with its `IncomingMessageType` and any `IncomingMedia`.
+Verified traffic becomes an `InboundWebhookPayload`. The adapter's `normalize()` turns it
+into an `IncomingMessage` with its `IncomingMessageType` and any `IncomingMedia`, or throws
+`InboundEventIgnoredException` for a delivery that is not a person's message. Providers
+echo the bot's own messages and its edits back to the webhook, so this matters: Slack sends
+both, and an adapter that normalized them would make the assistant answer itself.
 
 ## Egress
 
@@ -68,32 +95,64 @@ interface ProviderSenderInterface
 The envelope carries no secret and may sit in a queue. Core loads the channel when it
 sends and passes it in: read the credentials from `$channel->getConfig()` during the
 call (`token`, `secret_token`, and the channel's settings under `options`), and never
-keep or log them. `TypingCapableProviderInterface` receives the channel the same way.
+keep or log them. `TypingCapableProviderInterface` receives the channel the same way and
+exposes a typing or processing indicator through a `ProcessingIndicatorHandle`.
 
-Two optional capabilities sit alongside it. `TypingCapableProviderInterface`
-exposes a typing or processing indicator through a `ProcessingIndicatorHandle`;
-`ChannelMediaUploaderInterface` and `ChannelMediaDownloaderInterface` handle media
-in each direction.
+`DeliveryResult` reports `sent`, the provider's message id and, on failure, an `error`.
+When the provider refuses a message, put its reason in the error or the exception, not
+only its code: a refusal such as Slack's `invalid_blocks` says nothing until you add the
+detail the provider sent with it. A failed send moves the flow to the node's `error` edge;
+with no such edge the flow ends.
 
 A message with buttons carries them as a channel-neutral `ButtonSet` in
-`MessagePayload::$buttons` (each button is a callback, a reply, a contact request or a
-location request); the sender translates it into the provider's format. What a channel
-can show is declared through `ChannelCapabilities`, and a press on a callback button is
-reported back as an `IncomingMessage` of type `CallbackQuery` whose `text` is the payload
-unchanged. See [Connectors](/extending/connectors#buttons-and-capabilities).
+`MessagePayload::$buttons`, and the sender translates it into the provider's format. What a
+channel can show is declared through `ChannelCapabilities`. A press on a callback button
+comes back as an `IncomingMessage` of type `CallbackQuery` whose `text` is the payload
+unchanged. See [Buttons and capabilities](/extending/connectors#buttons-and-capabilities).
 
-A provider that accepts pictures, video and files only as a URL it fetches itself
-registers `ChannelMediaLinkPolicyInterface` instead of an uploader, tagged
-`media.channel.link`. Core then puts a signed public link to the file in the outgoing
-payload, issued just before delivery and valid for a limited time: `media.url`, with
-`mime_type`, `size` (bytes), `file_name` (with its extension) and `kind` (`image`,
-`video`, `audio` or `document`). The payload's `type` is shaped for channels that
-upload, so choose the provider's message type from `mime_type`. The link is the only
-way to the file without signing in, so the sender never logs it, never stores it and
-never builds links of its own. A channel type with an uploader keeps uploading.
+## Media
+
+**Sending.** A channel either uploads files to the provider or lets the provider fetch them.
+
+- `ChannelMediaUploaderInterface` uploads the file and gives the provider's id back. Telegram
+  works this way.
+- A provider that accepts pictures, video and files only as a URL it fetches itself registers
+  `ChannelMediaLinkPolicyInterface` instead. Core then puts a signed public link to the file in
+  the outgoing payload, issued just before delivery: `media.url`, with `mime_type`, `size`
+  (bytes), `file_name` (with its extension) and `kind` (`image`, `video`, `audio` or
+  `document`). `linkTtlSeconds()` asks for how long the link stays valid; Core caps it. The
+  payload's `type` is shaped for channels that upload, so choose the provider's message type
+  from `mime_type`. A channel type with an uploader keeps uploading.
+
+The link is the only way to the file without signing in, so the sender never logs it, never
+stores it and never builds links of its own. The provider fetches it from the internet, so
+the installation's address must be public. On a development install behind a private host
+the provider cannot fetch the file and refuses the message. Slack, for example, answers
+`invalid_blocks`. Use a [tunnel](/contributing/local-webhooks) to test.
+
+**Receiving.** `ChannelMediaDownloaderInterface::download()` returns a `DownloadResult`: a
+PSR-7 stream, the MIME type, the size and optionally the file name. The stream may be the
+body of a streamed HTTP response. It need not be seekable: Core reads it once, from where it
+stands. Core downloads files of incoming messages in a queued job after the message is
+logged, so the flow does not wait for them.
 
 ## Rate limits are preventive
 
-Provider rate limits and backpressure are handled before sending, not as a
-reaction to the provider's error. A sender that discovers the limit by being
-rejected has already spent the request, and on a broadcast that failure multiplies.
+Provider rate limits and backpressure are handled before sending, not as a reaction to
+the provider's error. A sender that discovers the limit by being rejected has already spent
+the request, and on a broadcast that failure multiplies.
+
+## Checking a channel against the real provider
+
+`ConnectorTestCase` and recorded payloads prove the code. Before you call a channel done,
+run it against the provider itself through a [tunnel](/contributing/local-webhooks). Slack
+was checked this way:
+
+- the URL challenge is answered, and every request's signature is verified;
+- a person's text reaches the flow, and the flow's text, formatting and emoji reach the person;
+- buttons arrive, a press takes the right branch, and the buttons are removed afterwards;
+- the bot's own messages and edits are ignored, so the assistant never answers itself;
+- a picture from the flow arrives with its caption, and a file from the person is stored.
+
+Save the payloads the provider actually sent, remove tokens and callback URLs from them, and
+keep them as fixtures for the adapter's tests.
