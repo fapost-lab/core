@@ -80,6 +80,7 @@ Annotation nodes (`comment`) are exempt from node-level checks. Per node:
 | `subflow_missing_flow_id`, `subflow_template_in_flow_id`, `subflow_invalid_timeout` | `subflow.flow_id` is a literal; `timeout` is an ISO 8601 duration |
 | `subflow_target_is_template` | `subflow.flow_id` does not name a flow template (path `nodes.<id>.config.flow_id`): a template never starts on its own, it is placed with a template node |
 | `loop_invalid_iterator_name`, `loop_reserved_iterator_name`, `loop_count_exceeds_budget` | iterator name is an identifier and not one of `id, language, meta, tenant_id, external_id`; a literal count above 100 is rejected |
+| `loop_iterator_variable_conflict`, `loop_count_not_numeric` | `LoopConfigChecker` (path `nodes.<loop>.config.iterator_name` / `.config.count_source`): no node writes a session variable named like a loop's `iterator_name` or `{iterator_name}_total`; a counted loop's literal `count_source` is a number (a numeric string counts) |
 | `loop_end_missing_loop_node_id`, `loop_end_invalid_loop_node_id` | `loop_end.loop_node_id` references an existing `loop` node |
 
 Graph-level checks (need `edges`):
@@ -127,6 +128,15 @@ channels gets none. Annotation nodes are skipped.
 | same, `keyboard_mode` `reply` | `ReplyButtons`; a button with `special` `request_contact` / `request_location` needs `ShareContact` / `ShareLocation` instead |
 | `input` expecting `select` or `confirm` | `CallbackButtons` |
 | `input` expecting `contact` / `location` | `ShareContact` / `ShareLocation` |
+
+`LoopConfigChecker` emits `loop_while_condition_unchanged` (path `nodes.{loop}.config.condition`) for a `while` loop whose
+condition reads a session or contact variable (or `flow.*` / `contact.*` source) that no node of the loop body writes.
+The body is everything reachable from the `loop` handle up to the loop's own `loop_end`; writes are read from the save
+targets of `input`, `assign` (operations and the legacy form), `send_message`, `call` (`save_to_variable`, `result_mapping`)
+and `subflow` (`output_mapping`). Unlike the other warnings it is produced on every `execute()`, with or without an assistant
+id, and is never an error: the value may change from outside the flow. It is skipped when the condition is on the loop's
+own iterator, on a path the check cannot follow (`module.*`, `rag.*`), or when the body holds a Solution node (it may
+write anything).
 
 `ButtonLimitChecker` emits `channel_button_limit_exceeded` (path `nodes.{id}`) when a keyboard is larger than a
 channel declares in its `ButtonLimits`: one warning per node and per kind of limit (buttons in one message, buttons
