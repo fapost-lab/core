@@ -1,0 +1,58 @@
+---
+title: "Connectors"
+description: "Messaging channels you can add to your own FaPost installation, and how to install one."
+---
+
+A **connector** brings a messaging channel to the platform: once installed, workspaces can create channels
+of its type in the console ([Channels](/using/channels)). Telegram is built into Core; every other channel
+is a separate Composer package.
+
+## Available connectors
+
+| Channel | Package | Licence | Status |
+|---|---|---|---|
+| Telegram | Built into Core | Apache-2.0 | Stable |
+| [Slack](https://github.com/fapost-lab/connector-slack) | `fapost/connector-slack` | MIT | Experimental: run end to end against a real Slack app, no release yet |
+
+Connectors are MIT, so a connector for another provider can be started from an existing one. Building your
+own? See [Connectors](/extending/connectors) and [Channel contracts](/extending/channel-drivers).
+
+## Installing a connector
+
+A connector is installed like a [Solution](/self-hosting/solutions-directory#installing-a-solution): a
+Composer package added on top of Core with a **composer overlay**, then `php artisan platform:update`.
+
+<Steps>
+  <Step title="Describe the package in composer.overlay.json">
+    At Core's root (the file is git-ignored), name the package's repository and a version:
+
+    ```json
+    {
+      "repositories": [{ "type": "vcs", "url": "https://github.com/fapost-lab/connector-slack" }],
+      "require": { "fapost/connector-slack": "dev-main" }
+    }
+    ```
+  </Step>
+
+  <Step title="Install it">
+    ```bash
+    composer overlay
+    ```
+  </Step>
+
+  <Step title="Update the platform">
+    ```bash
+    php artisan platform:update
+    ```
+
+    It lists the installed connectors with their channel types, or refuses with every manifest problem it
+    found.
+  </Step>
+</Steps>
+
+Unlike a Solution, a connector is not turned on per workspace: once installed, its channel type is available
+on the whole installation. Each connector's README describes what to set up at the provider.
+
+In an image, add the overlay to the build ([Building your own images](/self-hosting/docker-compose#building-your-own-images)).
+Removing a connector leaves its channels in place but unavailable; see
+[When a connector is removed](/extending/connectors#when-a-connector-is-removed).
