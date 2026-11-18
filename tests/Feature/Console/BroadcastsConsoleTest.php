@@ -107,6 +107,7 @@ final class BroadcastsConsoleTest extends FeatureTestCase
         $draft     = $this->broadcast('Draft');
         $running   = $this->broadcast('Running', ['status' => BroadcastStatus::Running->value, 'total_recipients' => 10, 'sent_count' => 4, 'failed_count' => 1, 'skipped_count' => 2]);
         $completed = $this->broadcast('Completed', ['status' => BroadcastStatus::Completed->value]);
+        $failed    = $this->broadcast('Failed', ['status' => BroadcastStatus::Failed->value, 'stop_reason' => BroadcastStatus::STOP_REASON_RUN_FAILED]);
         $base      = "/assistant/{$this->assistant->getKey()}/broadcasts";
 
         $rows = [];
@@ -137,6 +138,9 @@ final class BroadcastsConsoleTest extends FeatureTestCase
         $this->assertNull($rows['Completed']['editUrl']);
         $this->assertNull($rows['Completed']['cancelUrl']);
         $this->assertSame("{$base}/{$completed->getKey()}", $rows['Completed']['deleteUrl']);
+        $this->assertSame('run_failed', $rows['Failed']['stopReason'], 'The row carries why a run failed, for the list to show.');
+        $this->assertNull($rows['Completed']['stopReason']);
+        $this->assertSame("{$base}/{$failed->getKey()}", $rows['Failed']['deleteUrl']);
     }
 
     public function test_the_list_searches_filters_by_status_and_shows_the_newest_first(): void

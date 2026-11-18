@@ -6,9 +6,11 @@ namespace Tests\Feature\Domains\Broadcasting;
 
 use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Broadcasting\Enums\BroadcastStatus;
+use App\Domains\Broadcasting\Enums\RecipientStatus;
 use App\Domains\Broadcasting\Jobs\RunBroadcastJob;
 use App\Domains\Broadcasting\Jobs\SendBroadcastRecipientJob;
 use App\Domains\Broadcasting\Models\Broadcast;
+use App\Domains\Broadcasting\Models\BroadcastRecipient;
 use App\Domains\Channels\Enums\ChannelTypeEnum;
 use App\Domains\Channels\Models\Channel;
 use App\Domains\Contact\Models\ChannelContact;
@@ -18,7 +20,6 @@ use App\Domains\Contact\Models\ContactSegment;
 use App\Domains\Contact\Models\ContactTag;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use RuntimeException;
 use Tests\Feature\FeatureTestCase;
 
@@ -149,16 +150,13 @@ final class RunBroadcastJobTest extends FeatureTestCase
         $broadcast = $this->runningBroadcast((string) $channel->assistant_id);
         $contact   = $this->contact();
 
-        foreach (['pending', 'sent'] as $status) {
-            DB::table('broadcast_recipients')->insert([
-                'id'           => (string) Str::ulid()->toRfc4122(),
+        foreach ([[RecipientStatus::Pending, $contact], [RecipientStatus::Sent, $this->contact()]] as [$status, $recipientContact]) {
+            BroadcastRecipient::query()->create([
                 'tenant_id'    => self::TENANT_ID,
                 'broadcast_id' => $broadcast->getKey(),
-                'contact_id'   => 'pending' === $status ? $contact->getKey() : $this->contact()->getKey(),
+                'contact_id'   => $recipientContact->getKey(),
                 'channel_id'   => $channel->getKey(),
-                'status'       => $status,
-                'created_at'   => now(),
-                'updated_at'   => now(),
+                'status'       => $status->value,
             ]);
         }
 

@@ -9,6 +9,7 @@ export interface BroadcastsTranslations {
   edit_title: string
   columns: { name: string; target: string; status: string; progress: string; failed: string; skipped: string; created: string }
   statuses: Record<BroadcastStatus, string>
+  stop_reasons: Record<BroadcastStopReason, string>
   targets: Record<BroadcastTarget, string>
   filters: { status: string; status_all: string }
   search_label: string
@@ -48,6 +49,8 @@ export type BroadcastsPageProps = ShellPageProps & {
 
 export type BroadcastStatus = 'draft' | 'running' | 'completed' | 'failed' | 'cancelled'
 
+export type BroadcastStopReason = 'run_failed' | 'limit_reached'
+
 export type BroadcastTarget = 'all' | 'tags' | 'segment'
 
 export interface BroadcastRow extends Record<string, unknown> {
@@ -55,6 +58,8 @@ export interface BroadcastRow extends Record<string, unknown> {
   name: string
   target: BroadcastTarget
   status: BroadcastStatus
+  /** Why a failed or stopped run ended, when it is one of the known reasons. */
+  stopReason: BroadcastStopReason | null
   sent: number
   total: number
   failed: number

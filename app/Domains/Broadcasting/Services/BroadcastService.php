@@ -33,6 +33,9 @@ use Illuminate\Support\Str;
  *
  * Every read and write is bounded by the tenant and the assistant, explicitly, because no global scope
  * does it implicitly: a broadcast of another assistant or tenant is "not found", never "forbidden".
+ * The exceptions are the queue-path entries, {@see failRun()} and {@see settleRecipient()}: they are
+ * keyed by a broadcast or recipient id from a job, use none of the console dependencies, and need
+ * only the tenant to be switched.
  *
  * A broadcast reaches real people, so the three things that can go wrong are closed here and not left to the screen:
  *
@@ -268,8 +271,10 @@ final readonly class BroadcastService
      * Ends a run whose launching job crashed: a still-Running broadcast becomes Failed and its still-Pending
      * recipients are skipped (counted in skipped_count). A Cancelled or Completed broadcast is left alone.
      * A recipient already in flight is not touched: its job finds the Failed status on the next check, or, when
-     * it was past that check, moves the unit out of skipped_count on finishing (see SendBroadcastRecipientJob).
+     * it was past that check, moves the unit out of skipped_count on finishing (see settleRecipient()).
      * Callable from a queue job: it does not depend on the current assistant, only on the tenant being switched.
+     * Lock order, shared with {@see settleRecipient()}: the broadcast row (the status UPDATE) first, then the
+     * recipient rows. A deadlock victim is retried, so the run is not left Running.
      *
      * @return bool false when the broadcast was not running
      */
@@ -303,6 +308,77 @@ final readonly class BroadcastService
             if ($skipped > 0) {
                 Broadcast::query()->whereKey($broadcastId)->increment('skipped_count', $skipped);
             }
+
+            return true;
+        }, attempts: 3);
+    }
+
+    /**
+     * Records the outcome of one recipient and moves the matching broadcast counter, once per recipient.
+     * Only a still-Pending row is settled. When the run failed while the send was in flight, {@see failRun()}
+     * has already skipped the row and counted it in skipped_count; the send really happened, so the unit
+     * moves from skipped_count to its real counter in one UPDATE, together with the row, in one transaction
+     * (a crash between them can never leave sent + failed + skipped short of total_recipients).
+     * Callable from a queue job: it does not depend on the current assistant.
+     *
+     * Lock order, shared with {@see failRun()}: the broadcast row first, then its recipient rows. Taking
+     * them in the other order lets the two deadlock on Postgres.
+     *
+     * @param  'sent_count'|'failed_count'|'skipped_count'  $counter
+     * @return bool false when the recipient was already settled (nothing changed)
+     */
+    public function settleRecipient(
+        string $broadcastId,
+        string $recipientId,
+        RecipientStatus $status,
+        string $counter,
+        ?string $error = null,
+        ?string $providerMessageId = null,
+    ): bool {
+        $values = [
+            'status'              => $status->value,
+            'error'               => $error,
+            'provider_message_id' => $providerMessageId,
+            'sent_at'             => RecipientStatus::Sent === $status ? Carbon::now() : null,
+            'updated_at'          => Carbon::now(),
+        ];
+
+        return DB::transaction(function () use ($broadcastId, $recipientId, $status, $counter, $values): bool {
+            // Lock order is broadcast row first, then recipient rows, the same as failRun(): the other order deadlocks.
+            Broadcast::query()->whereKey($broadcastId)->lockForUpdate()->first();
+
+            $recipients = DB::table('broadcast_recipients')->where('id', $recipientId);
+
+            $settled = (clone $recipients)
+                ->where('status', RecipientStatus::Pending->value)
+                ->update($values) > 0;
+
+            if ($settled) {
+                Broadcast::query()->whereKey($broadcastId)->increment($counter);
+
+                return true;
+            }
+
+            // Skipping again is no outcome to reclaim; only a real one (sent, failed) undoes the run_failed skip.
+            if (RecipientStatus::Skipped === $status) {
+                return false;
+            }
+
+            $reclaimed = (clone $recipients)
+                ->where('status', RecipientStatus::Skipped->value)
+                ->where('error', BroadcastStatus::STOP_REASON_RUN_FAILED)
+                ->update($values) > 0;
+
+            if (! $reclaimed) {
+                return false;
+            }
+
+            $column = DB::getQueryGrammar()->wrap($counter);
+
+            Broadcast::query()->whereKey($broadcastId)->update([
+                'skipped_count' => DB::raw('skipped_count - 1'),
+                $counter        => DB::raw($column . ' + 1'),
+            ]);
 
             return true;
         });

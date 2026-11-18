@@ -45,10 +45,13 @@ broken.
   a 30-second delay (`RunBroadcastJob`). No test covers it.
 - **A send job starts only from a `Pending` recipient,** and only the last recipient to finish flips
   the broadcast to `Completed`, through a conditional update (`SendBroadcastRecipientJob`).
-  `finish()` settles the row only from `Pending`; if a failed run skipped it (`Skipped`,
-  `run_failed`) while its send was already in flight, `finish()` takes the row back to the real
-  outcome and moves that one unit from `skipped_count` to the matching counter, so the counters
-  never exceed `total_recipients`. Enforced: `SendBroadcastRecipientJobTest`.
+  The job's `finish()` calls `BroadcastService::settleRecipient()`, which settles the row only from
+  `Pending`; if a failed run skipped it (`Skipped`, `run_failed`) while its send was already in
+  flight, it takes the row back to the real outcome and moves that one unit from `skipped_count` to
+  the matching counter (one UPDATE, one transaction), so the counters never exceed
+  `total_recipients`. The settle/reclaim lives only in the service. Both `settleRecipient()` and
+  `failRun()` lock the broadcast row first, then the recipient rows; the other order deadlocks on
+  Postgres. Enforced: `SendBroadcastRecipientJobTest` (the lock order is not testable on sqlite).
 - **Every job runs inside `TenantSwitcher::runForTenant()`.**
 
 - **A crashed run fails the broadcast.** When `RunBroadcastJob` exhausts its attempts, `failed()`
