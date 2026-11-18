@@ -110,7 +110,7 @@ final class PruneFlowLogsCommand extends Command
         }
 
         $suffix = Str::after($partitionName, 'flow_logs_');
-        $month  = CarbonImmutable::createFromFormat('Y_m', $suffix, 'UTC');
+        $month  = CarbonImmutable::createFromFormat('!Y_m', $suffix, 'UTC');
 
         return false === $month ? null : $month->startOfMonth();
     }
