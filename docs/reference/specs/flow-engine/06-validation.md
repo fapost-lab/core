@@ -2,12 +2,12 @@
 
 How a flow definition is checked before it can run. Validation is split across three layers with
 different failure shapes; do not assume a rule from one layer holds in another. The structural graph
-checks do not yet run on save, validate or publish; wiring them into `ValidateFlowService` is the next
-step, after the audit below has shown how many stored flows would fail.
+checks run inside `ValidateFlowService::execute()`, so a graph they reject cannot be published and is
+reported by the builder's Validate button.
 
 | Layer | Class | Failure shape | Wired into |
 |---|---|---|---|
-| Structural graph check | `App\Domains\Flow\Validation\FlowGraphStructureValidator` | returns a list of `FlowValidationErrorDto`, never throws | **not called by the save / validate / publish pipeline**; run today only by `php artisan flow:audit-graph` |
+| Structural graph check | `App\Domains\Flow\Validation\FlowGraphStructureValidator` | returns a list of `FlowValidationErrorDto`, never throws | called by `ValidateFlowService::execute()` (so by validate and publish, not by save-draft), and by `php artisan flow:audit-graph` |
 | Builder validation | `App\Domains\Flow\Services\ValidateFlowService::execute()` | returns `FlowValidationResultDto` with a list of `FlowValidationErrorDto` (`path`, `code`, `message`) | `POST .../validate` (`BuilderFlowController::validate`) and `PublishFlowService` |
 | Publish-time checks | `App\Domains\Flow\Services\PublishFlowService::execute()` | throws `FlowValidationException` carrying the DTO errors | `POST .../publish` |
 
@@ -26,7 +26,7 @@ step, after the audit below has shown how many stored flows would fail.
 Edges in a stored definition use `from` / `to` / `handle`. `ValidateFlowService` and the engine's
 `FlowGraphResolver` use that shape.
 
-## `FlowGraphStructureValidator` (DTO errors, audit only)
+## `FlowGraphStructureValidator` (DTO errors)
 
 `validate(nodes, edges)` takes the stored shape (`{from, to, handle}` edges, `handle` defaulting to
 `default`), strips annotation nodes the way publish does (a comment between two steps bridges the
@@ -40,14 +40,25 @@ chain), and returns every problem it finds:
 | `entry_node_count` | not exactly one node without an incoming edge (same rule as `FlowGraphResolver::resolveEntryNode()`, so a loop back-edge to the entry node counts as "no entry") |
 | `orphan_node` | a node is not reachable from the single entry (only checked when there is exactly one) |
 | `variable_contract_conflict` | `input`, `send_message` or `assign` mixes the new variable shape with the legacy one |
-| `variable_contract_invalid`, `variable_contract_invalid_operation`, `variable_contract_duplicate_target` | a variable does not construct a valid `Variable`; an `assign` operation is malformed or repeats a `(storage, group, name)` target |
+| `variable_contract_invalid`, `variable_contract_invalid_operation`, `variable_contract_duplicate_target` | a variable has a name but does not construct a valid `Variable` (unknown storage, no storage, reserved name, a group on a session variable); an `assign` operation is malformed, has no name / storage, or repeats a `(storage, group, name)` target |
 | `branch_rules_*` | a branch rule is not an object, or its `left` has an unknown `ref`, a missing name / source / field, or a source outside `contact`, `rag`, `call`, `system`, `flow`, `module.*` |
+
+A variable object **with no name** is "no save target", not an error, for `input`, `send_message` and
+branch rules: the runtime reads it that way (`Variable::tryFromArray()` returns `null`) and the builder
+keeps `{type, storage}` defaults in a draft the author has not filled in. An `input` without a target is
+`input_missing_save_target` in `ValidateFlowService`. An `assign` operation without a name or storage
+throws at runtime, so it stays invalid.
+
+An empty flow (no nodes) has no entry node and is refused with `entry_node_count`, as the runtime would
+refuse to start it. A new flow is created with an `end` node, so only a hand-emptied canvas is affected.
 
 Checks that stay in `ValidateFlowService` are not repeated: node type and version, required config,
 the `input` save target and the minimum of one branch rule.
 
 `php artisan flow:audit-graph [--tenant=slug] [--json]` runs it over every active published definition
-and every non-empty draft of each active tenant, and prints the findings. Findings never change the exit code (it is a report, not a gate); it exits non-zero only when the audit could not run: an unknown `--tenant` slug, or a tenant that failed. Published definitions are checked as stored; drafts have annotation nodes stripped first.
+and every non-empty draft of each active tenant, and prints the findings. Run it before upgrading to a
+release that enforces these checks: a flow it reports as a definition is already active and would be refused
+on its next publish. Findings never change the exit code (it is a report, not a gate); it exits non-zero only when the audit could not run: an unknown `--tenant` slug, or a tenant that failed. Published definitions are checked as stored; drafts have annotation nodes stripped first.
 
 ## `ValidateFlowService` (DTO errors)
 
@@ -86,8 +97,9 @@ Trigger checks (when a trigger payload is sent): `invalid_trigger_type`, `invali
 `invalid_trigger_priority`, `invalid_trigger_config` (delegated to `FlowTriggerConfigValidator`),
 `duplicate_exact_trigger_keyword`, `missing_event_trigger_selection`, `unknown_event_trigger_selection`.
 
-There is **no** requirement that a flow contains an `end` node, no check that a knowledge base
-exists, and no entry-node or orphan check in this layer (see `FlowGraphStructureValidator`).
+There is **no** requirement that a flow contains an `end` node and no check that a knowledge base
+exists. The entry-node and orphan checks are `FlowGraphStructureValidator`'s, called from the end of
+`execute()` on the nodes and edges it was given, so their errors come back in the same list.
 
 ### Warnings
 

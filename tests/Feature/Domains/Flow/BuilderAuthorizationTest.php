@@ -139,7 +139,10 @@ final class BuilderAuthorizationTest extends FeatureTestCase
      */
     private function draftPayload(FlowDraft $draft): array
     {
-        return ['draft_version' => $draft->draft_version, 'definition' => ['nodes' => []]];
+        return [
+            'draft_version' => $draft->draft_version,
+            'definition'    => ['nodes' => [['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']]]],
+        ];
     }
 
     private function userWithFlowPermissions(): User
@@ -157,6 +160,7 @@ final class BuilderAuthorizationTest extends FeatureTestCase
         return FlowDraft::factory()->create([
             'tenant_id'    => $assistant->tenant_id,
             'assistant_id' => $assistant->getKey(),
+            'nodes'        => [['id' => 'end', 'type' => 'end', 'version' => 1, 'config' => ['status' => 'success']]],
         ]);
     }
 }

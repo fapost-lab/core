@@ -262,6 +262,52 @@ final class FlowGraphStructureValidatorTest extends TestCase
         $this->assertSame([], $this->validate([$this->node('a', 'input', [])], []));
     }
 
+    public function test_a_nameless_variable_object_is_no_save_target_for_input_and_send_message(): void
+    {
+        $errors = $this->validate(
+            [
+                $this->node('a', 'input', ['variable' => ['type' => 'text', 'storage' => 'session']]),
+                $this->node('b', 'send_message', ['save_to_variable' => ['type' => 'text', 'storage' => 'session']]),
+                $this->node('c', 'send_message', ['save_to_variable' => []]),
+            ],
+            [$this->edge('a', 'b'), $this->edge('b', 'c')],
+        );
+
+        $this->assertSame([], $errors);
+    }
+
+    public function test_a_nameless_variable_object_does_not_hide_a_real_contradiction(): void
+    {
+        $errors = $this->validate(
+            [$this->node('a', 'input', ['save_to' => 'answer', 'variable' => ['type' => 'text', 'storage' => 'session']])],
+            [],
+        );
+
+        $this->assertSame(['variable_contract_conflict'], $this->codes($errors));
+    }
+
+    public function test_an_assign_operation_without_a_name_is_still_invalid(): void
+    {
+        $errors = $this->validate(
+            [$this->node('a', 'assign', ['operations' => [
+                ['variable' => ['type' => 'text', 'storage' => 'session']],
+            ]])],
+            [],
+        );
+
+        $this->assertSame(['variable_contract_invalid'], $this->codes($errors));
+    }
+
+    public function test_a_variable_with_an_unknown_storage_is_invalid_once_it_has_a_name(): void
+    {
+        $errors = $this->validate(
+            [$this->node('a', 'send_message', ['save_to_variable' => ['name' => 'answer', 'storage' => 'nowhere']])],
+            [],
+        );
+
+        $this->assertSame(['variable_contract_invalid'], $this->codes($errors));
+    }
+
     public function test_variable_without_storage_is_invalid(): void
     {
         $errors = $this->validate(
