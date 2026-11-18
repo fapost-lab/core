@@ -5,15 +5,18 @@ declare(strict_types=1);
 namespace App\Domains\Flow\Logging;
 
 use App\Domains\Flow\Logging\Contracts\FlowLogPartitionManagerInterface;
+use App\Domains\Shared\Infrastructure\PostgresMonthlyPartitions;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Support\Collection;
-use InvalidArgumentException;
 
 final readonly class FlowLogPartitionManager implements FlowLogPartitionManagerInterface
 {
+    private const string PARENT_TABLE = 'flow_logs';
+
     public function __construct(
         private ConnectionInterface $connection,
+        private PostgresMonthlyPartitions $partitions = new PostgresMonthlyPartitions(),
     ) {
     }
 
@@ -45,48 +48,27 @@ final readonly class FlowLogPartitionManager implements FlowLogPartitionManagerI
     }
 
     /**
-     * Monthly partitions of flow_logs in the CURRENT schema only. Without the
-     * schema filter a listing taken in one tenant would also see the
-     * identically named partitions of every other tenant schema.
+     * Monthly partitions of flow_logs in the CURRENT schema only (the one
+     * `current_schema()` reports). Without the schema filter a listing taken in
+     * one tenant would also see the identically named partitions of every other
+     * tenant schema.
      *
      * @return Collection<int, string>
      */
     public function listMonthlyPartitions(): Collection
     {
-        $rows = $this->connection->select(
-            <<<'SQL'
-SELECT child.relname AS partition_name
-FROM pg_inherits
-INNER JOIN pg_class parent ON pg_inherits.inhparent = parent.oid
-INNER JOIN pg_class child ON pg_inherits.inhrelid = child.oid
-INNER JOIN pg_namespace parent_ns ON parent.relnamespace = parent_ns.oid
-INNER JOIN pg_namespace child_ns ON child.relnamespace = child_ns.oid
-WHERE parent.relname = 'flow_logs'
-  AND parent_ns.nspname = current_schema()
-  AND child_ns.nspname = current_schema()
-  AND child.relname ~ '^flow_logs_[0-9]{4}_[0-9]{2}$'
-ORDER BY child.relname
-SQL
-        );
-
-        return collect($rows)
-            ->map(static fn (object $row): string => (string)$row->partition_name)
-            ->values();
+        return collect($this->partitions->list($this->connection, self::PARENT_TABLE));
     }
 
+    /**
+     * Drops one monthly partition of the CURRENT schema only (the one
+     * `current_schema()` reports); it never reaches another tenant's schema.
+     * Runs in a transaction with `lock_timeout = 5s`, so a long reader makes it
+     * fail with an exception instead of queueing every log insert behind the
+     * DROP; the next prune run retries.
+     */
     public function dropPartition(string $partitionName): void
     {
-        if (1 !== preg_match('/^flow_logs_\d{4}_\d{2}$/', $partitionName)) {
-            throw new InvalidArgumentException("Invalid partition name: {$partitionName}");
-        }
-
-        $schema = $this->connection->selectOne('SELECT current_schema() AS schema_name')->schema_name ?? null;
-
-        if (! is_string($schema) || 1 !== preg_match('/^[a-z][a-z0-9_]*$/', $schema)) {
-            throw new InvalidArgumentException('Invalid current schema name.');
-        }
-
-        // Schema-qualified so a search_path change cannot redirect the drop.
-        $this->connection->statement("DROP TABLE IF EXISTS \"{$schema}\".\"{$partitionName}\"");
+        $this->partitions->drop($this->connection, self::PARENT_TABLE, $partitionName);
     }
 }

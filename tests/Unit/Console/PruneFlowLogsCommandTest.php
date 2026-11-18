@@ -170,6 +170,8 @@ final class PruneFlowLogsCommandTest extends TestCase
         ));
 
         $connection->shouldReceive('selectOne')->andReturn((object)['schema_name' => 'tenant_x']);
+        $connection->shouldReceive('transaction')->andReturnUsing(static fn (callable $callback): mixed => $callback());
+        $connection->shouldReceive('statement')->with("SET LOCAL lock_timeout = '5s'")->zeroOrMoreTimes();
 
         $this->connections[spl_object_id($tenant)] = $connection;
 

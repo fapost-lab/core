@@ -143,7 +143,8 @@ Authoring — drafts, validation, publishing and the visual editor — is descri
   cannot delay, and would re-enter the running engine. There a timeout never fires and a delay
   moves on only with the next inbound message.
 - Console: `flow:sweep-subflow-timeouts` (every minute), `logs:prune-flow`, `logs:create-partition`
-  (`routes/console.php`); `flow:node-usage` is run by hand and is not scheduled.
+  (`routes/console.php`; the prune drops a partition under `lock_timeout` 5s through
+  `Shared/Infrastructure/PostgresMonthlyPartitions`, and on a timeout the tenant is marked ✘ and the next run retries); `flow:node-usage` is run by hand and is not scheduled.
 - Bindings: `Providers/FlowServiceProvider.php`. Registries are singletons, frozen after boot
   (not in the testing environment); engine, orchestrator, router and repositories are `scoped`.
   The node handler registry holds handler classes and builds each handler per `resolve()`
