@@ -102,11 +102,11 @@ Contact context (`ContactContextChecker`, code `node_needs_contact`, path `nodes
 no contact — `schedule`, `webhook`, `api` (`FlowTriggerType::givesContact()`) — no node may need one. The trigger is
 the one in the request; without one (publish) the stored trigger of the flow, active or not; `_delete` or no trigger
 at all means a contact. A node needs a contact when its handler declares `NodeContextRequirement::Contact` or declares
-nothing (`DeclaresContextRequirementInterface`; every Solution node today), or when its config reads `contact.*` or
+nothing (Foundation's `DeclaresContextRequirementInterface`, which a Solution's handler may implement too), or when its config reads `contact.*` or
 `module.*` (a `{{…}}` placeholder, a bare path, a `source` operand), uses a variable with `storage: contact`, or is a
 legacy `assign` to the contact. Core handlers declaring `any`: `branch`, `delay`, `assign`, `end`, `loop`, `loop_end`,
-`template`, `template_output`; every other Core node needs a contact — `subflow` (its target is not followed) and
-`call` (it hands the contact id to its transport and to Solution action handlers) included. A template's publish republishes its hosts, so it is refused (`template_breaks_flow`) when a host
+`template`, `template_output`, `call` (its `CallContext::$contactId` is `null` without a contact); every other Core node
+needs a contact — `subflow` (its target is not followed) included. A template's publish republishes its hosts, so it is refused (`template_breaks_flow`) when a host
 with such a trigger would get a contact node.
 
 There is **no** requirement that a flow contains an `end` node and no check that a knowledge base

@@ -60,11 +60,32 @@ shipping any front-end code — see [Builder UI extensions](/extending/builder-u
 | `$state` | Namespaced session state, **read-only** for the handler |
 | `$context` | `NodeExecutionContext` — tenant, contact, and session metadata, plus the writers a handler is allowed to use |
 
-A flow started by a schedule, a webhook or an API call runs without a contact. Core treats a node from an
-extension as one that needs a contact, so such a flow cannot be published while it holds your node; nodes in
-flows started by a message or an event are unaffected.
+A flow started by a schedule, a webhook or an API call runs without a contact. A node needs a contact unless its
+handler says otherwise, so such a flow cannot be published while it holds your node; nodes in flows started by a
+message or an event are unaffected. A handler that can run without a contact implements
+`Fapost\Foundation\Flow\Contracts\DeclaresContextRequirementInterface`:
 
-It returns a `NodeExecutionResult`, built through one of its named constructors:
+```php
+use Fapost\Foundation\Flow\Contracts\DeclaresContextRequirementInterface;
+use Fapost\Foundation\Flow\Enums\NodeContextRequirement;
+
+final class TickHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface
+{
+    public function contextRequirement(): NodeContextRequirement
+    {
+        return NodeContextRequirement::Any;   // or None: never uses a contact
+    }
+
+    // type(), version(), category(), execute() …
+}
+```
+
+On a run without a contact, `$context->contactId` and `$context->platform` are `null`, reading `contact.*` or
+`module.*` through the state reader throws, and so does every write through the contact writer. A node whose config
+reads the contact or uses a contact variable is refused in such a flow whatever its handler declares. The interface
+needs `fapost/foundation` `^0.42`.
+
+`execute()` returns a `NodeExecutionResult`, built through one of its named constructors:
 
 ```php
 NodeExecutionResult::executed(sourceHandle: 'default', stateChanges: [

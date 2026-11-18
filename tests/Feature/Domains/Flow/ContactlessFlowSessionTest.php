@@ -45,6 +45,14 @@ final class ContactlessFlowSessionTest extends FeatureTestCase
         $this->app->make(NodeHandlerRegistry::class)->register(ContactlessProbeTestHandler::class);
     }
 
+    protected function tearDown(): void
+    {
+        ContactlessProbeTestHandler::$contactIds = [];
+        ContactlessProbeTestHandler::$platforms  = [];
+
+        parent::tearDown();
+    }
+
     public function test_a_contactless_run_completes_without_a_contact_or_an_assistant(): void
     {
         $definition = $this->definition([
@@ -68,7 +76,8 @@ final class ContactlessFlowSessionTest extends FeatureTestCase
         $this->assertSame('written', data_get($session->state, 'flow.probe'));
         $this->assertSame('written', data_get($session->state, 'flow.seen'));
         $this->assertArrayNotHasKey('contact_id', $session->state['system']);
-        $this->assertSame('', ContactlessProbeTestHandler::$contactIds[0]);
+        $this->assertNull(ContactlessProbeTestHandler::$contactIds[0]);
+        $this->assertNull(ContactlessProbeTestHandler::$platforms[0]);
     }
 
     public function test_a_contactless_run_takes_no_ambient_assistant_and_keeps_the_one_its_origin_names(): void
@@ -183,13 +192,6 @@ final class ContactlessFlowSessionTest extends FeatureTestCase
         $this->assertNull($session->refresh()->assistant_id);
     }
 
-    protected function tearDown(): void
-    {
-        ContactlessProbeTestHandler::$contactIds = [];
-
-        parent::tearDown();
-    }
-
     private function engine(): FlowEngineInterface
     {
         return $this->app->make(FlowEngineInterface::class);
@@ -225,8 +227,11 @@ final class ContactlessFlowSessionTest extends FeatureTestCase
  */
 final class ContactlessProbeTestHandler implements NodeHandlerInterface
 {
-    /** @var list<string> */
+    /** @var list<string|null> */
     public static array $contactIds = [];
+
+    /** @var list<string|null> */
+    public static array $platforms = [];
 
     public function type(): string
     {
@@ -264,6 +269,7 @@ final class ContactlessProbeTestHandler implements NodeHandlerInterface
     public function execute(array $nodeConfig, array $state, NodeExecutionContext $context): NodeExecutionResult
     {
         self::$contactIds[] = $context->contactId;
+        self::$platforms[]  = $context->platform;
 
         return match ($nodeConfig['config']['action'] ?? null) {
             'write_flow'    => NodeExecutionResult::executed(stateChanges: ['flow.probe' => 'written']),

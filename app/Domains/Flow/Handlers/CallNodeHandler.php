@@ -24,6 +24,8 @@ use Fapost\Foundation\Flow\Call\CallContext;
 use Fapost\Foundation\Flow\Call\CallRequest;
 use Fapost\Foundation\Flow\Call\CallResult;
 use Fapost\Foundation\Flow\Contracts\ContactWriterInterface;
+use Fapost\Foundation\Flow\Contracts\DeclaresContextRequirementInterface;
+use Fapost\Foundation\Flow\Enums\NodeContextRequirement;
 use Fapost\Foundation\Flow\Handlers\AbstractVersionedHandler;
 use Fapost\Support\Builder\Schema\Fields\ObjectArrayField;
 use Fapost\Support\Builder\Schema\Fields\ObjectField;
@@ -49,8 +51,12 @@ use JsonException;
  * Legacy nodes (no `transport`/`target`) keep their original behavior through
  * {@see executeLegacy()} — POST `url` with `include_state`, save body to
  * `save_response_to` / `save_to_variable`.
+ *
+ * It runs with a contact or without one: {@see CallContext::$contactId} (and the legacy payload's `contact_id`) is
+ * `null` on a contactless run, and a config that reads the contact or saves to a contact variable is refused at
+ * publish there.
  */
-final class CallNodeHandler extends AbstractVersionedHandler
+final class CallNodeHandler extends AbstractVersionedHandler implements DeclaresContextRequirementInterface
 {
     final public const string TYPE = 'call';
 
@@ -93,6 +99,11 @@ final class CallNodeHandler extends AbstractVersionedHandler
     public function category(): string
     {
         return 'Integration';
+    }
+
+    public function contextRequirement(): NodeContextRequirement
+    {
+        return NodeContextRequirement::Any;
     }
 
     /**

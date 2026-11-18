@@ -11,6 +11,7 @@ paths:
   - app/Domains/Flow/State/Exceptions/ContactlessSessionException.php
   - "database/migrations/tenant/*contactless_flow_sessions*"
 summary: Why contactless automation runs are flow_sessions rows with nullable contact/assistant, a caller-stated run_kind and an FK-less trigger_id, and why the reader, writer and lock scope throw ContactlessSessionException
+reviewed_at: 2026-11-19
 ---
 # A flow session may run without a contact or an assistant; what started it is `run_kind` and `trigger_id` on the same row
 
@@ -40,8 +41,8 @@ assumed one. Task `flow-contactless-sessions` laid the base; later tasks (`flow-
   `ContactWriter` for every write, and `LockScope` for an empty contact id — instead of a TypeError, a null, or one
   lock key shared by the whole tenant. This departs from the Foundation reader docblock ("never throws on missing
   paths"): such a path is not missing, it cannot exist for that kind of run.
-- Foundation's `NodeExecutionContext` still types `contactId` and `platform` as strings; a contactless run passes
-  `''` until `flow-contact-context` makes them nullable in a Foundation minor release.
+- Foundation's `NodeExecutionContext` types `contactId` and `platform` as `?string` (Foundation 0.42,
+  `flow-node-context-foundation`): a contactless run passes `null`; before that release it passed `''`.
 
 ## Alternatives
 
@@ -56,6 +57,6 @@ assumed one. Task `flow-contactless-sessions` laid the base; later tasks (`flow-
 - Until `flow-segmented-execution`, a contactless run cannot take the session lock, so the rule "running the engine
   outside `FlowOrchestrator` requires the session lock" holds for it only because no production path starts one;
   deferred resumes of a contactless session (delay, timeout, subflow sweep) fail loudly.
-- Handlers that use `NodeExecutionContext::$contactId` directly get `''` on a contactless run; publish-time context
+- Handlers that use `NodeExecutionContext::$contactId` directly get `null` on a contactless run; publish-time context
   checks (`flow-contact-context`) are what keep contact nodes out of contactless flows.
 - Conversation sessions of a deleted assistant stay with `assistant_id = null`.
