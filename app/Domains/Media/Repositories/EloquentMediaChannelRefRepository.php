@@ -27,7 +27,7 @@ final class EloquentMediaChannelRefRepository implements MediaChannelRefReposito
         string $channelId,
         string $providerFileId,
         ?CarbonImmutable $expiresAt,
-        ?string $providerKind = null,
+        ?string $providerKind,
     ): MediaChannelRef {
         $now = CarbonImmutable::now();
 

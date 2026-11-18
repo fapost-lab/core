@@ -87,8 +87,8 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             $dispatch                    = $this->dispatchMedia($media, $payload, $channel, $chatId);
             $payload['provider_file_id'] = $dispatch->providerFileId;
             // The upload chose its method by the file's format, not by the node's type; a cached id must go out the same way.
-            $payload['delivery_kind'] = DeliveryKind::payloadType($dispatch->providerKind, (string)($media->blob->mime_type ?? ''));
-            $publicLink               = $dispatch->publicLink;
+            $payload['media_payload_type'] = DeliveryKind::payloadType($dispatch->providerKind, (string)($media->blob->mime_type ?? ''));
+            $publicLink                    = $dispatch->publicLink;
 
             if ($dispatch->alreadyDelivered) {
                 // Upload-as-send (Telegram cache miss): the media dispatcher already
@@ -241,10 +241,10 @@ final readonly class FlowMessageSender implements MessageSenderInterface
             return $this->toLinkPayload($payload, $contentType, $publicLink);
         }
 
-        $deliveryKind = $payload['delivery_kind'] ?? null;
+        $mediaPayloadType = $payload['media_payload_type'] ?? null;
 
-        if ($contentType->requiresMediaUrl() && is_string($deliveryKind)) {
-            return $this->toFileIdPayload($payload, $deliveryKind);
+        if ($contentType->requiresMediaUrl() && is_string($mediaPayloadType)) {
+            return $this->toFileIdPayload($payload, $mediaPayloadType);
         }
 
         return match ($contentType) {
@@ -261,16 +261,16 @@ final readonly class FlowMessageSender implements MessageSenderInterface
                     sessionId: (string)$payload['session_id'],
                 ),
             ),
-            // Media content types leave through toFileIdPayload; send() always sets a delivery kind for them.
+            // Media content types leave through toFileIdPayload; send() always sets a media payload type for them.
             SendMessageContentType::Image,
             SendMessageContentType::Document,
             SendMessageContentType::Video,
-            SendMessageContentType::Voice => throw new RuntimeException('Media send payload has no delivery kind.'),
+            SendMessageContentType::Voice => throw new RuntimeException('Media send payload has no media payload type.'),
         };
     }
 
     /**
-     * A cached or just-minted file id, sent by the kind the provider stored it as, or by the one its format dictates ({@see DeliveryKind::payloadType()}) when no kind is stored, whatever the node says.
+     * A cached or just-minted file id, sent by the message type resolved in send(): the kind the provider stored it as, or the one its format dictates when no kind is stored ({@see DeliveryKind::payloadType()}), whatever the node says.
      *
      * @param  array<string, mixed>  $payload
      */

@@ -41,8 +41,8 @@ final class DeliveryKind
     private const array PAYLOAD_TYPES = ['photo', 'video', 'audio', 'voice', 'document'];
 
     /**
-     * The message type a cached file id is sent as: the kind the provider reported when it stored the file, or, for
-     * a ref that has none, the one the file's format dictates.
+     * The message type a cached file id is sent as: the kind the provider reported when it stored the file if Core
+     * can send by it, otherwise (none stored, or an unknown one) the one the file's format dictates.
      */
     public static function payloadType(?string $providerKind, string $mimeType): string
     {
@@ -60,11 +60,12 @@ final class DeliveryKind
 
     /**
      * The outgoing payload for a provider file id sent by the given message type (see {@see self::payloadType()}).
-     * A voice message has no caption in Telegram.
+     * The caption stays on a voice message too: Bot API sendVoice takes one, and a file Telegram stores as voice may
+     * have gone out captioned on its upload.
      */
     public static function fileIdPayload(string $type, string $providerFileId, string $caption): MessagePayload
     {
-        return new MessagePayload(type: $type, text: 'voice' === $type ? '' : $caption, media: [$type => $providerFileId]);
+        return new MessagePayload(type: $type, text: $caption, media: [$type => $providerFileId]);
     }
 
     public static function of(string $mimeType): MediaKind

@@ -40,10 +40,14 @@ final class MediaChannelRefRepositoryTest extends FeatureTestCase
         $refs->upsert($blob->id, (string) $channel->getKey(), 'file-1', null, 'document');
         $this->assertSame('document', $refs->find($blob->id, (string) $channel->getKey())?->provider_kind);
 
-        // An old-style call without a kind clears it: the id then is whatever the new upload produced.
-        $refs->upsert($blob->id, (string) $channel->getKey(), 'file-2', null);
+        // An explicit null clears it: the id then is whatever the new upload produced.
+        $refs->upsert($blob->id, (string) $channel->getKey(), 'file-2', null, null);
         $ref = $refs->find($blob->id, (string) $channel->getKey());
         $this->assertSame('file-2', $ref?->provider_file_id);
         $this->assertNull($ref->provider_kind);
+
+        // An unknown kind is stored as given; DeliveryKind::payloadType() ignores it when sending.
+        $refs->upsert($blob->id, (string) $channel->getKey(), 'file-3', null, 'sticker');
+        $this->assertSame('sticker', $refs->find($blob->id, (string) $channel->getKey())?->provider_kind);
     }
 }
