@@ -59,11 +59,13 @@ A group on a session variable is rejected.
 
 ## Validation
 
-`FlowGraphStructureValidator` (audit only for now) checks `input`, `send_message` and `assign` configs:
+`FlowGraphStructureValidator` runs in validate and publish (and in `php artisan flow:audit-graph`) and checks `input`, `send_message` and `assign` configs:
 
 - the new shape (`variable` / `save_to_variable` / `operations`) and the legacy shape (`save_to`, `target`+`key`)
   cannot be defined together;
-- the new shape must construct a valid `Variable`;
+- a variable that has a name must construct a valid `Variable`; a variable with no name on `input` or
+  `send_message` is "no save target", not an error (an assign operation without a name or
+  storage is invalid);
 - within one Assign node the (`storage`, `group`, `name`) of `operations[*].variable` are unique;
 - Branch rules with a `user_variable` left side must carry a valid variable.
 

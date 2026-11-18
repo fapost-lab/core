@@ -9,13 +9,18 @@ use App\Domains\Assistant\Models\Assistant;
 use App\Domains\Contact\Models\Contact;
 use App\Domains\Flow\Contracts\FlowEngineInterface;
 use App\Domains\Flow\Enums\EndStatus;
+use App\Domains\Flow\Enums\FlowKind;
 use App\Domains\Flow\Enums\FlowSessionStatus;
 use App\Domains\Flow\Exceptions\FlowConcurrencyException;
+use App\Domains\Flow\Exceptions\InvalidNodeConfigException;
+use App\Domains\Flow\Exceptions\SubflowPinnedVersionMissingException;
+use App\Domains\Flow\Handlers\SubflowNodeHandler;
 use App\Domains\Flow\Models\FlowDefinition;
 use App\Domains\Flow\Models\FlowSession;
 use App\Domains\Flow\Models\FlowSessionHistoryEntry;
 use App\Domains\Flow\Registry\NodeHandlerRegistry;
 use App\Domains\Flow\Services\ValidateFlowService;
+use App\Domains\Flow\Subflow\SubflowStarterService;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
 use DateInterval;
@@ -506,10 +511,48 @@ final class SubflowLifecycleTest extends FeatureTestCase
         );
         $parent = $this->runParentCalling($childFlowId, []);
 
-        $starter = $this->app->make(\App\Domains\Flow\Subflow\SubflowStarterService::class);
+        $starter = $this->app->make(SubflowStarterService::class);
 
-        $this->expectException(\App\Domains\Flow\Exceptions\SubflowPinnedVersionMissingException::class);
+        $this->expectException(SubflowPinnedVersionMissingException::class);
         $starter->start($parent, $childFlowId, new DateInterval('PT1H'), 'p-sub', [], 9);
+    }
+
+    public function test_the_handler_reports_a_missing_pinned_version_with_its_own_error_type(): void
+    {
+        $childFlowId = (string) Str::uuid();
+        $this->createDefinition(
+            flowId: $childFlowId,
+            nodes: [['id' => 'c-mark', 'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'v1']]],
+            edges: [],
+        );
+        $parent = $this->runParentCalling($childFlowId, []);
+
+        $result = $this->app->make(SubflowNodeHandler::class)->execute(
+            $this->subflowNode($childFlowId, ['flow_version' => 7]),
+            [],
+            $this->contextFor($parent),
+        );
+
+        $this->assertSame(NodeExecutionStatus::Failed, $result->status);
+        $this->assertSame('subflow_pinned_version_missing', $result->metadata['error_type'] ?? null);
+    }
+
+    public function test_the_handler_rejects_a_malformed_stored_pin(): void
+    {
+        $childFlowId = (string) Str::uuid();
+        $this->createDefinition(
+            flowId: $childFlowId,
+            nodes: [['id' => 'c-mark', 'type' => 'marker_test', 'version' => 1, 'config' => ['marker' => 'v1']]],
+            edges: [],
+        );
+        $parent = $this->runParentCalling($childFlowId, []);
+
+        $this->expectException(InvalidNodeConfigException::class);
+        $this->app->make(SubflowNodeHandler::class)->execute(
+            $this->subflowNode($childFlowId, ['flow_version' => 'two']),
+            [],
+            $this->contextFor($parent),
+        );
     }
 
     public function test_a_pin_never_resolves_to_a_template(): void
@@ -519,7 +562,7 @@ final class SubflowLifecycleTest extends FeatureTestCase
             'tenant_id' => $this->tenantId,
             'flow_id'   => $templateFlowId,
             'version'   => 1,
-            'kind'      => \App\Domains\Flow\Enums\FlowKind::Template->value,
+            'kind'      => FlowKind::Template->value,
             'name'      => 'Template',
             'nodes'     => [],
             'edges'     => [],
@@ -569,6 +612,33 @@ final class SubflowLifecycleTest extends FeatureTestCase
         $this->assertContains('subflow_pinned_version_missing', $codes(2));
         $this->assertContains('subflow_invalid_flow_version', $codes(0));
         $this->assertContains('subflow_invalid_flow_version', $codes('latest'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $extraConfig
+     *
+     * @return array<string, mixed>
+     */
+    private function subflowNode(string $childFlowId, array $extraConfig): array
+    {
+        return [
+            'id'      => 'p-sub',
+            'type'    => 'subflow',
+            'version' => 1,
+            'config'  => ['flow_id' => $childFlowId, 'timeout' => 'PT1H', ...$extraConfig],
+        ];
+    }
+
+    private function contextFor(FlowSession $parent): NodeExecutionContext
+    {
+        return new NodeExecutionContext(
+            tenantId: $this->tenantId,
+            contactId: (string) $parent->contact_id,
+            sessionId: (string) $parent->getKey(),
+            nodeId: 'p-sub',
+            idempotencyKey: 'test',
+            platform: 'telegram',
+        );
     }
 
     /**

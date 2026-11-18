@@ -24,7 +24,7 @@ sequenceDiagram
     SH->>SH: evaluate input_mapping against the parent's state
     SH->>ST: start(parent, flow_id, timeout, subflowNodeId, input)
     ST->>DB: UPDATE parent: status = paused_subflow<br/>(expires_at extended past the child's)
-    ST->>DB: CREATE child FlowSession<br/>parent_session_id = parent.id<br/>parent_resume_node_id = subflow node id<br/>flow_definition_id = latest active of flow_id (or the pinned flow_version)<br/>state = flow.* from input_mapping, status = active
+    ST->>DB: CREATE child FlowSession<br/>parent_session_id = parent.id<br/>parent_resume_node_id = subflow node id<br/>flow_definition_id = pinned flow_version if set, otherwise latest active of flow_id<br/>state = flow.* from input_mapping, status = active
     ST->>FE: runSession(child) (synchronously)
     FE->>FE: child runs to its first wait point<br/>(or straight to its end node)
     ST-->>SH: child session
@@ -56,7 +56,7 @@ sequenceDiagram
 
 | Class | Path | Role |
 |-------|------|------|
-| `SubflowNodeHandler` | `app/Domains/Flow/Handlers/SubflowNodeHandler.php` | Validates config, calls the starter, returns `Waiting`. Failures: `subflow_parent_missing`, `subflow_target_inactive`, `subflow_pinned_version_missing` (failed results) |
+| `SubflowNodeHandler` | `app/Domains/Flow/Handlers/SubflowNodeHandler.php` | Validates config, calls the starter, returns `Waiting`. Failures: `subflow_parent_missing`, `subflow_target_inactive`, `subflow_pinned_version_missing` (each fails the node result, so the parent session fails; the `failed` handle is only for a child that ended failed) |
 | `SubflowStarterService` | `app/Domains/Flow/Subflow/SubflowStarterService.php` | Pauses the parent, creates the child, drives it with `runSession()` |
 | `SubflowResumerInterface` / `DefaultSubflowResumer` | `app/Domains/Flow/Subflow/` | `resumeIfChild(child, endStatus)`: maps `end_status` to a handle, records history, calls `FlowEngine::resumeAfterSubflow()` |
 | `NoOpSubflowResumer` | `app/Domains/Flow/Subflow/` | Null implementation |
@@ -73,8 +73,8 @@ sequenceDiagram
   so one inbound message can carry parent, child, child end and parent resume in a single run.
 - **Routing:** while a child is live the contact's messages go to the child, because a
   `paused_subflow` parent is not returned by `findActiveForContact()`.
-- **`flow_definition_id` is a snapshot:** the child starts on the latest active definition of
-  `flow_id` (or on the node's pinned `flow_version`) and stays on it.
+- **`flow_definition_id` is a snapshot:** the child starts on the node's pinned `flow_version` when
+  one is set, otherwise on the latest active definition of `flow_id`, and stays on it.
 - **`parent_resume_node_id`** is the id of the parent's subflow node (`$subflowNodeId` in
   `SubflowStarterService`). It is stored on the child and shown in the admin panel; the resumer
   continues from the parent's own `current_node_id`, which still is the subflow node.

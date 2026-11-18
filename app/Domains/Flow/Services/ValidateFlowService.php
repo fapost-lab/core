@@ -24,6 +24,7 @@ use App\Domains\Flow\Models\FlowTrigger;
 use App\Domains\Flow\Nodes\AnnotationNodeTypes;
 use App\Domains\Flow\Subflow\CallGraphValidator;
 use App\Domains\Flow\Subflow\SubflowPin;
+use App\Domains\Flow\Subflow\SubflowStarterService;
 use App\Domains\Flow\Validation\ButtonLimitChecker;
 use App\Domains\Flow\Validation\ChannelCapabilityChecker;
 use App\Domains\Flow\Validation\ContactContextChecker;
@@ -242,7 +243,7 @@ final readonly class ValidateFlowService
     }
 
     /**
-     * A handler that implements {@see NodeConfigValidatorInterface} (a Solution's node, in practice) checks its own
+     * A handler that implements {@see NodeConfigValidatorInterface} (Core's subflow node, or a Solution's node) checks its own
      * node after the generic checks above. An error issue blocks publishing like any other error.
      *
      * @param  array<string, mixed>  $node
@@ -744,7 +745,7 @@ final readonly class ValidateFlowService
                 );
             } else {
                 try {
-                    \App\Domains\Flow\Subflow\SubflowStarterService::parseTimeout($timeout);
+                    SubflowStarterService::parseTimeout($timeout);
                 } catch (Exception) {
                     $errors[] = new FlowValidationErrorDto(
                         path: "{$path}.config.timeout",

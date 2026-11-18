@@ -138,14 +138,7 @@ final readonly class SubflowTimeoutSweeper
 
         $liveChild = FlowSession::query()
             ->where('parent_session_id', $parent->getKey())
-            ->whereIn('status', [
-                FlowSessionStatus::Active->value,
-                FlowSessionStatus::WaitingInput->value,
-                // A child sleeping in a `delay` node, or itself waiting on a nested subflow, is alive: its
-                // own expiry (or its child's) decides, not this parent's.
-                FlowSessionStatus::Paused->value,
-                FlowSessionStatus::PausedSubflow->value,
-            ])
+            ->whereIn('status', FlowSessionStatus::inFlightValues())
             ->latest('created_at')
             ->first();
 
@@ -198,12 +191,7 @@ final readonly class SubflowTimeoutSweeper
 
         $descendants = FlowSession::query()
             ->where('parent_session_id', $session->getKey())
-            ->whereIn('status', [
-                FlowSessionStatus::Active->value,
-                FlowSessionStatus::WaitingInput->value,
-                FlowSessionStatus::Paused->value,
-                FlowSessionStatus::PausedSubflow->value,
-            ])
+            ->whereIn('status', FlowSessionStatus::inFlightValues())
             ->get();
 
         foreach ($descendants as $descendant) {

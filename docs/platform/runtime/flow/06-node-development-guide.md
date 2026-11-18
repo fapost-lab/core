@@ -191,7 +191,8 @@ directly through `ContactWriterInterface`, available as `NodeExecutionContext->c
 - It must be JSON-serialisable.
 - Normalise and validate it first thing in `execute()`.
 - On an invalid config throw a domain error (`InvalidNodeConfigException`). The engine marks the
-  session `failed` and rethrows.
+  session `failed` and rethrows. A subflow child session is the exception: once the failure is recorded the
+  engine hands the parent its `failed` exit and returns without rethrowing.
 - Do not assume the UI always sent a perfect payload.
 
 ### `configSchema()` and the builder

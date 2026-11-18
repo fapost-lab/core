@@ -87,7 +87,7 @@ flowchart TD
 | `end` status | Handler puts it in `metadata`; the persister applies it (`persistEnd`) |
 | Sending messages | Handler, through `MessageSenderInterface` during `execute()`. The engine sends nothing and `NodeExecutionResult` has no messages |
 | Contact mutations | Handler, through `ContactWriterInterface` |
-| Session state / status / `current_node_id` | `FlowSessionPersister` |
+| Session state / status / `current_node_id` | `FlowSessionPersister`; one exception: `resumeAfterSubflow` merges a child's `output_mapping` values into the parent's `flow.*` state in its own save (see ARCHITECTURE, "One state model") |
 
 ## Status mapping (persister)
 

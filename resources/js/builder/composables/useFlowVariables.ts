@@ -289,6 +289,22 @@ export function useFlowVariables() {
                 continue
             }
 
+            // Subflow — each `output_mapping` key is a session variable the child hands back to this flow.
+            if (node.type === 'subflow') {
+                const mapping = cfg.output_mapping
+                if (mapping && typeof mapping === 'object' && !Array.isArray(mapping)) {
+                    for (const name of Object.keys(mapping as Record<string, unknown>)) {
+                        if (name === '') continue
+                        push(fromVariable(
+                            { name, type: 'text', storage: 'session', group: null },
+                            nodeLabel,
+                            node.id,
+                        ))
+                    }
+                }
+                continue
+            }
+
             // Assign — operations[*].variable (new) | target+key (legacy) | flat key
             if (node.type === 'assign') {
                 const ops = cfg.operations

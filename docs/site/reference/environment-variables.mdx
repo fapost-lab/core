@@ -23,8 +23,6 @@ to FaPost, and the Laravel ones whose value matters here.
 | `TENANCY_BASE_DOMAIN` | `localhost` | Base domain tenant hosts are derived from |
 | `TENANCY_RESOLUTION` | `single` | `single`: one tenant, named by `TENANT_SLUG`. `host`: the tenant is taken from the request host `<slug>.<TENANCY_BASE_DOMAIN>`, so one install serves many tenants; unknown hosts get 404, and hosts outside the base domain get 400. Needs a wildcard DNS name and certificate, `SESSION_DRIVER` other than `database`, and `SESSION_DOMAIN` unset; see [Several tenants](/self-hosting/docker-compose#several-tenants-host-mode) and the [upgrade note](/self-hosting/upgrading#moving-to-host-mode). Changing it needs the route cache rebuilt |
 | `TENANCY_PROVISIONING_LEASE_SECONDS` | `900` | How long a provisioning run holds a pending tenant before another run may take it over (at least 60; the run renews it between steps). A crashed run frees the tenant after this long |
-| `FLOW_AUTOMATION_SUCCEEDED_RETENTION_DAYS` | `7` | `flow.automation_runs.succeeded_retention_days`: how many days a succeeded automation run is kept before `flow:prune-automation-runs` deletes it; `0` keeps them forever. A value that is not a whole number from 0 to 3650 is ignored |
-| `FLOW_AUTOMATION_FAILED_RETENTION_DAYS` | `30` | `flow.automation_runs.failed_retention_days`: the same for every other finished automation run |
 | `TENANCY_RENAME_REDIRECT_DAYS` | `30` | How long the old host of a renamed tenant redirects `GET` and `HEAD` requests to the new one (HTTP 302). `0` switches the redirect off. The old slug stays reserved for the tenant either way. Needs `TENANCY_RESOLUTION=host`; read when a tenant is renamed, so changing it does not affect redirects already issued. Only the default of the platform setting `tenancy.rename.redirect_days`: a value stored with `platform:settings:set` or from an operator panel wins |
 | `TENANT_SLUG` | `app` | The tenant served in `single` mode; ignored in `host` mode |
 | `WEBHOOK_BASE_URL` | `${APP_URL}` | The base providers will call back on |
@@ -56,6 +54,8 @@ value stored in the database wins over them, and resetting the stored value brin
 | `FLOW_CALL_DEDUP_TTL_HOURS` | `192` | `flow.call.dedup_ttl_hours`: how many hours the `call` node remembers a successful call, so a retried step is not sent again |
 | `FLOW_AUTOMATION_SEGMENT_STEPS` | `50` | `flow.automation.segment_steps`: how many nodes an automation run passes through in one queue job |
 | `FLOW_AUTOMATION_SEGMENT_SECONDS` | `20` | `flow.automation.segment_seconds`: how many seconds an automation run executes in one queue job, at most 30 |
+| `FLOW_AUTOMATION_SUCCEEDED_RETENTION_DAYS` | `7` | `flow.automation_runs.succeeded_retention_days`: how many days a succeeded automation run is kept before `flow:prune-automation-runs` deletes it; `0` keeps them forever. A value that is not a whole number from 0 to 3650 is ignored |
+| `FLOW_AUTOMATION_FAILED_RETENTION_DAYS` | `30` | `flow.automation_runs.failed_retention_days`: the same for every other finished automation run |
 | `TENANCY_RENAME_REDIRECT_DAYS` | `30` | `tenancy.rename.redirect_days`, described above |
 | `AUDIT_RETENTION_DAYS` | `365` | `audit.retention_days`: how many days an entry of the [activity log](/using/activity-log) is kept, for every tenant; `0` keeps it forever. A value that is not a whole number from 0 to 3650 is ignored |
 

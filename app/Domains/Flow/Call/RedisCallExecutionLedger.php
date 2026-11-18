@@ -33,6 +33,12 @@ final readonly class RedisCallExecutionLedger implements CallExecutionLedgerInte
     ) {
     }
 
+    /** The key prefix shared by every record of one tenant; the tenant forgetter matches on it. */
+    public static function tenantKeyPrefix(string $tenantId): string
+    {
+        return "flow:call:{$tenantId}:";
+    }
+
     public function completed(string $tenantId, string $key): ?CallResult
     {
         try {
@@ -131,7 +137,7 @@ final readonly class RedisCallExecutionLedger implements CallExecutionLedgerInte
 
     private function key(string $tenantId, string $key, string $part): string
     {
-        return "flow:call:{$tenantId}:{$key}:{$part}";
+        return self::tenantKeyPrefix($tenantId) . "{$key}:{$part}";
     }
 
     private function warn(string $action, string $tenantId, Throwable $exception): void

@@ -122,6 +122,10 @@ Assistant and Media models directly, and import cycles exist (for example Contac
 - **One state model.** Flow state is read by `ScopedStateReader` and written through
   `stateChanges` → `FlowSessionPersister` and `ContactWriter`; the canonical namespaces are the
   Foundation `StateNamespace` enum (ADR-0002).
+  One recorded exception: when a subflow child hands back its `output_mapping`, `FlowEngine::resumeAfterSubflow`
+  merges the mapped values into the parent's `flow.*` state itself (`SubflowMapping::withSessionVariables`), in the same
+  optimistic-lock save that advances the parent. It writes only the session `flow` namespace, so no namespace guard is
+  bypassed; a rule added to `FlowSessionPersister` for session writes must be applied to this path too.
 
 ## Runtime flows
 
