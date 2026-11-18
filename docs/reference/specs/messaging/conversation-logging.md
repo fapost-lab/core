@@ -48,7 +48,7 @@ independent of any flow session's lifecycle and usable for audit and for an Inbo
    idempotency index: `unique(conversation_id, direction, idempotency_key, created_at)`; retries replay the
    same serialised entry, so duplicates still collide and NULL keys insert freely.
 9. **Media is not duplicated.** The Media domain is reused: the message stores a descriptor
-   (`media_file_id`, kind, mime, size, `provider_file_id`), never bytes. Inbound download is asynchronous
+   (`media_file_id`, kind, mime, size, `provider_file_id`, `provider_kind`: how the message carried the file, so a cached id is sent back by the same method), never bytes. Inbound download is asynchronous
    (`FetchConversationMediaJob`, descriptor starts `pending`, `failed` keeps the provider id). Ingested
    files use `MediaSource::Conversation`, filtered out of the admin media library by `MediaService`.
 10. **Takeover and inbox are modelled in the aggregate.** Ownership is small mutable per-thread state kept

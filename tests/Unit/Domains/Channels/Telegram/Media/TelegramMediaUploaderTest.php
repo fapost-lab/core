@@ -23,6 +23,17 @@ final class TelegramMediaUploaderTest extends TestCase
         parent::tearDown();
     }
 
+    /**
+     * @return array<string, array{0: string, 1: array<string, mixed>}>
+     */
+    public static function mismatchedResponses(): array
+    {
+        return [
+            'wav answered as a document' => ['audio/wav', ['document' => ['file_id' => 'wav-doc']]],
+            'ogg answered as a voice'    => ['audio/ogg', ['voice' => ['file_id' => 'ogg-voice']]],
+        ];
+    }
+
     public function test_uploads_image_via_send_photo_multipart_and_extracts_largest_file_id(): void
     {
         Http::fake([
@@ -92,6 +103,34 @@ final class TelegramMediaUploaderTest extends TestCase
         $this->assertSame('heic-doc', $result->providerFileId);
         Http::assertSent(static fn ($request): bool => str_contains($request->url(), '/sendDocument'));
         Http::assertNotSent(static fn ($request): bool => str_contains($request->url(), '/sendPhoto'));
+    }
+
+    /**
+     * @param  array<string, mixed>  $media
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('mismatchedResponses')]
+    public function test_the_file_id_is_found_in_whatever_field_telegram_answers_with(string $mime, array $media): void
+    {
+        Http::fake([
+            'api.telegram.org/*sendAudio' => Http::response([
+                'ok'     => true,
+                'result' => ['message_id' => 13] + $media,
+            ]),
+        ]);
+
+        $result = (new TelegramMediaUploader(new TelegramBotApiClientFactory()))->upload(
+            $this->makeBlob($mime),
+            $this->makeChannel(),
+            new UploadContext('chat-1'),
+        );
+
+        $this->assertSame(array_values($media)[0]['file_id'], $result->providerFileId);
+        $this->assertSame(array_key_first($media), $result->providerKind);
+    }
+
+    public function test_it_declares_that_it_reports_the_provider_kind(): void
+    {
+        $this->assertInstanceOf(\Fapost\Foundation\Media\ReportsProviderKind::class, new TelegramMediaUploader(new TelegramBotApiClientFactory()));
     }
 
     public function test_throws_when_chat_id_is_missing(): void

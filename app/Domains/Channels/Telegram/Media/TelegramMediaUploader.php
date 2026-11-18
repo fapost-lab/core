@@ -13,6 +13,7 @@ use Fapost\Foundation\Media\DTO\UploadContext;
 use Fapost\Foundation\Media\DTO\UploadResult;
 use Fapost\Foundation\Media\Enums\MediaKind;
 use Fapost\Foundation\Media\MediaBlobReadInterface;
+use Fapost\Foundation\Media\ReportsProviderKind;
 
 /**
  * Telegram-side media uploader using the upload-as-send pattern.
@@ -27,7 +28,7 @@ use Fapost\Foundation\Media\MediaBlobReadInterface;
  * The resulting `deliveredMessageId` lets the dispatcher signal "already delivered" so
  * upstream handlers do not double-send to the same recipient.
  */
-final readonly class TelegramMediaUploader implements ChannelMediaUploaderInterface
+final readonly class TelegramMediaUploader implements ChannelMediaUploaderInterface, ReportsProviderKind
 {
     public function __construct(
         private TelegramBotApiClientFactory $clientFactory,
@@ -102,19 +103,20 @@ final readonly class TelegramMediaUploader implements ChannelMediaUploaderInterf
 
         $result = is_array($response['result'] ?? null) ? $response['result'] : [];
 
-        $providerFileId = $this->extractFileId($result, $blob->getMimeType());
-        $messageId      = isset($result['message_id']) ? (string)$result['message_id'] : null;
+        $found     = $this->extractFileId($result, $blob->getMimeType());
+        $messageId = isset($result['message_id']) ? (string)$result['message_id'] : null;
 
-        if (null === $providerFileId) {
+        if (null === $found) {
             throw MediaUploadFailedException::storageFailed(
                 'Telegram response did not contain a file_id for the uploaded media.',
             );
         }
 
         return new UploadResult(
-            providerFileId: $providerFileId,
+            providerFileId: $found['file_id'],
             expiresAt: null,
             deliveredMessageId: $messageId,
+            providerKind: $found['kind'],
         );
     }
 
@@ -126,29 +128,35 @@ final readonly class TelegramMediaUploader implements ChannelMediaUploaderInterf
     /**
      * Pull the file_id of the uploaded asset out of Telegram's response payload.
      *
-     * Photos arrive as an array of size variants; we take the largest. Other media kinds
-     * carry a single object keyed by the media field name.
+     * Telegram decides what a file is, not the method that was asked for: a WAV sent through sendAudio may come back
+     * as a `document` or a `voice`. So every media field is searched, the requested one first. Photos arrive as an
+     * array of size variants; we take the largest.
+     *
+     * The field it came from is the kind Telegram stored the file as, and the cached id has to be sent by it.
      *
      * @param  array<string, mixed>  $result
+     *
+     * @return array{file_id: string, kind: string}|null
      */
-    private function extractFileId(array $result, string $mimeType): ?string
+    private function extractFileId(array $result, string $mimeType): ?array
     {
-        $kind = DeliveryKind::of($mimeType);
+        $expected = DeliveryKind::payloadType(null, $mimeType);
 
-        if (MediaKind::Image === $kind && isset($result['photo']) && is_array($result['photo'])) {
-            $largest = end($result['photo']);
+        $fields = array_values(array_unique([$expected, 'photo', 'video', 'audio', 'voice', 'document']));
 
-            return is_array($largest) && isset($largest['file_id']) ? (string)$largest['file_id'] : null;
-        }
+        foreach ($fields as $field) {
+            $media = $result[$field] ?? null;
 
-        $field = match ($kind) {
-            MediaKind::Video => 'video',
-            MediaKind::Audio => 'audio',
-            default          => 'document',
-        };
+            if (! is_array($media) || [] === $media) {
+                continue;
+            }
 
-        if (isset($result[$field]) && is_array($result[$field]) && isset($result[$field]['file_id'])) {
-            return (string)$result[$field]['file_id'];
+            // A photo is a list of size variants, every other media field a single object.
+            $file = array_is_list($media) ? end($media) : $media;
+
+            if (is_array($file) && isset($file['file_id']) && is_string($file['file_id']) && '' !== $file['file_id']) {
+                return ['file_id' => $file['file_id'], 'kind' => $field];
+            }
         }
 
         return null;

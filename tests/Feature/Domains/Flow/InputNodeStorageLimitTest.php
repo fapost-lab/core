@@ -19,6 +19,7 @@ use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFolder;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use App\Domains\Tenancy\ValueObjects\RuntimeTenant;
+use ArrayObject;
 use Fapost\Foundation\DTO\IncomingMedia;
 use Fapost\Foundation\DTO\IncomingMessage;
 use Fapost\Foundation\DTO\IncomingMessageType;
@@ -43,6 +44,25 @@ final class InputNodeStorageLimitTest extends FeatureTestCase
 
     public function test_a_file_that_does_not_fit_sends_the_session_straight_to_invalid(): void
     {
+        $result = $this->runInput('image', IncomingMessageType::Photo, new IncomingMedia('AgAC', MediaKind::Image), new ArrayObject());
+
+        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
+        $this->assertSame('invalid', $result->sourceHandle);
+        $this->assertSame('storage_limit_reached', $result->metadata['error_key']);
+        $this->assertArrayNotHasKey('retry_count', $result->metadata, 'There is no retry and no hint.');
+    }
+
+    public function test_the_way_the_message_carried_the_file_reaches_the_ingestor(): void
+    {
+        $seen = new ArrayObject();
+
+        $this->runInput('voice', IncomingMessageType::Voice, new IncomingMedia('AwAD', MediaKind::Audio, 'audio/ogg'), $seen);
+
+        $this->assertSame('voice', $seen['kind']);
+    }
+
+    private function runInput(string $expectedType, IncomingMessageType $type, IncomingMedia $media, ArrayObject $seen): \Fapost\Foundation\DTO\NodeExecutionResult
+    {
         $assistant = Assistant::factory()->create();
         $contact   = Contact::factory()->create(['tenant_id' => self::TENANT_ID]);
         $channel   = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
@@ -57,20 +77,27 @@ final class InputNodeStorageLimitTest extends FeatureTestCase
         ]);
         $session = $this->startedSession($assistant, $contact);
 
-        $this->app->instance(MediaIngestorInterface::class, new class () implements MediaIngestorInterface {
+        $this->app->instance(MediaIngestorInterface::class, new class ($seen) implements MediaIngestorInterface {
+            public function __construct(private readonly ArrayObject $seen)
+            {
+            }
+
             public function ingestFromChannel(
                 Channel $channel,
                 string $providerFileId,
                 ?MediaFolder $folder = null,
                 ?string $uploadedBy = null,
                 MediaSource $source = MediaSource::InputNode,
+                ?string $providerKind = null,
             ): MediaFile {
+                $this->seen['kind'] = $providerKind;
+
                 throw new StorageLimitReachedException('media_storage', 10, 10, 5);
             }
         });
 
-        $result = $this->app->make(InputNodeHandler::class)->execute(
-            ['id' => 'input-1', 'config' => ['expected_type' => 'image', 'variable' => null]],
+        return $this->app->make(InputNodeHandler::class)->execute(
+            ['id' => 'input-1', 'config' => ['expected_type' => $expectedType, 'variable' => null]],
             [],
             new NodeExecutionContext(
                 tenantId: self::TENANT_ID,
@@ -84,17 +111,12 @@ final class InputNodeStorageLimitTest extends FeatureTestCase
                     externalUserId: 'ext-user',
                     externalChatId: 'ext-chat',
                     text: null,
-                    type: IncomingMessageType::Photo,
+                    type: $type,
                     platform: 'telegram',
-                    media: [new IncomingMedia('AgAC', MediaKind::Image)],
+                    media: [$media],
                 ),
             ),
         );
-
-        $this->assertSame(NodeExecutionStatus::Executed, $result->status);
-        $this->assertSame('invalid', $result->sourceHandle);
-        $this->assertSame('storage_limit_reached', $result->metadata['error_key']);
-        $this->assertArrayNotHasKey('retry_count', $result->metadata, 'There is no retry and no hint.');
     }
 
     private function startedSession(Assistant $assistant, Contact $contact): FlowSession

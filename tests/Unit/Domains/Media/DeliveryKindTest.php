@@ -38,4 +38,24 @@ final class DeliveryKindTest extends TestCase
     {
         $this->assertSame($expected, DeliveryKind::of($mime));
     }
+
+    public function test_the_stored_provider_kind_decides_the_message_type_over_the_format(): void
+    {
+        $this->assertSame('document', DeliveryKind::payloadType('document', 'audio/wav'));
+        $this->assertSame('voice', DeliveryKind::payloadType('voice', 'audio/ogg'));
+    }
+
+    public function test_an_inbound_voice_note_and_a_jpeg_sent_as_a_document_go_back_the_way_they_came(): void
+    {
+        $this->assertSame('voice', DeliveryKind::payloadType('voice', 'audio/ogg'));
+        $this->assertSame('document', DeliveryKind::payloadType('document', 'image/jpeg'));
+    }
+
+    public function test_without_a_usable_stored_kind_the_format_decides(): void
+    {
+        $this->assertSame('audio', DeliveryKind::payloadType(null, 'audio/mpeg'));
+        $this->assertSame('photo', DeliveryKind::payloadType(null, 'image/jpeg'));
+        $this->assertSame('document', DeliveryKind::payloadType(null, 'image/heic'));
+        $this->assertSame('video', DeliveryKind::payloadType('nonsense', 'video/mp4'));
+    }
 }

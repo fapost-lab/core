@@ -109,7 +109,7 @@ media_folders:
 
 media_channel_refs:
   id (ULID), blob_id (FK → media_blobs), channel_id (FK → channels),
-  provider_file_id, expires_at (nullable), uploaded_at
+  provider_file_id, provider_kind (nullable), expires_at (nullable), uploaded_at
   UNIQUE (blob_id, channel_id)
 
 media_file_references:
@@ -129,7 +129,7 @@ ChannelMediaDownloaderInterface
   channelType(): ChannelTypeEnum
   download(Channel $channel, string $providerFileId): DownloadResult
 
-UploadResult { providerFileId: string, expiresAt: ?CarbonImmutable }
+UploadResult { providerFileId: string, expiresAt: ?CarbonImmutable, deliveredMessageId: ?string, providerKind: ?string }
 DownloadResult { stream, mimeType, size, originalFilename, expiresAt }
 
 MediaKind enum: image | video | audio | document | sticker | other

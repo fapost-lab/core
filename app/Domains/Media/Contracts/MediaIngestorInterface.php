@@ -27,5 +27,6 @@ interface MediaIngestorInterface
         ?MediaFolder $folder = null,
         ?string $uploadedBy = null,
         MediaSource $source = MediaSource::InputNode,
+        ?string $providerKind = null,
     ): MediaFile;
 }

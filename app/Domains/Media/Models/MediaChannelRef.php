@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string                       $blob_id
  * @property string                       $channel_id
  * @property string                       $provider_file_id
+ * @property string|null                  $provider_kind
  * @property \Carbon\CarbonImmutable|null $expires_at
  * @property \Carbon\CarbonImmutable      $uploaded_at
  * @property-read MediaBlob               $blob
@@ -39,6 +40,7 @@ final class MediaChannelRef extends BaseModel
         'blob_id',
         'channel_id',
         'provider_file_id',
+        'provider_kind',
         'expires_at',
         'uploaded_at',
     ];

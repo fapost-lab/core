@@ -127,11 +127,12 @@ final readonly class ConversationReplyService implements ConversationReplyServic
 
         // As the upload chose the method: a cached document id must not go out as a photo.
         $kind    = DeliveryKind::of((string) ($media->blob->mime_type ?? ''));
+        $type    = DeliveryKind::payloadType($dispatch->providerKind, (string) ($media->blob->mime_type ?? ''));
         $message = $this->buildMessage(
             $conversation,
             $channel,
             $chatId,
-            $this->mediaPayload($kind, (string) $dispatch->providerFileId, $caption, $dispatch->publicLink),
+            $this->mediaPayload($kind, $type, (string) $dispatch->providerFileId, $caption, $dispatch->publicLink),
             $staffUserId,
             $idempotencyKey,
         );
@@ -151,7 +152,7 @@ final readonly class ConversationReplyService implements ConversationReplyServic
         return $this->sender->send($message);
     }
 
-    private function mediaPayload(MediaKind $kind, string $providerFileId, string $caption, ?PublicMediaLink $publicLink = null): MessagePayload
+    private function mediaPayload(MediaKind $kind, string $type, string $providerFileId, string $caption, ?PublicMediaLink $publicLink = null): MessagePayload
     {
         if (null !== $publicLink) {
             // A channel that fetches media by URL: the link and what the connector needs to pick its message type.
@@ -171,12 +172,7 @@ final readonly class ConversationReplyService implements ConversationReplyServic
             };
         }
 
-        return match ($kind) {
-            MediaKind::Image => new MessagePayload(type: 'photo', text: $caption, media: ['photo' => $providerFileId]),
-            MediaKind::Video => new MessagePayload(type: 'video', text: $caption, media: ['video' => $providerFileId]),
-            MediaKind::Audio => new MessagePayload(type: 'voice', text: '', media: ['voice' => $providerFileId]),
-            default          => new MessagePayload(type: 'document', text: $caption, media: ['document' => $providerFileId]),
-        };
+        return DeliveryKind::fileIdPayload($type, $providerFileId, $caption);
     }
 
     /**

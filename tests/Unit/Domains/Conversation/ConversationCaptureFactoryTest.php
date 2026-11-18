@@ -104,6 +104,7 @@ final class ConversationCaptureFactoryTest extends TestCase
         $this->assertCount(1, $entry->media);
         $this->assertSame([
             'provider_file_id' => 'AgAC-file',
+            'provider_kind'    => 'photo',
             'kind'             => 'image',
             'mime'             => 'image/jpeg',
             'file_name'        => 'photo.jpg',

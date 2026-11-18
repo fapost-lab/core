@@ -16,13 +16,15 @@ use App\Domains\Media\Registries\ChannelMediaUploaderRegistry;
 use App\Domains\Tenancy\Contracts\TenantContextInterface;
 use Carbon\CarbonImmutable;
 use Fapost\Foundation\Media\DTO\UploadContext;
+use Fapost\Foundation\Media\ReportsProviderKind;
 
 /**
  * Resolves provider-side file ids for sending media through a channel.
  *
  * Lazy upload + per-channel cache: first send uploads and stores the result in
  * media_channel_refs; subsequent sends short-circuit to the cached provider_file_id
- * unless `expires_at` has lapsed (relevant for WhatsApp's 30-day TTL).
+ * unless `expires_at` has lapsed (relevant for WhatsApp's 30-day TTL). A ref without a stored kind is treated
+ * as lapsed too for an uploader that reports one, see {@see self::predatesProviderKind()}.
  *
  * For upload-as-send providers (Telegram), the cache-miss upload also delivers the
  * payload to the recipient — surfaced via {@see DispatchResult::$alreadyDelivered}
@@ -67,10 +69,11 @@ final readonly class MediaDispatcher implements MediaDispatcherInterface
         $blob     = $media->blob;
         $existing = $this->refs->find($blob->id, $channel->id);
 
-        if (null !== $existing && ! $this->isExpired($existing)) {
+        if (null !== $existing && ! $this->isExpired($existing) && ! $this->predatesProviderKind($existing, $channelType)) {
             return new DispatchResult(
                 providerFileId: $existing->provider_file_id,
                 alreadyDelivered: false,
+                providerKind: $existing->provider_kind,
             );
         }
 
@@ -82,13 +85,28 @@ final readonly class MediaDispatcher implements MediaDispatcherInterface
             channelId: $channel->id,
             providerFileId: $result->providerFileId,
             expiresAt: $result->expiresAt,
+            providerKind: $result->providerKind,
         );
 
         return new DispatchResult(
             providerFileId: $result->providerFileId,
             alreadyDelivered: null !== $result->deliveredMessageId,
             deliveredMessageId: $result->deliveredMessageId,
+            providerKind: $result->providerKind,
         );
+    }
+
+    /**
+     * A ref minted before `provider_kind` existed does not say how the provider stored the file, and a file id cannot
+     * be sent by another method than the one that minted it (a voice id through sendAudio is refused). The migration
+     * cannot backfill it, so for an uploader that reports the kind ({@see ReportsProviderKind}) such a ref counts as
+     * a cache miss: the re-upload stores the kind, once per ref. Other uploaders never report one.
+     */
+    private function predatesProviderKind(MediaChannelRef $ref, string $channelType): bool
+    {
+        return null === $ref->provider_kind
+            && $this->uploaderRegistry->has($channelType)
+            && $this->uploaderRegistry->forChannelType($channelType) instanceof ReportsProviderKind;
     }
 
     private function isExpired(MediaChannelRef $ref): bool

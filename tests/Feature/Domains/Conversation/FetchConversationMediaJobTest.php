@@ -13,6 +13,7 @@ use App\Domains\Media\Enums\MediaSource;
 use App\Domains\Media\Exceptions\StorageLimitReachedException;
 use App\Domains\Media\Models\MediaFile;
 use App\Domains\Media\Models\MediaFolder;
+use ArrayObject;
 use Mockery;
 use Tests\Feature\FeatureTestCase;
 
@@ -34,6 +35,7 @@ final class FetchConversationMediaJobTest extends FeatureTestCase
                 ?MediaFolder $folder = null,
                 ?string $uploadedBy = null,
                 MediaSource $source = MediaSource::InputNode,
+                ?string $providerKind = null,
             ): MediaFile {
                 throw new StorageLimitReachedException('media_storage', 10, 10, 5);
             }
@@ -58,5 +60,45 @@ final class FetchConversationMediaJobTest extends FeatureTestCase
         );
 
         $this->app->call([$job, 'handle']);
+    }
+
+    public function test_the_way_the_message_carried_the_file_is_handed_to_the_ingestor(): void
+    {
+        $channel = Channel::withoutEvents(fn (): Channel => Channel::factory()->create([
+            'assistant_id' => Assistant::factory()->create()->getKey(),
+            'tenant_id'    => self::TENANT_ID,
+        ]));
+
+        $seen = new ArrayObject();
+        $this->app->instance(MediaIngestorInterface::class, new class ($seen) implements MediaIngestorInterface {
+            public function __construct(private readonly ArrayObject $seen)
+            {
+            }
+
+            public function ingestFromChannel(
+                Channel $channel,
+                string $providerFileId,
+                ?MediaFolder $folder = null,
+                ?string $uploadedBy = null,
+                MediaSource $source = MediaSource::InputNode,
+                ?string $providerKind = null,
+            ): MediaFile {
+                $this->seen['kind'] = $providerKind;
+
+                throw new StorageLimitReachedException('media_storage', 10, 10, 5);
+            }
+        });
+        $this->app->instance(ConversationStoreInterface::class, Mockery::mock(ConversationStoreInterface::class)->shouldIgnoreMissing());
+
+        $job = new FetchConversationMediaJob(
+            tenantId: self::TENANT_ID,
+            messageId: 'msg-2',
+            channelId: (string) $channel->getKey(),
+            media: [['provider_file_id' => 'AwAD', 'kind' => 'audio', 'provider_kind' => 'voice', 'status' => 'pending']],
+        );
+
+        $this->app->call([$job, 'handle']);
+
+        $this->assertSame('voice', $seen['kind']);
     }
 }

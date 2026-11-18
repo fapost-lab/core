@@ -48,6 +48,7 @@ final class OutboundGateCoverageTest extends TestCase
         'app/Domains/Channels/Telegram/TelegramDocumentDeliveryAction.php',
         'app/Domains/Channels/Telegram/TelegramVideoDeliveryAction.php',
         'app/Domains/Channels/Telegram/TelegramVoiceDeliveryAction.php',
+        'app/Domains/Channels/Telegram/TelegramAudioDeliveryAction.php',
         'app/Domains/Media/Services/MediaDispatcher.php',
     ];
 

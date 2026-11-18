@@ -16,6 +16,9 @@ namespace App\Domains\Media\DTO;
  * `deliveredMessageId` is the platform-side message id of the upload-as-send call, useful
  * for logging or downstream operations (edit/delete).
  *
+ * `providerKind` is what the provider said it stored for `providerFileId`, when it said (Telegram: photo, video,
+ * audio, voice, document). It decides the method of the send; null means the format decides ({@see \App\Domains\Media\Services\DeliveryKind}).
+ *
  * For a channel that sends media by URL, `publicLink` is set and `providerFileId` is null: nothing was uploaded and
  * the caller puts the link into the outgoing payload.
  */
@@ -26,6 +29,7 @@ final readonly class DispatchResult
         public bool $alreadyDelivered = false,
         public ?string $deliveredMessageId = null,
         public ?PublicMediaLink $publicLink = null,
+        public ?string $providerKind = null,
     ) {
     }
 }

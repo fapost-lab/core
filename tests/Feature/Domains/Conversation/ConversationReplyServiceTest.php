@@ -51,6 +51,7 @@ final class ConversationReplyServiceTest extends FeatureTestCase
         return [
             'jpeg goes as a photo'    => ['image/jpeg', 'photo', 'photo'],
             'heic goes as a document' => ['image/heic', 'document', 'document'],
+            'mp3 goes as audio'       => ['audio/mpeg', 'audio', 'audio'],
         ];
     }
 
@@ -232,6 +233,26 @@ final class ConversationReplyServiceTest extends FeatureTestCase
             $mock->shouldReceive('send')
                 ->once()
                 ->withArgs(fn (OutboundMessage $message): bool => $type === $message->payload->type && 'file-1' === ($message->payload->media[$field] ?? null))
+                ->andReturn(new DeliveryResult(sent: true, providerMessageId: 'p-1'));
+        });
+
+        app(ConversationReplyServiceInterface::class)->send($conversation, 'see attached', 'staff-1', (string) $mediaFile->getKey());
+    }
+
+    public function test_a_cached_attachment_goes_out_by_the_kind_the_provider_stored(): void
+    {
+        [$conversation] = $this->threadWithLinkedContact();
+        $mediaFile      = $this->mediaFile('audio/wav');
+
+        $this->app->make(TenantContextInterface::class)->set(new RuntimeTenant(id: self::TENANT_ID, schemaName: 'main'));
+        $this->app->instance(UsageMeterInterface::class, FakeUsageMeter::allowing());
+        $this->mock(MediaDispatcherInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('ensureUploadedToChannel')->once()->andReturn(new DispatchResult(providerFileId: 'wav-doc', alreadyDelivered: false, providerKind: 'document'));
+        });
+        $this->mock(OutboundMessageSenderInterface::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('send')
+                ->once()
+                ->withArgs(fn (OutboundMessage $message): bool => 'document' === $message->payload->type && 'wav-doc' === ($message->payload->media['document'] ?? null))
                 ->andReturn(new DeliveryResult(sent: true, providerMessageId: 'p-1'));
         });
 

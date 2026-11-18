@@ -27,6 +27,7 @@ final class EloquentMediaChannelRefRepository implements MediaChannelRefReposito
         string $channelId,
         string $providerFileId,
         ?CarbonImmutable $expiresAt,
+        ?string $providerKind = null,
     ): MediaChannelRef {
         $now = CarbonImmutable::now();
 
@@ -35,6 +36,7 @@ final class EloquentMediaChannelRefRepository implements MediaChannelRefReposito
         if (null !== $existing) {
             $existing->forceFill([
                 'provider_file_id' => $providerFileId,
+                'provider_kind'    => $providerKind,
                 'expires_at'       => $expiresAt,
                 'uploaded_at'      => $now,
             ])->save();
@@ -46,6 +48,7 @@ final class EloquentMediaChannelRefRepository implements MediaChannelRefReposito
             'blob_id'          => $blobId,
             'channel_id'       => $channelId,
             'provider_file_id' => $providerFileId,
+            'provider_kind'    => $providerKind,
             'expires_at'       => $expiresAt,
             'uploaded_at'      => $now,
         ]);
