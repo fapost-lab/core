@@ -47,17 +47,18 @@ here so that none of them lives only in a document nobody plans from.
     Redis outbound dedup with a TTL at least the queue retention plus grace (the ADR Idempotency
     Strategy the routing ADR left as TBD);
   - subflow: `input_mapping` / `output_mapping` and a pinned target version;
-  - emit_event: an explicit `assistant_filter` on event triggers;
   - validation: a design-time leaf-vs-group variable path check (today only the publish-time type
     conflict check and the runtime `StructuralPathConflictException` exist);
   - expression engine per tenant (ADR-08): a tenant setting, boot validation and a snapshot at save —
     today the engine comes from `flow_definitions.expression_engine` with `template` as the only one;
   - routing (ADR-09 V1.x): commands registered by a Solution, more command action types;
-  - node capabilities: `auth_request` by phone/SMS/email (only `Basic` exists); `notify` staff
-    identity on a messenger and staff targeting by tag.
+  - node capabilities: `auth_request` by phone/SMS/email (only `Basic` exists).
 - Not doing: `rag_query` storage and a prompt node — both moved to the AI Solution (spec
   `ai-solution`), which also needs `call@2` with action schemas (a config form and named outcomes for a
-  Solution's action) and may file it here; NLP date parsing,
+  Solution's action) and may file it here; `emit_event` `assistant_filter` on event triggers and
+  `notify` staff identity on a messenger with staff targeting by tag — both moved to spec
+  `flow-automations` (2026-11-18), where contactless, assistant-less events and "ask a person and wait"
+  change what each of them means; NLP date parsing,
   custom input validators and custom expression functions — named in the V1 out-of-scope list, kept
   out until a rollout asks; cross-assistant subflows (V2, needs its own ADR).
 
